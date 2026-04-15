@@ -1,9 +1,6 @@
 # Task Board
 
 ## Open
-- Scaffold repository structure
-- Establish backend service skeletons
-- Establish web app shell
 - Define core database schema
 - Define plugin registry skeleton
 - Define world clock state model
@@ -18,3 +15,7 @@
 
 ## Done
 - Pre-build architecture and governance package drafted
+- Scaffold repository structure
+- Establish backend service skeletons
+- Establish web app shell
+- Establish local infrastructure skeleton

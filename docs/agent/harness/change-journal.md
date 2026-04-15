@@ -21,3 +21,14 @@
 - Tests added/updated: N/A
 - Docs updated: initial package
 - Follow-up notes: scaffold repository next
+
+## Runnable skeleton entry
+
+- Date: 2026-04-15
+- Branch: feat/bootstrap-runnable-skeleton
+- Scope: repository scaffold
+- Summary: Added runnable backend, web, contracts, and local infrastructure skeletons without implementing sensitive domain behavior.
+- Files changed: `/README.md`, `/.editorconfig`, `/.gitignore`, `/.env.example`, `/backend/**`, `/web/**`, `/contracts/README.md`, `/infra/compose.yaml`, `/docs/agent/harness/**`
+- Tests added/updated: backend health/import/Alembic config tests; frontend status component test; Playwright dashboard smoke test
+- Docs updated: project index, file inventory, task board, debug journal, active handoff
+- Follow-up notes: implement core database schema, plugin registry, world clock, event/snapshot baseline, and auth/session baseline as separate tasks.

@@ -1,0 +1,38 @@
+name: noveland
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: noveland-postgres
+    environment:
+      POSTGRES_DB: noveland
+      POSTGRES_USER: noveland
+      POSTGRES_PASSWORD: noveland
+    ports:
+      - "5432:5432"
+    volumes:
+      - noveland-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noveland -d noveland"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.11-alpine
+    container_name: noveland-nats
+    command: ["-js", "-sd", "/data/jetstream"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - noveland-nats-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  noveland-postgres-data:
+  noveland-nats-data:

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noveland-service-runtime"
+version = "0.1.0"
+description = "Long-running runtime host for Noveland."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "noveland-core",
+]
+
+[project.scripts]
+noveland-runtime = "noveland.services.runtime.main:main"
+
+[tool.uv.sources]
+noveland-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noveland"]

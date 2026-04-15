@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noveland-service-api"
+version = "0.1.0"
+description = "HTTP and WebSocket entrypoint for Noveland."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.135,<0.136",
+  "noveland-core",
+  "pydantic>=2.13,<3",
+  "uvicorn[standard]>=0.38,<0.39",
+]
+
+[project.scripts]
+noveland-api = "noveland.services.api.main:main"
+
+[tool.uv.sources]
+noveland-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noveland"]
