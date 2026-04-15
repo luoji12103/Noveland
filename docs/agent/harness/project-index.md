@@ -23,7 +23,8 @@ Fast orientation for a new coding session.
   - `noveland.core.database` — SQLAlchemy base, metadata, and session factory
   - `noveland.core.models` — platform settings ORM model
 - `backend/packages/worlds/`
-  - `noveland.worlds.models` — world, membership, and scene ORM models
+  - `noveland.worlds.clock` — pure world clock state and transition logic
+  - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
   - `noveland.agents.models` — agent identity ORM model
 - `backend/packages/calendar/`
@@ -45,7 +46,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema and world clock state
 
 ## Update rule
 

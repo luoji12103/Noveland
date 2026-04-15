@@ -1,61 +1,52 @@
 # Active Session Handoff
 
-- Date: 2026-04-15T12:35:02Z
-- Branch: feat/plugin-registry-skeleton
-- Objective: Implement the plugin registry skeleton.
+- Date: 2026-04-15T13:10:00Z
+- Branch: feat/world-clock-state-model
+- Objective: Implement the world clock state model after merging the plugin registry skeleton into `main`.
 - Completed work:
-  - Renamed the local trunk from `master` to `main` and created `feat/bootstrap-runnable-skeleton`.
-  - Committed the runnable skeleton as `1b7d404 feat(repo): add runnable skeleton` and fast-forward merged it into `main`.
-  - Added root README, editor, ignore, and local environment example files.
-  - Added backend `uv` workspace, Python 3.12.13 pin, namespace packages, FastAPI health endpoint, runtime host skeleton, Alembic skeleton, and backend tests.
-  - Added Next.js App Router shell, Tailwind styling, Vitest component test, and Playwright smoke test on port `3107`.
-  - Added Docker Compose config for PostgreSQL 16 with pgvector and NATS JetStream.
-  - Added `contracts/` placeholder and synchronized harness docs.
-  - Added SQLAlchemy `Base`, naming conventions, UUID/timestamp mixins, engine/session helpers, and ORM models for users, platform settings, worlds, memberships, scenes, and agents.
-  - Added first Alembic migration `20260415_0001_core_schema` and verified upgrade/downgrade/upgrade against PostgreSQL on parameterized port `55432`.
-  - Parameterized Compose ports for PostgreSQL, NATS client, and NATS monitor.
-  - Added code-registered plugin registry skeleton with categories, manifest, definitions, config validation, instance creation, enabled identifier resolution, and typed failures.
-  - Added plugin registry contract tests for all v1 categories, duplicate registration, missing lookup, config validation, factory failure wrapping, category listing, and enabled resolution.
+  - Fast-forward merged `feat/plugin-registry-skeleton` into `main`.
+  - Created `feat/world-clock-state-model` from `main`.
+  - Added `noveland.worlds.clock` with immutable clock state, typed statuses, typed transition kinds, typed domain errors, and pure pause/resume/advance/skip/current-time projection functions.
+  - Added `WorldClockStateModel` and `WorldClockTransitionModel` ORM models for current world clock state and append-only operational transition audit.
+  - Added Alembic migration `20260415_0002_world_clock_state` with clock tables, status/type/multiplier/revision check constraints, world foreign keys, unique state per world, and world-scoped indexes.
+  - Updated backend tests for clock transition behavior, schema metadata, and workspace imports.
+  - Updated architecture and harness docs for world clock ownership, boundaries, inventory, task status, and follow-up work.
 - Incomplete work:
-  - World clock state model.
   - Event log and snapshot baseline.
   - Auth/session baseline.
+  - Runtime ticking loop, scheduler integration, calendar parsing, UI controls, permission checks, and event-log linkage for clock transitions.
 - Exact files changed:
-  - `/README.md`, `/.editorconfig`, `/.gitignore`, `/.env.example`
-  - `/backend/**`
-  - `/web/**`
-  - `/contracts/README.md`
-  - `/infra/compose.yaml`
+  - `/backend/packages/worlds/src/noveland/worlds/__init__.py`
+  - `/backend/packages/worlds/src/noveland/worlds/clock.py`
+  - `/backend/packages/worlds/src/noveland/worlds/models.py`
+  - `/backend/migrations/README.md`
+  - `/backend/migrations/versions/20260415_0002_world_clock_state.py`
+  - `/backend/tests/test_schema_metadata.py`
+  - `/backend/tests/test_workspace_imports.py`
+  - `/backend/tests/test_world_clock.py`
+  - `/docs/agent/architecture/world-clock-and-scheduling.md`
+  - `/docs/agent/architecture/data-ownership.md`
   - `/docs/agent/harness/project-index.md`
   - `/docs/agent/harness/file-inventory.md`
   - `/docs/agent/harness/task-board.md`
   - `/docs/agent/harness/change-journal.md`
-  - `/docs/agent/harness/debug-journal.md`
   - `/docs/agent/harness/handoffs/active-session.md`
-  - `/docs/agent/architecture/configuration-and-secrets.md`
-  - `/docs/agent/architecture/data-ownership.md`
-  - `/docs/agent/architecture/plugin-architecture.md`
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade base`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260415_0001`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test`
-  - `cd web && npm run test:e2e`
-  - `cd web && npm run build`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
   - `docker compose -f infra/compose.yaml config`
-  - `NOVELAND_POSTGRES_PORT=55432 NOVELAND_NATS_PORT=44222 NOVELAND_NATS_MONITOR_PORT=48222 docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - Core schema is intentionally minimal; auth/session, world clock, event/snapshot, calendar, memory, and narrative persistence are not implemented yet.
-  - Plugin registry has no persistence, no category-specific runtime method contracts, no admin diagnostics, and no real plugin implementations yet.
-  - The web image is loaded from Unsplash; replace with a local licensed asset when visual direction is chosen.
+  - Clock transition audit is operational audit only; it is not yet the canonical world event stream.
+  - Clock state is not connected to runtime loops, scheduler ticks, calendar resolution, UI controls, or permissions.
+  - Actor and correlation fields are nullable placeholders until auth/session and event causation are modeled.
 - Recommended next step:
-  - Implement the world clock state model as the next isolated task.
+  - Implement the event log and snapshot baseline as the next isolated task.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
   - world-clock semantics

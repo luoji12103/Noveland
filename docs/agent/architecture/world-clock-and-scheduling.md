@@ -27,6 +27,16 @@ World time is an internal kernel concern, not an external cron concern.
 - per-agent calendars must resolve against world time
 - clock state changes are auditable
 
+## Implemented baseline
+
+- `noveland.worlds.clock` defines immutable clock state and pure transitions for pause, resume, advance, skip, and current-time projection.
+- `world_clock_states` stores one current clock state row per world.
+- `world_clock_transitions` stores append-only operational audit records for clock state changes.
+- `wall_time_anchor` is present only while a clock is running; paused clocks keep a materialized `current_world_time`.
+- `speed_multiplier` must be greater than zero; pause is represented by `status=paused`, not by setting speed to zero.
+
 ## v1 simplification
 
 Advanced user-facing replay UI may be deferred, but clock state and recovery semantics may not be deferred.
+
+The current baseline intentionally does not implement runtime loops, external schedulers, event-log integration, calendar parsing, UI controls, or permission checks.

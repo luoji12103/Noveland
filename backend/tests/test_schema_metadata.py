@@ -41,6 +41,8 @@ def test_core_schema_tables_are_registered() -> None:
         "platform_settings",
         "scenes",
         "users",
+        "world_clock_states",
+        "world_clock_transitions",
         "world_memberships",
         "worlds",
     } <= table_names()
@@ -56,11 +58,39 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_scenes_world_scene_key" in constraint_names("scenes", UniqueConstraint)
     assert "uq_agents_world_agent_key" in constraint_names("agents", UniqueConstraint)
     assert "uq_platform_settings_key" in constraint_names("platform_settings", UniqueConstraint)
+    assert "uq_world_clock_states_world_id" in constraint_names(
+        "world_clock_states",
+        UniqueConstraint,
+    )
+    assert "uq_world_clock_transitions_world_revision" in constraint_names(
+        "world_clock_transitions",
+        UniqueConstraint,
+    )
 
 
 def test_core_schema_check_constraints_capture_initial_enums() -> None:
     assert "ck_world_memberships_role" in constraint_names("world_memberships", CheckConstraint)
     assert "ck_agents_kind" in constraint_names("agents", CheckConstraint)
+    assert "ck_world_clock_states_status" in constraint_names(
+        "world_clock_states",
+        CheckConstraint,
+    )
+    assert "ck_world_clock_states_speed_multiplier_positive" in constraint_names(
+        "world_clock_states",
+        CheckConstraint,
+    )
+    assert "ck_world_clock_states_wall_time_anchor_matches_status" in constraint_names(
+        "world_clock_states",
+        CheckConstraint,
+    )
+    assert "ck_world_clock_transitions_transition_type" in constraint_names(
+        "world_clock_transitions",
+        CheckConstraint,
+    )
+    assert "ck_world_clock_transitions_new_status" in constraint_names(
+        "world_clock_transitions",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -68,6 +98,8 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_memberships") == {"users.id", "worlds.id"}
     assert foreign_key_targets("scenes") == {"worlds.id"}
     assert foreign_key_targets("agents") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("world_clock_states") == {"worlds.id"}
+    assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
 
 
 def test_core_schema_indexes_cover_world_boundaries() -> None:
@@ -75,3 +107,8 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_memberships_world_id" in index_names("world_memberships")
     assert "ix_scenes_world_id" in index_names("scenes")
     assert "ix_agents_world_id" in index_names("agents")
+    assert "ix_world_clock_states_world_id" in index_names("world_clock_states")
+    assert "ix_world_clock_transitions_world_id" in index_names("world_clock_transitions")
+    assert "ix_world_clock_transitions_world_wall_time" in index_names(
+        "world_clock_transitions",
+    )

@@ -54,3 +54,14 @@
 - Tests added/updated: plugin registry contract tests; workspace import coverage for plugin modules
 - Docs updated: plugin architecture, project index, file inventory, task board, active handoff
 - Follow-up notes: world clock state model, event/snapshot baseline, and auth/session baseline remain separate tasks.
+
+## World clock state model entry
+
+- Date: 2026-04-15
+- Branch: feat/world-clock-state-model
+- Scope: world clock state model
+- Summary: Added immutable world clock state transitions, current clock state persistence, transition audit persistence, and schema tests.
+- Files changed: `/backend/packages/worlds/**`, `/backend/migrations/versions/20260415_0002_world_clock_state.py`, `/backend/tests/**`, `/backend/migrations/README.md`, `/docs/agent/architecture/world-clock-and-scheduling.md`, `/docs/agent/architecture/data-ownership.md`, `/docs/agent/harness/**`
+- Tests added/updated: world clock pure logic tests; schema metadata coverage for clock tables; workspace import coverage for `noveland.worlds.clock`
+- Docs updated: world clock scheduling, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: event/snapshot baseline and auth/session baseline remain separate tasks; runtime ticking, scheduling, calendar parsing, and UI controls are not implemented.

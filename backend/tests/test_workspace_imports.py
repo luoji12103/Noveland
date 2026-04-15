@@ -23,6 +23,7 @@ PACKAGES = [
     "noveland.services.runtime",
     "noveland.storage",
     "noveland.worlds",
+    "noveland.worlds.clock",
     "noveland.worlds.models",
 ]
 

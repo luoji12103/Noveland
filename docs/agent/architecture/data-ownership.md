@@ -38,7 +38,9 @@
 - `platform_settings` stores non-secret platform configuration values.
 - `worlds`, `world_memberships`, and `scenes` establish world ownership, membership, and location boundaries.
 - `agents` stores world-scoped agent identity basics only, not runtime state, memory, or private calendars.
-- Event streams, snapshots, clock state, plugin registry data, sessions, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
+- `world_clock_states` stores world-owned operational clock state, with one current state row per world.
+- `world_clock_transitions` stores world-owned operational audit records for clock state changes.
+- Event streams, snapshots, plugin registry data, sessions, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
 
 ## Ownership rules
 
