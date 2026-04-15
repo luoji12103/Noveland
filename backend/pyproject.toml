@@ -85,6 +85,7 @@ strict = true
 namespace_packages = true
 explicit_package_bases = true
 files = ["packages", "services", "tests"]
+exclude = ["migrations/versions/"]
 mypy_path = [
   "packages/adapters/src",
   "packages/agents/src",

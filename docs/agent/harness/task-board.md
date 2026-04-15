@@ -1,7 +1,6 @@
 # Task Board
 
 ## Open
-- Define core database schema
 - Define plugin registry skeleton
 - Define world clock state model
 - Define event log + snapshot baseline
@@ -19,3 +18,4 @@
 - Establish backend service skeletons
 - Establish web app shell
 - Establish local infrastructure skeleton
+- Define core database schema

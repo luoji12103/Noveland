@@ -1,17 +1,20 @@
 # Active Session Handoff
 
-- Date: 2026-04-15T11:52:00Z
-- Branch: feat/bootstrap-runnable-skeleton
-- Objective: Implement the first runnable repository skeleton from the approved plan.
+- Date: 2026-04-15T12:17:53Z
+- Branch: main
+- Objective: Close out the runnable skeleton and implement the core database schema baseline.
 - Completed work:
   - Renamed the local trunk from `master` to `main` and created `feat/bootstrap-runnable-skeleton`.
+  - Committed the runnable skeleton as `1b7d404 feat(repo): add runnable skeleton` and fast-forward merged it into `main`.
   - Added root README, editor, ignore, and local environment example files.
   - Added backend `uv` workspace, Python 3.12.13 pin, namespace packages, FastAPI health endpoint, runtime host skeleton, Alembic skeleton, and backend tests.
   - Added Next.js App Router shell, Tailwind styling, Vitest component test, and Playwright smoke test on port `3107`.
   - Added Docker Compose config for PostgreSQL 16 with pgvector and NATS JetStream.
   - Added `contracts/` placeholder and synchronized harness docs.
+  - Added SQLAlchemy `Base`, naming conventions, UUID/timestamp mixins, engine/session helpers, and ORM models for users, platform settings, worlds, memberships, scenes, and agents.
+  - Added first Alembic migration `20260415_0001_core_schema` and verified upgrade/downgrade/upgrade against PostgreSQL on parameterized port `55432`.
+  - Parameterized Compose ports for PostgreSQL, NATS client, and NATS monitor.
 - Incomplete work:
-  - Core database schema.
   - Plugin registry skeleton.
   - World clock state model.
   - Event log and snapshot baseline.
@@ -28,22 +31,28 @@
   - `/docs/agent/harness/change-journal.md`
   - `/docs/agent/harness/debug-journal.md`
   - `/docs/agent/harness/handoffs/active-session.md`
+  - `/docs/agent/architecture/configuration-and-secrets.md`
+  - `/docs/agent/architecture/data-ownership.md`
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade base`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
   - `cd web && npm run test:e2e`
   - `cd web && npm run build`
   - `docker compose -f infra/compose.yaml config`
+  - `NOVELAND_POSTGRES_PORT=55432 NOVELAND_NATS_PORT=44222 NOVELAND_NATS_MONITOR_PORT=48222 docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - `docker compose up` was not run because this environment already has services bound to common ports, including `5432`.
+  - Core schema is intentionally minimal; auth/session, plugin registry, world clock, event/snapshot, calendar, memory, and narrative persistence are not implemented yet.
   - The web image is loaded from Unsplash; replace with a local licensed asset when visual direction is chosen.
 - Recommended next step:
-  - Implement the core database schema and first migration without touching event replay, world-clock, auth, or plugin semantics prematurely.
+  - Implement the plugin registry skeleton or world clock state model as the next isolated task.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
   - world-clock semantics

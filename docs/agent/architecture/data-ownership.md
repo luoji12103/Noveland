@@ -32,6 +32,14 @@
 - published narrative artifacts
 - artifact metadata
 
+## Initial persistence baseline
+
+- `users` stores platform user identity basics only, not passwords or sessions.
+- `platform_settings` stores non-secret platform configuration values.
+- `worlds`, `world_memberships`, and `scenes` establish world ownership, membership, and location boundaries.
+- `agents` stores world-scoped agent identity basics only, not runtime state, memory, or private calendars.
+- Event streams, snapshots, clock state, plugin registry data, sessions, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
+
 ## Ownership rules
 
 - A world may read its own events and state.

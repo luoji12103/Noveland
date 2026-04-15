@@ -1,6 +1,7 @@
 from logging.config import fileConfig
 
 from alembic import context
+from noveland.core.database import Base, import_model_modules
 from noveland.core.settings import load_settings
 from sqlalchemy import engine_from_config, pool
 
@@ -9,7 +10,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+import_model_modules()
+target_metadata = Base.metadata
 
 
 def database_url() -> str:

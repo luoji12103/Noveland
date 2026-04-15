@@ -3,9 +3,12 @@ import importlib
 PACKAGES = [
     "noveland.adapters",
     "noveland.agents",
+    "noveland.agents.models",
     "noveland.auth",
+    "noveland.auth.models",
     "noveland.calendar",
     "noveland.core",
+    "noveland.core.models",
     "noveland.events",
     "noveland.memory",
     "noveland.narrative",
@@ -15,6 +18,7 @@ PACKAGES = [
     "noveland.services.runtime",
     "noveland.storage",
     "noveland.worlds",
+    "noveland.worlds.models",
 ]
 
 

@@ -23,6 +23,16 @@
 - session/auth secrets
 - messaging credentials
 
+## Local development variables
+
+- `NOVELAND_ENV`
+- `NOVELAND_DATABASE_URL`
+- `NOVELAND_NATS_URL`
+- `NOVELAND_OBJECT_STORAGE_ROOT`
+- `NOVELAND_POSTGRES_PORT`
+- `NOVELAND_NATS_PORT`
+- `NOVELAND_NATS_MONITOR_PORT`
+
 ## Required docs sync
 
 If config changes:

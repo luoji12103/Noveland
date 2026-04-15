@@ -31,6 +31,20 @@ Start local infrastructure:
 docker compose -f infra/compose.yaml up -d
 ```
 
+If local ports are already taken, override them before starting Compose:
+
+```sh
+NOVELAND_POSTGRES_PORT=55432 NOVELAND_NATS_PORT=44222 NOVELAND_NATS_MONITOR_PORT=48222 \
+  docker compose -f infra/compose.yaml up -d
+```
+
+Use a matching database URL when running backend commands against the overridden port:
+
+```sh
+NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland \
+  uv run alembic upgrade head
+```
+
 Run backend checks from `backend/`:
 
 ```sh
@@ -43,6 +57,12 @@ Run the API from `backend/`:
 
 ```sh
 uv run uvicorn noveland.services.api.app:app --reload
+```
+
+Apply database migrations from `backend/`:
+
+```sh
+uv run alembic upgrade head
 ```
 
 Run frontend checks from `web/`:
