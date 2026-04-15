@@ -1,0 +1,26 @@
+# Active Session Handoff
+
+- Date: 2026-04-15T10:43:57.591005Z
+- Branch: docs/initial-agent-package
+- Objective: Produce the initial `/docs/agent` governance package and package it as a zip artifact.
+- Completed work:
+  - Locked product, MVP, architecture, governance, git workflow, harness, testing, and prompt structure.
+  - Wrote the initial `/docs/agent` files.
+- Incomplete work:
+  - Scaffold the repository codebase.
+  - Initialize repo structure and baseline configs.
+  - Add project-level README and implementation assets outside `/docs/agent`.
+- Exact files changed:
+  - `/docs/agent/**`
+- Tests run:
+  - Package generation sanity check only
+- Current risks:
+  - Package is a strong first draft but will need synchronization once real code exists.
+  - License not yet chosen.
+- Recommended next step:
+  - Scaffold repository structure according to `architecture/repository-layout.md`.
+- Sensitive areas to avoid casual edits:
+  - event-and-snapshot model
+  - world-clock semantics
+  - auth-and-access model
+  - plugin architecture

@@ -1,0 +1,20 @@
+# Task Board
+
+## Open
+- Scaffold repository structure
+- Establish backend service skeletons
+- Establish web app shell
+- Define core database schema
+- Define plugin registry skeleton
+- Define world clock state model
+- Define event log + snapshot baseline
+- Define auth/session baseline
+
+## In Progress
+- None
+
+## Blocked
+- None
+
+## Done
+- Pre-build architecture and governance package drafted
