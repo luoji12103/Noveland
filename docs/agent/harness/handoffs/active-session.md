@@ -1,8 +1,8 @@
 # Active Session Handoff
 
-- Date: 2026-04-15T12:17:53Z
-- Branch: main
-- Objective: Close out the runnable skeleton and implement the core database schema baseline.
+- Date: 2026-04-15T12:35:02Z
+- Branch: feat/plugin-registry-skeleton
+- Objective: Implement the plugin registry skeleton.
 - Completed work:
   - Renamed the local trunk from `master` to `main` and created `feat/bootstrap-runnable-skeleton`.
   - Committed the runnable skeleton as `1b7d404 feat(repo): add runnable skeleton` and fast-forward merged it into `main`.
@@ -14,8 +14,9 @@
   - Added SQLAlchemy `Base`, naming conventions, UUID/timestamp mixins, engine/session helpers, and ORM models for users, platform settings, worlds, memberships, scenes, and agents.
   - Added first Alembic migration `20260415_0001_core_schema` and verified upgrade/downgrade/upgrade against PostgreSQL on parameterized port `55432`.
   - Parameterized Compose ports for PostgreSQL, NATS client, and NATS monitor.
+  - Added code-registered plugin registry skeleton with categories, manifest, definitions, config validation, instance creation, enabled identifier resolution, and typed failures.
+  - Added plugin registry contract tests for all v1 categories, duplicate registration, missing lookup, config validation, factory failure wrapping, category listing, and enabled resolution.
 - Incomplete work:
-  - Plugin registry skeleton.
   - World clock state model.
   - Event log and snapshot baseline.
   - Auth/session baseline.
@@ -33,6 +34,7 @@
   - `/docs/agent/harness/handoffs/active-session.md`
   - `/docs/agent/architecture/configuration-and-secrets.md`
   - `/docs/agent/architecture/data-ownership.md`
+  - `/docs/agent/architecture/plugin-architecture.md`
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -49,10 +51,11 @@
   - `NOVELAND_POSTGRES_PORT=55432 NOVELAND_NATS_PORT=44222 NOVELAND_NATS_MONITOR_PORT=48222 docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - Core schema is intentionally minimal; auth/session, plugin registry, world clock, event/snapshot, calendar, memory, and narrative persistence are not implemented yet.
+  - Core schema is intentionally minimal; auth/session, world clock, event/snapshot, calendar, memory, and narrative persistence are not implemented yet.
+  - Plugin registry has no persistence, no category-specific runtime method contracts, no admin diagnostics, and no real plugin implementations yet.
   - The web image is loaded from Unsplash; replace with a local licensed asset when visual direction is chosen.
 - Recommended next step:
-  - Implement the plugin registry skeleton or world clock state model as the next isolated task.
+  - Implement the world clock state model as the next isolated task.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
   - world-clock semantics

@@ -1,7 +1,6 @@
 # Task Board
 
 ## Open
-- Define plugin registry skeleton
 - Define world clock state model
 - Define event log + snapshot baseline
 - Define auth/session baseline
@@ -19,3 +18,4 @@
 - Establish web app shell
 - Establish local infrastructure skeleton
 - Define core database schema
+- Define plugin registry skeleton

@@ -33,6 +33,7 @@ Fast orientation for a new coding session.
   - `noveland.auth.models` — user identity ORM model
 - `backend/packages/memory/`
 - `backend/packages/plugins/`
+  - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
 - `backend/packages/adapters/`
 - `backend/packages/storage/`
 - `backend/packages/observability/`

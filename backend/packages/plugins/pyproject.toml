@@ -7,7 +7,9 @@ name = "noveland-plugins"
 version = "0.1.0"
 description = "Plugin interfaces and registry package for Noveland."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+  "pydantic>=2.13,<3",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

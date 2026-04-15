@@ -43,3 +43,14 @@
 - Tests added/updated: schema metadata tests; workspace import coverage for ORM modules
 - Docs updated: configuration/secrets, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: plugin registry, world clock state, event/snapshot baseline, and auth/session baseline remain separate tasks.
+
+## Plugin registry skeleton entry
+
+- Date: 2026-04-15
+- Branch: feat/plugin-registry-skeleton
+- Scope: plugin registry skeleton
+- Summary: Added code-registered plugin contracts, manifest/config validation, typed registry errors, and contract tests.
+- Files changed: `/backend/packages/plugins/**`, `/backend/tests/test_plugin_registry.py`, `/backend/tests/test_workspace_imports.py`, `/docs/agent/architecture/plugin-architecture.md`, `/docs/agent/harness/**`
+- Tests added/updated: plugin registry contract tests; workspace import coverage for plugin modules
+- Docs updated: plugin architecture, project index, file inventory, task board, active handoff
+- Follow-up notes: world clock state model, event/snapshot baseline, and auth/session baseline remain separate tasks.

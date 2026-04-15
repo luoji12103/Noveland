@@ -29,6 +29,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/events/`
 - `backend/packages/memory/`
 - `backend/packages/plugins/`
+- `backend/packages/plugins/src/noveland/plugins/categories.py`
+- `backend/packages/plugins/src/noveland/plugins/definition.py`
+- `backend/packages/plugins/src/noveland/plugins/errors.py`
+- `backend/packages/plugins/src/noveland/plugins/manifest.py`
+- `backend/packages/plugins/src/noveland/plugins/registry.py`
 - `backend/packages/adapters/`
 - `backend/packages/storage/`
 - `backend/packages/observability/`

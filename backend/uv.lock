@@ -423,6 +423,12 @@ source = { editable = "packages/observability" }
 name = "noveland-plugins"
 version = "0.1.0"
 source = { editable = "packages/plugins" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.13,<3" }]
 
 [[package]]
 name = "noveland-service-api"
