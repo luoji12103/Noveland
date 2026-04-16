@@ -32,6 +32,7 @@ PACKAGES = [
     "noveland.services.api.auth",
     "noveland.services.api.csrf",
     "noveland.services.api.dependencies",
+    "noveland.services.api.worlds",
     "noveland.services.runtime",
     "noveland.storage",
     "noveland.worlds",

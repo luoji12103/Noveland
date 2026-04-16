@@ -44,6 +44,7 @@ RBAC with world-scoped ownership checks.
 - `noveland-seed-admin` seeds or updates a local platform admin without exposing public registration.
 - The web app exposes `/login`, protects `/`, and proxies browser auth calls through same-origin `/api/auth/*` route handlers.
 - API authorization helpers enforce platform-admin, world-member, and world-admin checks for backend routes.
+- World management endpoints use those helpers for platform-admin creation, world-admin mutation, and member-scoped reads.
 
 ## Current limits
 

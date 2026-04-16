@@ -1,32 +1,40 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/authorization-dependencies
-- Objective: Add lightweight backend authorization dependencies after merging `feat/web-auth-integration` into `main`.
+- Branch: feat/world-management-api
+- Objective: Add first backend world management endpoints after merging authorization dependencies into `main`.
 - Completed work:
-  - Fast-forward merged `feat/web-auth-integration` into `main`.
-  - Created `feat/authorization-dependencies` from `main`.
-  - Added `noveland.services.api.authorization` for platform-admin, world-member, and world-admin checks.
-  - Added `WorldAccessContext` and FastAPI dependency wrappers for platform and world access.
-  - Added authorization tests covering platform admin, world admin, human user, missing sessions, and inaccessible worlds.
-  - Adjusted JSON ORM column definitions so SQLite-backed API tests can create world/agent tables without PostgreSQL JSONB syntax.
-  - Updated auth/access docs and harness inventory/status files.
+  - Fast-forward merged `feat/authorization-dependencies` into `main`.
+  - Created `feat/world-management-api` from `main`.
+  - Added `/worlds` API routes for worlds, scenes, memberships, and agents.
+  - Applied platform-admin, world-admin, and world-member dependencies to the new routes.
+  - Added duplicate-key, cross-world reference, hidden-world, and final-admin safeguards.
+  - Added SQLite-backed API tests and a skipped-by-default PostgreSQL integration smoke.
+  - Updated README and harness docs for the new backend API surface and next mainline.
 - Incomplete work:
-  - World management API routes.
-  - Real dashboard data from backend world APIs.
-  - Broad policy engine and frontend world access UI.
-  - OAuth/OIDC, email verification, password reset, MFA, and public registration.
+  - Web dashboard data integration.
+  - Web UI for managing worlds, scenes, memberships, and agents.
+  - Runtime loops, world clock controls, event emission, replay, and plugin execution.
+  - Broad policy engine, OAuth/OIDC, email verification, password reset, MFA, and public registration.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
+  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_api_worlds_integration.py`
   - `docker compose -f infra/compose.yaml config`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run test:e2e`
+  - `cd web && npm run build`
 - Current risks:
   - License is still TBD.
-  - Authorization is intentionally a lightweight dependency baseline, not a complete policy engine.
-  - Platform admins bypass world membership checks, but still get 404 for missing worlds.
+  - The web dashboard remains a status shell and does not call the new world APIs.
+  - World management endpoints manipulate database records only; they do not emit canonical world events yet.
+  - CSRF is not applied directly to backend world routes in this stage; browser integration through the web proxy is future work.
 - Recommended next step:
-  - Implement World Management API on top of these authorization dependencies.
+  - Implement World Dashboard Data so the protected web dashboard reads the new backend world API.
 - Sensitive areas to avoid casual edits:
   - auth-and-access model
   - event-and-snapshot model

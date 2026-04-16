@@ -23,6 +23,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
+- `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
 - `backend/packages/core/`
 - `backend/packages/core/src/noveland/core/database.py`

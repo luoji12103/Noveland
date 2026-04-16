@@ -120,3 +120,14 @@
 - Tests added/updated: authorization dependency tests; workspace import coverage for authorization helpers
 - Docs updated: auth/access model, project index, file inventory, task board, active handoff
 - Follow-up notes: world management APIs, real dashboard data, broad policy engine, and frontend world access UI remain separate tasks.
+
+## World management API entry
+
+- Date: 2026-04-16
+- Branch: feat/world-management-api
+- Scope: world management API
+- Summary: Added backend endpoints for worlds, scenes, memberships, and agents using the authorization dependency baseline.
+- Files changed: `/backend/services/api/**`, `/backend/tests/test_api_worlds.py`, `/backend/tests/test_api_worlds_integration.py`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: SQLite-backed world management API tests; skipped-by-default PostgreSQL integration smoke; workspace import coverage for world router
+- Docs updated: README, auth/access model, project index, file inventory, task board, active handoff
+- Follow-up notes: real dashboard data, runtime loops, event emission, world clock controls, plugin execution, and Web world management UI remain separate tasks.

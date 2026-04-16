@@ -23,6 +23,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
+  - `noveland.services.api.worlds` — initial worlds, scenes, memberships, and agents management router
 - `backend/services/runtime/` — long-running runtime host
 - `backend/pyproject.toml` — backend uv workspace manifest
 

@@ -119,6 +119,26 @@ POST /auth/logout
 
 Auth uses an HttpOnly opaque session cookie named `noveland_session`, a readable CSRF cookie named `noveland_csrf`, and `X-CSRF-Token` for mutating authenticated requests. The web app reaches FastAPI through same-origin Next route handlers under `/api/auth/*`; `NOVELAND_API_BASE_URL` points those handlers at the backend API.
 
+The initial world management API is available under:
+
+```http
+GET /worlds
+POST /worlds
+GET /worlds/{world_id}
+PATCH /worlds/{world_id}
+GET /worlds/{world_id}/scenes
+POST /worlds/{world_id}/scenes
+PATCH /worlds/{world_id}/scenes/{scene_id}
+GET /worlds/{world_id}/memberships
+PUT /worlds/{world_id}/memberships/{user_id}
+DELETE /worlds/{world_id}/memberships/{user_id}
+GET /worlds/{world_id}/agents
+POST /worlds/{world_id}/agents
+PATCH /worlds/{world_id}/agents/{agent_id}
+```
+
+These endpoints manage database records only. They do not start runtime loops, emit world events, or connect the web dashboard to real world data yet.
+
 ## Development Rules
 
 Read `docs/agent/README.md` before changing structure or implementing domain behavior. New structural files must be reflected in the agent harness docs.
