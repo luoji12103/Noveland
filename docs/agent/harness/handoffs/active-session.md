@@ -1,30 +1,40 @@
 # Active Session Handoff
 
-- Date: 2026-04-15T13:10:00Z
-- Branch: feat/world-clock-state-model
-- Objective: Implement the world clock state model after merging the plugin registry skeleton into `main`.
+- Date: 2026-04-16T00:00:00Z
+- Branch: feat/event-snapshot-baseline
+- Objective: Implement the event log and snapshot metadata baseline after merging the world clock state model into `main`.
 - Completed work:
-  - Fast-forward merged `feat/plugin-registry-skeleton` into `main`.
-  - Created `feat/world-clock-state-model` from `main`.
-  - Added `noveland.worlds.clock` with immutable clock state, typed statuses, typed transition kinds, typed domain errors, and pure pause/resume/advance/skip/current-time projection functions.
-  - Added `WorldClockStateModel` and `WorldClockTransitionModel` ORM models for current world clock state and append-only operational transition audit.
-  - Added Alembic migration `20260415_0002_world_clock_state` with clock tables, status/type/multiplier/revision check constraints, world foreign keys, unique state per world, and world-scoped indexes.
-  - Updated backend tests for clock transition behavior, schema metadata, and workspace imports.
-  - Updated architecture and harness docs for world clock ownership, boundaries, inventory, task status, and follow-up work.
+  - Fast-forward merged `feat/world-clock-state-model` into `main`.
+  - Created `feat/event-snapshot-baseline` from `main`.
+  - Added `noveland.events.contracts` with event append/record and snapshot create/record contracts.
+  - Added typed event store and validation errors.
+  - Added `WorldEventModel` and `WorldSnapshotModel` ORM models for append-only world events and snapshot metadata.
+  - Added `WorldEventStore` with `append_event`, `list_events_after`, `record_snapshot`, and `latest_snapshot`.
+  - Added Alembic migration `20260416_0003_event_snapshot_baseline`.
+  - Registered `noveland.events.models` in core SQLAlchemy metadata imports.
+  - Updated backend tests for event contracts, schema metadata, workspace imports, and PostgreSQL-backed store behavior.
+  - Updated architecture and harness docs for event/snapshot ownership, boundaries, inventory, task status, and follow-up work.
 - Incomplete work:
-  - Event log and snapshot baseline.
   - Auth/session baseline.
-  - Runtime ticking loop, scheduler integration, calendar parsing, UI controls, permission checks, and event-log linkage for clock transitions.
+  - Replay engine and replay regression suite.
+  - Runtime event emission, NATS broadcast, UI controls, permission checks, object storage writes, and narrative-specific event semantics.
+  - Automatic linkage from world clock transitions into `world_events`.
 - Exact files changed:
-  - `/backend/packages/worlds/src/noveland/worlds/__init__.py`
-  - `/backend/packages/worlds/src/noveland/worlds/clock.py`
-  - `/backend/packages/worlds/src/noveland/worlds/models.py`
+  - `/backend/packages/events/src/noveland/events/__init__.py`
+  - `/backend/packages/events/src/noveland/events/contracts.py`
+  - `/backend/packages/events/src/noveland/events/errors.py`
+  - `/backend/packages/events/src/noveland/events/event_store.py`
+  - `/backend/packages/events/src/noveland/events/models.py`
+  - `/backend/packages/events/pyproject.toml`
+  - `/backend/packages/core/src/noveland/core/database.py`
   - `/backend/migrations/README.md`
-  - `/backend/migrations/versions/20260415_0002_world_clock_state.py`
+  - `/backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`
+  - `/backend/tests/test_event_contracts.py`
+  - `/backend/tests/test_event_store_integration.py`
   - `/backend/tests/test_schema_metadata.py`
   - `/backend/tests/test_workspace_imports.py`
-  - `/backend/tests/test_world_clock.py`
-  - `/docs/agent/architecture/world-clock-and-scheduling.md`
+  - `/backend/uv.lock`
+  - `/docs/agent/architecture/event-and-snapshot-model.md`
   - `/docs/agent/architecture/data-ownership.md`
   - `/docs/agent/harness/project-index.md`
   - `/docs/agent/harness/file-inventory.md`
@@ -36,17 +46,18 @@
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260415_0001`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260415_0002`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
+  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_event_store_integration.py`
   - `docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - Clock transition audit is operational audit only; it is not yet the canonical world event stream.
-  - Clock state is not connected to runtime loops, scheduler ticks, calendar resolution, UI controls, or permissions.
-  - Actor and correlation fields are nullable placeholders until auth/session and event causation are modeled.
+  - Event store sequence allocation depends on locking the owning `worlds` row and has only PostgreSQL integration coverage.
+  - Snapshot payload storage is metadata-only; object storage writes are not implemented.
+  - `actor_ref` is required but not FK-backed until auth/session is modeled.
+  - Replay behavior is not implemented.
 - Recommended next step:
-  - Implement the event log and snapshot baseline as the next isolated task.
+  - Implement the auth/session baseline as the next isolated task.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
   - world-clock semantics

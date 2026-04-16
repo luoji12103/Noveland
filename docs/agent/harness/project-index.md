@@ -30,6 +30,9 @@ Fast orientation for a new coding session.
 - `backend/packages/calendar/`
 - `backend/packages/narrative/`
 - `backend/packages/events/`
+  - `noveland.events` — event/snapshot contracts and store exports
+  - `noveland.events.models` — world event log and snapshot metadata ORM models
+  - `noveland.events.event_store` — minimal world event append/list/snapshot helper
 - `backend/packages/auth/`
   - `noveland.auth.models` — user identity ORM model
 - `backend/packages/memory/`
@@ -46,7 +49,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema and world clock state
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, and event/snapshot baseline
 
 ## Update rule
 

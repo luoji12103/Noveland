@@ -65,3 +65,14 @@
 - Tests added/updated: world clock pure logic tests; schema metadata coverage for clock tables; workspace import coverage for `noveland.worlds.clock`
 - Docs updated: world clock scheduling, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: event/snapshot baseline and auth/session baseline remain separate tasks; runtime ticking, scheduling, calendar parsing, and UI controls are not implemented.
+
+## Event log and snapshot baseline entry
+
+- Date: 2026-04-16
+- Branch: feat/event-snapshot-baseline
+- Scope: event log and snapshot baseline
+- Summary: Added world event/snapshot contracts, ORM models, Alembic migration, and a minimal transactional event store helper.
+- Files changed: `/backend/packages/events/**`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`, `/backend/tests/**`, `/backend/migrations/README.md`, `/docs/agent/architecture/event-and-snapshot-model.md`, `/docs/agent/architecture/data-ownership.md`, `/docs/agent/harness/**`
+- Tests added/updated: event contract tests; schema metadata coverage for event/snapshot tables; skipped-by-default PostgreSQL integration test for `WorldEventStore`
+- Docs updated: event/snapshot architecture, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: auth/session baseline remains separate; replay engine, runtime event emission, NATS broadcast, UI controls, and object storage writes are not implemented.

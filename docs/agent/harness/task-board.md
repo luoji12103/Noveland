@@ -1,7 +1,6 @@
 # Task Board
 
 ## Open
-- Define event log + snapshot baseline
 - Define auth/session baseline
 
 ## In Progress
@@ -19,3 +18,4 @@
 - Define core database schema
 - Define plugin registry skeleton
 - Define world clock state model
+- Define event log + snapshot baseline

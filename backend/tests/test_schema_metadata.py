@@ -41,9 +41,11 @@ def test_core_schema_tables_are_registered() -> None:
         "platform_settings",
         "scenes",
         "users",
+        "world_events",
         "world_clock_states",
         "world_clock_transitions",
         "world_memberships",
+        "world_snapshots",
         "worlds",
     } <= table_names()
 
@@ -64,6 +66,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_world_clock_transitions_world_revision" in constraint_names(
         "world_clock_transitions",
+        UniqueConstraint,
+    )
+    assert "uq_world_events_world_sequence" in constraint_names(
+        "world_events",
         UniqueConstraint,
     )
 
@@ -91,6 +97,22 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "world_clock_transitions",
         CheckConstraint,
     )
+    assert "ck_world_events_sequence_positive" in constraint_names(
+        "world_events",
+        CheckConstraint,
+    )
+    assert "ck_world_events_event_name_format" in constraint_names(
+        "world_events",
+        CheckConstraint,
+    )
+    assert "ck_world_snapshots_status" in constraint_names(
+        "world_snapshots",
+        CheckConstraint,
+    )
+    assert "ck_world_snapshots_payload_or_uri" in constraint_names(
+        "world_snapshots",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -100,6 +122,8 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("agents") == {"scenes.id", "worlds.id"}
     assert foreign_key_targets("world_clock_states") == {"worlds.id"}
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
+    assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
 
 
 def test_core_schema_indexes_cover_world_boundaries() -> None:
@@ -112,3 +136,8 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_clock_transitions_world_wall_time" in index_names(
         "world_clock_transitions",
     )
+    assert "ix_world_events_world_sequence" in index_names("world_events")
+    assert "ix_world_events_world_event_name" in index_names("world_events")
+    assert "ix_world_events_world_wall_time" in index_names("world_events")
+    assert "ix_world_snapshots_world_sequence" in index_names("world_snapshots")
+    assert "ix_world_snapshots_world_latest_valid" in index_names("world_snapshots")
