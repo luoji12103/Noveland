@@ -98,3 +98,14 @@
 - Tests added/updated: API auth contract tests; skipped-by-default PostgreSQL seed/login/logout integration test; workspace import coverage for new API and seed modules
 - Docs updated: README, auth/access model, configuration/secrets, project index, file inventory, task board, active handoff
 - Follow-up notes: frontend login UI, OAuth/OIDC, password reset, MFA, authorization middleware, world access enforcement, and production cookie hardening remain separate tasks.
+
+## Web auth integration entry
+
+- Date: 2026-04-16
+- Branch: feat/web-auth-integration
+- Scope: web auth integration
+- Summary: Added same-origin Next auth proxy routes, protected dashboard access, dedicated login page, current-user display, and logout flow.
+- Files changed: `/web/app/**`, `/web/features/auth/**`, `/web/lib/auth/**`, `/web/tests/e2e/**`, `/.env.example`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: auth client tests; login/logout component tests; proxy helper tests; Playwright auth flow tests with local mock backend
+- Docs updated: README, auth/access model, configuration/secrets, project index, file inventory, task board, active handoff
+- Follow-up notes: authorization dependencies, world management APIs, real dashboard data, OAuth/OIDC, password reset, MFA, and production cookie hardening remain separate tasks.

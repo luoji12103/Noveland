@@ -1,37 +1,45 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/http-auth-surface
-- Objective: Add the first backend HTTP auth surface after merging `feat/auth-session-baseline` into `main`.
+- Branch: feat/web-auth-integration
+- Objective: Connect the web app to the HTTP auth surface after merging `feat/http-auth-surface` into `main`.
 - Completed work:
-  - Fast-forward merged `feat/auth-session-baseline` into `main`.
-  - Created `feat/http-auth-surface` from `main`.
-  - Added API database session and current-subject dependencies backed by SQLAlchemy sessions.
-  - Added CSRF helpers for `noveland_session`, `noveland_csrf`, and `X-CSRF-Token`.
-  - Added `/auth/csrf`, `/auth/login`, `/auth/me`, and `/auth/logout`.
-  - Added `noveland-seed-admin` for local/operator platform admin seeding.
-  - Added API auth tests and PostgreSQL-backed seed/login/logout integration coverage.
-  - Updated README, auth/security docs, and harness inventory/status files.
+  - Fast-forward merged `feat/http-auth-surface` into `main`.
+  - Created `feat/web-auth-integration` from `main`.
+  - Added `NOVELAND_API_BASE_URL` for server-side Next auth proxy routing.
+  - Added same-origin `/api/auth/csrf`, `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` route handlers.
+  - Added dedicated `/login` page with email/password sign-in.
+  - Protected `/` by checking the backend subject server-side and redirecting unauthenticated users to `/login`.
+  - Added current-user display and logout control on the dashboard shell.
+  - Added web auth client, proxy, component, and Playwright tests.
+  - Updated README, auth/config docs, project index, file inventory, task board, and change journal.
 - Incomplete work:
-  - Frontend login UI and browser flow integration.
+  - Authorization dependencies and world access enforcement.
+  - World/scenes/agents management APIs.
+  - Real dashboard data from backend world APIs.
   - OAuth/OIDC, email verification, password reset, MFA, and public registration.
-  - Authorization middleware and world access enforcement.
   - Agent runtime credentials.
   - Production cookie hardening, signed CSRF tokens, and CSRF rotation.
 - Exact files changed:
+  - `/.env.example`
   - `/README.md`
-  - `/backend/packages/auth/pyproject.toml`
-  - `/backend/packages/auth/src/noveland/auth/seed_admin.py`
-  - `/backend/packages/auth/src/noveland/auth/services.py`
-  - `/backend/services/api/pyproject.toml`
-  - `/backend/services/api/src/noveland/services/api/app.py`
-  - `/backend/services/api/src/noveland/services/api/auth.py`
-  - `/backend/services/api/src/noveland/services/api/csrf.py`
-  - `/backend/services/api/src/noveland/services/api/dependencies.py`
-  - `/backend/tests/test_api_auth.py`
-  - `/backend/tests/test_api_auth_integration.py`
-  - `/backend/tests/test_workspace_imports.py`
-  - `/backend/uv.lock`
+  - `/web/app/page.tsx`
+  - `/web/app/login/page.tsx`
+  - `/web/app/api/auth/csrf/route.ts`
+  - `/web/app/api/auth/login/route.ts`
+  - `/web/app/api/auth/me/route.ts`
+  - `/web/app/api/auth/logout/route.ts`
+  - `/web/app/globals.css`
+  - `/web/features/auth/login-form.tsx`
+  - `/web/features/auth/logout-button.tsx`
+  - `/web/lib/auth/client.ts`
+  - `/web/lib/auth/proxy.ts`
+  - `/web/lib/auth/server.ts`
+  - `/web/lib/auth/server-config.ts`
+  - `/web/lib/auth/types.ts`
+  - `/web/tests/e2e/auth.spec.ts`
+  - `/web/tests/e2e/start-with-mock-auth.mjs`
+  - `/web/playwright.config.ts`
   - `/docs/agent/architecture/auth-and-access-model.md`
   - `/docs/agent/architecture/configuration-and-secrets.md`
   - `/docs/agent/harness/project-index.md`
@@ -43,17 +51,20 @@
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_api_auth_integration.py`
   - `docker compose -f infra/compose.yaml config`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run test:e2e`
+  - `cd web && npm run build`
 - Current risks:
   - License is still TBD.
-  - The web shell is not connected to auth endpoints.
+  - The dashboard remains a status shell and does not display real world data.
+  - Web E2E uses a local mock auth backend; full-stack browser smoke remains optional.
   - Local cookies use `Secure=false`; production deployment must harden cookie settings.
-  - CSRF is an unsigned double-submit token baseline.
   - `platform_admin` is the only platform role persisted; world roles still come from `world_memberships`.
 - Recommended next step:
-  - Plan frontend login integration or server-side authorization middleware, depending on product priority.
+  - Implement authorization dependencies for platform role checks and world access helpers before adding world management APIs.
 - Sensitive areas to avoid casual edits:
   - auth-and-access model
   - configuration-and-secrets model

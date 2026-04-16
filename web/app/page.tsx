@@ -1,6 +1,9 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 
+import { LogoutButton } from "@/features/auth/logout-button";
 import { StatusCards } from "@/features/dashboard/status-cards";
+import { getCurrentSubject } from "@/lib/auth/server";
 import { systemStatuses } from "@/lib/status";
 
 const metrics = [
@@ -9,7 +12,12 @@ const metrics = [
   { label: "Narrative", value: "Not scheduled" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const subject = await getCurrentSubject();
+  if (subject === null) {
+    redirect("/login");
+  }
+
   return (
     <main className="page-shell">
       <section className="top-band">
@@ -31,6 +39,17 @@ export default function Home() {
             alt="Mountain lake at sunrise"
           />
         </div>
+      </section>
+
+      <section className="session-strip" aria-label="Current session">
+        <div>
+          <p className="session-label">Signed in</p>
+          <p className="session-user">
+            {subject.display_name} - {subject.email}
+          </p>
+          <p className="session-roles">{subject.roles.join(", ")}</p>
+        </div>
+        <LogoutButton />
       </section>
 
       <section className="dashboard-grid" aria-label="World overview">

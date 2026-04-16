@@ -29,6 +29,7 @@
 - `NOVELAND_DATABASE_URL`
 - `NOVELAND_NATS_URL`
 - `NOVELAND_OBJECT_STORAGE_ROOT`
+- `NOVELAND_API_BASE_URL`
 - `NOVELAND_POSTGRES_PORT`
 - `NOVELAND_NATS_PORT`
 - `NOVELAND_NATS_MONITOR_PORT`
@@ -38,8 +39,9 @@
 - Local password credentials are stored as Argon2id PHC hashes, not as committed secrets.
 - Opaque session tokens are generated server-side and only SHA-256 token hashes are persisted.
 - HTTP auth uses the `noveland_session` HttpOnly cookie and `noveland_csrf` readable CSRF cookie.
+- Web auth proxy routes use `NOVELAND_API_BASE_URL` to reach the backend API from the Next server.
 - Local development cookies default to `Secure=false`; production cookie hardening remains a deployment/security task.
-- The current auth/session and HTTP auth baselines do not add a new environment variable.
+- `NOVELAND_API_BASE_URL` is non-secret local routing configuration.
 
 ## Required docs sync
 

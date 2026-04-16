@@ -10,9 +10,14 @@ Track key structural files and prevent unregistered sprawl.
 - `.env.example`
 - `web/`
 - `web/app/`
+- `web/app/login/`
+- `web/app/api/auth/`
 - `web/features/`
+- `web/features/auth/`
 - `web/components/`
 - `web/lib/`
+- `web/lib/auth/`
+- `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`

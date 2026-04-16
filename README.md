@@ -1,6 +1,6 @@
 # Noveland
 
-Noveland is a persistent virtual-world operating system for AI agents. The repository is currently in its first runnable skeleton phase: the architecture and governance package is in place, and the implementation starts with a minimal backend API, runtime host, web shell, and local infrastructure.
+Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a minimal backend API, auth/session baseline, protected web shell, runtime host, and local infrastructure.
 
 ## Current Status
 
@@ -31,6 +31,21 @@ Start local infrastructure:
 docker compose -f infra/compose.yaml up -d
 ```
 
+Apply database migrations from `backend/`:
+
+```sh
+uv run alembic upgrade head
+```
+
+Seed a local platform admin from `backend/` after migrations:
+
+```sh
+uv run noveland-seed-admin \
+  --email admin@example.test \
+  --password "change-me-local-only" \
+  --display-name "Admin"
+```
+
 If local ports are already taken, override them before starting Compose:
 
 ```sh
@@ -59,21 +74,6 @@ Run the API from `backend/`:
 uv run uvicorn noveland.services.api.app:app --reload
 ```
 
-Apply database migrations from `backend/`:
-
-```sh
-uv run alembic upgrade head
-```
-
-Seed a local platform admin from `backend/` after migrations:
-
-```sh
-uv run noveland-seed-admin \
-  --email admin@example.test \
-  --password "change-me-local-only" \
-  --display-name "Admin"
-```
-
 Run frontend checks from `web/`:
 
 ```sh
@@ -89,6 +89,8 @@ Run the web app from `web/`:
 ```sh
 npm run dev
 ```
+
+Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account.
 
 ## Stable Interfaces
 
@@ -115,7 +117,7 @@ GET /auth/me
 POST /auth/logout
 ```
 
-Auth uses an HttpOnly opaque session cookie named `noveland_session`, a readable CSRF cookie named `noveland_csrf`, and `X-CSRF-Token` for mutating authenticated requests. The web UI is not wired to this flow yet.
+Auth uses an HttpOnly opaque session cookie named `noveland_session`, a readable CSRF cookie named `noveland_csrf`, and `X-CSRF-Token` for mutating authenticated requests. The web app reaches FastAPI through same-origin Next route handlers under `/api/auth/*`; `NOVELAND_API_BASE_URL` points those handlers at the backend API.
 
 ## Development Rules
 

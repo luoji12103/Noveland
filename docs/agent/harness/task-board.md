@@ -21,3 +21,15 @@
 - Define event log + snapshot baseline
 - Define auth/session baseline
 - Add HTTP auth surface
+- Add web auth integration
+
+## Upcoming Mainline
+- Authorization Dependencies
+- World Management API
+- World Dashboard Data
+- Runtime Clock Service
+- Runtime Event Emission + NATS Baseline
+- Replay + Snapshot Restore Baseline
+- Calendar + Schedule Rules Baseline
+- Memory Backend + Local pgvector Baseline
+- Agent Loop + Narrative Baseline
