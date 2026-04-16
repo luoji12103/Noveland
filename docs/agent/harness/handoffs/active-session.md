@@ -1,40 +1,40 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/event-snapshot-baseline
-- Objective: Implement the event log and snapshot metadata baseline after merging the world clock state model into `main`.
+- Branch: feat/auth-session-baseline
+- Objective: Implement the auth/session baseline after merging the event log and snapshot baseline into `main`.
 - Completed work:
-  - Fast-forward merged `feat/world-clock-state-model` into `main`.
-  - Created `feat/event-snapshot-baseline` from `main`.
-  - Added `noveland.events.contracts` with event append/record and snapshot create/record contracts.
-  - Added typed event store and validation errors.
-  - Added `WorldEventModel` and `WorldSnapshotModel` ORM models for append-only world events and snapshot metadata.
-  - Added `WorldEventStore` with `append_event`, `list_events_after`, `record_snapshot`, and `latest_snapshot`.
-  - Added Alembic migration `20260416_0003_event_snapshot_baseline`.
-  - Registered `noveland.events.models` in core SQLAlchemy metadata imports.
-  - Updated backend tests for event contracts, schema metadata, workspace imports, and PostgreSQL-backed store behavior.
-  - Updated architecture and harness docs for event/snapshot ownership, boundaries, inventory, task status, and follow-up work.
+  - Fast-forward merged `feat/event-snapshot-baseline` into `main`.
+  - Created `feat/auth-session-baseline` from `main`.
+  - Added auth contracts for roles, session status, password credential input/record, auth session input/record/result, and authenticated subjects.
+  - Added typed auth errors.
+  - Added `UserCredential`, `AuthSession`, and `PlatformRoleAssignment` ORM models.
+  - Added `PasswordCredentialService` for Argon2id local password hash set/verify/update.
+  - Added `AuthSessionService` for opaque token session create/authenticate/revoke/expire.
+  - Added Alembic migration `20260416_0004_auth_session_baseline`.
+  - Updated backend tests for auth contracts, schema metadata, workspace imports, and PostgreSQL-backed credential/session behavior.
+  - Updated architecture and harness docs for auth/session ownership, boundaries, inventory, task status, and follow-up work.
 - Incomplete work:
-  - Auth/session baseline.
-  - Replay engine and replay regression suite.
-  - Runtime event emission, NATS broadcast, UI controls, permission checks, object storage writes, and narrative-specific event semantics.
-  - Automatic linkage from world clock transitions into `world_events`.
+  - Login/logout HTTP API.
+  - Cookie transport, CSRF policy, auth middleware, and world access enforcement.
+  - OAuth/OIDC, email verification, password reset, MFA, agent runtime credentials, and UI integration.
+  - Replay engine, runtime event emission, NATS broadcast, object storage writes, and narrative-specific event semantics.
 - Exact files changed:
-  - `/backend/packages/events/src/noveland/events/__init__.py`
-  - `/backend/packages/events/src/noveland/events/contracts.py`
-  - `/backend/packages/events/src/noveland/events/errors.py`
-  - `/backend/packages/events/src/noveland/events/event_store.py`
-  - `/backend/packages/events/src/noveland/events/models.py`
-  - `/backend/packages/events/pyproject.toml`
-  - `/backend/packages/core/src/noveland/core/database.py`
+  - `/backend/packages/auth/src/noveland/auth/__init__.py`
+  - `/backend/packages/auth/src/noveland/auth/contracts.py`
+  - `/backend/packages/auth/src/noveland/auth/errors.py`
+  - `/backend/packages/auth/src/noveland/auth/models.py`
+  - `/backend/packages/auth/src/noveland/auth/services.py`
+  - `/backend/packages/auth/pyproject.toml`
   - `/backend/migrations/README.md`
-  - `/backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`
-  - `/backend/tests/test_event_contracts.py`
-  - `/backend/tests/test_event_store_integration.py`
+  - `/backend/migrations/versions/20260416_0004_auth_session_baseline.py`
+  - `/backend/tests/test_auth_contracts.py`
+  - `/backend/tests/test_auth_services_integration.py`
   - `/backend/tests/test_schema_metadata.py`
   - `/backend/tests/test_workspace_imports.py`
   - `/backend/uv.lock`
-  - `/docs/agent/architecture/event-and-snapshot-model.md`
+  - `/docs/agent/architecture/auth-and-access-model.md`
+  - `/docs/agent/architecture/configuration-and-secrets.md`
   - `/docs/agent/architecture/data-ownership.md`
   - `/docs/agent/harness/project-index.md`
   - `/docs/agent/harness/file-inventory.md`
@@ -46,18 +46,18 @@
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260415_0002`
+  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260416_0003`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_event_store_integration.py`
+  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_auth_services_integration.py`
   - `docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - Event store sequence allocation depends on locking the owning `worlds` row and has only PostgreSQL integration coverage.
-  - Snapshot payload storage is metadata-only; object storage writes are not implemented.
-  - `actor_ref` is required but not FK-backed until auth/session is modeled.
-  - Replay behavior is not implemented.
+  - Auth/session services are not exposed through HTTP yet.
+  - Opaque token transport, cookie settings, CSRF policy, and middleware are not implemented.
+  - `platform_admin` is the only platform role persisted; world roles still come from `world_memberships`.
+  - Agent runtime identity remains deferred.
 - Recommended next step:
-  - Implement the auth/session baseline as the next isolated task.
+  - Plan the first HTTP auth surface or runtime integration task, depending on product priority.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
   - world-clock semantics

@@ -33,6 +33,12 @@
 - `NOVELAND_NATS_PORT`
 - `NOVELAND_NATS_MONITOR_PORT`
 
+## Auth/session baseline
+
+- Local password credentials are stored as Argon2id PHC hashes, not as committed secrets.
+- Opaque session tokens are generated server-side and only SHA-256 token hashes are persisted.
+- The current auth/session baseline does not add a new environment variable.
+
 ## Required docs sync
 
 If config changes:

@@ -38,8 +38,11 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "auth_sessions",
         "platform_settings",
+        "platform_role_assignments",
         "scenes",
+        "user_credentials",
         "users",
         "world_events",
         "world_clock_states",
@@ -52,6 +55,18 @@ def test_core_schema_tables_are_registered() -> None:
 
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
+    assert "uq_user_credentials_user_id" in constraint_names(
+        "user_credentials",
+        UniqueConstraint,
+    )
+    assert "uq_auth_sessions_token_hash" in constraint_names(
+        "auth_sessions",
+        UniqueConstraint,
+    )
+    assert "uq_platform_role_assignments_user_role" in constraint_names(
+        "platform_role_assignments",
+        UniqueConstraint,
+    )
     assert "uq_worlds_slug" in constraint_names("worlds", UniqueConstraint)
     assert "uq_world_memberships_world_user" in constraint_names(
         "world_memberships",
@@ -76,6 +91,22 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
 
 def test_core_schema_check_constraints_capture_initial_enums() -> None:
     assert "ck_world_memberships_role" in constraint_names("world_memberships", CheckConstraint)
+    assert "ck_user_credentials_password_hash_present" in constraint_names(
+        "user_credentials",
+        CheckConstraint,
+    )
+    assert "ck_auth_sessions_status" in constraint_names(
+        "auth_sessions",
+        CheckConstraint,
+    )
+    assert "ck_auth_sessions_token_hash_length" in constraint_names(
+        "auth_sessions",
+        CheckConstraint,
+    )
+    assert "ck_platform_role_assignments_role" in constraint_names(
+        "platform_role_assignments",
+        CheckConstraint,
+    )
     assert "ck_agents_kind" in constraint_names("agents", CheckConstraint)
     assert "ck_world_clock_states_status" in constraint_names(
         "world_clock_states",
@@ -116,6 +147,9 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
+    assert foreign_key_targets("user_credentials") == {"users.id"}
+    assert foreign_key_targets("auth_sessions") == {"users.id"}
+    assert foreign_key_targets("platform_role_assignments") == {"users.id"}
     assert foreign_key_targets("worlds") == {"users.id"}
     assert foreign_key_targets("world_memberships") == {"users.id", "worlds.id"}
     assert foreign_key_targets("scenes") == {"worlds.id"}
@@ -127,6 +161,10 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
 
 
 def test_core_schema_indexes_cover_world_boundaries() -> None:
+    assert "ix_user_credentials_user_id" in index_names("user_credentials")
+    assert "ix_auth_sessions_user_id" in index_names("auth_sessions")
+    assert "ix_auth_sessions_user_status_expires" in index_names("auth_sessions")
+    assert "ix_platform_role_assignments_user_id" in index_names("platform_role_assignments")
     assert "ix_worlds_owner_user_id" in index_names("worlds")
     assert "ix_world_memberships_world_id" in index_names("world_memberships")
     assert "ix_scenes_world_id" in index_names("scenes")

@@ -29,3 +29,18 @@ RBAC with world-scoped ownership checks.
 
 - backend-owned authenticated sessions
 - no client-side trust for role enforcement
+
+## Implemented baseline
+
+- `user_credentials` stores one local password credential per user using Argon2id PHC hashes.
+- `auth_sessions` stores backend-owned opaque sessions; plaintext session tokens are returned only once and only SHA-256 token hashes are persisted.
+- `platform_role_assignments` stores platform-level `platform_admin` grants.
+- `noveland.auth.PasswordCredentialService` sets and verifies local passwords.
+- `noveland.auth.AuthSessionService` creates, authenticates, revokes, and expires opaque sessions.
+
+## Current limits
+
+- No login/logout HTTP API, cookie transport, CSRF policy, OAuth/OIDC, email verification, password reset, MFA, or UI integration.
+- No auth middleware or world access enforcement yet.
+- `world_admin` and `human_user` continue to be represented by `world_memberships`.
+- `agent_runtime` credential modeling remains deferred.

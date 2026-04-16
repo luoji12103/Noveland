@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- Define auth/session baseline
+- None
 
 ## In Progress
 - None
@@ -19,3 +19,4 @@
 - Define plugin registry skeleton
 - Define world clock state model
 - Define event log + snapshot baseline
+- Define auth/session baseline

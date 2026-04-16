@@ -35,6 +35,9 @@
 ## Initial persistence baseline
 
 - `users` stores platform user identity basics only, not passwords or sessions.
+- `user_credentials` stores local user password hashes.
+- `auth_sessions` stores backend-owned opaque session records and token hashes.
+- `platform_role_assignments` stores platform-level role grants.
 - `platform_settings` stores non-secret platform configuration values.
 - `worlds`, `world_memberships`, and `scenes` establish world ownership, membership, and location boundaries.
 - `agents` stores world-scoped agent identity basics only, not runtime state, memory, or private calendars.
@@ -42,7 +45,7 @@
 - `world_clock_transitions` stores world-owned operational audit records for clock state changes.
 - `world_events` stores the append-only world event stream.
 - `world_snapshots` stores world-owned snapshot metadata and payload references.
-- Plugin registry data, sessions, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
+- Plugin registry data, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
 
 ## Ownership rules
 

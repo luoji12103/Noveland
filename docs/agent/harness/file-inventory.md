@@ -19,7 +19,10 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
 - `backend/packages/auth/`
+- `backend/packages/auth/src/noveland/auth/contracts.py`
+- `backend/packages/auth/src/noveland/auth/errors.py`
 - `backend/packages/auth/src/noveland/auth/models.py`
+- `backend/packages/auth/src/noveland/auth/services.py`
 - `backend/packages/worlds/`
 - `backend/packages/worlds/src/noveland/worlds/clock.py`
 - `backend/packages/worlds/src/noveland/worlds/models.py`
@@ -46,6 +49,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260415_0001_core_schema.py`
 - `backend/migrations/versions/20260415_0002_world_clock_state.py`
 - `backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`
+- `backend/migrations/versions/20260416_0004_auth_session_baseline.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

@@ -34,7 +34,9 @@ Fast orientation for a new coding session.
   - `noveland.events.models` — world event log and snapshot metadata ORM models
   - `noveland.events.event_store` — minimal world event append/list/snapshot helper
 - `backend/packages/auth/`
-  - `noveland.auth.models` — user identity ORM model
+  - `noveland.auth` — auth/session contracts, services, and typed errors
+  - `noveland.auth.models` — user identity, credential, session, and platform role ORM models
+  - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
@@ -49,7 +51,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, and event/snapshot baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, and auth/session baseline
 
 ## Update rule
 
