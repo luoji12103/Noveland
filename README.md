@@ -65,6 +65,15 @@ Apply database migrations from `backend/`:
 uv run alembic upgrade head
 ```
 
+Seed a local platform admin from `backend/` after migrations:
+
+```sh
+uv run noveland-seed-admin \
+  --email admin@example.test \
+  --password "change-me-local-only" \
+  --display-name "Admin"
+```
+
 Run frontend checks from `web/`:
 
 ```sh
@@ -96,6 +105,17 @@ Expected response:
 ```
 
 This health endpoint does not imply database, messaging, world-clock, replay, auth, or plugin readiness.
+
+The initial auth HTTP surface is:
+
+```http
+GET /auth/csrf
+POST /auth/login
+GET /auth/me
+POST /auth/logout
+```
+
+Auth uses an HttpOnly opaque session cookie named `noveland_session`, a readable CSRF cookie named `noveland_csrf`, and `X-CSRF-Token` for mutating authenticated requests. The web UI is not wired to this flow yet.
 
 ## Development Rules
 

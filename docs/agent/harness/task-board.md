@@ -20,3 +20,4 @@
 - Define world clock state model
 - Define event log + snapshot baseline
 - Define auth/session baseline
+- Add HTTP auth surface

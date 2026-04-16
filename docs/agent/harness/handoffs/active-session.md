@@ -1,41 +1,39 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/auth-session-baseline
-- Objective: Implement the auth/session baseline after merging the event log and snapshot baseline into `main`.
+- Branch: feat/http-auth-surface
+- Objective: Add the first backend HTTP auth surface after merging `feat/auth-session-baseline` into `main`.
 - Completed work:
-  - Fast-forward merged `feat/event-snapshot-baseline` into `main`.
-  - Created `feat/auth-session-baseline` from `main`.
-  - Added auth contracts for roles, session status, password credential input/record, auth session input/record/result, and authenticated subjects.
-  - Added typed auth errors.
-  - Added `UserCredential`, `AuthSession`, and `PlatformRoleAssignment` ORM models.
-  - Added `PasswordCredentialService` for Argon2id local password hash set/verify/update.
-  - Added `AuthSessionService` for opaque token session create/authenticate/revoke/expire.
-  - Added Alembic migration `20260416_0004_auth_session_baseline`.
-  - Updated backend tests for auth contracts, schema metadata, workspace imports, and PostgreSQL-backed credential/session behavior.
-  - Updated architecture and harness docs for auth/session ownership, boundaries, inventory, task status, and follow-up work.
+  - Fast-forward merged `feat/auth-session-baseline` into `main`.
+  - Created `feat/http-auth-surface` from `main`.
+  - Added API database session and current-subject dependencies backed by SQLAlchemy sessions.
+  - Added CSRF helpers for `noveland_session`, `noveland_csrf`, and `X-CSRF-Token`.
+  - Added `/auth/csrf`, `/auth/login`, `/auth/me`, and `/auth/logout`.
+  - Added `noveland-seed-admin` for local/operator platform admin seeding.
+  - Added API auth tests and PostgreSQL-backed seed/login/logout integration coverage.
+  - Updated README, auth/security docs, and harness inventory/status files.
 - Incomplete work:
-  - Login/logout HTTP API.
-  - Cookie transport, CSRF policy, auth middleware, and world access enforcement.
-  - OAuth/OIDC, email verification, password reset, MFA, agent runtime credentials, and UI integration.
-  - Replay engine, runtime event emission, NATS broadcast, object storage writes, and narrative-specific event semantics.
+  - Frontend login UI and browser flow integration.
+  - OAuth/OIDC, email verification, password reset, MFA, and public registration.
+  - Authorization middleware and world access enforcement.
+  - Agent runtime credentials.
+  - Production cookie hardening, signed CSRF tokens, and CSRF rotation.
 - Exact files changed:
-  - `/backend/packages/auth/src/noveland/auth/__init__.py`
-  - `/backend/packages/auth/src/noveland/auth/contracts.py`
-  - `/backend/packages/auth/src/noveland/auth/errors.py`
-  - `/backend/packages/auth/src/noveland/auth/models.py`
-  - `/backend/packages/auth/src/noveland/auth/services.py`
+  - `/README.md`
   - `/backend/packages/auth/pyproject.toml`
-  - `/backend/migrations/README.md`
-  - `/backend/migrations/versions/20260416_0004_auth_session_baseline.py`
-  - `/backend/tests/test_auth_contracts.py`
-  - `/backend/tests/test_auth_services_integration.py`
-  - `/backend/tests/test_schema_metadata.py`
+  - `/backend/packages/auth/src/noveland/auth/seed_admin.py`
+  - `/backend/packages/auth/src/noveland/auth/services.py`
+  - `/backend/services/api/pyproject.toml`
+  - `/backend/services/api/src/noveland/services/api/app.py`
+  - `/backend/services/api/src/noveland/services/api/auth.py`
+  - `/backend/services/api/src/noveland/services/api/csrf.py`
+  - `/backend/services/api/src/noveland/services/api/dependencies.py`
+  - `/backend/tests/test_api_auth.py`
+  - `/backend/tests/test_api_auth_integration.py`
   - `/backend/tests/test_workspace_imports.py`
   - `/backend/uv.lock`
   - `/docs/agent/architecture/auth-and-access-model.md`
   - `/docs/agent/architecture/configuration-and-secrets.md`
-  - `/docs/agent/architecture/data-ownership.md`
   - `/docs/agent/harness/project-index.md`
   - `/docs/agent/harness/file-inventory.md`
   - `/docs/agent/harness/task-board.md`
@@ -46,20 +44,18 @@
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
   - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic downgrade 20260416_0003`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_auth_services_integration.py`
+  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_api_auth_integration.py`
   - `docker compose -f infra/compose.yaml config`
 - Current risks:
   - License is still TBD.
-  - Auth/session services are not exposed through HTTP yet.
-  - Opaque token transport, cookie settings, CSRF policy, and middleware are not implemented.
+  - The web shell is not connected to auth endpoints.
+  - Local cookies use `Secure=false`; production deployment must harden cookie settings.
+  - CSRF is an unsigned double-submit token baseline.
   - `platform_admin` is the only platform role persisted; world roles still come from `world_memberships`.
-  - Agent runtime identity remains deferred.
 - Recommended next step:
-  - Plan the first HTTP auth surface or runtime integration task, depending on product priority.
+  - Plan frontend login integration or server-side authorization middleware, depending on product priority.
 - Sensitive areas to avoid casual edits:
+  - auth-and-access model
+  - configuration-and-secrets model
   - event-and-snapshot model
   - world-clock semantics
-  - auth-and-access model
-  - plugin architecture

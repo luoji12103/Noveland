@@ -37,10 +37,15 @@ RBAC with world-scoped ownership checks.
 - `platform_role_assignments` stores platform-level `platform_admin` grants.
 - `noveland.auth.PasswordCredentialService` sets and verifies local passwords.
 - `noveland.auth.AuthSessionService` creates, authenticates, revokes, and expires opaque sessions.
+- `GET /auth/csrf` issues a readable CSRF token cookie for browser clients.
+- `POST /auth/login` accepts email/password credentials, creates an opaque backend session, and sets auth cookies.
+- `GET /auth/me` returns the authenticated subject for a valid session cookie.
+- `POST /auth/logout` requires a valid session plus matching `X-CSRF-Token` header and CSRF cookie, then revokes the session.
+- `noveland-seed-admin` seeds or updates a local platform admin without exposing public registration.
 
 ## Current limits
 
-- No login/logout HTTP API, cookie transport, CSRF policy, OAuth/OIDC, email verification, password reset, MFA, or UI integration.
+- No frontend login UI, OAuth/OIDC, email verification, password reset, MFA, or public registration endpoint.
 - No auth middleware or world access enforcement yet.
 - `world_admin` and `human_user` continue to be represented by `world_memberships`.
 - `agent_runtime` credential modeling remains deferred.

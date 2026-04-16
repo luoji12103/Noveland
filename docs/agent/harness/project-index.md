@@ -15,6 +15,9 @@ Fast orientation for a new coding session.
 
 ### Backend services
 - `backend/services/api/` — HTTP/WebSocket entry
+  - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
+  - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
+  - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
 - `backend/services/runtime/` — long-running runtime host
 - `backend/pyproject.toml` — backend uv workspace manifest
 
@@ -36,6 +39,7 @@ Fast orientation for a new coding session.
 - `backend/packages/auth/`
   - `noveland.auth` — auth/session contracts, services, and typed errors
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models
+  - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
 - `backend/packages/plugins/`

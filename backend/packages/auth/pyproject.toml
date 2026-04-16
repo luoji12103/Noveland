@@ -17,5 +17,8 @@ dependencies = [
 [tool.uv.sources]
 noveland-core = { workspace = true }
 
+[project.scripts]
+noveland-seed-admin = "noveland.auth.seed_admin:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

@@ -54,6 +54,7 @@ class PasswordCredentialService:
         try:
             if credential_model is None:
                 credential_model = UserCredential(
+                    id=uuid.uuid4(),
                     user_id=credential_input.user_id,
                     password_hash=password_hash,
                     password_set_at=now,
@@ -133,6 +134,7 @@ class AuthSessionService:
 
         token = secrets.token_urlsafe(48)
         session_model = AuthSession(
+            id=uuid.uuid4(),
             user_id=session_input.user_id,
             token_hash=hash_session_token(token),
             status=AuthSessionStatus.ACTIVE.value,
@@ -161,10 +163,8 @@ class AuthSessionService:
         if session_model.status == AuthSessionStatus.REVOKED.value:
             raise InvalidSessionError("invalid session")
 
-        if (
-            session_model.status == AuthSessionStatus.EXPIRED.value
-            or session_model.expires_at <= now
-        ):
+        expires_at = _database_datetime(session_model.expires_at)
+        if session_model.status == AuthSessionStatus.EXPIRED.value or expires_at <= now:
             self._expire_session_model(session_model, now)
             raise InvalidSessionError("invalid session")
 
@@ -259,9 +259,9 @@ def _credential_record_from_model(credential_model: UserCredential) -> PasswordC
         id=credential_model.id,
         user_id=credential_model.user_id,
         password_hash=credential_model.password_hash,
-        password_set_at=credential_model.password_set_at,
-        password_updated_at=credential_model.password_updated_at,
-        disabled_at=credential_model.disabled_at,
+        password_set_at=_database_datetime(credential_model.password_set_at),
+        password_updated_at=_database_datetime(credential_model.password_updated_at),
+        disabled_at=_optional_database_datetime(credential_model.disabled_at),
     )
 
 
@@ -271,12 +271,12 @@ def _session_record_from_model(session_model: AuthSession) -> AuthSessionRecord:
         user_id=session_model.user_id,
         token_hash=session_model.token_hash,
         status=AuthSessionStatus(session_model.status),
-        expires_at=session_model.expires_at,
-        revoked_at=session_model.revoked_at,
-        last_seen_at=session_model.last_seen_at,
+        expires_at=_database_datetime(session_model.expires_at),
+        revoked_at=_optional_database_datetime(session_model.revoked_at),
+        last_seen_at=_optional_database_datetime(session_model.last_seen_at),
         user_agent=session_model.user_agent,
         ip_address=session_model.ip_address,
-        created_at=session_model.created_at,
+        created_at=_database_datetime(session_model.created_at),
     )
 
 
@@ -284,3 +284,15 @@ def _normalize_datetime(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise AuthValidationError("datetimes must be timezone-aware")
     return value.astimezone(UTC)
+
+
+def _database_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _optional_database_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return _database_datetime(value)

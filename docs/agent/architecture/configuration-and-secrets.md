@@ -37,7 +37,9 @@
 
 - Local password credentials are stored as Argon2id PHC hashes, not as committed secrets.
 - Opaque session tokens are generated server-side and only SHA-256 token hashes are persisted.
-- The current auth/session baseline does not add a new environment variable.
+- HTTP auth uses the `noveland_session` HttpOnly cookie and `noveland_csrf` readable CSRF cookie.
+- Local development cookies default to `Secure=false`; production cookie hardening remains a deployment/security task.
+- The current auth/session and HTTP auth baselines do not add a new environment variable.
 
 ## Required docs sync
 

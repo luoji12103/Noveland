@@ -87,3 +87,14 @@
 - Tests added/updated: auth contract tests; schema metadata coverage for auth tables; skipped-by-default PostgreSQL integration test for credential/session services
 - Docs updated: auth/access model, configuration/secrets, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: login HTTP API, cookie/CSRF policy, OAuth/OIDC, password reset, MFA, auth middleware, agent runtime credential, and UI integration remain separate tasks.
+
+## HTTP auth surface entry
+
+- Date: 2026-04-16
+- Branch: feat/http-auth-surface
+- Scope: HTTP auth surface
+- Summary: Added CSRF, login, current user, logout endpoints, API database dependencies, and local platform admin seed command.
+- Files changed: `/backend/services/api/**`, `/backend/packages/auth/**`, `/backend/tests/test_api_auth.py`, `/backend/tests/test_api_auth_integration.py`, `/backend/tests/test_workspace_imports.py`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: API auth contract tests; skipped-by-default PostgreSQL seed/login/logout integration test; workspace import coverage for new API and seed modules
+- Docs updated: README, auth/access model, configuration/secrets, project index, file inventory, task board, active handoff
+- Follow-up notes: frontend login UI, OAuth/OIDC, password reset, MFA, authorization middleware, world access enforcement, and production cookie hardening remain separate tasks.
