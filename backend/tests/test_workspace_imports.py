@@ -28,6 +28,7 @@ PACKAGES = [
     "noveland.plugins.manifest",
     "noveland.plugins.registry",
     "noveland.services.api",
+    "noveland.services.api.authorization",
     "noveland.services.api.auth",
     "noveland.services.api.csrf",
     "noveland.services.api.dependencies",

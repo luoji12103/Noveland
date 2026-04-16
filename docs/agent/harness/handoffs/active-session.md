@@ -1,72 +1,33 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/web-auth-integration
-- Objective: Connect the web app to the HTTP auth surface after merging `feat/http-auth-surface` into `main`.
+- Branch: feat/authorization-dependencies
+- Objective: Add lightweight backend authorization dependencies after merging `feat/web-auth-integration` into `main`.
 - Completed work:
-  - Fast-forward merged `feat/http-auth-surface` into `main`.
-  - Created `feat/web-auth-integration` from `main`.
-  - Added `NOVELAND_API_BASE_URL` for server-side Next auth proxy routing.
-  - Added same-origin `/api/auth/csrf`, `/api/auth/login`, `/api/auth/me`, and `/api/auth/logout` route handlers.
-  - Added dedicated `/login` page with email/password sign-in.
-  - Protected `/` by checking the backend subject server-side and redirecting unauthenticated users to `/login`.
-  - Added current-user display and logout control on the dashboard shell.
-  - Added web auth client, proxy, component, and Playwright tests.
-  - Updated README, auth/config docs, project index, file inventory, task board, and change journal.
+  - Fast-forward merged `feat/web-auth-integration` into `main`.
+  - Created `feat/authorization-dependencies` from `main`.
+  - Added `noveland.services.api.authorization` for platform-admin, world-member, and world-admin checks.
+  - Added `WorldAccessContext` and FastAPI dependency wrappers for platform and world access.
+  - Added authorization tests covering platform admin, world admin, human user, missing sessions, and inaccessible worlds.
+  - Adjusted JSON ORM column definitions so SQLite-backed API tests can create world/agent tables without PostgreSQL JSONB syntax.
+  - Updated auth/access docs and harness inventory/status files.
 - Incomplete work:
-  - Authorization dependencies and world access enforcement.
-  - World/scenes/agents management APIs.
+  - World management API routes.
   - Real dashboard data from backend world APIs.
+  - Broad policy engine and frontend world access UI.
   - OAuth/OIDC, email verification, password reset, MFA, and public registration.
-  - Agent runtime credentials.
-  - Production cookie hardening, signed CSRF tokens, and CSRF rotation.
-- Exact files changed:
-  - `/.env.example`
-  - `/README.md`
-  - `/web/app/page.tsx`
-  - `/web/app/login/page.tsx`
-  - `/web/app/api/auth/csrf/route.ts`
-  - `/web/app/api/auth/login/route.ts`
-  - `/web/app/api/auth/me/route.ts`
-  - `/web/app/api/auth/logout/route.ts`
-  - `/web/app/globals.css`
-  - `/web/features/auth/login-form.tsx`
-  - `/web/features/auth/logout-button.tsx`
-  - `/web/lib/auth/client.ts`
-  - `/web/lib/auth/proxy.ts`
-  - `/web/lib/auth/server.ts`
-  - `/web/lib/auth/server-config.ts`
-  - `/web/lib/auth/types.ts`
-  - `/web/tests/e2e/auth.spec.ts`
-  - `/web/tests/e2e/start-with-mock-auth.mjs`
-  - `/web/playwright.config.ts`
-  - `/docs/agent/architecture/auth-and-access-model.md`
-  - `/docs/agent/architecture/configuration-and-secrets.md`
-  - `/docs/agent/harness/project-index.md`
-  - `/docs/agent/harness/file-inventory.md`
-  - `/docs/agent/harness/task-board.md`
-  - `/docs/agent/harness/change-journal.md`
-  - `/docs/agent/harness/handoffs/active-session.md`
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
   - `docker compose -f infra/compose.yaml config`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test`
-  - `cd web && npm run test:e2e`
-  - `cd web && npm run build`
 - Current risks:
   - License is still TBD.
-  - The dashboard remains a status shell and does not display real world data.
-  - Web E2E uses a local mock auth backend; full-stack browser smoke remains optional.
-  - Local cookies use `Secure=false`; production deployment must harden cookie settings.
-  - `platform_admin` is the only platform role persisted; world roles still come from `world_memberships`.
+  - Authorization is intentionally a lightweight dependency baseline, not a complete policy engine.
+  - Platform admins bypass world membership checks, but still get 404 for missing worlds.
 - Recommended next step:
-  - Implement authorization dependencies for platform role checks and world access helpers before adding world management APIs.
+  - Implement World Management API on top of these authorization dependencies.
 - Sensitive areas to avoid casual edits:
   - auth-and-access model
-  - configuration-and-secrets model
   - event-and-snapshot model
   - world-clock semantics

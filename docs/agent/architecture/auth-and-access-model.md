@@ -43,10 +43,11 @@ RBAC with world-scoped ownership checks.
 - `POST /auth/logout` requires a valid session plus matching `X-CSRF-Token` header and CSRF cookie, then revokes the session.
 - `noveland-seed-admin` seeds or updates a local platform admin without exposing public registration.
 - The web app exposes `/login`, protects `/`, and proxies browser auth calls through same-origin `/api/auth/*` route handlers.
+- API authorization helpers enforce platform-admin, world-member, and world-admin checks for backend routes.
 
 ## Current limits
 
 - No OAuth/OIDC, email verification, password reset, MFA, or public registration endpoint.
-- No auth middleware or world access enforcement yet.
+- No broad policy engine or frontend world-access UI yet.
 - `world_admin` and `human_user` continue to be represented by `world_memberships`.
 - `agent_runtime` credential modeling remains deferred.

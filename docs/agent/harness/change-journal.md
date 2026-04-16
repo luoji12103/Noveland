@@ -109,3 +109,14 @@
 - Tests added/updated: auth client tests; login/logout component tests; proxy helper tests; Playwright auth flow tests with local mock backend
 - Docs updated: README, auth/access model, configuration/secrets, project index, file inventory, task board, active handoff
 - Follow-up notes: authorization dependencies, world management APIs, real dashboard data, OAuth/OIDC, password reset, MFA, and production cookie hardening remain separate tasks.
+
+## Authorization dependencies entry
+
+- Date: 2026-04-16
+- Branch: feat/authorization-dependencies
+- Scope: API authorization dependencies
+- Summary: Added lightweight platform-admin, world-member, and world-admin checks for backend route dependencies.
+- Files changed: `/backend/services/api/**`, `/backend/packages/worlds/**`, `/backend/packages/agents/**`, `/backend/tests/**`, `/docs/agent/**`
+- Tests added/updated: authorization dependency tests; workspace import coverage for authorization helpers
+- Docs updated: auth/access model, project index, file inventory, task board, active handoff
+- Follow-up notes: world management APIs, real dashboard data, broad policy engine, and frontend world access UI remain separate tasks.

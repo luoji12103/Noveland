@@ -7,6 +7,7 @@ from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -38,9 +39,9 @@ class World(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     rules_config: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
-        server_default=text("'{}'::jsonb"),
+        default=dict,
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,

@@ -19,6 +19,7 @@ Fast orientation for a new coding session.
 
 ### Backend services
 - `backend/services/api/` — HTTP/WebSocket entry
+  - `noveland.services.api.authorization` — platform and world access helper checks
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies

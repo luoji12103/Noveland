@@ -19,6 +19,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/auth/`
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
+- `backend/services/api/src/noveland/services/api/authorization.py`
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`

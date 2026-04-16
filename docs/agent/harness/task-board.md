@@ -22,9 +22,9 @@
 - Define auth/session baseline
 - Add HTTP auth surface
 - Add web auth integration
+- Add authorization dependencies
 
 ## Upcoming Mainline
-- Authorization Dependencies
 - World Management API
 - World Dashboard Data
 - Runtime Clock Service

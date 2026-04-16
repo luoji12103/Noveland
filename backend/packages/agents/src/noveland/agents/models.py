@@ -4,7 +4,16 @@ import uuid
 from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,9 +42,9 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     config: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
-        server_default=text("'{}'::jsonb"),
+        default=dict,
     )
     is_enabled: Mapped[bool] = mapped_column(
         Boolean,
