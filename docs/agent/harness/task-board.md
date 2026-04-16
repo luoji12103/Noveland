@@ -24,9 +24,9 @@
 - Add web auth integration
 - Add authorization dependencies
 - Add world management API
+- Add world dashboard data
 
 ## Upcoming Mainline
-- World Dashboard Data
 - Runtime Clock Service
 - Runtime Event Emission + NATS Baseline
 - Replay + Snapshot Restore Baseline

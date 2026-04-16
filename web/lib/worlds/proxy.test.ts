@@ -1,0 +1,57 @@
+import { NextRequest } from "next/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { proxyWorldRequest } from "@/lib/worlds/proxy";
+
+describe("world proxy", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("forwards path, query, cookies, csrf header, and json body", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const request = new NextRequest("http://web.example.test/api/worlds/world-1/scenes?limit=2", {
+      method: "POST",
+      headers: {
+        cookie: "noveland_session=session",
+        "content-type": "application/json",
+        "x-csrf-token": "csrf",
+      },
+      body: JSON.stringify({ scene_key: "home", name: "Home" }),
+    });
+
+    const response = await proxyWorldRequest(request, ["world-1", "scenes"], "POST");
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.example.test/worlds/world-1/scenes?limit=2",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ scene_key: "home", name: "Home" }),
+      }),
+    );
+    const headers = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(headers.get("cookie")).toBe("noveland_session=session");
+    expect(headers.get("x-csrf-token")).toBe("csrf");
+  });
+
+  it("relays backend delete status", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    const request = new NextRequest("http://web.example.test/api/worlds/world-1");
+
+    const response = await proxyWorldRequest(request, ["world-1"], "DELETE");
+
+    expect(response.status).toBe(204);
+  });
+});
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}

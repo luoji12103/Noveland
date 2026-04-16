@@ -12,7 +12,7 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -41,6 +41,8 @@ def test_world_management_flow_against_postgres(engine: Engine) -> None:
     user_id, token = _seed_platform_admin_session(engine)
     client = _client_for_engine(engine)
     client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "integration-csrf")
+    client.headers.update({CSRF_HEADER_NAME: "integration-csrf"})
     slug = f"world-{uuid.uuid4().hex[:12]}"
 
     create_world = client.post("/worlds", json={"slug": slug, "name": "Integration World"})

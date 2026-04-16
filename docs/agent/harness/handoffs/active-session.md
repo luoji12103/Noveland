@@ -1,40 +1,38 @@
 # Active Session Handoff
 
 - Date: 2026-04-16T00:00:00Z
-- Branch: feat/world-management-api
-- Objective: Add first backend world management endpoints after merging authorization dependencies into `main`.
+- Branch: feat/world-dashboard-data
+- Objective: Connect the protected web dashboard to real world management data and add the first browser management console.
 - Completed work:
-  - Fast-forward merged `feat/authorization-dependencies` into `main`.
-  - Created `feat/world-management-api` from `main`.
-  - Added `/worlds` API routes for worlds, scenes, memberships, and agents.
-  - Applied platform-admin, world-admin, and world-member dependencies to the new routes.
-  - Added duplicate-key, cross-world reference, hidden-world, and final-admin safeguards.
-  - Added SQLite-backed API tests and a skipped-by-default PostgreSQL integration smoke.
-  - Updated README and harness docs for the new backend API surface and next mainline.
+  - Fast-forward merged `feat/world-management-api` into `main`.
+  - Created `feat/world-dashboard-data` from `main`.
+  - Added backend CSRF enforcement for mutating `/worlds` routes.
+  - Added member candidate lookup, membership user summaries, and soft-disable DELETE routes for worlds, scenes, and agents.
+  - Added Web world API types, browser helpers, server data loader, and same-origin `/api/worlds/*` proxy routes.
+  - Replaced the static dashboard metrics with real world, scene, agent, and membership data.
+  - Added admin controls for creating/updating/deactivating worlds, scenes, agents, and memberships.
+  - Extended Playwright's local mock backend to cover auth plus world management flows.
+  - Updated README and harness docs for the dashboard data stage.
 - Incomplete work:
-  - Web dashboard data integration.
-  - Web UI for managing worlds, scenes, memberships, and agents.
-  - Runtime loops, world clock controls, event emission, replay, and plugin execution.
-  - Broad policy engine, OAuth/OIDC, email verification, password reset, MFA, and public registration.
+  - Runtime clock service and world clock control endpoints.
+  - Runtime event emission, NATS broadcast, replay, and snapshot restore flows.
+  - Calendar rules, memory backend, agent loop, narrative loop, and plugin execution.
+  - Full user administration, invitation flows, OAuth/OIDC, email verification, password reset, MFA, and production cookie hardening.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest`
-  - `cd backend && NOVELAND_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run alembic upgrade head`
-  - `cd backend && NOVELAND_TEST_DATABASE_URL=postgresql+psycopg://noveland:noveland@localhost:55432/noveland uv run pytest tests/test_api_worlds_integration.py`
-  - `docker compose -f infra/compose.yaml config`
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_api_worlds_integration.py`
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
   - `cd web && npm run test:e2e`
-  - `cd web && npm run build`
 - Current risks:
   - License is still TBD.
-  - The web dashboard remains a status shell and does not call the new world APIs.
-  - World management endpoints manipulate database records only; they do not emit canonical world events yet.
-  - CSRF is not applied directly to backend world routes in this stage; browser integration through the web proxy is future work.
+  - World management writes still manipulate records only; they do not emit canonical events yet.
+  - DELETE routes are intentionally soft-disable controls and must not be treated as physical deletion.
+  - Web dashboard management is local/admin oriented and has not been optimized for large world lists.
 - Recommended next step:
-  - Implement World Dashboard Data so the protected web dashboard reads the new backend world API.
+  - Implement Runtime Clock Service.
 - Sensitive areas to avoid casual edits:
   - auth-and-access model
   - event-and-snapshot model

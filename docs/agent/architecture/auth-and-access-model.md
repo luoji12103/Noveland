@@ -45,10 +45,13 @@ RBAC with world-scoped ownership checks.
 - The web app exposes `/login`, protects `/`, and proxies browser auth calls through same-origin `/api/auth/*` route handlers.
 - API authorization helpers enforce platform-admin, world-member, and world-admin checks for backend routes.
 - World management endpoints use those helpers for platform-admin creation, world-admin mutation, and member-scoped reads.
+- Mutating world management endpoints require the readable CSRF cookie plus matching `X-CSRF-Token` header.
+- The protected web dashboard reads world data server-side and proxies browser world mutations through same-origin `/api/worlds/*` route handlers.
+- World DELETE routes are soft-disable controls, not hard deletes.
 
 ## Current limits
 
 - No OAuth/OIDC, email verification, password reset, MFA, or public registration endpoint.
-- No broad policy engine or frontend world-access UI yet.
+- No broad policy engine yet.
 - `world_admin` and `human_user` continue to be represented by `world_memberships`.
 - `agent_runtime` credential modeling remains deferred.

@@ -10,11 +10,14 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
+- `web/app/api/worlds/` — same-origin world management proxy route handlers
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
+  - `web/features/dashboard/` — protected world management dashboard components
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
+  - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
 - `web/package.json` — frontend scripts and dependency manifest
 
 ### Backend services

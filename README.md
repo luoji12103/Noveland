@@ -1,6 +1,6 @@
 # Noveland
 
-Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a minimal backend API, auth/session baseline, protected web shell, runtime host, and local infrastructure.
+Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a minimal backend API, auth/session baseline, protected world management dashboard, runtime host, and local infrastructure.
 
 ## Current Status
 
@@ -126,18 +126,26 @@ GET /worlds
 POST /worlds
 GET /worlds/{world_id}
 PATCH /worlds/{world_id}
+DELETE /worlds/{world_id}
 GET /worlds/{world_id}/scenes
 POST /worlds/{world_id}/scenes
 PATCH /worlds/{world_id}/scenes/{scene_id}
+DELETE /worlds/{world_id}/scenes/{scene_id}
 GET /worlds/{world_id}/memberships
 PUT /worlds/{world_id}/memberships/{user_id}
 DELETE /worlds/{world_id}/memberships/{user_id}
+GET /worlds/{world_id}/member-candidates
 GET /worlds/{world_id}/agents
 POST /worlds/{world_id}/agents
 PATCH /worlds/{world_id}/agents/{agent_id}
+DELETE /worlds/{world_id}/agents/{agent_id}
 ```
 
-These endpoints manage database records only. They do not start runtime loops, emit world events, or connect the web dashboard to real world data yet.
+Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
+
+The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, and memberships according to the current user's backend permissions.
+
+These endpoints manage database records only. They do not start runtime loops, emit world events, run world clocks, or execute plugins.
 
 ## Development Rules
 

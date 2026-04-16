@@ -4,11 +4,12 @@ import re
 import uuid
 from typing import Annotated, Any, Literal, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.agents.models import Agent
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
 from noveland.services.api.authorization import is_platform_admin
+from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
     get_current_subject,
@@ -19,7 +20,7 @@ from noveland.services.api.dependencies import (
 )
 from noveland.worlds.models import Scene, World, WorldMembership
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$"
@@ -100,11 +101,23 @@ class SceneResponse(BaseModel):
     is_active: bool
 
 
+class UserSummaryResponse(BaseModel):
+    id: uuid.UUID
+    email: str
+    display_name: str
+    is_active: bool
+
+
+class MemberCandidateResponse(UserSummaryResponse):
+    role: WorldRole | None = None
+
+
 class MembershipResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
     user_id: uuid.UUID
     role: WorldRole
+    user: UserSummaryResponse
 
 
 class AgentResponse(BaseModel):
@@ -138,9 +151,11 @@ def list_worlds(
 @router.post("", response_model=WorldResponse, status_code=status.HTTP_201_CREATED)
 def create_world(
     world_create: WorldCreateRequest,
+    request: Request,
     subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldResponse:
+    require_csrf(request)
     _ensure_slug_available(db_session, world_create.slug)
     world = World(
         id=uuid.uuid4(),
@@ -169,9 +184,11 @@ def get_world(
 @router.patch("/{world_id}", response_model=WorldResponse)
 def update_world(
     world_update: WorldUpdateRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldResponse:
+    require_csrf(request)
     world = _world_or_404(db_session, context.world_id)
     if "name" in world_update.model_fields_set:
         world.name = world_update.name or world.name
@@ -183,6 +200,18 @@ def update_world(
         world.is_active = bool(world_update.is_active)
     db_session.flush()
     return _world_response(world)
+
+
+@router.delete("/{world_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_world(
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    world = _world_or_404(db_session, context.world_id)
+    world.is_active = False
+    db_session.flush()
 
 
 @router.get("/{world_id}/scenes", response_model=list[SceneResponse])
@@ -203,9 +232,11 @@ def list_scenes(
 )
 def create_scene(
     scene_create: SceneCreateRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> SceneResponse:
+    require_csrf(request)
     _ensure_scene_key_available(db_session, context.world_id, scene_create.scene_key)
     scene = Scene(
         id=uuid.uuid4(),
@@ -224,9 +255,11 @@ def create_scene(
 def update_scene(
     scene_id: uuid.UUID,
     scene_update: SceneUpdateRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> SceneResponse:
+    require_csrf(request)
     scene = _scene_or_404(db_session, context.world_id, scene_id)
     if "name" in scene_update.model_fields_set:
         scene.name = scene_update.name or scene.name
@@ -238,32 +271,85 @@ def update_scene(
     return _scene_response(scene)
 
 
+@router.delete("/{world_id}/scenes/{scene_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_scene(
+    scene_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    scene = _scene_or_404(db_session, context.world_id, scene_id)
+    scene.is_active = False
+    db_session.flush()
+
+
 @router.get("/{world_id}/memberships", response_model=list[MembershipResponse])
 def list_memberships(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[MembershipResponse]:
-    memberships = db_session.scalars(
-        select(WorldMembership)
+    rows = db_session.execute(
+        select(WorldMembership, User)
+        .join(User, User.id == WorldMembership.user_id)
         .where(WorldMembership.world_id == context.world_id)
         .order_by(WorldMembership.role, WorldMembership.user_id),
     ).all()
-    return [_membership_response(membership) for membership in memberships]
+    return [_membership_response(membership, user) for membership, user in rows]
+
+
+@router.get("/{world_id}/member-candidates", response_model=list[MemberCandidateResponse])
+def list_member_candidates(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    query: Annotated[str | None, Query(max_length=160)] = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[MemberCandidateResponse]:
+    statement = (
+        select(User, WorldMembership.role)
+        .outerjoin(
+            WorldMembership,
+            (WorldMembership.user_id == User.id)
+            & (WorldMembership.world_id == context.world_id),
+        )
+        .where(User.is_active.is_(True))
+        .order_by(User.email)
+        .limit(limit)
+    )
+    normalized_query = query.strip() if query is not None else ""
+    if normalized_query:
+        pattern = f"%{normalized_query}%"
+        statement = statement.where(
+            or_(User.email.ilike(pattern), User.display_name.ilike(pattern)),
+        )
+
+    return [
+        MemberCandidateResponse(
+            id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            is_active=user.is_active,
+            role=cast(WorldRole | None, role),
+        )
+        for user, role in db_session.execute(statement).all()
+    ]
 
 
 @router.put("/{world_id}/memberships/{user_id}", response_model=MembershipResponse)
 def upsert_membership(
     user_id: uuid.UUID,
     membership_upsert: MembershipUpsertRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> MembershipResponse:
+    require_csrf(request)
     if user_id != membership_upsert.user_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="user_id mismatch",
         )
-    _user_or_404(db_session, user_id)
+    user = _user_or_404(db_session, user_id)
     existing = _membership_or_none(db_session, context.world_id, user_id)
     if (
         existing is not None
@@ -274,16 +360,18 @@ def upsert_membership(
         raise _conflict("Cannot remove the final world admin")
     membership = _upsert_membership(db_session, context.world_id, user_id, membership_upsert.role)
     db_session.flush()
-    return _membership_response(membership)
+    return _membership_response(membership, user)
 
 
 @router.delete("/{world_id}/memberships/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_membership(
     user_id: uuid.UUID,
+    request: Request,
     response: Response,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> None:
+    require_csrf(request)
     membership = _membership_or_404(db_session, context.world_id, user_id)
     if membership.role == AuthRole.WORLD_ADMIN.value and _world_admin_count(
         db_session,
@@ -312,9 +400,11 @@ def list_agents(
 )
 def create_agent(
     agent_create: AgentCreateRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> AgentResponse:
+    require_csrf(request)
     _ensure_agent_key_available(db_session, context.world_id, agent_create.agent_key)
     if agent_create.home_scene_id is not None:
         _scene_or_404(db_session, context.world_id, agent_create.home_scene_id)
@@ -337,9 +427,11 @@ def create_agent(
 def update_agent(
     agent_id: uuid.UUID,
     agent_update: AgentUpdateRequest,
+    request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> AgentResponse:
+    require_csrf(request)
     agent = _agent_or_404(db_session, context.world_id, agent_id)
     if "display_name" in agent_update.model_fields_set:
         agent.display_name = agent_update.display_name or agent.display_name
@@ -353,6 +445,19 @@ def update_agent(
         agent.is_enabled = bool(agent_update.is_enabled)
     db_session.flush()
     return _agent_response(agent)
+
+
+@router.delete("/{world_id}/agents/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deactivate_agent(
+    agent_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    agent = _agent_or_404(db_session, context.world_id, agent_id)
+    agent.is_enabled = False
+    db_session.flush()
 
 
 def _world_response(world: World) -> WorldResponse:
@@ -378,12 +483,22 @@ def _scene_response(scene: Scene) -> SceneResponse:
     )
 
 
-def _membership_response(membership: WorldMembership) -> MembershipResponse:
+def _membership_response(membership: WorldMembership, user: User) -> MembershipResponse:
     return MembershipResponse(
         id=membership.id,
         world_id=membership.world_id,
         user_id=membership.user_id,
         role=cast(WorldRole, membership.role),
+        user=_user_summary_response(user),
+    )
+
+
+def _user_summary_response(user: User) -> UserSummaryResponse:
+    return UserSummaryResponse(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        is_active=user.is_active,
     )
 
 

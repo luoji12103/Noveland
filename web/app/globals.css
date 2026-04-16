@@ -93,6 +93,115 @@ a {
   padding: 28px 0;
 }
 
+.management-section,
+.world-toolbar,
+.management-panel,
+.management-columns {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.management-section {
+  padding: 0 0 24px;
+}
+
+.management-notice {
+  width: min(1120px, calc(100% - 32px));
+  margin: 22px auto 0;
+  padding: 12px 14px;
+  color: var(--forest-dark);
+  background: #eaf4ef;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.world-toolbar {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 0 0 20px;
+}
+
+.management-panel {
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+}
+
+.management-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+  align-items: start;
+}
+
+.management-columns .management-panel {
+  width: 100%;
+  margin: 0;
+}
+
+.management-form,
+.inline-form {
+  display: grid;
+  gap: 10px;
+}
+
+.management-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
+.inline-form {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.resource-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.resource-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  min-height: 86px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.resource-row h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.resource-row p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .session-strip {
   display: flex;
   width: min(1120px, calc(100% - 32px));
@@ -296,8 +405,22 @@ a {
 @media (max-width: 900px) {
   .top-band-inner,
   .dashboard-grid,
+  .management-columns,
   .status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .management-form,
+  .world-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-row {
+    grid-template-columns: 1fr;
+  }
+
+  .button-row {
+    justify-content: stretch;
   }
 
   .world-image {

@@ -3,20 +3,24 @@ import { redirect } from "next/navigation";
 
 import { LogoutButton } from "@/features/auth/logout-button";
 import { StatusCards } from "@/features/dashboard/status-cards";
+import { WorldManagementDashboard } from "@/features/dashboard/world-management-dashboard";
 import { getCurrentSubject } from "@/lib/auth/server";
 import { systemStatuses } from "@/lib/status";
+import { getWorldDashboardData } from "@/lib/worlds/server";
 
-const metrics = [
-  { label: "Worlds", value: "0 configured" },
-  { label: "Agents", value: "0 active" },
-  { label: "Narrative", value: "Not scheduled" },
-];
+type HomeProps = {
+  searchParams?: Promise<{
+    world?: string;
+  }>;
+};
 
-export default async function Home() {
+export default async function Home({ searchParams }: HomeProps) {
   const subject = await getCurrentSubject();
   if (subject === null) {
     redirect("/login");
   }
+  const resolvedSearchParams = await searchParams;
+  const dashboardData = await getWorldDashboardData(resolvedSearchParams?.world ?? null);
 
   return (
     <main className="page-shell">
@@ -24,10 +28,9 @@ export default async function Home() {
         <div className="top-band-inner">
           <div>
             <p className="eyebrow">Noveland control surface</p>
-            <h1 className="title">World kernel standing by</h1>
+            <h1 className="title">World management console</h1>
             <p className="intro">
-              Create the first world after the core schema, access checks, clock state, and plugin
-              registry tasks land.
+              Manage worlds, scenes, agents, and memberships from the local control surface.
             </p>
           </div>
           <Image
@@ -52,14 +55,7 @@ export default async function Home() {
         <LogoutButton />
       </section>
 
-      <section className="dashboard-grid" aria-label="World overview">
-        {metrics.map((metric) => (
-          <div className="metric" key={metric.label}>
-            <p className="metric-label">{metric.label}</p>
-            <p className="metric-value">{metric.value}</p>
-          </div>
-        ))}
-      </section>
+      <WorldManagementDashboard subject={subject} initialData={dashboardData} />
 
       <section className="status-section">
         <h2 className="section-title">System status</h2>

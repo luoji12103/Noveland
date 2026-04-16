@@ -131,3 +131,14 @@
 - Tests added/updated: SQLite-backed world management API tests; skipped-by-default PostgreSQL integration smoke; workspace import coverage for world router
 - Docs updated: README, auth/access model, project index, file inventory, task board, active handoff
 - Follow-up notes: real dashboard data, runtime loops, event emission, world clock controls, plugin execution, and Web world management UI remain separate tasks.
+
+## World dashboard data entry
+
+- Date: 2026-04-16
+- Branch: feat/world-dashboard-data
+- Scope: world dashboard data and management console
+- Summary: Connected the protected web dashboard to the backend world API, added same-origin world proxy routes, added admin management controls, and extended backend world routes with CSRF, member candidates, membership user summaries, and soft-disable DELETE routes.
+- Files changed: `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/test_api_worlds.py`, `/web/app/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: backend world API CSRF/member-candidate/soft-disable tests; world client/proxy/component tests; Playwright dashboard management flows with local mock backend
+- Docs updated: README, auth/access model, project index, file inventory, task board, active handoff
+- Follow-up notes: runtime clock service, event emission, replay, calendar rules, memory backend, and agent loop remain separate tasks.

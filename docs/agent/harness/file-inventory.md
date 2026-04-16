@@ -12,11 +12,14 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/`
 - `web/app/login/`
 - `web/app/api/auth/`
+- `web/app/api/worlds/`
 - `web/features/`
 - `web/features/auth/`
+- `web/features/dashboard/`
 - `web/components/`
 - `web/lib/`
 - `web/lib/auth/`
+- `web/lib/worlds/`
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
 - `backend/services/api/src/noveland/services/api/authorization.py`

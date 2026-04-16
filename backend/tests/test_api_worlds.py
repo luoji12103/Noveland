@@ -12,7 +12,7 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import Scene, World, WorldMembership
 from sqlalchemy import Table, create_engine, select
@@ -41,6 +41,8 @@ def test_platform_admin_can_create_list_and_update_worlds() -> None:
         f"/worlds/{world['id']}",
         json={"name": "Renamed World", "is_active": False},
     )
+    deactivate_response = client.delete(f"/worlds/{world['id']}")
+    inactive_world = _world_is_active(engine, uuid.UUID(world["id"]))
 
     assert create_response.status_code == 201
     assert world["owner_user_id"] == str(platform_user_id)
@@ -49,6 +51,8 @@ def test_platform_admin_can_create_list_and_update_worlds() -> None:
     assert update_response.status_code == 200
     assert update_response.json()["name"] == "Renamed World"
     assert update_response.json()["is_active"] is False
+    assert deactivate_response.status_code == 204
+    assert inactive_world is False
     assert _membership_role(engine, uuid.UUID(world["id"]), platform_user_id) == "world_admin"
 
 
@@ -65,6 +69,7 @@ def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None
     member_list = client.get("/worlds")
     member_get = client.get(f"/worlds/{world_id}")
     member_patch = client.patch(f"/worlds/{world_id}", json={"name": "Blocked"})
+    member_candidates = client.get(f"/worlds/{world_id}/member-candidates")
 
     _authenticate(client, stranger_token)
     stranger_list = client.get("/worlds")
@@ -73,8 +78,33 @@ def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None
     assert [item["id"] for item in member_list.json()] == [str(world_id)]
     assert member_get.status_code == 200
     assert member_patch.status_code == 403
+    assert member_candidates.status_code == 403
     assert stranger_list.json() == []
     assert stranger_get.status_code == 404
+
+
+def test_world_mutations_require_csrf() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    _authenticate_session_only(client, token)
+
+    missing_csrf = client.post("/worlds", json={"slug": "missing-csrf", "name": "Blocked"})
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    wrong_csrf = client.post(
+        "/worlds",
+        headers={CSRF_HEADER_NAME: "wrong-token"},
+        json={"slug": "wrong-csrf", "name": "Blocked"},
+    )
+    allowed = client.post(
+        "/worlds",
+        headers={CSRF_HEADER_NAME: "csrf-token"},
+        json={"slug": "allowed-world", "name": "Allowed"},
+    )
+
+    assert platform_user_id
+    assert missing_csrf.status_code == 403
+    assert wrong_csrf.status_code == 403
+    assert allowed.status_code == 201
 
 
 def test_world_admin_manages_scenes_agents_and_conflicts() -> None:
@@ -100,6 +130,7 @@ def test_world_admin_manages_scenes_agents_and_conflicts() -> None:
         f"/worlds/{world_id}/scenes/{scene_id}",
         json={"name": "New Home", "is_active": False},
     )
+    deactivate_scene = client.delete(f"/worlds/{world_id}/scenes/{scene_id}")
     agent_response = client.post(
         f"/worlds/{world_id}/agents",
         json={
@@ -127,17 +158,22 @@ def test_world_admin_manages_scenes_agents_and_conflicts() -> None:
         f"/worlds/{world_id}/agents/{agent_response.json()['id']}",
         json={"display_name": "Guide Updated", "is_enabled": False},
     )
+    deactivate_agent = client.delete(f"/worlds/{world_id}/agents/{agent_response.json()['id']}")
     list_agents = client.get(f"/worlds/{world_id}/agents")
 
     assert scene_response.status_code == 201
     assert duplicate_scene.status_code == 409
     assert update_scene.status_code == 200
     assert update_scene.json()["is_active"] is False
+    assert deactivate_scene.status_code == 204
+    assert _scene_is_active(engine, uuid.UUID(scene_id)) is False
     assert agent_response.status_code == 201
     assert duplicate_agent.status_code == 409
     assert cross_world_agent.status_code == 404
     assert update_agent.status_code == 200
     assert update_agent.json()["display_name"] == "Guide Updated"
+    assert deactivate_agent.status_code == 204
+    assert _agent_is_enabled(engine, uuid.UUID(agent_response.json()["id"])) is False
     assert list_agents.json()[0]["agent_key"] == "guide"
 
 
@@ -159,6 +195,11 @@ def test_membership_management_and_final_admin_guard() -> None:
         json={"user_id": str(user_id), "role": "human_user"},
     )
     list_members = client.get(f"/worlds/{world_id}/memberships")
+    member_candidates = client.get(
+        f"/worlds/{world_id}/member-candidates",
+        params={"query": "user", "limit": 5},
+    )
+    invalid_limit = client.get(f"/worlds/{world_id}/member-candidates", params={"limit": 51})
     delete_member = client.delete(f"/worlds/{world_id}/memberships/{user_id}")
     downgrade_final_admin = client.put(
         f"/worlds/{world_id}/memberships/{owner_id}",
@@ -174,7 +215,20 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert invalid_role.status_code == 422
     assert create_member.status_code == 200
     assert create_member.json()["role"] == "human_user"
+    assert create_member.json()["user"]["email"] == "user@example.test"
     assert sorted(item["role"] for item in list_members.json()) == ["human_user", "world_admin"]
+    assert list_members.json()[0]["user"]["email"]
+    assert member_candidates.status_code == 200
+    assert invalid_limit.status_code == 422
+    assert member_candidates.json() == [
+        {
+            "id": str(user_id),
+            "email": "user@example.test",
+            "display_name": "user@example.test",
+            "is_active": True,
+            "role": "human_user",
+        },
+    ]
     assert delete_member.status_code == 204
     assert downgrade_final_admin.status_code == 409
     assert delete_final_admin.status_code == 409
@@ -306,6 +360,28 @@ def _membership_role(engine: Engine, world_id: uuid.UUID, user_id: uuid.UUID) ->
         ).one_or_none()
 
 
+def _world_is_active(engine: Engine, world_id: uuid.UUID) -> bool:
+    with Session(engine) as session:
+        return bool(session.scalars(select(World.is_active).where(World.id == world_id)).one())
+
+
+def _scene_is_active(engine: Engine, scene_id: uuid.UUID) -> bool:
+    with Session(engine) as session:
+        return bool(session.scalars(select(Scene.is_active).where(Scene.id == scene_id)).one())
+
+
+def _agent_is_enabled(engine: Engine, agent_id: uuid.UUID) -> bool:
+    with Session(engine) as session:
+        return bool(session.scalars(select(Agent.is_enabled).where(Agent.id == agent_id)).one())
+
+
 def _authenticate(client: TestClient, token: str) -> None:
+    _authenticate_session_only(client, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_session_only(client: TestClient, token: str) -> None:
     client.cookies.clear()
+    client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)
