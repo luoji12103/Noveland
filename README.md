@@ -104,6 +104,101 @@ npm run dev
 
 Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account.
 
+## 人工确认步骤
+
+按下面顺序做一轮人工验收，可以覆盖当前主干上最重要的能力：
+
+1. 启动基础设施：
+   ```sh
+   docker compose -f infra/compose.yaml up -d
+   ```
+2. 在 `backend/` 执行数据库迁移并 seed 管理员：
+   ```sh
+   uv run alembic upgrade head
+   uv run noveland-seed-admin \
+     --email admin@example.test \
+     --password "change-me-local-only" \
+     --display-name "Admin"
+   ```
+3. 分别启动 API、Web、runtime daemon：
+   ```sh
+   # backend/
+   uv run uvicorn noveland.services.api.app:app --reload
+   ```
+   ```sh
+   # web/
+   npm run dev
+   ```
+   ```sh
+   # backend/
+   uv run noveland-runtime --daemon
+   ```
+4. 打开 `http://127.0.0.1:3000/login`，用刚刚 seed 的管理员账号登录。
+5. 在 dashboard 中确认以下操作可用：
+   - 创建 world，确认 world clock 已初始化
+   - 创建 scene 和 agent
+   - 创建 provider profile，并执行 `Test provider`
+   - 给 agent 设置 persona，手动添加 observation，并执行 refresh
+   - 手动运行 agent，确认 run、memory、narrative artifact、diagnostics 有更新
+   - 启动 runtime，确认 runtime status 和 diagnostics 有变化
+6. 如需验证 API 面，额外确认：
+   - `GET /health` 返回固定 contract
+   - `/auth/*` 登录、当前用户、登出正常
+   - `/worlds/*`、`/runtime/*`、`/provider-profiles/*` 在登录态下按权限正常工作
+
+## 正常使用教程
+
+日常本地使用可以按这个最短路径：
+
+1. 首次环境准备：
+   - 安装 `uv`
+   - 复制 `.env.example` 为 `.env`
+   - 在 `web/` 执行一次 `npm install`
+2. 每次开始工作前：
+   ```sh
+   docker compose -f infra/compose.yaml up -d
+   ```
+3. 后端如有新 migration，先在 `backend/` 执行：
+   ```sh
+   uv run alembic upgrade head
+   ```
+4. 如需重新建立管理员账号，在 `backend/` 执行：
+   ```sh
+   uv run noveland-seed-admin \
+     --email admin@example.test \
+     --password "change-me-local-only" \
+     --display-name "Admin"
+   ```
+5. 开发时通常需要三个进程：
+   - `backend/`: `uv run uvicorn noveland.services.api.app:app --reload`
+   - `web/`: `npm run dev`
+   - `backend/`: `uv run noveland-runtime --daemon`
+6. 登录后的一般操作顺序：
+   - 先创建或选择 world
+   - 再配置 scenes、agents、memberships
+   - 配置 provider profile，并先做 `Test provider`
+   - 给 agent 设置 persona 和 observations
+   - 通过 manual run 或启动 runtime 观察 agent 行为
+7. 常用回归命令：
+   ```sh
+   # backend/
+   uv run ruff check .
+   uv run mypy .
+   uv run pytest
+   ```
+   ```sh
+   # web/
+   npm run lint
+   npm run typecheck
+   npm run test
+   npm run test:e2e
+   npm run build
+   ```
+8. 停止本地依赖：
+   ```sh
+   docker compose -f infra/compose.yaml down
+   ```
+
 ## Stable Interfaces
 
 The first stable backend endpoint is:
