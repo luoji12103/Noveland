@@ -29,7 +29,7 @@
 - Runtime Event Emission + NATS Baseline
 - Replay + Snapshot Restore Baseline
 - Calendar + Schedule Rules Baseline
+- Memory Backend + Local pgvector Baseline
 
 ## Upcoming Mainline
-- Memory Backend + Local pgvector Baseline
 - Agent Loop + Narrative Baseline

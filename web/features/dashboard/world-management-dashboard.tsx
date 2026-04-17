@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { AuthSubject } from "@/lib/auth/types";
 import {
   createAgent,
+  createAgentMemoryItem,
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
   createScene,
@@ -22,6 +23,7 @@ import {
   getLatestSnapshot,
   getReplayState,
   listAgentCalendar,
+  listAgentMemory,
   listAgents,
   listMemberCandidates,
   listMemberships,
@@ -29,6 +31,7 @@ import {
   listScenes,
   pauseWorldClock,
   resumeWorldClock,
+  searchAgentMemory,
   skipWorldClock,
   updateAgentCalendarEntry,
   updateAgent,
@@ -37,12 +40,14 @@ import {
   updateWorld,
   upsertMembership,
   WorldClientError,
+  disableAgentMemoryItem,
 } from "@/lib/worlds/client";
 import type {
   Agent,
   AgentKind,
   CalendarEntry,
   MemberCandidate,
+  MemoryItem,
   Membership,
   Scene,
   ScheduleRule,
@@ -76,6 +81,7 @@ export function WorldManagementDashboard({
   const [selectedAgentId, setSelectedAgentId] = useState(initialData.selectedAgentId);
   const [calendarEntries, setCalendarEntries] = useState(initialData.calendarEntries);
   const [scheduleRules, setScheduleRules] = useState(initialData.scheduleRules);
+  const [memoryItems, setMemoryItems] = useState(initialData.memoryItems);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -122,8 +128,14 @@ export function WorldManagementDashboard({
         listScheduleRules(worldId),
       ]);
       const nextSelectedAgent = nextAgents[0] ?? null;
-      const nextCalendarEntries =
-        nextSelectedAgent === null ? [] : await listAgentCalendar(worldId, nextSelectedAgent.id);
+      const nextCanManage = nextMemberships !== null;
+      const [nextCalendarEntries, nextMemoryItems] =
+        nextSelectedAgent === null
+          ? [[], []]
+          : await Promise.all([
+              listAgentCalendar(worldId, nextSelectedAgent.id),
+              nextCanManage ? listAgentMemory(worldId, nextSelectedAgent.id) : Promise.resolve([]),
+            ]);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
       setAgents(nextAgents);
@@ -134,7 +146,8 @@ export function WorldManagementDashboard({
       setSelectedAgentId(nextSelectedAgent?.id ?? null);
       setCalendarEntries(nextCalendarEntries);
       setScheduleRules(nextScheduleRules);
-      setCanManageSelectedWorld(nextMemberships !== null);
+      setMemoryItems(nextMemoryItems);
+      setCanManageSelectedWorld(nextCanManage);
       setMemberCandidates([]);
     });
   }
@@ -173,6 +186,7 @@ export function WorldManagementDashboard({
       setSelectedAgentId(null);
       setCalendarEntries([]);
       setScheduleRules([]);
+      setMemoryItems([]);
       setMemberships([
         {
           id: "local-owner",
@@ -387,6 +401,7 @@ export function WorldManagementDashboard({
       setAgents((currentAgents) => [...currentAgents, agent].sort(compareAgents));
       setSelectedAgentId(agent.id);
       setCalendarEntries([]);
+      setMemoryItems([]);
       event.currentTarget.reset();
     }, "Agent created.");
   }
@@ -397,7 +412,12 @@ export function WorldManagementDashboard({
     }
     await runAction(async () => {
       setSelectedAgentId(agentId);
-      setCalendarEntries(await listAgentCalendar(selectedWorld.id, agentId));
+      const [nextCalendarEntries, nextMemoryItems] = await Promise.all([
+        listAgentCalendar(selectedWorld.id, agentId),
+        canManage ? listAgentMemory(selectedWorld.id, agentId) : Promise.resolve([]),
+      ]);
+      setCalendarEntries(nextCalendarEntries);
+      setMemoryItems(nextMemoryItems);
     });
   }
 
@@ -514,6 +534,64 @@ export function WorldManagementDashboard({
         ),
       );
     }, "Schedule rule disabled.");
+  }
+
+  async function handleCreateMemoryItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const content = formString(form, "content");
+    if (content === "") {
+      setNotice("Memory content is required.");
+      return;
+    }
+    await runAction(async () => {
+      const memoryItem = await createAgentMemoryItem(selectedWorld.id, selectedAgent.id, {
+        content,
+        embedding: jsonNumberArray(formString(form, "embedding")),
+        metadata: jsonObject(formString(form, "metadata")),
+      });
+      setMemoryItems((currentItems) => [memoryItem, ...currentItems]);
+      event.currentTarget.reset();
+    }, "Memory item created.");
+  }
+
+  async function handleSearchMemory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      setMemoryItems(
+        await searchAgentMemory(selectedWorld.id, selectedAgent.id, {
+          embedding: jsonNumberArray(formString(form, "embedding")),
+        }),
+      );
+    }, "Memory search completed.");
+  }
+
+  async function handleRefreshMemory() {
+    if (selectedWorld === null || selectedAgent === null || !canManage) {
+      return;
+    }
+    await runAction(async () => {
+      setMemoryItems(await listAgentMemory(selectedWorld.id, selectedAgent.id));
+    }, "Memory refreshed.");
+  }
+
+  async function handleDisableMemoryItem(memoryItem: MemoryItem) {
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    await runAction(async () => {
+      await disableAgentMemoryItem(selectedWorld.id, selectedAgent.id, memoryItem.id);
+      setMemoryItems((currentItems) =>
+        currentItems.filter((currentItem) => currentItem.id !== memoryItem.id),
+      );
+    }, "Memory item disabled.");
   }
 
   async function handleUpdateAgent(event: FormEvent<HTMLFormElement>, agent: Agent) {
@@ -736,6 +814,19 @@ export function WorldManagementDashboard({
             onCreate={handleCreateCalendarEntry}
             onUpdate={handleUpdateCalendarEntry}
             onCancel={handleCancelCalendarEntry}
+          />
+
+          <MemoryPanel
+            agents={agents}
+            selectedAgent={selectedAgent}
+            items={memoryItems}
+            canManage={canManage}
+            isBusy={isBusy}
+            onSelectAgent={handleSelectAgent}
+            onCreate={handleCreateMemoryItem}
+            onSearch={handleSearchMemory}
+            onRefresh={handleRefreshMemory}
+            onDisable={handleDisableMemoryItem}
           />
 
           <section className="management-columns">
@@ -1262,6 +1353,111 @@ function CalendarPanel({
   );
 }
 
+function MemoryPanel({
+  agents,
+  selectedAgent,
+  items,
+  canManage,
+  isBusy,
+  onSelectAgent,
+  onCreate,
+  onSearch,
+  onRefresh,
+  onDisable,
+}: {
+  agents: Agent[];
+  selectedAgent: Agent | null;
+  items: MemoryItem[];
+  canManage: boolean;
+  isBusy: boolean;
+  onSelectAgent: (agentId: string) => void | Promise<void>;
+  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onSearch: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onRefresh: () => void | Promise<void>;
+  onDisable: (item: MemoryItem) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Agent memory">
+      <h2 className="section-title">Agent memory</h2>
+      <select
+        className="text-input"
+        value={selectedAgent?.id ?? ""}
+        onChange={(event) => void onSelectAgent(event.target.value)}
+      >
+        {agents.length === 0 ? <option value="">No agents</option> : null}
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.display_name}
+          </option>
+        ))}
+      </select>
+      {canManage && selectedAgent !== null ? (
+        <>
+          <form className="management-form" onSubmit={(event) => void onCreate(event)}>
+            <input className="text-input" name="content" placeholder="Memory content" />
+            <textarea
+              className="text-input"
+              name="embedding"
+              placeholder="[1,0,0]"
+              rows={3}
+            />
+            <textarea className="text-input" name="metadata" placeholder="{}" rows={3} />
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Add memory item
+            </button>
+          </form>
+          <form className="management-form" onSubmit={(event) => void onSearch(event)}>
+            <textarea
+              className="text-input"
+              name="embedding"
+              placeholder="Search embedding"
+              rows={3}
+            />
+            <div className="button-row">
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Search memory
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void onRefresh()}
+              >
+                Refresh memory
+              </button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <p className="status-detail">Memory management requires world admin access.</p>
+      )}
+      <div className="resource-list">
+        {items.map((item) => (
+          <article className="resource-row" key={item.id}>
+            <div>
+              <h3>{item.content}</h3>
+              <p>
+                {item.visibility}
+                {item.score === null ? "" : ` - score ${item.score.toFixed(3)}`}
+              </p>
+            </div>
+            {canManage ? (
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void onDisable(item)}
+              >
+                Disable memory item
+              </button>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 async function listMembershipsIfAllowed(worldId: string): Promise<Membership[] | null> {
   try {
     return await listMemberships(worldId);
@@ -1292,6 +1488,14 @@ function jsonObject(rawValue: string): Record<string, unknown> {
     throw new Error("Config must be a JSON object.");
   }
   return parsed as Record<string, unknown>;
+}
+
+function jsonNumberArray(rawValue: string): number[] {
+  const parsed = JSON.parse(rawValue) as unknown;
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "number")) {
+    throw new Error("Embedding must be a JSON array of numbers.");
+  }
+  return parsed;
 }
 
 function messageForError(error: unknown): string {

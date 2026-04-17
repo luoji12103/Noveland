@@ -4,6 +4,7 @@ import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
   CalendarEntry,
+  MemoryItem,
   Membership,
   Scene,
   ScheduleRule,
@@ -27,22 +28,30 @@ export async function getWorldDashboardData(
 
     const [scenes, agents, memberships, clock, replayState, latestSnapshot, scheduleRules] =
       await Promise.all([
-      apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
-      apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
-      apiFetchOptional<Membership[]>(`/worlds/${selectedWorld.id}/memberships`, cookieHeader),
-      apiFetch<WorldClock>(`/worlds/${selectedWorld.id}/clock`, cookieHeader),
-      apiFetch<WorldReplayState>(`/worlds/${selectedWorld.id}/replay/state`, cookieHeader),
-      apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
-      apiFetch<ScheduleRule[]>(`/worlds/${selectedWorld.id}/schedule-rules`, cookieHeader),
-    ]);
+        apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
+        apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
+        apiFetchOptional<Membership[]>(`/worlds/${selectedWorld.id}/memberships`, cookieHeader),
+        apiFetch<WorldClock>(`/worlds/${selectedWorld.id}/clock`, cookieHeader),
+        apiFetch<WorldReplayState>(`/worlds/${selectedWorld.id}/replay/state`, cookieHeader),
+        apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
+        apiFetch<ScheduleRule[]>(`/worlds/${selectedWorld.id}/schedule-rules`, cookieHeader),
+      ]);
     const selectedAgent = agents[0] ?? null;
-    const calendarEntries =
+    const [calendarEntries, memoryItems] =
       selectedAgent === null
-        ? []
-        : await apiFetch<CalendarEntry[]>(
-            `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/calendar`,
-            cookieHeader,
-          );
+        ? [[], []]
+        : await Promise.all([
+            apiFetch<CalendarEntry[]>(
+              `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/calendar`,
+              cookieHeader,
+            ),
+            memberships === null
+              ? Promise.resolve<MemoryItem[]>([])
+              : apiFetch<MemoryItem[]>(
+                  `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/memory`,
+                  cookieHeader,
+                ),
+          ]);
 
     return {
       worlds,
@@ -56,6 +65,7 @@ export async function getWorldDashboardData(
       selectedAgentId: selectedAgent?.id ?? null,
       calendarEntries,
       scheduleRules,
+      memoryItems,
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -132,6 +142,7 @@ function emptyDashboardData(
     selectedAgentId: null,
     calendarEntries: [],
     scheduleRules: [],
+    memoryItems: [],
     canManageSelectedWorld: false,
     loadError,
   };

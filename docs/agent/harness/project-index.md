@@ -58,6 +58,10 @@ Fast orientation for a new coding session.
   - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
+  - `noveland.memory.contracts` — memory item and search contracts plus backend protocol
+  - `noveland.memory.models` — agent memory ORM model
+  - `noveland.memory.local_pgvector` — local pgvector-backed memory helper with add/list/search/disable
+  - `noveland.memory.vector_type` — shared embedding dimension and SQLAlchemy vector type adapter
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
 - `backend/packages/adapters/`

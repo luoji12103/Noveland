@@ -506,6 +506,22 @@ requires-dist = [
 name = "noveland-memory"
 version = "0.1.0"
 source = { editable = "packages/memory" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-core" },
+    { name = "noveland-events" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-events", editable = "packages/events" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
 
 [[package]]
 name = "noveland-narrative"
@@ -538,6 +554,7 @@ dependencies = [
     { name = "noveland-auth" },
     { name = "noveland-calendar" },
     { name = "noveland-core" },
+    { name = "noveland-memory" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -552,6 +569,7 @@ requires-dist = [
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-calendar", editable = "packages/calendar" },
     { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.13,<3" },

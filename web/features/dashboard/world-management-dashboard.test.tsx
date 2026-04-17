@@ -29,6 +29,7 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("button", { name: "Create snapshot" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Schedule rules" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent calendar" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agent memory" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create agent" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
@@ -71,6 +72,7 @@ const emptyData: WorldDashboardData = {
   selectedAgentId: null,
   calendarEntries: [],
   scheduleRules: [],
+  memoryItems: [],
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -133,6 +135,20 @@ const adminData: WorldDashboardData = {
       kind: "weekday",
       config: {},
       is_enabled: true,
+    },
+  ],
+  memoryItems: [
+    {
+      id: "memory-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      content: "Memory content",
+      metadata: { source: "test" },
+      embedding: [1, 0, 0],
+      visibility: "private",
+      is_active: true,
+      source_event_id: null,
+      score: null,
     },
   ],
   canManageSelectedWorld: true,
@@ -219,6 +235,20 @@ const readOnlyData: WorldDashboardData = {
     },
   ],
   scheduleRules: [],
+  memoryItems: [
+    {
+      id: "memory-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      content: "Read-only memory",
+      metadata: {},
+      embedding: [1, 0, 0],
+      visibility: "private",
+      is_active: true,
+      source_event_id: null,
+      score: 0.91,
+    },
+  ],
   canManageSelectedWorld: false,
   loadError: null,
 };

@@ -14,6 +14,7 @@ from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.memory.models import AgentMemoryItem
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -376,6 +377,61 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert cancel_entry.status_code == 204
 
 
+def test_world_admin_manages_agent_memory() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "memory-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    member_list = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    member_create = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory",
+        json={"content": "blocked", "embedding": _embedding()},
+    )
+
+    _authenticate(client, owner_token)
+    create_memory = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory",
+        json={
+            "content": "Stored memory",
+            "embedding": _embedding(),
+            "metadata": {"source": "api-test"},
+        },
+    )
+    list_memory = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    search_memory = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"embedding": _embedding(), "limit": 5},
+    )
+    bad_embedding = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"embedding": [1, 2, 3]},
+    )
+    disable_memory = client.delete(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/{create_memory.json()['id']}",
+    )
+    list_after_disable = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+
+    assert member_list.status_code == 403
+    assert member_create.status_code == 403
+    assert create_memory.status_code == 201
+    assert create_memory.json()["content"] == "Stored memory"
+    assert create_memory.json()["visibility"] == "private"
+    assert create_memory.json()["metadata"] == {"source": "api-test"}
+    assert list_memory.status_code == 200
+    assert len(list_memory.json()) == 1
+    assert search_memory.status_code == 200
+    assert search_memory.json()[0]["content"] == "Stored memory"
+    assert isinstance(search_memory.json()[0]["score"], float)
+    assert bad_embedding.status_code == 422
+    assert disable_memory.status_code == 204
+    assert list_after_disable.json() == []
+
+
 def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -454,6 +510,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
+        cast(Table, AgentMemoryItem.__table__),
     ):
         table.create(engine)
 
@@ -618,3 +675,7 @@ def _authenticate_session_only(client: TestClient, token: str) -> None:
     client.cookies.clear()
     client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)
+
+
+def _embedding() -> list[float]:
+    return [1.0] + [0.0] * 1535

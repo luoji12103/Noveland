@@ -23,6 +23,7 @@ MODEL_MODULES = (
     "noveland.worlds.models",
     "noveland.agents.models",
     "noveland.calendar.models",
+    "noveland.memory.models",
     "noveland.events.models",
 )
 

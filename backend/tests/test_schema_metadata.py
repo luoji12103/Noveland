@@ -39,6 +39,7 @@ def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
         "agent_calendar_entries",
+        "agent_memory_items",
         "auth_sessions",
         "platform_settings",
         "platform_role_assignments",
@@ -162,6 +163,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "world_schedule_rules",
         CheckConstraint,
     )
+    assert "ck_agent_memory_items_visibility" in constraint_names(
+        "agent_memory_items",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -178,6 +183,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
     assert foreign_key_targets("agent_calendar_entries") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("world_schedule_rules") == {"worlds.id"}
+    assert foreign_key_targets("agent_memory_items") == {
+        "agents.id",
+        "world_events.id",
+        "worlds.id",
+    }
 
 
 def test_core_schema_indexes_cover_world_boundaries() -> None:
@@ -207,3 +217,6 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     )
     assert "ix_world_schedule_rules_world_id" in index_names("world_schedule_rules")
     assert "ix_world_schedule_rules_world_enabled" in index_names("world_schedule_rules")
+    assert "ix_agent_memory_items_world_agent" in index_names("agent_memory_items")
+    assert "ix_agent_memory_items_world_agent_active" in index_names("agent_memory_items")
+    assert "ix_agent_memory_items_source_event_id" in index_names("agent_memory_items")

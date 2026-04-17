@@ -8,6 +8,9 @@ import type {
   CalendarEntryCreateInput,
   CalendarEntryUpdateInput,
   MemberCandidate,
+  MemoryItem,
+  MemoryItemCreateInput,
+  MemorySearchInput,
   Membership,
   Scene,
   SceneCreateInput,
@@ -229,6 +232,47 @@ export function updateScheduleRule(
 
 export function disableScheduleRule(worldId: string, ruleId: string): Promise<void> {
   return worldRequest<void>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
+}
+
+export function listAgentMemory(worldId: string, agentId: string): Promise<MemoryItem[]> {
+  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
+    method: "GET",
+  });
+}
+
+export function createAgentMemoryItem(
+  worldId: string,
+  agentId: string,
+  input: MemoryItemCreateInput,
+): Promise<MemoryItem> {
+  return worldRequest<MemoryItem>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function searchAgentMemory(
+  worldId: string,
+  agentId: string,
+  input: MemorySearchInput,
+): Promise<MemoryItem[]> {
+  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory/search`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function disableAgentMemoryItem(
+  worldId: string,
+  agentId: string,
+  memoryId: string,
+): Promise<void> {
+  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/memory/${memoryId}`, {
     method: "DELETE",
     csrf: true,
   });

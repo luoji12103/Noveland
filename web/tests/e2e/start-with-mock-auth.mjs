@@ -101,6 +101,20 @@ const calendarEntries = [
     metadata: {},
   },
 ];
+const memoryItems = [
+  {
+    id: "70000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    content: "Guide memory",
+    metadata: { source: "mock" },
+    embedding: [1, 0, 0],
+    visibility: "private",
+    is_active: true,
+    source_event_id: null,
+    score: null,
+  },
+];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
 
@@ -384,6 +398,10 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       await handleCalendar(request, response, currentSubject, worldId, agentId, segments[5]);
       return;
     }
+    if (segments[4] === "memory") {
+      await handleMemory(request, response, currentSubject, worldId, agentId, segments[5]);
+      return;
+    }
   }
   if (request.method === "GET" && agentId === undefined) {
     sendJson(response, 200, agents.filter((agent) => agent.world_id === worldId));
@@ -430,6 +448,67 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
   }
   if (request.method === "DELETE") {
     agent.is_enabled = false;
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemory(request, response, currentSubject, worldId, agentId, memoryId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && memoryId === undefined) {
+    sendJson(
+      response,
+      200,
+      memoryItems.filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && memoryId === undefined) {
+    const body = await readJson(request);
+    const item = {
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      content: body.content,
+      metadata: body.metadata ?? {},
+      embedding: body.embedding ?? [1, 0, 0],
+      visibility: "private",
+      is_active: true,
+      source_event_id: body.source_event_id ?? null,
+      score: null,
+    };
+    memoryItems.unshift(item);
+    sendJson(response, 201, item);
+    return;
+  }
+  if (request.method === "POST" && memoryId === "search") {
+    sendJson(
+      response,
+      200,
+      memoryItems
+        .filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active)
+        .map((item, index) => ({ ...item, score: 1 - index * 0.1 })),
+    );
+    return;
+  }
+  const item = memoryItems.find(
+    (candidate) => candidate.id === memoryId && candidate.world_id === worldId && candidate.agent_id === agentId,
+  );
+  if (item === undefined) {
+    sendJson(response, 404, { detail: "Memory item not found" });
+    return;
+  }
+  if (request.method === "DELETE") {
+    item.is_active = false;
     response.writeHead(204);
     response.end();
     return;

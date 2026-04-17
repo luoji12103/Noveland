@@ -119,6 +119,19 @@ export type ScheduleRule = {
   is_enabled: boolean;
 };
 
+export type MemoryItem = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  embedding: number[];
+  visibility: "private";
+  is_active: boolean;
+  source_event_id: string | null;
+  score: number | null;
+};
+
 export type WorldDashboardData = {
   worlds: World[];
   selectedWorldId: string | null;
@@ -131,6 +144,7 @@ export type WorldDashboardData = {
   selectedAgentId: string | null;
   calendarEntries: CalendarEntry[];
   scheduleRules: ScheduleRule[];
+  memoryItems: MemoryItem[];
   canManageSelectedWorld: boolean;
   loadError: string | null;
 };
@@ -207,4 +221,16 @@ export type ScheduleRuleUpdateInput = {
   kind?: ScheduleRuleKind;
   config?: Record<string, unknown>;
   is_enabled?: boolean;
+};
+
+export type MemoryItemCreateInput = {
+  content: string;
+  embedding: number[];
+  metadata?: Record<string, unknown>;
+  source_event_id?: string | null;
+};
+
+export type MemorySearchInput = {
+  embedding: number[];
+  limit?: number;
 };

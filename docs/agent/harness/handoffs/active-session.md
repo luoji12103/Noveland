@@ -1,29 +1,27 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/calendar-schedule-baseline
-- Objective: Add agent calendar entries, world schedule rules, APIs, and Web dashboard panels.
+- Branch: feat/memory-pgvector-baseline
+- Objective: Add private agent memory contracts, local pgvector persistence, memory APIs, and a Web dashboard panel.
 - Completed work:
-  - Fast-forward merged `feat/replay-snapshot-restore` into `main`.
-  - Created `feat/calendar-schedule-baseline` from `main`.
-  - Added `agent_calendar_entries` and `world_schedule_rules` migration.
-  - Added `noveland.calendar` contracts, ORM models, and service CRUD/due-resolution helpers.
-  - Added calendar and schedule rule API routes under `/worlds`.
-  - Added Web world helpers, schedule rule panel, and selected-agent calendar panel.
+  - Fast-forward merged `feat/calendar-schedule-baseline` into `main`.
+  - Created `feat/memory-pgvector-baseline` from `main`.
+  - Added `agent_memory_items` migration with pgvector extension setup.
+  - Added `noveland.memory` contracts, ORM model, vector type, and local backend add/list/search/disable helper.
+  - Added agent memory API routes under `/worlds/{world_id}/agents/{agent_id}/memory`.
+  - Added Web world helpers and dashboard panel for listing, adding, searching, refreshing, and disabling agent memory items.
   - Updated README and harness docs.
 - Incomplete work:
-  - Memory backend and local pgvector schema.
-  - Provider profiles, runtime agent loop, narrative artifacts, and plugin execution.
+  - Provider profiles, runtime daemon control, agent loop, narrative artifacts, and plugin execution.
 - Tests run:
-  - `cd backend && uv run ruff check . && uv run mypy .`
-  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
+  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_memory_backend.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
   - `cd web && npm run lint && npm run typecheck && npm run test`
 - Current risks:
-  - Calendar/rule changes are operational records only; they do not emit world events yet.
-  - Due resolution is intentionally simple and only handles active entry ranges plus weekday/weekend/timetable hour rules.
+  - The local backend stores embeddings through a shared SQLAlchemy type adapter and computes cosine similarity in application code; native pgvector similarity operators are reserved for later optimization work.
+  - Memory API access is intentionally limited to world admins and platform admins in this baseline.
 - Recommended next step:
-  - Implement Memory Backend + Local pgvector Baseline.
+  - Implement Agent Loop + Narrative Baseline.
 - Sensitive areas to avoid casual edits:
-  - world-clock and scheduling semantics
   - agent data isolation
   - API authorization and CSRF boundaries
+  - migration ordering and pgvector extension setup

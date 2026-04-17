@@ -47,7 +47,8 @@
 - `world_snapshots` stores world-owned snapshot metadata, inline diagnostic payloads, and future object-storage payload references.
 - `agent_calendar_entries` stores private, world-scoped agent calendar items.
 - `world_schedule_rules` stores world-owned weekday/weekend/timetable rule configuration.
-- Plugin registry data, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
+- `agent_memory_items` stores private, world-scoped agent memory records, embeddings, and optional source-event linkage.
+- Plugin registry data and narrative artifacts are intentionally deferred to separate migrations.
 
 ## Ownership rules
 

@@ -57,6 +57,10 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/events/src/noveland/events/publisher.py`
 - `backend/packages/events/src/noveland/events/replay.py`
 - `backend/packages/memory/`
+- `backend/packages/memory/src/noveland/memory/contracts.py`
+- `backend/packages/memory/src/noveland/memory/local_pgvector.py`
+- `backend/packages/memory/src/noveland/memory/models.py`
+- `backend/packages/memory/src/noveland/memory/vector_type.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
 - `backend/packages/plugins/src/noveland/plugins/definition.py`
@@ -72,6 +76,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`
 - `backend/migrations/versions/20260416_0004_auth_session_baseline.py`
 - `backend/migrations/versions/20260417_0005_calendar_schedule_baseline.py`
+- `backend/migrations/versions/20260417_0006_memory_pgvector_baseline.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

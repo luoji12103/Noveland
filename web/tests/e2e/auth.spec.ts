@@ -25,8 +25,9 @@ test("signs in and shows the protected dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "First World" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent memory" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Guide" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Guide", exact: true })).toBeVisible();
   await expect(page.getByText("admin@example.test - world_admin")).toBeVisible();
 });
 
@@ -103,6 +104,14 @@ test("world admin manages scenes agents and memberships", async ({ page }) => {
   await page.getByPlaceholder("Calendar start").fill("2030-01-01T08:00:00Z");
   await page.getByRole("button", { name: "Create calendar entry" }).click();
   await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible();
+
+  await page.getByPlaceholder("Memory content").fill("E2E memory");
+  await page.getByPlaceholder("[1,0,0]").fill("[1,0,0]");
+  await page.getByRole("button", { name: "Add memory item" }).click();
+  await expect(page.getByRole("heading", { name: "E2E memory" })).toBeVisible();
+  await page.getByPlaceholder("Search embedding").fill("[1,0,0]");
+  await page.getByRole("button", { name: "Search memory" }).click();
+  await expect(page.getByText(/score/)).toBeVisible();
 });
 
 test("world member sees read-only dashboard", async ({ page }) => {
@@ -114,9 +123,11 @@ test("world member sees read-only dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Schedule rules" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent memory" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save world" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Resume clock" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create snapshot" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add memory item" })).toHaveCount(0);
 });
 
 async function signIn(page: Page, email = "admin@example.test") {

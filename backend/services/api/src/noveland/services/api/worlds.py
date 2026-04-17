@@ -21,6 +21,14 @@ from noveland.calendar import (
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
+from noveland.memory import (
+    VECTOR_DIMENSIONS,
+    LocalPgvectorMemoryBackend,
+    MemoryItemCreate,
+    MemoryItemRecord,
+    MemorySearchQuery,
+)
+from noveland.memory.models import AgentMemoryItem
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -144,6 +152,32 @@ class ScheduleRuleUpdateRequest(_RequestModel):
     is_enabled: bool | None = None
 
 
+class MemoryItemCreateRequest(_RequestModel):
+    content: str = Field(min_length=1)
+    embedding: list[float]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    source_event_id: uuid.UUID | None = None
+
+    @field_validator("embedding", mode="after")
+    @classmethod
+    def embedding_must_match_dimensions(cls, value: list[float]) -> list[float]:
+        if len(value) != VECTOR_DIMENSIONS:
+            raise ValueError(f"embedding must have {VECTOR_DIMENSIONS} dimensions")
+        return value
+
+
+class MemorySearchRequest(_RequestModel):
+    embedding: list[float]
+    limit: int = Field(default=10, ge=1, le=50)
+
+    @field_validator("embedding", mode="after")
+    @classmethod
+    def embedding_must_match_dimensions(cls, value: list[float]) -> list[float]:
+        if len(value) != VECTOR_DIMENSIONS:
+            raise ValueError(f"embedding must have {VECTOR_DIMENSIONS} dimensions")
+        return value
+
+
 class ClockTransitionRequest(_RequestModel):
     reason: str | None = Field(default=None, max_length=500)
 
@@ -231,6 +265,19 @@ class ScheduleRuleResponse(BaseModel):
     kind: str
     config: dict[str, Any]
     is_enabled: bool
+
+
+class MemoryItemResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    content: str
+    metadata: dict[str, Any]
+    embedding: list[float]
+    visibility: str
+    is_active: bool
+    source_event_id: uuid.UUID | None
+    score: float | None = None
 
 
 class WorldClockResponse(BaseModel):
@@ -836,6 +883,91 @@ def cancel_agent_calendar_entry(
     )
 
 
+@router.get(
+    "/{world_id}/agents/{agent_id}/memory",
+    response_model=list[MemoryItemResponse],
+)
+def list_agent_memory(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[MemoryItemResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return [
+        _memory_item_response(item)
+        for item in LocalPgvectorMemoryBackend(db_session).list(context.world_id, agent_id)
+    ]
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/memory",
+    response_model=MemoryItemResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_agent_memory(
+    agent_id: uuid.UUID,
+    memory_create: MemoryItemCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryItemResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return _memory_item_response(
+        LocalPgvectorMemoryBackend(db_session).add(
+            MemoryItemCreate(
+                world_id=context.world_id,
+                agent_id=agent_id,
+                content=memory_create.content,
+                embedding=memory_create.embedding,
+                metadata=memory_create.metadata,
+                source_event_id=memory_create.source_event_id,
+            ),
+        ),
+    )
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/memory/search",
+    response_model=list[MemoryItemResponse],
+)
+def search_agent_memory(
+    agent_id: uuid.UUID,
+    search_request: MemorySearchRequest,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[MemoryItemResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return [
+        _memory_item_response(item)
+        for item in LocalPgvectorMemoryBackend(db_session).search(
+            MemorySearchQuery(
+                world_id=context.world_id,
+                agent_id=agent_id,
+                embedding=search_request.embedding,
+                limit=search_request.limit,
+            ),
+        )
+    ]
+
+
+@router.delete(
+    "/{world_id}/agents/{agent_id}/memory/{memory_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def disable_agent_memory(
+    agent_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    _memory_item_or_404(db_session, context.world_id, agent_id, memory_id)
+    LocalPgvectorMemoryBackend(db_session).disable(memory_id)
+
+
 @router.post(
     "/{world_id}/agents",
     response_model=AgentResponse,
@@ -985,6 +1117,21 @@ def _schedule_rule_response(rule: ScheduleRuleResponse | Any) -> ScheduleRuleRes
     )
 
 
+def _memory_item_response(item: MemoryItemRecord) -> MemoryItemResponse:
+    return MemoryItemResponse(
+        id=item.id,
+        world_id=item.world_id,
+        agent_id=item.agent_id,
+        content=item.content,
+        metadata=item.metadata,
+        embedding=item.embedding,
+        visibility=item.visibility,
+        is_active=item.is_active,
+        source_event_id=item.source_event_id,
+        score=item.score,
+    )
+
+
 def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
     state = clock_view.state
     return WorldClockResponse(
@@ -1058,6 +1205,22 @@ def _schedule_rule_or_404(
     if rule is None or rule.world_id != world_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule rule not found")
     return rule
+
+
+def _memory_item_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    memory_id: uuid.UUID,
+) -> AgentMemoryItem:
+    memory_item = db_session.get(AgentMemoryItem, memory_id)
+    if (
+        memory_item is None
+        or memory_item.world_id != world_id
+        or memory_item.agent_id != agent_id
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory item not found")
+    return memory_item
 
 
 def _user_or_404(db_session: Session, user_id: uuid.UUID) -> User:

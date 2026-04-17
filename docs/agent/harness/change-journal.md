@@ -186,3 +186,14 @@
 - Tests added/updated: calendar contract/service tests, schema metadata tests, world API tests, Web client/component/E2E coverage
 - Docs updated: README, data ownership, world clock/scheduling, project index, file inventory, task board, active handoff
 - Follow-up notes: memory vectors, provider profiles, runtime agent loop, narrative artifacts, and plugin execution remain separate tasks.
+
+## Memory backend and local pgvector baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/memory-pgvector-baseline
+- Scope: private agent memory baseline
+- Summary: Added the local pgvector-backed memory contract and ORM model, world-admin memory APIs, migration coverage, and a Web dashboard panel for viewing, adding, searching, and disabling agent memory items.
+- Files changed: `/backend/packages/memory/**`, `/backend/migrations/versions/20260417_0006_memory_pgvector_baseline.py`, `/backend/services/api/**`, `/backend/tests/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: memory backend contract tests, world API memory tests, schema metadata tests, Web client/component/E2E coverage
+- Docs updated: README, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: provider profiles, runtime agent loop, narrative artifacts, and plugin execution remain separate tasks.

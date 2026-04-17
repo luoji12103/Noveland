@@ -3,17 +3,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
+  createAgentMemoryItem,
   createScheduleRule,
   createSnapshot,
   createWorld,
+  disableAgentMemoryItem,
   deactivateScene,
   getLatestSnapshot,
   getReplayState,
   pauseWorldClock,
   resumeWorldClock,
+  listAgentMemory,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
+  searchAgentMemory,
   updateAgent,
   updateScheduleRule,
 } from "@/lib/worlds/client";
@@ -143,6 +147,32 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/agents/agent-1/calendar");
     expect(fetchMock.mock.calls[4][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/calendar/entry-1",
+    );
+  });
+
+  it("maps memory requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "memory-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "memory-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "memory-1", score: 0.9 }]))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentMemory("world-1", "agent-1");
+    await createAgentMemoryItem("world-1", "agent-1", {
+      content: "Memory",
+      embedding: [1, 0, 0],
+    });
+    await searchAgentMemory("world-1", "agent-1", { embedding: [1, 0, 0], limit: 5 });
+    await disableAgentMemoryItem("world-1", "agent-1", "memory-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/memory/memory-1",
     );
   });
 

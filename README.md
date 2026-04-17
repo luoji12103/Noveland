@@ -149,6 +149,10 @@ GET /worlds/{world_id}/agents/{agent_id}/calendar
 POST /worlds/{world_id}/agents/{agent_id}/calendar
 PATCH /worlds/{world_id}/agents/{agent_id}/calendar/{entry_id}
 DELETE /worlds/{world_id}/agents/{agent_id}/calendar/{entry_id}
+GET /worlds/{world_id}/agents/{agent_id}/memory
+POST /worlds/{world_id}/agents/{agent_id}/memory
+POST /worlds/{world_id}/agents/{agent_id}/memory/search
+DELETE /worlds/{world_id}/agents/{agent_id}/memory/{memory_id}
 GET /worlds/{world_id}/schedule-rules
 POST /worlds/{world_id}/schedule-rules
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
@@ -165,7 +169,7 @@ POST /worlds/{world_id}/snapshots
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
 
-The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
+The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
 
 The runtime host remains finite: `noveland-runtime` performs one tick, advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. It does not start an infinite loop, schedule agents, or execute plugins.
 
