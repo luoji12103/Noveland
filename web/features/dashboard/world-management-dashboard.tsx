@@ -12,10 +12,15 @@ import {
   deactivateScene,
   deactivateWorld,
   deleteMembership,
+  advanceWorldClock,
+  getWorldClock,
   listAgents,
   listMemberCandidates,
   listMemberships,
   listScenes,
+  pauseWorldClock,
+  resumeWorldClock,
+  skipWorldClock,
   updateAgent,
   updateScene,
   updateWorld,
@@ -29,6 +34,7 @@ import type {
   Membership,
   Scene,
   World,
+  WorldClock,
   WorldDashboardData,
   WorldRole,
 } from "@/lib/worlds/types";
@@ -48,6 +54,7 @@ export function WorldManagementDashboard({
   const [scenes, setScenes] = useState(initialData.scenes);
   const [agents, setAgents] = useState(initialData.agents);
   const [memberships, setMemberships] = useState(initialData.memberships);
+  const [clock, setClock] = useState(initialData.clock);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -72,15 +79,17 @@ export function WorldManagementDashboard({
 
   async function loadWorld(worldId: string) {
     await runAction(async () => {
-      const [nextScenes, nextAgents, nextMemberships] = await Promise.all([
+      const [nextScenes, nextAgents, nextMemberships, nextClock] = await Promise.all([
         listScenes(worldId),
         listAgents(worldId),
         listMembershipsIfAllowed(worldId),
+        getWorldClock(worldId),
       ]);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
       setAgents(nextAgents);
       setMemberships(nextMemberships ?? []);
+      setClock(nextClock);
       setCanManageSelectedWorld(nextMemberships !== null);
       setMemberCandidates([]);
     });
@@ -97,11 +106,17 @@ export function WorldManagementDashboard({
     }
 
     await runAction(async () => {
-      const world = await createWorld({ slug, name, description: optionalFormString(form, "description") });
+      const world = await createWorld({
+        slug,
+        name,
+        description: optionalFormString(form, "description"),
+      });
+      const nextClock = await getWorldClock(world.id);
       setWorlds((currentWorlds) => [...currentWorlds, world].sort(compareWorlds));
       setSelectedWorldId(world.id);
       setScenes([]);
       setAgents([]);
+      setClock(nextClock);
       setMemberships([
         {
           id: "local-owner",
@@ -151,6 +166,67 @@ export function WorldManagementDashboard({
         ),
       );
     }, "World deactivated.");
+  }
+
+  async function handlePauseClock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      setClock(await pauseWorldClock(selectedWorld.id, optionalFormString(form, "reason") ?? undefined));
+    }, "Clock paused.");
+  }
+
+  async function handleResumeClock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      setClock(
+        await resumeWorldClock(
+          selectedWorld.id,
+          optionalFormString(form, "speed_multiplier") ?? undefined,
+          optionalFormString(form, "reason") ?? undefined,
+        ),
+      );
+    }, "Clock resumed.");
+  }
+
+  async function handleAdvanceClock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      setClock(await advanceWorldClock(selectedWorld.id, optionalFormString(form, "reason") ?? undefined));
+    }, "Clock advanced.");
+  }
+
+  async function handleSkipClock(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const targetWorldTime = formString(form, "target_world_time");
+    if (targetWorldTime === "") {
+      setNotice("Target world time is required.");
+      return;
+    }
+    await runAction(async () => {
+      setClock(
+        await skipWorldClock(
+          selectedWorld.id,
+          targetWorldTime,
+          optionalFormString(form, "reason") ?? undefined,
+        ),
+      );
+    }, "Clock skipped.");
   }
 
   async function handleCreateScene(event: FormEvent<HTMLFormElement>) {
@@ -409,6 +485,16 @@ export function WorldManagementDashboard({
             )}
           </section>
 
+          <ClockPanel
+            clock={clock}
+            canManage={canManage}
+            isBusy={isBusy}
+            onPause={handlePauseClock}
+            onResume={handleResumeClock}
+            onAdvance={handleAdvanceClock}
+            onSkip={handleSkipClock}
+          />
+
           <section className="management-columns">
             <ResourcePanel title="Scenes">
               {canManage ? (
@@ -622,6 +708,81 @@ function ResourcePanel({ title, children }: { title: string; children: ReactNode
   );
 }
 
+function ClockPanel({
+  clock,
+  canManage,
+  isBusy,
+  onPause,
+  onResume,
+  onAdvance,
+  onSkip,
+}: {
+  clock: WorldClock | null;
+  canManage: boolean;
+  isBusy: boolean;
+  onPause: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onResume: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onAdvance: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onSkip: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="World clock">
+      <h2 className="section-title">World clock</h2>
+      {clock === null ? (
+        <p className="status-detail">Clock state is not available.</p>
+      ) : (
+        <>
+          <div className="clock-grid">
+            <Metric label="Clock" value={clock.status} />
+            <Metric label="Speed" value={`${clock.speed_multiplier}x`} />
+            <Metric label="Revision" value={String(clock.revision)} />
+          </div>
+          <p className="status-detail">
+            World time {formatDateTime(clock.effective_world_time)}
+          </p>
+          <p className="status-detail">
+            Anchor {clock.wall_time_anchor === null ? "Paused" : formatDateTime(clock.wall_time_anchor)}
+          </p>
+        </>
+      )}
+      {canManage ? (
+        <div className="clock-actions">
+          <form className="inline-form" onSubmit={(event) => void onPause(event)}>
+            <input className="text-input" name="reason" placeholder="Pause reason" />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Pause clock
+            </button>
+          </form>
+          <form className="inline-form" onSubmit={(event) => void onResume(event)}>
+            <input className="text-input" name="speed_multiplier" placeholder="Speed multiplier" />
+            <input className="text-input" name="reason" placeholder="Resume reason" />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Resume clock
+            </button>
+          </form>
+          <form className="inline-form" onSubmit={(event) => void onAdvance(event)}>
+            <input className="text-input" name="reason" placeholder="Advance reason" />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Advance clock
+            </button>
+          </form>
+          <form className="inline-form" onSubmit={(event) => void onSkip(event)}>
+            <input
+              className="text-input"
+              name="target_world_time"
+              placeholder="2030-01-01T00:00:00Z"
+            />
+            <input className="text-input" name="reason" placeholder="Skip reason" />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Skip clock
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 async function listMembershipsIfAllowed(worldId: string): Promise<Membership[] | null> {
   try {
     return await listMemberships(worldId);
@@ -671,6 +832,10 @@ function messageForError(error: unknown): string {
     return error.message;
   }
   return "World request failed.";
+}
+
+function formatDateTime(value: string): string {
+  return new Date(value).toISOString();
 }
 
 function replaceById<T extends { id: string }>(items: T[], nextItem: T): T[] {

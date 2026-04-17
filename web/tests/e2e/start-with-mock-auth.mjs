@@ -62,6 +62,20 @@ const memberships = [
   membership(membershipOwnerId, worldOneId, adminUserId, "world_admin"),
   membership(membershipMemberId, worldOneId, memberUserId, "human_user"),
 ];
+const clocks = new Map([
+  [
+    worldOneId,
+    {
+      world_id: worldOneId,
+      status: "paused",
+      current_world_time: "2026-04-17T00:00:00.000Z",
+      effective_world_time: "2026-04-17T00:00:00.000Z",
+      wall_time_anchor: null,
+      speed_multiplier: "1",
+      revision: 0,
+    },
+  ],
+]);
 
 const mockServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
@@ -194,6 +208,7 @@ async function handleWorldCollection(request, response) {
     };
     worlds.push(world);
     memberships.push(membership(randomUUID(), world.id, currentSubject.user_id, "world_admin"));
+    clocks.set(world.id, clockForWorld(world.id));
     sendJson(response, 201, world);
     return;
   }
@@ -234,6 +249,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "member-candidates") {
     handleMemberCandidates(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "clock") {
+    await handleClock(request, response, currentSubject, worldId, segments[3]);
     return;
   }
   sendJson(response, 404, { detail: "not found" });
@@ -432,6 +451,71 @@ function handleMemberCandidates(request, response, currentSubject, worldId, url)
     .slice(0, limit)
     .map((item) => ({ ...item, role: membershipFor(worldId, item.id)?.role ?? null }));
   sendJson(response, 200, candidates);
+}
+
+async function handleClock(request, response, currentSubject, worldId, action) {
+  const currentClock = clocks.get(worldId) ?? clockForWorld(worldId);
+  clocks.set(worldId, currentClock);
+  if (request.method === "GET" && action === undefined) {
+    sendJson(response, 200, projectClock(currentClock));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const nextClock = projectClock(currentClock);
+  nextClock.revision += 1;
+  if (action === "pause") {
+    nextClock.status = "paused";
+    nextClock.current_world_time = nextClock.effective_world_time;
+    nextClock.wall_time_anchor = null;
+  } else if (action === "resume") {
+    nextClock.status = "running";
+    nextClock.wall_time_anchor = new Date().toISOString();
+    nextClock.speed_multiplier = String(body.speed_multiplier ?? nextClock.speed_multiplier);
+  } else if (action === "advance") {
+    nextClock.current_world_time = nextClock.effective_world_time;
+    nextClock.wall_time_anchor = nextClock.status === "running" ? new Date().toISOString() : null;
+  } else if (action === "skip") {
+    nextClock.current_world_time = new Date(body.target_world_time).toISOString();
+    nextClock.effective_world_time = nextClock.current_world_time;
+    nextClock.wall_time_anchor = nextClock.status === "running" ? new Date().toISOString() : null;
+  } else {
+    sendJson(response, 404, { detail: "not found" });
+    return;
+  }
+  clocks.set(worldId, nextClock);
+  sendJson(response, 200, nextClock);
+}
+
+function clockForWorld(worldId) {
+  const now = new Date().toISOString();
+  return {
+    world_id: worldId,
+    status: "paused",
+    current_world_time: now,
+    effective_world_time: now,
+    wall_time_anchor: null,
+    speed_multiplier: "1",
+    revision: 0,
+  };
+}
+
+function projectClock(clock) {
+  if (clock.status !== "running" || clock.wall_time_anchor === null) {
+    return { ...clock, effective_world_time: clock.current_world_time };
+  }
+  const elapsed = Date.now() - new Date(clock.wall_time_anchor).getTime();
+  const effectiveTime = new Date(
+    new Date(clock.current_world_time).getTime() + elapsed * Number(clock.speed_multiplier),
+  ).toISOString();
+  return { ...clock, effective_world_time: effectiveTime };
 }
 
 function subject(user_id, email, display_name, roles) {

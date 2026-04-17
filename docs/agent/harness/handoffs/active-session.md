@@ -1,38 +1,31 @@
 # Active Session Handoff
 
-- Date: 2026-04-16T00:00:00Z
-- Branch: feat/world-dashboard-data
-- Objective: Connect the protected web dashboard to real world management data and add the first browser management console.
+- Date: 2026-04-17T00:00:00Z
+- Branch: feat/runtime-clock-service
+- Objective: Add persistent world clock service, HTTP controls, and Web dashboard clock controls.
 - Completed work:
-  - Fast-forward merged `feat/world-management-api` into `main`.
-  - Created `feat/world-dashboard-data` from `main`.
-  - Added backend CSRF enforcement for mutating `/worlds` routes.
-  - Added member candidate lookup, membership user summaries, and soft-disable DELETE routes for worlds, scenes, and agents.
-  - Added Web world API types, browser helpers, server data loader, and same-origin `/api/worlds/*` proxy routes.
-  - Replaced the static dashboard metrics with real world, scene, agent, and membership data.
-  - Added admin controls for creating/updating/deactivating worlds, scenes, agents, and memberships.
-  - Extended Playwright's local mock backend to cover auth plus world management flows.
-  - Updated README and harness docs for the dashboard data stage.
+  - Fast-forward merged `feat/world-dashboard-data` into `main`.
+  - Created `feat/runtime-clock-service` from `main`.
+  - Added `noveland.worlds.clock_service` for clock persistence and transition audit writes.
+  - Initialized a paused clock automatically when creating a world.
+  - Added `/worlds/{world_id}/clock` read and pause/resume/advance/skip mutation endpoints.
+  - Added Web clock types, client/server data loading, dashboard clock panel, and E2E mock support.
+  - Updated README and harness docs for the runtime clock service stage.
 - Incomplete work:
-  - Runtime clock service and world clock control endpoints.
-  - Runtime event emission, NATS broadcast, replay, and snapshot restore flows.
+  - Runtime event emission and NATS broadcast.
+  - Replay/snapshot restore.
   - Calendar rules, memory backend, agent loop, narrative loop, and plugin execution.
-  - Full user administration, invitation flows, OAuth/OIDC, email verification, password reset, MFA, and production cookie hardening.
 - Tests run:
-  - `cd backend && uv run ruff check .`
-  - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_api_worlds_integration.py`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test`
+  - `cd backend && uv run ruff check . && uv run mypy .`
+  - `cd backend && uv run pytest tests/test_world_clock_service.py tests/test_api_worlds.py tests/test_workspace_imports.py`
+  - `cd web && npm run lint && npm run typecheck && npm run test`
   - `cd web && npm run test:e2e`
 - Current risks:
-  - License is still TBD.
-  - World management writes still manipulate records only; they do not emit canonical events yet.
-  - DELETE routes are intentionally soft-disable controls and must not be treated as physical deletion.
-  - Web dashboard management is local/admin oriented and has not been optimized for large world lists.
+  - Clock controls update operational clock state only; they do not emit canonical world events yet.
+  - Runtime host does not tick worlds until the next stage.
+  - Existing databases without clock rows rely on the clock service's safe initialization path when a clock is first read.
 - Recommended next step:
-  - Implement Runtime Clock Service.
+  - Implement Runtime Event Emission + NATS Baseline.
 - Sensitive areas to avoid casual edits:
   - auth-and-access model
   - event-and-snapshot model

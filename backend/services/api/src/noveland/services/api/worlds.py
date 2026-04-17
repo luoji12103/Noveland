@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -18,8 +20,10 @@ from noveland.services.api.dependencies import (
     get_world_admin_context,
     get_world_member_context,
 )
+from noveland.worlds.clock import WorldClockError
+from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.models import Scene, World, WorldMembership
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -82,6 +86,23 @@ class AgentUpdateRequest(_RequestModel):
     is_enabled: bool | None = None
 
 
+class ClockTransitionRequest(_RequestModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class ClockResumeRequest(ClockTransitionRequest):
+    speed_multiplier: Decimal | None = Field(default=None, gt=0)
+
+
+class ClockSkipRequest(ClockTransitionRequest):
+    target_world_time: datetime
+
+    @field_validator("target_world_time", mode="after")
+    @classmethod
+    def target_world_time_must_be_timezone_aware(cls, value: datetime) -> datetime:
+        return _timezone_aware(value, "target_world_time")
+
+
 class WorldResponse(BaseModel):
     id: uuid.UUID
     owner_user_id: uuid.UUID
@@ -131,6 +152,16 @@ class AgentResponse(BaseModel):
     is_enabled: bool
 
 
+class WorldClockResponse(BaseModel):
+    world_id: uuid.UUID
+    status: str
+    current_world_time: datetime
+    effective_world_time: datetime
+    wall_time_anchor: datetime | None
+    speed_multiplier: str
+    revision: int
+
+
 @router.get("", response_model=list[WorldResponse])
 def list_worlds(
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
@@ -169,6 +200,11 @@ def create_world(
     db_session.add(world)
     db_session.flush()
     _upsert_membership(db_session, world.id, subject.user_id, AuthRole.WORLD_ADMIN.value)
+    WorldClockService(db_session).ensure_initialized(
+        world.id,
+        actor_ref=_actor_ref(subject),
+        reason="world created",
+    )
     db_session.flush()
     return _world_response(world)
 
@@ -212,6 +248,101 @@ def deactivate_world(
     world = _world_or_404(db_session, context.world_id)
     world.is_active = False
     db_session.flush()
+
+
+@router.get("/{world_id}/clock", response_model=WorldClockResponse)
+def get_clock(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldClockResponse:
+    _world_or_404(db_session, context.world_id)
+    return _clock_response(WorldClockService(db_session).view(context.world_id))
+
+
+@router.post("/{world_id}/clock/pause", response_model=WorldClockResponse)
+def pause_clock_endpoint(
+    clock_request: ClockTransitionRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldClockResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        return _clock_response(
+            WorldClockService(db_session).pause(
+                context.world_id,
+                actor_ref=_actor_ref(context.subject),
+                reason=clock_request.reason,
+            ),
+        )
+    except WorldClockError as exc:
+        raise _clock_conflict(exc) from exc
+
+
+@router.post("/{world_id}/clock/resume", response_model=WorldClockResponse)
+def resume_clock_endpoint(
+    clock_request: ClockResumeRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldClockResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        return _clock_response(
+            WorldClockService(db_session).resume(
+                context.world_id,
+                speed_multiplier=clock_request.speed_multiplier,
+                actor_ref=_actor_ref(context.subject),
+                reason=clock_request.reason,
+            ),
+        )
+    except WorldClockError as exc:
+        raise _clock_conflict(exc) from exc
+
+
+@router.post("/{world_id}/clock/advance", response_model=WorldClockResponse)
+def advance_clock_endpoint(
+    clock_request: ClockTransitionRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldClockResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        return _clock_response(
+            WorldClockService(db_session).advance(
+                context.world_id,
+                actor_ref=_actor_ref(context.subject),
+                reason=clock_request.reason,
+            ),
+        )
+    except WorldClockError as exc:
+        raise _clock_conflict(exc) from exc
+
+
+@router.post("/{world_id}/clock/skip", response_model=WorldClockResponse)
+def skip_clock_endpoint(
+    clock_request: ClockSkipRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldClockResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        return _clock_response(
+            WorldClockService(db_session).skip(
+                context.world_id,
+                target_world_time=clock_request.target_world_time,
+                actor_ref=_actor_ref(context.subject),
+                reason=clock_request.reason,
+            ),
+        )
+    except WorldClockError as exc:
+        raise _clock_conflict(exc) from exc
 
 
 @router.get("/{world_id}/scenes", response_model=list[SceneResponse])
@@ -515,6 +646,19 @@ def _agent_response(agent: Agent) -> AgentResponse:
     )
 
 
+def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
+    state = clock_view.state
+    return WorldClockResponse(
+        world_id=state.world_id,
+        status=state.status.value,
+        current_world_time=state.current_world_time,
+        effective_world_time=clock_view.effective_world_time,
+        wall_time_anchor=state.wall_time_anchor,
+        speed_multiplier=str(state.speed_multiplier),
+        revision=state.revision,
+    )
+
+
 def _world_or_404(db_session: Session, world_id: uuid.UUID) -> World:
     world = db_session.get(World, world_id)
     if world is None:
@@ -623,3 +767,17 @@ def _ensure_agent_key_available(db_session: Session, world_id: uuid.UUID, agent_
 
 def _conflict(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+def _clock_conflict(error: WorldClockError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error))
+
+
+def _actor_ref(subject: AuthenticatedSubject) -> str:
+    return f"user:{subject.user_id}"
+
+
+def _timezone_aware(value: datetime, field_name: str) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{field_name} must be timezone-aware")
+    return value.astimezone(UTC)

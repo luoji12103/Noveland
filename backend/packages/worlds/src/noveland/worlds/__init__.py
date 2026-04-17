@@ -12,6 +12,7 @@ from noveland.worlds.clock import (
     resume_clock,
     skip_clock,
 )
+from noveland.worlds.clock_service import WorldClockService, WorldClockView
 
 PACKAGE_NAME = "worlds"
 
@@ -24,6 +25,8 @@ __all__ = [
     "WorldClockStatus",
     "WorldClockTimeError",
     "WorldClockTransitionType",
+    "WorldClockService",
+    "WorldClockView",
     "advance_clock",
     "current_world_time_at",
     "pause_clock",

@@ -37,6 +37,7 @@ PACKAGES = [
     "noveland.storage",
     "noveland.worlds",
     "noveland.worlds.clock",
+    "noveland.worlds.clock_service",
     "noveland.worlds.models",
 ]
 

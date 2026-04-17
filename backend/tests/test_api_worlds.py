@@ -14,7 +14,13 @@ from noveland.auth.services import hash_session_token
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
-from noveland.worlds.models import Scene, World, WorldMembership
+from noveland.worlds.models import (
+    Scene,
+    World,
+    WorldClockStateModel,
+    WorldClockTransitionModel,
+    WorldMembership,
+)
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -54,6 +60,7 @@ def test_platform_admin_can_create_list_and_update_worlds() -> None:
     assert deactivate_response.status_code == 204
     assert inactive_world is False
     assert _membership_role(engine, uuid.UUID(world["id"]), platform_user_id) == "world_admin"
+    assert _clock_revision(engine, uuid.UUID(world["id"])) == 0
 
 
 def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None:
@@ -105,6 +112,73 @@ def test_world_mutations_require_csrf() -> None:
     assert missing_csrf.status_code == 403
     assert wrong_csrf.status_code == 403
     assert allowed.status_code == 201
+
+
+def test_clock_api_allows_members_to_read_and_admins_to_control_clock() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "clock-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    read_clock = client.get(f"/worlds/{world_id}/clock")
+    blocked_resume = client.post(
+        f"/worlds/{world_id}/clock/resume",
+        json={"speed_multiplier": "2"},
+    )
+
+    _authenticate_session_only(client, owner_token)
+    missing_csrf = client.post(f"/worlds/{world_id}/clock/resume", json={})
+    _authenticate(client, owner_token)
+    resume = client.post(
+        f"/worlds/{world_id}/clock/resume",
+        json={"speed_multiplier": "2.5", "reason": "test resume"},
+    )
+    advance = client.post(f"/worlds/{world_id}/clock/advance", json={"reason": "checkpoint"})
+    pause = client.post(f"/worlds/{world_id}/clock/pause", json={"reason": "operator pause"})
+    skip = client.post(
+        f"/worlds/{world_id}/clock/skip",
+        json={"target_world_time": "2030-01-01T00:00:00Z"},
+    )
+
+    assert read_clock.status_code == 200
+    assert read_clock.json()["status"] == "paused"
+    assert blocked_resume.status_code == 403
+    assert missing_csrf.status_code == 403
+    assert resume.status_code == 200
+    assert resume.json()["status"] == "running"
+    assert resume.json()["speed_multiplier"] == "2.5"
+    assert advance.status_code == 200
+    assert advance.json()["revision"] == 2
+    assert pause.status_code == 200
+    assert pause.json()["status"] == "paused"
+    assert skip.status_code == 200
+    assert skip.json()["current_world_time"].startswith("2030-01-01T00:00:00")
+    assert _clock_revision(engine, world_id) == 4
+
+
+def test_clock_api_rejects_invalid_transitions_and_inputs() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "clock-errors")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, token)
+
+    pause_paused = client.post(f"/worlds/{world_id}/clock/pause", json={})
+    bad_multiplier = client.post(
+        f"/worlds/{world_id}/clock/resume",
+        json={"speed_multiplier": 0},
+    )
+    bad_skip = client.post(
+        f"/worlds/{world_id}/clock/skip",
+        json={"target_world_time": "not-a-date"},
+    )
+
+    assert pause_paused.status_code == 409
+    assert bad_multiplier.status_code == 422
+    assert bad_skip.status_code == 422
 
 
 def test_world_admin_manages_scenes_agents_and_conflicts() -> None:
@@ -266,6 +340,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, World.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
+        cast(Table, WorldClockStateModel.__table__),
+        cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, Agent.__table__),
     ):
         table.create(engine)
@@ -373,6 +449,13 @@ def _scene_is_active(engine: Engine, scene_id: uuid.UUID) -> bool:
 def _agent_is_enabled(engine: Engine, agent_id: uuid.UUID) -> bool:
     with Session(engine) as session:
         return bool(session.scalars(select(Agent.is_enabled).where(Agent.id == agent_id)).one())
+
+
+def _clock_revision(engine: Engine, world_id: uuid.UUID) -> int:
+    with Session(engine) as session:
+        return session.scalars(
+            select(WorldClockStateModel.revision).where(WorldClockStateModel.world_id == world_id),
+        ).one()
 
 
 def _authenticate(client: TestClient, token: str) -> None:

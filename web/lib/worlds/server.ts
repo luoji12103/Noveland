@@ -6,6 +6,7 @@ import type {
   Membership,
   Scene,
   World,
+  WorldClock,
   WorldDashboardData,
 } from "@/lib/worlds/types";
 
@@ -20,10 +21,11 @@ export async function getWorldDashboardData(
       return emptyDashboardData(worlds, null, null);
     }
 
-    const [scenes, agents, memberships] = await Promise.all([
+    const [scenes, agents, memberships, clock] = await Promise.all([
       apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
       apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
       apiFetchOptional<Membership[]>(`/worlds/${selectedWorld.id}/memberships`, cookieHeader),
+      apiFetch<WorldClock>(`/worlds/${selectedWorld.id}/clock`, cookieHeader),
     ]);
 
     return {
@@ -32,6 +34,7 @@ export async function getWorldDashboardData(
       scenes,
       agents,
       memberships: memberships ?? [],
+      clock,
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -102,6 +105,7 @@ function emptyDashboardData(
     scenes: [],
     agents: [],
     memberships: [],
+    clock: null,
     canManageSelectedWorld: false,
     loadError,
   };

@@ -51,12 +51,23 @@ export type Agent = {
   is_enabled: boolean;
 };
 
+export type WorldClock = {
+  world_id: string;
+  status: "running" | "paused";
+  current_world_time: string;
+  effective_world_time: string;
+  wall_time_anchor: string | null;
+  speed_multiplier: string;
+  revision: number;
+};
+
 export type WorldDashboardData = {
   worlds: World[];
   selectedWorldId: string | null;
   scenes: Scene[];
   agents: Agent[];
   memberships: Membership[];
+  clock: WorldClock | null;
   canManageSelectedWorld: boolean;
   loadError: string | null;
 };

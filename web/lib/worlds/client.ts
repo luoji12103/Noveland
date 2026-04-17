@@ -11,6 +11,7 @@ import type {
   SceneUpdateInput,
   World,
   WorldCreateInput,
+  WorldClock,
   WorldRole,
   WorldUpdateInput,
 } from "@/lib/worlds/types";
@@ -43,6 +44,53 @@ export function updateWorld(worldId: string, input: WorldUpdateInput): Promise<W
 
 export function deactivateWorld(worldId: string): Promise<void> {
   return worldRequest<void>(`/api/worlds/${worldId}`, { method: "DELETE", csrf: true });
+}
+
+export function getWorldClock(worldId: string): Promise<WorldClock> {
+  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock`, { method: "GET" });
+}
+
+export function pauseWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
+  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/pause`, {
+    method: "POST",
+    body: reason === undefined ? {} : { reason },
+    csrf: true,
+  });
+}
+
+export function resumeWorldClock(
+  worldId: string,
+  speed_multiplier?: string,
+  reason?: string,
+): Promise<WorldClock> {
+  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/resume`, {
+    method: "POST",
+    body: {
+      ...(speed_multiplier === undefined || speed_multiplier === "" ? {} : { speed_multiplier }),
+      ...(reason === undefined ? {} : { reason }),
+    },
+    csrf: true,
+  });
+}
+
+export function advanceWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
+  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/advance`, {
+    method: "POST",
+    body: reason === undefined ? {} : { reason },
+    csrf: true,
+  });
+}
+
+export function skipWorldClock(
+  worldId: string,
+  target_world_time: string,
+  reason?: string,
+): Promise<WorldClock> {
+  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/skip`, {
+    method: "POST",
+    body: { target_world_time, ...(reason === undefined ? {} : { reason }) },
+    csrf: true,
+  });
 }
 
 export function listScenes(worldId: string): Promise<Scene[]> {

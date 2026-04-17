@@ -139,13 +139,18 @@ GET /worlds/{world_id}/agents
 POST /worlds/{world_id}/agents
 PATCH /worlds/{world_id}/agents/{agent_id}
 DELETE /worlds/{world_id}/agents/{agent_id}
+GET /worlds/{world_id}/clock
+POST /worlds/{world_id}/clock/pause
+POST /worlds/{world_id}/clock/resume
+POST /worlds/{world_id}/clock/advance
+POST /worlds/{world_id}/clock/skip
 ```
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
 
-The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, and memberships according to the current user's backend permissions.
+The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, and world clock state according to the current user's backend permissions.
 
-These endpoints manage database records only. They do not start runtime loops, emit world events, run world clocks, or execute plugins.
+These endpoints manage database records only. They do not start runtime loops, emit world events, or execute plugins.
 
 ## Development Rules
 

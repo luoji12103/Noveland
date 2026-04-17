@@ -195,6 +195,20 @@ a {
   line-height: 1.45;
 }
 
+.clock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.clock-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -406,6 +420,8 @@ a {
   .top-band-inner,
   .dashboard-grid,
   .management-columns,
+  .clock-actions,
+  .clock-grid,
   .status-grid {
     grid-template-columns: 1fr;
   }

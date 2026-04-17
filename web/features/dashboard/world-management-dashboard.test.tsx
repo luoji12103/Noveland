@@ -23,6 +23,8 @@ describe("WorldManagementDashboard", () => {
 
     expect(screen.getByRole("heading", { name: "First World" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save world" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "World clock" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume clock" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create agent" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
@@ -33,6 +35,7 @@ describe("WorldManagementDashboard", () => {
 
     expect(screen.getByText("Read-only world access.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save world" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resume clock" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
   });
 });
@@ -57,6 +60,7 @@ const emptyData: WorldDashboardData = {
   scenes: [],
   agents: [],
   memberships: [],
+  clock: null,
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -90,6 +94,15 @@ const adminData: WorldDashboardData = {
       },
     },
   ],
+  clock: {
+    world_id: "world-1",
+    status: "paused",
+    current_world_time: "2026-04-17T00:00:00.000Z",
+    effective_world_time: "2026-04-17T00:00:00.000Z",
+    wall_time_anchor: null,
+    speed_multiplier: "1",
+    revision: 0,
+  },
   canManageSelectedWorld: true,
   loadError: null,
 };
@@ -109,6 +122,15 @@ const readOnlyData: WorldDashboardData = {
   ],
   agents: [],
   memberships: [],
+  clock: {
+    world_id: "world-1",
+    status: "running",
+    current_world_time: "2026-04-17T00:00:00.000Z",
+    effective_world_time: "2026-04-17T00:01:00.000Z",
+    wall_time_anchor: "2026-04-17T00:00:00.000Z",
+    speed_multiplier: "1",
+    revision: 1,
+  },
   canManageSelectedWorld: false,
   loadError: null,
 };

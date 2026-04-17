@@ -36,6 +36,7 @@ Fast orientation for a new coding session.
   - `noveland.core.models` — platform settings ORM model
 - `backend/packages/worlds/`
   - `noveland.worlds.clock` — pure world clock state and transition logic
+  - `noveland.worlds.clock_service` — persistent world clock state and transition audit service
   - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
   - `noveland.agents.models` — agent identity ORM model

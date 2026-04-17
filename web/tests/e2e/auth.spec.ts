@@ -23,6 +23,7 @@ test("signs in and shows the protected dashboard", async ({ page }) => {
   await expect(page.getByText("Admin - admin@example.test")).toBeVisible();
   await expect(page.getByText("platform_admin")).toBeVisible();
   await expect(page.getByRole("heading", { name: "First World" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Guide" })).toBeVisible();
   await expect(page.getByText("admin@example.test - world_admin")).toBeVisible();
@@ -78,6 +79,15 @@ test("world admin manages scenes agents and memberships", async ({ page }) => {
   await expect(page.getByText(/E2E Scene[\s\S]*Inactive/)).toBeVisible();
   await page.getByRole("button", { name: "Deactivate agent" }).last().click();
   await expect(page.getByText(/E2E Agent[\s\S]*Disabled/)).toBeVisible();
+
+  await page.getByPlaceholder("Speed multiplier").fill("2");
+  await page.getByRole("button", { name: "Resume clock" }).click();
+  await expect(page.getByText("Clock resumed.")).toBeVisible();
+  await page.getByRole("button", { name: "Pause clock" }).click();
+  await expect(page.getByText("Clock paused.")).toBeVisible();
+  await page.getByPlaceholder("2030-01-01T00:00:00Z").fill("2030-01-01T00:00:00Z");
+  await page.getByRole("button", { name: "Skip clock" }).click();
+  await expect(page.getByText("Clock skipped.")).toBeVisible();
 });
 
 test("world member sees read-only dashboard", async ({ page }) => {
@@ -85,7 +95,9 @@ test("world member sees read-only dashboard", async ({ page }) => {
 
   await expect(page.getByText("Read-only world access.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "First World" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save world" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Resume clock" })).toHaveCount(0);
 });
 
 async function signIn(page: Page, email = "admin@example.test") {

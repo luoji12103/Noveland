@@ -142,3 +142,14 @@
 - Tests added/updated: backend world API CSRF/member-candidate/soft-disable tests; world client/proxy/component tests; Playwright dashboard management flows with local mock backend
 - Docs updated: README, auth/access model, project index, file inventory, task board, active handoff
 - Follow-up notes: runtime clock service, event emission, replay, calendar rules, memory backend, and agent loop remain separate tasks.
+
+## Runtime clock service entry
+
+- Date: 2026-04-17
+- Branch: feat/runtime-clock-service
+- Scope: runtime clock service
+- Summary: Added persistent world clock service, automatic clock initialization on world creation, clock control HTTP endpoints, and Web clock controls in the dashboard.
+- Files changed: `/backend/packages/worlds/**`, `/backend/services/api/**`, `/backend/tests/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: clock service persistence tests; clock API permission/CSRF tests; Web client/component/E2E coverage for clock controls
+- Docs updated: README, world clock architecture, project index, file inventory, task board, active handoff
+- Follow-up notes: runtime event emission, NATS broadcast, replay, calendar rules, memory backend, and agent loop remain separate tasks.

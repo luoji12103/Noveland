@@ -508,8 +508,10 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "noveland-agents" },
     { name = "noveland-auth" },
     { name = "noveland-core" },
+    { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "sqlalchemy" },
@@ -519,8 +521,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.135,<0.136" },
+    { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },

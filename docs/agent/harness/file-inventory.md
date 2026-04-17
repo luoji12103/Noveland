@@ -39,6 +39,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/auth/src/noveland/auth/services.py`
 - `backend/packages/worlds/`
 - `backend/packages/worlds/src/noveland/worlds/clock.py`
+- `backend/packages/worlds/src/noveland/worlds/clock_service.py`
 - `backend/packages/worlds/src/noveland/worlds/models.py`
 - `backend/packages/agents/`
 - `backend/packages/agents/src/noveland/agents/models.py`
