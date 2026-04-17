@@ -6,6 +6,7 @@ vi.mock("@/lib/worlds/client", async () => {
   return {
     ...actual,
     listAgentMemory: vi.fn(),
+    listWorldDiagnostics: vi.fn(),
     listNarrativeArtifacts: vi.fn(),
     runAgent: vi.fn(),
   };
@@ -13,7 +14,12 @@ vi.mock("@/lib/worlds/client", async () => {
 
 import { WorldManagementDashboard } from "@/features/dashboard/world-management-dashboard";
 import type { AuthSubject } from "@/lib/auth/types";
-import { listAgentMemory, listNarrativeArtifacts, runAgent } from "@/lib/worlds/client";
+import {
+  listAgentMemory,
+  listNarrativeArtifacts,
+  listWorldDiagnostics,
+  runAgent,
+} from "@/lib/worlds/client";
 import type { WorldDashboardData } from "@/lib/worlds/types";
 
 vi.mock("next/navigation", () => ({
@@ -46,6 +52,7 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("heading", { name: "Agent calendar" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent memory" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Runtime control" })).toBeInTheDocument();
+    expect(screen.getByText("Runtime iteration failed.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Provider profiles" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent runs" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Narrative artifacts" })).toBeInTheDocument();
@@ -79,6 +86,7 @@ describe("WorldManagementDashboard", () => {
     });
     vi.mocked(listNarrativeArtifacts).mockResolvedValue(adminData.narrativeArtifacts);
     vi.mocked(listAgentMemory).mockResolvedValue(adminData.memoryItems);
+    vi.mocked(listWorldDiagnostics).mockResolvedValue(adminData.worldDiagnostics);
 
     render(<WorldManagementDashboard subject={platformAdmin} initialData={adminDataWithAgent} />);
 
@@ -126,6 +134,8 @@ const emptyData: WorldDashboardData = {
   providerProfiles: [],
   runtimeControl: null,
   runtimeStatus: null,
+  runtimeDiagnostics: [],
+  worldDiagnostics: [],
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -260,6 +270,38 @@ const adminData: WorldDashboardData = {
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
   },
+  runtimeDiagnostics: [
+    {
+      id: "diagnostic-1",
+      severity: "error",
+      component: "runtime",
+      event_type: "runtime.iteration_failed",
+      message: "Runtime iteration failed.",
+      details: {},
+      occurred_at: "2026-04-17T00:04:00.000Z",
+      world_id: null,
+      agent_id: null,
+      run_id: null,
+      provider_profile_id: null,
+      created_at: "2026-04-17T00:04:00.000Z",
+    },
+  ],
+  worldDiagnostics: [
+    {
+      id: "diagnostic-2",
+      severity: "info",
+      component: "agent",
+      event_type: "agent.run_succeeded",
+      message: "Agent runtime run succeeded.",
+      details: {},
+      occurred_at: "2026-04-17T00:05:00.000Z",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      run_id: "run-1",
+      provider_profile_id: "profile-1",
+      created_at: "2026-04-17T00:05:00.000Z",
+    },
+  ],
   canManageSelectedWorld: true,
   loadError: null,
 };
@@ -429,6 +471,8 @@ const readOnlyData: WorldDashboardData = {
   providerProfiles: [],
   runtimeControl: null,
   runtimeStatus: null,
+  runtimeDiagnostics: [],
+  worldDiagnostics: [],
   canManageSelectedWorld: false,
   loadError: null,
 };

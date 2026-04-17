@@ -27,6 +27,7 @@ MODEL_MODULES = (
     "noveland.memory.models",
     "noveland.events.models",
     "noveland.narrative.models",
+    "noveland.observability.models",
 )
 
 

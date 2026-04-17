@@ -135,6 +135,38 @@ const runtimeControl = {
   last_run_finished_at: null,
   last_error: null,
 };
+const runtimeDiagnostics = [
+  {
+    id: "74000000-0000-4000-8000-000000000001",
+    severity: "info",
+    component: "runtime",
+    event_type: "runtime.iteration_skipped",
+    message: "Runtime iteration skipped because desired state is stopped.",
+    details: {},
+    occurred_at: "2026-04-17T00:00:00.000Z",
+    world_id: null,
+    agent_id: null,
+    run_id: null,
+    provider_profile_id: null,
+    created_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const worldDiagnostics = [
+  {
+    id: "74000000-0000-4000-8000-000000000002",
+    severity: "info",
+    component: "agent",
+    event_type: "agent.run_succeeded",
+    message: "Agent runtime run succeeded.",
+    details: {},
+    occurred_at: "2026-04-17T00:03:01.000Z",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    run_id: "72000000-0000-4000-8000-000000000001",
+    provider_profile_id: providerProfiles[0].id,
+    created_at: "2026-04-17T00:03:01.000Z",
+  },
+];
 const agentRuns = [
   {
     run_id: "72000000-0000-4000-8000-000000000001",
@@ -228,6 +260,11 @@ const mockServer = createServer(async (request, response) => {
 
   if (url.pathname === "/runtime/status") {
     handleRuntimeStatus(response);
+    return;
+  }
+
+  if (url.pathname === "/runtime/diagnostics") {
+    handleRuntimeDiagnostics(request, response);
     return;
   }
 
@@ -378,6 +415,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "snapshots") {
     await handleSnapshots(request, response, currentSubject, worldId, segments[3]);
+    return;
+  }
+  if (resource === "diagnostics") {
+    handleWorldDiagnostics(request, response, currentSubject, worldId);
     return;
   }
   sendJson(response, 404, { detail: "not found" });
@@ -563,6 +604,22 @@ function handleRuntimeStatus(response) {
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
   });
+}
+
+function handleRuntimeDiagnostics(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  sendJson(response, 200, runtimeDiagnostics);
+}
+
+function handleWorldDiagnostics(request, response, currentSubject, worldId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  sendJson(response, 200, worldDiagnostics.filter((item) => item.world_id === worldId));
 }
 
 async function handleProviderProfiles(request, response) {

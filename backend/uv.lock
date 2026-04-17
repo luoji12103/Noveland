@@ -560,6 +560,18 @@ requires-dist = [
 name = "noveland-observability"
 version = "0.1.0"
 source = { editable = "packages/observability" }
+dependencies = [
+    { name = "noveland-core" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
 
 [[package]]
 name = "noveland-plugins"
@@ -586,6 +598,7 @@ dependencies = [
     { name = "noveland-events" },
     { name = "noveland-memory" },
     { name = "noveland-narrative" },
+    { name = "noveland-observability" },
     { name = "noveland-service-runtime" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
@@ -605,6 +618,7 @@ requires-dist = [
     { name = "noveland-events", editable = "packages/events" },
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
@@ -626,6 +640,7 @@ dependencies = [
     { name = "noveland-events" },
     { name = "noveland-memory" },
     { name = "noveland-narrative" },
+    { name = "noveland-observability" },
     { name = "noveland-worlds" },
     { name = "sqlalchemy" },
 ]
@@ -640,6 +655,7 @@ requires-dist = [
     { name = "noveland-events", editable = "packages/events" },
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]

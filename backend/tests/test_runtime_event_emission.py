@@ -5,7 +5,10 @@ from datetime import UTC, datetime
 from typing import cast
 
 import pytest
+from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth.models import User
+from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import (
     EventPublishError,
     InMemoryWorldEventPublisher,
@@ -14,13 +17,14 @@ from noveland.events import (
     subject_for_world,
 )
 from noveland.events.models import WorldEventModel
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.runtime.clock_tick import (
     CLOCK_ADVANCED_EVENT_NAME,
     RuntimeClockTicker,
     RuntimeEventPublishError,
 )
 from noveland.worlds.clock_service import WorldClockService
-from noveland.worlds.models import World, WorldClockStateModel, WorldClockTransitionModel
+from noveland.worlds.models import Scene, World, WorldClockStateModel, WorldClockTransitionModel
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -87,10 +91,13 @@ def test_runtime_tick_keeps_event_log_when_publish_fails() -> None:
 
     with Session(engine) as session:
         events = session.scalars(select(WorldEventModel)).all()
+        diagnostics = session.scalars(select(RuntimeDiagnosticEvent)).all()
 
     assert len(exc_info.value.failures) == 1
     assert len(events) == 1
     assert events[0].event_name == CLOCK_ADVANCED_EVENT_NAME
+    assert diagnostics[0].event_type == "event_publisher.publish_failed"
+    assert diagnostics[0].component == "event_publisher"
 
 
 class FailingPublisher(WorldEventPublisher):
@@ -107,9 +114,16 @@ def _engine() -> Engine:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Scene.__table__),
+        cast(Table, ProviderProfile.__table__),
+        cast(Table, Agent.__table__),
+        cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, AgentCalendarEntry.__table__),
+        cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
         table.create(engine)
     return engine

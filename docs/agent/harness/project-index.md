@@ -15,7 +15,7 @@ Fast orientation for a new coding session.
 - `web/app/api/provider-profiles/` — same-origin provider profile proxy route handlers
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
-  - `web/features/dashboard/` — protected world management, runtime, and narrative dashboard components
+  - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
@@ -29,8 +29,8 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control and provider profile router
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, clock, replay, snapshots, agent runs, and narrative router
+  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, clock, replay, snapshots, diagnostics, agent runs, and narrative router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation
@@ -78,6 +78,9 @@ Fast orientation for a new coding session.
   - `noveland.adapters.models` — provider profile ORM model
 - `backend/packages/storage/`
 - `backend/packages/observability/`
+  - `noveland.observability.contracts` — diagnostic severity/component contracts and record DTOs
+  - `noveland.observability.models` — runtime diagnostic event ORM model
+  - `noveland.observability.services` — runtime diagnostic record/list service and detail redaction
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts
@@ -86,7 +89,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, and agent/runtime narrative baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, and runtime diagnostics
 
 ## Update rule
 

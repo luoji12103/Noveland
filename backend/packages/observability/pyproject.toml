@@ -7,7 +7,14 @@ name = "noveland-observability"
 version = "0.1.0"
 description = "Structured logging and observability helpers package for Noveland."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+  "noveland-core",
+  "pydantic>=2.13,<3",
+  "sqlalchemy>=2.0,<3",
+]
+
+[tool.uv.sources]
+noveland-core = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

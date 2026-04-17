@@ -208,3 +208,14 @@
 - Tests added/updated: provider adapter contract tests; runtime daemon iteration test; world API tests for agent runs and narrative artifacts; schema/import coverage for runtime/provider/narrative modules; Web client/component/E2E coverage for runtime controls, provider profiles, agent runs, and narrative artifacts
 - Docs updated: README, configuration/secrets, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: production process supervision, richer prompt/runtime policy, provider retry/rate-limit handling, plugin execution, and advanced narrative reader flows remain separate tasks.
+
+## Runtime observability and diagnostics entry
+
+- Date: 2026-04-17
+- Branch: feat/runtime-observability-diagnostics
+- Scope: runtime/provider/agent diagnostics baseline
+- Summary: Added runtime diagnostic event persistence, redacted diagnostic contracts/services, runtime/provider/agent/event-publisher diagnostic writes, admin diagnostics APIs, and Web dashboard diagnostics panels.
+- Files changed: `/backend/packages/observability/**`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260417_0008_runtime_diagnostics_baseline.py`, `/backend/tests/**`, `/web/app/api/runtime/diagnostics/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: observability service/contract tests; runtime/event-publisher diagnostic tests; API diagnostics permission tests; schema/import coverage; Web client/component/mock-backend diagnostics coverage
+- Docs updated: README, data ownership, architecture map, project index, file inventory, task board, active handoff
+- Follow-up notes: provider timeout/retry/rate-limit hardening, provider test-call health state, and agent observation/persona policy remain separate tasks.

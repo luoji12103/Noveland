@@ -7,14 +7,25 @@ from typing import cast
 
 from fastapi.testclient import TestClient
 from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.models import RuntimeControlState
+from noveland.events.models import WorldEventModel
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticsService,
+)
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
+from noveland.worlds.models import Scene, World
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -28,6 +39,8 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
 
     control = client.get("/runtime/control")
     status = client.get("/runtime/status")
+    _seed_runtime_diagnostic(engine)
+    diagnostics = client.get("/runtime/diagnostics")
     start_runtime = client.patch("/runtime/control", json={"desired_state": "running"})
     create_profile = client.post(
         "/provider-profiles",
@@ -52,6 +65,9 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert control.json()["desired_state"] == "stopped"
     assert status.status_code == 200
     assert status.json()["runtime_loop_interval_seconds"] == 5
+    assert diagnostics.status_code == 200
+    assert diagnostics.json()[0]["event_type"] == "runtime.test"
+    assert diagnostics.json()[0]["details"]["token"] == "[redacted]"
     assert start_runtime.status_code == 200
     assert start_runtime.json()["desired_state"] == "running"
     assert create_profile.status_code == 201
@@ -69,9 +85,11 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     _authenticate(client, token)
 
     control = client.get("/runtime/control")
+    diagnostics = client.get("/runtime/diagnostics")
     profiles = client.get("/provider-profiles")
 
     assert control.status_code == 403
+    assert diagnostics.status_code == 403
     assert profiles.status_code == 403
 
 
@@ -102,8 +120,16 @@ def _create_tables(engine: Engine) -> None:
         User.__table__,
         AuthSession.__table__,
         PlatformRoleAssignment.__table__,
+        World.__table__,
+        Scene.__table__,
         RuntimeControlState.__table__,
         ProviderProfile.__table__,
+        Agent.__table__,
+        WorldScheduleRule.__table__,
+        WorldEventModel.__table__,
+        AgentCalendarEntry.__table__,
+        AgentRuntimeRun.__table__,
+        RuntimeDiagnosticEvent.__table__,
     ):
         table = cast(Table, table)
         table.create(engine)
@@ -143,3 +169,17 @@ def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.set(SESSION_COOKIE_NAME, token)
     client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
     client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _seed_runtime_diagnostic(engine: Engine) -> None:
+    with Session(engine) as session:
+        RuntimeDiagnosticsService(session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.ERROR,
+                component=DiagnosticComponent.RUNTIME,
+                event_type="runtime.test",
+                message="Runtime test diagnostic",
+                details={"token": "secret", "note": "visible"},
+            ),
+        )
+        session.commit()

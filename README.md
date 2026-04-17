@@ -175,6 +175,7 @@ POST /worlds/{world_id}/clock/skip
 GET /worlds/{world_id}/replay/state
 GET /worlds/{world_id}/snapshots/latest
 POST /worlds/{world_id}/snapshots
+GET /worlds/{world_id}/diagnostics
 ```
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
@@ -185,6 +186,7 @@ The platform-admin runtime surface is available under:
 GET /runtime/control
 PATCH /runtime/control
 GET /runtime/status
+GET /runtime/diagnostics
 GET /provider-profiles
 POST /provider-profiles
 PATCH /provider-profiles/{profile_id}
@@ -195,7 +197,7 @@ Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_AP
 
 The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
 
-The protected web dashboard also exposes runtime controls, provider profiles, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+The protected web dashboard also exposes runtime controls, recent runtime/world diagnostics, provider profiles, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
 
 The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, appends agent/runtime events, optionally writes memory items, and optionally creates narrative artifacts.
 

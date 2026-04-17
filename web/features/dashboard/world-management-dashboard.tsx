@@ -32,12 +32,14 @@ import {
   listAgentMemory,
   listAgentRuns,
   listAgents,
+  listRuntimeDiagnostics,
   listMemberCandidates,
   listMemberships,
   listNarrativeArtifacts,
   listProviderProfiles,
   listScheduleRules,
   listScenes,
+  listWorldDiagnostics,
   pauseWorldClock,
   resumeWorldClock,
   runAgent,
@@ -65,6 +67,7 @@ import type {
   NarrativeArtifactKind,
   ProviderProfile,
   ProviderType,
+  RuntimeDiagnostic,
   RuntimeControl,
   RuntimeStatus,
   Scene,
@@ -105,6 +108,8 @@ export function WorldManagementDashboard({
   const [providerProfiles, setProviderProfiles] = useState(initialData.providerProfiles);
   const [runtimeControl, setRuntimeControl] = useState(initialData.runtimeControl);
   const [runtimeStatus, setRuntimeStatus] = useState(initialData.runtimeStatus);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(initialData.runtimeDiagnostics);
+  const [worldDiagnostics, setWorldDiagnostics] = useState(initialData.worldDiagnostics);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -142,6 +147,7 @@ export function WorldManagementDashboard({
         nextLatestSnapshot,
         nextScheduleRules,
         nextNarrativeArtifacts,
+        nextWorldDiagnostics,
       ] = await Promise.all([
         listScenes(worldId),
         listAgents(worldId),
@@ -151,6 +157,7 @@ export function WorldManagementDashboard({
         getLatestSnapshot(worldId),
         listScheduleRules(worldId),
         listNarrativeArtifacts(worldId),
+        listWorldDiagnosticsIfAllowed(worldId),
       ]);
       const nextSelectedAgent = nextAgents[0] ?? null;
       const nextCanManage = nextMemberships !== null;
@@ -175,6 +182,7 @@ export function WorldManagementDashboard({
       setMemoryItems(nextMemoryItems);
       setAgentRuns(nextAgentRuns);
       setNarrativeArtifacts(nextNarrativeArtifacts);
+      setWorldDiagnostics(nextWorldDiagnostics ?? []);
       setCanManageSelectedWorld(nextCanManage);
       setMemberCandidates([]);
     });
@@ -218,6 +226,7 @@ export function WorldManagementDashboard({
       setMemoryItems([]);
       setAgentRuns([]);
       setNarrativeArtifacts([]);
+      setWorldDiagnostics([]);
       setMemberships([
         {
           id: "local-owner",
@@ -649,6 +658,7 @@ export function WorldManagementDashboard({
       });
       setAgentRuns((currentRuns) => [run, ...currentRuns]);
       setNarrativeArtifacts(await listNarrativeArtifacts(selectedWorld.id));
+      setWorldDiagnostics(await listWorldDiagnosticsIfAllowed(selectedWorld.id) ?? []);
       if (canManage) {
         setMemoryItems(await listAgentMemory(selectedWorld.id, selectedAgent.id));
       }
@@ -697,12 +707,14 @@ export function WorldManagementDashboard({
 
   async function handleRefreshRuntimeStatus() {
     await runAction(async () => {
-      const [nextRuntimeControl, nextRuntimeStatus] = await Promise.all([
+      const [nextRuntimeControl, nextRuntimeStatus, nextRuntimeDiagnostics] = await Promise.all([
         getRuntimeControl(),
         getRuntimeStatus(),
+        listRuntimeDiagnostics(),
       ]);
       setRuntimeControl(nextRuntimeControl);
       setRuntimeStatus(nextRuntimeStatus);
+      setRuntimeDiagnostics(nextRuntimeDiagnostics);
     }, "Runtime status refreshed.");
   }
 
@@ -908,6 +920,7 @@ export function WorldManagementDashboard({
           <RuntimeControlPanel
             runtimeControl={runtimeControl}
             runtimeStatus={runtimeStatus}
+            diagnostics={runtimeDiagnostics}
             isBusy={isBusy}
             onStart={handleStartRuntime}
             onStop={handleStopRuntime}
@@ -1036,6 +1049,8 @@ export function WorldManagementDashboard({
             isBusy={isBusy}
             onCreate={handleCreateNarrativeArtifact}
           />
+
+          {canManage ? <DiagnosticsPanel title="World diagnostics" diagnostics={worldDiagnostics} /> : null}
 
           <section className="management-columns">
             <ResourcePanel title="Scenes">
@@ -1230,6 +1245,20 @@ export function WorldManagementDashboard({
       )}
     </section>
   );
+}
+
+async function listWorldDiagnosticsIfAllowed(worldId: string): Promise<RuntimeDiagnostic[] | null> {
+  try {
+    return await listWorldDiagnostics(worldId);
+  } catch (error) {
+    if (
+      error instanceof WorldClientError
+      && (error.status === 403 || error.status === 404)
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -1669,6 +1698,7 @@ function MemoryPanel({
 function RuntimeControlPanel({
   runtimeControl,
   runtimeStatus,
+  diagnostics,
   isBusy,
   onStart,
   onStop,
@@ -1676,6 +1706,7 @@ function RuntimeControlPanel({
 }: {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
+  diagnostics: RuntimeDiagnostic[];
   isBusy: boolean;
   onStart: () => void | Promise<void>;
   onStop: () => void | Promise<void>;
@@ -1715,7 +1746,48 @@ function RuntimeControlPanel({
           Stop runtime
         </button>
       </div>
+      <div aria-label="Runtime diagnostics">
+        <h3>Runtime diagnostics</h3>
+        <DiagnosticList diagnostics={diagnostics} />
+      </div>
     </section>
+  );
+}
+
+function DiagnosticsPanel({
+  title,
+  diagnostics,
+}: {
+  title: string;
+  diagnostics: RuntimeDiagnostic[];
+}) {
+  return (
+    <section className="management-panel" aria-label={title}>
+      <h2 className="section-title">{title}</h2>
+      <DiagnosticList diagnostics={diagnostics} />
+    </section>
+  );
+}
+
+function DiagnosticList({ diagnostics }: { diagnostics: RuntimeDiagnostic[] }) {
+  if (diagnostics.length === 0) {
+    return <p className="status-detail">No diagnostics recorded.</p>;
+  }
+  return (
+    <div className="resource-list">
+      {diagnostics.slice(0, 8).map((diagnostic) => (
+        <article className="resource-row" key={diagnostic.id}>
+          <div>
+            <h3>{diagnostic.message}</h3>
+            <p>
+              {diagnostic.severity} - {diagnostic.component} - {diagnostic.event_type}
+            </p>
+            <p className="status-detail">{formatDateTime(diagnostic.occurred_at)}</p>
+          </div>
+          <p className="status-detail">{diagnostic.agent_id ?? diagnostic.run_id ?? "runtime"}</p>
+        </article>
+      ))}
+    </div>
   );
 }
 

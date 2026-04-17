@@ -8,6 +8,7 @@ from typing import Any
 
 from noveland.adapters import (
     ProviderConfigurationError,
+    ProviderError,
     ProviderProfileRecord,
     ProviderProfileService,
 )
@@ -20,6 +21,12 @@ from noveland.narrative import (
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
     NarrativeArtifactService,
+)
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticsService,
 )
 from noveland.worlds.clock_service import WorldClockService
 from sqlalchemy import select
@@ -130,6 +137,21 @@ class AgentRuntimeOrchestrator:
                 "provider_type": provider_profile.provider_type.value,
                 "profile_key": provider_profile.profile_key,
             }
+            self._record_diagnostic(
+                severity=DiagnosticSeverity.INFO,
+                component=DiagnosticComponent.AGENT,
+                event_type="agent.run_succeeded",
+                message="Agent runtime run succeeded.",
+                details={
+                    "trigger_source": trigger_source,
+                    "provider_type": provider_profile.provider_type.value,
+                    "profile_key": provider_profile.profile_key,
+                },
+                world_id=world_id,
+                agent_id=agent_id,
+                run_id=run_model.id,
+                provider_profile_id=provider_profile.id,
+            )
             created_event = self._append_event(
                 world_id=world_id,
                 event_name=AGENT_RUN_COMPLETED_EVENT_NAME,
@@ -195,6 +217,37 @@ class AgentRuntimeOrchestrator:
                 if provider_profile is None
                 else str(provider_profile.id),
             }
+            self._record_diagnostic(
+                severity=DiagnosticSeverity.ERROR,
+                component=DiagnosticComponent.AGENT,
+                event_type="agent.run_failed",
+                message="Agent runtime run failed.",
+                details={
+                    "trigger_source": trigger_source,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+                world_id=world_id,
+                agent_id=agent_id,
+                run_id=run_model.id,
+                provider_profile_id=None if provider_profile is None else provider_profile.id,
+            )
+            if isinstance(exc, ProviderError):
+                self._record_diagnostic(
+                    severity=DiagnosticSeverity.ERROR,
+                    component=DiagnosticComponent.PROVIDER,
+                    event_type="provider.invocation_failed",
+                    message="Provider configuration or invocation failed.",
+                    details={
+                        "trigger_source": trigger_source,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                    world_id=world_id,
+                    agent_id=agent_id,
+                    run_id=run_model.id,
+                    provider_profile_id=None if provider_profile is None else provider_profile.id,
+                )
             failed_event = self._append_event(
                 world_id=world_id,
                 event_name=AGENT_RUN_FAILED_EVENT_NAME,
@@ -340,6 +393,33 @@ class AgentRuntimeOrchestrator:
                 payload=payload,
                 wall_time=datetime.now(UTC),
                 actor_ref=actor_ref,
+            ),
+        )
+
+    def _record_diagnostic(
+        self,
+        *,
+        severity: DiagnosticSeverity,
+        component: DiagnosticComponent,
+        event_type: str,
+        message: str,
+        details: dict[str, Any],
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        run_id: uuid.UUID,
+        provider_profile_id: uuid.UUID | None,
+    ) -> None:
+        RuntimeDiagnosticsService(self._session).record(
+            RuntimeDiagnosticCreate(
+                severity=severity,
+                component=component,
+                event_type=event_type,
+                message=message,
+                details=details,
+                world_id=world_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                provider_profile_id=provider_profile_id,
             ),
         )
 

@@ -11,6 +11,13 @@ from noveland.events import (
     WorldEventPublisher,
     WorldEventRecord,
     WorldEventStore,
+    subject_for_world,
+)
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticsService,
 )
 from noveland.worlds.clock import WorldClockStatus
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
@@ -78,11 +85,29 @@ class RuntimeClockTicker:
             try:
                 self._publisher.publish(WorldEventEnvelope.from_record(event))
             except EventPublishError as exc:
+                RuntimeDiagnosticsService(self._session).record(
+                    RuntimeDiagnosticCreate(
+                        severity=DiagnosticSeverity.ERROR,
+                        component=DiagnosticComponent.EVENT_PUBLISHER,
+                        event_type="event_publisher.publish_failed",
+                        message="Runtime event was persisted but could not be published.",
+                        details={
+                            "event_id": str(event.id),
+                            "event_name": event.event_name,
+                            "sequence": event.sequence,
+                            "subject": subject_for_world(event.world_id),
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
+                        world_id=event.world_id,
+                    ),
+                )
                 publish_failures.append(EventPublishFailure(event=event, error=exc))
             else:
                 published_events += 1
 
         if publish_failures:
+            self._session.commit()
             raise RuntimeEventPublishError(publish_failures)
 
         return RuntimeTickResult(

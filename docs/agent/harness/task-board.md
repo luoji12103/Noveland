@@ -31,6 +31,8 @@
 - Calendar + Schedule Rules Baseline
 - Memory Backend + Local pgvector Baseline
 - Agent Loop + Narrative Baseline
+- Runtime Observability + Diagnostics
 
 ## Upcoming Mainline
-- TBD
+- Provider Reliability Hardening
+- Agent Observation + Persona Policy Baseline

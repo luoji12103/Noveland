@@ -1,32 +1,37 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/agent-loop-narrative-baseline
-- Objective: Add provider profiles, runtime daemon control, agent loop execution, and narrative artifacts across backend and Web.
+- Branch: feat/runtime-observability-diagnostics
+- Objective: Add runtime/provider/agent diagnostic events and admin diagnostics panels.
 - Completed work:
-  - Fast-forward merged `feat/memory-pgvector-baseline` into `main`.
-  - Created `feat/agent-loop-narrative-baseline` from `main`.
-  - Added migration `20260417_0007_agent_narrative_runtime_baseline.py` for provider profiles, runtime control state, agent runtime runs, and narrative artifacts.
-  - Added `noveland.adapters` provider profile contracts/models/service plus OpenAI-compatible and Anthropic-compatible adapters.
-  - Added `noveland.narrative` contracts/models/service for narrative artifact storage and retrieval.
-  - Added runtime daemon control and agent loop orchestration to `noveland.services.runtime`.
-  - Added platform-admin runtime/provider APIs and world-scoped agent-run/narrative APIs.
-  - Added Web dashboard panels for runtime control, provider profiles, agent runs, and narrative artifacts.
-  - Added backend tests for provider adapters, runtime daemon iteration, schema/import coverage, and world/runtime API flows.
+  - Created `feat/runtime-observability-diagnostics` from `main`.
+  - Added migration `20260417_0008_runtime_diagnostics_baseline.py` for `runtime_diagnostic_events`.
+  - Expanded `noveland.observability` with diagnostic enums, create/record contracts, ORM model, redaction helper, and record/list service.
+  - Registered observability metadata with `noveland.core.database.MODEL_MODULES`.
+  - Added diagnostic writes for daemon iteration start/finish/skipped/failure, event publisher failures, and agent/provider run outcomes.
+  - Added platform-admin `GET /runtime/diagnostics` and world-admin `GET /worlds/{world_id}/diagnostics`.
+  - Added Web diagnostics types, client/server helpers, same-origin runtime diagnostics proxy, and dashboard diagnostics panels.
+  - Added backend and Web tests for diagnostic contracts, schema metadata, API authorization, runtime writes, and dashboard/client behavior.
 - Incomplete work:
-  - Stage 3 implementation is in final regression/commit phase; branch is not merged yet.
+  - Stage 1 commit/merge are next.
+  - Provider reliability hardening and agent observation/persona policy are not implemented in this branch.
 - Tests run:
-  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run ruff check .`
-  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run mypy .`
-  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_model_provider.py tests/test_runtime_daemon.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
-  - `cd web && npm run lint && npm run typecheck`
+  - `cd backend && uv run ruff check .`
+  - `cd backend && uv run mypy .`
+  - `cd backend && uv run pytest`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
+  - `docker compose -f infra/compose.yaml config`
 - Current risks:
-  - Provider adapters intentionally cover only OpenAI-compatible chat-completions and Anthropic-compatible messages baselines.
-  - Runtime Web controls only change database desired state; an operator still needs a running `noveland-runtime --daemon` process.
-  - Agent loop behavior is intentionally minimal and does not include tool execution, retries, or prompt management.
+  - Diagnostics are operational records only; the world event log remains canonical.
+  - Diagnostic detail redaction is key-name based and should stay conservative around provider/API payloads.
+  - Runtime Web controls still only change database desired state; an operator needs a running `noveland-runtime --daemon`.
 - Recommended next step:
-  - Finish full backend/web regression, then commit `feat(runtime): add agent narrative baseline`.
+  - Commit `feat(observability): add runtime diagnostics`, merge to `main`, then start `feat/provider-reliability-hardening`.
 - Sensitive areas to avoid casual edits:
-  - provider secret handling
+  - provider secret handling and diagnostic redaction
   - API authorization and CSRF boundaries
   - migration ordering and runtime/event invariants

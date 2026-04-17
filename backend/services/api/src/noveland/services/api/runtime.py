@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.adapters import (
     ProviderProfileCreate,
     ProviderProfileRecord,
@@ -15,6 +15,12 @@ from noveland.adapters import (
 from noveland.adapters.models import ProviderProfile
 from noveland.auth import AuthenticatedSubject
 from noveland.core.settings import load_settings
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticRecord,
+    RuntimeDiagnosticsService,
+)
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
@@ -72,6 +78,21 @@ class ProviderProfileResponse(BaseModel):
     is_enabled: bool
 
 
+class RuntimeDiagnosticResponse(BaseModel):
+    id: uuid.UUID
+    severity: DiagnosticSeverity
+    component: DiagnosticComponent
+    event_type: str
+    message: str
+    details: dict[str, Any]
+    occurred_at: datetime
+    world_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    run_id: uuid.UUID | None
+    provider_profile_id: uuid.UUID | None
+    created_at: datetime
+
+
 @router.get("/runtime/control", response_model=RuntimeControlResponse)
 def get_runtime_control(
     subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
@@ -108,6 +129,25 @@ def get_runtime_status(
         runtime_batch_limit=settings.runtime_batch_limit,
         **_runtime_control_response(view).model_dump(),
     )
+
+
+@router.get("/runtime/diagnostics", response_model=list[RuntimeDiagnosticResponse])
+def list_runtime_diagnostics(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    severity: DiagnosticSeverity | None = None,
+    component: DiagnosticComponent | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[RuntimeDiagnosticResponse]:
+    del subject
+    return [
+        _diagnostic_response(record)
+        for record in RuntimeDiagnosticsService(db_session).list(
+            severity=severity,
+            component=component,
+            limit=limit,
+        )
+    ]
 
 
 @router.get("/provider-profiles", response_model=list[ProviderProfileResponse])
@@ -209,3 +249,7 @@ def _runtime_control_response(view: Any) -> RuntimeControlResponse:
         last_run_finished_at=view.last_run_finished_at,
         last_error=view.last_error,
     )
+
+
+def _diagnostic_response(record: RuntimeDiagnosticRecord) -> RuntimeDiagnosticResponse:
+    return RuntimeDiagnosticResponse(**record.model_dump())

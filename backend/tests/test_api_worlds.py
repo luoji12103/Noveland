@@ -19,6 +19,13 @@ from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEv
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import AgentMemoryItem
 from noveland.narrative.models import NarrativeArtifact
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticsService,
+)
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -551,6 +558,36 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert hidden_replay.status_code == 404
 
 
+def test_world_diagnostics_require_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
+    world_id = _seed_world(engine, owner_id, "diagnostics-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_world_diagnostic(engine, world_id, agent_id)
+
+    _authenticate(client, member_token)
+    member_response = client.get(f"/worlds/{world_id}/diagnostics")
+
+    _authenticate(client, owner_token)
+    owner_response = client.get(
+        f"/worlds/{world_id}/diagnostics",
+        params={"agent_id": str(agent_id)},
+    )
+
+    _authenticate(client, stranger_token)
+    hidden_response = client.get(f"/worlds/{world_id}/diagnostics")
+
+    assert member_response.status_code == 403
+    assert owner_response.status_code == 200
+    assert owner_response.json()[0]["event_type"] == "agent.run_failed"
+    assert owner_response.json()[0]["agent_id"] == str(agent_id)
+    assert hidden_response.status_code == 404
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -592,6 +629,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
         table.create(engine)
 
@@ -758,6 +796,22 @@ def _seed_clock_event(engine: Engine, world_id: uuid.UUID, revision: int) -> Non
                 wall_time=datetime(2026, 4, 17, 12, revision, tzinfo=UTC),
                 world_time=datetime(2030, 1, 1, 0, revision - 1, tzinfo=UTC),
                 actor_ref="system:test",
+            ),
+        )
+        session.commit()
+
+
+def _seed_world_diagnostic(engine: Engine, world_id: uuid.UUID, agent_id: uuid.UUID) -> None:
+    with Session(engine) as session:
+        RuntimeDiagnosticsService(session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.ERROR,
+                component=DiagnosticComponent.AGENT,
+                event_type="agent.run_failed",
+                message="Agent run failed.",
+                details={"error": "Provider failed"},
+                world_id=world_id,
+                agent_id=agent_id,
             ),
         )
         session.commit()

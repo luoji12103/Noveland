@@ -17,6 +17,7 @@ from noveland.events import InMemoryWorldEventPublisher
 from noveland.events.models import WorldEventModel
 from noveland.memory.models import AgentMemoryItem
 from noveland.narrative.models import NarrativeArtifact
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.runtime.daemon import RuntimeDaemon
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.models import World, WorldClockStateModel, WorldClockTransitionModel
@@ -86,6 +87,7 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
         events = session.scalars(
             select(WorldEventModel).order_by(WorldEventModel.sequence),
         ).all()
+        diagnostics = session.scalars(select(RuntimeDiagnosticEvent)).all()
 
     assert control.last_heartbeat_at is not None
     assert control.last_run_started_at is not None
@@ -106,6 +108,11 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
         "memory.item_created",
         "narrative.artifact_created",
     ]
+    assert {event.event_type for event in diagnostics} >= {
+        "runtime.iteration_started",
+        "runtime.iteration_finished",
+        "agent.run_succeeded",
+    }
 
 
 def _create_tables(engine: Engine) -> None:
@@ -123,6 +130,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
         table.create(engine)
 

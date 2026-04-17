@@ -46,6 +46,7 @@ def test_core_schema_tables_are_registered() -> None:
         "platform_role_assignments",
         "provider_profiles",
         "runtime_control_states",
+        "runtime_diagnostic_events",
         "narrative_artifacts",
         "scenes",
         "user_credentials",
@@ -199,6 +200,14 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "narrative_artifacts",
         CheckConstraint,
     )
+    assert "ck_runtime_diagnostic_events_severity" in constraint_names(
+        "runtime_diagnostic_events",
+        CheckConstraint,
+    )
+    assert "ck_runtime_diagnostic_events_component" in constraint_names(
+        "runtime_diagnostic_events",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -233,6 +242,12 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("narrative_artifacts") == {
         "agent_runtime_runs.id",
         "agents.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("runtime_diagnostic_events") == {
+        "agent_runtime_runs.id",
+        "agents.id",
+        "provider_profiles.id",
         "worlds.id",
     }
 
@@ -271,3 +286,15 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")
+    assert "ix_runtime_diagnostic_events_occurred_at" in index_names(
+        "runtime_diagnostic_events",
+    )
+    assert "ix_runtime_diagnostic_events_severity_component" in index_names(
+        "runtime_diagnostic_events",
+    )
+    assert "ix_runtime_diagnostic_events_world_occurred_at" in index_names(
+        "runtime_diagnostic_events",
+    )
+    assert "ix_runtime_diagnostic_events_agent_occurred_at" in index_names(
+        "runtime_diagnostic_events",
+    )

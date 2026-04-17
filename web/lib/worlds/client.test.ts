@@ -16,6 +16,7 @@ import {
   getRuntimeStatus,
   getLatestSnapshot,
   getReplayState,
+  listRuntimeDiagnostics,
   listAgentRuns,
   pauseWorldClock,
   resumeWorldClock,
@@ -26,6 +27,7 @@ import {
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
+  listWorldDiagnostics,
   searchAgentMemory,
   updateAgent,
   updateProviderProfile,
@@ -200,6 +202,8 @@ describe("world client", () => {
           runtime_batch_limit: 20,
         }),
       )
+      .mockResolvedValueOnce(jsonResponse([{ event_type: "runtime.iteration_failed" }]))
+      .mockResolvedValueOnce(jsonResponse([{ event_type: "agent.run_succeeded" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }))
@@ -209,6 +213,8 @@ describe("world client", () => {
     await getRuntimeControl();
     await updateRuntimeControl({ desired_state: "running" });
     await getRuntimeStatus();
+    await listRuntimeDiagnostics();
+    await listWorldDiagnostics("world-1");
     await listProviderProfiles();
     await createProviderProfile({
       profile_key: "openai-local",
@@ -224,10 +230,12 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/runtime/control");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/runtime/control");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/runtime/status");
-    expect(fetchMock.mock.calls[3][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[4][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles/profile-1");
-    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/runtime/diagnostics");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/diagnostics");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1");
   });
 
   it("maps runs and narrative requests", async () => {

@@ -22,6 +22,7 @@ import type {
   ProviderProfile,
   ProviderProfileCreateInput,
   ProviderProfileUpdateInput,
+  RuntimeDiagnostic,
   RuntimeControl,
   RuntimeControlUpdateInput,
   RuntimeStatus,
@@ -398,6 +399,16 @@ export function updateRuntimeControl(input: RuntimeControlUpdateInput): Promise<
 
 export function getRuntimeStatus(): Promise<RuntimeStatus> {
   return apiRequest<RuntimeStatus>("/api/runtime/status", { method: "GET" });
+}
+
+export function listRuntimeDiagnostics(): Promise<RuntimeDiagnostic[]> {
+  return apiRequest<RuntimeDiagnostic[]>("/api/runtime/diagnostics", { method: "GET" });
+}
+
+export function listWorldDiagnostics(worldId: string): Promise<RuntimeDiagnostic[]> {
+  return worldRequest<RuntimeDiagnostic[]>(`/api/worlds/${worldId}/diagnostics`, {
+    method: "GET",
+  });
 }
 
 export function listProviderProfiles(): Promise<ProviderProfile[]> {

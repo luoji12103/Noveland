@@ -10,6 +10,12 @@ from noveland.core.database import create_engine_from_settings, create_session_f
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import AppSettings
 from noveland.events import WorldEventPublisher
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticsService,
+)
 from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.clock_tick import RuntimeClockTicker
 from sqlalchemy import select
@@ -92,9 +98,19 @@ class RuntimeDaemon:
     def run_iteration(self) -> RuntimeLoopResult:
         with self._session_factory() as session:
             control_service = RuntimeControlService(session)
+            diagnostics = RuntimeDiagnosticsService(session)
             control = control_service.get_or_create()
             if control.desired_state != "running":
                 control_service.mark_heartbeat()
+                diagnostics.record(
+                    RuntimeDiagnosticCreate(
+                        severity=DiagnosticSeverity.INFO,
+                        component=DiagnosticComponent.RUNTIME,
+                        event_type="runtime.iteration_skipped",
+                        message="Runtime iteration skipped because desired state is stopped.",
+                        details={"desired_state": control.desired_state},
+                    ),
+                )
                 session.commit()
                 return RuntimeLoopResult(
                     desired_state=control.desired_state,
@@ -103,6 +119,15 @@ class RuntimeDaemon:
                 )
 
             control_service.mark_loop_started()
+            diagnostics.record(
+                RuntimeDiagnosticCreate(
+                    severity=DiagnosticSeverity.INFO,
+                    component=DiagnosticComponent.RUNTIME,
+                    event_type="runtime.iteration_started",
+                    message="Runtime iteration started.",
+                    details={"desired_state": control.desired_state},
+                ),
+            )
             try:
                 wall_time = datetime.now(UTC)
                 tick_result = RuntimeClockTicker(session, self._publisher).run_once(wall_time)
@@ -116,6 +141,19 @@ class RuntimeDaemon:
                     batch_limit=self._settings.runtime_batch_limit,
                 ).executed_runs
                 view = control_service.mark_loop_finished()
+                diagnostics.record(
+                    RuntimeDiagnosticCreate(
+                        severity=DiagnosticSeverity.INFO,
+                        component=DiagnosticComponent.RUNTIME,
+                        event_type="runtime.iteration_finished",
+                        message="Runtime iteration finished.",
+                        details={
+                            "advanced_worlds": tick_result.advanced_worlds,
+                            "executed_runs": executed_runs,
+                            "published_events": tick_result.published_events,
+                        },
+                    ),
+                )
                 session.commit()
                 return RuntimeLoopResult(
                     desired_state=view.desired_state,
@@ -124,6 +162,18 @@ class RuntimeDaemon:
                 )
             except Exception as exc:
                 view = control_service.mark_loop_finished(str(exc))
+                diagnostics.record(
+                    RuntimeDiagnosticCreate(
+                        severity=DiagnosticSeverity.ERROR,
+                        component=DiagnosticComponent.RUNTIME,
+                        event_type="runtime.iteration_failed",
+                        message="Runtime iteration failed.",
+                        details={
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
+                    ),
+                )
                 session.commit()
                 LOGGER.exception("runtime iteration failed")
                 return RuntimeLoopResult(

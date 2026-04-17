@@ -23,7 +23,7 @@
 - `plugins/` — plugin interfaces, registry, manifests
 - `adapters/` — provider/storage/transport implementations
 - `storage/` — object storage interfaces and default implementations
-- `observability/` — structured logging and context helpers
+- `observability/` — runtime diagnostic contracts, storage, redaction, and listing helpers
 
 ## Dependency direction
 

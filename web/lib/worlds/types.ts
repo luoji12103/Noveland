@@ -145,6 +145,25 @@ export type RuntimeStatus = RuntimeControl & {
   runtime_batch_limit: number;
 };
 
+export type DiagnosticSeverity = "info" | "warning" | "error";
+
+export type DiagnosticComponent = "runtime" | "provider" | "agent" | "event_publisher" | "api";
+
+export type RuntimeDiagnostic = {
+  id: string;
+  severity: DiagnosticSeverity;
+  component: DiagnosticComponent;
+  event_type: string;
+  message: string;
+  details: Record<string, unknown>;
+  occurred_at: string;
+  world_id: string | null;
+  agent_id: string | null;
+  run_id: string | null;
+  provider_profile_id: string | null;
+  created_at: string;
+};
+
 export type ProviderType = "openai_compatible" | "anthropic_compatible";
 
 export type ProviderProfile = {
@@ -204,6 +223,8 @@ export type WorldDashboardData = {
   providerProfiles: ProviderProfile[];
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
+  runtimeDiagnostics: RuntimeDiagnostic[];
+  worldDiagnostics: RuntimeDiagnostic[];
   canManageSelectedWorld: boolean;
   loadError: string | null;
 };

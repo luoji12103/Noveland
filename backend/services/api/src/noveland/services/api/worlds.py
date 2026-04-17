@@ -36,6 +36,12 @@ from noveland.narrative import (
     NarrativeArtifactRecord,
     NarrativeArtifactService,
 )
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticRecord,
+    RuntimeDiagnosticsService,
+)
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -350,6 +356,21 @@ class WorldSnapshotResponse(BaseModel):
     created_at: datetime
 
 
+class RuntimeDiagnosticResponse(BaseModel):
+    id: uuid.UUID
+    severity: DiagnosticSeverity
+    component: DiagnosticComponent
+    event_type: str
+    message: str
+    details: dict[str, Any]
+    occurred_at: datetime
+    world_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    run_id: uuid.UUID | None
+    provider_profile_id: uuid.UUID | None
+    created_at: datetime
+
+
 @router.get("", response_model=list[WorldResponse])
 def list_worlds(
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
@@ -646,6 +667,26 @@ def create_snapshot(
         actor_ref=_actor_ref(context.subject),
     )
     return _snapshot_response(snapshot)
+
+
+@router.get("/{world_id}/diagnostics", response_model=list[RuntimeDiagnosticResponse])
+def list_world_diagnostics(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    agent_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[RuntimeDiagnosticResponse]:
+    _world_or_404(db_session, context.world_id)
+    if agent_id is not None:
+        _agent_or_404(db_session, context.world_id, agent_id)
+    return [
+        _diagnostic_response(record)
+        for record in RuntimeDiagnosticsService(db_session).list_for_world(
+            context.world_id,
+            agent_id=agent_id,
+            limit=limit,
+        )
+    ]
 
 
 @router.get("/{world_id}/scenes", response_model=list[SceneResponse])
@@ -1317,6 +1358,10 @@ def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
         speed_multiplier=str(state.speed_multiplier),
         revision=state.revision,
     )
+
+
+def _diagnostic_response(record: RuntimeDiagnosticRecord) -> RuntimeDiagnosticResponse:
+    return RuntimeDiagnosticResponse(**record.model_dump())
 
 
 def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:

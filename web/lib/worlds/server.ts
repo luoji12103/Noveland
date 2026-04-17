@@ -9,6 +9,7 @@ import type {
   Membership,
   NarrativeArtifact,
   ProviderProfile,
+  RuntimeDiagnostic,
   RuntimeControl,
   RuntimeStatus,
   Scene,
@@ -26,17 +27,26 @@ export async function getWorldDashboardData(
 ): Promise<WorldDashboardData> {
   const cookieHeader = (await headers()).get("cookie");
   try {
-    const [providerProfiles, runtimeControl, runtimeStatus] = isPlatformAdmin
+    const [providerProfiles, runtimeControl, runtimeStatus, runtimeDiagnostics] = isPlatformAdmin
       ? await Promise.all([
           apiFetch<ProviderProfile[]>("/provider-profiles", cookieHeader),
           apiFetch<RuntimeControl>("/runtime/control", cookieHeader),
           apiFetch<RuntimeStatus>("/runtime/status", cookieHeader),
+          apiFetch<RuntimeDiagnostic[]>("/runtime/diagnostics", cookieHeader),
         ])
-      : [[], null, null];
+      : [[], null, null, []];
     const worlds = await apiFetch<World[]>("/worlds", cookieHeader);
     const selectedWorld = selectedWorldForRequest(worlds, requestedWorldId);
     if (selectedWorld === null) {
-      return emptyDashboardData(worlds, null, null, providerProfiles, runtimeControl, runtimeStatus);
+      return emptyDashboardData(
+        worlds,
+        null,
+        null,
+        providerProfiles,
+        runtimeControl,
+        runtimeStatus,
+        runtimeDiagnostics,
+      );
     }
 
     const [
@@ -48,6 +58,7 @@ export async function getWorldDashboardData(
       latestSnapshot,
       scheduleRules,
       narrativeArtifacts,
+      worldDiagnostics,
     ] =
       await Promise.all([
         apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
@@ -58,6 +69,7 @@ export async function getWorldDashboardData(
         apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
         apiFetch<ScheduleRule[]>(`/worlds/${selectedWorld.id}/schedule-rules`, cookieHeader),
         apiFetch<NarrativeArtifact[]>(`/worlds/${selectedWorld.id}/narrative-artifacts`, cookieHeader),
+        apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${selectedWorld.id}/diagnostics`, cookieHeader),
       ]);
     const selectedAgent = agents[0] ?? null;
     const [calendarEntries, memoryItems, agentRuns] =
@@ -98,6 +110,8 @@ export async function getWorldDashboardData(
       providerProfiles,
       runtimeControl,
       runtimeStatus,
+      runtimeDiagnostics,
+      worldDiagnostics: worldDiagnostics ?? [],
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -105,7 +119,7 @@ export async function getWorldDashboardData(
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
     }
-    return emptyDashboardData([], null, "Unable to load world data.", [], null, null);
+    return emptyDashboardData([], null, "Unable to load world data.", [], null, null, []);
   }
 }
 
@@ -164,6 +178,7 @@ function emptyDashboardData(
   providerProfiles: ProviderProfile[],
   runtimeControl: RuntimeControl | null,
   runtimeStatus: RuntimeStatus | null,
+  runtimeDiagnostics: RuntimeDiagnostic[],
 ): WorldDashboardData {
   return {
     worlds,
@@ -183,6 +198,8 @@ function emptyDashboardData(
     providerProfiles,
     runtimeControl,
     runtimeStatus,
+    runtimeDiagnostics,
+    worldDiagnostics: [],
     canManageSelectedWorld: false,
     loadError,
   };
