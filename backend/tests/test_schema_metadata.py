@@ -184,6 +184,22 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "provider_profiles",
         CheckConstraint,
     )
+    assert "ck_provider_profiles_timeout_seconds_positive" in constraint_names(
+        "provider_profiles",
+        CheckConstraint,
+    )
+    assert "ck_provider_profiles_retry_attempts_non_negative" in constraint_names(
+        "provider_profiles",
+        CheckConstraint,
+    )
+    assert "ck_provider_profiles_rate_limit_per_minute_positive" in constraint_names(
+        "provider_profiles",
+        CheckConstraint,
+    )
+    assert "ck_provider_profiles_last_test_status" in constraint_names(
+        "provider_profiles",
+        CheckConstraint,
+    )
     assert "ck_runtime_control_states_desired_state" in constraint_names(
         "runtime_control_states",
         CheckConstraint,

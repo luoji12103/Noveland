@@ -29,6 +29,7 @@ import {
   listScheduleRules,
   listWorldDiagnostics,
   searchAgentMemory,
+  testProviderProfile,
   updateAgent,
   updateProviderProfile,
   updateRuntimeControl,
@@ -207,6 +208,7 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "success", latency_ms: 10 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -223,8 +225,11 @@ describe("world client", () => {
       base_url: "https://api.example.test/v1",
       model_name: "gpt-test",
       api_key_ref: "openai-local",
+      timeout_seconds: 20,
+      retry_attempts: 1,
     });
     await updateProviderProfile("profile-1", { name: "Updated" });
+    await testProviderProfile("profile-1", "Reply with OK.");
     await disableProviderProfile("profile-1");
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/runtime/control");
@@ -235,7 +240,8 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles");
     expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles");
     expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles/profile-1");
-    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles/profile-1");
   });
 
   it("maps runs and narrative requests", async () => {

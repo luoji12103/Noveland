@@ -32,7 +32,7 @@
 - Memory Backend + Local pgvector Baseline
 - Agent Loop + Narrative Baseline
 - Runtime Observability + Diagnostics
+- Provider Reliability Hardening
 
 ## Upcoming Mainline
-- Provider Reliability Hardening
 - Agent Observation + Persona Policy Baseline

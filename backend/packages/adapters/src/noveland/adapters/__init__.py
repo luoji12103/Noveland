@@ -5,12 +5,15 @@ from noveland.adapters.model_provider import (
     ProviderCompletion,
     ProviderConfigurationError,
     ProviderError,
+    ProviderErrorCode,
     ProviderInvocationError,
+    ProviderInvocationResult,
     ProviderProfileCreate,
     ProviderProfileRecord,
     ProviderProfileService,
     ProviderProfileUpdate,
     ProviderProfileValidationError,
+    ProviderTestStatus,
     ProviderType,
 )
 from noveland.adapters.models import ProviderProfile
@@ -25,6 +28,8 @@ __all__ = [
     "ProviderCompletion",
     "ProviderConfigurationError",
     "ProviderError",
+    "ProviderErrorCode",
+    "ProviderInvocationResult",
     "ProviderInvocationError",
     "ProviderProfile",
     "ProviderProfileCreate",
@@ -32,5 +37,6 @@ __all__ = [
     "ProviderProfileService",
     "ProviderProfileUpdate",
     "ProviderProfileValidationError",
+    "ProviderTestStatus",
     "ProviderType",
 ]

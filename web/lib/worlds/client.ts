@@ -21,6 +21,7 @@ import type {
   SceneUpdateInput,
   ProviderProfile,
   ProviderProfileCreateInput,
+  ProviderTestCallResult,
   ProviderProfileUpdateInput,
   RuntimeDiagnostic,
   RuntimeControl,
@@ -437,6 +438,17 @@ export function updateProviderProfile(
 export function disableProviderProfile(profileId: string): Promise<void> {
   return apiRequest<void>(`/api/provider-profiles/${profileId}`, {
     method: "DELETE",
+    csrf: true,
+  });
+}
+
+export function testProviderProfile(
+  profileId: string,
+  prompt?: string,
+): Promise<ProviderTestCallResult> {
+  return apiRequest<ProviderTestCallResult>(`/api/provider-profiles/${profileId}/test-call`, {
+    method: "POST",
+    body: prompt === undefined || prompt.trim() === "" ? {} : { prompt },
     csrf: true,
   });
 }

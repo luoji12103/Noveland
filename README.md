@@ -190,10 +190,11 @@ GET /runtime/diagnostics
 GET /provider-profiles
 POST /provider-profiles
 PATCH /provider-profiles/{profile_id}
+POST /provider-profiles/{profile_id}/test-call
 DELETE /provider-profiles/{profile_id}
 ```
 
-Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`.
+Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material.
 
 The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
 

@@ -49,8 +49,10 @@
 ## Provider/runtime baseline
 
 - Provider profiles are non-secret database records containing provider type, base URL, model, capabilities, and `api_key_ref`.
+- Provider profiles also store non-secret reliability controls: timeout seconds, retry attempts, optional per-process rate limit, and last test status metadata.
 - Provider API keys are not persisted in the database; runtime resolves them from `NOVELAND_PROVIDER_API_KEYS_JSON`.
 - Web and HTTP APIs may read and update provider profiles, but they must never return API key material.
+- Provider test calls use the configured `api_key_ref`, update only non-secret health fields, and record redacted diagnostics.
 - `NOVELAND_RUNTIME_LOOP_INTERVAL_SECONDS` controls the daemon sleep interval between iterations.
 - `NOVELAND_RUNTIME_BATCH_LIMIT` caps how many due agent runs a single daemon iteration will execute.
 

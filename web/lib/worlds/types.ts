@@ -175,7 +175,21 @@ export type ProviderProfile = {
   model_name: string;
   capabilities: Record<string, unknown>;
   api_key_ref: string;
+  timeout_seconds: number;
+  retry_attempts: number;
+  rate_limit_per_minute: number | null;
+  last_tested_at: string | null;
+  last_test_status: "success" | "failed" | null;
+  last_test_error: string | null;
   is_enabled: boolean;
+};
+
+export type ProviderTestCallResult = {
+  status: "success" | "failed";
+  latency_ms: number;
+  text_preview: string | null;
+  error_code: string | null;
+  error_message: string | null;
 };
 
 export type AgentRun = {
@@ -327,6 +341,9 @@ export type ProviderProfileCreateInput = {
   model_name: string;
   capabilities?: Record<string, unknown>;
   api_key_ref: string;
+  timeout_seconds?: number;
+  retry_attempts?: number;
+  rate_limit_per_minute?: number | null;
 };
 
 export type ProviderProfileUpdateInput = {
@@ -335,6 +352,9 @@ export type ProviderProfileUpdateInput = {
   model_name?: string;
   capabilities?: Record<string, unknown>;
   api_key_ref?: string;
+  timeout_seconds?: number;
+  retry_attempts?: number;
+  rate_limit_per_minute?: number | null;
   is_enabled?: boolean;
 };
 

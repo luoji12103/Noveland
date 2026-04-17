@@ -12,7 +12,7 @@ Fast orientation for a new coding session.
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
-- `web/app/api/provider-profiles/` — same-origin provider profile proxy route handlers
+- `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
@@ -74,8 +74,8 @@ Fast orientation for a new coding session.
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
 - `backend/packages/adapters/`
-  - `noveland.adapters.model_provider` — provider profile contracts, services, and model-provider adapters
-  - `noveland.adapters.models` — provider profile ORM model
+  - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, test-call support, services, and model-provider adapters
+  - `noveland.adapters.models` — provider profile ORM model and provider health fields
 - `backend/packages/storage/`
 - `backend/packages/observability/`
   - `noveland.observability.contracts` — diagnostic severity/component contracts and record DTOs
@@ -89,7 +89,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, and runtime diagnostics
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, and provider reliability
 
 ## Update rule
 

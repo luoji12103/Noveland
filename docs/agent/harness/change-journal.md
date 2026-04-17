@@ -219,3 +219,14 @@
 - Tests added/updated: observability service/contract tests; runtime/event-publisher diagnostic tests; API diagnostics permission tests; schema/import coverage; Web client/component/mock-backend diagnostics coverage
 - Docs updated: README, data ownership, architecture map, project index, file inventory, task board, active handoff
 - Follow-up notes: provider timeout/retry/rate-limit hardening, provider test-call health state, and agent observation/persona policy remain separate tasks.
+
+## Provider reliability hardening entry
+
+- Date: 2026-04-17
+- Branch: feat/provider-reliability-hardening
+- Scope: provider timeout/retry/rate-limit and health-test baseline
+- Summary: Added non-secret provider reliability fields, timeout/retry/error classification behavior, per-process rate limiting, provider test-call API, diagnostic recording, and Web provider panel controls.
+- Files changed: `/backend/packages/adapters/**`, `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/migrations/versions/20260417_0009_provider_reliability.py`, `/backend/tests/**`, `/web/app/api/provider-profiles/[profileId]/test-call/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: provider adapter reliability tests, API test-call coverage, schema metadata checks, Web client/component/mock-backend coverage for reliability fields and provider test calls
+- Docs updated: README, configuration/secrets, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: provider rate limiting is process-local; distributed rate limiting, richer provider health dashboards, agent observation/persona policy, and plugin runtime execution remain separate tasks.

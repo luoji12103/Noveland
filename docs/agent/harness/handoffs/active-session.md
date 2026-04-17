@@ -1,20 +1,20 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/runtime-observability-diagnostics
-- Objective: Add runtime/provider/agent diagnostic events and admin diagnostics panels.
+- Branch: feat/provider-reliability-hardening
+- Objective: Add provider timeout/retry/rate-limit controls, health test-call support, and Web provider reliability controls.
 - Completed work:
-  - Created `feat/runtime-observability-diagnostics` from `main`.
-  - Added migration `20260417_0008_runtime_diagnostics_baseline.py` for `runtime_diagnostic_events`.
-  - Expanded `noveland.observability` with diagnostic enums, create/record contracts, ORM model, redaction helper, and record/list service.
-  - Registered observability metadata with `noveland.core.database.MODEL_MODULES`.
-  - Added diagnostic writes for daemon iteration start/finish/skipped/failure, event publisher failures, and agent/provider run outcomes.
-  - Added platform-admin `GET /runtime/diagnostics` and world-admin `GET /worlds/{world_id}/diagnostics`.
-  - Added Web diagnostics types, client/server helpers, same-origin runtime diagnostics proxy, and dashboard diagnostics panels.
-  - Added backend and Web tests for diagnostic contracts, schema metadata, API authorization, runtime writes, and dashboard/client behavior.
+  - Created `feat/provider-reliability-hardening` from `main` after merging runtime diagnostics.
+  - Added migration `20260417_0009_provider_reliability.py` for provider timeout, retry, rate-limit, and last test-call fields.
+  - Extended provider profile contracts, ORM model, service create/update/list records, and API responses with reliability fields.
+  - Added provider invocation timeout, retry, HTTP/error-code classification, invalid response classification, and process-local per-profile rate limiting.
+  - Added `ProviderInvocationResult` and `ProviderProfileService.test_profile`, updating `last_test_*` fields without exposing secrets.
+  - Added platform-admin CSRF-protected `POST /provider-profiles/{profile_id}/test-call` and redacted provider test diagnostics.
+  - Added Web same-origin test-call proxy, dashboard reliability form fields, last-test status display, and test-provider action.
+  - Updated backend and Web tests for provider reliability, API test-call behavior, schema metadata, and dashboard/client behavior.
 - Incomplete work:
-  - Stage 1 commit/merge are next.
-  - Provider reliability hardening and agent observation/persona policy are not implemented in this branch.
+  - Stage 2 full regression, commit, and merge are next.
+  - Agent observation/persona policy is not implemented in this branch.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -22,15 +22,13 @@
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
-  - `cd web && npm run build`
-  - `cd web && npm run test:e2e`
-  - `docker compose -f infra/compose.yaml config`
+  - Full `cd web && npm run build`, `cd web && npm run test:e2e`, and Compose config remain to rerun after docs sync.
 - Current risks:
-  - Diagnostics are operational records only; the world event log remains canonical.
-  - Diagnostic detail redaction is key-name based and should stay conservative around provider/API payloads.
+  - Provider rate limiting is process-local for this baseline.
+  - Test-call diagnostics must remain redacted and must not store API keys, cookies, or provider payload secrets.
   - Runtime Web controls still only change database desired state; an operator needs a running `noveland-runtime --daemon`.
 - Recommended next step:
-  - Commit `feat(observability): add runtime diagnostics`, merge to `main`, then start `feat/provider-reliability-hardening`.
+  - Run full backend/Web regression, commit `feat(providers): harden provider reliability`, merge to `main`, then start `feat/agent-observation-persona`.
 - Sensitive areas to avoid casual edits:
   - provider secret handling and diagnostic redaction
   - API authorization and CSRF boundaries

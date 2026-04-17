@@ -55,9 +55,19 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
         },
     )
     list_profiles = client.get("/provider-profiles")
+    test_profile = client.post(
+        f"/provider-profiles/{create_profile.json()['id']}/test-call",
+        json={"prompt": "Reply with OK."},
+    )
     update_profile = client.patch(
         f"/provider-profiles/{create_profile.json()['id']}",
-        json={"name": "OpenAI Updated", "is_enabled": False},
+        json={
+            "name": "OpenAI Updated",
+            "timeout_seconds": 15,
+            "retry_attempts": 2,
+            "rate_limit_per_minute": 30,
+            "is_enabled": False,
+        },
     )
     disable_profile = client.delete(f"/provider-profiles/{create_profile.json()['id']}")
 
@@ -71,10 +81,17 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert start_runtime.status_code == 200
     assert start_runtime.json()["desired_state"] == "running"
     assert create_profile.status_code == 201
+    assert create_profile.json()["timeout_seconds"] == 20
     assert list_profiles.status_code == 200
     assert list_profiles.json()[0]["profile_key"] == "openai-local"
+    assert test_profile.status_code == 200
+    assert test_profile.json()["status"] == "failed"
+    assert test_profile.json()["error_code"] == "configuration"
     assert update_profile.status_code == 200
     assert update_profile.json()["name"] == "OpenAI Updated"
+    assert update_profile.json()["timeout_seconds"] == 15
+    assert update_profile.json()["retry_attempts"] == 2
+    assert update_profile.json()["rate_limit_per_minute"] == 30
     assert update_profile.json()["is_enabled"] is False
     assert disable_profile.status_code == 204
 

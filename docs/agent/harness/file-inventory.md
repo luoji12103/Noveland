@@ -15,6 +15,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/worlds/`
 - `web/app/api/runtime/`
 - `web/app/api/provider-profiles/`
+- `web/app/api/provider-profiles/[profileId]/test-call/`
 - `web/features/`
 - `web/features/auth/`
 - `web/features/dashboard/`
@@ -93,6 +94,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260417_0006_memory_pgvector_baseline.py`
 - `backend/migrations/versions/20260417_0007_agent_narrative_runtime_baseline.py`
 - `backend/migrations/versions/20260417_0008_runtime_diagnostics_baseline.py`
+- `backend/migrations/versions/20260417_0009_provider_reliability.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

@@ -45,6 +45,7 @@ import {
   runAgent,
   searchAgentMemory,
   skipWorldClock,
+  testProviderProfile,
   updateAgent,
   updateAgentCalendarEntry,
   updateProviderProfile,
@@ -737,6 +738,9 @@ export function WorldManagementDashboard({
         model_name: formString(form, "model_name"),
         capabilities: jsonObject(formString(form, "capabilities")),
         api_key_ref: formString(form, "api_key_ref"),
+        timeout_seconds: numberFormValue(form, "timeout_seconds", 20),
+        retry_attempts: numberFormValue(form, "retry_attempts", 1),
+        rate_limit_per_minute: optionalNumberFormValue(form, "rate_limit_per_minute"),
       });
       setProviderProfiles((currentProfiles) => [...currentProfiles, profile].sort(compareProviderProfiles));
       formElement.reset();
@@ -756,6 +760,9 @@ export function WorldManagementDashboard({
         model_name: formString(form, "model_name"),
         capabilities: jsonObject(formString(form, "capabilities")),
         api_key_ref: formString(form, "api_key_ref"),
+        timeout_seconds: numberFormValue(form, "timeout_seconds", profile.timeout_seconds),
+        retry_attempts: numberFormValue(form, "retry_attempts", profile.retry_attempts),
+        rate_limit_per_minute: optionalNumberFormValue(form, "rate_limit_per_minute"),
         is_enabled: form.get("is_enabled") === "on",
       });
       setProviderProfiles((currentProfiles) => replaceById(currentProfiles, updatedProfile));
@@ -773,6 +780,27 @@ export function WorldManagementDashboard({
         ),
       );
     }, "Provider profile disabled.");
+  }
+
+  async function handleTestProviderProfile(
+    event: FormEvent<HTMLFormElement>,
+    profile: ProviderProfile,
+  ) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      const result = await testProviderProfile(
+        profile.id,
+        optionalFormString(form, "prompt") ?? undefined,
+      );
+      setProviderProfiles(await listProviderProfiles());
+      setRuntimeDiagnostics(await listRuntimeDiagnostics());
+      setNotice(
+        result.status === "success"
+          ? `Provider test succeeded in ${result.latency_ms}ms.`
+          : `Provider test failed: ${result.error_code ?? "provider_error"}`,
+      );
+    });
   }
 
   async function handleUpdateAgent(event: FormEvent<HTMLFormElement>, agent: Agent) {
@@ -932,6 +960,7 @@ export function WorldManagementDashboard({
             onCreate={handleCreateProviderProfile}
             onUpdate={handleUpdateProviderProfile}
             onDisable={handleDisableProviderProfile}
+            onTest={handleTestProviderProfile}
           />
         </>
       ) : null}
@@ -1797,12 +1826,14 @@ function ProviderProfilesPanel({
   onCreate,
   onUpdate,
   onDisable,
+  onTest,
 }: {
   profiles: ProviderProfile[];
   isBusy: boolean;
   onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   onUpdate: (event: FormEvent<HTMLFormElement>, profile: ProviderProfile) => void | Promise<void>;
   onDisable: (profile: ProviderProfile) => void | Promise<void>;
+  onTest: (event: FormEvent<HTMLFormElement>, profile: ProviderProfile) => void | Promise<void>;
 }) {
   return (
     <section className="management-panel" aria-label="Provider profiles">
@@ -1817,6 +1848,9 @@ function ProviderProfilesPanel({
         <input className="text-input" name="base_url" placeholder="https://api.example.test/v1" />
         <input className="text-input" name="model_name" placeholder="Model name" />
         <input className="text-input" name="api_key_ref" placeholder="api-key-ref" />
+        <input className="text-input" name="timeout_seconds" placeholder="Timeout seconds" />
+        <input className="text-input" name="retry_attempts" placeholder="Retry attempts" />
+        <input className="text-input" name="rate_limit_per_minute" placeholder="Rate limit per minute" />
         <textarea className="text-input" name="capabilities" placeholder="{}" rows={3} />
         <button className="primary-button" type="submit" disabled={isBusy}>
           Create provider profile
@@ -1831,12 +1865,39 @@ function ProviderProfilesPanel({
                 {profile.profile_key} - {profile.provider_type} - {profile.model_name} -{" "}
                 {profile.is_enabled ? "Enabled" : "Disabled"}
               </p>
+              <p className="status-detail">
+                Timeout {profile.timeout_seconds}s - retries {profile.retry_attempts} - rate{" "}
+                {profile.rate_limit_per_minute ?? "unlimited"}/min
+              </p>
+              <p className="status-detail">
+                Last test{" "}
+                {profile.last_test_status === null
+                  ? "never"
+                  : `${profile.last_test_status} at ${optionalDateTime(profile.last_tested_at)}`}
+                {profile.last_test_error === null ? "" : ` - ${profile.last_test_error}`}
+              </p>
             </div>
             <form className="inline-form" onSubmit={(event) => void onUpdate(event, profile)}>
               <input className="text-input" name="name" defaultValue={profile.name} />
               <input className="text-input" name="base_url" defaultValue={profile.base_url} />
               <input className="text-input" name="model_name" defaultValue={profile.model_name} />
               <input className="text-input" name="api_key_ref" defaultValue={profile.api_key_ref} />
+              <input
+                className="text-input"
+                name="timeout_seconds"
+                defaultValue={String(profile.timeout_seconds)}
+              />
+              <input
+                className="text-input"
+                name="retry_attempts"
+                defaultValue={String(profile.retry_attempts)}
+              />
+              <input
+                className="text-input"
+                name="rate_limit_per_minute"
+                defaultValue={profile.rate_limit_per_minute ?? ""}
+                placeholder="Rate limit per minute"
+              />
               <textarea
                 className="text-input"
                 name="capabilities"
@@ -1857,6 +1918,12 @@ function ProviderProfilesPanel({
                 onClick={() => void onDisable(profile)}
               >
                 Disable profile
+              </button>
+            </form>
+            <form className="inline-form" onSubmit={(event) => void onTest(event, profile)}>
+              <input className="text-input" name="prompt" placeholder="Reply with OK." />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Test provider
               </button>
             </form>
           </article>
@@ -2014,6 +2081,30 @@ function optionalFormString(form: FormData, key: string): string | null {
   return value === "" ? null : value;
 }
 
+function numberFormValue(form: FormData, key: string, fallback: number): number {
+  const value = formString(form, key);
+  if (value === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${key} must be a number.`);
+  }
+  return parsed;
+}
+
+function optionalNumberFormValue(form: FormData, key: string): number | null {
+  const value = formString(form, key);
+  if (value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${key} must be a number.`);
+  }
+  return parsed;
+}
+
 function jsonObject(rawValue: string): Record<string, unknown> {
   if (rawValue.trim() === "") {
     return {};
@@ -2054,6 +2145,10 @@ function messageForError(error: unknown): string {
 
 function formatDateTime(value: string): string {
   return new Date(value).toISOString();
+}
+
+function optionalDateTime(value: string | null): string {
+  return value === null ? "unknown time" : formatDateTime(value);
 }
 
 function replaceById<T extends { id: string }>(items: T[], nextItem: T): T[] {

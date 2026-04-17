@@ -125,6 +125,12 @@ const providerProfiles = [
     model_name: "gpt-test",
     capabilities: {},
     api_key_ref: "openai-local",
+    timeout_seconds: 20,
+    retry_attempts: 1,
+    rate_limit_per_minute: null,
+    last_tested_at: null,
+    last_test_status: null,
+    last_test_error: null,
     is_enabled: true,
   },
 ];
@@ -274,7 +280,8 @@ const mockServer = createServer(async (request, response) => {
   }
 
   if (url.pathname.startsWith("/provider-profiles/")) {
-    await handleProviderProfileItem(request, response, url.pathname.split("/")[2]);
+    const providerSegments = url.pathname.split("/");
+    await handleProviderProfileItem(request, response, providerSegments[2], providerSegments[3]);
     return;
   }
 
@@ -646,6 +653,12 @@ async function handleProviderProfiles(request, response) {
       model_name: body.model_name,
       capabilities: body.capabilities ?? {},
       api_key_ref: body.api_key_ref,
+      timeout_seconds: body.timeout_seconds ?? 20,
+      retry_attempts: body.retry_attempts ?? 1,
+      rate_limit_per_minute: body.rate_limit_per_minute ?? null,
+      last_tested_at: null,
+      last_test_status: null,
+      last_test_error: null,
       is_enabled: true,
     };
     providerProfiles.push(profile);
@@ -655,7 +668,7 @@ async function handleProviderProfiles(request, response) {
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleProviderProfileItem(request, response, profileId) {
+async function handleProviderProfileItem(request, response, profileId, action) {
   if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -667,6 +680,19 @@ async function handleProviderProfileItem(request, response, profileId) {
   }
   if (!hasValidCsrf(request)) {
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "test-call") {
+    profile.last_tested_at = new Date().toISOString();
+    profile.last_test_status = "success";
+    profile.last_test_error = null;
+    sendJson(response, 200, {
+      status: "success",
+      latency_ms: 5,
+      text_preview: "OK",
+      error_code: null,
+      error_message: null,
+    });
     return;
   }
   if (request.method === "PATCH") {
