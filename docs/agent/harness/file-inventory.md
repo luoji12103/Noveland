@@ -28,6 +28,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/dependencies.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
+- `backend/services/runtime/src/noveland/services/runtime/clock_tick.py`
 - `backend/packages/core/`
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
@@ -50,6 +51,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/events/src/noveland/events/errors.py`
 - `backend/packages/events/src/noveland/events/event_store.py`
 - `backend/packages/events/src/noveland/events/models.py`
+- `backend/packages/events/src/noveland/events/publisher.py`
 - `backend/packages/memory/`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`

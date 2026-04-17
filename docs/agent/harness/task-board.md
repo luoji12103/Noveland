@@ -26,9 +26,9 @@
 - Add world management API
 - Add world dashboard data
 - Add runtime clock service
+- Runtime Event Emission + NATS Baseline
 
 ## Upcoming Mainline
-- Runtime Event Emission + NATS Baseline
 - Replay + Snapshot Restore Baseline
 - Calendar + Schedule Rules Baseline
 - Memory Backend + Local pgvector Baseline

@@ -6,6 +6,7 @@ from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     DateTime,
@@ -28,7 +29,7 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "event_name ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'",
             name="event_name_format",
-        ),
+        ).ddl_if(dialect="postgresql"),
         Index("ix_world_events_world_sequence", "world_id", "sequence"),
         Index("ix_world_events_world_event_name", "world_id", "event_name"),
         Index("ix_world_events_world_wall_time", "world_id", "wall_time"),
@@ -41,9 +42,9 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     event_name: Mapped[str] = mapped_column(String(120), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
-        server_default=text("'{}'::jsonb"),
+        default=dict,
     )
     wall_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     world_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -81,13 +82,16 @@ class WorldSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default=text("'valid'"),
     )
-    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=True,
+    )
     payload_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
     snapshot_metadata: Mapped[dict[str, Any]] = mapped_column(
         "metadata",
-        JSONB,
+        JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
-        server_default=text("'{}'::jsonb"),
+        default=dict,
     )
     created_by_event_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("world_events.id", ondelete="RESTRICT"),

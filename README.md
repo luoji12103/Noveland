@@ -74,6 +74,12 @@ Run the API from `backend/`:
 uv run uvicorn noveland.services.api.app:app --reload
 ```
 
+Run one finite runtime tick from `backend/`:
+
+```sh
+uv run noveland-runtime
+```
+
 Run frontend checks from `web/`:
 
 ```sh
@@ -150,7 +156,7 @@ Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Tok
 
 The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, and world clock state according to the current user's backend permissions.
 
-These endpoints manage database records only. They do not start runtime loops, emit world events, or execute plugins.
+The runtime host remains finite: `noveland-runtime` performs one tick, advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. It does not start an infinite loop, schedule agents, or execute plugins.
 
 ## Development Rules
 

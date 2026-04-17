@@ -153,3 +153,14 @@
 - Tests added/updated: clock service persistence tests; clock API permission/CSRF tests; Web client/component/E2E coverage for clock controls
 - Docs updated: README, world clock architecture, project index, file inventory, task board, active handoff
 - Follow-up notes: runtime event emission, NATS broadcast, replay, calendar rules, memory backend, and agent loop remain separate tasks.
+
+## Runtime event emission and NATS baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/runtime-event-nats-baseline
+- Scope: runtime event emission and NATS broadcast baseline
+- Summary: Added world event publisher interfaces, NATS event envelope broadcasting, and a finite runtime tick service that advances active running clocks and appends `world.clock_advanced` events.
+- Files changed: `/backend/packages/events/**`, `/backend/services/runtime/**`, `/backend/tests/test_runtime_event_emission.py`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: runtime tick tests for running/paused clocks, event log append behavior, in-memory publisher envelopes, publish failure visibility, and workspace import coverage
+- Docs updated: README, event/snapshot model, world clock architecture, project index, file inventory, task board, active handoff
+- Follow-up notes: replay/snapshot restore, infinite runtime loop, external scheduler, agent loop, calendar rules, memory backend, and plugin execution remain separate tasks.

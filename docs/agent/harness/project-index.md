@@ -28,6 +28,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
   - `noveland.services.api.worlds` — initial worlds, scenes, memberships, and agents management router
 - `backend/services/runtime/` — long-running runtime host
+  - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
 - `backend/pyproject.toml` — backend uv workspace manifest
 
 ### Backend packages
@@ -46,6 +47,7 @@ Fast orientation for a new coding session.
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models
   - `noveland.events.event_store` — minimal world event append/list/snapshot helper
+  - `noveland.events.publisher` — world event envelope and NATS/in-memory publisher interfaces
 - `backend/packages/auth/`
   - `noveland.auth` — auth/session contracts, services, and typed errors
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models

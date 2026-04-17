@@ -13,5 +13,9 @@ class EventAppendError(EventStoreError):
     """Raised when an event cannot be appended."""
 
 
+class EventPublishError(EventStoreError):
+    """Raised when an event cannot be published to a broadcast transport."""
+
+
 class SnapshotValidationError(ValueError):
     """Raised when snapshot input does not match the snapshot contract."""

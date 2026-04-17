@@ -1,32 +1,30 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/runtime-clock-service
-- Objective: Add persistent world clock service, HTTP controls, and Web dashboard clock controls.
+- Branch: feat/runtime-event-nats-baseline
+- Objective: Add finite runtime event emission and NATS broadcast baseline.
 - Completed work:
-  - Fast-forward merged `feat/world-dashboard-data` into `main`.
-  - Created `feat/runtime-clock-service` from `main`.
-  - Added `noveland.worlds.clock_service` for clock persistence and transition audit writes.
-  - Initialized a paused clock automatically when creating a world.
-  - Added `/worlds/{world_id}/clock` read and pause/resume/advance/skip mutation endpoints.
-  - Added Web clock types, client/server data loading, dashboard clock panel, and E2E mock support.
-  - Updated README and harness docs for the runtime clock service stage.
+  - Fast-forward merged `feat/runtime-clock-service` into `main`.
+  - Created `feat/runtime-event-nats-baseline` from `main`.
+  - Added `noveland.events.publisher` with world event envelopes, in-memory publisher, NATS publisher, and subject helper.
+  - Updated `WorldEventStore` to allocate event and snapshot UUIDs in code and use a SQLAlchemy world-row lock path that remains testable on SQLite.
+  - Added `noveland.services.runtime.clock_tick` for finite runtime ticks over active running world clocks.
+  - Runtime ticks persist clock advancement, append `world.clock_advanced`, commit the canonical event log, and then publish to NATS.
+  - Added tests for runtime clock advancement, skipped paused clocks, NATS envelope shape, and typed publish failure visibility.
+  - Updated README and harness docs for runtime event emission.
 - Incomplete work:
-  - Runtime event emission and NATS broadcast.
-  - Replay/snapshot restore.
-  - Calendar rules, memory backend, agent loop, narrative loop, and plugin execution.
+  - Replay/snapshot restore and Web replay/snapshot panel.
+  - Infinite runtime loop, external scheduler, calendar rules, memory backend, agent loop, narrative loop, and plugin execution.
 - Tests run:
   - `cd backend && uv run ruff check . && uv run mypy .`
-  - `cd backend && uv run pytest tests/test_world_clock_service.py tests/test_api_worlds.py tests/test_workspace_imports.py`
-  - `cd web && npm run lint && npm run typecheck && npm run test`
-  - `cd web && npm run test:e2e`
+  - `cd backend && uv run pytest tests/test_runtime_event_emission.py tests/test_event_contracts.py tests/test_workspace_imports.py`
 - Current risks:
-  - Clock controls update operational clock state only; they do not emit canonical world events yet.
-  - Runtime host does not tick worlds until the next stage.
-  - Existing databases without clock rows rely on the clock service's safe initialization path when a clock is first read.
+  - NATS publishing is best-effort after the PostgreSQL event commit; publish failures are typed and visible, but there is no outbox/retry worker yet.
+  - Manual clock HTTP controls still do not emit events; only finite runtime ticks emit `world.clock_advanced`.
+  - Runtime host remains finite and must be invoked manually or by future scheduling infrastructure.
 - Recommended next step:
-  - Implement Runtime Event Emission + NATS Baseline.
+  - Implement Replay + Snapshot Restore Baseline.
 - Sensitive areas to avoid casual edits:
-  - auth-and-access model
   - event-and-snapshot model
   - world-clock semantics
+  - runtime tick boundaries

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from noveland.core.database import import_model_modules
+from noveland.core.database import Base, import_model_modules
 from noveland.events.contracts import (
     SNAPSHOT_EVENT_NAME,
     WorldEventAppend,
@@ -22,7 +22,7 @@ from noveland.events.errors import (
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from pydantic import ValidationError
-from sqlalchemy import desc, func, select, text
+from sqlalchemy import desc, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -40,6 +40,7 @@ class WorldEventStore:
         try:
             sequence = self._next_sequence(event_input.world_id)
             event_model = WorldEventModel(
+                id=uuid.uuid4(),
                 world_id=event_input.world_id,
                 sequence=sequence,
                 event_name=event_input.event_name,
@@ -105,6 +106,7 @@ class WorldEventStore:
 
         try:
             snapshot_model = WorldSnapshotModel(
+                id=uuid.uuid4(),
                 world_id=snapshot_input.world_id,
                 covers_event_sequence=snapshot_input.covers_event_sequence,
                 schema_version=snapshot_input.schema_version,
@@ -141,9 +143,11 @@ class WorldEventStore:
         return _snapshot_record_from_model(snapshot_model)
 
     def _next_sequence(self, world_id: uuid.UUID) -> int:
+        worlds_table = Base.metadata.tables["worlds"]
         locked_world = self._session.execute(
-            text("SELECT id FROM worlds WHERE id = CAST(:world_id AS uuid) FOR UPDATE"),
-            {"world_id": str(world_id)},
+            select(worlds_table.c.id)
+            .where(worlds_table.c.id == world_id)
+            .with_for_update(),
         ).first()
         if locked_world is None:
             raise EventAppendError("world does not exist")
@@ -181,12 +185,12 @@ def _event_record_from_model(event_model: WorldEventModel) -> WorldEventRecord:
         sequence=event_model.sequence,
         event_name=event_model.event_name,
         payload=event_model.payload,
-        wall_time=event_model.wall_time,
-        world_time=event_model.world_time,
+        wall_time=_utc(event_model.wall_time),
+        world_time=None if event_model.world_time is None else _utc(event_model.world_time),
         actor_ref=event_model.actor_ref,
         causation_event_id=event_model.causation_event_id,
         correlation_id=event_model.correlation_id,
-        created_at=event_model.created_at,
+        created_at=_utc(event_model.created_at),
     )
 
 
@@ -201,5 +205,11 @@ def _snapshot_record_from_model(snapshot_model: WorldSnapshotModel) -> WorldSnap
         payload_uri=snapshot_model.payload_uri,
         metadata=snapshot_model.snapshot_metadata,
         created_by_event_id=snapshot_model.created_by_event_id,
-        created_at=snapshot_model.created_at,
+        created_at=_utc(snapshot_model.created_at),
     )
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

@@ -28,6 +28,9 @@ Current materialized state is derived.
 - `world_snapshots` stores snapshot metadata and links each snapshot to the `world.snapshot_created` event that created it.
 - Snapshot payloads may be inline JSONB or referenced by `payload_uri`; this baseline does not write object storage objects.
 - `noveland.events.WorldEventStore` provides append, list-after, record-snapshot, and latest-valid-snapshot helpers.
+- `noveland.events.publisher` defines world event envelopes, an in-memory test publisher, and a NATS publisher.
+- Runtime ticks append `world.clock_advanced` events for running clocks and publish them to `noveland.world.{world_id}.events`.
+- PostgreSQL remains canonical; NATS is only the broadcast layer.
 
 ## Recovery model
 
@@ -45,4 +48,4 @@ Current materialized state is derived.
 
 Do not implement fake replay by reconstructing from ad hoc chat logs.
 
-The current baseline intentionally does not implement replay execution, runtime event emission, NATS broadcast, permission checks, UI controls, or narrative-specific event semantics.
+The current baseline intentionally does not implement replay execution, infinite runtime loops, scheduler integration, agent behavior, permission-policy expansion, UI replay controls, or narrative-specific event semantics.
