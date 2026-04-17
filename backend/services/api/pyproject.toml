@@ -9,11 +9,15 @@ description = "HTTP and WebSocket entrypoint for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.135,<0.136",
+  "noveland-adapters",
   "noveland-agents",
   "noveland-auth",
   "noveland-calendar",
   "noveland-core",
+  "noveland-events",
   "noveland-memory",
+  "noveland-narrative",
+  "noveland-service-runtime",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.13,<3",
@@ -25,11 +29,15 @@ dependencies = [
 noveland-api = "noveland.services.api.main:main"
 
 [tool.uv.sources]
+noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
 noveland-auth = { workspace = true }
 noveland-calendar = { workspace = true }
 noveland-core = { workspace = true }
+noveland-events = { workspace = true }
 noveland-memory = { workspace = true }
+noveland-narrative = { workspace = true }
+noveland-service-runtime = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

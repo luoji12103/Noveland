@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from noveland.core.version import PROJECT_VERSION
 from noveland.services.api.auth import router as auth_router
+from noveland.services.api.runtime import router as runtime_router
 from noveland.services.api.worlds import router as worlds_router
 from pydantic import BaseModel
 
@@ -14,6 +15,7 @@ class HealthResponse(BaseModel):
 def create_app() -> FastAPI:
     api = FastAPI(title="Noveland API", version=PROJECT_VERSION)
     api.include_router(auth_router)
+    api.include_router(runtime_router)
     api.include_router(worlds_router)
 
     @api.get("/health", response_model=HealthResponse)

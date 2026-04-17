@@ -13,12 +13,15 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/login/`
 - `web/app/api/auth/`
 - `web/app/api/worlds/`
+- `web/app/api/runtime/`
+- `web/app/api/provider-profiles/`
 - `web/features/`
 - `web/features/auth/`
 - `web/features/dashboard/`
 - `web/components/`
 - `web/lib/`
 - `web/lib/auth/`
+- `web/lib/runtime/`
 - `web/lib/worlds/`
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
@@ -26,9 +29,12 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
+- `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
+- `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
 - `backend/services/runtime/src/noveland/services/runtime/clock_tick.py`
+- `backend/services/runtime/src/noveland/services/runtime/daemon.py`
 - `backend/packages/core/`
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
@@ -49,6 +55,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/calendar/src/noveland/calendar/models.py`
 - `backend/packages/calendar/src/noveland/calendar/services.py`
 - `backend/packages/narrative/`
+- `backend/packages/narrative/src/noveland/narrative/contracts.py`
+- `backend/packages/narrative/src/noveland/narrative/models.py`
+- `backend/packages/narrative/src/noveland/narrative/services.py`
 - `backend/packages/events/`
 - `backend/packages/events/src/noveland/events/contracts.py`
 - `backend/packages/events/src/noveland/events/errors.py`
@@ -68,6 +77,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/plugins/src/noveland/plugins/manifest.py`
 - `backend/packages/plugins/src/noveland/plugins/registry.py`
 - `backend/packages/adapters/`
+- `backend/packages/adapters/src/noveland/adapters/model_provider.py`
+- `backend/packages/adapters/src/noveland/adapters/models.py`
 - `backend/packages/storage/`
 - `backend/packages/observability/`
 - `backend/migrations/`
@@ -77,6 +88,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260416_0004_auth_session_baseline.py`
 - `backend/migrations/versions/20260417_0005_calendar_schedule_baseline.py`
 - `backend/migrations/versions/20260417_0006_memory_pgvector_baseline.py`
+- `backend/migrations/versions/20260417_0007_agent_narrative_runtime_baseline.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

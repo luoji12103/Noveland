@@ -5,8 +5,11 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+import pytest
 from fastapi.testclient import TestClient
-from noveland.agents.models import Agent
+from noveland.adapters import ProviderCompletion, ProviderProfileService
+from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -15,6 +18,7 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import AgentMemoryItem
+from noveland.narrative.models import NarrativeArtifact
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -432,6 +436,80 @@ def test_world_admin_manages_agent_memory() -> None:
     assert list_after_disable.json() == []
 
 
+def test_agent_runs_and_narrative_artifacts_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "runtime-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _seed_provider_profile(engine)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    def fake_invoke_profile(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile
+        return ProviderCompletion(
+            text=f"Run completed for: {prompt}",
+            raw_response={"ok": True},
+        )
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
+
+    _authenticate(client, member_token)
+    member_list_runs = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
+    member_list_artifacts = client.get(f"/worlds/{world_id}/narrative-artifacts")
+    member_run = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/run",
+        json={"prompt": "blocked"},
+    )
+    member_create_artifact = client.post(
+        f"/worlds/{world_id}/narrative-artifacts",
+        json={"title": "Blocked", "content": "Blocked"},
+    )
+
+    _authenticate(client, owner_token)
+    run_response = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/run",
+        json={"prompt": "Operator run"},
+    )
+    list_runs = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
+    create_artifact = client.post(
+        f"/worlds/{world_id}/narrative-artifacts",
+        json={
+            "title": "Manual summary",
+            "content": "Current world summary",
+            "artifact_kind": "world_summary",
+            "agent_id": str(agent_id),
+        },
+    )
+    list_artifacts = client.get(f"/worlds/{world_id}/narrative-artifacts")
+
+    assert member_list_runs.status_code == 200
+    assert member_list_runs.json() == []
+    assert member_list_artifacts.status_code == 200
+    assert member_list_artifacts.json() == []
+    assert member_run.status_code == 403
+    assert member_create_artifact.status_code == 403
+    assert run_response.status_code == 201
+    assert run_response.json()["status"] == "succeeded"
+    assert run_response.json()["response_text"].startswith("Run completed for: Operator run")
+    assert run_response.json()["diagnostics"]["profile_key"] == "runtime-profile"
+    assert list_runs.status_code == 200
+    assert list_runs.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert create_artifact.status_code == 201
+    assert create_artifact.json()["artifact_kind"] == "world_summary"
+    assert [item["title"] for item in list_artifacts.json()] == [
+        "Manual summary",
+        "guide runtime note",
+    ]
+
+
 def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -511,6 +589,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
         cast(Table, AgentMemoryItem.__table__),
+        cast(Table, ProviderProfile.__table__),
+        cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, NarrativeArtifact.__table__),
     ):
         table.create(engine)
 
@@ -606,6 +687,23 @@ def _add_membership(
                 world_id=world_id,
                 user_id=user_id,
                 role=role.value,
+            ),
+        )
+        session.commit()
+
+
+def _seed_provider_profile(engine: Engine) -> None:
+    with Session(engine) as session:
+        session.add(
+            ProviderProfile(
+                profile_key="runtime-profile",
+                name="Runtime Profile",
+                provider_type="openai_compatible",
+                base_url="https://api.example.test/v1",
+                model_name="test-model",
+                capabilities={},
+                api_key_ref="runtime-ref",
+                is_enabled=True,
             ),
         )
         session.commit()

@@ -5,50 +5,68 @@ import { useRouter } from "next/navigation";
 
 import type { AuthSubject } from "@/lib/auth/types";
 import {
-  createAgent,
-  createAgentMemoryItem,
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
+  createAgent,
+  createAgentMemoryItem,
+  createNarrativeArtifact,
+  createProviderProfile,
   createScene,
   createScheduleRule,
   createSnapshot,
   createWorld,
+  advanceWorldClock,
   deactivateAgent,
   deactivateScene,
   deactivateWorld,
   deleteMembership,
+  disableAgentMemoryItem,
+  disableProviderProfile,
   disableScheduleRule,
-  advanceWorldClock,
-  getWorldClock,
   getLatestSnapshot,
   getReplayState,
+  getRuntimeControl,
+  getRuntimeStatus,
+  getWorldClock,
   listAgentCalendar,
   listAgentMemory,
+  listAgentRuns,
   listAgents,
   listMemberCandidates,
   listMemberships,
+  listNarrativeArtifacts,
+  listProviderProfiles,
   listScheduleRules,
   listScenes,
   pauseWorldClock,
   resumeWorldClock,
+  runAgent,
   searchAgentMemory,
   skipWorldClock,
-  updateAgentCalendarEntry,
   updateAgent,
+  updateAgentCalendarEntry,
+  updateProviderProfile,
+  updateRuntimeControl,
   updateScheduleRule,
   updateScene,
   updateWorld,
   upsertMembership,
   WorldClientError,
-  disableAgentMemoryItem,
 } from "@/lib/worlds/client";
 import type {
   Agent,
   AgentKind,
+  AgentRun,
   CalendarEntry,
   MemberCandidate,
   MemoryItem,
   Membership,
+  NarrativeArtifact,
+  NarrativeArtifactKind,
+  ProviderProfile,
+  ProviderType,
+  RuntimeControl,
+  RuntimeStatus,
   Scene,
   ScheduleRule,
   ScheduleRuleKind,
@@ -82,6 +100,11 @@ export function WorldManagementDashboard({
   const [calendarEntries, setCalendarEntries] = useState(initialData.calendarEntries);
   const [scheduleRules, setScheduleRules] = useState(initialData.scheduleRules);
   const [memoryItems, setMemoryItems] = useState(initialData.memoryItems);
+  const [agentRuns, setAgentRuns] = useState(initialData.agentRuns);
+  const [narrativeArtifacts, setNarrativeArtifacts] = useState(initialData.narrativeArtifacts);
+  const [providerProfiles, setProviderProfiles] = useState(initialData.providerProfiles);
+  const [runtimeControl, setRuntimeControl] = useState(initialData.runtimeControl);
+  const [runtimeStatus, setRuntimeStatus] = useState(initialData.runtimeStatus);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -118,6 +141,7 @@ export function WorldManagementDashboard({
         nextReplayState,
         nextLatestSnapshot,
         nextScheduleRules,
+        nextNarrativeArtifacts,
       ] = await Promise.all([
         listScenes(worldId),
         listAgents(worldId),
@@ -126,15 +150,17 @@ export function WorldManagementDashboard({
         getReplayState(worldId),
         getLatestSnapshot(worldId),
         listScheduleRules(worldId),
+        listNarrativeArtifacts(worldId),
       ]);
       const nextSelectedAgent = nextAgents[0] ?? null;
       const nextCanManage = nextMemberships !== null;
-      const [nextCalendarEntries, nextMemoryItems] =
+      const [nextCalendarEntries, nextMemoryItems, nextAgentRuns] =
         nextSelectedAgent === null
-          ? [[], []]
+          ? [[], [], []]
           : await Promise.all([
               listAgentCalendar(worldId, nextSelectedAgent.id),
               nextCanManage ? listAgentMemory(worldId, nextSelectedAgent.id) : Promise.resolve([]),
+              listAgentRuns(worldId, nextSelectedAgent.id),
             ]);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
@@ -147,6 +173,8 @@ export function WorldManagementDashboard({
       setCalendarEntries(nextCalendarEntries);
       setScheduleRules(nextScheduleRules);
       setMemoryItems(nextMemoryItems);
+      setAgentRuns(nextAgentRuns);
+      setNarrativeArtifacts(nextNarrativeArtifacts);
       setCanManageSelectedWorld(nextCanManage);
       setMemberCandidates([]);
     });
@@ -154,7 +182,8 @@ export function WorldManagementDashboard({
 
   async function handleCreateWorld(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const slug = formString(form, "slug");
     const name = formString(form, "name");
     if (slug === "" || name === "") {
@@ -187,6 +216,8 @@ export function WorldManagementDashboard({
       setCalendarEntries([]);
       setScheduleRules([]);
       setMemoryItems([]);
+      setAgentRuns([]);
+      setNarrativeArtifacts([]);
       setMemberships([
         {
           id: "local-owner",
@@ -204,7 +235,7 @@ export function WorldManagementDashboard({
       setCanManageSelectedWorld(true);
       setMemberCandidates([]);
       router.replace(`/?world=${world.id}`);
-      event.currentTarget.reset();
+      formElement.reset();
     }, "World created.");
   }
 
@@ -330,7 +361,8 @@ export function WorldManagementDashboard({
     if (selectedWorld === null) {
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const scene_key = formString(form, "scene_key");
     const name = formString(form, "name");
     if (scene_key === "" || name === "") {
@@ -344,7 +376,7 @@ export function WorldManagementDashboard({
         description: optionalFormString(form, "description"),
       });
       setScenes((currentScenes) => [...currentScenes, scene].sort(compareScenes));
-      event.currentTarget.reset();
+      formElement.reset();
     }, "Scene created.");
   }
 
@@ -383,7 +415,8 @@ export function WorldManagementDashboard({
     if (selectedWorld === null) {
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const agent_key = formString(form, "agent_key");
     const display_name = formString(form, "display_name");
     if (agent_key === "" || display_name === "") {
@@ -402,7 +435,8 @@ export function WorldManagementDashboard({
       setSelectedAgentId(agent.id);
       setCalendarEntries([]);
       setMemoryItems([]);
-      event.currentTarget.reset();
+      setAgentRuns([]);
+      formElement.reset();
     }, "Agent created.");
   }
 
@@ -412,12 +446,14 @@ export function WorldManagementDashboard({
     }
     await runAction(async () => {
       setSelectedAgentId(agentId);
-      const [nextCalendarEntries, nextMemoryItems] = await Promise.all([
+      const [nextCalendarEntries, nextMemoryItems, nextAgentRuns] = await Promise.all([
         listAgentCalendar(selectedWorld.id, agentId),
         canManage ? listAgentMemory(selectedWorld.id, agentId) : Promise.resolve([]),
+        listAgentRuns(selectedWorld.id, agentId),
       ]);
       setCalendarEntries(nextCalendarEntries);
       setMemoryItems(nextMemoryItems);
+      setAgentRuns(nextAgentRuns);
     });
   }
 
@@ -426,7 +462,8 @@ export function WorldManagementDashboard({
     if (selectedWorld === null || selectedAgent === null) {
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const title = formString(form, "title");
     const starts_at = formString(form, "starts_at");
     if (title === "" || starts_at === "") {
@@ -442,7 +479,7 @@ export function WorldManagementDashboard({
         metadata: {},
       });
       setCalendarEntries((currentEntries) => [...currentEntries, entry].sort(compareCalendarEntries));
-      event.currentTarget.reset();
+      formElement.reset();
     }, "Calendar entry created.");
   }
 
@@ -486,7 +523,8 @@ export function WorldManagementDashboard({
     if (selectedWorld === null) {
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const rule_key = formString(form, "rule_key");
     const name = formString(form, "name");
     if (rule_key === "" || name === "") {
@@ -501,7 +539,7 @@ export function WorldManagementDashboard({
         config: jsonObject(formString(form, "config")),
       });
       setScheduleRules((currentRules) => [...currentRules, rule].sort(compareScheduleRules));
-      event.currentTarget.reset();
+      formElement.reset();
     }, "Schedule rule created.");
   }
 
@@ -541,7 +579,8 @@ export function WorldManagementDashboard({
     if (selectedWorld === null || selectedAgent === null) {
       return;
     }
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const content = formString(form, "content");
     if (content === "") {
       setNotice("Memory content is required.");
@@ -554,7 +593,7 @@ export function WorldManagementDashboard({
         metadata: jsonObject(formString(form, "metadata")),
       });
       setMemoryItems((currentItems) => [memoryItem, ...currentItems]);
-      event.currentTarget.reset();
+      formElement.reset();
     }, "Memory item created.");
   }
 
@@ -592,6 +631,136 @@ export function WorldManagementDashboard({
         currentItems.filter((currentItem) => currentItem.id !== memoryItem.id),
       );
     }, "Memory item disabled.");
+  }
+
+  async function handleRunAgent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(async () => {
+      const run = await runAgent(selectedWorld.id, selectedAgent.id, {
+        prompt: optionalFormString(form, "prompt") ?? undefined,
+        provider_profile_id: optionalFormString(form, "provider_profile_id"),
+        create_memory: form.get("create_memory") === "on",
+        create_narrative_artifact: form.get("create_narrative_artifact") === "on",
+      });
+      setAgentRuns((currentRuns) => [run, ...currentRuns]);
+      setNarrativeArtifacts(await listNarrativeArtifacts(selectedWorld.id));
+      if (canManage) {
+        setMemoryItems(await listAgentMemory(selectedWorld.id, selectedAgent.id));
+      }
+      formElement.reset();
+    }, "Agent run completed.");
+  }
+
+  async function handleCreateNarrativeArtifact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const title = formString(form, "title");
+    const content = formString(form, "content");
+    if (title === "" || content === "") {
+      setNotice("Narrative title and content are required.");
+      return;
+    }
+    await runAction(async () => {
+      const artifact = await createNarrativeArtifact(selectedWorld.id, {
+        title,
+        content,
+        artifact_kind: formString(form, "artifact_kind") as NarrativeArtifactKind,
+        agent_id: optionalFormString(form, "agent_id"),
+      });
+      setNarrativeArtifacts((currentArtifacts) => [artifact, ...currentArtifacts]);
+      formElement.reset();
+    }, "Narrative artifact created.");
+  }
+
+  async function handleStartRuntime() {
+    await runAction(async () => {
+      setRuntimeControl(await updateRuntimeControl({ desired_state: "running" }));
+      setRuntimeStatus(await getRuntimeStatus());
+    }, "Runtime start requested.");
+  }
+
+  async function handleStopRuntime() {
+    await runAction(async () => {
+      setRuntimeControl(await updateRuntimeControl({ desired_state: "stopped" }));
+      setRuntimeStatus(await getRuntimeStatus());
+    }, "Runtime stop requested.");
+  }
+
+  async function handleRefreshRuntimeStatus() {
+    await runAction(async () => {
+      const [nextRuntimeControl, nextRuntimeStatus] = await Promise.all([
+        getRuntimeControl(),
+        getRuntimeStatus(),
+      ]);
+      setRuntimeControl(nextRuntimeControl);
+      setRuntimeStatus(nextRuntimeStatus);
+    }, "Runtime status refreshed.");
+  }
+
+  async function handleCreateProviderProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const profile_key = formString(form, "profile_key");
+    const name = formString(form, "name");
+    if (profile_key === "" || name === "") {
+      setNotice("Provider profile key and name are required.");
+      return;
+    }
+    await runAction(async () => {
+      const profile = await createProviderProfile({
+        profile_key,
+        name,
+        provider_type: formString(form, "provider_type") as ProviderType,
+        base_url: formString(form, "base_url"),
+        model_name: formString(form, "model_name"),
+        capabilities: jsonObject(formString(form, "capabilities")),
+        api_key_ref: formString(form, "api_key_ref"),
+      });
+      setProviderProfiles((currentProfiles) => [...currentProfiles, profile].sort(compareProviderProfiles));
+      formElement.reset();
+    }, "Provider profile created.");
+  }
+
+  async function handleUpdateProviderProfile(
+    event: FormEvent<HTMLFormElement>,
+    profile: ProviderProfile,
+  ) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      const updatedProfile = await updateProviderProfile(profile.id, {
+        name: formString(form, "name"),
+        base_url: formString(form, "base_url"),
+        model_name: formString(form, "model_name"),
+        capabilities: jsonObject(formString(form, "capabilities")),
+        api_key_ref: formString(form, "api_key_ref"),
+        is_enabled: form.get("is_enabled") === "on",
+      });
+      setProviderProfiles((currentProfiles) => replaceById(currentProfiles, updatedProfile));
+    }, "Provider profile updated.");
+  }
+
+  async function handleDisableProviderProfile(profile: ProviderProfile) {
+    await runAction(async () => {
+      await disableProviderProfile(profile.id);
+      setProviderProfiles((currentProfiles) =>
+        currentProfiles.map((currentProfile) =>
+          currentProfile.id === profile.id
+            ? { ...currentProfile, is_enabled: false }
+            : currentProfile,
+        ),
+      );
+    }, "Provider profile disabled.");
   }
 
   async function handleUpdateAgent(event: FormEvent<HTMLFormElement>, agent: Agent) {
@@ -734,6 +903,26 @@ export function WorldManagementDashboard({
         </section>
       ) : null}
 
+      {isPlatformAdmin ? (
+        <>
+          <RuntimeControlPanel
+            runtimeControl={runtimeControl}
+            runtimeStatus={runtimeStatus}
+            isBusy={isBusy}
+            onStart={handleStartRuntime}
+            onStop={handleStopRuntime}
+            onRefresh={handleRefreshRuntimeStatus}
+          />
+          <ProviderProfilesPanel
+            profiles={providerProfiles}
+            isBusy={isBusy}
+            onCreate={handleCreateProviderProfile}
+            onUpdate={handleUpdateProviderProfile}
+            onDisable={handleDisableProviderProfile}
+          />
+        </>
+      ) : null}
+
       {selectedWorld === null ? (
         <section className="management-panel">
           <h2 className="section-title">No world selected</h2>
@@ -827,6 +1016,25 @@ export function WorldManagementDashboard({
             onSearch={handleSearchMemory}
             onRefresh={handleRefreshMemory}
             onDisable={handleDisableMemoryItem}
+          />
+
+          <AgentRunsPanel
+            agents={agents}
+            selectedAgent={selectedAgent}
+            runs={agentRuns}
+            providerProfiles={providerProfiles}
+            canManage={canManage}
+            isBusy={isBusy}
+            onSelectAgent={handleSelectAgent}
+            onRun={handleRunAgent}
+          />
+
+          <NarrativeArtifactsPanel
+            agents={agents}
+            artifacts={narrativeArtifacts}
+            canManage={canManage}
+            isBusy={isBusy}
+            onCreate={handleCreateNarrativeArtifact}
           />
 
           <section className="management-columns">
@@ -1458,6 +1666,261 @@ function MemoryPanel({
   );
 }
 
+function RuntimeControlPanel({
+  runtimeControl,
+  runtimeStatus,
+  isBusy,
+  onStart,
+  onStop,
+  onRefresh,
+}: {
+  runtimeControl: RuntimeControl | null;
+  runtimeStatus: RuntimeStatus | null;
+  isBusy: boolean;
+  onStart: () => void | Promise<void>;
+  onStop: () => void | Promise<void>;
+  onRefresh: () => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Runtime control">
+      <h2 className="section-title">Runtime control</h2>
+      {runtimeControl === null || runtimeStatus === null ? (
+        <p className="status-detail">Runtime control is not available.</p>
+      ) : (
+        <>
+          <div className="clock-grid">
+            <Metric label="Desired state" value={runtimeControl.desired_state} />
+            <Metric label="Loop interval" value={`${runtimeStatus.runtime_loop_interval_seconds}s`} />
+            <Metric label="Batch limit" value={String(runtimeStatus.runtime_batch_limit)} />
+          </div>
+          <p className="status-detail">
+            Last heartbeat{" "}
+            {runtimeControl.last_heartbeat_at === null
+              ? "never"
+              : formatDateTime(runtimeControl.last_heartbeat_at)}
+          </p>
+          <p className="status-detail">
+            Last error {runtimeControl.last_error ?? "none"}
+          </p>
+        </>
+      )}
+      <div className="button-row">
+        <button className="secondary-button" type="button" disabled={isBusy} onClick={() => void onRefresh()}>
+          Refresh runtime
+        </button>
+        <button className="primary-button" type="button" disabled={isBusy} onClick={() => void onStart()}>
+          Start runtime
+        </button>
+        <button className="secondary-button" type="button" disabled={isBusy} onClick={() => void onStop()}>
+          Stop runtime
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ProviderProfilesPanel({
+  profiles,
+  isBusy,
+  onCreate,
+  onUpdate,
+  onDisable,
+}: {
+  profiles: ProviderProfile[];
+  isBusy: boolean;
+  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onUpdate: (event: FormEvent<HTMLFormElement>, profile: ProviderProfile) => void | Promise<void>;
+  onDisable: (profile: ProviderProfile) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Provider profiles">
+      <h2 className="section-title">Provider profiles</h2>
+      <form className="management-form" onSubmit={(event) => void onCreate(event)}>
+        <input className="text-input" name="profile_key" placeholder="profile-key" />
+        <input className="text-input" name="name" placeholder="Profile name" />
+        <select className="text-input" name="provider_type" defaultValue="openai_compatible">
+          <option value="openai_compatible">openai_compatible</option>
+          <option value="anthropic_compatible">anthropic_compatible</option>
+        </select>
+        <input className="text-input" name="base_url" placeholder="https://api.example.test/v1" />
+        <input className="text-input" name="model_name" placeholder="Model name" />
+        <input className="text-input" name="api_key_ref" placeholder="api-key-ref" />
+        <textarea className="text-input" name="capabilities" placeholder="{}" rows={3} />
+        <button className="primary-button" type="submit" disabled={isBusy}>
+          Create provider profile
+        </button>
+      </form>
+      <div className="resource-list">
+        {profiles.map((profile) => (
+          <article className="resource-row" key={profile.id}>
+            <div>
+              <h3>{profile.name}</h3>
+              <p>
+                {profile.profile_key} - {profile.provider_type} - {profile.model_name} -{" "}
+                {profile.is_enabled ? "Enabled" : "Disabled"}
+              </p>
+            </div>
+            <form className="inline-form" onSubmit={(event) => void onUpdate(event, profile)}>
+              <input className="text-input" name="name" defaultValue={profile.name} />
+              <input className="text-input" name="base_url" defaultValue={profile.base_url} />
+              <input className="text-input" name="model_name" defaultValue={profile.model_name} />
+              <input className="text-input" name="api_key_ref" defaultValue={profile.api_key_ref} />
+              <textarea
+                className="text-input"
+                name="capabilities"
+                defaultValue={JSON.stringify(profile.capabilities)}
+                rows={3}
+              />
+              <label className="checkbox-label">
+                <input name="is_enabled" type="checkbox" defaultChecked={profile.is_enabled} />
+                Enabled
+              </label>
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Save profile
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void onDisable(profile)}
+              >
+                Disable profile
+              </button>
+            </form>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AgentRunsPanel({
+  agents,
+  selectedAgent,
+  runs,
+  providerProfiles,
+  canManage,
+  isBusy,
+  onSelectAgent,
+  onRun,
+}: {
+  agents: Agent[];
+  selectedAgent: Agent | null;
+  runs: AgentRun[];
+  providerProfiles: ProviderProfile[];
+  canManage: boolean;
+  isBusy: boolean;
+  onSelectAgent: (agentId: string) => void | Promise<void>;
+  onRun: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Agent runs">
+      <h2 className="section-title">Agent runs</h2>
+      <select
+        className="text-input"
+        value={selectedAgent?.id ?? ""}
+        onChange={(event) => void onSelectAgent(event.target.value)}
+      >
+        {agents.length === 0 ? <option value="">No agents</option> : null}
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.display_name}
+          </option>
+        ))}
+      </select>
+      {canManage && selectedAgent !== null ? (
+        <form className="management-form" onSubmit={(event) => void onRun(event)}>
+          <textarea className="text-input" name="prompt" placeholder="Manual run prompt" rows={3} />
+          <select className="text-input" name="provider_profile_id" defaultValue="">
+            <option value="">Use default enabled profile</option>
+            {providerProfiles
+              .filter((profile) => profile.is_enabled)
+              .map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+          </select>
+          <label className="checkbox-label">
+            <input name="create_memory" type="checkbox" defaultChecked />
+            Create memory
+          </label>
+          <label className="checkbox-label">
+            <input name="create_narrative_artifact" type="checkbox" defaultChecked />
+            Create narrative artifact
+          </label>
+          <button className="primary-button" type="submit" disabled={isBusy}>
+            Run agent
+          </button>
+        </form>
+      ) : null}
+      <div className="resource-list">
+        {runs.map((run) => (
+          <article className="resource-row" key={run.run_id}>
+            <div>
+              <h3>{run.status}</h3>
+              <p>{formatDateTime(run.started_at)}</p>
+              <p>{run.response_text ?? run.prompt_text}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NarrativeArtifactsPanel({
+  agents,
+  artifacts,
+  canManage,
+  isBusy,
+  onCreate,
+}: {
+  agents: Agent[];
+  artifacts: NarrativeArtifact[];
+  canManage: boolean;
+  isBusy: boolean;
+  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Narrative artifacts">
+      <h2 className="section-title">Narrative artifacts</h2>
+      {canManage ? (
+        <form className="management-form" onSubmit={(event) => void onCreate(event)}>
+          <input className="text-input" name="title" placeholder="Artifact title" />
+          <textarea className="text-input" name="content" placeholder="Artifact content" rows={4} />
+          <select className="text-input" name="artifact_kind" defaultValue="world_summary">
+            <option value="world_summary">world_summary</option>
+            <option value="agent_note">agent_note</option>
+          </select>
+          <select className="text-input" name="agent_id" defaultValue="">
+            <option value="">No agent</option>
+            {agents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.display_name}
+              </option>
+            ))}
+          </select>
+          <button className="primary-button" type="submit" disabled={isBusy}>
+            Create narrative artifact
+          </button>
+        </form>
+      ) : null}
+      <div className="resource-list">
+        {artifacts.map((artifact) => (
+          <article className="resource-row" key={artifact.id}>
+            <div>
+              <h3>{artifact.title}</h3>
+              <p>{artifact.artifact_kind} - {formatDateTime(artifact.created_at)}</p>
+              <p>{artifact.content}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 async function listMembershipsIfAllowed(worldId: string): Promise<Membership[] | null> {
   try {
     return await listMemberships(worldId);
@@ -1553,6 +2016,10 @@ function compareCalendarEntries(left: CalendarEntry, right: CalendarEntry): numb
 
 function compareScheduleRules(left: ScheduleRule, right: ScheduleRule): number {
   return left.rule_key.localeCompare(right.rule_key);
+}
+
+function compareProviderProfiles(left: ProviderProfile, right: ProviderProfile): number {
+  return left.profile_key.localeCompare(right.profile_key);
 }
 
 function compareMemberships(left: Membership, right: Membership): number {

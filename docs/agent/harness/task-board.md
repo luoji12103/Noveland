@@ -30,6 +30,7 @@
 - Replay + Snapshot Restore Baseline
 - Calendar + Schedule Rules Baseline
 - Memory Backend + Local pgvector Baseline
+- Agent Loop + Narrative Baseline
 
 ## Upcoming Mainline
-- Agent Loop + Narrative Baseline
+- TBD

@@ -3,6 +3,8 @@ import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
 import type {
   Agent,
   AgentCreateInput,
+  AgentRun,
+  AgentRunCreateInput,
   AgentUpdateInput,
   CalendarEntry,
   CalendarEntryCreateInput,
@@ -12,9 +14,17 @@ import type {
   MemoryItemCreateInput,
   MemorySearchInput,
   Membership,
+  NarrativeArtifact,
+  NarrativeArtifactCreateInput,
   Scene,
   SceneCreateInput,
   SceneUpdateInput,
+  ProviderProfile,
+  ProviderProfileCreateInput,
+  ProviderProfileUpdateInput,
+  RuntimeControl,
+  RuntimeControlUpdateInput,
+  RuntimeStatus,
   ScheduleRule,
   ScheduleRuleCreateInput,
   ScheduleRuleUpdateInput,
@@ -278,6 +288,37 @@ export function disableAgentMemoryItem(
   });
 }
 
+export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRun[]> {
+  return worldRequest<AgentRun[]>(`/api/worlds/${worldId}/agents/${agentId}/runs`, {
+    method: "GET",
+  });
+}
+
+export function runAgent(worldId: string, agentId: string, input: AgentRunCreateInput): Promise<AgentRun> {
+  return worldRequest<AgentRun>(`/api/worlds/${worldId}/agents/${agentId}/run`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listNarrativeArtifacts(worldId: string): Promise<NarrativeArtifact[]> {
+  return worldRequest<NarrativeArtifact[]>(`/api/worlds/${worldId}/narrative-artifacts`, {
+    method: "GET",
+  });
+}
+
+export function createNarrativeArtifact(
+  worldId: string,
+  input: NarrativeArtifactCreateInput,
+): Promise<NarrativeArtifact> {
+  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
 export function createAgent(worldId: string, input: AgentCreateInput): Promise<Agent> {
   return worldRequest<Agent>(`/api/worlds/${worldId}/agents`, {
     method: "POST",
@@ -343,6 +384,52 @@ export function listMemberCandidates(
   );
 }
 
+export function getRuntimeControl(): Promise<RuntimeControl> {
+  return apiRequest<RuntimeControl>("/api/runtime/control", { method: "GET" });
+}
+
+export function updateRuntimeControl(input: RuntimeControlUpdateInput): Promise<RuntimeControl> {
+  return apiRequest<RuntimeControl>("/api/runtime/control", {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function getRuntimeStatus(): Promise<RuntimeStatus> {
+  return apiRequest<RuntimeStatus>("/api/runtime/status", { method: "GET" });
+}
+
+export function listProviderProfiles(): Promise<ProviderProfile[]> {
+  return apiRequest<ProviderProfile[]>("/api/provider-profiles", { method: "GET" });
+}
+
+export function createProviderProfile(input: ProviderProfileCreateInput): Promise<ProviderProfile> {
+  return apiRequest<ProviderProfile>("/api/provider-profiles", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateProviderProfile(
+  profileId: string,
+  input: ProviderProfileUpdateInput,
+): Promise<ProviderProfile> {
+  return apiRequest<ProviderProfile>(`/api/provider-profiles/${profileId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function disableProviderProfile(profileId: string): Promise<void> {
+  return apiRequest<void>(`/api/provider-profiles/${profileId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
+}
+
 type WorldRequestOptions = {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
@@ -350,6 +437,10 @@ type WorldRequestOptions = {
 };
 
 async function worldRequest<T>(path: string, options: WorldRequestOptions): Promise<T> {
+  return apiRequest<T>(path, options);
+}
+
+async function apiRequest<T>(path: string, options: WorldRequestOptions): Promise<T> {
   const headers = new Headers();
   if (options.body !== undefined) {
     headers.set("Content-Type", "application/json");

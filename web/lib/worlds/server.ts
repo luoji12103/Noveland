@@ -3,9 +3,14 @@ import { headers } from "next/headers";
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
+  AgentRun,
   CalendarEntry,
   MemoryItem,
   Membership,
+  NarrativeArtifact,
+  ProviderProfile,
+  RuntimeControl,
+  RuntimeStatus,
   Scene,
   ScheduleRule,
   World,
@@ -17,16 +22,33 @@ import type {
 
 export async function getWorldDashboardData(
   requestedWorldId: string | null,
+  isPlatformAdmin: boolean,
 ): Promise<WorldDashboardData> {
   const cookieHeader = (await headers()).get("cookie");
   try {
+    const [providerProfiles, runtimeControl, runtimeStatus] = isPlatformAdmin
+      ? await Promise.all([
+          apiFetch<ProviderProfile[]>("/provider-profiles", cookieHeader),
+          apiFetch<RuntimeControl>("/runtime/control", cookieHeader),
+          apiFetch<RuntimeStatus>("/runtime/status", cookieHeader),
+        ])
+      : [[], null, null];
     const worlds = await apiFetch<World[]>("/worlds", cookieHeader);
     const selectedWorld = selectedWorldForRequest(worlds, requestedWorldId);
     if (selectedWorld === null) {
-      return emptyDashboardData(worlds, null, null);
+      return emptyDashboardData(worlds, null, null, providerProfiles, runtimeControl, runtimeStatus);
     }
 
-    const [scenes, agents, memberships, clock, replayState, latestSnapshot, scheduleRules] =
+    const [
+      scenes,
+      agents,
+      memberships,
+      clock,
+      replayState,
+      latestSnapshot,
+      scheduleRules,
+      narrativeArtifacts,
+    ] =
       await Promise.all([
         apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
         apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
@@ -35,11 +57,12 @@ export async function getWorldDashboardData(
         apiFetch<WorldReplayState>(`/worlds/${selectedWorld.id}/replay/state`, cookieHeader),
         apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
         apiFetch<ScheduleRule[]>(`/worlds/${selectedWorld.id}/schedule-rules`, cookieHeader),
+        apiFetch<NarrativeArtifact[]>(`/worlds/${selectedWorld.id}/narrative-artifacts`, cookieHeader),
       ]);
     const selectedAgent = agents[0] ?? null;
-    const [calendarEntries, memoryItems] =
+    const [calendarEntries, memoryItems, agentRuns] =
       selectedAgent === null
-        ? [[], []]
+        ? [[], [], []]
         : await Promise.all([
             apiFetch<CalendarEntry[]>(
               `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/calendar`,
@@ -51,6 +74,10 @@ export async function getWorldDashboardData(
                   `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/memory`,
                   cookieHeader,
                 ),
+            apiFetch<AgentRun[]>(
+              `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/runs`,
+              cookieHeader,
+            ),
           ]);
 
     return {
@@ -66,6 +93,11 @@ export async function getWorldDashboardData(
       calendarEntries,
       scheduleRules,
       memoryItems,
+      agentRuns,
+      narrativeArtifacts,
+      providerProfiles,
+      runtimeControl,
+      runtimeStatus,
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -73,7 +105,7 @@ export async function getWorldDashboardData(
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
     }
-    return emptyDashboardData([], null, "Unable to load world data.");
+    return emptyDashboardData([], null, "Unable to load world data.", [], null, null);
   }
 }
 
@@ -129,6 +161,9 @@ function emptyDashboardData(
   worlds: World[],
   selectedWorldId: string | null,
   loadError: string | null,
+  providerProfiles: ProviderProfile[],
+  runtimeControl: RuntimeControl | null,
+  runtimeStatus: RuntimeStatus | null,
 ): WorldDashboardData {
   return {
     worlds,
@@ -143,6 +178,11 @@ function emptyDashboardData(
     calendarEntries: [],
     scheduleRules: [],
     memoryItems: [],
+    agentRuns: [],
+    narrativeArtifacts: [],
+    providerProfiles,
+    runtimeControl,
+    runtimeStatus,
     canManageSelectedWorld: false,
     loadError,
   };

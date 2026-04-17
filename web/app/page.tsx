@@ -20,7 +20,10 @@ export default async function Home({ searchParams }: HomeProps) {
     redirect("/login");
   }
   const resolvedSearchParams = await searchParams;
-  const dashboardData = await getWorldDashboardData(resolvedSearchParams?.world ?? null);
+  const dashboardData = await getWorldDashboardData(
+    resolvedSearchParams?.world ?? null,
+    subject.roles.includes("platform_admin"),
+  );
 
   return (
     <main className="page-shell">

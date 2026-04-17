@@ -11,13 +11,16 @@ Fast orientation for a new coding session.
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
+- `web/app/api/runtime/` — same-origin runtime control proxy route handlers
+- `web/app/api/provider-profiles/` — same-origin provider profile proxy route handlers
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
-  - `web/features/dashboard/` — protected world management dashboard components
+  - `web/features/dashboard/` — protected world management, runtime, and narrative dashboard components
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
+  - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
 - `web/package.json` — frontend scripts and dependency manifest
 
 ### Backend services
@@ -26,26 +29,32 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, clock, replay, and snapshot management router
+  - `noveland.services.api.runtime` — platform-admin runtime control and provider profile router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, clock, replay, snapshots, agent runs, and narrative router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
+  - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation
+  - `noveland.services.runtime.daemon` — database-backed runtime control state and daemon loop orchestration
 - `backend/pyproject.toml` — backend uv workspace manifest
 
 ### Backend packages
 - `backend/packages/core/`
   - `noveland.core.database` — SQLAlchemy base, metadata, and session factory
-  - `noveland.core.models` — platform settings ORM model
+  - `noveland.core.models` — platform settings and runtime control ORM models
 - `backend/packages/worlds/`
   - `noveland.worlds.clock` — pure world clock state and transition logic
   - `noveland.worlds.clock_service` — persistent world clock state and transition audit service
   - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
-  - `noveland.agents.models` — agent identity ORM model
+  - `noveland.agents.models` — agent identity and runtime run ORM models
 - `backend/packages/calendar/`
   - `noveland.calendar.contracts` — calendar entry and schedule rule contracts
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
   - `noveland.calendar.services` — calendar CRUD and due-resolution service
 - `backend/packages/narrative/`
+  - `noveland.narrative.contracts` — narrative artifact contracts
+  - `noveland.narrative.models` — narrative artifact ORM model
+  - `noveland.narrative.services` — narrative artifact create/list service
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models
@@ -65,6 +74,8 @@ Fast orientation for a new coding session.
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
 - `backend/packages/adapters/`
+  - `noveland.adapters.model_provider` — provider profile contracts, services, and model-provider adapters
+  - `noveland.adapters.models` — provider profile ORM model
 - `backend/packages/storage/`
 - `backend/packages/observability/`
 
@@ -75,7 +86,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, and auth/session baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, and agent/runtime narrative baseline
 
 ## Update rule
 

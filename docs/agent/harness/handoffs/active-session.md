@@ -1,27 +1,32 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/memory-pgvector-baseline
-- Objective: Add private agent memory contracts, local pgvector persistence, memory APIs, and a Web dashboard panel.
+- Branch: feat/agent-loop-narrative-baseline
+- Objective: Add provider profiles, runtime daemon control, agent loop execution, and narrative artifacts across backend and Web.
 - Completed work:
-  - Fast-forward merged `feat/calendar-schedule-baseline` into `main`.
-  - Created `feat/memory-pgvector-baseline` from `main`.
-  - Added `agent_memory_items` migration with pgvector extension setup.
-  - Added `noveland.memory` contracts, ORM model, vector type, and local backend add/list/search/disable helper.
-  - Added agent memory API routes under `/worlds/{world_id}/agents/{agent_id}/memory`.
-  - Added Web world helpers and dashboard panel for listing, adding, searching, refreshing, and disabling agent memory items.
-  - Updated README and harness docs.
+  - Fast-forward merged `feat/memory-pgvector-baseline` into `main`.
+  - Created `feat/agent-loop-narrative-baseline` from `main`.
+  - Added migration `20260417_0007_agent_narrative_runtime_baseline.py` for provider profiles, runtime control state, agent runtime runs, and narrative artifacts.
+  - Added `noveland.adapters` provider profile contracts/models/service plus OpenAI-compatible and Anthropic-compatible adapters.
+  - Added `noveland.narrative` contracts/models/service for narrative artifact storage and retrieval.
+  - Added runtime daemon control and agent loop orchestration to `noveland.services.runtime`.
+  - Added platform-admin runtime/provider APIs and world-scoped agent-run/narrative APIs.
+  - Added Web dashboard panels for runtime control, provider profiles, agent runs, and narrative artifacts.
+  - Added backend tests for provider adapters, runtime daemon iteration, schema/import coverage, and world/runtime API flows.
 - Incomplete work:
-  - Provider profiles, runtime daemon control, agent loop, narrative artifacts, and plugin execution.
+  - Stage 3 implementation is in final regression/commit phase; branch is not merged yet.
 - Tests run:
-  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_memory_backend.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
-  - `cd web && npm run lint && npm run typecheck && npm run test`
+  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run ruff check .`
+  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run mypy .`
+  - `cd backend && env UV_CACHE_DIR=/tmp/uv-cache uv run pytest tests/test_model_provider.py tests/test_runtime_daemon.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
+  - `cd web && npm run lint && npm run typecheck`
 - Current risks:
-  - The local backend stores embeddings through a shared SQLAlchemy type adapter and computes cosine similarity in application code; native pgvector similarity operators are reserved for later optimization work.
-  - Memory API access is intentionally limited to world admins and platform admins in this baseline.
+  - Provider adapters intentionally cover only OpenAI-compatible chat-completions and Anthropic-compatible messages baselines.
+  - Runtime Web controls only change database desired state; an operator still needs a running `noveland-runtime --daemon` process.
+  - Agent loop behavior is intentionally minimal and does not include tool execution, retries, or prompt management.
 - Recommended next step:
-  - Implement Agent Loop + Narrative Baseline.
+  - Finish full backend/web regression, then commit `feat(runtime): add agent narrative baseline`.
 - Sensitive areas to avoid casual edits:
-  - agent data isolation
+  - provider secret handling
   - API authorization and CSRF boundaries
-  - migration ordering and pgvector extension setup
+  - migration ordering and runtime/event invariants

@@ -132,6 +132,60 @@ export type MemoryItem = {
   score: number | null;
 };
 
+export type RuntimeControl = {
+  desired_state: "running" | "stopped";
+  last_heartbeat_at: string | null;
+  last_run_started_at: string | null;
+  last_run_finished_at: string | null;
+  last_error: string | null;
+};
+
+export type RuntimeStatus = RuntimeControl & {
+  runtime_loop_interval_seconds: number;
+  runtime_batch_limit: number;
+};
+
+export type ProviderType = "openai_compatible" | "anthropic_compatible";
+
+export type ProviderProfile = {
+  id: string;
+  profile_key: string;
+  name: string;
+  provider_type: ProviderType;
+  base_url: string;
+  model_name: string;
+  capabilities: Record<string, unknown>;
+  api_key_ref: string;
+  is_enabled: boolean;
+};
+
+export type AgentRun = {
+  run_id: string;
+  world_id: string;
+  agent_id: string;
+  status: string;
+  prompt_text: string;
+  response_text: string | null;
+  provider_profile_id: string | null;
+  diagnostics: Record<string, unknown>;
+  started_at: string;
+  finished_at: string | null;
+};
+
+export type NarrativeArtifactKind = "agent_note" | "world_summary";
+
+export type NarrativeArtifact = {
+  id: string;
+  world_id: string;
+  agent_id: string | null;
+  source_run_id: string | null;
+  title: string;
+  content: string;
+  artifact_kind: NarrativeArtifactKind;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type WorldDashboardData = {
   worlds: World[];
   selectedWorldId: string | null;
@@ -145,6 +199,11 @@ export type WorldDashboardData = {
   calendarEntries: CalendarEntry[];
   scheduleRules: ScheduleRule[];
   memoryItems: MemoryItem[];
+  agentRuns: AgentRun[];
+  narrativeArtifacts: NarrativeArtifact[];
+  providerProfiles: ProviderProfile[];
+  runtimeControl: RuntimeControl | null;
+  runtimeStatus: RuntimeStatus | null;
   canManageSelectedWorld: boolean;
   loadError: string | null;
 };
@@ -233,4 +292,41 @@ export type MemoryItemCreateInput = {
 export type MemorySearchInput = {
   embedding: number[];
   limit?: number;
+};
+
+export type RuntimeControlUpdateInput = {
+  desired_state: "running" | "stopped";
+};
+
+export type ProviderProfileCreateInput = {
+  profile_key: string;
+  name: string;
+  provider_type: ProviderType;
+  base_url: string;
+  model_name: string;
+  capabilities?: Record<string, unknown>;
+  api_key_ref: string;
+};
+
+export type ProviderProfileUpdateInput = {
+  name?: string;
+  base_url?: string;
+  model_name?: string;
+  capabilities?: Record<string, unknown>;
+  api_key_ref?: string;
+  is_enabled?: boolean;
+};
+
+export type AgentRunCreateInput = {
+  prompt?: string;
+  provider_profile_id?: string | null;
+  create_memory?: boolean;
+  create_narrative_artifact?: boolean;
+};
+
+export type NarrativeArtifactCreateInput = {
+  title: string;
+  content: string;
+  artifact_kind?: NarrativeArtifactKind;
+  agent_id?: string | null;
 };

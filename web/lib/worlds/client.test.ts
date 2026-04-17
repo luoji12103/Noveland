@@ -4,21 +4,32 @@ import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
   createAgentMemoryItem,
+  createNarrativeArtifact,
+  createProviderProfile,
   createScheduleRule,
   createSnapshot,
   createWorld,
   disableAgentMemoryItem,
+  disableProviderProfile,
   deactivateScene,
+  getRuntimeControl,
+  getRuntimeStatus,
   getLatestSnapshot,
   getReplayState,
+  listAgentRuns,
   pauseWorldClock,
   resumeWorldClock,
   listAgentMemory,
+  listNarrativeArtifacts,
+  listProviderProfiles,
+  runAgent,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
   searchAgentMemory,
   updateAgent,
+  updateProviderProfile,
+  updateRuntimeControl,
   updateScheduleRule,
 } from "@/lib/worlds/client";
 
@@ -174,6 +185,70 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[3][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/memory/memory-1",
     );
+  });
+
+  it("maps runtime and provider requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ desired_state: "stopped" }))
+      .mockResolvedValueOnce(jsonResponse({ desired_state: "running" }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          desired_state: "running",
+          runtime_loop_interval_seconds: 5,
+          runtime_batch_limit: 20,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getRuntimeControl();
+    await updateRuntimeControl({ desired_state: "running" });
+    await getRuntimeStatus();
+    await listProviderProfiles();
+    await createProviderProfile({
+      profile_key: "openai-local",
+      name: "OpenAI Local",
+      provider_type: "openai_compatible",
+      base_url: "https://api.example.test/v1",
+      model_name: "gpt-test",
+      api_key_ref: "openai-local",
+    });
+    await updateProviderProfile("profile-1", { name: "Updated" });
+    await disableProviderProfile("profile-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/runtime/control");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/runtime/control");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/runtime/status");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles/profile-1");
+  });
+
+  it("maps runs and narrative requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ run_id: "run-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ run_id: "run-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "artifact-2" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentRuns("world-1", "agent-1");
+    await runAgent("world-1", "agent-1", { prompt: "hello" });
+    await listNarrativeArtifacts("world-1");
+    await createNarrativeArtifact("world-1", { title: "Artifact", content: "Body" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/runs");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/run");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/narrative-artifacts");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/narrative-artifacts");
   });
 
   it("raises typed world client errors", async () => {

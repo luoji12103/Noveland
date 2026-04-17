@@ -38,11 +38,15 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "agent_runtime_runs",
         "agent_calendar_entries",
         "agent_memory_items",
         "auth_sessions",
         "platform_settings",
         "platform_role_assignments",
+        "provider_profiles",
+        "runtime_control_states",
+        "narrative_artifacts",
         "scenes",
         "user_credentials",
         "users",
@@ -92,6 +96,14 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_world_events_world_sequence" in constraint_names(
         "world_events",
+        UniqueConstraint,
+    )
+    assert "uq_provider_profiles_profile_key" in constraint_names(
+        "provider_profiles",
+        UniqueConstraint,
+    )
+    assert "uq_runtime_control_states_control_key" in constraint_names(
+        "runtime_control_states",
         UniqueConstraint,
     )
 
@@ -167,6 +179,26 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "agent_memory_items",
         CheckConstraint,
     )
+    assert "ck_provider_profiles_provider_type" in constraint_names(
+        "provider_profiles",
+        CheckConstraint,
+    )
+    assert "ck_runtime_control_states_desired_state" in constraint_names(
+        "runtime_control_states",
+        CheckConstraint,
+    )
+    assert "ck_agent_runtime_runs_status" in constraint_names(
+        "agent_runtime_runs",
+        CheckConstraint,
+    )
+    assert "ck_agent_runtime_runs_trigger_source" in constraint_names(
+        "agent_runtime_runs",
+        CheckConstraint,
+    )
+    assert "ck_narrative_artifacts_artifact_kind" in constraint_names(
+        "narrative_artifacts",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -186,6 +218,21 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("agent_memory_items") == {
         "agents.id",
         "world_events.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("provider_profiles") == set()
+    assert foreign_key_targets("runtime_control_states") == set()
+    assert foreign_key_targets("agent_runtime_runs") == {
+        "agent_calendar_entries.id",
+        "agents.id",
+        "provider_profiles.id",
+        "world_events.id",
+        "world_schedule_rules.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("narrative_artifacts") == {
+        "agent_runtime_runs.id",
+        "agents.id",
         "worlds.id",
     }
 
@@ -220,3 +267,7 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_memory_items_world_agent" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_world_agent_active" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_source_event_id" in index_names("agent_memory_items")
+    assert "ix_agent_runtime_runs_world_agent_started_at" in index_names("agent_runtime_runs")
+    assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
+    assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
+    assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")

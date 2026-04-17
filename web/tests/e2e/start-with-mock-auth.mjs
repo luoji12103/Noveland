@@ -115,6 +115,53 @@ const memoryItems = [
     score: null,
   },
 ];
+const providerProfiles = [
+  {
+    id: "71000000-0000-4000-8000-000000000001",
+    profile_key: "openai-local",
+    name: "OpenAI Local",
+    provider_type: "openai_compatible",
+    base_url: "https://api.example.test/v1",
+    model_name: "gpt-test",
+    capabilities: {},
+    api_key_ref: "openai-local",
+    is_enabled: true,
+  },
+];
+const runtimeControl = {
+  desired_state: "stopped",
+  last_heartbeat_at: null,
+  last_run_started_at: null,
+  last_run_finished_at: null,
+  last_error: null,
+};
+const agentRuns = [
+  {
+    run_id: "72000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    status: "succeeded",
+    prompt_text: "Initial prompt",
+    response_text: "Initial response",
+    provider_profile_id: providerProfiles[0].id,
+    diagnostics: {},
+    started_at: "2026-04-17T00:03:00.000Z",
+    finished_at: "2026-04-17T00:03:01.000Z",
+  },
+];
+const narrativeArtifacts = [
+  {
+    id: "73000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    source_run_id: agentRuns[0].run_id,
+    title: "Initial artifact",
+    content: "Initial artifact content",
+    artifact_kind: "agent_note",
+    metadata: {},
+    created_at: "2026-04-17T00:03:02.000Z",
+  },
+];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
 
@@ -171,6 +218,26 @@ const mockServer = createServer(async (request, response) => {
       ],
     });
     response.end();
+    return;
+  }
+
+  if (url.pathname === "/runtime/control") {
+    await handleRuntimeControl(request, response);
+    return;
+  }
+
+  if (url.pathname === "/runtime/status") {
+    handleRuntimeStatus(response);
+    return;
+  }
+
+  if (url.pathname === "/provider-profiles") {
+    await handleProviderProfiles(request, response);
+    return;
+  }
+
+  if (url.pathname.startsWith("/provider-profiles/")) {
+    await handleProviderProfileItem(request, response, url.pathname.split("/")[2]);
     return;
   }
 
@@ -297,6 +364,10 @@ async function handleWorldResource(request, response, url) {
     await handleScheduleRules(request, response, currentSubject, worldId, segments[3]);
     return;
   }
+  if (resource === "narrative-artifacts") {
+    await handleNarrativeArtifacts(request, response, currentSubject, worldId);
+    return;
+  }
   if (resource === "clock") {
     await handleClock(request, response, currentSubject, worldId, segments[3]);
     return;
@@ -402,6 +473,14 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       await handleMemory(request, response, currentSubject, worldId, agentId, segments[5]);
       return;
     }
+    if (segments[4] === "runs") {
+      handleAgentRuns(request, response, currentSubject, worldId, agentId);
+      return;
+    }
+    if (segments[4] === "run") {
+      await handleAgentRun(request, response, currentSubject, worldId, agentId);
+      return;
+    }
   }
   if (request.method === "GET" && agentId === undefined) {
     sendJson(response, 200, agents.filter((agent) => agent.world_id === worldId));
@@ -448,6 +527,98 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
   }
   if (request.method === "DELETE") {
     agent.is_enabled = false;
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleRuntimeControl(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, runtimeControl);
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    const body = await readJson(request);
+    runtimeControl.desired_state = body.desired_state;
+    runtimeControl.last_heartbeat_at = new Date().toISOString();
+    sendJson(response, 200, runtimeControl);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleRuntimeStatus(response) {
+  sendJson(response, 200, {
+    ...runtimeControl,
+    runtime_loop_interval_seconds: 5,
+    runtime_batch_limit: 20,
+  });
+}
+
+async function handleProviderProfiles(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, providerProfiles);
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const profile = {
+      id: randomUUID(),
+      profile_key: body.profile_key,
+      name: body.name,
+      provider_type: body.provider_type,
+      base_url: body.base_url,
+      model_name: body.model_name,
+      capabilities: body.capabilities ?? {},
+      api_key_ref: body.api_key_ref,
+      is_enabled: true,
+    };
+    providerProfiles.push(profile);
+    sendJson(response, 201, profile);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleProviderProfileItem(request, response, profileId) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const profile = providerProfiles.find((item) => item.id === profileId);
+  if (profile === undefined) {
+    sendJson(response, 404, { detail: "Provider profile not found" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(profile, await readJson(request));
+    sendJson(response, 200, profile);
+    return;
+  }
+  if (request.method === "DELETE") {
+    profile.is_enabled = false;
     response.writeHead(204);
     response.end();
     return;
@@ -511,6 +682,79 @@ async function handleMemory(request, response, currentSubject, worldId, agentId,
     item.is_active = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleAgentRuns(request, response, currentSubject, worldId, agentId) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 404, { detail: "World not found" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      agentRuns.filter((run) => run.world_id === worldId && run.agent_id === agentId),
+    );
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAgentRun(request, response, currentSubject, worldId, agentId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const run = {
+      run_id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      status: "succeeded",
+      prompt_text: body.prompt ?? "Manual run",
+      response_text: `Run output for ${agentId}`,
+      provider_profile_id: body.provider_profile_id ?? providerProfiles[0]?.id ?? null,
+      diagnostics: {},
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+    };
+    agentRuns.unshift(run);
+    if (body.create_memory !== false) {
+      memoryItems.unshift({
+        id: randomUUID(),
+        world_id: worldId,
+        agent_id: agentId,
+        content: run.response_text,
+        metadata: { run_id: run.run_id },
+        embedding: [1, 0, 0],
+        visibility: "private",
+        is_active: true,
+        source_event_id: null,
+        score: null,
+      });
+    }
+    if (body.create_narrative_artifact !== false) {
+      narrativeArtifacts.unshift({
+        id: randomUUID(),
+        world_id: worldId,
+        agent_id: agentId,
+        source_run_id: run.run_id,
+        title: "Runtime note",
+        content: run.response_text,
+        artifact_kind: "agent_note",
+        metadata: {},
+        created_at: new Date().toISOString(),
+      });
+    }
+    sendJson(response, 201, run);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -766,6 +1010,43 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
     snapshots.set(worldId, snapshot);
     replaySequences.set(worldId, replay.source_sequence + 1);
     sendJson(response, 201, snapshot);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleNarrativeArtifacts(request, response, currentSubject, worldId) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 404, { detail: "World not found" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, narrativeArtifacts.filter((artifact) => artifact.world_id === worldId));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const artifact = {
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: body.agent_id ?? null,
+      source_run_id: null,
+      title: body.title,
+      content: body.content,
+      artifact_kind: body.artifact_kind ?? "world_summary",
+      metadata: {},
+      created_at: new Date().toISOString(),
+    };
+    narrativeArtifacts.unshift(artifact);
+    sendJson(response, 201, artifact);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });

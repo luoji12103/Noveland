@@ -22,9 +22,11 @@ MODEL_MODULES = (
     "noveland.auth.models",
     "noveland.worlds.models",
     "noveland.agents.models",
+    "noveland.adapters.models",
     "noveland.calendar.models",
     "noveland.memory.models",
     "noveland.events.models",
+    "noveland.narrative.models",
 )
 
 
@@ -36,6 +38,7 @@ class UUIDPrimaryKeyMixin:
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
 

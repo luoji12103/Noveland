@@ -48,7 +48,11 @@
 - `agent_calendar_entries` stores private, world-scoped agent calendar items.
 - `world_schedule_rules` stores world-owned weekday/weekend/timetable rule configuration.
 - `agent_memory_items` stores private, world-scoped agent memory records, embeddings, and optional source-event linkage.
-- Plugin registry data and narrative artifacts are intentionally deferred to separate migrations.
+- `provider_profiles` stores non-secret provider configuration records and API key references.
+- `runtime_control_states` stores platform-owned runtime desired state and daemon heartbeat metadata.
+- `agent_runtime_runs` stores world-scoped operational run history, prompt/response content, and diagnostics for agent executions.
+- `narrative_artifacts` stores world-scoped narrative outputs linked to optional agents and runtime runs.
+- Plugin registry persistence remains deferred to a separate task.
 
 ## Ownership rules
 

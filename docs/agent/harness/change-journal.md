@@ -197,3 +197,14 @@
 - Tests added/updated: memory backend contract tests, world API memory tests, schema metadata tests, Web client/component/E2E coverage
 - Docs updated: README, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: provider profiles, runtime agent loop, narrative artifacts, and plugin execution remain separate tasks.
+
+## Agent loop and narrative baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/agent-loop-narrative-baseline
+- Scope: provider profiles, runtime daemon control, agent loop execution, and narrative artifacts
+- Summary: Added non-secret provider profiles, database-backed runtime control, a daemon-aware agent loop, manual agent-run and narrative APIs, and Web dashboard panels for runtime/provider/run/artifact operations.
+- Files changed: `/backend/packages/adapters/**`, `/backend/packages/agents/src/noveland/agents/models.py`, `/backend/packages/core/**`, `/backend/packages/narrative/**`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260417_0007_agent_narrative_runtime_baseline.py`, `/backend/tests/**`, `/web/app/**`, `/web/features/dashboard/**`, `/web/lib/runtime/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/.env.example`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: provider adapter contract tests; runtime daemon iteration test; world API tests for agent runs and narrative artifacts; schema/import coverage for runtime/provider/narrative modules; Web client/component/E2E coverage for runtime controls, provider profiles, agent runs, and narrative artifacts
+- Docs updated: README, configuration/secrets, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: production process supervision, richer prompt/runtime policy, provider retry/rate-limit handling, plugin execution, and advanced narrative reader flows remain separate tasks.

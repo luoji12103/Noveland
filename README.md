@@ -80,6 +80,12 @@ Run one finite runtime tick from `backend/`:
 uv run noveland-runtime
 ```
 
+Run the long-lived runtime loop from `backend/`:
+
+```sh
+uv run noveland-runtime --daemon
+```
+
 Run frontend checks from `web/`:
 
 ```sh
@@ -153,10 +159,14 @@ GET /worlds/{world_id}/agents/{agent_id}/memory
 POST /worlds/{world_id}/agents/{agent_id}/memory
 POST /worlds/{world_id}/agents/{agent_id}/memory/search
 DELETE /worlds/{world_id}/agents/{agent_id}/memory/{memory_id}
+GET /worlds/{world_id}/agents/{agent_id}/runs
+POST /worlds/{world_id}/agents/{agent_id}/run
 GET /worlds/{world_id}/schedule-rules
 POST /worlds/{world_id}/schedule-rules
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
 DELETE /worlds/{world_id}/schedule-rules/{rule_id}
+GET /worlds/{world_id}/narrative-artifacts
+POST /worlds/{world_id}/narrative-artifacts
 GET /worlds/{world_id}/clock
 POST /worlds/{world_id}/clock/pause
 POST /worlds/{world_id}/clock/resume
@@ -169,9 +179,25 @@ POST /worlds/{world_id}/snapshots
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
 
+The platform-admin runtime surface is available under:
+
+```http
+GET /runtime/control
+PATCH /runtime/control
+GET /runtime/status
+GET /provider-profiles
+POST /provider-profiles
+PATCH /provider-profiles/{profile_id}
+DELETE /provider-profiles/{profile_id}
+```
+
+Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`.
+
 The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
 
-The runtime host remains finite: `noveland-runtime` performs one tick, advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. It does not start an infinite loop, schedule agents, or execute plugins.
+The protected web dashboard also exposes runtime controls, provider profiles, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+
+The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, appends agent/runtime events, optionally writes memory items, and optionally creates narrative artifacts.
 
 ## Development Rules
 

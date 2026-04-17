@@ -26,6 +26,10 @@ test("signs in and shows the protected dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent memory" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Runtime control" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Provider profiles" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent runs" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Narrative artifacts" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Guide", exact: true })).toBeVisible();
   await expect(page.getByText("admin@example.test - world_admin")).toBeVisible();
@@ -112,6 +116,27 @@ test("world admin manages scenes agents and memberships", async ({ page }) => {
   await page.getByPlaceholder("Search embedding").fill("[1,0,0]");
   await page.getByRole("button", { name: "Search memory" }).click();
   await expect(page.getByText(/score/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Start runtime" }).click();
+  await expect(page.getByText("Runtime start requested.")).toBeVisible();
+
+  await page.getByPlaceholder("profile-key").fill(`profile-${Date.now()}`);
+  await page.getByPlaceholder("Profile name").fill("E2E Provider");
+  await page.getByPlaceholder("https://api.example.test/v1").fill("https://api.example.test/v1");
+  await page.getByPlaceholder("Model name").fill("gpt-e2e");
+  await page.getByPlaceholder("api-key-ref").fill("openai-local");
+  await page.getByRole("button", { name: "Create provider profile" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Provider" })).toBeVisible();
+
+  await page.getByPlaceholder("Manual run prompt").fill("Say hello from runtime");
+  await page.getByRole("button", { name: "Run agent" }).click();
+  await expect(page.getByText("Agent run completed.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "succeeded" }).first()).toBeVisible();
+
+  await page.getByPlaceholder("Artifact title").fill("E2E Artifact");
+  await page.getByPlaceholder("Artifact content").fill("Artifact body");
+  await page.getByRole("button", { name: "Create narrative artifact" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Artifact" })).toBeVisible();
 });
 
 test("world member sees read-only dashboard", async ({ page }) => {
@@ -124,10 +149,13 @@ test("world member sees read-only dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Schedule rules" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent calendar" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent memory" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent runs" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Narrative artifacts" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save world" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Resume clock" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create snapshot" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add memory item" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Run agent" })).toHaveCount(0);
 });
 
 async function signIn(page: Page, email = "admin@example.test") {

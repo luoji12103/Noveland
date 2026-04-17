@@ -1,8 +1,19 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/worlds/client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
+  return {
+    ...actual,
+    listAgentMemory: vi.fn(),
+    listNarrativeArtifacts: vi.fn(),
+    runAgent: vi.fn(),
+  };
+});
 
 import { WorldManagementDashboard } from "@/features/dashboard/world-management-dashboard";
 import type { AuthSubject } from "@/lib/auth/types";
+import { listAgentMemory, listNarrativeArtifacts, runAgent } from "@/lib/worlds/client";
 import type { WorldDashboardData } from "@/lib/worlds/types";
 
 vi.mock("next/navigation", () => ({
@@ -10,6 +21,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("WorldManagementDashboard", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders an empty platform admin state with create controls", () => {
     render(<WorldManagementDashboard subject={platformAdmin} initialData={emptyData} />);
 
@@ -30,6 +45,10 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("heading", { name: "Schedule rules" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent calendar" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent memory" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Runtime control" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Provider profiles" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agent runs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Narrative artifacts" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create agent" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
@@ -43,6 +62,35 @@ describe("WorldManagementDashboard", () => {
     expect(screen.queryByRole("button", { name: "Resume clock" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create snapshot" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
+  });
+
+  it("shows a success notice after running an agent", async () => {
+    vi.mocked(runAgent).mockResolvedValue({
+      run_id: "run-2",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      status: "succeeded",
+      prompt_text: "Say hello from runtime",
+      response_text: "Hello from runtime",
+      provider_profile_id: "profile-1",
+      diagnostics: {},
+      started_at: "2026-04-17T00:05:00.000Z",
+      finished_at: "2026-04-17T00:05:01.000Z",
+    });
+    vi.mocked(listNarrativeArtifacts).mockResolvedValue(adminData.narrativeArtifacts);
+    vi.mocked(listAgentMemory).mockResolvedValue(adminData.memoryItems);
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={adminDataWithAgent} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Manual run prompt"), {
+      target: { value: "Say hello from runtime" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Agent run completed.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Cannot read properties of null (reading 'reset')")).not.toBeInTheDocument();
   });
 });
 
@@ -73,6 +121,11 @@ const emptyData: WorldDashboardData = {
   calendarEntries: [],
   scheduleRules: [],
   memoryItems: [],
+  agentRuns: [],
+  narrativeArtifacts: [],
+  providerProfiles: [],
+  runtimeControl: null,
+  runtimeStatus: null,
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -151,8 +204,105 @@ const adminData: WorldDashboardData = {
       score: null,
     },
   ],
+  agentRuns: [
+    {
+      run_id: "run-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      status: "succeeded",
+      prompt_text: "Prompt",
+      response_text: "Response",
+      provider_profile_id: "profile-1",
+      diagnostics: {},
+      started_at: "2026-04-17T00:03:00.000Z",
+      finished_at: "2026-04-17T00:03:01.000Z",
+    },
+  ],
+  narrativeArtifacts: [
+    {
+      id: "artifact-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      source_run_id: "run-1",
+      title: "Artifact",
+      content: "Artifact content",
+      artifact_kind: "agent_note",
+      metadata: {},
+      created_at: "2026-04-17T00:03:02.000Z",
+    },
+  ],
+  providerProfiles: [
+    {
+      id: "profile-1",
+      profile_key: "openai-local",
+      name: "OpenAI Local",
+      provider_type: "openai_compatible",
+      base_url: "https://api.example.test/v1",
+      model_name: "gpt-test",
+      capabilities: {},
+      api_key_ref: "openai-local",
+      is_enabled: true,
+    },
+  ],
+  runtimeControl: {
+    desired_state: "stopped",
+    last_heartbeat_at: null,
+    last_run_started_at: null,
+    last_run_finished_at: null,
+    last_error: null,
+  },
+  runtimeStatus: {
+    desired_state: "stopped",
+    last_heartbeat_at: null,
+    last_run_started_at: null,
+    last_run_finished_at: null,
+    last_error: null,
+    runtime_loop_interval_seconds: 5,
+    runtime_batch_limit: 20,
+  },
   canManageSelectedWorld: true,
   loadError: null,
+};
+
+const adminDataWithAgent: WorldDashboardData = {
+  ...adminData,
+  selectedAgentId: "agent-1",
+  scenes: [
+    {
+      id: "scene-1",
+      world_id: "world-1",
+      scene_key: "home",
+      name: "Home",
+      description: null,
+      is_active: true,
+    },
+  ],
+  agents: [
+    {
+      id: "agent-1",
+      world_id: "world-1",
+      home_scene_id: "scene-1",
+      agent_key: "guide",
+      display_name: "Guide",
+      kind: "role_agent",
+      config: {},
+      is_enabled: true,
+    },
+  ],
+  calendarEntries: [
+    {
+      id: "entry-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      title: "Morning scene",
+      description: null,
+      starts_at: "2030-01-01T08:00:00.000Z",
+      ends_at: null,
+      recurrence_rule: null,
+      status: "active",
+      metadata: {},
+    },
+  ],
 };
 
 const readOnlyData: WorldDashboardData = {
@@ -249,6 +399,36 @@ const readOnlyData: WorldDashboardData = {
       score: 0.91,
     },
   ],
+  agentRuns: [
+    {
+      run_id: "run-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      status: "succeeded",
+      prompt_text: "Prompt",
+      response_text: "Response",
+      provider_profile_id: "profile-1",
+      diagnostics: {},
+      started_at: "2026-04-17T00:03:00.000Z",
+      finished_at: "2026-04-17T00:03:01.000Z",
+    },
+  ],
+  narrativeArtifacts: [
+    {
+      id: "artifact-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      source_run_id: "run-1",
+      title: "Artifact",
+      content: "Artifact content",
+      artifact_kind: "agent_note",
+      metadata: {},
+      created_at: "2026-04-17T00:03:02.000Z",
+    },
+  ],
+  providerProfiles: [],
+  runtimeControl: null,
+  runtimeStatus: null,
   canManageSelectedWorld: false,
   loadError: null,
 };

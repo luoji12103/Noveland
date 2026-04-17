@@ -33,6 +33,9 @@
 - `NOVELAND_POSTGRES_PORT`
 - `NOVELAND_NATS_PORT`
 - `NOVELAND_NATS_MONITOR_PORT`
+- `NOVELAND_PROVIDER_API_KEYS_JSON`
+- `NOVELAND_RUNTIME_LOOP_INTERVAL_SECONDS`
+- `NOVELAND_RUNTIME_BATCH_LIMIT`
 
 ## Auth/session baseline
 
@@ -42,6 +45,14 @@
 - Web auth proxy routes use `NOVELAND_API_BASE_URL` to reach the backend API from the Next server.
 - Local development cookies default to `Secure=false`; production cookie hardening remains a deployment/security task.
 - `NOVELAND_API_BASE_URL` is non-secret local routing configuration.
+
+## Provider/runtime baseline
+
+- Provider profiles are non-secret database records containing provider type, base URL, model, capabilities, and `api_key_ref`.
+- Provider API keys are not persisted in the database; runtime resolves them from `NOVELAND_PROVIDER_API_KEYS_JSON`.
+- Web and HTTP APIs may read and update provider profiles, but they must never return API key material.
+- `NOVELAND_RUNTIME_LOOP_INTERVAL_SECONDS` controls the daemon sleep interval between iterations.
+- `NOVELAND_RUNTIME_BATCH_LIMIT` caps how many due agent runs a single daemon iteration will execute.
 
 ## Required docs sync
 

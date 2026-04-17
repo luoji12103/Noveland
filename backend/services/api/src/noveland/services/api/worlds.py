@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from noveland.adapters import ProviderProfileService
 from noveland.agents.models import Agent
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
@@ -20,6 +21,7 @@ from noveland.calendar import (
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.core.settings import load_settings
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
 from noveland.memory import (
     VECTOR_DIMENSIONS,
@@ -29,6 +31,11 @@ from noveland.memory import (
     MemorySearchQuery,
 )
 from noveland.memory.models import AgentMemoryItem
+from noveland.narrative import (
+    NarrativeArtifactKind,
+    NarrativeArtifactRecord,
+    NarrativeArtifactService,
+)
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -39,6 +46,7 @@ from noveland.services.api.dependencies import (
     get_world_admin_context,
     get_world_member_context,
 )
+from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.models import Scene, World, WorldMembership
@@ -178,6 +186,20 @@ class MemorySearchRequest(_RequestModel):
         return value
 
 
+class AgentRunRequest(_RequestModel):
+    prompt: str | None = None
+    provider_profile_id: uuid.UUID | None = None
+    create_memory: bool = True
+    create_narrative_artifact: bool = True
+
+
+class NarrativeArtifactCreateRequest(_RequestModel):
+    title: str = Field(min_length=1, max_length=160)
+    content: str = Field(min_length=1)
+    artifact_kind: Literal["agent_note", "world_summary"] = "world_summary"
+    agent_id: uuid.UUID | None = None
+
+
 class ClockTransitionRequest(_RequestModel):
     reason: str | None = Field(default=None, max_length=500)
 
@@ -278,6 +300,31 @@ class MemoryItemResponse(BaseModel):
     is_active: bool
     source_event_id: uuid.UUID | None
     score: float | None = None
+
+
+class AgentRunResponse(BaseModel):
+    run_id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    status: str
+    prompt_text: str
+    response_text: str | None
+    provider_profile_id: uuid.UUID | None
+    diagnostics: dict[str, Any]
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class NarrativeArtifactResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    source_run_id: uuid.UUID | None
+    title: str
+    content: str
+    artifact_kind: str
+    metadata: dict[str, Any]
+    created_at: datetime
 
 
 class WorldClockResponse(BaseModel):
@@ -968,6 +1015,102 @@ def disable_agent_memory(
     LocalPgvectorMemoryBackend(db_session).disable(memory_id)
 
 
+@router.get(
+    "/{world_id}/agents/{agent_id}/runs",
+    response_model=list[AgentRunResponse],
+)
+def list_agent_runs(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[AgentRunResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    orchestrator = AgentRuntimeOrchestrator(
+        db_session,
+        ProviderProfileService(db_session, load_settings()),
+    )
+    return [
+        _agent_run_response(run)
+        for run in orchestrator.list_runs(context.world_id, agent_id)
+    ]
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/run",
+    response_model=AgentRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def run_agent(
+    agent_id: uuid.UUID,
+    run_request: AgentRunRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentRunResponse:
+    require_csrf(request)
+    agent = _agent_or_404(db_session, context.world_id, agent_id)
+    orchestrator = AgentRuntimeOrchestrator(
+        db_session,
+        ProviderProfileService(db_session, load_settings()),
+    )
+    prompt = run_request.prompt or (
+        f"Manual operator run for {agent.display_name}. "
+        "Provide one concise operational and narrative update."
+    )
+    return _agent_run_response(
+        orchestrator.run_agent(
+            world_id=context.world_id,
+            agent_id=agent_id,
+            prompt_text=prompt,
+            trigger_source="manual",
+            provider_profile_id=run_request.provider_profile_id,
+            create_memory=run_request.create_memory,
+            create_narrative_artifact=run_request.create_narrative_artifact,
+        ),
+    )
+
+
+@router.get(
+    "/{world_id}/narrative-artifacts",
+    response_model=list[NarrativeArtifactResponse],
+)
+def list_narrative_artifacts(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[NarrativeArtifactResponse]:
+    return [
+        _narrative_artifact_response(artifact)
+        for artifact in NarrativeArtifactService(db_session).list_artifacts(context.world_id)
+    ]
+
+
+@router.post(
+    "/{world_id}/narrative-artifacts",
+    response_model=NarrativeArtifactResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_narrative_artifact(
+    artifact_create: NarrativeArtifactCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeArtifactResponse:
+    require_csrf(request)
+    if artifact_create.agent_id is not None:
+        _agent_or_404(db_session, context.world_id, artifact_create.agent_id)
+    artifact = AgentRuntimeOrchestrator(
+        db_session,
+        ProviderProfileService(db_session, load_settings()),
+    ).create_narrative_artifact(
+        world_id=context.world_id,
+        agent_id=artifact_create.agent_id,
+        title=artifact_create.title,
+        content=artifact_create.content,
+        artifact_kind=NarrativeArtifactKind(artifact_create.artifact_kind),
+    )
+    return _narrative_artifact_response(artifact)
+
+
 @router.post(
     "/{world_id}/agents",
     response_model=AgentResponse,
@@ -1129,6 +1272,37 @@ def _memory_item_response(item: MemoryItemRecord) -> MemoryItemResponse:
         is_active=item.is_active,
         source_event_id=item.source_event_id,
         score=item.score,
+    )
+
+
+def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
+    return AgentRunResponse(
+        run_id=run.run_id,
+        world_id=run.world_id,
+        agent_id=run.agent_id,
+        status=run.status,
+        prompt_text=run.prompt_text,
+        response_text=run.response_text,
+        provider_profile_id=run.provider_profile_id,
+        diagnostics=run.diagnostics,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+    )
+
+
+def _narrative_artifact_response(
+    artifact: NarrativeArtifactRecord,
+) -> NarrativeArtifactResponse:
+    return NarrativeArtifactResponse(
+        id=artifact.id,
+        world_id=artifact.world_id,
+        agent_id=artifact.agent_id,
+        source_run_id=artifact.source_run_id,
+        title=artifact.title,
+        content=artifact.content,
+        artifact_kind=artifact.artifact_kind.value,
+        metadata=artifact.metadata,
+        created_at=artifact.created_at,
     )
 
 
