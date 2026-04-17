@@ -3,8 +3,10 @@ import { headers } from "next/headers";
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
+  CalendarEntry,
   Membership,
   Scene,
+  ScheduleRule,
   World,
   WorldClock,
   WorldDashboardData,
@@ -23,14 +25,24 @@ export async function getWorldDashboardData(
       return emptyDashboardData(worlds, null, null);
     }
 
-    const [scenes, agents, memberships, clock, replayState, latestSnapshot] = await Promise.all([
+    const [scenes, agents, memberships, clock, replayState, latestSnapshot, scheduleRules] =
+      await Promise.all([
       apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
       apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
       apiFetchOptional<Membership[]>(`/worlds/${selectedWorld.id}/memberships`, cookieHeader),
       apiFetch<WorldClock>(`/worlds/${selectedWorld.id}/clock`, cookieHeader),
       apiFetch<WorldReplayState>(`/worlds/${selectedWorld.id}/replay/state`, cookieHeader),
       apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
+      apiFetch<ScheduleRule[]>(`/worlds/${selectedWorld.id}/schedule-rules`, cookieHeader),
     ]);
+    const selectedAgent = agents[0] ?? null;
+    const calendarEntries =
+      selectedAgent === null
+        ? []
+        : await apiFetch<CalendarEntry[]>(
+            `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/calendar`,
+            cookieHeader,
+          );
 
     return {
       worlds,
@@ -41,6 +53,9 @@ export async function getWorldDashboardData(
       clock,
       replayState,
       latestSnapshot,
+      selectedAgentId: selectedAgent?.id ?? null,
+      calendarEntries,
+      scheduleRules,
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -114,6 +129,9 @@ function emptyDashboardData(
     clock: null,
     replayState: null,
     latestSnapshot: null,
+    selectedAgentId: null,
+    calendarEntries: [],
+    scheduleRules: [],
     canManageSelectedWorld: false,
     loadError,
   };

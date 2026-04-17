@@ -4,11 +4,17 @@ import type {
   Agent,
   AgentCreateInput,
   AgentUpdateInput,
+  CalendarEntry,
+  CalendarEntryCreateInput,
+  CalendarEntryUpdateInput,
   MemberCandidate,
   Membership,
   Scene,
   SceneCreateInput,
   SceneUpdateInput,
+  ScheduleRule,
+  ScheduleRuleCreateInput,
+  ScheduleRuleUpdateInput,
   World,
   WorldCreateInput,
   WorldClock,
@@ -147,6 +153,85 @@ export function deactivateScene(worldId: string, sceneId: string): Promise<void>
 
 export function listAgents(worldId: string): Promise<Agent[]> {
   return worldRequest<Agent[]>(`/api/worlds/${worldId}/agents`, { method: "GET" });
+}
+
+export function listAgentCalendar(worldId: string, agentId: string): Promise<CalendarEntry[]> {
+  return worldRequest<CalendarEntry[]>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+    method: "GET",
+  });
+}
+
+export function createAgentCalendarEntry(
+  worldId: string,
+  agentId: string,
+  input: CalendarEntryCreateInput,
+): Promise<CalendarEntry> {
+  return worldRequest<CalendarEntry>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateAgentCalendarEntry(
+  worldId: string,
+  agentId: string,
+  entryId: string,
+  input: CalendarEntryUpdateInput,
+): Promise<CalendarEntry> {
+  return worldRequest<CalendarEntry>(
+    `/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function cancelAgentCalendarEntry(
+  worldId: string,
+  agentId: string,
+  entryId: string,
+): Promise<void> {
+  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
+}
+
+export function listScheduleRules(worldId: string): Promise<ScheduleRule[]> {
+  return worldRequest<ScheduleRule[]>(`/api/worlds/${worldId}/schedule-rules`, { method: "GET" });
+}
+
+export function createScheduleRule(
+  worldId: string,
+  input: ScheduleRuleCreateInput,
+): Promise<ScheduleRule> {
+  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateScheduleRule(
+  worldId: string,
+  ruleId: string,
+  input: ScheduleRuleUpdateInput,
+): Promise<ScheduleRule> {
+  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function disableScheduleRule(worldId: string, ruleId: string): Promise<void> {
+  return worldRequest<void>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
 }
 
 export function createAgent(worldId: string, input: AgentCreateInput): Promise<Agent> {

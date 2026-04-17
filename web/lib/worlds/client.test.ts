@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  cancelAgentCalendarEntry,
+  createAgentCalendarEntry,
+  createScheduleRule,
   createSnapshot,
   createWorld,
   deactivateScene,
@@ -10,7 +13,9 @@ import {
   resumeWorldClock,
   skipWorldClock,
   listMemberCandidates,
+  listScheduleRules,
   updateAgent,
+  updateScheduleRule,
 } from "@/lib/worlds/client";
 
 describe("world client", () => {
@@ -109,6 +114,35 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/snapshots");
     expect((fetchMock.mock.calls[2][1].headers as Headers).get("X-CSRF-Token")).toBe(
       "csrf-token",
+    );
+  });
+
+  it("maps calendar and schedule requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ rule_key: "weekday" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "entry-1" }, 201))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listScheduleRules("world-1");
+    await createScheduleRule("world-1", { rule_key: "weekday", name: "Weekday", kind: "weekday" });
+    await updateScheduleRule("world-1", "rule-1", { is_enabled: false });
+    await createAgentCalendarEntry("world-1", "agent-1", {
+      title: "Morning scene",
+      starts_at: "2030-01-01T08:00:00Z",
+    });
+    await cancelAgentCalendarEntry("world-1", "agent-1", "entry-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/schedule-rules");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/schedule-rules");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/schedule-rules/rule-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/agents/agent-1/calendar");
+    expect(fetchMock.mock.calls[4][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/calendar/entry-1",
     );
   });
 

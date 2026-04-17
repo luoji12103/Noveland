@@ -93,6 +93,16 @@ test("world admin manages scenes agents and memberships", async ({ page }) => {
   await page.getByRole("button", { name: "Create snapshot" }).click();
   await expect(page.getByText("Snapshot created.")).toBeVisible();
   await expect(page.getByText(/Latest snapshot covers sequence/)).toBeVisible();
+
+  await page.getByPlaceholder("rule-key").fill(`rule-${Date.now()}`);
+  await page.getByPlaceholder("Rule name").fill("E2E Rule");
+  await page.getByRole("button", { name: "Create schedule rule" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Rule" })).toBeVisible();
+
+  await page.getByPlaceholder("Calendar title").fill("E2E Calendar");
+  await page.getByPlaceholder("Calendar start").fill("2030-01-01T08:00:00Z");
+  await page.getByRole("button", { name: "Create calendar entry" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible();
 });
 
 test("world member sees read-only dashboard", async ({ page }) => {
@@ -102,6 +112,8 @@ test("world member sees read-only dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "First World" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Schedule rules" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent calendar" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save world" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Resume clock" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create snapshot" })).toHaveCount(0);

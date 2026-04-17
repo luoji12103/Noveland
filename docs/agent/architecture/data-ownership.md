@@ -45,7 +45,9 @@
 - `world_clock_transitions` stores world-owned operational audit records for clock state changes.
 - `world_events` stores the append-only world event stream.
 - `world_snapshots` stores world-owned snapshot metadata, inline diagnostic payloads, and future object-storage payload references.
-- Plugin registry data, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
+- `agent_calendar_entries` stores private, world-scoped agent calendar items.
+- `world_schedule_rules` stores world-owned weekday/weekend/timetable rule configuration.
+- Plugin registry data, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
 
 ## Ownership rules
 

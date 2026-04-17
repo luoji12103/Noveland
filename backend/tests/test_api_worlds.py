@@ -11,6 +11,7 @@ from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.services.api.app import create_app
@@ -312,6 +313,69 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert delete_original_admin.status_code == 204
 
 
+def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "calendar-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    member_rules = client.get(f"/worlds/{world_id}/schedule-rules")
+    member_create_rule = client.post(
+        f"/worlds/{world_id}/schedule-rules",
+        json={"rule_key": "weekday", "name": "Weekday", "kind": "weekday"},
+    )
+
+    _authenticate(client, owner_token)
+    create_rule = client.post(
+        f"/worlds/{world_id}/schedule-rules",
+        json={"rule_key": "weekday", "name": "Weekday", "kind": "weekday"},
+    )
+    duplicate_rule = client.post(
+        f"/worlds/{world_id}/schedule-rules",
+        json={"rule_key": "weekday", "name": "Again", "kind": "weekday"},
+    )
+    update_rule = client.patch(
+        f"/worlds/{world_id}/schedule-rules/{create_rule.json()['id']}",
+        json={"name": "Weekday Updated", "is_enabled": False},
+    )
+    create_entry = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/calendar",
+        json={
+            "title": "Morning scene",
+            "starts_at": "2030-01-01T08:00:00Z",
+            "ends_at": "2030-01-01T09:00:00Z",
+            "metadata": {"source": "api-test"},
+        },
+    )
+    list_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+    update_entry = client.patch(
+        f"/worlds/{world_id}/agents/{agent_id}/calendar/{create_entry.json()['id']}",
+        json={"title": "Morning scene updated"},
+    )
+    cancel_entry = client.delete(
+        f"/worlds/{world_id}/agents/{agent_id}/calendar/{create_entry.json()['id']}",
+    )
+
+    assert member_rules.status_code == 200
+    assert member_create_rule.status_code == 403
+    assert create_rule.status_code == 201
+    assert duplicate_rule.status_code == 409
+    assert update_rule.status_code == 200
+    assert update_rule.json()["name"] == "Weekday Updated"
+    assert update_rule.json()["is_enabled"] is False
+    assert create_entry.status_code == 201
+    assert create_entry.json()["status"] == "active"
+    assert list_entries.status_code == 200
+    assert list_entries.json()[0]["title"] == "Morning scene"
+    assert update_entry.status_code == 200
+    assert update_entry.json()["title"] == "Morning scene updated"
+    assert cancel_entry.status_code == 204
+
+
 def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -386,6 +450,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentCalendarEntry.__table__),
+        cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
     ):
@@ -451,6 +517,23 @@ def _seed_scene(engine: Engine, world_id: uuid.UUID, scene_key: str) -> uuid.UUI
         )
         session.commit()
     return scene_id
+
+
+def _seed_agent(engine: Engine, world_id: uuid.UUID, agent_key: str) -> uuid.UUID:
+    agent_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=agent_id,
+                world_id=world_id,
+                agent_key=agent_key,
+                display_name=agent_key,
+                kind="role_agent",
+                config={},
+            ),
+        )
+        session.commit()
+    return agent_id
 
 
 def _add_membership(

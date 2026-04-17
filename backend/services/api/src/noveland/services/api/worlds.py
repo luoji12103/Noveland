@@ -10,6 +10,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from noveland.agents.models import Agent
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
+from noveland.calendar import (
+    CalendarEntryCreate,
+    CalendarEntryStatus,
+    CalendarEntryUpdate,
+    CalendarService,
+    ScheduleRuleCreate,
+    ScheduleRuleKind,
+    ScheduleRuleUpdate,
+)
+from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
@@ -87,6 +97,53 @@ class AgentUpdateRequest(_RequestModel):
     is_enabled: bool | None = None
 
 
+class CalendarEntryCreateRequest(_RequestModel):
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    starts_at: datetime
+    ends_at: datetime | None = None
+    recurrence_rule: str | None = Field(default=None, max_length=240)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("starts_at", "ends_at", mode="after")
+    @classmethod
+    def calendar_times_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "calendar time")
+
+
+class CalendarEntryUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    recurrence_rule: str | None = Field(default=None, max_length=240)
+    status: Literal["active", "cancelled"] | None = None
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("starts_at", "ends_at", mode="after")
+    @classmethod
+    def calendar_times_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "calendar time")
+
+
+class ScheduleRuleCreateRequest(_RequestModel):
+    rule_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    kind: Literal["weekday", "weekend", "timetable"]
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScheduleRuleUpdateRequest(_RequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    kind: Literal["weekday", "weekend", "timetable"] | None = None
+    config: dict[str, Any] | None = None
+    is_enabled: bool | None = None
+
+
 class ClockTransitionRequest(_RequestModel):
     reason: str | None = Field(default=None, max_length=500)
 
@@ -149,6 +206,29 @@ class AgentResponse(BaseModel):
     agent_key: str
     display_name: str
     kind: AgentKind
+    config: dict[str, Any]
+    is_enabled: bool
+
+
+class CalendarEntryResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    title: str
+    description: str | None
+    starts_at: datetime
+    ends_at: datetime | None
+    recurrence_rule: str | None
+    status: str
+    metadata: dict[str, Any]
+
+
+class ScheduleRuleResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    rule_key: str
+    name: str
+    kind: str
     config: dict[str, Any]
     is_enabled: bool
 
@@ -380,6 +460,81 @@ def latest_snapshot(
     return _snapshot_response(snapshot)
 
 
+@router.get("/{world_id}/schedule-rules", response_model=list[ScheduleRuleResponse])
+def list_schedule_rules(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[ScheduleRuleResponse]:
+    _world_or_404(db_session, context.world_id)
+    return [
+        _schedule_rule_response(rule)
+        for rule in CalendarService(db_session).list_rules(context.world_id)
+    ]
+
+
+@router.post(
+    "/{world_id}/schedule-rules",
+    response_model=ScheduleRuleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_schedule_rule(
+    rule_create: ScheduleRuleCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ScheduleRuleResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    _ensure_schedule_rule_key_available(db_session, context.world_id, rule_create.rule_key)
+    return _schedule_rule_response(
+        CalendarService(db_session).create_rule(
+            ScheduleRuleCreate(
+                world_id=context.world_id,
+                rule_key=rule_create.rule_key,
+                name=rule_create.name,
+                kind=ScheduleRuleKind(rule_create.kind),
+                config=rule_create.config,
+            ),
+        ),
+    )
+
+
+@router.patch("/{world_id}/schedule-rules/{rule_id}", response_model=ScheduleRuleResponse)
+def update_schedule_rule(
+    rule_id: uuid.UUID,
+    rule_update: ScheduleRuleUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ScheduleRuleResponse:
+    require_csrf(request)
+    rule = _schedule_rule_or_404(db_session, context.world_id, rule_id)
+    return _schedule_rule_response(
+        CalendarService(db_session).update_rule(
+            rule,
+            ScheduleRuleUpdate(
+                name=rule_update.name,
+                kind=None if rule_update.kind is None else ScheduleRuleKind(rule_update.kind),
+                config=rule_update.config,
+                is_enabled=rule_update.is_enabled,
+            ),
+        ),
+    )
+
+
+@router.delete("/{world_id}/schedule-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def disable_schedule_rule(
+    rule_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    CalendarService(db_session).disable_rule(
+        _schedule_rule_or_404(db_session, context.world_id, rule_id),
+    )
+
+
 @router.post(
     "/{world_id}/snapshots",
     response_model=WorldSnapshotResponse,
@@ -578,6 +733,109 @@ def list_agents(
     return [_agent_response(agent) for agent in agents]
 
 
+@router.get(
+    "/{world_id}/agents/{agent_id}/calendar",
+    response_model=list[CalendarEntryResponse],
+)
+def list_agent_calendar(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[CalendarEntryResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return [
+        _calendar_entry_response(entry)
+        for entry in CalendarService(db_session).list_entries(context.world_id, agent_id)
+    ]
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/calendar",
+    response_model=CalendarEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_agent_calendar_entry(
+    agent_id: uuid.UUID,
+    entry_create: CalendarEntryCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> CalendarEntryResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return _calendar_entry_response(
+        CalendarService(db_session).create_entry(
+            CalendarEntryCreate(
+                world_id=context.world_id,
+                agent_id=agent_id,
+                title=entry_create.title,
+                description=entry_create.description,
+                starts_at=entry_create.starts_at,
+                ends_at=entry_create.ends_at,
+                recurrence_rule=entry_create.recurrence_rule,
+                metadata=entry_create.metadata,
+            ),
+        ),
+    )
+
+
+@router.patch(
+    "/{world_id}/agents/{agent_id}/calendar/{entry_id}",
+    response_model=CalendarEntryResponse,
+)
+def update_agent_calendar_entry(
+    agent_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    entry_update: CalendarEntryUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> CalendarEntryResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    entry = _calendar_entry_or_404(db_session, context.world_id, agent_id, entry_id)
+    try:
+        return _calendar_entry_response(
+            CalendarService(db_session).update_entry(
+                entry,
+                CalendarEntryUpdate(
+                    title=entry_update.title,
+                    description=entry_update.description,
+                    starts_at=entry_update.starts_at,
+                    ends_at=entry_update.ends_at,
+                    recurrence_rule=entry_update.recurrence_rule,
+                    status=None
+                    if entry_update.status is None
+                    else CalendarEntryStatus(entry_update.status),
+                    metadata=entry_update.metadata,
+                ),
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/{world_id}/agents/{agent_id}/calendar/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def cancel_agent_calendar_entry(
+    agent_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    CalendarService(db_session).cancel_entry(
+        _calendar_entry_or_404(db_session, context.world_id, agent_id, entry_id),
+    )
+
+
 @router.post(
     "/{world_id}/agents",
     response_model=AgentResponse,
@@ -700,6 +958,33 @@ def _agent_response(agent: Agent) -> AgentResponse:
     )
 
 
+def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntryResponse:
+    return CalendarEntryResponse(
+        id=entry.id,
+        world_id=entry.world_id,
+        agent_id=entry.agent_id,
+        title=entry.title,
+        description=entry.description,
+        starts_at=entry.starts_at,
+        ends_at=entry.ends_at,
+        recurrence_rule=entry.recurrence_rule,
+        status=entry.status.value if hasattr(entry.status, "value") else str(entry.status),
+        metadata=entry.metadata,
+    )
+
+
+def _schedule_rule_response(rule: ScheduleRuleResponse | Any) -> ScheduleRuleResponse:
+    return ScheduleRuleResponse(
+        id=rule.id,
+        world_id=rule.world_id,
+        rule_key=rule.rule_key,
+        name=rule.name,
+        kind=rule.kind.value if hasattr(rule.kind, "value") else str(rule.kind),
+        config=rule.config,
+        is_enabled=rule.is_enabled,
+    )
+
+
 def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
     state = clock_view.state
     return WorldClockResponse(
@@ -747,6 +1032,32 @@ def _agent_or_404(db_session: Session, world_id: uuid.UUID, agent_id: uuid.UUID)
     if agent is None or agent.world_id != world_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
     return agent
+
+
+def _calendar_entry_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    entry_id: uuid.UUID,
+) -> AgentCalendarEntry:
+    entry = db_session.get(AgentCalendarEntry, entry_id)
+    if entry is None or entry.world_id != world_id or entry.agent_id != agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Calendar entry not found",
+        )
+    return entry
+
+
+def _schedule_rule_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    rule_id: uuid.UUID,
+) -> WorldScheduleRule:
+    rule = db_session.get(WorldScheduleRule, rule_id)
+    if rule is None or rule.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule rule not found")
+    return rule
 
 
 def _user_or_404(db_session: Session, user_id: uuid.UUID) -> User:
@@ -832,6 +1143,23 @@ def _ensure_agent_key_available(db_session: Session, world_id: uuid.UUID, agent_
         is not None
     ):
         raise _conflict("Agent key already exists")
+
+
+def _ensure_schedule_rule_key_available(
+    db_session: Session,
+    world_id: uuid.UUID,
+    rule_key: str,
+) -> None:
+    if (
+        db_session.scalars(
+            select(WorldScheduleRule.id).where(
+                WorldScheduleRule.world_id == world_id,
+                WorldScheduleRule.rule_key == rule_key,
+            ),
+        ).first()
+        is not None
+    ):
+        raise _conflict("Schedule rule key already exists")
 
 
 def _conflict(detail: str) -> HTTPException:

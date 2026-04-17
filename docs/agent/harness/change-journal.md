@@ -175,3 +175,14 @@
 - Tests added/updated: replay service tests for empty state, latest snapshot plus incremental events, snapshot creation; API tests for replay/snapshot auth and CSRF; Web client/component/E2E coverage for replay and snapshots
 - Docs updated: README, event/snapshot model, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: destructive restore, object-storage snapshot payload writes, calendar rules, memory backend, agent loop, narrative behavior, and plugin execution remain separate tasks.
+
+## Calendar and schedule rules baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/calendar-schedule-baseline
+- Scope: agent calendar entries and world schedule rules
+- Summary: Added world-scoped agent calendar entries, weekday/weekend/timetable schedule rules, service-level due resolution, backend APIs, and Web dashboard panels.
+- Files changed: `/backend/packages/calendar/**`, `/backend/migrations/versions/20260417_0005_calendar_schedule_baseline.py`, `/backend/services/api/**`, `/backend/tests/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: calendar contract/service tests, schema metadata tests, world API tests, Web client/component/E2E coverage
+- Docs updated: README, data ownership, world clock/scheduling, project index, file inventory, task board, active handoff
+- Follow-up notes: memory vectors, provider profiles, runtime agent loop, narrative artifacts, and plugin execution remain separate tasks.

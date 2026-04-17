@@ -7,7 +7,21 @@ name = "noveland-calendar"
 version = "0.1.0"
 description = "Private agent calendar package for Noveland."
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+  "noveland-agents",
+  "noveland-core",
+  "noveland-worlds",
+  "pydantic>=2.13,<3",
+  "sqlalchemy>=2.0,<3",
+]
+
+[project.optional-dependencies]
+test = []
+
+[tool.uv.sources]
+noveland-agents = { workspace = true }
+noveland-core = { workspace = true }
+noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

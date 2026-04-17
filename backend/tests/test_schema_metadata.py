@@ -38,6 +38,7 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "agent_calendar_entries",
         "auth_sessions",
         "platform_settings",
         "platform_role_assignments",
@@ -48,6 +49,7 @@ def test_core_schema_tables_are_registered() -> None:
         "world_clock_states",
         "world_clock_transitions",
         "world_memberships",
+        "world_schedule_rules",
         "world_snapshots",
         "worlds",
     } <= table_names()
@@ -74,6 +76,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_scenes_world_scene_key" in constraint_names("scenes", UniqueConstraint)
     assert "uq_agents_world_agent_key" in constraint_names("agents", UniqueConstraint)
+    assert "uq_world_schedule_rules_world_rule_key" in constraint_names(
+        "world_schedule_rules",
+        UniqueConstraint,
+    )
     assert "uq_platform_settings_key" in constraint_names("platform_settings", UniqueConstraint)
     assert "uq_world_clock_states_world_id" in constraint_names(
         "world_clock_states",
@@ -144,6 +150,18 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "world_snapshots",
         CheckConstraint,
     )
+    assert "ck_agent_calendar_entries_status" in constraint_names(
+        "agent_calendar_entries",
+        CheckConstraint,
+    )
+    assert "ck_agent_calendar_entries_ends_after_starts" in constraint_names(
+        "agent_calendar_entries",
+        CheckConstraint,
+    )
+    assert "ck_world_schedule_rules_kind" in constraint_names(
+        "world_schedule_rules",
+        CheckConstraint,
+    )
 
 
 def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
@@ -158,6 +176,8 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
     assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
     assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("agent_calendar_entries") == {"agents.id", "worlds.id"}
+    assert foreign_key_targets("world_schedule_rules") == {"worlds.id"}
 
 
 def test_core_schema_indexes_cover_world_boundaries() -> None:
@@ -179,3 +199,11 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_events_world_wall_time" in index_names("world_events")
     assert "ix_world_snapshots_world_sequence" in index_names("world_snapshots")
     assert "ix_world_snapshots_world_latest_valid" in index_names("world_snapshots")
+    assert "ix_agent_calendar_entries_world_agent_starts" in index_names(
+        "agent_calendar_entries",
+    )
+    assert "ix_agent_calendar_entries_world_agent_status" in index_names(
+        "agent_calendar_entries",
+    )
+    assert "ix_world_schedule_rules_world_id" in index_names("world_schedule_rules")
+    assert "ix_world_schedule_rules_world_enabled" in index_names("world_schedule_rules")

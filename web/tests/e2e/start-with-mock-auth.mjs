@@ -76,6 +76,31 @@ const clocks = new Map([
     },
   ],
 ]);
+const scheduleRules = [
+  {
+    id: "50000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    rule_key: "weekday",
+    name: "Weekday",
+    kind: "weekday",
+    config: {},
+    is_enabled: true,
+  },
+];
+const calendarEntries = [
+  {
+    id: "60000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    title: "Morning scene",
+    description: null,
+    starts_at: "2030-01-01T08:00:00.000Z",
+    ends_at: null,
+    recurrence_rule: null,
+    status: "active",
+    metadata: {},
+  },
+];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
 
@@ -254,6 +279,10 @@ async function handleWorldResource(request, response, url) {
     handleMemberCandidates(request, response, currentSubject, worldId, url);
     return;
   }
+  if (resource === "schedule-rules") {
+    await handleScheduleRules(request, response, currentSubject, worldId, segments[3]);
+    return;
+  }
   if (resource === "clock") {
     await handleClock(request, response, currentSubject, worldId, segments[3]);
     return;
@@ -347,6 +376,15 @@ async function handleScenes(request, response, currentSubject, worldId, sceneId)
 }
 
 async function handleAgents(request, response, currentSubject, worldId, agentId) {
+  if (agentId !== undefined && arguments.length >= 5) {
+    const segments = new URL(request.url ?? "/", `http://${request.headers.host}`).pathname
+      .split("/")
+      .filter(Boolean);
+    if (segments[4] === "calendar") {
+      await handleCalendar(request, response, currentSubject, worldId, agentId, segments[5]);
+      return;
+    }
+  }
   if (request.method === "GET" && agentId === undefined) {
     sendJson(response, 200, agents.filter((agent) => agent.world_id === worldId));
     return;
@@ -376,6 +414,7 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       is_enabled: true,
     };
     agents.push(agent);
+    calendarEntries.push(...[]);
     sendJson(response, 201, agent);
     return;
   }
@@ -391,6 +430,111 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
   }
   if (request.method === "DELETE") {
     agent.is_enabled = false;
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleCalendar(request, response, currentSubject, worldId, agentId, entryId) {
+  if (request.method === "GET" && entryId === undefined) {
+    sendJson(
+      response,
+      200,
+      calendarEntries.filter((entry) => entry.world_id === worldId && entry.agent_id === agentId),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && entryId === undefined) {
+    const body = await readJson(request);
+    const entry = {
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      title: body.title,
+      description: body.description ?? null,
+      starts_at: new Date(body.starts_at).toISOString(),
+      ends_at: body.ends_at === undefined || body.ends_at === null ? null : new Date(body.ends_at).toISOString(),
+      recurrence_rule: body.recurrence_rule ?? null,
+      status: "active",
+      metadata: body.metadata ?? {},
+    };
+    calendarEntries.push(entry);
+    sendJson(response, 201, entry);
+    return;
+  }
+  const entry = calendarEntries.find((item) => item.id === entryId && item.world_id === worldId);
+  if (entry === undefined) {
+    sendJson(response, 404, { detail: "Calendar entry not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(entry, await readJson(request));
+    sendJson(response, 200, entry);
+    return;
+  }
+  if (request.method === "DELETE") {
+    entry.status = "cancelled";
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleScheduleRules(request, response, currentSubject, worldId, ruleId) {
+  if (request.method === "GET" && ruleId === undefined) {
+    sendJson(response, 200, scheduleRules.filter((rule) => rule.world_id === worldId));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && ruleId === undefined) {
+    const body = await readJson(request);
+    if (scheduleRules.some((rule) => rule.world_id === worldId && rule.rule_key === body.rule_key)) {
+      sendJson(response, 409, { detail: "Schedule rule key already exists" });
+      return;
+    }
+    const rule = {
+      id: randomUUID(),
+      world_id: worldId,
+      rule_key: body.rule_key,
+      name: body.name,
+      kind: body.kind,
+      config: body.config ?? {},
+      is_enabled: true,
+    };
+    scheduleRules.push(rule);
+    sendJson(response, 201, rule);
+    return;
+  }
+  const rule = scheduleRules.find((item) => item.id === ruleId && item.world_id === worldId);
+  if (rule === undefined) {
+    sendJson(response, 404, { detail: "Schedule rule not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(rule, await readJson(request));
+    sendJson(response, 200, rule);
+    return;
+  }
+  if (request.method === "DELETE") {
+    rule.is_enabled = false;
     response.writeHead(204);
     response.end();
     return;

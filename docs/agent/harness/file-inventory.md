@@ -45,6 +45,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/agents/`
 - `backend/packages/agents/src/noveland/agents/models.py`
 - `backend/packages/calendar/`
+- `backend/packages/calendar/src/noveland/calendar/contracts.py`
+- `backend/packages/calendar/src/noveland/calendar/models.py`
+- `backend/packages/calendar/src/noveland/calendar/services.py`
 - `backend/packages/narrative/`
 - `backend/packages/events/`
 - `backend/packages/events/src/noveland/events/contracts.py`
@@ -68,6 +71,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260415_0002_world_clock_state.py`
 - `backend/migrations/versions/20260416_0003_event_snapshot_baseline.py`
 - `backend/migrations/versions/20260416_0004_auth_session_baseline.py`
+- `backend/migrations/versions/20260417_0005_calendar_schedule_baseline.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

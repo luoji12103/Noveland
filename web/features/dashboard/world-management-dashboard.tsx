@@ -6,25 +6,33 @@ import { useRouter } from "next/navigation";
 import type { AuthSubject } from "@/lib/auth/types";
 import {
   createAgent,
+  cancelAgentCalendarEntry,
+  createAgentCalendarEntry,
   createScene,
+  createScheduleRule,
   createSnapshot,
   createWorld,
   deactivateAgent,
   deactivateScene,
   deactivateWorld,
   deleteMembership,
+  disableScheduleRule,
   advanceWorldClock,
   getWorldClock,
   getLatestSnapshot,
   getReplayState,
+  listAgentCalendar,
   listAgents,
   listMemberCandidates,
   listMemberships,
+  listScheduleRules,
   listScenes,
   pauseWorldClock,
   resumeWorldClock,
   skipWorldClock,
+  updateAgentCalendarEntry,
   updateAgent,
+  updateScheduleRule,
   updateScene,
   updateWorld,
   upsertMembership,
@@ -33,9 +41,12 @@ import {
 import type {
   Agent,
   AgentKind,
+  CalendarEntry,
   MemberCandidate,
   Membership,
   Scene,
+  ScheduleRule,
+  ScheduleRuleKind,
   World,
   WorldClock,
   WorldDashboardData,
@@ -62,6 +73,9 @@ export function WorldManagementDashboard({
   const [clock, setClock] = useState(initialData.clock);
   const [replayState, setReplayState] = useState(initialData.replayState);
   const [latestSnapshot, setLatestSnapshot] = useState(initialData.latestSnapshot);
+  const [selectedAgentId, setSelectedAgentId] = useState(initialData.selectedAgentId);
+  const [calendarEntries, setCalendarEntries] = useState(initialData.calendarEntries);
+  const [scheduleRules, setScheduleRules] = useState(initialData.scheduleRules);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -75,6 +89,10 @@ export function WorldManagementDashboard({
   );
   const isPlatformAdmin = subject.roles.includes("platform_admin");
   const canManage = selectedWorld !== null && canManageSelectedWorld;
+  const selectedAgent = useMemo(
+    () => agents.find((agent) => agent.id === selectedAgentId) ?? agents[0] ?? null,
+    [agents, selectedAgentId],
+  );
 
   async function handleSelectWorld(nextWorldId: string) {
     if (nextWorldId === "") {
@@ -93,6 +111,7 @@ export function WorldManagementDashboard({
         nextClock,
         nextReplayState,
         nextLatestSnapshot,
+        nextScheduleRules,
       ] = await Promise.all([
         listScenes(worldId),
         listAgents(worldId),
@@ -100,7 +119,11 @@ export function WorldManagementDashboard({
         getWorldClock(worldId),
         getReplayState(worldId),
         getLatestSnapshot(worldId),
+        listScheduleRules(worldId),
       ]);
+      const nextSelectedAgent = nextAgents[0] ?? null;
+      const nextCalendarEntries =
+        nextSelectedAgent === null ? [] : await listAgentCalendar(worldId, nextSelectedAgent.id);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
       setAgents(nextAgents);
@@ -108,6 +131,9 @@ export function WorldManagementDashboard({
       setClock(nextClock);
       setReplayState(nextReplayState);
       setLatestSnapshot(nextLatestSnapshot);
+      setSelectedAgentId(nextSelectedAgent?.id ?? null);
+      setCalendarEntries(nextCalendarEntries);
+      setScheduleRules(nextScheduleRules);
       setCanManageSelectedWorld(nextMemberships !== null);
       setMemberCandidates([]);
     });
@@ -144,6 +170,9 @@ export function WorldManagementDashboard({
         unhandled_event_count: 0,
       });
       setLatestSnapshot(null);
+      setSelectedAgentId(null);
+      setCalendarEntries([]);
+      setScheduleRules([]);
       setMemberships([
         {
           id: "local-owner",
@@ -356,8 +385,135 @@ export function WorldManagementDashboard({
         config: jsonObject(formString(form, "config")),
       });
       setAgents((currentAgents) => [...currentAgents, agent].sort(compareAgents));
+      setSelectedAgentId(agent.id);
+      setCalendarEntries([]);
       event.currentTarget.reset();
     }, "Agent created.");
+  }
+
+  async function handleSelectAgent(agentId: string) {
+    if (selectedWorld === null || agentId === "") {
+      return;
+    }
+    await runAction(async () => {
+      setSelectedAgentId(agentId);
+      setCalendarEntries(await listAgentCalendar(selectedWorld.id, agentId));
+    });
+  }
+
+  async function handleCreateCalendarEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const title = formString(form, "title");
+    const starts_at = formString(form, "starts_at");
+    if (title === "" || starts_at === "") {
+      setNotice("Calendar title and start time are required.");
+      return;
+    }
+    await runAction(async () => {
+      const entry = await createAgentCalendarEntry(selectedWorld.id, selectedAgent.id, {
+        title,
+        starts_at,
+        ends_at: optionalFormString(form, "ends_at"),
+        description: optionalFormString(form, "description"),
+        metadata: {},
+      });
+      setCalendarEntries((currentEntries) => [...currentEntries, entry].sort(compareCalendarEntries));
+      event.currentTarget.reset();
+    }, "Calendar entry created.");
+  }
+
+  async function handleUpdateCalendarEntry(
+    event: FormEvent<HTMLFormElement>,
+    entry: CalendarEntry,
+  ) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      const updatedEntry = await updateAgentCalendarEntry(selectedWorld.id, selectedAgent.id, entry.id, {
+        title: formString(form, "title"),
+        starts_at: formString(form, "starts_at"),
+        ends_at: optionalFormString(form, "ends_at"),
+        description: optionalFormString(form, "description"),
+        status: form.get("status") === "cancelled" ? "cancelled" : "active",
+      });
+      setCalendarEntries((currentEntries) => replaceById(currentEntries, updatedEntry));
+    }, "Calendar entry updated.");
+  }
+
+  async function handleCancelCalendarEntry(entry: CalendarEntry) {
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    await runAction(async () => {
+      await cancelAgentCalendarEntry(selectedWorld.id, selectedAgent.id, entry.id);
+      setCalendarEntries((currentEntries) =>
+        currentEntries.map((currentEntry) =>
+          currentEntry.id === entry.id ? { ...currentEntry, status: "cancelled" } : currentEntry,
+        ),
+      );
+    }, "Calendar entry cancelled.");
+  }
+
+  async function handleCreateScheduleRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const rule_key = formString(form, "rule_key");
+    const name = formString(form, "name");
+    if (rule_key === "" || name === "") {
+      setNotice("Schedule rule key and name are required.");
+      return;
+    }
+    await runAction(async () => {
+      const rule = await createScheduleRule(selectedWorld.id, {
+        rule_key,
+        name,
+        kind: formString(form, "kind") as ScheduleRuleKind,
+        config: jsonObject(formString(form, "config")),
+      });
+      setScheduleRules((currentRules) => [...currentRules, rule].sort(compareScheduleRules));
+      event.currentTarget.reset();
+    }, "Schedule rule created.");
+  }
+
+  async function handleUpdateScheduleRule(event: FormEvent<HTMLFormElement>, rule: ScheduleRule) {
+    event.preventDefault();
+    if (selectedWorld === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      const updatedRule = await updateScheduleRule(selectedWorld.id, rule.id, {
+        name: formString(form, "name"),
+        kind: formString(form, "kind") as ScheduleRuleKind,
+        config: jsonObject(formString(form, "config")),
+        is_enabled: form.get("is_enabled") === "on",
+      });
+      setScheduleRules((currentRules) => replaceById(currentRules, updatedRule));
+    }, "Schedule rule updated.");
+  }
+
+  async function handleDisableScheduleRule(rule: ScheduleRule) {
+    if (selectedWorld === null) {
+      return;
+    }
+    await runAction(async () => {
+      await disableScheduleRule(selectedWorld.id, rule.id);
+      setScheduleRules((currentRules) =>
+        currentRules.map((currentRule) =>
+          currentRule.id === rule.id ? { ...currentRule, is_enabled: false } : currentRule,
+        ),
+      );
+    }, "Schedule rule disabled.");
   }
 
   async function handleUpdateAgent(event: FormEvent<HTMLFormElement>, agent: Agent) {
@@ -559,6 +715,27 @@ export function WorldManagementDashboard({
             isBusy={isBusy}
             onRefresh={handleRefreshReplay}
             onCreateSnapshot={handleCreateSnapshot}
+          />
+
+          <ScheduleRulesPanel
+            rules={scheduleRules}
+            canManage={canManage}
+            isBusy={isBusy}
+            onCreate={handleCreateScheduleRule}
+            onUpdate={handleUpdateScheduleRule}
+            onDisable={handleDisableScheduleRule}
+          />
+
+          <CalendarPanel
+            agents={agents}
+            selectedAgent={selectedAgent}
+            entries={calendarEntries}
+            canManage={canManage}
+            isBusy={isBusy}
+            onSelectAgent={handleSelectAgent}
+            onCreate={handleCreateCalendarEntry}
+            onUpdate={handleUpdateCalendarEntry}
+            onCancel={handleCancelCalendarEntry}
           />
 
           <section className="management-columns">
@@ -919,6 +1096,172 @@ function ReplayPanel({
   );
 }
 
+function ScheduleRulesPanel({
+  rules,
+  canManage,
+  isBusy,
+  onCreate,
+  onUpdate,
+  onDisable,
+}: {
+  rules: ScheduleRule[];
+  canManage: boolean;
+  isBusy: boolean;
+  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onUpdate: (event: FormEvent<HTMLFormElement>, rule: ScheduleRule) => void | Promise<void>;
+  onDisable: (rule: ScheduleRule) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Schedule rules">
+      <h2 className="section-title">Schedule rules</h2>
+      {canManage ? (
+        <form className="management-form" onSubmit={(event) => void onCreate(event)}>
+          <input className="text-input" name="rule_key" placeholder="rule-key" />
+          <input className="text-input" name="name" placeholder="Rule name" />
+          <select className="text-input" name="kind" defaultValue="weekday">
+            <option value="weekday">weekday</option>
+            <option value="weekend">weekend</option>
+            <option value="timetable">timetable</option>
+          </select>
+          <textarea className="text-input" name="config" placeholder='{"hours":[8]}' rows={3} />
+          <button className="primary-button" type="submit" disabled={isBusy}>
+            Create schedule rule
+          </button>
+        </form>
+      ) : null}
+      <div className="resource-list">
+        {rules.map((rule) => (
+          <article className="resource-row" key={rule.id}>
+            <div>
+              <h3>{rule.name}</h3>
+              <p>{rule.rule_key} - {rule.kind} - {rule.is_enabled ? "Enabled" : "Disabled"}</p>
+            </div>
+            {canManage ? (
+              <form className="inline-form" onSubmit={(event) => void onUpdate(event, rule)}>
+                <input className="text-input" name="name" defaultValue={rule.name} />
+                <select className="text-input" name="kind" defaultValue={rule.kind}>
+                  <option value="weekday">weekday</option>
+                  <option value="weekend">weekend</option>
+                  <option value="timetable">timetable</option>
+                </select>
+                <textarea
+                  className="text-input"
+                  name="config"
+                  defaultValue={JSON.stringify(rule.config)}
+                  rows={3}
+                />
+                <label className="checkbox-label">
+                  <input name="is_enabled" type="checkbox" defaultChecked={rule.is_enabled} />
+                  Enabled
+                </label>
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save rule
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => void onDisable(rule)}
+                >
+                  Disable rule
+                </button>
+              </form>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CalendarPanel({
+  agents,
+  selectedAgent,
+  entries,
+  canManage,
+  isBusy,
+  onSelectAgent,
+  onCreate,
+  onUpdate,
+  onCancel,
+}: {
+  agents: Agent[];
+  selectedAgent: Agent | null;
+  entries: CalendarEntry[];
+  canManage: boolean;
+  isBusy: boolean;
+  onSelectAgent: (agentId: string) => void | Promise<void>;
+  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onUpdate: (event: FormEvent<HTMLFormElement>, entry: CalendarEntry) => void | Promise<void>;
+  onCancel: (entry: CalendarEntry) => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Agent calendar">
+      <h2 className="section-title">Agent calendar</h2>
+      <select
+        className="text-input"
+        value={selectedAgent?.id ?? ""}
+        onChange={(event) => void onSelectAgent(event.target.value)}
+      >
+        {agents.length === 0 ? <option value="">No agents</option> : null}
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.display_name}
+          </option>
+        ))}
+      </select>
+      {canManage && selectedAgent !== null ? (
+        <form className="management-form" onSubmit={(event) => void onCreate(event)}>
+          <input className="text-input" name="title" placeholder="Calendar title" />
+          <input className="text-input" name="starts_at" placeholder="Calendar start" />
+          <input className="text-input" name="ends_at" placeholder="Calendar end" />
+          <input className="text-input" name="description" placeholder="Description" />
+          <button className="primary-button" type="submit" disabled={isBusy}>
+            Create calendar entry
+          </button>
+        </form>
+      ) : null}
+      <div className="resource-list">
+        {entries.map((entry) => (
+          <article className="resource-row" key={entry.id}>
+            <div>
+              <h3>{entry.title}</h3>
+              <p>{formatDateTime(entry.starts_at)} - {entry.status}</p>
+            </div>
+            {canManage ? (
+              <form className="inline-form" onSubmit={(event) => void onUpdate(event, entry)}>
+                <input className="text-input" name="title" defaultValue={entry.title} />
+                <input className="text-input" name="starts_at" defaultValue={entry.starts_at} />
+                <input className="text-input" name="ends_at" defaultValue={entry.ends_at ?? ""} />
+                <input
+                  className="text-input"
+                  name="description"
+                  defaultValue={entry.description ?? ""}
+                />
+                <select className="text-input" name="status" defaultValue={entry.status}>
+                  <option value="active">active</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save calendar entry
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => void onCancel(entry)}
+                >
+                  Cancel calendar entry
+                </button>
+              </form>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 async function listMembershipsIfAllowed(worldId: string): Promise<Membership[] | null> {
   try {
     return await listMemberships(worldId);
@@ -998,6 +1341,14 @@ function compareScenes(left: Scene, right: Scene): number {
 
 function compareAgents(left: Agent, right: Agent): number {
   return left.agent_key.localeCompare(right.agent_key);
+}
+
+function compareCalendarEntries(left: CalendarEntry, right: CalendarEntry): number {
+  return left.starts_at.localeCompare(right.starts_at);
+}
+
+function compareScheduleRules(left: ScheduleRule, right: ScheduleRule): number {
+  return left.rule_key.localeCompare(right.rule_key);
 }
 
 function compareMemberships(left: Membership, right: Membership): number {

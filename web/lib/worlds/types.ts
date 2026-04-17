@@ -94,6 +94,31 @@ export type WorldSnapshot = {
   created_at: string;
 };
 
+export type CalendarEntry = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  title: string;
+  description: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  recurrence_rule: string | null;
+  status: "active" | "cancelled";
+  metadata: Record<string, unknown>;
+};
+
+export type ScheduleRuleKind = "weekday" | "weekend" | "timetable";
+
+export type ScheduleRule = {
+  id: string;
+  world_id: string;
+  rule_key: string;
+  name: string;
+  kind: ScheduleRuleKind;
+  config: Record<string, unknown>;
+  is_enabled: boolean;
+};
+
 export type WorldDashboardData = {
   worlds: World[];
   selectedWorldId: string | null;
@@ -103,6 +128,9 @@ export type WorldDashboardData = {
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
+  selectedAgentId: string | null;
+  calendarEntries: CalendarEntry[];
+  scheduleRules: ScheduleRule[];
   canManageSelectedWorld: boolean;
   loadError: string | null;
 };
@@ -144,6 +172,39 @@ export type AgentCreateInput = {
 export type AgentUpdateInput = {
   display_name?: string;
   home_scene_id?: string | null;
+  config?: Record<string, unknown>;
+  is_enabled?: boolean;
+};
+
+export type CalendarEntryCreateInput = {
+  title: string;
+  description?: string | null;
+  starts_at: string;
+  ends_at?: string | null;
+  recurrence_rule?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type CalendarEntryUpdateInput = {
+  title?: string;
+  description?: string | null;
+  starts_at?: string;
+  ends_at?: string | null;
+  recurrence_rule?: string | null;
+  status?: "active" | "cancelled";
+  metadata?: Record<string, unknown>;
+};
+
+export type ScheduleRuleCreateInput = {
+  rule_key: string;
+  name: string;
+  kind: ScheduleRuleKind;
+  config?: Record<string, unknown>;
+};
+
+export type ScheduleRuleUpdateInput = {
+  name?: string;
+  kind?: ScheduleRuleKind;
   config?: Record<string, unknown>;
   is_enabled?: boolean;
 };

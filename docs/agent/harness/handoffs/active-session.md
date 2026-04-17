@@ -1,33 +1,29 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/replay-snapshot-restore
-- Objective: Add replay state reconstruction, snapshot API, and Web replay/snapshot panel.
+- Branch: feat/calendar-schedule-baseline
+- Objective: Add agent calendar entries, world schedule rules, APIs, and Web dashboard panels.
 - Completed work:
-  - Fast-forward merged `feat/runtime-event-nats-baseline` into `main`.
-  - Created `feat/replay-snapshot-restore` from `main`.
-  - Added `noveland.events.replay` with `WorldReplayService`, `WorldReplayState`, and `ClockReplayState`.
-  - Replay restores from the latest valid `world_state.v1` snapshot, applies `world.clock_advanced`, ignores `world.snapshot_created`, and counts unknown event names.
-  - Snapshot creation writes inline JSONB payloads through `WorldEventStore.record_snapshot`.
-  - Added `/worlds/{world_id}/replay/state`, `/worlds/{world_id}/snapshots/latest`, and `/worlds/{world_id}/snapshots`.
-  - Added Web world helpers, dashboard replay/snapshot panel, mock backend support, and E2E coverage.
-  - Updated README and harness docs for replay/snapshot restore.
+  - Fast-forward merged `feat/replay-snapshot-restore` into `main`.
+  - Created `feat/calendar-schedule-baseline` from `main`.
+  - Added `agent_calendar_entries` and `world_schedule_rules` migration.
+  - Added `noveland.calendar` contracts, ORM models, and service CRUD/due-resolution helpers.
+  - Added calendar and schedule rule API routes under `/worlds`.
+  - Added Web world helpers, schedule rule panel, and selected-agent calendar panel.
+  - Updated README and harness docs.
 - Incomplete work:
-  - Calendar and schedule rules baseline.
   - Memory backend and local pgvector schema.
-  - Agent loop, narrative loop, plugin execution, and destructive restore workflows.
-  - Object-storage writes for large snapshot payloads.
+  - Provider profiles, runtime agent loop, narrative artifacts, and plugin execution.
 - Tests run:
   - `cd backend && uv run ruff check . && uv run mypy .`
-  - `cd backend && uv run pytest tests/test_replay_snapshot.py tests/test_api_worlds.py tests/test_workspace_imports.py`
+  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_workspace_imports.py`
   - `cd web && npm run lint && npm run typecheck && npm run test`
 - Current risks:
-  - Replay currently reconstructs diagnostic state only; it does not overwrite current world or clock tables.
-  - Snapshot payloads are inline JSONB only; object storage integration is still future work.
-  - Replay only applies clock events; future domain events must add explicit replay handlers and regression tests.
+  - Calendar/rule changes are operational records only; they do not emit world events yet.
+  - Due resolution is intentionally simple and only handles active entry ranges plus weekday/weekend/timetable hour rules.
 - Recommended next step:
-  - Implement Calendar + Schedule Rules Baseline.
+  - Implement Memory Backend + Local pgvector Baseline.
 - Sensitive areas to avoid casual edits:
-  - event-and-snapshot model
-  - replay determinism
-  - world-clock event semantics
+  - world-clock and scheduling semantics
+  - agent data isolation
+  - API authorization and CSRF boundaries

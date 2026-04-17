@@ -22,6 +22,7 @@ MODEL_MODULES = (
     "noveland.auth.models",
     "noveland.worlds.models",
     "noveland.agents.models",
+    "noveland.calendar.models",
     "noveland.events.models",
 )
 

@@ -42,6 +42,9 @@ Fast orientation for a new coding session.
 - `backend/packages/agents/`
   - `noveland.agents.models` — agent identity ORM model
 - `backend/packages/calendar/`
+  - `noveland.calendar.contracts` — calendar entry and schedule rule contracts
+  - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
+  - `noveland.calendar.services` — calendar CRUD and due-resolution service
 - `backend/packages/narrative/`
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports

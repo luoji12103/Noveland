@@ -27,6 +27,8 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("button", { name: "Resume clock" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Replay and snapshots" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create snapshot" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Schedule rules" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agent calendar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create agent" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
@@ -66,6 +68,9 @@ const emptyData: WorldDashboardData = {
   clock: null,
   replayState: null,
   latestSnapshot: null,
+  selectedAgentId: null,
+  calendarEntries: [],
+  scheduleRules: [],
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -117,6 +122,19 @@ const adminData: WorldDashboardData = {
     unhandled_event_count: 0,
   },
   latestSnapshot: null,
+  selectedAgentId: null,
+  calendarEntries: [],
+  scheduleRules: [
+    {
+      id: "rule-1",
+      world_id: "world-1",
+      rule_key: "weekday",
+      name: "Weekday",
+      kind: "weekday",
+      config: {},
+      is_enabled: true,
+    },
+  ],
   canManageSelectedWorld: true,
   loadError: null,
 };
@@ -134,7 +152,18 @@ const readOnlyData: WorldDashboardData = {
       is_active: true,
     },
   ],
-  agents: [],
+  agents: [
+    {
+      id: "agent-1",
+      world_id: "world-1",
+      home_scene_id: "scene-1",
+      agent_key: "guide",
+      display_name: "Guide",
+      kind: "role_agent",
+      config: {},
+      is_enabled: true,
+    },
+  ],
   memberships: [],
   clock: {
     world_id: "world-1",
@@ -174,6 +203,22 @@ const readOnlyData: WorldDashboardData = {
     created_by_event_id: "event-2",
     created_at: "2026-04-17T00:02:00.000Z",
   },
+  selectedAgentId: "agent-1",
+  calendarEntries: [
+    {
+      id: "entry-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      title: "Morning scene",
+      description: null,
+      starts_at: "2030-01-01T08:00:00.000Z",
+      ends_at: null,
+      recurrence_rule: null,
+      status: "active",
+      metadata: {},
+    },
+  ],
+  scheduleRules: [],
   canManageSelectedWorld: false,
   loadError: null,
 };
