@@ -104,3 +104,72 @@ class AgentRuntimeRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AgentPersona(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "agent_personas"
+    __table_args__ = (
+        UniqueConstraint("agent_id", name="uq_agent_personas_agent_id"),
+        Index("ix_agent_personas_world_agent", "world_id", "agent_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    persona_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    behavior_policy: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
+
+
+class AgentObservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "agent_observations"
+    __table_args__ = (
+        CheckConstraint("observation_type <> ''", name="observation_type_present"),
+        Index("ix_agent_observations_world_agent_observed", "world_id", "agent_id", "observed_at"),
+        Index("ix_agent_observations_source_event_id", "source_event_id"),
+        Index(
+            "uq_agent_observations_agent_source_event",
+            "agent_id",
+            "source_event_id",
+            unique=True,
+            postgresql_where=text("source_event_id IS NOT NULL"),
+            sqlite_where=text("source_event_id IS NOT NULL"),
+        ),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    observation_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

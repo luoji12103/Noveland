@@ -205,6 +205,30 @@ export type AgentRun = {
   finished_at: string | null;
 };
 
+export type AgentPersona = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  persona_text: string;
+  behavior_policy: Record<string, unknown>;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentObservation = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  source_event_id: string | null;
+  observation_type: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  observed_at: string;
+  consumed_at: string | null;
+  created_at: string;
+};
+
 export type NarrativeArtifactKind = "agent_note" | "world_summary";
 
 export type NarrativeArtifact = {
@@ -233,6 +257,8 @@ export type WorldDashboardData = {
   scheduleRules: ScheduleRule[];
   memoryItems: MemoryItem[];
   agentRuns: AgentRun[];
+  agentPersona: AgentPersona | null;
+  agentObservations: AgentObservation[];
   narrativeArtifacts: NarrativeArtifact[];
   providerProfiles: ProviderProfile[];
   runtimeControl: RuntimeControl | null;
@@ -363,6 +389,19 @@ export type AgentRunCreateInput = {
   provider_profile_id?: string | null;
   create_memory?: boolean;
   create_narrative_artifact?: boolean;
+};
+
+export type AgentPersonaUpdateInput = {
+  persona_text: string;
+  behavior_policy?: Record<string, unknown>;
+  is_enabled?: boolean;
+};
+
+export type AgentObservationCreateInput = {
+  observation_type?: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  observed_at?: string | null;
 };
 
 export type NarrativeArtifactCreateInput = {

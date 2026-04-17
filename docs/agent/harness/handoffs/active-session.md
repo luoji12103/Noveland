@@ -1,34 +1,34 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/provider-reliability-hardening
-- Objective: Add provider timeout/retry/rate-limit controls, health test-call support, and Web provider reliability controls.
+- Branch: feat/agent-observation-persona
+- Objective: Add agent persona policy, filtered observations, runtime prompt context convergence, API endpoints, and Web controls.
 - Completed work:
-  - Created `feat/provider-reliability-hardening` from `main` after merging runtime diagnostics.
-  - Added migration `20260417_0009_provider_reliability.py` for provider timeout, retry, rate-limit, and last test-call fields.
-  - Extended provider profile contracts, ORM model, service create/update/list records, and API responses with reliability fields.
-  - Added provider invocation timeout, retry, HTTP/error-code classification, invalid response classification, and process-local per-profile rate limiting.
-  - Added `ProviderInvocationResult` and `ProviderProfileService.test_profile`, updating `last_test_*` fields without exposing secrets.
-  - Added platform-admin CSRF-protected `POST /provider-profiles/{profile_id}/test-call` and redacted provider test diagnostics.
-  - Added Web same-origin test-call proxy, dashboard reliability form fields, last-test status display, and test-provider action.
-  - Updated backend and Web tests for provider reliability, API test-call behavior, schema metadata, and dashboard/client behavior.
+  - Merged `feat/provider-reliability-hardening` into `main` after full backend/Web regression.
+  - Created `feat/agent-observation-persona` from `main`.
+  - Added migration `20260417_0010_agent_observation_persona.py` for `agent_personas` and `agent_observations`.
+  - Added `noveland.agents.contracts` and `noveland.agents.services` for persona upsert, observation list/create/refresh, and consume marking.
+  - Added filtered observation refresh from stable world events: clock, calendar due, agent run, memory, and narrative events.
+  - Updated runtime agent invocation to refresh observations before provider calls and include persona/policy/filtered observations in prompt context.
+  - Added world-admin `GET/PATCH persona`, `GET/POST observations`, and `POST observations/refresh` APIs.
+  - Added Web types, client helpers, server loading, dashboard persona editor, observation list, manual observation creation, and refresh action.
+  - Added backend and Web tests for service, API, runtime, schema, imports, clients, components, and mock E2E flows.
 - Incomplete work:
-  - Stage 2 full regression, commit, and merge are next.
-  - Agent observation/persona policy is not implemented in this branch.
+  - Final full regression, commit, and branch handoff are next.
+  - This stage intentionally stops on `feat/agent-observation-persona`; it is not merged to `main` yet.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest`
-  - `cd web && npm run lint`
+  - Targeted backend pytest for agent observations, API world persona/observations, runtime daemon, schema metadata, and workspace imports
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
-  - Full `cd web && npm run build`, `cd web && npm run test:e2e`, and Compose config remain to rerun after docs sync.
+  - Full `cd backend && uv run pytest`, Web lint/build/e2e, and Compose config remain to rerun after docs sync.
 - Current risks:
-  - Provider rate limiting is process-local for this baseline.
-  - Test-call diagnostics must remain redacted and must not store API keys, cookies, or provider payload secrets.
-  - Runtime Web controls still only change database desired state; an operator needs a running `noveland-runtime --daemon`.
+  - Observations are derived operational records, not canonical events; event log semantics must stay unchanged.
+  - Runtime prompt context should remain filtered and must not pull arbitrary world tables or other agents' private memory.
+  - Web persona controls are world-admin only in this baseline; no public reader or end-user persona UI exists.
 - Recommended next step:
-  - Run full backend/Web regression, commit `feat(providers): harden provider reliability`, merge to `main`, then start `feat/agent-observation-persona`.
+  - Run full backend/Web regression and commit `feat(agents): add observation persona baseline`.
 - Sensitive areas to avoid casual edits:
   - provider secret handling and diagnostic redaction
   - API authorization and CSRF boundaries

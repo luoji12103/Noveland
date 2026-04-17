@@ -12,6 +12,12 @@ from noveland.adapters import (
     ProviderProfileRecord,
     ProviderProfileService,
 )
+from noveland.agents import (
+    AgentObservationRecord,
+    AgentObservationService,
+    AgentPersonaRecord,
+    AgentPersonaService,
+)
 from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.calendar import CalendarEntryRecord, CalendarService, ScheduleRuleRecord
 from noveland.events import WorldEventAppend, WorldEventStore
@@ -96,6 +102,16 @@ class AgentRuntimeOrchestrator:
     ) -> AgentRunExecution:
         started_at = datetime.now(UTC)
         agent = self._agent_or_404(world_id, agent_id)
+        observation_service = AgentObservationService(self._session)
+        observation_service.refresh_from_events(world_id, agent_id)
+        persona = AgentPersonaService(self._session).get(world_id, agent_id)
+        observations = observation_service.list(world_id, agent_id, limit=8)
+        provider_prompt = _agent_prompt(agent, prompt_text, persona, observations)
+        prompt_context = {
+            "persona_enabled": persona is not None and persona.is_enabled,
+            "observation_ids": [str(observation.id) for observation in observations],
+            "observation_count": len(observations),
+        }
         run_model = AgentRuntimeRun(
             world_id=world_id,
             agent_id=agent_id,
@@ -104,7 +120,7 @@ class AgentRuntimeOrchestrator:
             source_schedule_rule_id=source_schedule_rule_id,
             status="running",
             trigger_source=trigger_source,
-            prompt_text=prompt_text,
+            prompt_text=provider_prompt,
             diagnostics={},
             started_at=started_at,
         )
@@ -128,7 +144,7 @@ class AgentRuntimeOrchestrator:
         try:
             if provider_profile is None:
                 raise ProviderConfigurationError("No enabled provider profile is available")
-            completion = self._profile_service.invoke_profile(provider_profile, prompt_text)
+            completion = self._profile_service.invoke_profile(provider_profile, provider_prompt)
             run_model.status = "succeeded"
             run_model.response_text = completion.text
             run_model.finished_at = datetime.now(UTC)
@@ -136,6 +152,7 @@ class AgentRuntimeOrchestrator:
                 "provider_profile_id": str(provider_profile.id),
                 "provider_type": provider_profile.provider_type.value,
                 "profile_key": provider_profile.profile_key,
+                **prompt_context,
             }
             self._record_diagnostic(
                 severity=DiagnosticSeverity.INFO,
@@ -146,6 +163,7 @@ class AgentRuntimeOrchestrator:
                     "trigger_source": trigger_source,
                     "provider_type": provider_profile.provider_type.value,
                     "profile_key": provider_profile.profile_key,
+                    **prompt_context,
                 },
                 world_id=world_id,
                 agent_id=agent_id,
@@ -216,6 +234,7 @@ class AgentRuntimeOrchestrator:
                 "provider_profile_id": None
                 if provider_profile is None
                 else str(provider_profile.id),
+                **prompt_context,
             }
             self._record_diagnostic(
                 severity=DiagnosticSeverity.ERROR,
@@ -226,6 +245,7 @@ class AgentRuntimeOrchestrator:
                     "trigger_source": trigger_source,
                     "error": str(exc),
                     "error_type": type(exc).__name__,
+                    **prompt_context,
                 },
                 world_id=world_id,
                 agent_id=agent_id,
@@ -463,6 +483,36 @@ def _due_prompt(
         f"Matching schedule rules: {rule_names}. "
         "Respond with one concise operational update."
     )
+
+
+def _agent_prompt(
+    agent: Agent,
+    task_prompt: str,
+    persona: AgentPersonaRecord | None,
+    observations: list[AgentObservationRecord],
+) -> str:
+    lines = [
+        task_prompt,
+        "",
+        f"Agent: {agent.display_name} ({agent.agent_key}).",
+    ]
+    if persona is not None and persona.is_enabled:
+        lines.extend(
+            [
+                "Persona:",
+                persona.persona_text or "No persona text configured.",
+                f"Behavior policy: {persona.behavior_policy}",
+            ],
+        )
+    else:
+        lines.append("Persona: disabled or not configured.")
+    if observations:
+        lines.append("Recent filtered observations:")
+        lines.extend(f"- {observation.content}" for observation in observations[:8])
+    else:
+        lines.append("Recent filtered observations: none.")
+    lines.append("Use only the persona, policy, task, and filtered observations above.")
+    return "\n".join(lines)
 
 
 def _deterministic_embedding(content: str) -> list[float]:

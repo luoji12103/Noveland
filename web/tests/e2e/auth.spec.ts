@@ -117,6 +117,15 @@ test("world admin manages scenes agents and memberships", async ({ page }) => {
   await page.getByRole("button", { name: "Search memory" }).click();
   await expect(page.getByText(/score/)).toBeVisible();
 
+  await page.getByPlaceholder("Persona text").fill("E2E persona");
+  await page.getByRole("button", { name: "Save persona" }).click();
+  await expect(page.getByText("Agent persona updated.")).toBeVisible();
+  await page.getByPlaceholder("Observation").fill("E2E observation");
+  await page.getByRole("button", { name: "Add observation" }).click();
+  await expect(page.getByText("E2E observation")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh observations" }).click();
+  await expect(page.getByText("Agent observations refreshed.")).toBeVisible();
+
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(page.getByText("Runtime start requested.")).toBeVisible();
 
@@ -149,12 +158,14 @@ test("world member sees read-only dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Schedule rules" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent calendar" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent memory" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agent persona and observations" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Agent runs" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Narrative artifacts" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save world" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Resume clock" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create snapshot" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add memory item" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save persona" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Run agent" })).toHaveCount(0);
 });
 

@@ -33,6 +33,7 @@
 - Agent Loop + Narrative Baseline
 - Runtime Observability + Diagnostics
 - Provider Reliability Hardening
+- Agent Observation + Persona Policy Baseline
 
 ## Upcoming Mainline
-- Agent Observation + Persona Policy Baseline
+- None selected; next mainline scope needs confirmation.

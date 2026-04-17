@@ -38,6 +38,8 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "agent_observations",
+        "agent_personas",
         "agent_runtime_runs",
         "agent_calendar_entries",
         "agent_memory_items",
@@ -82,6 +84,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_scenes_world_scene_key" in constraint_names("scenes", UniqueConstraint)
     assert "uq_agents_world_agent_key" in constraint_names("agents", UniqueConstraint)
+    assert "uq_agent_personas_agent_id" in constraint_names(
+        "agent_personas",
+        UniqueConstraint,
+    )
     assert "uq_world_schedule_rules_world_rule_key" in constraint_names(
         "world_schedule_rules",
         UniqueConstraint,
@@ -180,6 +186,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "agent_memory_items",
         CheckConstraint,
     )
+    assert "ck_agent_observations_observation_type_present" in constraint_names(
+        "agent_observations",
+        CheckConstraint,
+    )
     assert "ck_provider_profiles_provider_type" in constraint_names(
         "provider_profiles",
         CheckConstraint,
@@ -234,6 +244,12 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_memberships") == {"users.id", "worlds.id"}
     assert foreign_key_targets("scenes") == {"worlds.id"}
     assert foreign_key_targets("agents") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("agent_personas") == {"agents.id", "worlds.id"}
+    assert foreign_key_targets("agent_observations") == {
+        "agents.id",
+        "world_events.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("world_clock_states") == {"worlds.id"}
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
     assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
@@ -277,6 +293,10 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_memberships_world_id" in index_names("world_memberships")
     assert "ix_scenes_world_id" in index_names("scenes")
     assert "ix_agents_world_id" in index_names("agents")
+    assert "ix_agent_personas_world_agent" in index_names("agent_personas")
+    assert "ix_agent_observations_world_agent_observed" in index_names("agent_observations")
+    assert "ix_agent_observations_source_event_id" in index_names("agent_observations")
+    assert "uq_agent_observations_agent_source_event" in index_names("agent_observations")
     assert "ix_world_clock_states_world_id" in index_names("world_clock_states")
     assert "ix_world_clock_transitions_world_id" in index_names("world_clock_transitions")
     assert "ix_world_clock_transitions_world_wall_time" in index_names(

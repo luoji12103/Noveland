@@ -15,7 +15,7 @@
 - `core/` — minimal shared primitives only
 - `auth/` — identity, sessions, RBAC, world-scoped ownership
 - `worlds/` — world entities, scenes, world clock, transitions
-- `agents/` — agent identity, config, observation shaping, tool application
+- `agents/` — agent identity, config, persona policy, filtered observation shaping, tool application
 - `calendar/` — private schedule and calendar logic
 - `narrative/` — summarizer orchestration and artifacts
 - `events/` — event contracts, event store, snapshot interfaces, replay

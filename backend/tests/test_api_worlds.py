@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters import ProviderCompletion, ProviderProfileService
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentRuntimeRun
+from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -588,6 +588,55 @@ def test_world_diagnostics_require_world_admin() -> None:
     assert hidden_response.status_code == 404
 
 
+def test_agent_persona_and_observation_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "persona-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_clock_event(engine, world_id, revision=1)
+
+    _authenticate(client, member_token)
+    member_persona = client.get(f"/worlds/{world_id}/agents/{agent_id}/persona")
+    member_observations = client.get(f"/worlds/{world_id}/agents/{agent_id}/observations")
+
+    _authenticate(client, owner_token)
+    empty_persona = client.get(f"/worlds/{world_id}/agents/{agent_id}/persona")
+    upsert_persona = client.patch(
+        f"/worlds/{world_id}/agents/{agent_id}/persona",
+        json={
+            "persona_text": "Careful guide.",
+            "behavior_policy": {"tone": "direct"},
+            "is_enabled": True,
+        },
+    )
+    manual_observation = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/observations",
+        json={"content": "Operator observation", "observation_type": "manual"},
+    )
+    refreshed = client.post(f"/worlds/{world_id}/agents/{agent_id}/observations/refresh")
+    listed = client.get(f"/worlds/{world_id}/agents/{agent_id}/observations")
+
+    assert member_persona.status_code == 403
+    assert member_observations.status_code == 403
+    assert empty_persona.status_code == 200
+    assert empty_persona.json() is None
+    assert upsert_persona.status_code == 200
+    assert upsert_persona.json()["persona_text"] == "Careful guide."
+    assert upsert_persona.json()["behavior_policy"] == {"tone": "direct"}
+    assert manual_observation.status_code == 201
+    assert manual_observation.json()["content"] == "Operator observation"
+    assert refreshed.status_code == 200
+    assert any(item["observation_type"] == "world.clock_advanced" for item in refreshed.json())
+    assert listed.status_code == 200
+    assert {item["observation_type"] for item in listed.json()} >= {
+        "manual",
+        "world.clock_advanced",
+    }
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -621,6 +670,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentPersona.__table__),
+        cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),

@@ -7,6 +7,7 @@ import type { AuthSubject } from "@/lib/auth/types";
 import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
+  createAgentObservation,
   createAgent,
   createAgentMemoryItem,
   createNarrativeArtifact,
@@ -24,12 +25,14 @@ import {
   disableProviderProfile,
   disableScheduleRule,
   getLatestSnapshot,
+  getAgentPersona,
   getReplayState,
   getRuntimeControl,
   getRuntimeStatus,
   getWorldClock,
   listAgentCalendar,
   listAgentMemory,
+  listAgentObservations,
   listAgentRuns,
   listAgents,
   listRuntimeDiagnostics,
@@ -43,11 +46,13 @@ import {
   pauseWorldClock,
   resumeWorldClock,
   runAgent,
+  refreshAgentObservations,
   searchAgentMemory,
   skipWorldClock,
   testProviderProfile,
   updateAgent,
   updateAgentCalendarEntry,
+  updateAgentPersona,
   updateProviderProfile,
   updateRuntimeControl,
   updateScheduleRule,
@@ -59,6 +64,8 @@ import {
 import type {
   Agent,
   AgentKind,
+  AgentObservation,
+  AgentPersona,
   AgentRun,
   CalendarEntry,
   MemberCandidate,
@@ -105,6 +112,8 @@ export function WorldManagementDashboard({
   const [scheduleRules, setScheduleRules] = useState(initialData.scheduleRules);
   const [memoryItems, setMemoryItems] = useState(initialData.memoryItems);
   const [agentRuns, setAgentRuns] = useState(initialData.agentRuns);
+  const [agentPersona, setAgentPersona] = useState(initialData.agentPersona);
+  const [agentObservations, setAgentObservations] = useState(initialData.agentObservations);
   const [narrativeArtifacts, setNarrativeArtifacts] = useState(initialData.narrativeArtifacts);
   const [providerProfiles, setProviderProfiles] = useState(initialData.providerProfiles);
   const [runtimeControl, setRuntimeControl] = useState(initialData.runtimeControl);
@@ -162,13 +171,25 @@ export function WorldManagementDashboard({
       ]);
       const nextSelectedAgent = nextAgents[0] ?? null;
       const nextCanManage = nextMemberships !== null;
-      const [nextCalendarEntries, nextMemoryItems, nextAgentRuns] =
+      const [
+        nextCalendarEntries,
+        nextMemoryItems,
+        nextAgentRuns,
+        nextAgentPersona,
+        nextAgentObservations,
+      ] =
         nextSelectedAgent === null
-          ? [[], [], []]
+          ? [[], [], [], null, []]
           : await Promise.all([
               listAgentCalendar(worldId, nextSelectedAgent.id),
               nextCanManage ? listAgentMemory(worldId, nextSelectedAgent.id) : Promise.resolve([]),
               listAgentRuns(worldId, nextSelectedAgent.id),
+              nextCanManage
+                ? getAgentPersona(worldId, nextSelectedAgent.id)
+                : Promise.resolve(null),
+              nextCanManage
+                ? listAgentObservations(worldId, nextSelectedAgent.id)
+                : Promise.resolve([]),
             ]);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
@@ -182,6 +203,8 @@ export function WorldManagementDashboard({
       setScheduleRules(nextScheduleRules);
       setMemoryItems(nextMemoryItems);
       setAgentRuns(nextAgentRuns);
+      setAgentPersona(nextAgentPersona);
+      setAgentObservations(nextAgentObservations);
       setNarrativeArtifacts(nextNarrativeArtifacts);
       setWorldDiagnostics(nextWorldDiagnostics ?? []);
       setCanManageSelectedWorld(nextCanManage);
@@ -226,6 +249,8 @@ export function WorldManagementDashboard({
       setScheduleRules([]);
       setMemoryItems([]);
       setAgentRuns([]);
+      setAgentPersona(null);
+      setAgentObservations([]);
       setNarrativeArtifacts([]);
       setWorldDiagnostics([]);
       setMemberships([
@@ -446,6 +471,8 @@ export function WorldManagementDashboard({
       setCalendarEntries([]);
       setMemoryItems([]);
       setAgentRuns([]);
+      setAgentPersona(null);
+      setAgentObservations([]);
       formElement.reset();
     }, "Agent created.");
   }
@@ -456,14 +483,24 @@ export function WorldManagementDashboard({
     }
     await runAction(async () => {
       setSelectedAgentId(agentId);
-      const [nextCalendarEntries, nextMemoryItems, nextAgentRuns] = await Promise.all([
+      const [
+        nextCalendarEntries,
+        nextMemoryItems,
+        nextAgentRuns,
+        nextAgentPersona,
+        nextAgentObservations,
+      ] = await Promise.all([
         listAgentCalendar(selectedWorld.id, agentId),
         canManage ? listAgentMemory(selectedWorld.id, agentId) : Promise.resolve([]),
         listAgentRuns(selectedWorld.id, agentId),
+        canManage ? getAgentPersona(selectedWorld.id, agentId) : Promise.resolve(null),
+        canManage ? listAgentObservations(selectedWorld.id, agentId) : Promise.resolve([]),
       ]);
       setCalendarEntries(nextCalendarEntries);
       setMemoryItems(nextMemoryItems);
       setAgentRuns(nextAgentRuns);
+      setAgentPersona(nextAgentPersona);
+      setAgentObservations(nextAgentObservations);
     });
   }
 
@@ -643,6 +680,56 @@ export function WorldManagementDashboard({
     }, "Memory item disabled.");
   }
 
+  async function handleUpdatePersona(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    await runAction(async () => {
+      setAgentPersona(
+        await updateAgentPersona(selectedWorld.id, selectedAgent.id, {
+          persona_text: formString(form, "persona_text"),
+          behavior_policy: jsonObject(formString(form, "behavior_policy")),
+          is_enabled: form.get("is_enabled") === "on",
+        }),
+      );
+    }, "Agent persona updated.");
+  }
+
+  async function handleCreateObservation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedWorld === null || selectedAgent === null) {
+      return;
+    }
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const content = formString(form, "content");
+    if (content === "") {
+      setNotice("Observation content is required.");
+      return;
+    }
+    await runAction(async () => {
+      const observation = await createAgentObservation(selectedWorld.id, selectedAgent.id, {
+        observation_type: formString(form, "observation_type") || "manual",
+        content,
+        metadata: jsonObject(formString(form, "metadata")),
+        observed_at: optionalFormString(form, "observed_at"),
+      });
+      setAgentObservations((currentObservations) => [observation, ...currentObservations]);
+      formElement.reset();
+    }, "Agent observation created.");
+  }
+
+  async function handleRefreshObservations() {
+    if (selectedWorld === null || selectedAgent === null || !canManage) {
+      return;
+    }
+    await runAction(async () => {
+      setAgentObservations(await refreshAgentObservations(selectedWorld.id, selectedAgent.id));
+    }, "Agent observations refreshed.");
+  }
+
   async function handleRunAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (selectedWorld === null || selectedAgent === null) {
@@ -661,7 +748,12 @@ export function WorldManagementDashboard({
       setNarrativeArtifacts(await listNarrativeArtifacts(selectedWorld.id));
       setWorldDiagnostics(await listWorldDiagnosticsIfAllowed(selectedWorld.id) ?? []);
       if (canManage) {
-        setMemoryItems(await listAgentMemory(selectedWorld.id, selectedAgent.id));
+        const [nextMemoryItems, nextObservations] = await Promise.all([
+          listAgentMemory(selectedWorld.id, selectedAgent.id),
+          listAgentObservations(selectedWorld.id, selectedAgent.id),
+        ]);
+        setMemoryItems(nextMemoryItems);
+        setAgentObservations(nextObservations);
       }
       formElement.reset();
     }, "Agent run completed.");
@@ -1058,6 +1150,19 @@ export function WorldManagementDashboard({
             onSearch={handleSearchMemory}
             onRefresh={handleRefreshMemory}
             onDisable={handleDisableMemoryItem}
+          />
+
+          <AgentPersonaObservationsPanel
+            agents={agents}
+            selectedAgent={selectedAgent}
+            persona={agentPersona}
+            observations={agentObservations}
+            canManage={canManage}
+            isBusy={isBusy}
+            onSelectAgent={handleSelectAgent}
+            onUpdatePersona={handleUpdatePersona}
+            onCreateObservation={handleCreateObservation}
+            onRefreshObservations={handleRefreshObservations}
           />
 
           <AgentRunsPanel
@@ -1933,6 +2038,108 @@ function ProviderProfilesPanel({
   );
 }
 
+function AgentPersonaObservationsPanel({
+  agents,
+  selectedAgent,
+  persona,
+  observations,
+  canManage,
+  isBusy,
+  onSelectAgent,
+  onUpdatePersona,
+  onCreateObservation,
+  onRefreshObservations,
+}: {
+  agents: Agent[];
+  selectedAgent: Agent | null;
+  persona: AgentPersona | null;
+  observations: AgentObservation[];
+  canManage: boolean;
+  isBusy: boolean;
+  onSelectAgent: (agentId: string) => void | Promise<void>;
+  onUpdatePersona: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onCreateObservation: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onRefreshObservations: () => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Agent persona and observations">
+      <h2 className="section-title">Agent persona and observations</h2>
+      <select
+        className="text-input"
+        value={selectedAgent?.id ?? ""}
+        onChange={(event) => void onSelectAgent(event.target.value)}
+      >
+        {agents.length === 0 ? <option value="">No agents</option> : null}
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>
+            {agent.display_name}
+          </option>
+        ))}
+      </select>
+      {canManage && selectedAgent !== null ? (
+        <>
+          <form className="management-form" onSubmit={(event) => void onUpdatePersona(event)}>
+            <textarea
+              className="text-input"
+              name="persona_text"
+              placeholder="Persona text"
+              defaultValue={persona?.persona_text ?? ""}
+              rows={4}
+            />
+            <textarea
+              className="text-input"
+              name="behavior_policy"
+              placeholder="{}"
+              defaultValue={JSON.stringify(persona?.behavior_policy ?? {})}
+              rows={3}
+            />
+            <label className="checkbox-label">
+              <input name="is_enabled" type="checkbox" defaultChecked={persona?.is_enabled ?? true} />
+              Persona enabled
+            </label>
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Save persona
+            </button>
+          </form>
+          <form className="management-form" onSubmit={(event) => void onCreateObservation(event)}>
+            <input className="text-input" name="observation_type" placeholder="manual" />
+            <textarea className="text-input" name="content" placeholder="Observation" rows={3} />
+            <textarea className="text-input" name="metadata" placeholder="{}" rows={3} />
+            <input className="text-input" name="observed_at" placeholder="Observed at" />
+            <div className="button-row">
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Add observation
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void onRefreshObservations()}
+              >
+                Refresh observations
+              </button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <p className="status-detail">Persona and observation management requires world admin access.</p>
+      )}
+      <div className="resource-list">
+        {observations.map((observation) => (
+          <article className="resource-row" key={observation.id}>
+            <div>
+              <h3>{observation.observation_type}</h3>
+              <p>{observation.content}</p>
+              <p className="status-detail">{formatDateTime(observation.observed_at)}</p>
+            </div>
+            <p className="status-detail">{observation.source_event_id ?? "manual"}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function AgentRunsPanel({
   agents,
   selectedAgent,
@@ -1999,6 +2206,10 @@ function AgentRunsPanel({
             <div>
               <h3>{run.status}</h3>
               <p>{formatDateTime(run.started_at)}</p>
+              <p className="status-detail">
+                Persona {String(run.diagnostics.persona_enabled ?? false)} - observations{" "}
+                {String(run.diagnostics.observation_count ?? 0)}
+              </p>
               <p>{run.response_text ?? run.prompt_text}</p>
             </div>
           </article>

@@ -115,6 +115,35 @@ const memoryItems = [
     score: null,
   },
 ];
+const agentPersonas = new Map([
+  [
+    agentGuideId,
+    {
+      id: "70500000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      agent_id: agentGuideId,
+      persona_text: "Careful guide.",
+      behavior_policy: { tone: "direct" },
+      is_enabled: true,
+      created_at: "2026-04-17T00:02:00.000Z",
+      updated_at: "2026-04-17T00:02:00.000Z",
+    },
+  ],
+]);
+const agentObservations = [
+  {
+    id: "70600000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    source_event_id: null,
+    observation_type: "manual",
+    content: "Initial observation",
+    metadata: {},
+    observed_at: "2026-04-17T00:02:00.000Z",
+    consumed_at: null,
+    created_at: "2026-04-17T00:02:00.000Z",
+  },
+];
 const providerProfiles = [
   {
     id: "71000000-0000-4000-8000-000000000001",
@@ -182,7 +211,7 @@ const agentRuns = [
     prompt_text: "Initial prompt",
     response_text: "Initial response",
     provider_profile_id: providerProfiles[0].id,
-    diagnostics: {},
+    diagnostics: { persona_enabled: true, observation_count: 1 },
     started_at: "2026-04-17T00:03:00.000Z",
     finished_at: "2026-04-17T00:03:01.000Z",
   },
@@ -521,6 +550,14 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       await handleMemory(request, response, currentSubject, worldId, agentId, segments[5]);
       return;
     }
+    if (segments[4] === "persona") {
+      await handlePersona(request, response, currentSubject, worldId, agentId);
+      return;
+    }
+    if (segments[4] === "observations") {
+      await handleObservations(request, response, currentSubject, worldId, agentId, segments[5]);
+      return;
+    }
     if (segments[4] === "runs") {
       handleAgentRuns(request, response, currentSubject, worldId, agentId);
       return;
@@ -770,6 +807,90 @@ async function handleMemory(request, response, currentSubject, worldId, agentId,
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
+async function handlePersona(request, response, currentSubject, worldId, agentId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, agentPersonas.get(agentId) ?? null);
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    const body = await readJson(request);
+    const persona = {
+      id: agentPersonas.get(agentId)?.id ?? randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      persona_text: body.persona_text ?? "",
+      behavior_policy: body.behavior_policy ?? {},
+      is_enabled: body.is_enabled ?? true,
+      created_at: agentPersonas.get(agentId)?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    agentPersonas.set(agentId, persona);
+    sendJson(response, 200, persona);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleObservations(request, response, currentSubject, worldId, agentId, action) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && action === undefined) {
+    sendJson(response, 200, observationsFor(worldId, agentId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === undefined) {
+    const body = await readJson(request);
+    const observation = {
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      source_event_id: null,
+      observation_type: body.observation_type ?? "manual",
+      content: body.content,
+      metadata: body.metadata ?? {},
+      observed_at: body.observed_at ?? new Date().toISOString(),
+      consumed_at: null,
+      created_at: new Date().toISOString(),
+    };
+    agentObservations.unshift(observation);
+    sendJson(response, 201, observation);
+    return;
+  }
+  if (request.method === "POST" && action === "refresh") {
+    if (!agentObservations.some((item) => item.agent_id === agentId && item.source_event_id === "event-clock-1")) {
+      agentObservations.unshift({
+        id: randomUUID(),
+        world_id: worldId,
+        agent_id: agentId,
+        source_event_id: "event-clock-1",
+        observation_type: "world.clock_advanced",
+        content: "World clock advanced.",
+        metadata: {},
+        observed_at: new Date().toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+    }
+    sendJson(response, 200, observationsFor(worldId, agentId));
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
 function handleAgentRuns(request, response, currentSubject, worldId, agentId) {
   if (!canReadWorld(currentSubject, worldId)) {
     sendJson(response, 404, { detail: "World not found" });
@@ -805,7 +926,10 @@ async function handleAgentRun(request, response, currentSubject, worldId, agentI
       prompt_text: body.prompt ?? "Manual run",
       response_text: `Run output for ${agentId}`,
       provider_profile_id: body.provider_profile_id ?? providerProfiles[0]?.id ?? null,
-      diagnostics: {},
+      diagnostics: {
+        persona_enabled: agentPersonas.get(agentId)?.is_enabled ?? false,
+        observation_count: observationsFor(worldId, agentId).length,
+      },
       started_at: new Date().toISOString(),
       finished_at: new Date().toISOString(),
     };
@@ -1240,6 +1364,10 @@ function isPlatformAdmin(currentSubject) {
 
 function membershipFor(worldId, userId) {
   return memberships.find((item) => item.world_id === worldId && item.user_id === userId);
+}
+
+function observationsFor(worldId, agentId) {
+  return agentObservations.filter((item) => item.world_id === worldId && item.agent_id === agentId);
 }
 
 function hasValidCsrf(request) {

@@ -230,3 +230,14 @@
 - Tests added/updated: provider adapter reliability tests, API test-call coverage, schema metadata checks, Web client/component/mock-backend coverage for reliability fields and provider test calls
 - Docs updated: README, configuration/secrets, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: provider rate limiting is process-local; distributed rate limiting, richer provider health dashboards, agent observation/persona policy, and plugin runtime execution remain separate tasks.
+
+## Agent observation and persona baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/agent-observation-persona
+- Scope: agent persona policy, filtered observations, prompt context convergence
+- Summary: Added agent persona and filtered observation persistence, typed contracts/services, world-admin persona/observation APIs, runtime prompt enrichment, and Web dashboard persona/observation controls.
+- Files changed: `/backend/packages/agents/**`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/services/runtime/src/noveland/services/runtime/agent_loop.py`, `/backend/migrations/versions/20260417_0010_agent_observation_persona.py`, `/backend/tests/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: persona/observation service tests, API permission and flow tests, schema/import coverage, runtime daemon prompt-context coverage, Web client/component/E2E coverage for persona and observations
+- Docs updated: README, architecture map, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: observations are filtered derived records and do not alter event log semantics; same-scene multi-agent dialogue, public reader UI, plugin runtime execution, and advanced prompt policy remain future work.

@@ -3,6 +3,10 @@ import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
 import type {
   Agent,
   AgentCreateInput,
+  AgentObservation,
+  AgentObservationCreateInput,
+  AgentPersona,
+  AgentPersonaUpdateInput,
   AgentRun,
   AgentRunCreateInput,
   AgentUpdateInput,
@@ -294,6 +298,58 @@ export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRu
   return worldRequest<AgentRun[]>(`/api/worlds/${worldId}/agents/${agentId}/runs`, {
     method: "GET",
   });
+}
+
+export function getAgentPersona(worldId: string, agentId: string): Promise<AgentPersona | null> {
+  return worldRequest<AgentPersona | null>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+    method: "GET",
+  });
+}
+
+export function updateAgentPersona(
+  worldId: string,
+  agentId: string,
+  input: AgentPersonaUpdateInput,
+): Promise<AgentPersona> {
+  return worldRequest<AgentPersona>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listAgentObservations(
+  worldId: string,
+  agentId: string,
+): Promise<AgentObservation[]> {
+  return worldRequest<AgentObservation[]>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+    method: "GET",
+  });
+}
+
+export function createAgentObservation(
+  worldId: string,
+  agentId: string,
+  input: AgentObservationCreateInput,
+): Promise<AgentObservation> {
+  return worldRequest<AgentObservation>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function refreshAgentObservations(
+  worldId: string,
+  agentId: string,
+): Promise<AgentObservation[]> {
+  return worldRequest<AgentObservation[]>(
+    `/api/worlds/${worldId}/agents/${agentId}/observations/refresh`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function runAgent(worldId: string, agentId: string, input: AgentRunCreateInput): Promise<AgentRun> {

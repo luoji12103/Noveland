@@ -41,6 +41,8 @@
 - `platform_settings` stores non-secret platform configuration values.
 - `worlds`, `world_memberships`, and `scenes` establish world ownership, membership, and location boundaries.
 - `agents` stores world-scoped agent identity basics only, not runtime state, memory, or private calendars.
+- `agent_personas` stores one world-scoped persona/policy record per agent.
+- `agent_observations` stores filtered, agent-scoped derived observations from stable world events and operator notes.
 - `world_clock_states` stores world-owned operational clock state, with one current state row per world.
 - `world_clock_transitions` stores world-owned operational audit records for clock state changes.
 - `world_events` stores the append-only world event stream.

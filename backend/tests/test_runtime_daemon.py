@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 from noveland.adapters import ProviderCompletion, ProviderProfileService
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentRuntimeRun
+from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
 from noveland.auth.models import User
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.models import RuntimeControlState
@@ -123,6 +123,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentPersona.__table__),
+        cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, RuntimeControlState.__table__),

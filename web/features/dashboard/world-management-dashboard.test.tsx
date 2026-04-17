@@ -6,6 +6,7 @@ vi.mock("@/lib/worlds/client", async () => {
   return {
     ...actual,
     listAgentMemory: vi.fn(),
+    listAgentObservations: vi.fn(),
     listWorldDiagnostics: vi.fn(),
     listNarrativeArtifacts: vi.fn(),
     runAgent: vi.fn(),
@@ -16,6 +17,7 @@ import { WorldManagementDashboard } from "@/features/dashboard/world-management-
 import type { AuthSubject } from "@/lib/auth/types";
 import {
   listAgentMemory,
+  listAgentObservations,
   listNarrativeArtifacts,
   listWorldDiagnostics,
   runAgent,
@@ -51,6 +53,7 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("heading", { name: "Schedule rules" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent calendar" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Agent memory" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Agent persona and observations" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Runtime control" })).toBeInTheDocument();
     expect(screen.getByText("Runtime iteration failed.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Provider profiles" })).toBeInTheDocument();
@@ -80,12 +83,13 @@ describe("WorldManagementDashboard", () => {
       prompt_text: "Say hello from runtime",
       response_text: "Hello from runtime",
       provider_profile_id: "profile-1",
-      diagnostics: {},
+      diagnostics: { persona_enabled: true, observation_count: 1 },
       started_at: "2026-04-17T00:05:00.000Z",
       finished_at: "2026-04-17T00:05:01.000Z",
     });
     vi.mocked(listNarrativeArtifacts).mockResolvedValue(adminData.narrativeArtifacts);
     vi.mocked(listAgentMemory).mockResolvedValue(adminData.memoryItems);
+    vi.mocked(listAgentObservations).mockResolvedValue(adminData.agentObservations);
     vi.mocked(listWorldDiagnostics).mockResolvedValue(adminData.worldDiagnostics);
 
     render(<WorldManagementDashboard subject={platformAdmin} initialData={adminDataWithAgent} />);
@@ -130,6 +134,8 @@ const emptyData: WorldDashboardData = {
   scheduleRules: [],
   memoryItems: [],
   agentRuns: [],
+  agentPersona: null,
+  agentObservations: [],
   narrativeArtifacts: [],
   providerProfiles: [],
   runtimeControl: null,
@@ -223,9 +229,33 @@ const adminData: WorldDashboardData = {
       prompt_text: "Prompt",
       response_text: "Response",
       provider_profile_id: "profile-1",
-      diagnostics: {},
+      diagnostics: { persona_enabled: false, observation_count: 0 },
       started_at: "2026-04-17T00:03:00.000Z",
       finished_at: "2026-04-17T00:03:01.000Z",
+    },
+  ],
+  agentPersona: {
+    id: "persona-1",
+    world_id: "world-1",
+    agent_id: "agent-1",
+    persona_text: "Careful guide.",
+    behavior_policy: { tone: "direct" },
+    is_enabled: true,
+    created_at: "2026-04-17T00:02:00.000Z",
+    updated_at: "2026-04-17T00:02:00.000Z",
+  },
+  agentObservations: [
+    {
+      id: "observation-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      source_event_id: "event-1",
+      observation_type: "world.clock_advanced",
+      content: "World clock advanced.",
+      metadata: {},
+      observed_at: "2026-04-17T00:02:00.000Z",
+      consumed_at: null,
+      created_at: "2026-04-17T00:02:00.000Z",
     },
   ],
   narrativeArtifacts: [
@@ -456,11 +486,13 @@ const readOnlyData: WorldDashboardData = {
       prompt_text: "Prompt",
       response_text: "Response",
       provider_profile_id: "profile-1",
-      diagnostics: {},
+      diagnostics: { persona_enabled: false, observation_count: 0 },
       started_at: "2026-04-17T00:03:00.000Z",
       finished_at: "2026-04-17T00:03:01.000Z",
     },
   ],
+  agentPersona: null,
+  agentObservations: [],
   narrativeArtifacts: [
     {
       id: "artifact-1",

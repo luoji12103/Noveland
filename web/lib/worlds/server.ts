@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
+  AgentObservation,
+  AgentPersona,
   AgentRun,
   CalendarEntry,
   MemoryItem,
@@ -72,9 +74,9 @@ export async function getWorldDashboardData(
         apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${selectedWorld.id}/diagnostics`, cookieHeader),
       ]);
     const selectedAgent = agents[0] ?? null;
-    const [calendarEntries, memoryItems, agentRuns] =
+    const [calendarEntries, memoryItems, agentRuns, agentPersona, agentObservations] =
       selectedAgent === null
-        ? [[], [], []]
+        ? [[], [], [], null, []]
         : await Promise.all([
             apiFetch<CalendarEntry[]>(
               `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/calendar`,
@@ -90,6 +92,18 @@ export async function getWorldDashboardData(
               `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/runs`,
               cookieHeader,
             ),
+            memberships === null
+              ? Promise.resolve<AgentPersona | null>(null)
+              : apiFetch<AgentPersona | null>(
+                  `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/persona`,
+                  cookieHeader,
+                ),
+            memberships === null
+              ? Promise.resolve<AgentObservation[]>([])
+              : apiFetch<AgentObservation[]>(
+                  `/worlds/${selectedWorld.id}/agents/${selectedAgent.id}/observations`,
+                  cookieHeader,
+                ),
           ]);
 
     return {
@@ -106,6 +120,8 @@ export async function getWorldDashboardData(
       scheduleRules,
       memoryItems,
       agentRuns,
+      agentPersona,
+      agentObservations,
       narrativeArtifacts,
       providerProfiles,
       runtimeControl,
@@ -194,6 +210,8 @@ function emptyDashboardData(
     scheduleRules: [],
     memoryItems: [],
     agentRuns: [],
+    agentPersona: null,
+    agentObservations: [],
     narrativeArtifacts: [],
     providerProfiles,
     runtimeControl,

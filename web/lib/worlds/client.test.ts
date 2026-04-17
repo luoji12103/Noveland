@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
+  createAgentObservation,
   createAgentMemoryItem,
   createNarrativeArtifact,
   createProviderProfile,
@@ -15,15 +16,18 @@ import {
   getRuntimeControl,
   getRuntimeStatus,
   getLatestSnapshot,
+  getAgentPersona,
   getReplayState,
   listRuntimeDiagnostics,
   listAgentRuns,
+  listAgentObservations,
   pauseWorldClock,
   resumeWorldClock,
   listAgentMemory,
   listNarrativeArtifacts,
   listProviderProfiles,
   runAgent,
+  refreshAgentObservations,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
@@ -32,6 +36,7 @@ import {
   testProviderProfile,
   updateAgent,
   updateProviderProfile,
+  updateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
 } from "@/lib/worlds/client";
@@ -263,6 +268,36 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/run");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/narrative-artifacts");
     expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/narrative-artifacts");
+  });
+
+  it("maps persona and observation requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "persona-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "observation-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "observation-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "observation-1" }, { id: "observation-2" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getAgentPersona("world-1", "agent-1");
+    await updateAgentPersona("world-1", "agent-1", {
+      persona_text: "Careful guide.",
+      behavior_policy: { tone: "direct" },
+      is_enabled: true,
+    });
+    await listAgentObservations("world-1", "agent-1");
+    await createAgentObservation("world-1", "agent-1", { content: "Manual note" });
+    await refreshAgentObservations("world-1", "agent-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/persona");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/persona");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/observations");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/agents/agent-1/observations");
+    expect(fetchMock.mock.calls[4][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/observations/refresh",
+    );
   });
 
   it("raises typed world client errors", async () => {

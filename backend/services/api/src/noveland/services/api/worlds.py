@@ -8,6 +8,14 @@ from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.adapters import ProviderProfileService
+from noveland.agents import (
+    AgentObservationCreate,
+    AgentObservationRecord,
+    AgentObservationService,
+    AgentPersonaRecord,
+    AgentPersonaService,
+    AgentPersonaUpsert,
+)
 from noveland.agents.models import Agent
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
@@ -199,6 +207,26 @@ class AgentRunRequest(_RequestModel):
     create_narrative_artifact: bool = True
 
 
+class AgentPersonaUpdateRequest(_RequestModel):
+    persona_text: str = Field(default="", max_length=12_000)
+    behavior_policy: dict[str, Any] = Field(default_factory=dict)
+    is_enabled: bool = True
+
+
+class AgentObservationCreateRequest(_RequestModel):
+    observation_type: str = Field(default="manual", min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=12_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    observed_at: datetime | None = None
+
+    @field_validator("observed_at", mode="after")
+    @classmethod
+    def observed_at_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "observed_at")
+
+
 class NarrativeArtifactCreateRequest(_RequestModel):
     title: str = Field(min_length=1, max_length=160)
     content: str = Field(min_length=1)
@@ -319,6 +347,30 @@ class AgentRunResponse(BaseModel):
     diagnostics: dict[str, Any]
     started_at: datetime
     finished_at: datetime | None
+
+
+class AgentPersonaResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    persona_text: str
+    behavior_policy: dict[str, Any]
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentObservationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    source_event_id: uuid.UUID | None
+    observation_type: str
+    content: str
+    metadata: dict[str, Any]
+    observed_at: datetime
+    consumed_at: datetime | None
+    created_at: datetime
 
 
 class NarrativeArtifactResponse(BaseModel):
@@ -1057,6 +1109,111 @@ def disable_agent_memory(
 
 
 @router.get(
+    "/{world_id}/agents/{agent_id}/persona",
+    response_model=AgentPersonaResponse | None,
+)
+def get_agent_persona(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentPersonaResponse | None:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    persona = AgentPersonaService(db_session).get(context.world_id, agent_id)
+    return None if persona is None else _agent_persona_response(persona)
+
+
+@router.patch(
+    "/{world_id}/agents/{agent_id}/persona",
+    response_model=AgentPersonaResponse,
+)
+def upsert_agent_persona(
+    agent_id: uuid.UUID,
+    persona_update: AgentPersonaUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentPersonaResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return _agent_persona_response(
+        AgentPersonaService(db_session).upsert(
+            AgentPersonaUpsert(
+                world_id=context.world_id,
+                agent_id=agent_id,
+                persona_text=persona_update.persona_text,
+                behavior_policy=persona_update.behavior_policy,
+                is_enabled=persona_update.is_enabled,
+            ),
+        ),
+    )
+
+
+@router.get(
+    "/{world_id}/agents/{agent_id}/observations",
+    response_model=list[AgentObservationResponse],
+)
+def list_agent_observations(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[AgentObservationResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return [
+        _agent_observation_response(observation)
+        for observation in AgentObservationService(db_session).list(
+            context.world_id,
+            agent_id,
+            limit=limit,
+        )
+    ]
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/observations",
+    response_model=AgentObservationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_agent_observation(
+    agent_id: uuid.UUID,
+    observation_create: AgentObservationCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentObservationResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return _agent_observation_response(
+        AgentObservationService(db_session).create(
+            AgentObservationCreate(
+                world_id=context.world_id,
+                agent_id=agent_id,
+                observation_type=observation_create.observation_type,
+                content=observation_create.content,
+                metadata=observation_create.metadata,
+                observed_at=observation_create.observed_at or datetime.now(UTC),
+            ),
+        ),
+    )
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/observations/refresh",
+    response_model=list[AgentObservationResponse],
+)
+def refresh_agent_observations(
+    agent_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[AgentObservationResponse]:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    result = AgentObservationService(db_session).refresh_from_events(context.world_id, agent_id)
+    return [_agent_observation_response(observation) for observation in result.observations]
+
+
+@router.get(
     "/{world_id}/agents/{agent_id}/runs",
     response_model=list[AgentRunResponse],
 )
@@ -1329,6 +1486,14 @@ def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
         started_at=run.started_at,
         finished_at=run.finished_at,
     )
+
+
+def _agent_persona_response(persona: AgentPersonaRecord) -> AgentPersonaResponse:
+    return AgentPersonaResponse(**persona.model_dump())
+
+
+def _agent_observation_response(observation: AgentObservationRecord) -> AgentObservationResponse:
+    return AgentObservationResponse(**observation.model_dump())
 
 
 def _narrative_artifact_response(

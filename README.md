@@ -161,6 +161,11 @@ POST /worlds/{world_id}/agents/{agent_id}/memory/search
 DELETE /worlds/{world_id}/agents/{agent_id}/memory/{memory_id}
 GET /worlds/{world_id}/agents/{agent_id}/runs
 POST /worlds/{world_id}/agents/{agent_id}/run
+GET /worlds/{world_id}/agents/{agent_id}/persona
+PATCH /worlds/{world_id}/agents/{agent_id}/persona
+GET /worlds/{world_id}/agents/{agent_id}/observations
+POST /worlds/{world_id}/agents/{agent_id}/observations
+POST /worlds/{world_id}/agents/{agent_id}/observations/refresh
 GET /worlds/{world_id}/schedule-rules
 POST /worlds/{world_id}/schedule-rules
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
@@ -198,7 +203,7 @@ Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_AP
 
 The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
 
-The protected web dashboard also exposes runtime controls, recent runtime/world diagnostics, provider profiles, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+The protected web dashboard also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
 
 The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, appends agent/runtime events, optionally writes memory items, and optionally creates narrative artifacts.
 
