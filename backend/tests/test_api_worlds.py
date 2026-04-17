@@ -11,6 +11,8 @@ from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
+from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -310,6 +312,47 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert delete_original_admin.status_code == 204
 
 
+def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
+    world_id = _seed_world(engine, owner_id, "replay-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_clock_event(engine, world_id, revision=1)
+
+    _authenticate(client, member_token)
+    replay = client.get(f"/worlds/{world_id}/replay/state")
+    latest_before = client.get(f"/worlds/{world_id}/snapshots/latest")
+    member_create = client.post(f"/worlds/{world_id}/snapshots")
+
+    _authenticate_session_only(client, owner_token)
+    missing_csrf = client.post(f"/worlds/{world_id}/snapshots")
+    _authenticate(client, owner_token)
+    created = client.post(f"/worlds/{world_id}/snapshots")
+    latest_after = client.get(f"/worlds/{world_id}/snapshots/latest")
+    replay_after = client.get(f"/worlds/{world_id}/replay/state")
+
+    _authenticate(client, stranger_token)
+    hidden_replay = client.get(f"/worlds/{world_id}/replay/state")
+
+    assert replay.status_code == 200
+    assert replay.json()["clock"]["revision"] == 1
+    assert replay.json()["applied_event_count"] == 1
+    assert latest_before.status_code == 200
+    assert latest_before.json() is None
+    assert member_create.status_code == 403
+    assert missing_csrf.status_code == 403
+    assert created.status_code == 201
+    assert created.json()["covers_event_sequence"] == 1
+    assert created.json()["schema_version"] == "world_state.v1"
+    assert latest_after.status_code == 200
+    assert latest_after.json()["id"] == created.json()["id"]
+    assert replay_after.json()["source_sequence"] == 2
+    assert hidden_replay.status_code == 404
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -343,6 +386,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, WorldEventModel.__table__),
+        cast(Table, WorldSnapshotModel.__table__),
     ):
         table.create(engine)
 
@@ -456,6 +501,28 @@ def _clock_revision(engine: Engine, world_id: uuid.UUID) -> int:
         return session.scalars(
             select(WorldClockStateModel.revision).where(WorldClockStateModel.world_id == world_id),
         ).one()
+
+
+def _seed_clock_event(engine: Engine, world_id: uuid.UUID, revision: int) -> None:
+    with Session(engine) as session:
+        WorldEventStore(session).append_event(
+            WorldEventAppend(
+                world_id=world_id,
+                event_name=CLOCK_ADVANCED_EVENT_NAME,
+                payload={
+                    "status": "running",
+                    "current_world_time": "2030-01-01T00:00:00+00:00",
+                    "effective_world_time": "2030-01-01T00:00:00+00:00",
+                    "wall_time_anchor": "2026-04-17T12:00:00+00:00",
+                    "speed_multiplier": "1",
+                    "revision": revision,
+                },
+                wall_time=datetime(2026, 4, 17, 12, revision, tzinfo=UTC),
+                world_time=datetime(2030, 1, 1, 0, revision - 1, tzinfo=UTC),
+                actor_ref="system:test",
+            ),
+        )
+        session.commit()
 
 
 def _authenticate(client: TestClient, token: str) -> None:

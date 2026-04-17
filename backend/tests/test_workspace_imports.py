@@ -19,6 +19,7 @@ PACKAGES = [
     "noveland.events.event_store",
     "noveland.events.models",
     "noveland.events.publisher",
+    "noveland.events.replay",
     "noveland.memory",
     "noveland.narrative",
     "noveland.observability",

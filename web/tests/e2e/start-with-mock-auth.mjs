@@ -76,6 +76,8 @@ const clocks = new Map([
     },
   ],
 ]);
+const replaySequences = new Map([[worldOneId, 1]]);
+const snapshots = new Map();
 
 const mockServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
@@ -209,6 +211,7 @@ async function handleWorldCollection(request, response) {
     worlds.push(world);
     memberships.push(membership(randomUUID(), world.id, currentSubject.user_id, "world_admin"));
     clocks.set(world.id, clockForWorld(world.id));
+    replaySequences.set(world.id, 0);
     sendJson(response, 201, world);
     return;
   }
@@ -253,6 +256,14 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "clock") {
     await handleClock(request, response, currentSubject, worldId, segments[3]);
+    return;
+  }
+  if (resource === "replay") {
+    handleReplay(request, response, worldId, segments[3]);
+    return;
+  }
+  if (resource === "snapshots") {
+    await handleSnapshots(request, response, currentSubject, worldId, segments[3]);
     return;
   }
   sendJson(response, 404, { detail: "not found" });
@@ -494,6 +505,49 @@ async function handleClock(request, response, currentSubject, worldId, action) {
   sendJson(response, 200, nextClock);
 }
 
+function handleReplay(request, response, worldId, action) {
+  if (request.method === "GET" && action === "state") {
+    sendJson(response, 200, replayForWorld(worldId));
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+async function handleSnapshots(request, response, currentSubject, worldId, action) {
+  if (request.method === "GET" && action === "latest") {
+    sendJson(response, 200, snapshots.get(worldId) ?? null);
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === undefined) {
+    const replay = replayForWorld(worldId);
+    const snapshot = {
+      id: randomUUID(),
+      world_id: worldId,
+      covers_event_sequence: replay.source_sequence,
+      schema_version: "world_state.v1",
+      status: "valid",
+      payload: replay,
+      payload_uri: null,
+      metadata: { source: "mock" },
+      created_by_event_id: randomUUID(),
+      created_at: new Date().toISOString(),
+    };
+    snapshots.set(worldId, snapshot);
+    replaySequences.set(worldId, replay.source_sequence + 1);
+    sendJson(response, 201, snapshot);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
 function clockForWorld(worldId) {
   const now = new Date().toISOString();
   return {
@@ -504,6 +558,31 @@ function clockForWorld(worldId) {
     wall_time_anchor: null,
     speed_multiplier: "1",
     revision: 0,
+  };
+}
+
+function replayForWorld(worldId) {
+  const sourceSequence = replaySequences.get(worldId) ?? 0;
+  const projectedClock = projectClock(clocks.get(worldId) ?? clockForWorld(worldId));
+  return {
+    world_id: worldId,
+    schema_version: "world_state.v1",
+    source_sequence: sourceSequence,
+    clock:
+      sourceSequence === 0
+        ? null
+        : {
+            status: projectedClock.status,
+            current_world_time: projectedClock.current_world_time,
+            effective_world_time: projectedClock.effective_world_time,
+            wall_time_anchor: projectedClock.wall_time_anchor,
+            speed_multiplier: projectedClock.speed_multiplier,
+            revision: projectedClock.revision,
+            last_event_id: "mock-clock-event",
+            last_event_sequence: sourceSequence,
+          },
+    applied_event_count: sourceSequence === 0 ? 0 : 1,
+    unhandled_event_count: 0,
   };
 }
 

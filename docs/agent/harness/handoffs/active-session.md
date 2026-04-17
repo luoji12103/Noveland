@@ -1,30 +1,33 @@
 # Active Session Handoff
 
 - Date: 2026-04-17T00:00:00Z
-- Branch: feat/runtime-event-nats-baseline
-- Objective: Add finite runtime event emission and NATS broadcast baseline.
+- Branch: feat/replay-snapshot-restore
+- Objective: Add replay state reconstruction, snapshot API, and Web replay/snapshot panel.
 - Completed work:
-  - Fast-forward merged `feat/runtime-clock-service` into `main`.
-  - Created `feat/runtime-event-nats-baseline` from `main`.
-  - Added `noveland.events.publisher` with world event envelopes, in-memory publisher, NATS publisher, and subject helper.
-  - Updated `WorldEventStore` to allocate event and snapshot UUIDs in code and use a SQLAlchemy world-row lock path that remains testable on SQLite.
-  - Added `noveland.services.runtime.clock_tick` for finite runtime ticks over active running world clocks.
-  - Runtime ticks persist clock advancement, append `world.clock_advanced`, commit the canonical event log, and then publish to NATS.
-  - Added tests for runtime clock advancement, skipped paused clocks, NATS envelope shape, and typed publish failure visibility.
-  - Updated README and harness docs for runtime event emission.
+  - Fast-forward merged `feat/runtime-event-nats-baseline` into `main`.
+  - Created `feat/replay-snapshot-restore` from `main`.
+  - Added `noveland.events.replay` with `WorldReplayService`, `WorldReplayState`, and `ClockReplayState`.
+  - Replay restores from the latest valid `world_state.v1` snapshot, applies `world.clock_advanced`, ignores `world.snapshot_created`, and counts unknown event names.
+  - Snapshot creation writes inline JSONB payloads through `WorldEventStore.record_snapshot`.
+  - Added `/worlds/{world_id}/replay/state`, `/worlds/{world_id}/snapshots/latest`, and `/worlds/{world_id}/snapshots`.
+  - Added Web world helpers, dashboard replay/snapshot panel, mock backend support, and E2E coverage.
+  - Updated README and harness docs for replay/snapshot restore.
 - Incomplete work:
-  - Replay/snapshot restore and Web replay/snapshot panel.
-  - Infinite runtime loop, external scheduler, calendar rules, memory backend, agent loop, narrative loop, and plugin execution.
+  - Calendar and schedule rules baseline.
+  - Memory backend and local pgvector schema.
+  - Agent loop, narrative loop, plugin execution, and destructive restore workflows.
+  - Object-storage writes for large snapshot payloads.
 - Tests run:
   - `cd backend && uv run ruff check . && uv run mypy .`
-  - `cd backend && uv run pytest tests/test_runtime_event_emission.py tests/test_event_contracts.py tests/test_workspace_imports.py`
+  - `cd backend && uv run pytest tests/test_replay_snapshot.py tests/test_api_worlds.py tests/test_workspace_imports.py`
+  - `cd web && npm run lint && npm run typecheck && npm run test`
 - Current risks:
-  - NATS publishing is best-effort after the PostgreSQL event commit; publish failures are typed and visible, but there is no outbox/retry worker yet.
-  - Manual clock HTTP controls still do not emit events; only finite runtime ticks emit `world.clock_advanced`.
-  - Runtime host remains finite and must be invoked manually or by future scheduling infrastructure.
+  - Replay currently reconstructs diagnostic state only; it does not overwrite current world or clock tables.
+  - Snapshot payloads are inline JSONB only; object storage integration is still future work.
+  - Replay only applies clock events; future domain events must add explicit replay handlers and regression tests.
 - Recommended next step:
-  - Implement Replay + Snapshot Restore Baseline.
+  - Implement Calendar + Schedule Rules Baseline.
 - Sensitive areas to avoid casual edits:
   - event-and-snapshot model
-  - world-clock semantics
-  - runtime tick boundaries
+  - replay determinism
+  - world-clock event semantics

@@ -150,11 +150,14 @@ POST /worlds/{world_id}/clock/pause
 POST /worlds/{world_id}/clock/resume
 POST /worlds/{world_id}/clock/advance
 POST /worlds/{world_id}/clock/skip
+GET /worlds/{world_id}/replay/state
+GET /worlds/{world_id}/snapshots/latest
+POST /worlds/{world_id}/snapshots
 ```
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
 
-The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, and world clock state according to the current user's backend permissions.
+The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, world clock state, and inline snapshots according to the current user's backend permissions.
 
 The runtime host remains finite: `noveland-runtime` performs one tick, advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. It does not start an infinite loop, schedule agents, or execute plugins.
 

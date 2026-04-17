@@ -22,12 +22,22 @@ from noveland.events.publisher import (
     WorldEventPublisher,
     subject_for_world,
 )
+from noveland.events.replay import (
+    CLOCK_ADVANCED_EVENT_NAME,
+    WORLD_STATE_SCHEMA_VERSION,
+    ClockReplayState,
+    WorldReplayService,
+    WorldReplayState,
+)
 
 PACKAGE_NAME = "events"
 
 __all__ = [
     "PACKAGE_NAME",
     "SNAPSHOT_EVENT_NAME",
+    "CLOCK_ADVANCED_EVENT_NAME",
+    "WORLD_STATE_SCHEMA_VERSION",
+    "ClockReplayState",
     "EventAppendError",
     "EventPublishError",
     "EventStoreError",
@@ -41,6 +51,8 @@ __all__ = [
     "WorldEventPublisher",
     "WorldEventRecord",
     "WorldEventStore",
+    "WorldReplayService",
+    "WorldReplayState",
     "WorldSnapshotCreate",
     "WorldSnapshotRecord",
     "WorldSnapshotStatus",

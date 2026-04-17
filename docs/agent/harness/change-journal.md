@@ -164,3 +164,14 @@
 - Tests added/updated: runtime tick tests for running/paused clocks, event log append behavior, in-memory publisher envelopes, publish failure visibility, and workspace import coverage
 - Docs updated: README, event/snapshot model, world clock architecture, project index, file inventory, task board, active handoff
 - Follow-up notes: replay/snapshot restore, infinite runtime loop, external scheduler, agent loop, calendar rules, memory backend, and plugin execution remain separate tasks.
+
+## Replay and snapshot restore baseline entry
+
+- Date: 2026-04-17
+- Branch: feat/replay-snapshot-restore
+- Scope: replay and snapshot restore baseline
+- Summary: Added `world_state.v1` replay reconstruction, inline snapshot creation, replay/snapshot HTTP endpoints, and a Web dashboard replay/snapshot panel.
+- Files changed: `/backend/packages/events/**`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/**`, `/web/features/dashboard/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: replay service tests for empty state, latest snapshot plus incremental events, snapshot creation; API tests for replay/snapshot auth and CSRF; Web client/component/E2E coverage for replay and snapshots
+- Docs updated: README, event/snapshot model, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: destructive restore, object-storage snapshot payload writes, calendar rules, memory backend, agent loop, narrative behavior, and plugin execution remain separate tasks.

@@ -44,7 +44,7 @@
 - `world_clock_states` stores world-owned operational clock state, with one current state row per world.
 - `world_clock_transitions` stores world-owned operational audit records for clock state changes.
 - `world_events` stores the append-only world event stream.
-- `world_snapshots` stores world-owned snapshot metadata and payload references.
+- `world_snapshots` stores world-owned snapshot metadata, inline diagnostic payloads, and future object-storage payload references.
 - Plugin registry data, calendars, memory vectors, and narrative artifacts are intentionally deferred to separate migrations.
 
 ## Ownership rules

@@ -16,8 +16,8 @@ export const systemStatuses: SystemStatus[] = [
   },
   {
     label: "Runtime",
-    value: "Host skeleton ready",
-    detail: "The worker entrypoint starts without running a world loop.",
+    value: "Finite tick ready",
+    detail: "The worker advances running clocks once and broadcasts world events.",
     tone: "ready",
   },
   {
@@ -28,8 +28,8 @@ export const systemStatuses: SystemStatus[] = [
   },
   {
     label: "Worlds",
-    value: "Domain logic pending",
-    detail: "Clock, replay, auth, plugins, and schema work stay in their own tasks.",
-    tone: "waiting",
+    value: "Management console ready",
+    detail: "Worlds, clocks, replay state, and snapshots are available to authorized users.",
+    tone: "ready",
   },
 ];

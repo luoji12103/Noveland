@@ -6,12 +6,12 @@ import { StatusCards } from "@/features/dashboard/status-cards";
 import { systemStatuses } from "@/lib/status";
 
 describe("StatusCards", () => {
-  it("renders the initial runnable skeleton statuses", () => {
+  it("renders current system statuses", () => {
     render(createElement(StatusCards, { statuses: systemStatuses }));
 
     expect(screen.getByText("API")).toBeInTheDocument();
     expect(screen.getByText("Health endpoint ready")).toBeInTheDocument();
     expect(screen.getByText("Worlds")).toBeInTheDocument();
-    expect(screen.getByText("Domain logic pending")).toBeInTheDocument();
+    expect(screen.getByText("Management console ready")).toBeInTheDocument();
   });
 });

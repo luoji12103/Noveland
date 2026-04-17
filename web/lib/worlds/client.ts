@@ -13,6 +13,8 @@ import type {
   WorldCreateInput,
   WorldClock,
   WorldRole,
+  WorldReplayState,
+  WorldSnapshot,
   WorldUpdateInput,
 } from "@/lib/worlds/types";
 
@@ -89,6 +91,25 @@ export function skipWorldClock(
   return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/skip`, {
     method: "POST",
     body: { target_world_time, ...(reason === undefined ? {} : { reason }) },
+    csrf: true,
+  });
+}
+
+export function getReplayState(worldId: string): Promise<WorldReplayState> {
+  return worldRequest<WorldReplayState>(`/api/worlds/${worldId}/replay/state`, {
+    method: "GET",
+  });
+}
+
+export function getLatestSnapshot(worldId: string): Promise<WorldSnapshot | null> {
+  return worldRequest<WorldSnapshot | null>(`/api/worlds/${worldId}/snapshots/latest`, {
+    method: "GET",
+  });
+}
+
+export function createSnapshot(worldId: string): Promise<WorldSnapshot> {
+  return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots`, {
+    method: "POST",
     csrf: true,
   });
 }

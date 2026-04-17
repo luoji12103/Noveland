@@ -25,6 +25,8 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("button", { name: "Save world" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "World clock" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Resume clock" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Replay and snapshots" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create snapshot" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create scene" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create agent" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
@@ -36,6 +38,7 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByText("Read-only world access.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save world" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resume clock" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create snapshot" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
   });
 });
@@ -61,6 +64,8 @@ const emptyData: WorldDashboardData = {
   agents: [],
   memberships: [],
   clock: null,
+  replayState: null,
+  latestSnapshot: null,
   canManageSelectedWorld: false,
   loadError: null,
 };
@@ -103,6 +108,15 @@ const adminData: WorldDashboardData = {
     speed_multiplier: "1",
     revision: 0,
   },
+  replayState: {
+    world_id: "world-1",
+    schema_version: "world_state.v1",
+    source_sequence: 0,
+    clock: null,
+    applied_event_count: 0,
+    unhandled_event_count: 0,
+  },
+  latestSnapshot: null,
   canManageSelectedWorld: true,
   loadError: null,
 };
@@ -130,6 +144,35 @@ const readOnlyData: WorldDashboardData = {
     wall_time_anchor: "2026-04-17T00:00:00.000Z",
     speed_multiplier: "1",
     revision: 1,
+  },
+  replayState: {
+    world_id: "world-1",
+    schema_version: "world_state.v1",
+    source_sequence: 1,
+    clock: {
+      status: "running",
+      current_world_time: "2026-04-17T00:01:00.000Z",
+      effective_world_time: "2026-04-17T00:01:00.000Z",
+      wall_time_anchor: "2026-04-17T00:00:00.000Z",
+      speed_multiplier: "1",
+      revision: 1,
+      last_event_id: "event-1",
+      last_event_sequence: 1,
+    },
+    applied_event_count: 1,
+    unhandled_event_count: 0,
+  },
+  latestSnapshot: {
+    id: "snapshot-1",
+    world_id: "world-1",
+    covers_event_sequence: 1,
+    schema_version: "world_state.v1",
+    status: "valid",
+    payload: {},
+    payload_uri: null,
+    metadata: {},
+    created_by_event_id: "event-2",
+    created_at: "2026-04-17T00:02:00.000Z",
   },
   canManageSelectedWorld: false,
   loadError: null,

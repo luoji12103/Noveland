@@ -7,6 +7,7 @@ import type { AuthSubject } from "@/lib/auth/types";
 import {
   createAgent,
   createScene,
+  createSnapshot,
   createWorld,
   deactivateAgent,
   deactivateScene,
@@ -14,6 +15,8 @@ import {
   deleteMembership,
   advanceWorldClock,
   getWorldClock,
+  getLatestSnapshot,
+  getReplayState,
   listAgents,
   listMemberCandidates,
   listMemberships,
@@ -36,7 +39,9 @@ import type {
   World,
   WorldClock,
   WorldDashboardData,
+  WorldReplayState,
   WorldRole,
+  WorldSnapshot,
 } from "@/lib/worlds/types";
 
 type WorldManagementDashboardProps = {
@@ -55,6 +60,8 @@ export function WorldManagementDashboard({
   const [agents, setAgents] = useState(initialData.agents);
   const [memberships, setMemberships] = useState(initialData.memberships);
   const [clock, setClock] = useState(initialData.clock);
+  const [replayState, setReplayState] = useState(initialData.replayState);
+  const [latestSnapshot, setLatestSnapshot] = useState(initialData.latestSnapshot);
   const [canManageSelectedWorld, setCanManageSelectedWorld] = useState(
     initialData.canManageSelectedWorld,
   );
@@ -79,17 +86,28 @@ export function WorldManagementDashboard({
 
   async function loadWorld(worldId: string) {
     await runAction(async () => {
-      const [nextScenes, nextAgents, nextMemberships, nextClock] = await Promise.all([
+      const [
+        nextScenes,
+        nextAgents,
+        nextMemberships,
+        nextClock,
+        nextReplayState,
+        nextLatestSnapshot,
+      ] = await Promise.all([
         listScenes(worldId),
         listAgents(worldId),
         listMembershipsIfAllowed(worldId),
         getWorldClock(worldId),
+        getReplayState(worldId),
+        getLatestSnapshot(worldId),
       ]);
       setSelectedWorldId(worldId);
       setScenes(nextScenes);
       setAgents(nextAgents);
       setMemberships(nextMemberships ?? []);
       setClock(nextClock);
+      setReplayState(nextReplayState);
+      setLatestSnapshot(nextLatestSnapshot);
       setCanManageSelectedWorld(nextMemberships !== null);
       setMemberCandidates([]);
     });
@@ -117,6 +135,15 @@ export function WorldManagementDashboard({
       setScenes([]);
       setAgents([]);
       setClock(nextClock);
+      setReplayState({
+        world_id: world.id,
+        schema_version: "world_state.v1",
+        source_sequence: 0,
+        clock: null,
+        applied_event_count: 0,
+        unhandled_event_count: 0,
+      });
+      setLatestSnapshot(null);
       setMemberships([
         {
           id: "local-owner",
@@ -227,6 +254,32 @@ export function WorldManagementDashboard({
         ),
       );
     }, "Clock skipped.");
+  }
+
+  async function handleRefreshReplay() {
+    if (selectedWorld === null) {
+      return;
+    }
+    await runAction(async () => {
+      const [nextReplayState, nextLatestSnapshot] = await Promise.all([
+        getReplayState(selectedWorld.id),
+        getLatestSnapshot(selectedWorld.id),
+      ]);
+      setReplayState(nextReplayState);
+      setLatestSnapshot(nextLatestSnapshot);
+    }, "Replay state refreshed.");
+  }
+
+  async function handleCreateSnapshot() {
+    if (selectedWorld === null) {
+      return;
+    }
+    await runAction(async () => {
+      const snapshot = await createSnapshot(selectedWorld.id);
+      const nextReplayState = await getReplayState(selectedWorld.id);
+      setLatestSnapshot(snapshot);
+      setReplayState(nextReplayState);
+    }, "Snapshot created.");
   }
 
   async function handleCreateScene(event: FormEvent<HTMLFormElement>) {
@@ -408,6 +461,10 @@ export function WorldManagementDashboard({
         <Metric label="Worlds" value={`${worlds.length} visible`} />
         <Metric label="Scenes" value={selectedWorld === null ? "No world" : `${scenes.length} listed`} />
         <Metric label="Agents" value={selectedWorld === null ? "No world" : `${agents.length} listed`} />
+        <Metric
+          label="Replay"
+          value={replayState === null ? "No state" : `seq ${replayState.source_sequence}`}
+        />
       </div>
 
       <div className="world-toolbar">
@@ -493,6 +550,15 @@ export function WorldManagementDashboard({
             onResume={handleResumeClock}
             onAdvance={handleAdvanceClock}
             onSkip={handleSkipClock}
+          />
+
+          <ReplayPanel
+            replayState={replayState}
+            latestSnapshot={latestSnapshot}
+            canManage={canManage}
+            isBusy={isBusy}
+            onRefresh={handleRefreshReplay}
+            onCreateSnapshot={handleCreateSnapshot}
           />
 
           <section className="management-columns">
@@ -779,6 +845,76 @@ function ClockPanel({
           </form>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function ReplayPanel({
+  replayState,
+  latestSnapshot,
+  canManage,
+  isBusy,
+  onRefresh,
+  onCreateSnapshot,
+}: {
+  replayState: WorldReplayState | null;
+  latestSnapshot: WorldSnapshot | null;
+  canManage: boolean;
+  isBusy: boolean;
+  onRefresh: () => void | Promise<void>;
+  onCreateSnapshot: () => void | Promise<void>;
+}) {
+  return (
+    <section className="management-panel" aria-label="Replay and snapshots">
+      <h2 className="section-title">Replay and snapshots</h2>
+      {replayState === null ? (
+        <p className="status-detail">Replay state is not available.</p>
+      ) : (
+        <>
+          <div className="clock-grid">
+            <Metric label="Source sequence" value={String(replayState.source_sequence)} />
+            <Metric label="Applied events" value={String(replayState.applied_event_count)} />
+            <Metric label="Unhandled events" value={String(replayState.unhandled_event_count)} />
+          </div>
+          <p className="status-detail">
+            Schema {replayState.schema_version}
+          </p>
+          <p className="status-detail">
+            Clock{" "}
+            {replayState.clock === null
+              ? "No clock events"
+              : `${replayState.clock.status} revision ${replayState.clock.revision ?? "unknown"}`}
+          </p>
+        </>
+      )}
+      {latestSnapshot === null ? (
+        <p className="status-detail">No valid snapshot yet.</p>
+      ) : (
+        <p className="status-detail">
+          Latest snapshot covers sequence {latestSnapshot.covers_event_sequence} as{" "}
+          {latestSnapshot.schema_version} ({latestSnapshot.status})
+        </p>
+      )}
+      <div className="button-row">
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={isBusy}
+          onClick={() => void onRefresh()}
+        >
+          Refresh replay
+        </button>
+        {canManage ? (
+          <button
+            className="primary-button"
+            type="button"
+            disabled={isBusy}
+            onClick={() => void onCreateSnapshot()}
+          >
+            Create snapshot
+          </button>
+        ) : null}
+      </div>
     </section>
   );
 }

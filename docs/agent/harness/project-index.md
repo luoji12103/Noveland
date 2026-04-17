@@ -26,7 +26,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.worlds` — initial worlds, scenes, memberships, and agents management router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, clock, replay, and snapshot management router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
 - `backend/pyproject.toml` — backend uv workspace manifest
@@ -48,6 +48,7 @@ Fast orientation for a new coding session.
   - `noveland.events.models` — world event log and snapshot metadata ORM models
   - `noveland.events.event_store` — minimal world event append/list/snapshot helper
   - `noveland.events.publisher` — world event envelope and NATS/in-memory publisher interfaces
+  - `noveland.events.replay` — replay state reconstruction and inline snapshot creation service
 - `backend/packages/auth/`
   - `noveland.auth` — auth/session contracts, services, and typed errors
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models

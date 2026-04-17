@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from noveland.agents.models import Agent
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
+from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -160,6 +161,19 @@ class WorldClockResponse(BaseModel):
     wall_time_anchor: datetime | None
     speed_multiplier: str
     revision: int
+
+
+class WorldSnapshotResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    covers_event_sequence: int
+    schema_version: str
+    status: str
+    payload: dict[str, Any] | None
+    payload_uri: str | None
+    metadata: dict[str, Any]
+    created_by_event_id: uuid.UUID
+    created_at: datetime
 
 
 @router.get("", response_model=list[WorldResponse])
@@ -343,6 +357,46 @@ def skip_clock_endpoint(
         )
     except WorldClockError as exc:
         raise _clock_conflict(exc) from exc
+
+
+@router.get("/{world_id}/replay/state", response_model=WorldReplayState)
+def replay_state(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldReplayState:
+    _world_or_404(db_session, context.world_id)
+    return WorldReplayService(db_session).replay_state(context.world_id)
+
+
+@router.get("/{world_id}/snapshots/latest", response_model=WorldSnapshotResponse | None)
+def latest_snapshot(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldSnapshotResponse | None:
+    _world_or_404(db_session, context.world_id)
+    snapshot = WorldReplayService(db_session).latest_snapshot(context.world_id)
+    if snapshot is None:
+        return None
+    return _snapshot_response(snapshot)
+
+
+@router.post(
+    "/{world_id}/snapshots",
+    response_model=WorldSnapshotResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_snapshot(
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldSnapshotResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    snapshot = WorldReplayService(db_session).create_snapshot(
+        context.world_id,
+        actor_ref=_actor_ref(context.subject),
+    )
+    return _snapshot_response(snapshot)
 
 
 @router.get("/{world_id}/scenes", response_model=list[SceneResponse])
@@ -656,6 +710,21 @@ def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
         wall_time_anchor=state.wall_time_anchor,
         speed_multiplier=str(state.speed_multiplier),
         revision=state.revision,
+    )
+
+
+def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
+    return WorldSnapshotResponse(
+        id=snapshot.id,
+        world_id=snapshot.world_id,
+        covers_event_sequence=snapshot.covers_event_sequence,
+        schema_version=snapshot.schema_version,
+        status=snapshot.status.value,
+        payload=snapshot.payload,
+        payload_uri=snapshot.payload_uri,
+        metadata=snapshot.metadata,
+        created_by_event_id=snapshot.created_by_event_id,
+        created_at=snapshot.created_at,
     )
 
 

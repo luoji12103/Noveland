@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createSnapshot,
   createWorld,
   deactivateScene,
+  getLatestSnapshot,
+  getReplayState,
   pauseWorldClock,
   resumeWorldClock,
   skipWorldClock,
@@ -86,6 +89,27 @@ describe("world client", () => {
       JSON.stringify({ speed_multiplier: "2", reason: "go" }),
     );
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/clock/skip");
+  });
+
+  it("maps replay and snapshot requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ source_sequence: 3 }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot-1" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getReplayState("world-1");
+    await getLatestSnapshot("world-1");
+    await createSnapshot("world-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/replay/state");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/snapshots/latest");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/snapshots");
+    expect((fetchMock.mock.calls[2][1].headers as Headers).get("X-CSRF-Token")).toBe(
+      "csrf-token",
+    );
   });
 
   it("raises typed world client errors", async () => {

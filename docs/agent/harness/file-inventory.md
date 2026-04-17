@@ -52,6 +52,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/events/src/noveland/events/event_store.py`
 - `backend/packages/events/src/noveland/events/models.py`
 - `backend/packages/events/src/noveland/events/publisher.py`
+- `backend/packages/events/src/noveland/events/replay.py`
 - `backend/packages/memory/`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`

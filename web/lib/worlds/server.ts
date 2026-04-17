@@ -8,6 +8,8 @@ import type {
   World,
   WorldClock,
   WorldDashboardData,
+  WorldReplayState,
+  WorldSnapshot,
 } from "@/lib/worlds/types";
 
 export async function getWorldDashboardData(
@@ -21,11 +23,13 @@ export async function getWorldDashboardData(
       return emptyDashboardData(worlds, null, null);
     }
 
-    const [scenes, agents, memberships, clock] = await Promise.all([
+    const [scenes, agents, memberships, clock, replayState, latestSnapshot] = await Promise.all([
       apiFetch<Scene[]>(`/worlds/${selectedWorld.id}/scenes`, cookieHeader),
       apiFetch<Agent[]>(`/worlds/${selectedWorld.id}/agents`, cookieHeader),
       apiFetchOptional<Membership[]>(`/worlds/${selectedWorld.id}/memberships`, cookieHeader),
       apiFetch<WorldClock>(`/worlds/${selectedWorld.id}/clock`, cookieHeader),
+      apiFetch<WorldReplayState>(`/worlds/${selectedWorld.id}/replay/state`, cookieHeader),
+      apiFetch<WorldSnapshot | null>(`/worlds/${selectedWorld.id}/snapshots/latest`, cookieHeader),
     ]);
 
     return {
@@ -35,6 +39,8 @@ export async function getWorldDashboardData(
       agents,
       memberships: memberships ?? [],
       clock,
+      replayState,
+      latestSnapshot,
       canManageSelectedWorld: memberships !== null,
       loadError: null,
     };
@@ -106,6 +112,8 @@ function emptyDashboardData(
     agents: [],
     memberships: [],
     clock: null,
+    replayState: null,
+    latestSnapshot: null,
     canManageSelectedWorld: false,
     loadError,
   };

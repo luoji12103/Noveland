@@ -31,6 +31,10 @@ Current materialized state is derived.
 - `noveland.events.publisher` defines world event envelopes, an in-memory test publisher, and a NATS publisher.
 - Runtime ticks append `world.clock_advanced` events for running clocks and publish them to `noveland.world.{world_id}.events`.
 - PostgreSQL remains canonical; NATS is only the broadcast layer.
+- `noveland.events.WorldReplayService` reconstructs a diagnostic `world_state.v1` view from the latest valid snapshot plus incremental events.
+- Replay currently understands `world.clock_advanced`, ignores `world.snapshot_created`, and counts unknown event names as unhandled instead of failing.
+- The API exposes replay state, latest valid snapshot, and admin-only inline snapshot creation under `/worlds/{world_id}`.
+- The Web dashboard includes a replay/snapshot panel for the selected world.
 
 ## Recovery model
 
@@ -48,4 +52,4 @@ Current materialized state is derived.
 
 Do not implement fake replay by reconstructing from ad hoc chat logs.
 
-The current baseline intentionally does not implement replay execution, infinite runtime loops, scheduler integration, agent behavior, permission-policy expansion, UI replay controls, or narrative-specific event semantics.
+The current baseline intentionally does not implement destructive restore, infinite runtime loops, scheduler integration, agent behavior, permission-policy expansion, object-storage snapshot writes, or narrative-specific event semantics.

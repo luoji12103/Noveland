@@ -27,9 +27,9 @@
 - Add world dashboard data
 - Add runtime clock service
 - Runtime Event Emission + NATS Baseline
+- Replay + Snapshot Restore Baseline
 
 ## Upcoming Mainline
-- Replay + Snapshot Restore Baseline
 - Calendar + Schedule Rules Baseline
 - Memory Backend + Local pgvector Baseline
 - Agent Loop + Narrative Baseline
