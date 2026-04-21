@@ -1,6 +1,6 @@
 # Noveland
 
-Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a minimal backend API, auth/session baseline, protected world management dashboard, runtime host, and local infrastructure.
+Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a backend API, auth/session baseline, world-first Web workspace, multi-agent conversation substrate, conversation-first narrative writer pipeline, a dedicated reader surface, runtime host, and local infrastructure.
 
 ## Current Status
 
@@ -102,7 +102,7 @@ Run the web app from `web/`:
 npm run dev
 ```
 
-Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account.
+Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Successful sign-in lands on `/worlds`.
 
 ## 人工确认步骤
 
@@ -134,11 +134,13 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account.
    uv run noveland-runtime --daemon
    ```
 4. 打开 `http://127.0.0.1:3000/login`，用刚刚 seed 的管理员账号登录。
-5. 在 dashboard 中确认以下操作可用：
+5. 在 Web workspace 中确认以下操作可用：
    - 创建 world，确认 world clock 已初始化
    - 创建 scene 和 agent
+   - 在 agent builder 中设置 default provider、persona、observation、calendar 和 memory
+   - 创建 conversation，添加 participants，seed transcript，手动 advance 一轮
+   - 创建 auto dialogue conversation，Start 后由 `noveland-runtime --daemon` 逐轮推进
    - 创建 provider profile，并执行 `Test provider`
-   - 给 agent 设置 persona，手动添加 observation，并执行 refresh
    - 手动运行 agent，确认 run、memory、narrative artifact、diagnostics 有更新
    - 启动 runtime，确认 runtime status 和 diagnostics 有变化
 6. 如需验证 API 面，额外确认：
@@ -174,11 +176,16 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account.
    - `web/`: `npm run dev`
    - `backend/`: `uv run noveland-runtime --daemon`
 6. 登录后的一般操作顺序：
-   - 先创建或选择 world
-   - 再配置 scenes、agents、memberships
-   - 配置 provider profile，并先做 `Test provider`
-   - 给 agent 设置 persona 和 observations
-   - 通过 manual run 或启动 runtime 观察 agent 行为
+   - 先在 `/worlds` 创建或选择 world
+   - 在 `/worlds/{worldId}` 配置 scenes、memberships、clock、schedule rules、replay/snapshots
+   - 在 `/worlds/{worldId}/agents` 创建 agent
+   - 在 `/worlds/{worldId}/agents/{agentId}` 设置 scene、default provider、persona、observations、calendar、memory，并可手动 run
+   - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session，并配置 writer 行为
+   - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume，并可生成 summary / chapter
+   - 在 `/worlds/{worldId}/narrative` 查看 narrative artifacts
+   - 在 `/worlds/{worldId}/reader` 以只读方式阅读 summary / chapter，并跳回 source conversation
+   - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
+   - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
    ```sh
    # backend/
@@ -266,6 +273,7 @@ POST /worlds/{world_id}/schedule-rules
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
 DELETE /worlds/{world_id}/schedule-rules/{rule_id}
 GET /worlds/{world_id}/narrative-artifacts
+GET /worlds/{world_id}/narrative-artifacts/{artifact_id}
 POST /worlds/{world_id}/narrative-artifacts
 GET /worlds/{world_id}/clock
 POST /worlds/{world_id}/clock/pause
@@ -276,6 +284,20 @@ GET /worlds/{world_id}/replay/state
 GET /worlds/{world_id}/snapshots/latest
 POST /worlds/{world_id}/snapshots
 GET /worlds/{world_id}/diagnostics
+GET /worlds/{world_id}/conversations
+POST /worlds/{world_id}/conversations
+GET /worlds/{world_id}/conversations/{conversation_id}
+PATCH /worlds/{world_id}/conversations/{conversation_id}
+GET /worlds/{world_id}/conversations/{conversation_id}/participants
+PUT /worlds/{world_id}/conversations/{conversation_id}/participants
+GET /worlds/{world_id}/conversations/{conversation_id}/turns
+POST /worlds/{world_id}/conversations/{conversation_id}/seed
+POST /worlds/{world_id}/conversations/{conversation_id}/advance
+POST /worlds/{world_id}/conversations/{conversation_id}/start
+POST /worlds/{world_id}/conversations/{conversation_id}/pause
+POST /worlds/{world_id}/conversations/{conversation_id}/resume
+GET /worlds/{world_id}/conversations/{conversation_id}/narrative
+POST /worlds/{world_id}/conversations/{conversation_id}/narrative/generate
 ```
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
@@ -296,11 +318,13 @@ DELETE /provider-profiles/{profile_id}
 
 Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material.
 
-The protected web dashboard reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, and inline snapshots according to the current user's backend permissions.
+The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 
-The protected web dashboard also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+The Web workspace is split into `/worlds`, `/worlds/{worldId}`, `/worlds/{worldId}/agents`, `/worlds/{worldId}/agents/{agentId}`, `/worlds/{worldId}/conversations`, `/worlds/{worldId}/conversations/{conversationId}`, `/worlds/{worldId}/narrative`, `/worlds/{worldId}/reader`, `/worlds/{worldId}/reader/{artifactId}`, `/admin/providers`, and `/admin/runtime`.
 
-The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, appends agent/runtime events, optionally writes memory items, and optionally creates narrative artifacts.
+The protected Web workspace also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, conversation transcript controls, per-session writer configuration, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+
+The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, advances running auto-dialogue conversations one turn per loop, appends agent/runtime/conversation events, optionally writes memory items, and optionally creates narrative artifacts.
 
 ## Development Rules
 

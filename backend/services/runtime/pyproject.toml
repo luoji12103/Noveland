@@ -11,6 +11,7 @@ dependencies = [
   "noveland-adapters",
   "noveland-agents",
   "noveland-calendar",
+  "noveland-conversations",
   "noveland-core",
   "noveland-events",
   "noveland-memory",
@@ -28,6 +29,7 @@ noveland-runtime = "noveland.services.runtime.main:main"
 noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
 noveland-calendar = { workspace = true }
+noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
 noveland-memory = { workspace = true }

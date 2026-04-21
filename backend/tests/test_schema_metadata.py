@@ -25,6 +25,11 @@ def index_names(table_name: str) -> set[str]:
     }
 
 
+def column_names(table_name: str) -> set[str]:
+    table = Base.metadata.tables[table_name]
+    return {column.name for column in table.columns}
+
+
 def foreign_key_targets(table_name: str) -> set[str]:
     table = Base.metadata.tables[table_name]
     targets: set[str] = set()
@@ -44,6 +49,9 @@ def test_core_schema_tables_are_registered() -> None:
         "agent_calendar_entries",
         "agent_memory_items",
         "auth_sessions",
+        "conversation_participants",
+        "conversation_sessions",
+        "conversation_turns",
         "platform_settings",
         "platform_role_assignments",
         "provider_profiles",
@@ -103,6 +111,22 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_world_events_world_sequence" in constraint_names(
         "world_events",
+        UniqueConstraint,
+    )
+    assert "uq_conversation_sessions_world_session_key" in constraint_names(
+        "conversation_sessions",
+        UniqueConstraint,
+    )
+    assert "uq_conversation_participants_session_agent" in constraint_names(
+        "conversation_participants",
+        UniqueConstraint,
+    )
+    assert "uq_conversation_participants_session_turn_order" in constraint_names(
+        "conversation_participants",
+        UniqueConstraint,
+    )
+    assert "uq_conversation_turns_session_turn_index" in constraint_names(
+        "conversation_turns",
         UniqueConstraint,
     )
     assert "uq_provider_profiles_profile_key" in constraint_names(
@@ -182,6 +206,34 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "world_schedule_rules",
         CheckConstraint,
     )
+    assert "ck_conversation_sessions_scope_type" in constraint_names(
+        "conversation_sessions",
+        CheckConstraint,
+    )
+    assert "ck_conversation_sessions_mode" in constraint_names(
+        "conversation_sessions",
+        CheckConstraint,
+    )
+    assert "ck_conversation_sessions_status" in constraint_names(
+        "conversation_sessions",
+        CheckConstraint,
+    )
+    assert "ck_conversation_sessions_terminal_reason" in constraint_names(
+        "conversation_sessions",
+        CheckConstraint,
+    )
+    assert "ck_conversation_participants_turn_order_non_negative" in constraint_names(
+        "conversation_participants",
+        CheckConstraint,
+    )
+    assert "ck_conversation_turns_speaker_kind" in constraint_names(
+        "conversation_turns",
+        CheckConstraint,
+    )
+    assert "ck_conversation_turns_status" in constraint_names(
+        "conversation_turns",
+        CheckConstraint,
+    )
     assert "ck_agent_memory_items_visibility" in constraint_names(
         "agent_memory_items",
         CheckConstraint,
@@ -254,6 +306,16 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
     assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
     assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("conversation_sessions") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("conversation_participants") == {
+        "agents.id",
+        "conversation_sessions.id",
+    }
+    assert foreign_key_targets("conversation_turns") == {
+        "agent_runtime_runs.id",
+        "agents.id",
+        "conversation_sessions.id",
+    }
     assert foreign_key_targets("agent_calendar_entries") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("world_schedule_rules") == {"worlds.id"}
     assert foreign_key_targets("agent_memory_items") == {
@@ -272,6 +334,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worlds.id",
     }
     assert foreign_key_targets("narrative_artifacts") == {
+        "conversation_sessions.id",
         "agent_runtime_runs.id",
         "agents.id",
         "worlds.id",
@@ -305,6 +368,14 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_events_world_sequence" in index_names("world_events")
     assert "ix_world_events_world_event_name" in index_names("world_events")
     assert "ix_world_events_world_wall_time" in index_names("world_events")
+    assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
+    assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
+    assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")
+    assert "ix_conversation_participants_session_id" in index_names("conversation_participants")
+    assert "ix_conversation_participants_agent_id" in index_names("conversation_participants")
+    assert "ix_conversation_turns_session_id" in index_names("conversation_turns")
+    assert "ix_conversation_turns_speaker_agent_id" in index_names("conversation_turns")
+    assert "ix_conversation_turns_run_id" in index_names("conversation_turns")
     assert "ix_world_snapshots_world_sequence" in index_names("world_snapshots")
     assert "ix_world_snapshots_world_latest_valid" in index_names("world_snapshots")
     assert "ix_agent_calendar_entries_world_agent_starts" in index_names(
@@ -322,6 +393,9 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")
+    assert "ix_narrative_artifacts_world_conversation_created_at" in index_names(
+        "narrative_artifacts",
+    )
     assert "ix_runtime_diagnostic_events_occurred_at" in index_names(
         "runtime_diagnostic_events",
     )
@@ -334,3 +408,13 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_runtime_diagnostic_events_agent_occurred_at" in index_names(
         "runtime_diagnostic_events",
     )
+
+
+def test_conversation_schema_includes_policy_and_terminal_columns() -> None:
+    assert {"policy_config", "writer_config", "terminal_reason"} <= column_names(
+        "conversation_sessions",
+    )
+
+
+def test_narrative_schema_includes_conversation_source_column() -> None:
+    assert {"source_conversation_id"} <= column_names("narrative_artifacts")

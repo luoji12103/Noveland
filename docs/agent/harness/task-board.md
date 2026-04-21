@@ -34,6 +34,10 @@
 - Runtime Observability + Diagnostics
 - Provider Reliability Hardening
 - Agent Observation + Persona Policy Baseline
+- Conversation Workspace Baseline
+- Conversation Policies + Stop Conditions
+- Narrative Writer / Summarizer Pipeline
+- Dedicated Narrative Reader Surface
 
 ## Upcoming Mainline
-- None selected; next mainline scope needs confirmation.
+- None selected

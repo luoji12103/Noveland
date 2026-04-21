@@ -1,35 +1,34 @@
 # Active Session Handoff
 
-- Date: 2026-04-17T00:00:00Z
-- Branch: feat/agent-observation-persona
-- Objective: Add agent persona policy, filtered observations, runtime prompt context convergence, API endpoints, and Web controls.
+- Date: 2026-04-21T00:00:00Z
+- Branch: feat/narrative-reader-surface
+- Objective: Add a dedicated, read-only narrative reader for authenticated world members on top of the conversation-first writer pipeline.
 - Completed work:
-  - Merged `feat/provider-reliability-hardening` into `main` after full backend/Web regression.
-  - Created `feat/agent-observation-persona` from `main`.
-  - Added migration `20260417_0010_agent_observation_persona.py` for `agent_personas` and `agent_observations`.
-  - Added `noveland.agents.contracts` and `noveland.agents.services` for persona upsert, observation list/create/refresh, and consume marking.
-  - Added filtered observation refresh from stable world events: clock, calendar due, agent run, memory, and narrative events.
-  - Updated runtime agent invocation to refresh observations before provider calls and include persona/policy/filtered observations in prompt context.
-  - Added world-admin `GET/PATCH persona`, `GET/POST observations`, and `POST observations/refresh` APIs.
-  - Added Web types, client helpers, server loading, dashboard persona editor, observation list, manual observation creation, and refresh action.
-  - Added backend and Web tests for service, API, runtime, schema, imports, clients, components, and mock E2E flows.
+  - Extended world narrative APIs with optional `artifact_kind`, `source_conversation_id`, and `limit` filters, plus artifact detail lookup by id.
+  - Added reader-specific server loaders and world-reader routes at `/worlds/[worldId]/reader` and `/worlds/[worldId]/reader/[artifactId]`.
+  - Added read-only reader UI for filtered artifact browsing, detail rendering, and source-conversation linking.
+  - Updated workspace navigation and world overview shortcuts to expose the dedicated reader surface.
+  - Added backend/API, client, component, and mock-backend E2E coverage for reader access and rendering.
 - Incomplete work:
-  - Final full regression, commit, and branch handoff are next.
-  - This stage intentionally stops on `feat/agent-observation-persona`; it is not merged to `main` yet.
+  - Commit is still pending on this branch.
+  - Branch remains intentionally unmerged; the plan for this round stops on `feat/narrative-reader-surface`.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - Targeted backend pytest for agent observations, API world persona/observations, runtime daemon, schema metadata, and workspace imports
+  - `cd backend && uv run pytest`
+  - `docker compose -f infra/compose.yaml config`
+  - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
-  - Full `cd backend && uv run pytest`, Web lint/build/e2e, and Compose config remain to rerun after docs sync.
+  - `cd web && npm run test:e2e`
+  - `cd web && npm run build`
 - Current risks:
-  - Observations are derived operational records, not canonical events; event log semantics must stay unchanged.
-  - Runtime prompt context should remain filtered and must not pull arbitrary world tables or other agents' private memory.
-  - Web persona controls are world-admin only in this baseline; no public reader or end-user persona UI exists.
+  - Reader remains server-rendered and read-only; there is no full-text search, paging, or live update stream yet.
+  - Artifact detail lookup depends on existing world-membership visibility and returns 404 for inaccessible worlds/artifacts.
+  - Reader filters are intentionally narrow in v1 and focus on `conversation_summary` / `chapter_draft` workflows.
 - Recommended next step:
-  - Run full backend/Web regression and commit `feat(agents): add observation persona baseline`.
+  - Run final full regression, commit `feat(web): add dedicated narrative reader`, and hold on this branch for review.
 - Sensitive areas to avoid casual edits:
-  - provider secret handling and diagnostic redaction
-  - API authorization and CSRF boundaries
-  - migration ordering and runtime/event invariants
+  - world-member visibility rules on narrative artifact list/detail routes
+  - source-conversation linkage and reader/detail route stability
+  - provider secret handling and artifact metadata redaction

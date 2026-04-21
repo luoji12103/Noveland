@@ -15,6 +15,7 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.conversations.models import ConversationSession
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import AgentMemoryItem
@@ -637,6 +638,74 @@ def test_agent_persona_and_observation_api_requires_world_admin() -> None:
     }
 
 
+def test_narrative_reader_api_supports_filters_and_detail_for_world_members() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
+    world_id = _seed_world(engine, owner_id, "reader-world")
+    conversation_id = _seed_conversation(engine, world_id, "reader-conversation")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    summary_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Conversation summary",
+        "Summary body",
+        artifact_kind="conversation_summary",
+        source_conversation_id=conversation_id,
+    )
+    _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Chapter draft",
+        "Chapter body",
+        artifact_kind="chapter_draft",
+        source_conversation_id=conversation_id,
+    )
+    _seed_narrative_artifact(
+        engine,
+        world_id,
+        "World summary",
+        "World body",
+        artifact_kind="world_summary",
+    )
+
+    _authenticate(client, member_token)
+    filtered = client.get(
+        f"/worlds/{world_id}/narrative-artifacts",
+        params={
+            "artifact_kind": "conversation_summary",
+            "source_conversation_id": str(conversation_id),
+            "limit": 1,
+        },
+    )
+    detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
+
+    _authenticate(client, owner_token)
+    owner_list = client.get(
+        f"/worlds/{world_id}/narrative-artifacts",
+        params={"source_conversation_id": str(conversation_id)},
+    )
+
+    _authenticate(client, stranger_token)
+    hidden = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
+
+    assert filtered.status_code == 200
+    assert len(filtered.json()) == 1
+    assert filtered.json()[0]["artifact_kind"] == "conversation_summary"
+    assert filtered.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert detail.status_code == 200
+    assert detail.json()["id"] == str(summary_id)
+    assert detail.json()["source_conversation_id"] == str(conversation_id)
+    assert owner_list.status_code == 200
+    assert [item["artifact_kind"] for item in owner_list.json()] == [
+        "chapter_draft",
+        "conversation_summary",
+    ]
+    assert hidden.status_code == 404
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -679,6 +748,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, ConversationSession.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
@@ -796,6 +866,73 @@ def _seed_provider_profile(engine: Engine) -> None:
             ),
         )
         session.commit()
+
+
+def _seed_conversation(engine: Engine, world_id: uuid.UUID, session_key: str) -> uuid.UUID:
+    conversation_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                scene_id=None,
+                session_key=session_key,
+                title=session_key,
+                scope_type="world",
+                mode="manual_chain",
+                status="completed",
+                objective="Reader seed",
+                opening_prompt="Reader seed",
+                max_turns=4,
+                next_turn_index=1,
+                policy_config={
+                    "error_policy": "fail_session",
+                    "max_consecutive_failed_turns": 1,
+                    "loop_guard_window": 4,
+                    "repeat_output_threshold": 2,
+                },
+                writer_config={
+                    "provider_profile_id": None,
+                    "auto_generate_on_complete": False,
+                    "generate_summary": True,
+                    "generate_chapter": True,
+                },
+                terminal_reason="max_turns_reached",
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+        session.commit()
+    return conversation_id
+
+
+def _seed_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    title: str,
+    content: str,
+    *,
+    artifact_kind: str,
+    source_conversation_id: uuid.UUID | None = None,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                agent_id=None,
+                source_run_id=None,
+                source_conversation_id=source_conversation_id,
+                title=title,
+                content=content,
+                artifact_kind=artifact_kind,
+                artifact_metadata={},
+            ),
+        )
+        session.commit()
+    return artifact_id
 
 
 def _membership_role(engine: Engine, world_id: uuid.UUID, user_id: uuid.UUID) -> str | None:

@@ -15,6 +15,8 @@ const sceneHomeId = "20000000-0000-4000-8000-000000000001";
 const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
 const membershipMemberId = "40000000-0000-4000-8000-000000000002";
+const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
+const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 const users = [
   user(adminUserId, "admin@example.test", "Admin"),
@@ -54,7 +56,8 @@ const agents = [
     agent_key: "guide",
     display_name: "Guide",
     kind: "role_agent",
-    config: {},
+    provider_profile_id: providerOpenAiId,
+    config: { provider_profile_id: providerOpenAiId },
     is_enabled: true,
   },
 ];
@@ -146,7 +149,7 @@ const agentObservations = [
 ];
 const providerProfiles = [
   {
-    id: "71000000-0000-4000-8000-000000000001",
+    id: providerOpenAiId,
     profile_key: "openai-local",
     name: "OpenAI Local",
     provider_type: "openai_compatible",
@@ -222,15 +225,112 @@ const narrativeArtifacts = [
     world_id: worldOneId,
     agent_id: agentGuideId,
     source_run_id: agentRuns[0].run_id,
+    source_conversation_id: null,
     title: "Initial artifact",
     content: "Initial artifact content",
     artifact_kind: "agent_note",
     metadata: {},
     created_at: "2026-04-17T00:03:02.000Z",
   },
+  {
+    id: "73000000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    agent_id: null,
+    source_run_id: null,
+    source_conversation_id: seedConversationId,
+    title: "Seed conversation summary",
+    content: "Summary for the seeded conversation.",
+    artifact_kind: "conversation_summary",
+    metadata: { generation_mode: "manual", scope_type: "world" },
+    created_at: "2026-04-17T00:03:03.000Z",
+  },
+  {
+    id: "73000000-0000-4000-8000-000000000003",
+    world_id: worldOneId,
+    agent_id: null,
+    source_run_id: null,
+    source_conversation_id: seedConversationId,
+    title: "Seed chapter draft",
+    content: "Chapter draft for the seeded conversation.",
+    artifact_kind: "chapter_draft",
+    metadata: { generation_mode: "manual", scope_type: "world" },
+    created_at: "2026-04-17T00:03:04.000Z",
+  },
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
+const conversations = [
+  {
+    id: seedConversationId,
+    world_id: worldOneId,
+    scene_id: null,
+    session_key: "seed-reader",
+    title: "Seed Reader Conversation",
+    scope_type: "world",
+    mode: "manual_chain",
+    status: "completed",
+    objective: "Seed the narrative reader.",
+    opening_prompt: "Start the seed conversation.",
+    max_turns: 2,
+    next_turn_index: 2,
+    policy: {
+      error_policy: "fail_session",
+      max_consecutive_failed_turns: 1,
+      loop_guard_window: 4,
+      repeat_output_threshold: 2,
+    },
+    writer_config: {
+      provider_profile_id: null,
+      auto_generate_on_complete: true,
+      generate_summary: true,
+      generate_chapter: true,
+    },
+    terminal_reason: "max_turns_reached",
+    created_at: "2026-04-17T00:02:00.000Z",
+    updated_at: "2026-04-17T00:03:04.000Z",
+  },
+];
+const conversationParticipants = [
+  {
+    id: "76100000-0000-4000-8000-000000000001",
+    session_id: seedConversationId,
+    agent_id: agentGuideId,
+    turn_order: 0,
+    is_enabled: true,
+    created_at: "2026-04-17T00:02:00.000Z",
+    updated_at: "2026-04-17T00:02:00.000Z",
+  },
+];
+const conversationTurns = [
+  {
+    id: "76200000-0000-4000-8000-000000000001",
+    session_id: seedConversationId,
+    turn_index: 0,
+    speaker_kind: "operator",
+    speaker_agent_id: null,
+    input_text: "Seed the conversation.",
+    output_text: "Seed the conversation.",
+    status: "succeeded",
+    run_id: null,
+    error_text: null,
+    created_at: "2026-04-17T00:02:30.000Z",
+    updated_at: "2026-04-17T00:02:30.000Z",
+  },
+  {
+    id: "76200000-0000-4000-8000-000000000002",
+    session_id: seedConversationId,
+    turn_index: 1,
+    speaker_kind: "agent",
+    speaker_agent_id: agentGuideId,
+    input_text: "Seed the conversation.",
+    output_text: "Guide replies to seed the conversation.",
+    status: "succeeded",
+    run_id: null,
+    error_text: null,
+    created_at: "2026-04-17T00:02:31.000Z",
+    updated_at: "2026-04-17T00:02:31.000Z",
+  },
+];
 
 const mockServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
@@ -438,7 +538,7 @@ async function handleWorldResource(request, response, url) {
     return;
   }
   if (resource === "narrative-artifacts") {
-    await handleNarrativeArtifacts(request, response, currentSubject, worldId);
+    await handleNarrativeArtifacts(request, response, currentSubject, worldId, segments[3], url);
     return;
   }
   if (resource === "clock") {
@@ -455,6 +555,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "diagnostics") {
     handleWorldDiagnostics(request, response, currentSubject, worldId);
+    return;
+  }
+  if (resource === "conversations") {
+    await handleConversations(request, response, currentSubject, worldId, segments[3], segments[4]);
     return;
   }
   sendJson(response, 404, { detail: "not found" });
@@ -592,7 +696,13 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       agent_key: body.agent_key,
       display_name: body.display_name,
       kind: body.kind,
-      config: body.config ?? {},
+      provider_profile_id: body.provider_profile_id ?? null,
+      config: {
+        ...(body.config ?? {}),
+        ...(body.provider_profile_id === undefined || body.provider_profile_id === null
+          ? {}
+          : { provider_profile_id: body.provider_profile_id }),
+      },
       is_enabled: true,
     };
     agents.push(agent);
@@ -606,7 +716,18 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
     return;
   }
   if (request.method === "PATCH") {
-    Object.assign(agent, await readJson(request));
+    const body = await readJson(request);
+    Object.assign(agent, body);
+    if (Object.hasOwn(body, "provider_profile_id")) {
+      agent.provider_profile_id = body.provider_profile_id;
+      agent.config = {
+        ...(agent.config ?? {}),
+        ...(body.provider_profile_id === null ? {} : { provider_profile_id: body.provider_profile_id }),
+      };
+      if (body.provider_profile_id === null) {
+        delete agent.config.provider_profile_id;
+      }
+    }
     sendJson(response, 200, agent);
     return;
   }
@@ -1222,13 +1343,39 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleNarrativeArtifacts(request, response, currentSubject, worldId) {
+async function handleNarrativeArtifacts(request, response, currentSubject, worldId, artifactId, url) {
   if (!canReadWorld(currentSubject, worldId)) {
     sendJson(response, 404, { detail: "World not found" });
     return;
   }
+  if (request.method === "GET" && artifactId !== undefined) {
+    const artifact = narrativeArtifacts.find(
+      (item) => item.id === artifactId && item.world_id === worldId,
+    );
+    if (artifact === undefined) {
+      sendJson(response, 404, { detail: "Narrative artifact not found" });
+      return;
+    }
+    sendJson(response, 200, artifact);
+    return;
+  }
   if (request.method === "GET") {
-    sendJson(response, 200, narrativeArtifacts.filter((artifact) => artifact.world_id === worldId));
+    const artifactKind = url.searchParams.get("artifact_kind");
+    const sourceConversationId = url.searchParams.get("source_conversation_id");
+    const limitValue = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+    let items = narrativeArtifacts
+      .filter((artifact) => artifact.world_id === worldId)
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    if (artifactKind !== null && artifactKind !== "") {
+      items = items.filter((artifact) => artifact.artifact_kind === artifactKind);
+    }
+    if (sourceConversationId !== null && sourceConversationId !== "") {
+      items = items.filter((artifact) => artifact.source_conversation_id === sourceConversationId);
+    }
+    if (Number.isFinite(limitValue) && limitValue > 0) {
+      items = items.slice(0, limitValue);
+    }
+    sendJson(response, 200, items);
     return;
   }
   if (!canManageWorld(currentSubject, worldId)) {
@@ -1246,6 +1393,7 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       world_id: worldId,
       agent_id: body.agent_id ?? null,
       source_run_id: null,
+      source_conversation_id: null,
       title: body.title,
       content: body.content,
       artifact_kind: body.artifact_kind ?? "world_summary",
@@ -1257,6 +1405,329 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleConversations(request, response, currentSubject, worldId, conversationId, action) {
+  if (request.method === "GET" && conversationId === undefined) {
+    sendJson(response, 200, conversations.filter((item) => item.world_id === worldId));
+    return;
+  }
+
+  if (conversationId === undefined) {
+    if (!canManageWorld(currentSubject, worldId)) {
+      sendJson(response, 403, { detail: "Forbidden" });
+      return;
+    }
+    if (!hasValidCsrf(request)) {
+      sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+      return;
+    }
+    if (request.method === "POST") {
+      const body = await readJson(request);
+      const now = new Date().toISOString();
+      const session = {
+        id: randomUUID(),
+        world_id: worldId,
+        scene_id: body.scene_id ?? null,
+        session_key: body.session_key,
+        title: body.title,
+        scope_type: body.scope_type,
+        mode: body.mode,
+        status: "draft",
+        objective: body.objective ?? "",
+        opening_prompt: body.opening_prompt ?? "",
+        max_turns: body.max_turns ?? 12,
+        next_turn_index: 0,
+        policy: body.policy,
+        writer_config: body.writer_config ?? {
+          provider_profile_id: null,
+          auto_generate_on_complete: false,
+          generate_summary: true,
+          generate_chapter: true,
+        },
+        terminal_reason: null,
+        created_at: now,
+        updated_at: now,
+      };
+      conversations.push(session);
+      sendJson(response, 201, session);
+      return;
+    }
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+
+  const session = conversations.find((item) => item.id === conversationId && item.world_id === worldId);
+  if (session === undefined) {
+    sendJson(response, 404, { detail: "Conversation not found" });
+    return;
+  }
+
+  if (action === undefined && request.method === "GET") {
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "participants" && request.method === "GET") {
+    sendJson(response, 200, participantsForSession(conversationId));
+    return;
+  }
+  if (action === "turns" && request.method === "GET") {
+    sendJson(response, 200, turnsForSession(conversationId));
+    return;
+  }
+  if (action === "narrative" && request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      narrativeArtifacts
+        .filter((item) => item.world_id === worldId && item.source_conversation_id === conversationId)
+        .sort((left, right) => right.created_at.localeCompare(left.created_at)),
+    );
+    return;
+  }
+
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+
+  if (action === undefined && request.method === "PATCH") {
+    Object.assign(session, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "participants" && request.method === "PUT") {
+    const body = await readJson(request);
+    for (const existing of [...participantsForSession(conversationId)]) {
+      conversationParticipants.splice(conversationParticipants.indexOf(existing), 1);
+    }
+    const now = new Date().toISOString();
+    const participants = body.map((item) => ({
+      id: randomUUID(),
+      session_id: conversationId,
+      agent_id: item.agent_id,
+      turn_order: item.turn_order,
+      is_enabled: item.is_enabled ?? true,
+      created_at: now,
+      updated_at: now,
+    }));
+    conversationParticipants.push(...participants);
+    sendJson(response, 200, participants);
+    return;
+  }
+  if (action === "seed" && request.method === "POST") {
+    const body = await readJson(request);
+    const turn = appendConversationTurn(session, {
+      speaker_kind: "operator",
+      speaker_agent_id: null,
+      input_text: body.input_text,
+      output_text: body.input_text,
+      status: "succeeded",
+      run_id: null,
+      error_text: null,
+    });
+    sendJson(response, 201, turn);
+    return;
+  }
+  if (action === "advance" && request.method === "POST") {
+    const turn = appendAgentConversationTurn(session);
+    if (turn === null) {
+      sendJson(response, 409, { detail: "Conversation has no enabled participants" });
+      return;
+    }
+    sendJson(response, 200, { session, turn });
+    return;
+  }
+  if (action === "start" && request.method === "POST") {
+    session.status = "running";
+    session.updated_at = new Date().toISOString();
+    if (session.mode === "auto_dialogue") {
+      appendAgentConversationTurn(session);
+    }
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "pause" && request.method === "POST") {
+    session.status = "paused";
+    session.updated_at = new Date().toISOString();
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "resume" && request.method === "POST") {
+    session.status = "running";
+    session.updated_at = new Date().toISOString();
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "stop" && request.method === "POST") {
+    session.status = "stopped";
+    session.terminal_reason = "operator_stopped";
+    session.updated_at = new Date().toISOString();
+    sendJson(response, 200, session);
+    return;
+  }
+  if (action === "narrative" && request.method === "POST") {
+    const body = await readJson(request);
+    sendJson(response, 200, generateConversationNarrative(session, body.artifact_set));
+    return;
+  }
+
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function appendAgentConversationTurn(session) {
+  const participants = participantsForSession(session.id)
+    .filter((participant) => participant.is_enabled)
+    .sort((left, right) => left.turn_order - right.turn_order);
+  if (participants.length === 0) {
+    session.status = "failed";
+    session.updated_at = new Date().toISOString();
+    return null;
+  }
+  const participant = participants[session.next_turn_index % participants.length];
+  const agent = agents.find((item) => item.id === participant.agent_id);
+  const previousTurn = turnsForSession(session.id).at(-1);
+  const inputText = previousTurn?.output_text ?? session.opening_prompt ?? "Begin.";
+  const outputText = `${agent?.display_name ?? "Agent"} replies to: ${inputText}`;
+  const runId = randomUUID();
+  const run = {
+    run_id: runId,
+    world_id: session.world_id,
+    agent_id: participant.agent_id,
+    status: "succeeded",
+    prompt_text: inputText,
+    response_text: outputText,
+    provider_profile_id: agent?.provider_profile_id ?? providerProfiles[0]?.id ?? null,
+    diagnostics: { conversation_id: session.id },
+    started_at: new Date().toISOString(),
+    finished_at: new Date().toISOString(),
+  };
+  agentRuns.unshift(run);
+  const turn = appendConversationTurn(session, {
+    speaker_kind: "agent",
+    speaker_agent_id: participant.agent_id,
+    input_text: inputText,
+    output_text: outputText,
+    status: "succeeded",
+    run_id: runId,
+    error_text: null,
+  });
+  if (session.next_turn_index >= session.max_turns) {
+    session.status = "completed";
+    session.terminal_reason = "max_turns_reached";
+    if (session.writer_config?.auto_generate_on_complete) {
+      generateConversationNarrative(session, writerArtifactSet(session.writer_config));
+    }
+  }
+  return turn;
+}
+
+function appendConversationTurn(session, fields) {
+  const now = new Date().toISOString();
+  const turn = {
+    id: randomUUID(),
+    session_id: session.id,
+    turn_index: session.next_turn_index,
+    created_at: now,
+    updated_at: now,
+    ...fields,
+  };
+  conversationTurns.push(turn);
+  session.next_turn_index += 1;
+  session.updated_at = now;
+  return turn;
+}
+
+function participantsForSession(sessionId) {
+  return conversationParticipants.filter((item) => item.session_id === sessionId);
+}
+
+function turnsForSession(sessionId) {
+  return conversationTurns
+    .filter((item) => item.session_id === sessionId)
+    .sort((left, right) => left.turn_index - right.turn_index);
+}
+
+function generateConversationNarrative(session, artifactSet) {
+  const generated = [];
+  const summaryArtifact = findConversationArtifact(session.id, "conversation_summary");
+  const chapterArtifact = findConversationArtifact(session.id, "chapter_draft");
+  const summaryEnabled = artifactSet === "summary_and_chapter" || artifactSet === "summary_only";
+  const chapterEnabled = artifactSet === "summary_and_chapter" || artifactSet === "chapter_only";
+
+  if (summaryEnabled) {
+    if (summaryArtifact === undefined) {
+      generated.push(
+        pushNarrativeArtifact({
+          world_id: session.world_id,
+          agent_id: null,
+          source_run_id: null,
+          source_conversation_id: session.id,
+          title: `${session.title} summary`,
+          content: `Summary for ${session.title}`,
+          artifact_kind: "conversation_summary",
+          metadata: { generation_mode: "manual" },
+        }),
+      );
+    } else {
+      generated.push(summaryArtifact);
+    }
+  }
+
+  if (chapterEnabled) {
+    if (chapterArtifact === undefined) {
+      generated.push(
+        pushNarrativeArtifact({
+          world_id: session.world_id,
+          agent_id: null,
+          source_run_id: null,
+          source_conversation_id: session.id,
+          title: `${session.title} chapter draft`,
+          content: `Chapter draft for ${session.title}`,
+          artifact_kind: "chapter_draft",
+          metadata: { generation_mode: "manual" },
+        }),
+      );
+    } else {
+      generated.push(chapterArtifact);
+    }
+  }
+
+  return generated.sort((left, right) => right.created_at.localeCompare(left.created_at));
+}
+
+function pushNarrativeArtifact(fields) {
+  const artifact = {
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+    ...fields,
+  };
+  narrativeArtifacts.unshift(artifact);
+  return artifact;
+}
+
+function findConversationArtifact(conversationId, artifactKind) {
+  return narrativeArtifacts.find(
+    (item) =>
+      item.source_conversation_id === conversationId && item.artifact_kind === artifactKind,
+  );
+}
+
+function writerArtifactSet(writerConfig) {
+  if (writerConfig.generate_summary && writerConfig.generate_chapter) {
+    return "summary_and_chapter";
+  }
+  if (writerConfig.generate_summary) {
+    return "summary_only";
+  }
+  if (writerConfig.generate_chapter) {
+    return "chapter_only";
+  }
+  return "summary_only";
 }
 
 function clockForWorld(worldId) {

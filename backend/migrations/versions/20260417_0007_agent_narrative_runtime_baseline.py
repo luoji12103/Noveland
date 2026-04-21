@@ -132,13 +132,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["source_calendar_entry_id"],
             ["agent_calendar_entries.id"],
-            name="fk_agent_runtime_runs_source_calendar_entry_id_agent_calendar_entries",
+            name="fk_agent_runtime_runs_source_calendar_entry",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["source_schedule_rule_id"],
             ["world_schedule_rules.id"],
-            name="fk_agent_runtime_runs_source_schedule_rule_id_world_schedule_rules",
+            name="fk_agent_runtime_runs_source_schedule_rule",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(

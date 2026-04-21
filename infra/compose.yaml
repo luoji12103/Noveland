@@ -21,7 +21,7 @@ services:
   nats:
     image: nats:2.11-alpine
     container_name: noveland-nats
-    command: ["-js", "-sd", "/data/jetstream"]
+    command: ["-js", "-sd", "/data/jetstream", "-m", "8222"]
     ports:
       - "${NOVELAND_NATS_PORT:-4222}:4222"
       - "${NOVELAND_NATS_MONITOR_PORT:-8222}:8222"

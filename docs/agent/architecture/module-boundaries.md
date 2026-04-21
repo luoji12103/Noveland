@@ -34,11 +34,26 @@ Must not own:
 - global world time authority
 - other agents' calendar access
 
+## `conversations`
+Owns:
+- conversation session metadata
+- participant ordering
+- transcript turn persistence
+- deterministic round-robin turn advancement
+- per-session policy and writer configuration
+
+Must not own:
+- LLM provider transport details
+- narrative chapter publication
+- global runtime scheduling policy
+- arbitrary cross-agent private memory reads
+
 ## `narrative`
 Owns:
-- summarizer workflow
+- conversation-first summarizer workflow
 - summary/chapter artifacts
 - reader-facing narrative units
+- provider-backed generation ordering for conversation summary then chapter draft
 
 Must not own:
 - raw unrestricted access to all private scratch context

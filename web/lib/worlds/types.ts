@@ -47,8 +47,101 @@ export type Agent = {
   agent_key: string;
   display_name: string;
   kind: AgentKind;
+  provider_profile_id: string | null;
   config: Record<string, unknown>;
   is_enabled: boolean;
+};
+
+export type ConversationScopeType = "scene" | "world";
+
+export type ConversationMode = "manual_chain" | "auto_dialogue";
+
+export type ConversationSessionStatus =
+  | "draft"
+  | "running"
+  | "paused"
+  | "completed"
+  | "stopped"
+  | "failed";
+
+export type ConversationTurnStatus = "succeeded" | "skipped" | "failed";
+
+export type ConversationErrorPolicy =
+  | "fail_session"
+  | "skip_turn"
+  | "retry_once_then_fail"
+  | "retry_once_then_skip";
+
+export type ConversationTerminalReason =
+  | "max_turns_reached"
+  | "loop_guard_repeated_output"
+  | "no_enabled_participants"
+  | "consecutive_failures_exceeded"
+  | "operator_stopped"
+  | "speaker_error";
+
+export type ConversationPolicy = {
+  error_policy: ConversationErrorPolicy;
+  max_consecutive_failed_turns: number;
+  loop_guard_window: number;
+  repeat_output_threshold: number;
+};
+
+export type ConversationWriterConfig = {
+  provider_profile_id: string | null;
+  auto_generate_on_complete: boolean;
+  generate_summary: boolean;
+  generate_chapter: boolean;
+};
+
+export type ConversationSession = {
+  id: string;
+  world_id: string;
+  scene_id: string | null;
+  session_key: string;
+  title: string;
+  scope_type: ConversationScopeType;
+  mode: ConversationMode;
+  status: ConversationSessionStatus;
+  objective: string;
+  opening_prompt: string;
+  max_turns: number;
+  next_turn_index: number;
+  policy: ConversationPolicy;
+  writer_config: ConversationWriterConfig;
+  terminal_reason: ConversationTerminalReason | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationParticipant = {
+  id: string;
+  session_id: string;
+  agent_id: string;
+  turn_order: number;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationTurn = {
+  id: string;
+  session_id: string;
+  turn_index: number;
+  speaker_kind: "operator" | "agent";
+  speaker_agent_id: string | null;
+  input_text: string;
+  output_text: string | null;
+  status: ConversationTurnStatus;
+  run_id: string | null;
+  error_text: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationAdvanceResult = {
+  session: ConversationSession;
+  turn: ConversationTurn;
 };
 
 export type WorldClock = {
@@ -147,7 +240,13 @@ export type RuntimeStatus = RuntimeControl & {
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
-export type DiagnosticComponent = "runtime" | "provider" | "agent" | "event_publisher" | "api";
+export type DiagnosticComponent =
+  | "runtime"
+  | "provider"
+  | "agent"
+  | "conversation"
+  | "event_publisher"
+  | "api";
 
 export type RuntimeDiagnostic = {
   id: string;
@@ -229,13 +328,18 @@ export type AgentObservation = {
   created_at: string;
 };
 
-export type NarrativeArtifactKind = "agent_note" | "world_summary";
+export type NarrativeArtifactKind =
+  | "agent_note"
+  | "world_summary"
+  | "conversation_summary"
+  | "chapter_draft";
 
 export type NarrativeArtifact = {
   id: string;
   world_id: string;
   agent_id: string | null;
   source_run_id: string | null;
+  source_conversation_id: string | null;
   title: string;
   content: string;
   artifact_kind: NarrativeArtifactKind;
@@ -300,14 +404,49 @@ export type AgentCreateInput = {
   display_name: string;
   kind: AgentKind;
   home_scene_id?: string | null;
+  provider_profile_id?: string | null;
   config?: Record<string, unknown>;
 };
 
 export type AgentUpdateInput = {
   display_name?: string;
+  kind?: AgentKind;
   home_scene_id?: string | null;
+  provider_profile_id?: string | null;
   config?: Record<string, unknown>;
   is_enabled?: boolean;
+};
+
+export type ConversationCreateInput = {
+  session_key: string;
+  title: string;
+  scope_type: ConversationScopeType;
+  mode: ConversationMode;
+  scene_id?: string | null;
+  objective?: string;
+  opening_prompt?: string;
+  max_turns?: number;
+  policy: ConversationPolicy;
+  writer_config: ConversationWriterConfig;
+};
+
+export type ConversationUpdateInput = {
+  title?: string;
+  objective?: string;
+  opening_prompt?: string;
+  max_turns?: number;
+  policy?: ConversationPolicy;
+  writer_config?: ConversationWriterConfig;
+};
+
+export type ConversationParticipantInput = {
+  agent_id: string;
+  turn_order: number;
+  is_enabled?: boolean;
+};
+
+export type ConversationSeedInput = {
+  input_text: string;
 };
 
 export type CalendarEntryCreateInput = {
@@ -410,3 +549,8 @@ export type NarrativeArtifactCreateInput = {
   artifact_kind?: NarrativeArtifactKind;
   agent_id?: string | null;
 };
+
+export type ConversationNarrativeArtifactSet =
+  | "summary_and_chapter"
+  | "summary_only"
+  | "chapter_only";

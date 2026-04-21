@@ -216,6 +216,27 @@ a {
   justify-content: flex-end;
 }
 
+.workspace-nav {
+  display: flex;
+  width: min(1120px, calc(100% - 32px));
+  margin: 16px auto 0;
+  padding: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.workspace-nav a {
+  padding: 8px 10px;
+  color: var(--forest-dark);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 800;
+}
+
 .session-strip {
   display: flex;
   width: min(1120px, calc(100% - 32px));

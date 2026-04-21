@@ -6,7 +6,7 @@ import { getCurrentSubject } from "@/lib/auth/server";
 export default async function LoginPage() {
   const subject = await getCurrentSubject();
   if (subject !== null) {
-    redirect("/");
+    redirect("/worlds");
   }
 
   return (

@@ -69,6 +69,7 @@ class RuntimeDiagnosticsService:
         world_id: uuid.UUID,
         *,
         agent_id: uuid.UUID | None = None,
+        component: DiagnosticComponent | None = None,
         limit: int = 20,
     ) -> builtins.list[RuntimeDiagnosticRecord]:
         statement = select(RuntimeDiagnosticEvent).where(
@@ -76,6 +77,8 @@ class RuntimeDiagnosticsService:
         )
         if agent_id is not None:
             statement = statement.where(RuntimeDiagnosticEvent.agent_id == agent_id)
+        if component is not None:
+            statement = statement.where(RuntimeDiagnosticEvent.component == component.value)
         return self._records(_limited(statement, limit))
 
     def _records(

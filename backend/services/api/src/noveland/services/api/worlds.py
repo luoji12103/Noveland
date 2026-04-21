@@ -117,12 +117,15 @@ class AgentCreateRequest(_RequestModel):
     display_name: str = Field(min_length=1, max_length=120)
     kind: AgentKind
     home_scene_id: uuid.UUID | None = None
+    provider_profile_id: uuid.UUID | None = None
     config: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentUpdateRequest(_RequestModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=120)
+    kind: AgentKind | None = None
     home_scene_id: uuid.UUID | None = None
+    provider_profile_id: uuid.UUID | None = None
     config: dict[str, Any] | None = None
     is_enabled: bool | None = None
 
@@ -296,6 +299,7 @@ class AgentResponse(BaseModel):
     agent_key: str
     display_name: str
     kind: AgentKind
+    provider_profile_id: uuid.UUID | None
     config: dict[str, Any]
     is_enabled: bool
 
@@ -378,6 +382,7 @@ class NarrativeArtifactResponse(BaseModel):
     world_id: uuid.UUID
     agent_id: uuid.UUID | None
     source_run_id: uuid.UUID | None
+    source_conversation_id: uuid.UUID | None
     title: str
     content: str
     artifact_kind: str
@@ -1275,11 +1280,42 @@ def run_agent(
 def list_narrative_artifacts(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    artifact_kind: Annotated[
+        Literal["agent_note", "world_summary", "conversation_summary", "chapter_draft"] | None,
+        Query(),
+    ] = None,
+    source_conversation_id: uuid.UUID | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ) -> list[NarrativeArtifactResponse]:
     return [
         _narrative_artifact_response(artifact)
-        for artifact in NarrativeArtifactService(db_session).list_artifacts(context.world_id)
+        for artifact in NarrativeArtifactService(db_session).list_artifacts(
+            context.world_id,
+            artifact_kind=None
+            if artifact_kind is None
+            else NarrativeArtifactKind(artifact_kind),
+            source_conversation_id=source_conversation_id,
+            limit=limit,
+        )
     ]
+
+
+@router.get(
+    "/{world_id}/narrative-artifacts/{artifact_id}",
+    response_model=NarrativeArtifactResponse,
+)
+def get_narrative_artifact(
+    artifact_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeArtifactResponse:
+    artifact = NarrativeArtifactService(db_session).get_artifact(context.world_id, artifact_id)
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Narrative artifact not found",
+        )
+    return _narrative_artifact_response(artifact)
 
 
 @router.post(
@@ -1331,7 +1367,10 @@ def create_agent(
         agent_key=agent_create.agent_key,
         display_name=agent_create.display_name,
         kind=agent_create.kind,
-        config=agent_create.config,
+        config=_agent_config_with_provider_profile_id(
+            agent_create.config,
+            agent_create.provider_profile_id,
+        ),
         is_enabled=True,
     )
     db_session.add(agent)
@@ -1351,12 +1390,19 @@ def update_agent(
     agent = _agent_or_404(db_session, context.world_id, agent_id)
     if "display_name" in agent_update.model_fields_set:
         agent.display_name = agent_update.display_name or agent.display_name
+    if "kind" in agent_update.model_fields_set and agent_update.kind is not None:
+        agent.kind = agent_update.kind
     if "home_scene_id" in agent_update.model_fields_set:
         if agent_update.home_scene_id is not None:
             _scene_or_404(db_session, context.world_id, agent_update.home_scene_id)
         agent.home_scene_id = agent_update.home_scene_id
     if "config" in agent_update.model_fields_set:
         agent.config = agent_update.config or {}
+    if "provider_profile_id" in agent_update.model_fields_set:
+        agent.config = _agent_config_with_provider_profile_id(
+            agent.config,
+            agent_update.provider_profile_id,
+        )
     if "is_enabled" in agent_update.model_fields_set:
         agent.is_enabled = bool(agent_update.is_enabled)
     db_session.flush()
@@ -1426,9 +1472,32 @@ def _agent_response(agent: Agent) -> AgentResponse:
         agent_key=agent.agent_key,
         display_name=agent.display_name,
         kind=cast(AgentKind, agent.kind),
+        provider_profile_id=_provider_profile_id_from_config(agent.config),
         config=agent.config,
         is_enabled=agent.is_enabled,
     )
+
+
+def _provider_profile_id_from_config(config: dict[str, Any]) -> uuid.UUID | None:
+    raw_value = config.get("provider_profile_id")
+    if isinstance(raw_value, str):
+        try:
+            return uuid.UUID(raw_value)
+        except ValueError:
+            return None
+    return None
+
+
+def _agent_config_with_provider_profile_id(
+    config: dict[str, Any],
+    provider_profile_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    next_config = dict(config)
+    if provider_profile_id is None:
+        next_config.pop("provider_profile_id", None)
+    else:
+        next_config["provider_profile_id"] = str(provider_profile_id)
+    return next_config
 
 
 def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntryResponse:
@@ -1504,6 +1573,7 @@ def _narrative_artifact_response(
         world_id=artifact.world_id,
         agent_id=artifact.agent_id,
         source_run_id=artifact.source_run_id,
+        source_conversation_id=artifact.source_conversation_id,
         title=artifact.title,
         content=artifact.content,
         artifact_kind=artifact.artifact_kind.value,
