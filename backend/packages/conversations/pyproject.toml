@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noveland-conversations"
+version = "0.1.0"
+description = "Conversation session contracts and persistence for Noveland."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "noveland-agents",
+  "noveland-core",
+  "noveland-events",
+  "pydantic>=2.13,<3",
+  "sqlalchemy>=2.0,<3",
+]
+
+[tool.uv.sources]
+noveland-agents = { workspace = true }
+noveland-core = { workspace = true }
+noveland-events = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noveland"]

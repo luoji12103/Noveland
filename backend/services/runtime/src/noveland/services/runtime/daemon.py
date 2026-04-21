@@ -18,6 +18,7 @@ from noveland.observability import (
 )
 from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.clock_tick import RuntimeClockTicker
+from noveland.services.runtime.conversation_loop import ConversationRuntimeOrchestrator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -132,14 +133,21 @@ class RuntimeDaemon:
                 wall_time = datetime.now(UTC)
                 tick_result = RuntimeClockTicker(session, self._publisher).run_once(wall_time)
                 world_ids = sorted({event.world_id for event in tick_result.events}, key=str)
+                profile_service = ProviderProfileService(session, self._settings)
                 executed_runs = AgentRuntimeOrchestrator(
                     session,
-                    ProviderProfileService(session, self._settings),
+                    profile_service,
                 ).run_due_agents(
                     world_ids,
                     wall_time=wall_time,
                     batch_limit=self._settings.runtime_batch_limit,
                 ).executed_runs
+                remaining_capacity = max(self._settings.runtime_batch_limit - executed_runs, 0)
+                conversation_turns = ConversationRuntimeOrchestrator(
+                    session,
+                    profile_service,
+                ).advance_running_sessions(remaining_capacity).executed_turns
+                executed_runs += conversation_turns
                 view = control_service.mark_loop_finished()
                 diagnostics.record(
                     RuntimeDiagnosticCreate(
@@ -150,6 +158,7 @@ class RuntimeDaemon:
                         details={
                             "advanced_worlds": tick_result.advanced_worlds,
                             "executed_runs": executed_runs,
+                            "executed_conversation_turns": conversation_turns,
                             "published_events": tick_result.published_events,
                         },
                     ),

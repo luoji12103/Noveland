@@ -17,6 +17,10 @@ from noveland.services.runtime.clock_tick import (
     RuntimeEventPublishError,
     RuntimeTickResult,
 )
+from noveland.services.runtime.conversation_loop import (
+    ConversationBatchResult,
+    ConversationRuntimeOrchestrator,
+)
 from noveland.services.runtime.daemon import (
     RuntimeControlService,
     RuntimeControlView,
@@ -33,6 +37,8 @@ __all__ = [
     "AGENT_RUN_STARTED_EVENT_NAME",
     "CLOCK_ADVANCED_EVENT_NAME",
     "CALENDAR_ENTRY_DUE_EVENT_NAME",
+    "ConversationBatchResult",
+    "ConversationRuntimeOrchestrator",
     "DueRunBatchResult",
     "EventPublishFailure",
     "AgentRunExecution",

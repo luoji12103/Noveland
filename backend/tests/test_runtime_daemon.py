@@ -11,6 +11,11 @@ from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
 from noveland.auth.models import User
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.conversations.models import (
+    ConversationParticipant,
+    ConversationSession,
+    ConversationTurn,
+)
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import AppSettings
 from noveland.events import InMemoryWorldEventPublisher
@@ -115,6 +120,61 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     }
 
 
+def test_runtime_daemon_advances_running_auto_conversation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "runtime-conversation.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "conversation-world")
+    agent_id = _seed_agent(engine, world_id, "speaker")
+    _seed_provider_profile(engine, "runtime-profile", "runtime-ref")
+    _seed_runtime_control(engine, "running")
+    _seed_running_conversation(engine, world_id, agent_id)
+
+    def fake_invoke_profile(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile
+        return ProviderCompletion(
+            text=f"Conversation response for: {prompt}",
+            raw_response={"ok": True},
+        )
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
+
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+        provider_api_keys_json={"runtime-ref": "secret-key"},
+        runtime_loop_interval_seconds=1,
+        runtime_batch_limit=20,
+    )
+    daemon = RuntimeDaemon(settings, InMemoryWorldEventPublisher())
+
+    result = daemon.run_iteration()
+
+    with Session(engine) as session:
+        session_model = session.scalars(select(ConversationSession)).one()
+        turns = session.scalars(
+            select(ConversationTurn).order_by(ConversationTurn.turn_index.asc()),
+        ).all()
+
+    assert result.executed_runs == 1
+    assert session_model.next_turn_index == 1
+    assert len(turns) == 1
+    assert turns[0].speaker_kind == "agent"
+    assert turns[0].output_text is not None
+
+
 def _create_tables(engine: Engine) -> None:
     for table in (
         cast(Table, User.__table__),
@@ -127,6 +187,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
+        cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationParticipant.__table__),
+        cast(Table, ConversationTurn.__table__),
         cast(Table, RuntimeControlState.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, AgentRuntimeRun.__table__),
@@ -226,6 +289,37 @@ def _seed_runtime_control(engine: Engine, desired_state: str) -> None:
             RuntimeControlState(
                 control_key="default",
                 desired_state=desired_state,
+            ),
+        )
+        session.commit()
+
+
+def _seed_running_conversation(engine: Engine, world_id: uuid.UUID, agent_id: uuid.UUID) -> None:
+    session_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            ConversationSession(
+                id=session_id,
+                world_id=world_id,
+                scene_id=None,
+                session_key="runtime-session",
+                title="Runtime session",
+                scope_type="world",
+                mode="auto_dialogue",
+                status="running",
+                objective="Keep talking.",
+                opening_prompt="Begin the conversation.",
+                max_turns=3,
+                next_turn_index=0,
+            ),
+        )
+        session.add(
+            ConversationParticipant(
+                id=uuid.uuid4(),
+                session_id=session_id,
+                agent_id=agent_id,
+                turn_order=0,
+                is_enabled=True,
             ),
         )
         session.commit()

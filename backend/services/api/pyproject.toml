@@ -13,6 +13,7 @@ dependencies = [
   "noveland-agents",
   "noveland-auth",
   "noveland-calendar",
+  "noveland-conversations",
   "noveland-core",
   "noveland-events",
   "noveland-memory",
@@ -34,6 +35,7 @@ noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
 noveland-auth = { workspace = true }
 noveland-calendar = { workspace = true }
+noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
 noveland-memory = { workspace = true }

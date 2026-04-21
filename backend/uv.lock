@@ -9,6 +9,7 @@ members = [
     "noveland-auth",
     "noveland-backend",
     "noveland-calendar",
+    "noveland-conversations",
     "noveland-core",
     "noveland-events",
     "noveland-memory",
@@ -413,6 +414,7 @@ dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-auth" },
     { name = "noveland-calendar" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-events" },
     { name = "noveland-memory" },
@@ -442,6 +444,7 @@ requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-calendar", editable = "packages/calendar" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
     { name = "noveland-memory", editable = "packages/memory" },
@@ -485,6 +488,27 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
 provides-extras = ["test"]
+
+[[package]]
+name = "noveland-conversations"
+version = "0.1.0"
+source = { editable = "packages/conversations" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-core" },
+    { name = "noveland-events" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-events", editable = "packages/events" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
 
 [[package]]
 name = "noveland-core"
@@ -598,6 +622,7 @@ dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-auth" },
     { name = "noveland-calendar" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-events" },
     { name = "noveland-memory" },
@@ -618,6 +643,7 @@ requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-calendar", editable = "packages/calendar" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
     { name = "noveland-memory", editable = "packages/memory" },
@@ -640,6 +666,7 @@ dependencies = [
     { name = "noveland-adapters" },
     { name = "noveland-agents" },
     { name = "noveland-calendar" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-events" },
     { name = "noveland-memory" },
@@ -655,6 +682,7 @@ requires-dist = [
     { name = "noveland-adapters", editable = "packages/adapters" },
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-calendar", editable = "packages/calendar" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
     { name = "noveland-memory", editable = "packages/memory" },
