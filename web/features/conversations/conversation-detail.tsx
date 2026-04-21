@@ -10,8 +10,11 @@ import {
   resumeConversation,
   seedConversation,
   startConversation,
+  stopConversation,
+  updateConversation,
 } from "@/lib/worlds/client";
 import type { ConversationDetailData } from "@/lib/worlds/server";
+import type { ConversationPolicy, RuntimeDiagnostic } from "@/lib/worlds/types";
 import { formString, messageForError } from "@/features/workspace/form-utils";
 
 type ConversationDetailProps = {
@@ -88,6 +91,18 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
     );
   }
 
+  async function handlePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      () =>
+        updateConversation(worldId, conversationId, {
+          policy: policyFromForm(form),
+        }),
+      "Conversation policy updated.",
+    );
+  }
+
   const canManage = data.canManageSelectedWorld;
 
   return (
@@ -100,6 +115,9 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         <p>
           {conversation.session_key} - {conversation.mode} - {conversation.status}
         </p>
+        {conversation.terminal_reason !== null ? (
+          <p>Terminal reason: {conversation.terminal_reason}</p>
+        ) : null}
         <p>{conversation.objective || "No objective configured."}</p>
         {canManage ? (
           <div className="button-row">
@@ -143,11 +161,69 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
             >
               Resume
             </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() =>
+                runAction(() => stopConversation(worldId, conversationId), "Conversation stopped.")
+              }
+            >
+              Stop
+            </button>
           </div>
         ) : null}
       </section>
 
       <div className="management-columns">
+        <section className="management-panel" aria-labelledby="policy-title">
+          <h2 className="section-title" id="policy-title">
+            Conversation policy
+          </h2>
+          {canManage ? (
+            <form className="inline-form" onSubmit={handlePolicy}>
+              <select
+                aria-label="Conversation error policy"
+                className="text-input"
+                name="error_policy"
+                defaultValue={conversation.policy.error_policy}
+              >
+                <option value="retry_once_then_fail">retry_once_then_fail</option>
+                <option value="retry_once_then_skip">retry_once_then_skip</option>
+                <option value="fail_session">fail_session</option>
+                <option value="skip_turn">skip_turn</option>
+              </select>
+              <input
+                aria-label="Conversation max consecutive failed turns"
+                className="text-input"
+                name="max_consecutive_failed_turns"
+                defaultValue={String(conversation.policy.max_consecutive_failed_turns)}
+              />
+              <input
+                aria-label="Conversation loop guard window"
+                className="text-input"
+                name="loop_guard_window"
+                defaultValue={String(conversation.policy.loop_guard_window)}
+              />
+              <input
+                aria-label="Conversation repeat output threshold"
+                className="text-input"
+                name="repeat_output_threshold"
+                defaultValue={String(conversation.policy.repeat_output_threshold)}
+              />
+              <button className="primary-button" type="submit" disabled={isBusy}>
+                Save policy
+              </button>
+            </form>
+          ) : (
+            <p>
+              {conversation.policy.error_policy} / failures{" "}
+              {conversation.policy.max_consecutive_failed_turns} / loop{" "}
+              {conversation.policy.repeat_output_threshold} in {conversation.policy.loop_guard_window}
+            </p>
+          )}
+        </section>
+
         <section className="management-panel" aria-labelledby="participants-title">
           <h2 className="section-title" id="participants-title">
             Participants
@@ -202,6 +278,15 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         </section>
       </div>
 
+      {canManage ? (
+        <section className="management-panel" aria-labelledby="conversation-diagnostics-title">
+          <h2 className="section-title" id="conversation-diagnostics-title">
+            Conversation diagnostics
+          </h2>
+          <DiagnosticList diagnostics={data.diagnostics} />
+        </section>
+      ) : null}
+
       <section className="management-panel" aria-labelledby="transcript-title">
         <h2 className="section-title" id="transcript-title">
           Transcript
@@ -220,9 +305,10 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               return (
                 <article className="resource-row" key={turn.id}>
                   <div>
-                    <h3>
+                  <h3>
                       #{turn.turn_index} {agent?.display_name ?? turn.speaker_kind}
                     </h3>
+                    <p>Status: {turn.status}</p>
                     <p>{turn.output_text ?? turn.input_text}</p>
                     {turn.error_text !== null ? <p>{turn.error_text}</p> : null}
                   </div>
@@ -233,5 +319,36 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         </div>
       </section>
     </section>
+  );
+}
+
+function policyFromForm(form: FormData): ConversationPolicy {
+  return {
+    error_policy: formString(form, "error_policy") as ConversationPolicy["error_policy"],
+    max_consecutive_failed_turns: Number(formString(form, "max_consecutive_failed_turns")),
+    loop_guard_window: Number(formString(form, "loop_guard_window")),
+    repeat_output_threshold: Number(formString(form, "repeat_output_threshold")),
+  };
+}
+
+function DiagnosticList({ diagnostics }: { diagnostics: RuntimeDiagnostic[] }) {
+  if (diagnostics.length === 0) {
+    return <p>No diagnostics recorded.</p>;
+  }
+
+  return (
+    <div className="resource-list">
+      {diagnostics.map((diagnostic) => (
+        <article className="resource-row" key={diagnostic.id}>
+          <div>
+            <h3>
+              {diagnostic.severity} - {diagnostic.event_type}
+            </h3>
+            <p>{diagnostic.message}</p>
+            <p>{diagnostic.occurred_at}</p>
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }

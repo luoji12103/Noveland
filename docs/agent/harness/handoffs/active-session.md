@@ -1,34 +1,34 @@
 # Active Session Handoff
 
-- Date: 2026-04-19T00:00:00Z
-- Branch: feat/conversation-workspace-baseline
-- Objective: Add conversation workspace baseline with world/scene-scoped multi-agent sessions, manual chain and auto dialogue modes, and a world-first multi-page Web workspace.
+- Date: 2026-04-21T00:00:00Z
+- Branch: feat/conversation-policies-stop-conditions
+- Objective: Add explicit per-session conversation policies, stop/failure guards, and conversation diagnostics before narrative writer consumption.
 - Completed work:
-  - Created `feat/conversation-workspace-baseline` from the dirty local `main` worktree and continued the interrupted implementation there.
-  - Added `noveland.conversations` package with contracts, typed errors, ORM models, and deterministic round-robin conversation service.
-  - Added Alembic migration `20260419_0011_conversation_workspace_baseline.py` for `conversation_sessions`, `conversation_participants`, and `conversation_turns`.
-  - Registered conversation models in `noveland.core.database.MODEL_MODULES` and added workspace/package dependencies.
-  - Added `/worlds/{world_id}/conversations/**` backend API and included it in the FastAPI app.
-  - Added runtime `conversation_loop` and daemon integration for running auto-dialogue sessions.
-  - Added explicit `provider_profile_id` mapping to agent create/update/response contracts while keeping `agent.config` compatibility.
-  - Split the Web UI into `/worlds`, `/worlds/[worldId]`, agent builder, conversation workspace, narrative, `/admin/providers`, and `/admin/runtime` pages.
-  - Updated same-origin Web helpers, client calls, Playwright mock backend, E2E flows, and harness docs.
+  - Extended conversation contracts, ORM state, and migration coverage with `policy_config`, `terminal_reason`, `stopped`, and `skipped`.
+  - Added conversation error-policy behavior for skip, retry-once-then-skip, fail, and retry-once-then-fail in both the service layer and runtime daemon turn executor.
+  - Added terminal handling for max-turn completion, no-enabled-participant failure, consecutive failure exhaustion, loop-guard repeated output detection, and operator stop.
+  - Reused `runtime_diagnostic_events` for conversation diagnostics by extending the observability component enum with `conversation`.
+  - Added conversation diagnostics and explicit stop routes to the API, with world-admin/platform-admin visibility only.
+  - Updated the Web conversation workspace with a policy editor, stop control, terminal state display, and recent diagnostics panel.
+  - Hardened route transitions after world, agent, and conversation creation to use full-page navigation where Next client routing was causing flaky post-create state in E2E.
 - Incomplete work:
-  - Final backend full regression, Web build, Compose config, commit, and merge decision remain to run after this handoff update.
-  - Conversation policy hardening, richer stop conditions, LLM speaker selection, and narrative writer consumption are intentionally deferred.
+  - Final full regression, commit, and merge back to `main`.
+  - Narrative writer/summarizer pipeline and dedicated reader surface remain the next two planned stages.
 - Tests run:
-  - `cd web && npm run typecheck`
+  - `cd backend && uv run ruff check .`
+  - `cd backend && uv run mypy .`
+  - `cd backend && uv run pytest`
   - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
   - `cd web && npm run test`
   - `cd web && npm run test:e2e`
-  - Earlier targeted backend checks passed for conversations, runtime daemon, schema metadata, and workspace imports.
 - Current risks:
-  - `auto_dialogue` advances one turn per runtime loop iteration; it is not a standalone scheduler.
-  - Conversation prompt chaining is deterministic and does not choose speakers with an LLM.
-  - Existing local deployment-fix changes were already dirty before this branch and are still present in the worktree.
+  - Conversation loop guard is text-normalization based and intentionally simple; semantic loop detection is out of scope.
+  - Conversation diagnostics share the runtime diagnostics table, so long-term retention/partitioning is still a future operational concern.
+  - Auto dialogue still advances at most one turn per runtime loop iteration.
 - Recommended next step:
-  - Run full backend gates, Web build, Compose config, then commit `feat(conversations): add workspace baseline`.
+  - Run final compose/build gates, commit `feat(conversations): add policies and stop conditions`, merge to `main`, then branch for narrative writer work.
 - Sensitive areas to avoid casual edits:
+  - migration ordering and backwards compatibility
   - provider secret handling and diagnostic redaction
-  - API authorization and CSRF boundaries
-  - migration ordering and event/runtime invariants
+  - conversation event naming and runtime session state transitions

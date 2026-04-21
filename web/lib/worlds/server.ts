@@ -73,6 +73,7 @@ export type ConversationDetailData = ConversationListData & {
   conversation: ConversationSession | null;
   participants: ConversationParticipant[];
   turns: ConversationTurn[];
+  diagnostics: RuntimeDiagnostic[];
 };
 
 export type NarrativeWorkspaceData = {
@@ -387,9 +388,9 @@ export async function getConversationDetailData(
   const conversation =
     listData.conversations.find((item) => item.id === conversationId) ?? null;
   if (conversation === null) {
-    return { ...listData, conversation: null, participants: [], turns: [] };
+    return { ...listData, conversation: null, participants: [], turns: [], diagnostics: [] };
   }
-  const [participants, turns] = await Promise.all([
+  const [participants, turns, diagnostics] = await Promise.all([
     apiFetch<ConversationParticipant[]>(
       `/worlds/${worldId}/conversations/${conversationId}/participants`,
       cookies,
@@ -398,8 +399,12 @@ export async function getConversationDetailData(
       `/worlds/${worldId}/conversations/${conversationId}/turns`,
       cookies,
     ),
+    apiFetchOptional<RuntimeDiagnostic[]>(
+      `/worlds/${worldId}/conversations/${conversationId}/diagnostics`,
+      cookies,
+    ),
   ]);
-  return { ...listData, conversation, participants, turns };
+  return { ...listData, conversation, participants, turns, diagnostics: diagnostics ?? [] };
 }
 
 export async function getNarrativeWorkspaceData(

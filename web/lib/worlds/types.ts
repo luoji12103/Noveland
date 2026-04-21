@@ -56,7 +56,36 @@ export type ConversationScopeType = "scene" | "world";
 
 export type ConversationMode = "manual_chain" | "auto_dialogue";
 
-export type ConversationSessionStatus = "draft" | "running" | "paused" | "completed" | "failed";
+export type ConversationSessionStatus =
+  | "draft"
+  | "running"
+  | "paused"
+  | "completed"
+  | "stopped"
+  | "failed";
+
+export type ConversationTurnStatus = "succeeded" | "skipped" | "failed";
+
+export type ConversationErrorPolicy =
+  | "fail_session"
+  | "skip_turn"
+  | "retry_once_then_fail"
+  | "retry_once_then_skip";
+
+export type ConversationTerminalReason =
+  | "max_turns_reached"
+  | "loop_guard_repeated_output"
+  | "no_enabled_participants"
+  | "consecutive_failures_exceeded"
+  | "operator_stopped"
+  | "speaker_error";
+
+export type ConversationPolicy = {
+  error_policy: ConversationErrorPolicy;
+  max_consecutive_failed_turns: number;
+  loop_guard_window: number;
+  repeat_output_threshold: number;
+};
 
 export type ConversationSession = {
   id: string;
@@ -71,6 +100,8 @@ export type ConversationSession = {
   opening_prompt: string;
   max_turns: number;
   next_turn_index: number;
+  policy: ConversationPolicy;
+  terminal_reason: ConversationTerminalReason | null;
   created_at: string;
   updated_at: string;
 };
@@ -93,7 +124,7 @@ export type ConversationTurn = {
   speaker_agent_id: string | null;
   input_text: string;
   output_text: string | null;
-  status: "succeeded" | "failed";
+  status: ConversationTurnStatus;
   run_id: string | null;
   error_text: string | null;
   created_at: string;
@@ -201,7 +232,13 @@ export type RuntimeStatus = RuntimeControl & {
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
-export type DiagnosticComponent = "runtime" | "provider" | "agent" | "event_publisher" | "api";
+export type DiagnosticComponent =
+  | "runtime"
+  | "provider"
+  | "agent"
+  | "conversation"
+  | "event_publisher"
+  | "api";
 
 export type RuntimeDiagnostic = {
   id: string;
@@ -376,6 +413,7 @@ export type ConversationCreateInput = {
   objective?: string;
   opening_prompt?: string;
   max_turns?: number;
+  policy: ConversationPolicy;
 };
 
 export type ConversationUpdateInput = {
@@ -383,6 +421,7 @@ export type ConversationUpdateInput = {
   objective?: string;
   opening_prompt?: string;
   max_turns?: number;
+  policy?: ConversationPolicy;
 };
 
 export type ConversationParticipantInput = {

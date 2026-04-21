@@ -67,6 +67,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
             "mode": "manual_chain",
             "scene_id": str(scene_id),
             "max_turns": 3,
+            "policy": _policy_json(),
         },
     )
     conversation_id = create_response.json()["id"]
@@ -86,6 +87,9 @@ def test_conversation_api_enforces_access_and_manual_advance(
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/conversations")
     member_turns = client.get(f"/worlds/{world_id}/conversations/{conversation_id}/turns")
+    member_diagnostics = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics",
+    )
     member_advance = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
 
     _authenticate(client, stranger_token)
@@ -98,6 +102,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert advance_response.json()["turn"]["speaker_agent_id"] == str(first_agent_id)
     assert member_list.status_code == 200
     assert member_turns.status_code == 200
+    assert member_diagnostics.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
     assert member_advance.status_code == 403
     assert stranger_list.status_code == 404
@@ -138,6 +143,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "scope_type": "scene",
             "mode": "auto_dialogue",
             "scene_id": str(first_scene_id),
+            "policy": _policy_json(),
         },
     )
     invalid_world_scope = client.post(
@@ -148,6 +154,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "scope_type": "world",
             "mode": "manual_chain",
             "scene_id": str(first_scene_id),
+            "policy": _policy_json(),
         },
     )
     invalid_scene_scope = client.post(
@@ -157,6 +164,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "title": "Invalid scene missing",
             "scope_type": "scene",
             "mode": "manual_chain",
+            "policy": _policy_json(),
         },
     )
     conversation_id = create_conversation.json()["id"]
@@ -196,6 +204,37 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
     assert pause_response.json()["status"] == "paused"
     assert resume_response.status_code == 200
     assert resume_response.json()["status"] == "running"
+
+
+def test_conversation_api_stop_and_diagnostics() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "stop-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, owner_token)
+
+    create_conversation = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "stoppable",
+            "title": "Stoppable",
+            "scope_type": "world",
+            "mode": "manual_chain",
+            "policy": _policy_json(),
+        },
+    )
+    conversation_id = create_conversation.json()["id"]
+    stop_response = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/stop")
+    diagnostics_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics",
+    )
+
+    assert stop_response.status_code == 200
+    assert stop_response.json()["status"] == "stopped"
+    assert stop_response.json()["terminal_reason"] == "operator_stopped"
+    assert diagnostics_response.status_code == 200
+    assert diagnostics_response.json()[0]["component"] == "conversation"
+    assert diagnostics_response.json()[0]["details"]["conversation_id"] == str(conversation_id)
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -357,3 +396,12 @@ def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.set(SESSION_COOKIE_NAME, token)
     client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
     client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _policy_json() -> dict[str, object]:
+    return {
+        "error_policy": "retry_once_then_fail",
+        "max_consecutive_failed_turns": 2,
+        "loop_guard_window": 4,
+        "repeat_output_threshold": 3,
+    }

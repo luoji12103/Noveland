@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from noveland.adapters import ProviderProfileService
-from noveland.conversations import ConversationAdvanceResult, ConversationService
+from noveland.conversations import (
+    ConversationAdvanceResult,
+    ConversationErrorPolicy,
+    ConversationService,
+)
 from noveland.conversations.errors import ConversationStateError
-from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
+from noveland.services.runtime.agent_loop import AgentRunExecution, AgentRuntimeOrchestrator
 from sqlalchemy.orm import Session
 
 
@@ -39,14 +43,33 @@ class ConversationRuntimeOrchestrator:
             session_id,
             allow_running_auto=allow_running_auto,
         )
-        run = self._agent_orchestrator.run_agent(
+        policy = prepared.session.policy
+        run = self._run_agent_turn(
             world_id=world_id,
             agent_id=prepared.speaker_agent_id,
             prompt_text=prepared.prompt_text,
             trigger_source=trigger_source,
-            create_memory=False,
-            create_narrative_artifact=False,
         )
+        if (
+            run.status != "succeeded"
+            and policy.error_policy
+            in {
+                ConversationErrorPolicy.RETRY_ONCE_THEN_FAIL,
+                ConversationErrorPolicy.RETRY_ONCE_THEN_SKIP,
+            }
+        ):
+            retry_run = self._run_agent_turn(
+                world_id=world_id,
+                agent_id=prepared.speaker_agent_id,
+                prompt_text=prepared.prompt_text,
+                trigger_source=f"{trigger_source}:retry",
+            )
+            retry_diagnostics = dict(retry_run.diagnostics)
+            retry_diagnostics["attempt_count"] = 2
+            retry_diagnostics["initial_error"] = _error_text(run.diagnostics)
+            run = replace(retry_run, diagnostics=retry_diagnostics)
+        else:
+            run = replace(run, diagnostics={**run.diagnostics, "attempt_count": 1})
         return self._conversation_service.finalize_turn(
             prepared,
             response_text=run.response_text,
@@ -54,6 +77,23 @@ class ConversationRuntimeOrchestrator:
             diagnostics=run.diagnostics,
             succeeded=run.status == "succeeded",
             error_text=None if run.status == "succeeded" else _error_text(run.diagnostics),
+        )
+
+    def _run_agent_turn(
+        self,
+        *,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        prompt_text: str,
+        trigger_source: str,
+    ) -> AgentRunExecution:
+        return self._agent_orchestrator.run_agent(
+            world_id=world_id,
+            agent_id=agent_id,
+            prompt_text=prompt_text,
+            trigger_source=trigger_source,
+            create_memory=False,
+            create_narrative_artifact=False,
         )
 
     def advance_running_sessions(self, limit: int) -> ConversationBatchResult:

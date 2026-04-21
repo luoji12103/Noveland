@@ -31,6 +31,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/agents/`
 - `web/features/auth/`
 - `web/features/conversations/`
+- `web/features/conversations/conversation-detail.test.tsx`
 - `web/features/dashboard/`
 - `web/features/workspace/`
 - `web/features/worlds/`
@@ -121,6 +122,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260417_0009_provider_reliability.py`
 - `backend/migrations/versions/20260417_0010_agent_observation_persona.py`
 - `backend/migrations/versions/20260419_0011_conversation_workspace_baseline.py`
+- `backend/migrations/versions/20260421_0012_conversation_policies_stop_conditions.py`
 - `backend/tests/`
 - `contracts/`
 - `infra/`

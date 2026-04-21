@@ -18,6 +18,7 @@ class DiagnosticComponent(StrEnum):
     RUNTIME = "runtime"
     PROVIDER = "provider"
     AGENT = "agent"
+    CONVERSATION = "conversation"
     EVENT_PUBLISHER = "event_publisher"
     API = "api"
 

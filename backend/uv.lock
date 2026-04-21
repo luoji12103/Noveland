@@ -497,6 +497,7 @@ dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-core" },
     { name = "noveland-events" },
+    { name = "noveland-observability" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
@@ -506,6 +507,7 @@ requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
+    { name = "noveland-observability", editable = "packages/observability" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]

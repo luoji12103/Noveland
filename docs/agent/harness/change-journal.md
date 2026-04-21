@@ -252,3 +252,14 @@
 - Tests added/updated: conversation service/API tests; runtime daemon auto-dialogue test; schema/import coverage; Web auth/E2E updates for multi-page workspace and conversations
 - Docs updated: README, architecture map, module boundaries, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: conversation v1 uses deterministic round-robin only; LLM speaker selection, policy guardrails, richer stop conditions, and narrative writer consumption remain future tasks.
+
+## Conversation policies and stop conditions entry
+
+- Date: 2026-04-21
+- Branch: feat/conversation-policies-stop-conditions
+- Scope: per-session conversation policy, stop/failure guards, and diagnostics visibility
+- Summary: Added explicit per-session policy config and terminal reason fields, skip/retry/fail stop-condition handling, conversation diagnostics over the existing observability store, new stop/diagnostics API routes, and Web policy editing plus diagnostic display in the conversation detail view.
+- Files changed: `/backend/packages/conversations/**`, `/backend/packages/observability/**`, `/backend/services/api/src/noveland/services/api/conversations.py`, `/backend/services/runtime/src/noveland/services/runtime/conversation_loop.py`, `/backend/migrations/versions/20260421_0012_conversation_policies_stop_conditions.py`, `/backend/tests/**`, `/web/features/{agents,conversations,worlds}/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/**`
+- Tests added/updated: conversation service policy coverage, API stop/diagnostics coverage, runtime daemon retry handling, schema metadata assertions, Web conversation detail policy/diagnostics tests, and mock-backend E2E updates for stopped/max-turn sessions
+- Docs updated: project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: richer distributed conversation diagnostics, memory-aware conversation context, and writer consumption of transcripts remain separate future work.

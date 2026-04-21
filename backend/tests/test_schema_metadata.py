@@ -25,6 +25,11 @@ def index_names(table_name: str) -> set[str]:
     }
 
 
+def column_names(table_name: str) -> set[str]:
+    table = Base.metadata.tables[table_name]
+    return {column.name for column in table.columns}
+
+
 def foreign_key_targets(table_name: str) -> set[str]:
     table = Base.metadata.tables[table_name]
     targets: set[str] = set()
@@ -213,6 +218,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "conversation_sessions",
         CheckConstraint,
     )
+    assert "ck_conversation_sessions_terminal_reason" in constraint_names(
+        "conversation_sessions",
+        CheckConstraint,
+    )
     assert "ck_conversation_participants_turn_order_non_negative" in constraint_names(
         "conversation_participants",
         CheckConstraint,
@@ -395,3 +404,7 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_runtime_diagnostic_events_agent_occurred_at" in index_names(
         "runtime_diagnostic_events",
     )
+
+
+def test_conversation_schema_includes_policy_and_terminal_columns() -> None:
+    assert {"policy_config", "terminal_reason"} <= column_names("conversation_sessions")

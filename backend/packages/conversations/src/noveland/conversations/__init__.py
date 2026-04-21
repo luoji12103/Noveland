@@ -1,8 +1,10 @@
 from noveland.conversations.contracts import (
     ConversationAdvanceResult,
+    ConversationErrorPolicy,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
+    ConversationPolicyConfig,
     ConversationScopeType,
     ConversationSeed,
     ConversationSessionCreate,
@@ -10,6 +12,7 @@ from noveland.conversations.contracts import (
     ConversationSessionStatus,
     ConversationSessionUpdate,
     ConversationSpeakerKind,
+    ConversationTerminalReason,
     ConversationTurnRecord,
     ConversationTurnStatus,
     PreparedConversationTurn,
@@ -26,9 +29,12 @@ from noveland.conversations.models import (
 )
 from noveland.conversations.services import (
     CONVERSATION_SESSION_COMPLETED_EVENT_NAME,
+    CONVERSATION_SESSION_FAILED_EVENT_NAME,
     CONVERSATION_SESSION_STARTED_EVENT_NAME,
+    CONVERSATION_SESSION_STOPPED_EVENT_NAME,
     CONVERSATION_TURN_COMPLETED_EVENT_NAME,
     CONVERSATION_TURN_FAILED_EVENT_NAME,
+    CONVERSATION_TURN_SKIPPED_EVENT_NAME,
     ConversationService,
 )
 
@@ -36,15 +42,20 @@ PACKAGE_NAME = "conversations"
 
 __all__ = [
     "CONVERSATION_SESSION_COMPLETED_EVENT_NAME",
+    "CONVERSATION_SESSION_FAILED_EVENT_NAME",
     "CONVERSATION_SESSION_STARTED_EVENT_NAME",
+    "CONVERSATION_SESSION_STOPPED_EVENT_NAME",
     "CONVERSATION_TURN_COMPLETED_EVENT_NAME",
     "CONVERSATION_TURN_FAILED_EVENT_NAME",
+    "CONVERSATION_TURN_SKIPPED_EVENT_NAME",
     "ConversationAdvanceResult",
     "ConversationError",
+    "ConversationErrorPolicy",
     "ConversationMode",
     "ConversationParticipant",
     "ConversationParticipantDefinition",
     "ConversationParticipantRecord",
+    "ConversationPolicyConfig",
     "ConversationScopeType",
     "ConversationSeed",
     "ConversationService",
@@ -55,6 +66,7 @@ __all__ = [
     "ConversationSessionUpdate",
     "ConversationSpeakerKind",
     "ConversationStateError",
+    "ConversationTerminalReason",
     "ConversationTurn",
     "ConversationTurnRecord",
     "ConversationTurnStatus",

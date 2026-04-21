@@ -18,13 +18,15 @@ export function AgentList({ worldId, data }: AgentListProps) {
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
 
-  async function runAction(action: () => Promise<unknown>, success: string) {
+  async function runAction(action: () => Promise<unknown>, success: string, refresh = true) {
     setIsBusy(true);
     setNotice(null);
     try {
       await action();
       setNotice(success);
-      router.refresh();
+      if (refresh) {
+        router.refresh();
+      }
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -46,9 +48,10 @@ export function AgentList({ worldId, data }: AgentListProps) {
           provider_profile_id: optionalFormString(form, "provider_profile_id"),
         });
         formElement.reset();
-        router.push(`/worlds/${worldId}/agents/${agent.id}`);
+        window.location.assign(`/worlds/${worldId}/agents/${agent.id}`);
       },
       "Agent created.",
+      false,
     );
   }
 

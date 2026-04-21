@@ -35,6 +35,7 @@
 - Provider Reliability Hardening
 - Agent Observation + Persona Policy Baseline
 - Conversation Workspace Baseline
+- Conversation Policies + Stop Conditions
 
 ## Upcoming Mainline
-- Conversation Policies + Stop Conditions
+- Narrative Writer / Summarizer Pipeline

@@ -311,6 +311,13 @@ def _seed_running_conversation(engine: Engine, world_id: uuid.UUID, agent_id: uu
                 opening_prompt="Begin the conversation.",
                 max_turns=3,
                 next_turn_index=0,
+                policy_config={
+                    "error_policy": "retry_once_then_fail",
+                    "max_consecutive_failed_turns": 2,
+                    "loop_guard_window": 4,
+                    "repeat_output_threshold": 3,
+                },
+                terminal_reason=None,
             ),
         )
         session.add(

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 
 from noveland.agents.models import Agent
 from noveland.conversations.contracts import (
     ConversationAdvanceResult,
+    ConversationErrorPolicy,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
+    ConversationPolicyConfig,
     ConversationScopeType,
     ConversationSeed,
     ConversationSessionCreate,
@@ -16,6 +19,7 @@ from noveland.conversations.contracts import (
     ConversationSessionStatus,
     ConversationSessionUpdate,
     ConversationSpeakerKind,
+    ConversationTerminalReason,
     ConversationTurnRecord,
     ConversationTurnStatus,
     PreparedConversationTurn,
@@ -30,20 +34,32 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events import WorldEventAppend, WorldEventStore
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
+    RuntimeDiagnosticRecord,
+    RuntimeDiagnosticsService,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 CONVERSATION_SESSION_STARTED_EVENT_NAME = "conversation.session_started"
 CONVERSATION_TURN_COMPLETED_EVENT_NAME = "conversation.turn_completed"
+CONVERSATION_TURN_SKIPPED_EVENT_NAME = "conversation.turn_skipped"
 CONVERSATION_TURN_FAILED_EVENT_NAME = "conversation.turn_failed"
+CONVERSATION_SESSION_STOPPED_EVENT_NAME = "conversation.session_stopped"
+CONVERSATION_SESSION_FAILED_EVENT_NAME = "conversation.session_failed"
 CONVERSATION_SESSION_COMPLETED_EVENT_NAME = "conversation.session_completed"
 TRANSCRIPT_WINDOW = 8
 SYSTEM_ACTOR_REF = "system:conversation"
+_WHITESPACE_RE = re.compile(r"\s+")
 
 
 class ConversationService:
     def __init__(self, session: Session) -> None:
         self._session = session
+        self._diagnostics = RuntimeDiagnosticsService(session)
 
     def list_sessions(self, world_id: uuid.UUID) -> list[ConversationSessionRecord]:
         return [
@@ -62,9 +78,9 @@ class ConversationService:
             for model in self._session.scalars(
                 select(ConversationSession)
                 .where(
-                    ConversationSession.mode == ConversationMode.AUTO_DIALOGUE.value,
-                    ConversationSession.status == ConversationSessionStatus.RUNNING.value,
+                    ConversationSession.mode == ConversationMode.AUTO_DIALOGUE.value
                 )
+                .where(ConversationSession.status == ConversationSessionStatus.RUNNING.value)
                 .order_by(
                     ConversationSession.updated_at.asc(),
                     ConversationSession.created_at.asc(),
@@ -96,6 +112,8 @@ class ConversationService:
             opening_prompt=conversation.opening_prompt,
             max_turns=conversation.max_turns,
             next_turn_index=0,
+            policy_config=conversation.policy.model_dump(mode="json"),
+            terminal_reason=None,
         )
         self._session.add(model)
         self._session.flush()
@@ -110,6 +128,7 @@ class ConversationService:
         model = self._session_model(world_id, session_id)
         if model.status in {
             ConversationSessionStatus.COMPLETED.value,
+            ConversationSessionStatus.STOPPED.value,
             ConversationSessionStatus.FAILED.value,
         }:
             raise ConversationStateError("Conversation session is no longer editable")
@@ -123,6 +142,8 @@ class ConversationService:
             if self._agent_turn_count(model.id) > update.max_turns:
                 raise ConversationStateError("max_turns cannot be lower than existing agent turns")
             model.max_turns = update.max_turns
+        if "policy" in update.model_fields_set and update.policy is not None:
+            model.policy_config = update.policy.model_dump(mode="json")
         self._session.flush()
         return _session_record(model)
 
@@ -141,9 +162,13 @@ class ConversationService:
         participants: list[ConversationParticipantDefinition],
     ) -> list[ConversationParticipantRecord]:
         session_model = self._session_model(world_id, session_id)
-        if session_model.status == ConversationSessionStatus.COMPLETED.value:
+        if session_model.status in {
+            ConversationSessionStatus.COMPLETED.value,
+            ConversationSessionStatus.STOPPED.value,
+            ConversationSessionStatus.FAILED.value,
+        }:
             raise ConversationStateError(
-                "Completed conversation sessions cannot change participants",
+                "Completed, stopped, or failed conversation sessions cannot change participants",
             )
 
         agent_ids = [definition.agent_id for definition in participants]
@@ -207,6 +232,26 @@ class ConversationService:
         self._session_model(world_id, session_id)
         return self._turn_records(session_id)
 
+    def list_diagnostics(
+        self,
+        world_id: uuid.UUID,
+        session_id: uuid.UUID,
+        *,
+        limit: int = 20,
+    ) -> list[RuntimeDiagnosticRecord]:
+        self._session_model(world_id, session_id)
+        records = self._diagnostics.list_for_world(
+            world_id,
+            component=DiagnosticComponent.CONVERSATION,
+            limit=max(limit * 5, limit),
+        )
+        matches = [
+            record
+            for record in records
+            if record.details.get("conversation_id") == str(session_id)
+        ]
+        return matches[: max(1, min(limit, 100))]
+
     def seed_session(
         self,
         world_id: uuid.UUID,
@@ -257,6 +302,7 @@ class ConversationService:
                 },
             )
         model.status = ConversationSessionStatus.RUNNING.value
+        model.terminal_reason = None
         self._session.flush()
         return _session_record(model)
 
@@ -288,6 +334,28 @@ class ConversationService:
         self._session.flush()
         return _session_record(model)
 
+    def stop_session(
+        self,
+        world_id: uuid.UUID,
+        session_id: uuid.UUID,
+    ) -> ConversationSessionRecord:
+        model = self._session_model(world_id, session_id)
+        if model.status in {
+            ConversationSessionStatus.COMPLETED.value,
+            ConversationSessionStatus.STOPPED.value,
+            ConversationSessionStatus.FAILED.value,
+        }:
+            raise ConversationStateError("Conversation session is no longer active")
+        self._mark_session_stopped(
+            model,
+            terminal_reason=ConversationTerminalReason.OPERATOR_STOPPED,
+            event_name=CONVERSATION_SESSION_STOPPED_EVENT_NAME,
+            message="Conversation session stopped by operator.",
+            details={"conversation_id": str(model.id), "stop_source": "operator"},
+        )
+        self._session.flush()
+        return _session_record(model)
+
     def prepare_next_turn(
         self,
         world_id: uuid.UUID,
@@ -313,21 +381,19 @@ class ConversationService:
 
         participants = self._available_participants(session_model)
         if not participants:
-            session_model.status = ConversationSessionStatus.FAILED.value
+            self._mark_session_failed(
+                session_model,
+                terminal_reason=ConversationTerminalReason.NO_ENABLED_PARTICIPANTS,
+                turn_index=None,
+                speaker_agent_id=None,
+                error_text="Conversation session has no enabled participants",
+            )
             self._session.flush()
             raise ConversationStateError("Conversation session has no enabled participants")
 
         agent_turn_count = self._agent_turn_count(session_model.id)
         if agent_turn_count >= session_model.max_turns:
-            session_model.status = ConversationSessionStatus.COMPLETED.value
-            self._append_event(
-                world_id=session_model.world_id,
-                event_name=CONVERSATION_SESSION_COMPLETED_EVENT_NAME,
-                payload={
-                    "conversation_id": str(session_model.id),
-                    "max_turns": session_model.max_turns,
-                },
-            )
+            self._mark_session_completed(session_model)
             self._session.flush()
             raise ConversationStateError("Conversation session has reached max turns")
 
@@ -335,7 +401,8 @@ class ConversationService:
         participant = participants[participant_index]
         turn_index = self._next_turn_index(session_model.id)
         emit_started_event = (
-            session_model.mode == ConversationMode.MANUAL_CHAIN.value and agent_turn_count == 0
+            session_model.mode == ConversationMode.MANUAL_CHAIN.value
+            and agent_turn_count == 0
         )
         if emit_started_event:
             self._append_event(
@@ -370,26 +437,23 @@ class ConversationService:
         error_text: str | None = None,
     ) -> ConversationAdvanceResult:
         session_model = self._session_model(prepared.session.world_id, prepared.session.id)
-        status = (
-            ConversationTurnStatus.SUCCEEDED
-            if succeeded
-            else ConversationTurnStatus.FAILED
-        )
-        turn = ConversationTurn(
-            id=uuid.uuid4(),
-            session_id=prepared.session.id,
-            turn_index=prepared.turn_index,
-            speaker_kind=ConversationSpeakerKind.AGENT.value,
-            speaker_agent_id=prepared.speaker_agent_id,
-            input_text=prepared.prompt_text,
-            output_text=response_text,
-            status=status.value,
-            run_id=run_id,
-            error_text=error_text,
-        )
-        self._session.add(turn)
+        policy = _policy_config(session_model.policy_config)
+        prior_agent_turn_count = self._agent_turn_count(session_model.id)
 
         if succeeded:
+            turn = ConversationTurn(
+                id=uuid.uuid4(),
+                session_id=prepared.session.id,
+                turn_index=prepared.turn_index,
+                speaker_kind=ConversationSpeakerKind.AGENT.value,
+                speaker_agent_id=prepared.speaker_agent_id,
+                input_text=prepared.prompt_text,
+                output_text=response_text,
+                status=ConversationTurnStatus.SUCCEEDED.value,
+                run_id=run_id,
+                error_text=None,
+            )
+            self._session.add(turn)
             session_model.next_turn_index += 1
             self._append_event(
                 world_id=session_model.world_id,
@@ -401,18 +465,92 @@ class ConversationService:
                     "run_id": None if run_id is None else str(run_id),
                 },
             )
-            if self._agent_turn_count(session_model.id) >= session_model.max_turns:
-                session_model.status = ConversationSessionStatus.COMPLETED.value
-                self._append_event(
-                    world_id=session_model.world_id,
-                    event_name=CONVERSATION_SESSION_COMPLETED_EVENT_NAME,
-                    payload={
+
+            completed_turn_count = prior_agent_turn_count + 1
+            if completed_turn_count >= session_model.max_turns:
+                self._mark_session_completed(session_model)
+            elif self._loop_guard_triggered(session_model.id, policy=policy):
+                self._mark_session_stopped(
+                    session_model,
+                    terminal_reason=ConversationTerminalReason.LOOP_GUARD_REPEATED_OUTPUT,
+                    event_name=CONVERSATION_SESSION_STOPPED_EVENT_NAME,
+                    message="Conversation session stopped by loop guard.",
+                    details={
                         "conversation_id": str(session_model.id),
-                        "max_turns": session_model.max_turns,
+                        "turn_index": prepared.turn_index,
+                        "speaker_agent_id": str(prepared.speaker_agent_id),
+                        "reason": ConversationTerminalReason.LOOP_GUARD_REPEATED_OUTPUT.value,
                     },
                 )
+            self._session.flush()
+            return ConversationAdvanceResult(
+                session=_session_record(session_model),
+                turn=_turn_record(turn),
+            )
+
+        should_skip = policy.error_policy in {
+            ConversationErrorPolicy.SKIP_TURN,
+            ConversationErrorPolicy.RETRY_ONCE_THEN_SKIP,
+        }
+        turn_status = (
+            ConversationTurnStatus.SKIPPED if should_skip else ConversationTurnStatus.FAILED
+        )
+        turn = ConversationTurn(
+            id=uuid.uuid4(),
+            session_id=prepared.session.id,
+            turn_index=prepared.turn_index,
+            speaker_kind=ConversationSpeakerKind.AGENT.value,
+            speaker_agent_id=prepared.speaker_agent_id,
+            input_text=prepared.prompt_text,
+            output_text=response_text,
+            status=turn_status.value,
+            run_id=run_id,
+            error_text=error_text,
+        )
+        self._session.add(turn)
+
+        if should_skip:
+            session_model.next_turn_index += 1
+            self._append_event(
+                world_id=session_model.world_id,
+                event_name=CONVERSATION_TURN_SKIPPED_EVENT_NAME,
+                payload={
+                    "conversation_id": str(session_model.id),
+                    "turn_index": prepared.turn_index,
+                    "speaker_agent_id": str(prepared.speaker_agent_id),
+                    "run_id": None if run_id is None else str(run_id),
+                    "error": error_text or diagnostics.get("error") or "Unknown conversation error",
+                },
+            )
+            self._record_conversation_diagnostic(
+                session_model,
+                severity=DiagnosticSeverity.WARNING,
+                event_type="conversation.turn_skipped",
+                message="Conversation turn skipped after speaker failure.",
+                details={
+                    "conversation_id": str(session_model.id),
+                    "turn_index": prepared.turn_index,
+                    "speaker_agent_id": str(prepared.speaker_agent_id),
+                    "run_id": None if run_id is None else str(run_id),
+                    "error": error_text or diagnostics.get("error") or "Unknown conversation error",
+                    "error_policy": policy.error_policy.value,
+                },
+                agent_id=prepared.speaker_agent_id,
+                run_id=run_id,
+            )
+            if (
+                self._consecutive_failed_turns(session_model.id)
+                >= policy.max_consecutive_failed_turns
+            ):
+                self._mark_session_failed(
+                    session_model,
+                    terminal_reason=ConversationTerminalReason.CONSECUTIVE_FAILURES_EXCEEDED,
+                    turn_index=prepared.turn_index,
+                    speaker_agent_id=prepared.speaker_agent_id,
+                    error_text=error_text or "Conversation session exceeded failure threshold",
+                    run_id=run_id,
+                )
         else:
-            session_model.status = ConversationSessionStatus.FAILED.value
             self._append_event(
                 world_id=session_model.world_id,
                 event_name=CONVERSATION_TURN_FAILED_EVENT_NAME,
@@ -423,6 +561,14 @@ class ConversationService:
                     "run_id": None if run_id is None else str(run_id),
                     "error": error_text or diagnostics.get("error") or "Unknown conversation error",
                 },
+            )
+            self._mark_session_failed(
+                session_model,
+                terminal_reason=ConversationTerminalReason.SPEAKER_ERROR,
+                turn_index=prepared.turn_index,
+                speaker_agent_id=prepared.speaker_agent_id,
+                error_text=error_text or "Conversation turn failed",
+                run_id=run_id,
             )
 
         self._session.flush()
@@ -457,7 +603,7 @@ class ConversationService:
                     if agent is not None
                     else f"agent:{turn.speaker_agent_id}"
                 )
-            content = turn.output_text or turn.input_text
+            content = turn.output_text or turn.error_text or turn.input_text
             transcript_lines.append(f"{speaker}: {content}")
 
         speaker_agent = agents_by_id.get(speaker_agent_id)
@@ -465,7 +611,9 @@ class ConversationService:
         previous_output = ""
         if turns:
             previous_turn = turns[-1]
-            previous_output = previous_turn.output_text or previous_turn.input_text
+            previous_output = (
+                previous_turn.output_text or previous_turn.error_text or previous_turn.input_text
+            )
 
         scope_metadata = (
             f"scope=scene scene_id={session_model.scene_id}"
@@ -521,7 +669,7 @@ class ConversationService:
         self,
         session_model: ConversationSession,
     ) -> list[ConversationParticipant]:
-        participants = list(
+        return list(
             self._session.scalars(
                 select(ConversationParticipant)
                 .join(Agent, Agent.id == ConversationParticipant.agent_id)
@@ -536,7 +684,6 @@ class ConversationService:
                 ),
             ).all()
         )
-        return participants
 
     def _session_model(self, world_id: uuid.UUID, session_id: uuid.UUID) -> ConversationSession:
         model = self._session.get(ConversationSession, session_id)
@@ -580,6 +727,34 @@ class ConversationService:
         )
         return 0 if latest is None else int(latest) + 1
 
+    def _consecutive_failed_turns(self, session_id: uuid.UUID) -> int:
+        count = 0
+        for turn in reversed(self._turn_records(session_id)):
+            if turn.speaker_kind != ConversationSpeakerKind.AGENT:
+                continue
+            if turn.status == ConversationTurnStatus.SUCCEEDED:
+                break
+            count += 1
+        return count
+
+    def _loop_guard_triggered(
+        self,
+        session_id: uuid.UUID,
+        *,
+        policy: ConversationPolicyConfig,
+    ) -> bool:
+        normalized_outputs = [
+            _normalize_loop_text(turn.output_text or "")
+            for turn in self._turn_records(session_id)
+            if turn.speaker_kind == ConversationSpeakerKind.AGENT
+            and turn.status == ConversationTurnStatus.SUCCEEDED
+            and (turn.output_text or "") != ""
+        ]
+        if not normalized_outputs:
+            return False
+        recent_outputs = normalized_outputs[-policy.loop_guard_window :]
+        return recent_outputs.count(recent_outputs[-1]) >= policy.repeat_output_threshold
+
     def _agents_for_world(
         self,
         world_id: uuid.UUID,
@@ -600,9 +775,118 @@ class ConversationService:
     def _ensure_not_finished(self, session_model: ConversationSession) -> None:
         if session_model.status in {
             ConversationSessionStatus.COMPLETED.value,
+            ConversationSessionStatus.STOPPED.value,
             ConversationSessionStatus.FAILED.value,
         }:
             raise ConversationStateError("Conversation session is no longer active")
+
+    def _mark_session_completed(self, session_model: ConversationSession) -> None:
+        if session_model.status == ConversationSessionStatus.COMPLETED.value:
+            return
+        session_model.status = ConversationSessionStatus.COMPLETED.value
+        session_model.terminal_reason = ConversationTerminalReason.MAX_TURNS_REACHED.value
+        self._append_event(
+            world_id=session_model.world_id,
+            event_name=CONVERSATION_SESSION_COMPLETED_EVENT_NAME,
+            payload={
+                "conversation_id": str(session_model.id),
+                "max_turns": session_model.max_turns,
+                "terminal_reason": ConversationTerminalReason.MAX_TURNS_REACHED.value,
+            },
+        )
+
+    def _mark_session_stopped(
+        self,
+        session_model: ConversationSession,
+        *,
+        terminal_reason: ConversationTerminalReason,
+        event_name: str,
+        message: str,
+        details: dict[str, object],
+    ) -> None:
+        if session_model.status == ConversationSessionStatus.STOPPED.value:
+            return
+        session_model.status = ConversationSessionStatus.STOPPED.value
+        session_model.terminal_reason = terminal_reason.value
+        self._append_event(
+            world_id=session_model.world_id,
+            event_name=event_name,
+            payload={
+                **details,
+                "terminal_reason": terminal_reason.value,
+            },
+        )
+        self._record_conversation_diagnostic(
+            session_model,
+            severity=DiagnosticSeverity.WARNING,
+            event_type=event_name,
+            message=message,
+            details={
+                **details,
+                "terminal_reason": terminal_reason.value,
+            },
+        )
+
+    def _mark_session_failed(
+        self,
+        session_model: ConversationSession,
+        *,
+        terminal_reason: ConversationTerminalReason,
+        turn_index: int | None,
+        speaker_agent_id: uuid.UUID | None,
+        error_text: str,
+        run_id: uuid.UUID | None = None,
+    ) -> None:
+        if session_model.status == ConversationSessionStatus.FAILED.value:
+            return
+        session_model.status = ConversationSessionStatus.FAILED.value
+        session_model.terminal_reason = terminal_reason.value
+        payload: dict[str, object] = {
+            "conversation_id": str(session_model.id),
+            "turn_index": turn_index,
+            "speaker_agent_id": None if speaker_agent_id is None else str(speaker_agent_id),
+            "run_id": None if run_id is None else str(run_id),
+            "error": error_text,
+            "terminal_reason": terminal_reason.value,
+        }
+        self._append_event(
+            world_id=session_model.world_id,
+            event_name=CONVERSATION_SESSION_FAILED_EVENT_NAME,
+            payload=payload,
+        )
+        self._record_conversation_diagnostic(
+            session_model,
+            severity=DiagnosticSeverity.ERROR,
+            event_type="conversation.session_failed",
+            message="Conversation session failed.",
+            details=payload,
+            agent_id=speaker_agent_id,
+            run_id=run_id,
+        )
+
+    def _record_conversation_diagnostic(
+        self,
+        session_model: ConversationSession,
+        *,
+        severity: DiagnosticSeverity,
+        event_type: str,
+        message: str,
+        details: dict[str, object],
+        agent_id: uuid.UUID | None = None,
+        run_id: uuid.UUID | None = None,
+    ) -> None:
+        self._diagnostics.record(
+            RuntimeDiagnosticCreate(
+                severity=severity,
+                component=DiagnosticComponent.CONVERSATION,
+                event_type=event_type,
+                message=message,
+                details=details,
+                world_id=session_model.world_id,
+                agent_id=agent_id,
+                run_id=run_id,
+            ),
+        )
 
     def _append_event(
         self,
@@ -620,7 +904,14 @@ class ConversationService:
                 actor_ref=SYSTEM_ACTOR_REF,
             ),
         )
+
+
 def _session_record(model: ConversationSession) -> ConversationSessionRecord:
+    terminal_reason = (
+        None
+        if model.terminal_reason is None
+        else ConversationTerminalReason(model.terminal_reason)
+    )
     return ConversationSessionRecord(
         id=model.id,
         world_id=model.world_id,
@@ -634,6 +925,8 @@ def _session_record(model: ConversationSession) -> ConversationSessionRecord:
         opening_prompt=model.opening_prompt,
         max_turns=model.max_turns,
         next_turn_index=model.next_turn_index,
+        policy=_policy_config(model.policy_config),
+        terminal_reason=terminal_reason,
         created_at=_utc(model.created_at),
         updated_at=_utc(model.updated_at),
     )
@@ -666,6 +959,14 @@ def _turn_record(model: ConversationTurn) -> ConversationTurnRecord:
         created_at=_utc(model.created_at),
         updated_at=_utc(model.updated_at),
     )
+
+
+def _policy_config(value: dict[str, object]) -> ConversationPolicyConfig:
+    return ConversationPolicyConfig.model_validate(value)
+
+
+def _normalize_loop_text(value: str) -> str:
+    return _WHITESPACE_RE.sub(" ", value.strip().lower())
 
 
 def _utc(value: datetime) -> datetime:

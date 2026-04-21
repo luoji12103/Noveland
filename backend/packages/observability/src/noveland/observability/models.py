@@ -18,7 +18,14 @@ class RuntimeDiagnosticEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="severity",
         ),
         CheckConstraint(
-            "component IN ('runtime', 'provider', 'agent', 'event_publisher', 'api')",
+            "component IN ("
+            "'runtime', "
+            "'provider', "
+            "'agent', "
+            "'conversation', "
+            "'event_publisher', "
+            "'api'"
+            ")",
             name="component",
         ),
         Index("ix_runtime_diagnostic_events_occurred_at", "occurred_at"),

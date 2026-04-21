@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from noveland.adapters import ProviderProfileService
 from noveland.agents.models import Agent
 from noveland.conversations import (
+    ConversationErrorPolicy,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
+    ConversationPolicyConfig,
     ConversationScopeType,
     ConversationSeed,
     ConversationService,
@@ -21,6 +23,7 @@ from noveland.conversations import (
 )
 from noveland.conversations.errors import ConversationStateError, ConversationValidationError
 from noveland.core.settings import load_settings
+from noveland.observability import RuntimeDiagnosticRecord
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
@@ -40,6 +43,24 @@ class _RequestModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ConversationPolicyRequest(_RequestModel):
+    error_policy: Literal[
+        "fail_session",
+        "skip_turn",
+        "retry_once_then_fail",
+        "retry_once_then_skip",
+    ]
+    max_consecutive_failed_turns: int = Field(ge=1, le=20)
+    loop_guard_window: int = Field(ge=2, le=20)
+    repeat_output_threshold: int = Field(ge=2, le=20)
+
+    @model_validator(mode="after")
+    def validate_thresholds(self) -> ConversationPolicyRequest:
+        if self.repeat_output_threshold > self.loop_guard_window:
+            raise ValueError("repeat_output_threshold cannot exceed loop_guard_window")
+        return self
+
+
 class ConversationCreateRequest(_RequestModel):
     session_key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$", max_length=80)
     title: str = Field(min_length=1, max_length=160)
@@ -49,6 +70,7 @@ class ConversationCreateRequest(_RequestModel):
     objective: str = Field(default="", max_length=8_000)
     opening_prompt: str = Field(default="", max_length=12_000)
     max_turns: int = Field(default=12, ge=1, le=200)
+    policy: ConversationPolicyRequest
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationCreateRequest:
@@ -64,6 +86,7 @@ class ConversationUpdateRequest(_RequestModel):
     objective: str | None = Field(default=None, max_length=8_000)
     opening_prompt: str | None = Field(default=None, max_length=12_000)
     max_turns: int | None = Field(default=None, ge=1, le=200)
+    policy: ConversationPolicyRequest | None = None
 
 
 class ConversationParticipantRequest(_RequestModel):
@@ -74,6 +97,13 @@ class ConversationParticipantRequest(_RequestModel):
 
 class ConversationSeedRequest(_RequestModel):
     input_text: str = Field(min_length=1, max_length=12_000)
+
+
+class ConversationPolicyResponse(BaseModel):
+    error_policy: str
+    max_consecutive_failed_turns: int
+    loop_guard_window: int
+    repeat_output_threshold: int
 
 
 class ConversationSessionResponse(BaseModel):
@@ -89,6 +119,8 @@ class ConversationSessionResponse(BaseModel):
     opening_prompt: str
     max_turns: int
     next_turn_index: int
+    policy: ConversationPolicyResponse
+    terminal_reason: str | None
     created_at: str
     updated_at: str
 
@@ -116,6 +148,21 @@ class ConversationTurnResponse(BaseModel):
     error_text: str | None
     created_at: str
     updated_at: str
+
+
+class ConversationDiagnosticResponse(BaseModel):
+    id: uuid.UUID
+    severity: str
+    component: str
+    event_type: str
+    message: str
+    details: dict[str, Any]
+    occurred_at: str
+    world_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    run_id: uuid.UUID | None
+    provider_profile_id: uuid.UUID | None
+    created_at: str
 
 
 class ConversationAdvanceResponse(BaseModel):
@@ -156,6 +203,7 @@ def create_conversation(
                 objective=conversation_create.objective,
                 opening_prompt=conversation_create.opening_prompt,
                 max_turns=conversation_create.max_turns,
+                policy=_policy_contract(conversation_create.policy),
             ),
         )
     except ConversationValidationError as exc:
@@ -189,7 +237,15 @@ def update_conversation(
         session = ConversationService(db_session).update_session(
             context.world_id,
             conversation_id,
-            ConversationSessionUpdate.model_validate(conversation_update.model_dump(exclude_none=False)),
+            ConversationSessionUpdate(
+                title=conversation_update.title,
+                objective=conversation_update.objective,
+                opening_prompt=conversation_update.opening_prompt,
+                max_turns=conversation_update.max_turns,
+                policy=None
+                if conversation_update.policy is None
+                else _policy_contract(conversation_update.policy),
+            ),
         )
     except LookupError as exc:
         raise _not_found() from exc
@@ -252,6 +308,8 @@ def replace_participants(
         )
     except ConversationValidationError as exc:
         raise _http_error_for_conversation_error(str(exc)) from exc
+    except ConversationStateError as exc:
+        raise _conflict(str(exc)) from exc
     return [_participant_response(participant) for participant in records]
 
 
@@ -266,6 +324,27 @@ def list_turns(
     except LookupError as exc:
         raise _not_found() from exc
     return [_turn_response(turn) for turn in turns]
+
+
+@router.get(
+    "/{conversation_id}/diagnostics",
+    response_model=list[ConversationDiagnosticResponse],
+)
+def list_conversation_diagnostics(
+    conversation_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[ConversationDiagnosticResponse]:
+    try:
+        records = ConversationService(db_session).list_diagnostics(
+            context.world_id,
+            conversation_id,
+            limit=limit,
+        )
+    except LookupError as exc:
+        raise _not_found() from exc
+    return [_diagnostic_response(record) for record in records]
 
 
 @router.post("/{conversation_id}/seed", response_model=ConversationTurnResponse)
@@ -379,6 +458,32 @@ def resume_conversation(
     return _session_response(session)
 
 
+@router.post("/{conversation_id}/stop", response_model=ConversationSessionResponse)
+def stop_conversation(
+    conversation_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ConversationSessionResponse:
+    require_csrf(request)
+    try:
+        session = ConversationService(db_session).stop_session(context.world_id, conversation_id)
+    except LookupError as exc:
+        raise _not_found() from exc
+    except (ConversationValidationError, ConversationStateError) as exc:
+        raise _http_error_for_conversation_error(str(exc)) from exc
+    return _session_response(session)
+
+
+def _policy_contract(policy: ConversationPolicyRequest) -> ConversationPolicyConfig:
+    return ConversationPolicyConfig(
+        error_policy=ConversationErrorPolicy(policy.error_policy),
+        max_consecutive_failed_turns=policy.max_consecutive_failed_turns,
+        loop_guard_window=policy.loop_guard_window,
+        repeat_output_threshold=policy.repeat_output_threshold,
+    )
+
+
 def _session_response(session: ConversationSessionRecord) -> ConversationSessionResponse:
     return ConversationSessionResponse(
         id=session.id,
@@ -393,6 +498,15 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
         opening_prompt=session.opening_prompt,
         max_turns=session.max_turns,
         next_turn_index=session.next_turn_index,
+        policy=ConversationPolicyResponse(
+            error_policy=session.policy.error_policy.value,
+            max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
+            loop_guard_window=session.policy.loop_guard_window,
+            repeat_output_threshold=session.policy.repeat_output_threshold,
+        ),
+        terminal_reason=None
+        if session.terminal_reason is None
+        else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
     )
@@ -426,6 +540,23 @@ def _turn_response(turn: ConversationTurnRecord) -> ConversationTurnResponse:
         error_text=turn.error_text,
         created_at=turn.created_at.isoformat(),
         updated_at=turn.updated_at.isoformat(),
+    )
+
+
+def _diagnostic_response(record: RuntimeDiagnosticRecord) -> ConversationDiagnosticResponse:
+    return ConversationDiagnosticResponse(
+        id=record.id,
+        severity=record.severity.value,
+        component=record.component.value,
+        event_type=record.event_type,
+        message=record.message,
+        details=record.details,
+        occurred_at=record.occurred_at.isoformat(),
+        world_id=record.world_id,
+        agent_id=record.agent_id,
+        run_id=record.run_id,
+        provider_profile_id=record.provider_profile_id,
+        created_at=record.created_at.isoformat(),
     )
 
 
@@ -471,6 +602,8 @@ def _http_error_for_conversation_error(detail: str) -> HTTPException:
         or "no longer" in detail
         or "already" in detail
         or "paused" in detail
+        or "running" in detail
+        or "active" in detail
     ):
         status_code = status.HTTP_409_CONFLICT
     return HTTPException(status_code=status_code, detail=detail)

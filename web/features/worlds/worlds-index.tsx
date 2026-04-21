@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createWorld } from "@/lib/worlds/client";
 import type { World } from "@/lib/worlds/types";
@@ -14,7 +13,6 @@ type WorldsIndexProps = {
 };
 
 export function WorldsIndex({ worlds, canCreateWorld }: WorldsIndexProps) {
-  const router = useRouter();
   const [notice, setNotice] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -37,8 +35,7 @@ export function WorldsIndex({ worlds, canCreateWorld }: WorldsIndexProps) {
         description: optionalFormString(form, "description"),
       });
       formElement.reset();
-      router.push(`/worlds/${world.id}`);
-      router.refresh();
+      window.location.assign(`/worlds/${world.id}`);
     } catch (error) {
       setNotice(messageForError(error));
     } finally {

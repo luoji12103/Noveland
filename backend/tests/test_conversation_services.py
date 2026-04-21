@@ -9,12 +9,16 @@ from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth.models import User
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations import (
+    ConversationErrorPolicy,
     ConversationMode,
     ConversationParticipantDefinition,
+    ConversationPolicyConfig,
     ConversationScopeType,
     ConversationSeed,
     ConversationService,
     ConversationSessionCreate,
+    ConversationSessionStatus,
+    ConversationTerminalReason,
 )
 from noveland.conversations.errors import ConversationStateError
 from noveland.conversations.models import (
@@ -23,6 +27,7 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.worlds.models import Scene, World
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
@@ -50,6 +55,7 @@ def test_manual_chain_round_robin_and_completion() -> None:
                 objective="Coordinate the next move.",
                 opening_prompt="Start from the operator seed.",
                 max_turns=2,
+                policy=_default_policy(),
             ),
         )
         service.replace_participants(
@@ -93,7 +99,8 @@ def test_manual_chain_round_robin_and_completion() -> None:
         )
         turns = service.list_turns(world_id, created.id)
 
-    assert second_result.session.status.value == "completed"
+    assert second_result.session.status == ConversationSessionStatus.COMPLETED
+    assert second_result.session.terminal_reason == ConversationTerminalReason.MAX_TURNS_REACHED
     assert [turn.turn_index for turn in turns] == [0, 1, 2]
     assert [turn.speaker_kind.value for turn in turns] == ["operator", "agent", "agent"]
     assert turns[1].output_text == "First response"
@@ -117,6 +124,7 @@ def test_prepare_next_turn_skips_disabled_participant_and_marks_failed_without_a
                 scope_type=ConversationScopeType.WORLD,
                 mode=ConversationMode.MANUAL_CHAIN,
                 max_turns=3,
+                policy=_default_policy(),
             ),
         )
         service.replace_participants(
@@ -140,7 +148,132 @@ def test_prepare_next_turn_skips_disabled_participant_and_marks_failed_without_a
             service.prepare_next_turn(world_id, created.id)
         refreshed = service.get_session(world_id, created.id)
 
-    assert refreshed.status.value == "failed"
+    assert refreshed.status == ConversationSessionStatus.FAILED
+    assert refreshed.terminal_reason == ConversationTerminalReason.NO_ENABLED_PARTICIPANTS
+
+
+def test_skip_policy_and_failure_threshold_mark_failed() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    agent_id = _seed_agent(engine, world_id, "speaker")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                session_key="skip-world",
+                title="Skip world",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=4,
+                policy=ConversationPolicyConfig(
+                    error_policy=ConversationErrorPolicy.SKIP_TURN,
+                    max_consecutive_failed_turns=2,
+                    loop_guard_window=4,
+                    repeat_output_threshold=3,
+                ),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [ConversationParticipantDefinition(agent_id=agent_id, turn_order=0)],
+        )
+
+        first_prepared = service.prepare_next_turn(world_id, created.id)
+        first_result = service.finalize_turn(
+            first_prepared,
+            response_text=None,
+            run_id=None,
+            diagnostics={"error": "upstream timeout"},
+            succeeded=False,
+            error_text="upstream timeout",
+        )
+
+        second_prepared = service.prepare_next_turn(world_id, created.id)
+        second_result = service.finalize_turn(
+            second_prepared,
+            response_text=None,
+            run_id=None,
+            diagnostics={"error": "upstream timeout"},
+            succeeded=False,
+            error_text="upstream timeout",
+        )
+        turns = service.list_turns(world_id, created.id)
+
+    assert first_result.turn.status.value == "skipped"
+    assert first_result.session.status == ConversationSessionStatus.DRAFT
+    assert second_result.turn.status.value == "skipped"
+    assert second_result.session.status == ConversationSessionStatus.FAILED
+    assert (
+        second_result.session.terminal_reason
+        == ConversationTerminalReason.CONSECUTIVE_FAILURES_EXCEEDED
+    )
+    assert [turn.status.value for turn in turns] == ["skipped", "skipped"]
+
+
+def test_loop_guard_stops_repeated_output_session() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    agent_id = _seed_agent(engine, world_id, "speaker")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                session_key="loop-world",
+                title="Loop world",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=6,
+                policy=ConversationPolicyConfig(
+                    error_policy=ConversationErrorPolicy.FAIL_SESSION,
+                    max_consecutive_failed_turns=2,
+                    loop_guard_window=4,
+                    repeat_output_threshold=2,
+                ),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [ConversationParticipantDefinition(agent_id=agent_id, turn_order=0)],
+        )
+
+        first_prepared = service.prepare_next_turn(world_id, created.id)
+        first_result = service.finalize_turn(
+            first_prepared,
+            response_text="Same answer",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+        second_prepared = service.prepare_next_turn(world_id, created.id)
+        second_result = service.finalize_turn(
+            second_prepared,
+            response_text="Same answer",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+
+    assert first_result.session.status == ConversationSessionStatus.DRAFT
+    assert second_result.session.status == ConversationSessionStatus.STOPPED
+    assert (
+        second_result.session.terminal_reason
+        == ConversationTerminalReason.LOOP_GUARD_REPEATED_OUTPUT
+    )
+
+
+def _default_policy() -> ConversationPolicyConfig:
+    return ConversationPolicyConfig(
+        error_policy=ConversationErrorPolicy.RETRY_ONCE_THEN_FAIL,
+        max_consecutive_failed_turns=2,
+        loop_guard_window=4,
+        repeat_output_threshold=3,
+    )
 
 
 def _engine() -> Engine:
@@ -158,6 +291,7 @@ def _engine() -> Engine:
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, RuntimeDiagnosticEvent.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),

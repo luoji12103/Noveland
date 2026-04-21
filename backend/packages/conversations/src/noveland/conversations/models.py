@@ -4,6 +4,7 @@ import uuid
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -28,11 +30,22 @@ class ConversationSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("scope_type IN ('scene', 'world')", name="scope_type"),
         CheckConstraint("mode IN ('manual_chain', 'auto_dialogue')", name="mode"),
         CheckConstraint(
-            "status IN ('draft', 'running', 'paused', 'completed', 'failed')",
+            "status IN ('draft', 'running', 'paused', 'completed', 'stopped', 'failed')",
             name="status",
         ),
         CheckConstraint("max_turns > 0", name="max_turns_positive"),
         CheckConstraint("next_turn_index >= 0", name="next_turn_index_non_negative"),
+        CheckConstraint(
+            "terminal_reason IN ("
+            "'max_turns_reached', "
+            "'loop_guard_repeated_output', "
+            "'no_enabled_participants', "
+            "'consecutive_failures_exceeded', "
+            "'operator_stopped', "
+            "'speaker_error'"
+            ") OR terminal_reason IS NULL",
+            name="terminal_reason",
+        ),
         CheckConstraint(
             "(scope_type = 'scene' AND scene_id IS NOT NULL) OR "
             "(scope_type = 'world' AND scene_id IS NULL)",
@@ -70,6 +83,12 @@ class ConversationSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=0,
         server_default=text("0"),
     )
+    policy_config: Mapped[dict[str, object]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    terminal_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class ConversationParticipant(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -116,7 +135,7 @@ class ConversationTurn(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="uq_conversation_turns_session_turn_index",
         ),
         CheckConstraint("speaker_kind IN ('operator', 'agent')", name="speaker_kind"),
-        CheckConstraint("status IN ('succeeded', 'failed')", name="status"),
+        CheckConstraint("status IN ('succeeded', 'skipped', 'failed')", name="status"),
         Index("ix_conversation_turns_session_id", "session_id"),
         Index("ix_conversation_turns_speaker_agent_id", "speaker_agent_id"),
         Index("ix_conversation_turns_run_id", "run_id"),

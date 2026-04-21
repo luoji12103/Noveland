@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createConversation } from "@/lib/worlds/client";
 import type { ConversationListData } from "@/lib/worlds/server";
+import type { ConversationPolicy } from "@/lib/worlds/types";
 import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type ConversationListProps = {
@@ -14,7 +14,6 @@ type ConversationListProps = {
 };
 
 export function ConversationList({ worldId, data }: ConversationListProps) {
-  const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -34,10 +33,10 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
         objective: formString(form, "objective"),
         opening_prompt: formString(form, "opening_prompt"),
         max_turns: Number(formString(form, "max_turns") || "12"),
+        policy: policyFromForm(form),
       });
       formElement.reset();
-      router.push(`/worlds/${worldId}/conversations/${session.id}`);
-      router.refresh();
+      window.location.assign(`/worlds/${worldId}/conversations/${session.id}`);
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -75,6 +74,35 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
             <input className="text-input" name="max_turns" placeholder="12" />
             <input className="text-input" name="objective" placeholder="Objective" />
             <input className="text-input" name="opening_prompt" placeholder="Opening prompt" />
+            <select
+              aria-label="Error policy"
+              className="text-input"
+              name="error_policy"
+              defaultValue="retry_once_then_fail"
+            >
+              <option value="retry_once_then_fail">retry_once_then_fail</option>
+              <option value="retry_once_then_skip">retry_once_then_skip</option>
+              <option value="fail_session">fail_session</option>
+              <option value="skip_turn">skip_turn</option>
+            </select>
+            <input
+              aria-label="Max consecutive failed turns"
+              className="text-input"
+              name="max_consecutive_failed_turns"
+              defaultValue="2"
+            />
+            <input
+              aria-label="Loop guard window"
+              className="text-input"
+              name="loop_guard_window"
+              defaultValue="4"
+            />
+            <input
+              aria-label="Repeat output threshold"
+              className="text-input"
+              name="repeat_output_threshold"
+              defaultValue="3"
+            />
             <button className="primary-button" type="submit" disabled={isBusy}>
               Create conversation
             </button>
@@ -102,6 +130,9 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
                   <p>
                     {conversation.session_key} - {conversation.mode} - {conversation.status}
                   </p>
+                  {conversation.terminal_reason !== null ? (
+                    <p>Terminal reason: {conversation.terminal_reason}</p>
+                  ) : null}
                   <p>
                     {conversation.scope_type}
                     {conversation.scene_id !== null ? ` scene ${conversation.scene_id}` : ""}
@@ -122,4 +153,13 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
       </section>
     </section>
   );
+}
+
+function policyFromForm(form: FormData): ConversationPolicy {
+  return {
+    error_policy: formString(form, "error_policy") as ConversationPolicy["error_policy"],
+    max_consecutive_failed_turns: Number(formString(form, "max_consecutive_failed_turns")),
+    loop_guard_window: Number(formString(form, "loop_guard_window")),
+    repeat_output_threshold: Number(formString(form, "repeat_output_threshold")),
+  };
 }

@@ -546,6 +546,19 @@ export function resumeConversation(
   );
 }
 
+export function stopConversation(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/stop`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
 export function listMemberships(worldId: string): Promise<Membership[]> {
   return worldRequest<Membership[]>(`/api/worlds/${worldId}/memberships`, { method: "GET" });
 }

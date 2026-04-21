@@ -24,6 +24,7 @@ class ConversationSessionStatus(StrEnum):
     RUNNING = "running"
     PAUSED = "paused"
     COMPLETED = "completed"
+    STOPPED = "stopped"
     FAILED = "failed"
 
 
@@ -34,11 +35,41 @@ class ConversationSpeakerKind(StrEnum):
 
 class ConversationTurnStatus(StrEnum):
     SUCCEEDED = "succeeded"
+    SKIPPED = "skipped"
     FAILED = "failed"
+
+
+class ConversationErrorPolicy(StrEnum):
+    FAIL_SESSION = "fail_session"
+    SKIP_TURN = "skip_turn"
+    RETRY_ONCE_THEN_FAIL = "retry_once_then_fail"
+    RETRY_ONCE_THEN_SKIP = "retry_once_then_skip"
+
+
+class ConversationTerminalReason(StrEnum):
+    MAX_TURNS_REACHED = "max_turns_reached"
+    LOOP_GUARD_REPEATED_OUTPUT = "loop_guard_repeated_output"
+    NO_ENABLED_PARTICIPANTS = "no_enabled_participants"
+    CONSECUTIVE_FAILURES_EXCEEDED = "consecutive_failures_exceeded"
+    OPERATOR_STOPPED = "operator_stopped"
+    SPEAKER_ERROR = "speaker_error"
 
 
 class _FrozenContract(BaseModel):
     model_config = ConfigDict(frozen=True)
+
+
+class ConversationPolicyConfig(_FrozenContract):
+    error_policy: ConversationErrorPolicy
+    max_consecutive_failed_turns: int = Field(ge=1, le=20)
+    loop_guard_window: int = Field(ge=2, le=20)
+    repeat_output_threshold: int = Field(ge=2, le=20)
+
+    @model_validator(mode="after")
+    def validate_thresholds(self) -> ConversationPolicyConfig:
+        if self.repeat_output_threshold > self.loop_guard_window:
+            raise ValueError("repeat_output_threshold cannot exceed loop_guard_window")
+        return self
 
 
 class ConversationSessionCreate(_FrozenContract):
@@ -51,6 +82,7 @@ class ConversationSessionCreate(_FrozenContract):
     objective: str = Field(default="", max_length=8_000)
     opening_prompt: str = Field(default="", max_length=12_000)
     max_turns: int = Field(default=12, ge=1, le=200)
+    policy: ConversationPolicyConfig
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationSessionCreate:
@@ -66,6 +98,7 @@ class ConversationSessionUpdate(_FrozenContract):
     objective: str | None = Field(default=None, max_length=8_000)
     opening_prompt: str | None = Field(default=None, max_length=12_000)
     max_turns: int | None = Field(default=None, ge=1, le=200)
+    policy: ConversationPolicyConfig | None = None
 
 
 class ConversationParticipantDefinition(_FrozenContract):
@@ -91,6 +124,8 @@ class ConversationSessionRecord(_FrozenContract):
     opening_prompt: str
     max_turns: int
     next_turn_index: int
+    policy: ConversationPolicyConfig
+    terminal_reason: ConversationTerminalReason | None
     created_at: datetime
     updated_at: datetime
 

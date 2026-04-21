@@ -11,6 +11,7 @@ dependencies = [
   "noveland-agents",
   "noveland-core",
   "noveland-events",
+  "noveland-observability",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
@@ -19,6 +20,7 @@ dependencies = [
 noveland-agents = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
+noveland-observability = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

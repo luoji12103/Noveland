@@ -1316,6 +1316,8 @@ async function handleConversations(request, response, currentSubject, worldId, c
         opening_prompt: body.opening_prompt ?? "",
         max_turns: body.max_turns ?? 12,
         next_turn_index: 0,
+        policy: body.policy,
+        terminal_reason: null,
         created_at: now,
         updated_at: now,
       };
@@ -1423,6 +1425,13 @@ async function handleConversations(request, response, currentSubject, worldId, c
     sendJson(response, 200, session);
     return;
   }
+  if (action === "stop" && request.method === "POST") {
+    session.status = "stopped";
+    session.terminal_reason = "operator_stopped";
+    session.updated_at = new Date().toISOString();
+    sendJson(response, 200, session);
+    return;
+  }
 
   sendJson(response, 405, { detail: "method not allowed" });
 }
@@ -1466,6 +1475,7 @@ function appendAgentConversationTurn(session) {
   });
   if (session.next_turn_index >= session.max_turns) {
     session.status = "completed";
+    session.terminal_reason = "max_turns_reached";
   }
   return turn;
 }
