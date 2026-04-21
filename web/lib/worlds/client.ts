@@ -375,6 +375,42 @@ export function listNarrativeArtifacts(worldId: string): Promise<NarrativeArtifa
   });
 }
 
+export function listFilteredNarrativeArtifacts(
+  worldId: string,
+  options: {
+    artifact_kind?: string | null;
+    source_conversation_id?: string | null;
+    limit?: number;
+  } = {},
+): Promise<NarrativeArtifact[]> {
+  const search = new URLSearchParams();
+  if (options.artifact_kind) {
+    search.set("artifact_kind", options.artifact_kind);
+  }
+  if (options.source_conversation_id) {
+    search.set("source_conversation_id", options.source_conversation_id);
+  }
+  if (options.limit !== undefined) {
+    search.set("limit", String(options.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return worldRequest<NarrativeArtifact[]>(
+    `/api/worlds/${worldId}/narrative-artifacts${suffix}`,
+    {
+      method: "GET",
+    },
+  );
+}
+
+export function getNarrativeArtifact(
+  worldId: string,
+  artifactId: string,
+): Promise<NarrativeArtifact> {
+  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts/${artifactId}`, {
+    method: "GET",
+  });
+}
+
 export function createNarrativeArtifact(
   worldId: string,
   input: NarrativeArtifactCreateInput,

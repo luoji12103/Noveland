@@ -18,6 +18,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/conversations/`
 - `web/app/worlds/[worldId]/conversations/[conversationId]/`
 - `web/app/worlds/[worldId]/narrative/`
+- `web/app/worlds/[worldId]/reader/`
+- `web/app/worlds/[worldId]/reader/[artifactId]/`
 - `web/app/admin/`
 - `web/app/admin/providers/`
 - `web/app/admin/runtime/`
@@ -35,6 +37,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/dashboard/`
 - `web/features/workspace/`
 - `web/features/worlds/`
+- `web/features/worlds/narrative-reader.test.tsx`
+- `web/features/worlds/narrative-reader.tsx`
 - `web/components/`
 - `web/lib/`
 - `web/lib/auth/`

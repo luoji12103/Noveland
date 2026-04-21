@@ -1280,11 +1280,42 @@ def run_agent(
 def list_narrative_artifacts(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    artifact_kind: Annotated[
+        Literal["agent_note", "world_summary", "conversation_summary", "chapter_draft"] | None,
+        Query(),
+    ] = None,
+    source_conversation_id: uuid.UUID | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ) -> list[NarrativeArtifactResponse]:
     return [
         _narrative_artifact_response(artifact)
-        for artifact in NarrativeArtifactService(db_session).list_artifacts(context.world_id)
+        for artifact in NarrativeArtifactService(db_session).list_artifacts(
+            context.world_id,
+            artifact_kind=None
+            if artifact_kind is None
+            else NarrativeArtifactKind(artifact_kind),
+            source_conversation_id=source_conversation_id,
+            limit=limit,
+        )
     ]
+
+
+@router.get(
+    "/{world_id}/narrative-artifacts/{artifact_id}",
+    response_model=NarrativeArtifactResponse,
+)
+def get_narrative_artifact(
+    artifact_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeArtifactResponse:
+    artifact = NarrativeArtifactService(db_session).get_artifact(context.world_id, artifact_id)
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Narrative artifact not found",
+        )
+    return _narrative_artifact_response(artifact)
 
 
 @router.post(

@@ -16,6 +16,7 @@ const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
 const membershipMemberId = "40000000-0000-4000-8000-000000000002";
 const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
+const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 const users = [
   user(adminUserId, "admin@example.test", "Admin"),
@@ -231,12 +232,105 @@ const narrativeArtifacts = [
     metadata: {},
     created_at: "2026-04-17T00:03:02.000Z",
   },
+  {
+    id: "73000000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    agent_id: null,
+    source_run_id: null,
+    source_conversation_id: seedConversationId,
+    title: "Seed conversation summary",
+    content: "Summary for the seeded conversation.",
+    artifact_kind: "conversation_summary",
+    metadata: { generation_mode: "manual", scope_type: "world" },
+    created_at: "2026-04-17T00:03:03.000Z",
+  },
+  {
+    id: "73000000-0000-4000-8000-000000000003",
+    world_id: worldOneId,
+    agent_id: null,
+    source_run_id: null,
+    source_conversation_id: seedConversationId,
+    title: "Seed chapter draft",
+    content: "Chapter draft for the seeded conversation.",
+    artifact_kind: "chapter_draft",
+    metadata: { generation_mode: "manual", scope_type: "world" },
+    created_at: "2026-04-17T00:03:04.000Z",
+  },
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
-const conversations = [];
-const conversationParticipants = [];
-const conversationTurns = [];
+const conversations = [
+  {
+    id: seedConversationId,
+    world_id: worldOneId,
+    scene_id: null,
+    session_key: "seed-reader",
+    title: "Seed Reader Conversation",
+    scope_type: "world",
+    mode: "manual_chain",
+    status: "completed",
+    objective: "Seed the narrative reader.",
+    opening_prompt: "Start the seed conversation.",
+    max_turns: 2,
+    next_turn_index: 2,
+    policy: {
+      error_policy: "fail_session",
+      max_consecutive_failed_turns: 1,
+      loop_guard_window: 4,
+      repeat_output_threshold: 2,
+    },
+    writer_config: {
+      provider_profile_id: null,
+      auto_generate_on_complete: true,
+      generate_summary: true,
+      generate_chapter: true,
+    },
+    terminal_reason: "max_turns_reached",
+    created_at: "2026-04-17T00:02:00.000Z",
+    updated_at: "2026-04-17T00:03:04.000Z",
+  },
+];
+const conversationParticipants = [
+  {
+    id: "76100000-0000-4000-8000-000000000001",
+    session_id: seedConversationId,
+    agent_id: agentGuideId,
+    turn_order: 0,
+    is_enabled: true,
+    created_at: "2026-04-17T00:02:00.000Z",
+    updated_at: "2026-04-17T00:02:00.000Z",
+  },
+];
+const conversationTurns = [
+  {
+    id: "76200000-0000-4000-8000-000000000001",
+    session_id: seedConversationId,
+    turn_index: 0,
+    speaker_kind: "operator",
+    speaker_agent_id: null,
+    input_text: "Seed the conversation.",
+    output_text: "Seed the conversation.",
+    status: "succeeded",
+    run_id: null,
+    error_text: null,
+    created_at: "2026-04-17T00:02:30.000Z",
+    updated_at: "2026-04-17T00:02:30.000Z",
+  },
+  {
+    id: "76200000-0000-4000-8000-000000000002",
+    session_id: seedConversationId,
+    turn_index: 1,
+    speaker_kind: "agent",
+    speaker_agent_id: agentGuideId,
+    input_text: "Seed the conversation.",
+    output_text: "Guide replies to seed the conversation.",
+    status: "succeeded",
+    run_id: null,
+    error_text: null,
+    created_at: "2026-04-17T00:02:31.000Z",
+    updated_at: "2026-04-17T00:02:31.000Z",
+  },
+];
 
 const mockServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
@@ -444,7 +538,7 @@ async function handleWorldResource(request, response, url) {
     return;
   }
   if (resource === "narrative-artifacts") {
-    await handleNarrativeArtifacts(request, response, currentSubject, worldId);
+    await handleNarrativeArtifacts(request, response, currentSubject, worldId, segments[3], url);
     return;
   }
   if (resource === "clock") {
@@ -1249,13 +1343,39 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleNarrativeArtifacts(request, response, currentSubject, worldId) {
+async function handleNarrativeArtifacts(request, response, currentSubject, worldId, artifactId, url) {
   if (!canReadWorld(currentSubject, worldId)) {
     sendJson(response, 404, { detail: "World not found" });
     return;
   }
+  if (request.method === "GET" && artifactId !== undefined) {
+    const artifact = narrativeArtifacts.find(
+      (item) => item.id === artifactId && item.world_id === worldId,
+    );
+    if (artifact === undefined) {
+      sendJson(response, 404, { detail: "Narrative artifact not found" });
+      return;
+    }
+    sendJson(response, 200, artifact);
+    return;
+  }
   if (request.method === "GET") {
-    sendJson(response, 200, narrativeArtifacts.filter((artifact) => artifact.world_id === worldId));
+    const artifactKind = url.searchParams.get("artifact_kind");
+    const sourceConversationId = url.searchParams.get("source_conversation_id");
+    const limitValue = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+    let items = narrativeArtifacts
+      .filter((artifact) => artifact.world_id === worldId)
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    if (artifactKind !== null && artifactKind !== "") {
+      items = items.filter((artifact) => artifact.artifact_kind === artifactKind);
+    }
+    if (sourceConversationId !== null && sourceConversationId !== "") {
+      items = items.filter((artifact) => artifact.source_conversation_id === sourceConversationId);
+    }
+    if (Number.isFinite(limitValue) && limitValue > 0) {
+      items = items.slice(0, limitValue);
+    }
+    sendJson(response, 200, items);
     return;
   }
   if (!canManageWorld(currentSubject, worldId)) {

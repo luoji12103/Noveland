@@ -1,18 +1,17 @@
 # Active Session Handoff
 
 - Date: 2026-04-21T00:00:00Z
-- Branch: feat/narrative-writer-summarizer
-- Objective: Add conversation-first summary/chapter generation, per-session writer configuration, and completed-conversation auto-generation before building a dedicated reader surface.
+- Branch: feat/narrative-reader-surface
+- Objective: Add a dedicated, read-only narrative reader for authenticated world members on top of the conversation-first writer pipeline.
 - Completed work:
-  - Extended `conversation_sessions` with explicit `writer_config` and surfaced it through create/update/response contracts.
-  - Expanded `narrative_artifacts` with `source_conversation_id` and new `conversation_summary` / `chapter_draft` kinds.
-  - Added `ConversationNarrativeWriterService` with manual generation and completed-session auto-generation, including idempotent summary/chapter creation and provider fallback rules.
-  - Hooked the runtime conversation loop so completed conversations can auto-generate enabled artifacts.
-  - Added conversation narrative list/generate API routes and updated world narrative responses to include `source_conversation_id`.
-  - Updated the Web conversation list/detail flows with writer config editing, narrative generation actions, and related-artifact display.
+  - Extended world narrative APIs with optional `artifact_kind`, `source_conversation_id`, and `limit` filters, plus artifact detail lookup by id.
+  - Added reader-specific server loaders and world-reader routes at `/worlds/[worldId]/reader` and `/worlds/[worldId]/reader/[artifactId]`.
+  - Added read-only reader UI for filtered artifact browsing, detail rendering, and source-conversation linking.
+  - Updated workspace navigation and world overview shortcuts to expose the dedicated reader surface.
+  - Added backend/API, client, component, and mock-backend E2E coverage for reader access and rendering.
 - Incomplete work:
-  - Commit and merge back to `main`.
-  - Build the dedicated narrative reader surface on a fresh Stage 3 branch.
+  - Commit is still pending on this branch.
+  - Branch remains intentionally unmerged; the plan for this round stops on `feat/narrative-reader-surface`.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -24,12 +23,12 @@
   - `cd web && npm run test:e2e`
   - `cd web && npm run build`
 - Current risks:
-  - Writer prompt assembly is intentionally fixed-shape and transcript-first; no prompt-studio level customization exists yet.
-  - Auto-generation only fires on transition to `completed`; failed or manually stopped sessions do not generate artifacts in this stage.
-  - Artifact idempotency is enforced in service logic, not by a database uniqueness constraint.
+  - Reader remains server-rendered and read-only; there is no full-text search, paging, or live update stream yet.
+  - Artifact detail lookup depends on existing world-membership visibility and returns 404 for inaccessible worlds/artifacts.
+  - Reader filters are intentionally narrow in v1 and focus on `conversation_summary` / `chapter_draft` workflows.
 - Recommended next step:
-  - Commit `feat(narrative): add writer summarizer pipeline`, merge to `main`, and branch for the dedicated reader surface.
+  - Run final full regression, commit `feat(web): add dedicated narrative reader`, and hold on this branch for review.
 - Sensitive areas to avoid casual edits:
-  - migration ordering and backwards compatibility
-  - provider secret handling and diagnostic redaction
-  - conversation terminal state transitions and auto-generation trigger points
+  - world-member visibility rules on narrative artifact list/detail routes
+  - source-conversation linkage and reader/detail route stability
+  - provider secret handling and artifact metadata redaction

@@ -1,6 +1,6 @@
 # Noveland
 
-Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a backend API, auth/session baseline, world-first Web workspace, multi-agent conversation substrate, conversation-first narrative writer pipeline, runtime host, and local infrastructure.
+Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a backend API, auth/session baseline, world-first Web workspace, multi-agent conversation substrate, conversation-first narrative writer pipeline, a dedicated reader surface, runtime host, and local infrastructure.
 
 ## Current Status
 
@@ -183,6 +183,7 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Su
    - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session，并配置 writer 行为
    - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume，并可生成 summary / chapter
    - 在 `/worlds/{worldId}/narrative` 查看 narrative artifacts
+   - 在 `/worlds/{worldId}/reader` 以只读方式阅读 summary / chapter，并跳回 source conversation
    - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
    - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
@@ -272,6 +273,7 @@ POST /worlds/{world_id}/schedule-rules
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
 DELETE /worlds/{world_id}/schedule-rules/{rule_id}
 GET /worlds/{world_id}/narrative-artifacts
+GET /worlds/{world_id}/narrative-artifacts/{artifact_id}
 POST /worlds/{world_id}/narrative-artifacts
 GET /worlds/{world_id}/clock
 POST /worlds/{world_id}/clock/pause
@@ -316,9 +318,9 @@ DELETE /provider-profiles/{profile_id}
 
 Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material.
 
-The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions.
+The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 
-The Web workspace is split into `/worlds`, `/worlds/{worldId}`, `/worlds/{worldId}/agents`, `/worlds/{worldId}/agents/{agentId}`, `/worlds/{worldId}/conversations`, `/worlds/{worldId}/conversations/{conversationId}`, `/worlds/{worldId}/narrative`, `/admin/providers`, and `/admin/runtime`.
+The Web workspace is split into `/worlds`, `/worlds/{worldId}`, `/worlds/{worldId}/agents`, `/worlds/{worldId}/agents/{agentId}`, `/worlds/{worldId}/conversations`, `/worlds/{worldId}/conversations/{conversationId}`, `/worlds/{worldId}/narrative`, `/worlds/{worldId}/reader`, `/worlds/{worldId}/reader/{artifactId}`, `/admin/providers`, and `/admin/runtime`.
 
 The protected Web workspace also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, conversation transcript controls, per-session writer configuration, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
 

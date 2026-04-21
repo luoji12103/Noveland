@@ -37,6 +37,7 @@
 - Conversation Workspace Baseline
 - Conversation Policies + Stop Conditions
 - Narrative Writer / Summarizer Pipeline
+- Dedicated Narrative Reader Surface
 
 ## Upcoming Mainline
-- Dedicated Narrative Reader Surface
+- None selected

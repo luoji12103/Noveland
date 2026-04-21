@@ -11,6 +11,13 @@ test("redirects unauthenticated visitors to login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
 });
 
+test("redirects unauthenticated reader visitors to login", async ({ page }) => {
+  await page.goto(`/worlds/${worldOneId}/reader`);
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+});
+
 test("renders the login form", async ({ page }) => {
   await page.goto("/login");
 
@@ -191,6 +198,16 @@ test("world member sees read-only workspace pages", async ({ page }) => {
 
   await page.goto(`/worlds/${worldOneId}/conversations`);
   await expect(page.getByRole("heading", { name: "Create conversation" })).toHaveCount(0);
+
+  await page.goto(`/worlds/${worldOneId}/narrative`);
+  await expect(page.getByRole("button", { name: "Create artifact" })).toHaveCount(0);
+
+  await page.goto(`/worlds/${worldOneId}/reader`);
+  await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
+  await page.getByRole("link", { name: "Seed conversation summary" }).click();
+  await expect(page).toHaveURL(/\/reader\/[0-9a-f-]+$/);
+  await expect(page.getByText("Summary for the seeded conversation.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open source conversation" })).toBeVisible();
 });
 
 async function signIn(page: Page, email = "admin@example.test") {

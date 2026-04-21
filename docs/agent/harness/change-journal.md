@@ -274,3 +274,14 @@
 - Tests added/updated: narrative writer service tests, conversation API narrative generation/listing tests, runtime auto-generate coverage, schema metadata assertions, world client tests for conversation narrative routes, conversation detail component coverage, and mock-backend E2E narrative generation flow
 - Docs updated: README, architecture map, module boundaries, data ownership, project index, file inventory, task board, active handoff, change journal
 - Follow-up notes: dedicated reader routes, richer writer prompt controls, artifact publishing workflow, and transcript-to-memory integration remain future tasks.
+
+## Dedicated narrative reader surface entry
+
+- Date: 2026-04-21
+- Branch: feat/narrative-reader-surface
+- Scope: authenticated world-member narrative reader
+- Summary: Added filtered narrative artifact list/detail APIs, a read-only reader surface under `/worlds/{worldId}/reader`, reader navigation, source-conversation linking, and Web test coverage for member access and reader rendering.
+- Files changed: `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/test_api_worlds.py`, `/web/app/worlds/[worldId]/reader/**`, `/web/features/worlds/**`, `/web/features/workspace/workspace-shell.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: narrative artifact API filter/detail coverage for world members; reader component tests; world client tests for filtered narrative list/detail; mock-backend E2E coverage for reader redirects and member-readable narrative pages
+- Docs updated: README, project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: public sharing, reader search/sorting, reader timeline views, and realtime narrative updates remain future tasks.

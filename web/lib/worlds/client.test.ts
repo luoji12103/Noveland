@@ -10,6 +10,7 @@ import {
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
+  getNarrativeArtifact,
   createWorld,
   disableAgentMemoryItem,
   disableProviderProfile,
@@ -19,6 +20,7 @@ import {
   getLatestSnapshot,
   getAgentPersona,
   getReplayState,
+  listFilteredNarrativeArtifacts,
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
@@ -278,6 +280,26 @@ describe("world client", () => {
       "/api/worlds/world-1/conversations/conversation-1/narrative/generate",
     );
     expect(fetchMock.mock.calls[5][0]).toBe("/api/worlds/world-1/narrative-artifacts");
+  });
+
+  it("maps narrative reader filter and detail requests", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "artifact-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listFilteredNarrativeArtifacts("world-1", {
+      artifact_kind: "chapter_draft",
+      source_conversation_id: "conversation-1",
+      limit: 10,
+    });
+    await getNarrativeArtifact("world-1", "artifact-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/worlds/world-1/narrative-artifacts?artifact_kind=chapter_draft&source_conversation_id=conversation-1&limit=10",
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/narrative-artifacts/artifact-1");
   });
 
   it("maps persona and observation requests", async () => {

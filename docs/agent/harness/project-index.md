@@ -9,7 +9,7 @@ Fast orientation for a new coding session.
 ### Web
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
-- `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, and narrative artifacts
+- `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
 - `web/app/admin/` — platform-admin pages for provider profiles and runtime control
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
@@ -21,7 +21,7 @@ Fast orientation for a new coding session.
   - `web/features/agents/` — agent list and focused agent builder pages
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
-  - `web/features/worlds/` — world index, overview, and narrative workspace components
+  - `web/features/worlds/` — world index, overview, narrative management workspace, and read-only reader components
   - `web/features/workspace/` — shared workspace shell and form helpers
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
@@ -38,7 +38,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
   - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and narrative artifact router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation

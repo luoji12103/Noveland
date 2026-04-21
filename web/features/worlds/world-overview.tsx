@@ -474,6 +474,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/narrative`}>
             Narrative artifacts
           </Link>
+          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/reader`}>
+            Reader
+          </Link>
         </div>
       </section>
 

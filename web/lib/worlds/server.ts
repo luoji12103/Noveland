@@ -86,6 +86,24 @@ export type NarrativeWorkspaceData = {
   loadError: string | null;
 };
 
+export type NarrativeReaderListData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  conversations: ConversationSession[];
+  narrativeArtifacts: NarrativeArtifact[];
+  selectedArtifactKind: string;
+  selectedConversationId: string;
+  loadError: string | null;
+};
+
+export type NarrativeReaderDetailData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  conversations: ConversationSession[];
+  artifact: NarrativeArtifact | null;
+  loadError: string | null;
+};
+
 export type RuntimeAdminData = {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
@@ -460,6 +478,89 @@ export async function getNarrativeWorkspaceData(
   }
 }
 
+export async function getNarrativeReaderListData(
+  worldId: string,
+  filters: {
+    artifactKind?: string | null;
+    sourceConversationId?: string | null;
+    limit?: number;
+  } = {},
+): Promise<NarrativeReaderListData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyNarrativeReaderListData(
+        worlds,
+        "Unable to load narrative reader.",
+        filters.artifactKind ?? "",
+        filters.sourceConversationId ?? "",
+      );
+    }
+
+    const [conversations, narrativeArtifacts] = await Promise.all([
+      apiFetch<ConversationSession[]>(`/worlds/${worldId}/conversations`, cookies),
+      apiFetch<NarrativeArtifact[]>(
+        `/worlds/${worldId}/narrative-artifacts${narrativeArtifactQuery(filters)}`,
+        cookies,
+      ),
+    ]);
+
+    return {
+      worlds,
+      selectedWorld,
+      conversations,
+      narrativeArtifacts,
+      selectedArtifactKind: filters.artifactKind ?? "",
+      selectedConversationId: filters.sourceConversationId ?? "",
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyNarrativeReaderListData(
+      [],
+      "Unable to load narrative reader.",
+      filters.artifactKind ?? "",
+      filters.sourceConversationId ?? "",
+    );
+  }
+}
+
+export async function getNarrativeReaderDetailData(
+  worldId: string,
+  artifactId: string,
+): Promise<NarrativeReaderDetailData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyNarrativeReaderDetailData(worlds, "Unable to load narrative artifact.");
+    }
+
+    const [conversations, artifact] = await Promise.all([
+      apiFetch<ConversationSession[]>(`/worlds/${worldId}/conversations`, cookies),
+      apiFetch<NarrativeArtifact>(`/worlds/${worldId}/narrative-artifacts/${artifactId}`, cookies),
+    ]);
+
+    return {
+      worlds,
+      selectedWorld,
+      conversations,
+      artifact,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyNarrativeReaderDetailData([], "Unable to load narrative artifact.");
+  }
+}
+
 export async function getProviderAdminData(): Promise<ProviderProfile[]> {
   return apiFetch<ProviderProfile[]>("/provider-profiles", await cookieHeader());
 }
@@ -514,6 +615,36 @@ function emptyWorldWorkspaceData(worlds: World[], loadError: string): WorldWorks
     scheduleRules: [],
     worldDiagnostics: [],
     canManageSelectedWorld: false,
+    loadError,
+  };
+}
+
+function emptyNarrativeReaderListData(
+  worlds: World[],
+  loadError: string,
+  selectedArtifactKind: string,
+  selectedConversationId: string,
+): NarrativeReaderListData {
+  return {
+    worlds,
+    selectedWorld: null,
+    conversations: [],
+    narrativeArtifacts: [],
+    selectedArtifactKind,
+    selectedConversationId,
+    loadError,
+  };
+}
+
+function emptyNarrativeReaderDetailData(
+  worlds: World[],
+  loadError: string,
+): NarrativeReaderDetailData {
+  return {
+    worlds,
+    selectedWorld: null,
+    conversations: [],
+    artifact: null,
     loadError,
   };
 }
@@ -591,6 +722,24 @@ function emptyDashboardData(
     canManageSelectedWorld: false,
     loadError,
   };
+}
+
+function narrativeArtifactQuery(filters: {
+  artifactKind?: string | null;
+  sourceConversationId?: string | null;
+  limit?: number;
+}): string {
+  const search = new URLSearchParams();
+  if (filters.artifactKind) {
+    search.set("artifact_kind", filters.artifactKind);
+  }
+  if (filters.sourceConversationId) {
+    search.set("source_conversation_id", filters.sourceConversationId);
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return search.size === 0 ? "" : `?${search.toString()}`;
 }
 
 async function errorDetail(response: Response): Promise<string> {
