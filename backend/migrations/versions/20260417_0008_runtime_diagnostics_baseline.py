@@ -71,7 +71,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["provider_profile_id"],
             ["provider_profiles.id"],
-            name="fk_runtime_diagnostic_events_provider_profile_id_provider_profiles",
+            name="fk_runtime_diag_events_provider_profile",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(

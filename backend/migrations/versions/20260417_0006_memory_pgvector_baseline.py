@@ -79,7 +79,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name="pk_agent_memory_items"),
     )
-    op.execute("ALTER TABLE agent_memory_items ALTER COLUMN embedding TYPE vector(1536)")
+    op.execute(
+        "ALTER TABLE agent_memory_items "
+        "ALTER COLUMN embedding TYPE vector(1536) "
+        "USING embedding::vector(1536)"
+    )
     op.create_index(
         "ix_agent_memory_items_world_agent",
         "agent_memory_items",
