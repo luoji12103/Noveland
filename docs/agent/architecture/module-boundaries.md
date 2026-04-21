@@ -34,6 +34,19 @@ Must not own:
 - global world time authority
 - other agents' calendar access
 
+## `conversations`
+Owns:
+- conversation session metadata
+- participant ordering
+- transcript turn persistence
+- deterministic round-robin turn advancement
+
+Must not own:
+- LLM provider transport details
+- narrative chapter publication
+- global runtime scheduling policy
+- arbitrary cross-agent private memory reads
+
 ## `narrative`
 Owns:
 - summarizer workflow

@@ -16,6 +16,7 @@
 - world event stream
 - world snapshots
 - world-level runtime state
+- world/scene-scoped conversation transcripts
 
 ## Agent-owned data
 
@@ -43,6 +44,9 @@
 - `agents` stores world-scoped agent identity basics only, not runtime state, memory, or private calendars.
 - `agent_personas` stores one world-scoped persona/policy record per agent.
 - `agent_observations` stores filtered, agent-scoped derived observations from stable world events and operator notes.
+- `conversation_sessions` stores world/scene-scoped conversation objectives, mode, status, and turn cursor state.
+- `conversation_participants` stores enabled agent participant ordering for each conversation session.
+- `conversation_turns` stores append-only operator and agent transcript turns, including optional run linkage and failure text.
 - `world_clock_states` stores world-owned operational clock state, with one current state row per world.
 - `world_clock_transitions` stores world-owned operational audit records for clock state changes.
 - `world_events` stores the append-only world event stream.

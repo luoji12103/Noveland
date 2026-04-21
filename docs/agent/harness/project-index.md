@@ -9,13 +9,20 @@ Fast orientation for a new coding session.
 ### Web
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
+- `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, and narrative artifacts
+- `web/app/admin/` — platform-admin pages for provider profiles and runtime control
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
+  - `web/features/admin/` — platform-level provider and runtime management pages
+  - `web/features/agents/` — agent list and focused agent builder pages
+  - `web/features/conversations/` — conversation list/detail pages and transcript controls
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
+  - `web/features/worlds/` — world index, overview, and narrative workspace components
+  - `web/features/workspace/` — shared workspace shell and form helpers
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
@@ -30,10 +37,12 @@ Fast orientation for a new coding session.
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
   - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
+  - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, and control router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and narrative router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation
+  - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue
   - `noveland.services.runtime.daemon` — database-backed runtime control state and daemon loop orchestration
 - `backend/pyproject.toml` — backend uv workspace manifest
 
@@ -53,6 +62,10 @@ Fast orientation for a new coding session.
   - `noveland.calendar.contracts` — calendar entry and schedule rule contracts
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
   - `noveland.calendar.services` — calendar CRUD and due-resolution service
+- `backend/packages/conversations/`
+  - `noveland.conversations.contracts` — conversation session, participant, turn, and control DTOs
+  - `noveland.conversations.models` — conversation session, participant, and turn ORM models
+  - `noveland.conversations.services` — deterministic round-robin conversation service and transcript persistence
 - `backend/packages/narrative/`
   - `noveland.narrative.contracts` — narrative artifact contracts
   - `noveland.narrative.models` — narrative artifact ORM model
@@ -91,7 +104,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, and agent persona/observations
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, and conversation workspace baseline
 
 ## Update rule
 

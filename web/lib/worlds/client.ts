@@ -13,6 +13,14 @@ import type {
   CalendarEntry,
   CalendarEntryCreateInput,
   CalendarEntryUpdateInput,
+  ConversationAdvanceResult,
+  ConversationCreateInput,
+  ConversationParticipant,
+  ConversationParticipantInput,
+  ConversationSeedInput,
+  ConversationSession,
+  ConversationTurn,
+  ConversationUpdateInput,
   MemberCandidate,
   MemoryItem,
   MemoryItemCreateInput,
@@ -402,6 +410,140 @@ export function deactivateAgent(worldId: string, agentId: string): Promise<void>
     method: "DELETE",
     csrf: true,
   });
+}
+
+export function listConversations(worldId: string): Promise<ConversationSession[]> {
+  return worldRequest<ConversationSession[]>(`/api/worlds/${worldId}/conversations`, {
+    method: "GET",
+  });
+}
+
+export function createConversation(
+  worldId: string,
+  input: ConversationCreateInput,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(`/api/worlds/${worldId}/conversations`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateConversation(
+  worldId: string,
+  conversationId: string,
+  input: ConversationUpdateInput,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(
+    `/api/worlds/${worldId}/conversations/${conversationId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listConversationParticipants(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationParticipant[]> {
+  return worldRequest<ConversationParticipant[]>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    { method: "GET" },
+  );
+}
+
+export function replaceConversationParticipants(
+  worldId: string,
+  conversationId: string,
+  input: ConversationParticipantInput[],
+): Promise<ConversationParticipant[]> {
+  return worldRequest<ConversationParticipant[]>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    {
+      method: "PUT",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listConversationTurns(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationTurn[]> {
+  return worldRequest<ConversationTurn[]>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
+    { method: "GET" },
+  );
+}
+
+export function seedConversation(
+  worldId: string,
+  conversationId: string,
+  input: ConversationSeedInput,
+): Promise<ConversationTurn> {
+  return worldRequest<ConversationTurn>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/seed`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function advanceConversation(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationAdvanceResult> {
+  return worldRequest<ConversationAdvanceResult>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/advance`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function startConversation(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/start`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function pauseConversation(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/pause`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function resumeConversation(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationSession> {
+  return worldRequest<ConversationSession>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/resume`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function listMemberships(worldId: string): Promise<Membership[]> {

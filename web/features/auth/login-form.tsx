@@ -24,7 +24,7 @@ export function LoginForm() {
     try {
       await requestCsrf();
       await login({ email, password });
-      router.replace("/");
+      router.replace("/worlds");
       router.refresh();
     } catch (caughtError) {
       setError(messageForError(caughtError));

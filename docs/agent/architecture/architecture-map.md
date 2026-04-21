@@ -17,6 +17,7 @@
 - `worlds/` — world entities, scenes, world clock, transitions
 - `agents/` — agent identity, config, persona policy, filtered observation shaping, tool application
 - `calendar/` — private schedule and calendar logic
+- `conversations/` — world/scene-scoped multi-agent conversation sessions, participants, turns, and deterministic advancement
 - `narrative/` — summarizer orchestration and artifacts
 - `events/` — event contracts, event store, snapshot interfaces, replay
 - `memory/` — memory abstractions and implementations
@@ -37,6 +38,7 @@
 
 - `events/`
 - `worlds/` world clock and orchestration
+- `conversations/` transcript advancement and agent prompt chaining
 - `auth/`
 - `plugins/` registry and interface definitions
 - `memory/` namespace isolation

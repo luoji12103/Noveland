@@ -34,6 +34,7 @@
 - Runtime Observability + Diagnostics
 - Provider Reliability Hardening
 - Agent Observation + Persona Policy Baseline
+- Conversation Workspace Baseline
 
 ## Upcoming Mainline
-- None selected; next mainline scope needs confirmation.
+- Conversation Policies + Stop Conditions

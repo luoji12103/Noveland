@@ -51,7 +51,7 @@ describe("LoginForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/worlds"));
     expect(refresh).toHaveBeenCalled();
   });
 

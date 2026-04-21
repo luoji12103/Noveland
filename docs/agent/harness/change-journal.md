@@ -241,3 +241,14 @@
 - Tests added/updated: persona/observation service tests, API permission and flow tests, schema/import coverage, runtime daemon prompt-context coverage, Web client/component/E2E coverage for persona and observations
 - Docs updated: README, architecture map, data ownership, project index, file inventory, task board, active handoff
 - Follow-up notes: observations are filtered derived records and do not alter event log semantics; same-scene multi-agent dialogue, public reader UI, plugin runtime execution, and advanced prompt policy remain future work.
+
+## Conversation workspace baseline entry
+
+- Date: 2026-04-19
+- Branch: feat/conversation-workspace-baseline
+- Scope: multi-agent conversation substrate and world-first Web workspace
+- Summary: Added world/scene-scoped conversation sessions, deterministic round-robin participants and transcript turns, conversation API routes, runtime auto-dialogue ticking, explicit agent provider profile mapping, and a multi-page Web workspace for worlds, agents, conversations, narrative, providers, and runtime.
+- Files changed: `/backend/packages/conversations/**`, `/backend/migrations/versions/20260419_0011_conversation_workspace_baseline.py`, `/backend/services/api/src/noveland/services/api/conversations.py`, `/backend/services/runtime/src/noveland/services/runtime/conversation_loop.py`, `/backend/tests/**`, `/web/app/worlds/**`, `/web/app/admin/**`, `/web/features/{admin,agents,conversations,workspace,worlds}/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: conversation service/API tests; runtime daemon auto-dialogue test; schema/import coverage; Web auth/E2E updates for multi-page workspace and conversations
+- Docs updated: README, architecture map, module boundaries, data ownership, project index, file inventory, task board, active handoff
+- Follow-up notes: conversation v1 uses deterministic round-robin only; LLM speaker selection, policy guardrails, richer stop conditions, and narrative writer consumption remain future tasks.

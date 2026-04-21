@@ -1,35 +1,34 @@
 # Active Session Handoff
 
-- Date: 2026-04-17T00:00:00Z
-- Branch: feat/agent-observation-persona
-- Objective: Add agent persona policy, filtered observations, runtime prompt context convergence, API endpoints, and Web controls.
+- Date: 2026-04-19T00:00:00Z
+- Branch: feat/conversation-workspace-baseline
+- Objective: Add conversation workspace baseline with world/scene-scoped multi-agent sessions, manual chain and auto dialogue modes, and a world-first multi-page Web workspace.
 - Completed work:
-  - Merged `feat/provider-reliability-hardening` into `main` after full backend/Web regression.
-  - Created `feat/agent-observation-persona` from `main`.
-  - Added migration `20260417_0010_agent_observation_persona.py` for `agent_personas` and `agent_observations`.
-  - Added `noveland.agents.contracts` and `noveland.agents.services` for persona upsert, observation list/create/refresh, and consume marking.
-  - Added filtered observation refresh from stable world events: clock, calendar due, agent run, memory, and narrative events.
-  - Updated runtime agent invocation to refresh observations before provider calls and include persona/policy/filtered observations in prompt context.
-  - Added world-admin `GET/PATCH persona`, `GET/POST observations`, and `POST observations/refresh` APIs.
-  - Added Web types, client helpers, server loading, dashboard persona editor, observation list, manual observation creation, and refresh action.
-  - Added backend and Web tests for service, API, runtime, schema, imports, clients, components, and mock E2E flows.
+  - Created `feat/conversation-workspace-baseline` from the dirty local `main` worktree and continued the interrupted implementation there.
+  - Added `noveland.conversations` package with contracts, typed errors, ORM models, and deterministic round-robin conversation service.
+  - Added Alembic migration `20260419_0011_conversation_workspace_baseline.py` for `conversation_sessions`, `conversation_participants`, and `conversation_turns`.
+  - Registered conversation models in `noveland.core.database.MODEL_MODULES` and added workspace/package dependencies.
+  - Added `/worlds/{world_id}/conversations/**` backend API and included it in the FastAPI app.
+  - Added runtime `conversation_loop` and daemon integration for running auto-dialogue sessions.
+  - Added explicit `provider_profile_id` mapping to agent create/update/response contracts while keeping `agent.config` compatibility.
+  - Split the Web UI into `/worlds`, `/worlds/[worldId]`, agent builder, conversation workspace, narrative, `/admin/providers`, and `/admin/runtime` pages.
+  - Updated same-origin Web helpers, client calls, Playwright mock backend, E2E flows, and harness docs.
 - Incomplete work:
-  - Final full regression, commit, and branch handoff are next.
-  - This stage intentionally stops on `feat/agent-observation-persona`; it is not merged to `main` yet.
+  - Final backend full regression, Web build, Compose config, commit, and merge decision remain to run after this handoff update.
+  - Conversation policy hardening, richer stop conditions, LLM speaker selection, and narrative writer consumption are intentionally deferred.
 - Tests run:
-  - `cd backend && uv run ruff check .`
-  - `cd backend && uv run mypy .`
-  - Targeted backend pytest for agent observations, API world persona/observations, runtime daemon, schema metadata, and workspace imports
   - `cd web && npm run typecheck`
+  - `cd web && npm run lint`
   - `cd web && npm run test`
-  - Full `cd backend && uv run pytest`, Web lint/build/e2e, and Compose config remain to rerun after docs sync.
+  - `cd web && npm run test:e2e`
+  - Earlier targeted backend checks passed for conversations, runtime daemon, schema metadata, and workspace imports.
 - Current risks:
-  - Observations are derived operational records, not canonical events; event log semantics must stay unchanged.
-  - Runtime prompt context should remain filtered and must not pull arbitrary world tables or other agents' private memory.
-  - Web persona controls are world-admin only in this baseline; no public reader or end-user persona UI exists.
+  - `auto_dialogue` advances one turn per runtime loop iteration; it is not a standalone scheduler.
+  - Conversation prompt chaining is deterministic and does not choose speakers with an LLM.
+  - Existing local deployment-fix changes were already dirty before this branch and are still present in the worktree.
 - Recommended next step:
-  - Run full backend/Web regression and commit `feat(agents): add observation persona baseline`.
+  - Run full backend gates, Web build, Compose config, then commit `feat(conversations): add workspace baseline`.
 - Sensitive areas to avoid casual edits:
   - provider secret handling and diagnostic redaction
   - API authorization and CSRF boundaries
-  - migration ordering and runtime/event invariants
+  - migration ordering and event/runtime invariants
