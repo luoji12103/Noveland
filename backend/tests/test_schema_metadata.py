@@ -334,6 +334,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worlds.id",
     }
     assert foreign_key_targets("narrative_artifacts") == {
+        "conversation_sessions.id",
         "agent_runtime_runs.id",
         "agents.id",
         "worlds.id",
@@ -392,6 +393,9 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")
+    assert "ix_narrative_artifacts_world_conversation_created_at" in index_names(
+        "narrative_artifacts",
+    )
     assert "ix_runtime_diagnostic_events_occurred_at" in index_names(
         "runtime_diagnostic_events",
     )
@@ -407,4 +411,10 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
 
 
 def test_conversation_schema_includes_policy_and_terminal_columns() -> None:
-    assert {"policy_config", "terminal_reason"} <= column_names("conversation_sessions")
+    assert {"policy_config", "writer_config", "terminal_reason"} <= column_names(
+        "conversation_sessions",
+    )
+
+
+def test_narrative_schema_includes_conversation_source_column() -> None:
+    assert {"source_conversation_id"} <= column_names("narrative_artifacts")

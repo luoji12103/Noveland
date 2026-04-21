@@ -263,3 +263,14 @@
 - Tests added/updated: conversation service policy coverage, API stop/diagnostics coverage, runtime daemon retry handling, schema metadata assertions, Web conversation detail policy/diagnostics tests, and mock-backend E2E updates for stopped/max-turn sessions
 - Docs updated: project index, file inventory, task board, active handoff, change journal
 - Follow-up notes: richer distributed conversation diagnostics, memory-aware conversation context, and writer consumption of transcripts remain separate future work.
+
+## Narrative writer and summarizer pipeline entry
+
+- Date: 2026-04-21
+- Branch: feat/narrative-writer-summarizer
+- Scope: conversation-first narrative generation pipeline
+- Summary: Added per-session writer config, conversation-linked narrative artifact storage, manual and auto-on-complete summary/chapter generation, runtime hook-up for completed conversations, new conversation narrative API routes, and Web controls for writer config and generation.
+- Files changed: `/backend/packages/conversations/**`, `/backend/packages/narrative/**`, `/backend/services/api/src/noveland/services/api/{conversations,worlds}.py`, `/backend/services/runtime/src/noveland/services/runtime/conversation_loop.py`, `/backend/migrations/versions/20260421_0013_narrative_writer_summarizer.py`, `/backend/tests/**`, `/web/features/conversations/**`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: narrative writer service tests, conversation API narrative generation/listing tests, runtime auto-generate coverage, schema metadata assertions, world client tests for conversation narrative routes, conversation detail component coverage, and mock-backend E2E narrative generation flow
+- Docs updated: README, architecture map, module boundaries, data ownership, project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: dedicated reader routes, richer writer prompt controls, artifact publishing workflow, and transcript-to-memory integration remain future tasks.

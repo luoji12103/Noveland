@@ -142,6 +142,9 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByText("Operator starts.")).toBeVisible();
   await page.getByRole("button", { name: "Advance one turn" }).click();
   await expect(page.getByText(/replies to/)).toBeVisible();
+  await page.getByRole("button", { name: "Generate summary + chapter" }).click();
+  await expect(page.getByText("Conversation narrative generated.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Manual Chain summary/i })).toBeVisible();
 
   await page.goto(`/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`auto-${Date.now()}`);

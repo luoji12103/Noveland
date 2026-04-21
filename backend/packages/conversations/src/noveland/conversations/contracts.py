@@ -72,6 +72,13 @@ class ConversationPolicyConfig(_FrozenContract):
         return self
 
 
+class ConversationWriterConfig(_FrozenContract):
+    provider_profile_id: uuid.UUID | None = None
+    auto_generate_on_complete: bool = False
+    generate_summary: bool = True
+    generate_chapter: bool = True
+
+
 class ConversationSessionCreate(_FrozenContract):
     world_id: uuid.UUID
     scene_id: uuid.UUID | None = None
@@ -83,6 +90,7 @@ class ConversationSessionCreate(_FrozenContract):
     opening_prompt: str = Field(default="", max_length=12_000)
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyConfig
+    writer_config: ConversationWriterConfig
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationSessionCreate:
@@ -99,6 +107,7 @@ class ConversationSessionUpdate(_FrozenContract):
     opening_prompt: str | None = Field(default=None, max_length=12_000)
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyConfig | None = None
+    writer_config: ConversationWriterConfig | None = None
 
 
 class ConversationParticipantDefinition(_FrozenContract):
@@ -125,6 +134,7 @@ class ConversationSessionRecord(_FrozenContract):
     max_turns: int
     next_turn_index: int
     policy: ConversationPolicyConfig
+    writer_config: ConversationWriterConfig
     terminal_reason: ConversationTerminalReason | None
     created_at: datetime
     updated_at: datetime

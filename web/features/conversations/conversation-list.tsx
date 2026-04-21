@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 
 import { createConversation } from "@/lib/worlds/client";
 import type { ConversationListData } from "@/lib/worlds/server";
-import type { ConversationPolicy } from "@/lib/worlds/types";
+import type { ConversationPolicy, ConversationWriterConfig } from "@/lib/worlds/types";
 import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type ConversationListProps = {
@@ -34,6 +34,7 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
         opening_prompt: formString(form, "opening_prompt"),
         max_turns: Number(formString(form, "max_turns") || "12"),
         policy: policyFromForm(form),
+        writer_config: writerConfigFromForm(form),
       });
       formElement.reset();
       window.location.assign(`/worlds/${worldId}/conversations/${session.id}`);
@@ -74,6 +75,33 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
             <input className="text-input" name="max_turns" placeholder="12" />
             <input className="text-input" name="objective" placeholder="Objective" />
             <input className="text-input" name="opening_prompt" placeholder="Opening prompt" />
+            <input
+              className="text-input"
+              name="writer_provider_profile_id"
+              placeholder="Writer provider profile id (optional)"
+            />
+            <label className="checkbox-label">
+              <input name="writer_auto_generate_on_complete" type="checkbox" value="true" />
+              Auto generate on complete
+            </label>
+            <label className="checkbox-label">
+              <input
+                defaultChecked
+                name="writer_generate_summary"
+                type="checkbox"
+                value="true"
+              />
+              Generate summary
+            </label>
+            <label className="checkbox-label">
+              <input
+                defaultChecked
+                name="writer_generate_chapter"
+                type="checkbox"
+                value="true"
+              />
+              Generate chapter
+            </label>
             <select
               aria-label="Error policy"
               className="text-input"
@@ -161,5 +189,15 @@ function policyFromForm(form: FormData): ConversationPolicy {
     max_consecutive_failed_turns: Number(formString(form, "max_consecutive_failed_turns")),
     loop_guard_window: Number(formString(form, "loop_guard_window")),
     repeat_output_threshold: Number(formString(form, "repeat_output_threshold")),
+  };
+}
+
+
+function writerConfigFromForm(form: FormData): ConversationWriterConfig {
+  return {
+    provider_profile_id: optionalFormString(form, "writer_provider_profile_id"),
+    auto_generate_on_complete: form.get("writer_auto_generate_on_complete") === "true",
+    generate_summary: form.get("writer_generate_summary") === "true",
+    generate_chapter: form.get("writer_generate_chapter") === "true",
   };
 }

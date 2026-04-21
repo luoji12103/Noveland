@@ -87,6 +87,13 @@ export type ConversationPolicy = {
   repeat_output_threshold: number;
 };
 
+export type ConversationWriterConfig = {
+  provider_profile_id: string | null;
+  auto_generate_on_complete: boolean;
+  generate_summary: boolean;
+  generate_chapter: boolean;
+};
+
 export type ConversationSession = {
   id: string;
   world_id: string;
@@ -101,6 +108,7 @@ export type ConversationSession = {
   max_turns: number;
   next_turn_index: number;
   policy: ConversationPolicy;
+  writer_config: ConversationWriterConfig;
   terminal_reason: ConversationTerminalReason | null;
   created_at: string;
   updated_at: string;
@@ -320,13 +328,18 @@ export type AgentObservation = {
   created_at: string;
 };
 
-export type NarrativeArtifactKind = "agent_note" | "world_summary";
+export type NarrativeArtifactKind =
+  | "agent_note"
+  | "world_summary"
+  | "conversation_summary"
+  | "chapter_draft";
 
 export type NarrativeArtifact = {
   id: string;
   world_id: string;
   agent_id: string | null;
   source_run_id: string | null;
+  source_conversation_id: string | null;
   title: string;
   content: string;
   artifact_kind: NarrativeArtifactKind;
@@ -414,6 +427,7 @@ export type ConversationCreateInput = {
   opening_prompt?: string;
   max_turns?: number;
   policy: ConversationPolicy;
+  writer_config: ConversationWriterConfig;
 };
 
 export type ConversationUpdateInput = {
@@ -422,6 +436,7 @@ export type ConversationUpdateInput = {
   opening_prompt?: string;
   max_turns?: number;
   policy?: ConversationPolicy;
+  writer_config?: ConversationWriterConfig;
 };
 
 export type ConversationParticipantInput = {
@@ -534,3 +549,8 @@ export type NarrativeArtifactCreateInput = {
   artifact_kind?: NarrativeArtifactKind;
   agent_id?: string | null;
 };
+
+export type ConversationNarrativeArtifactSet =
+  | "summary_and_chapter"
+  | "summary_only"
+  | "chapter_only";

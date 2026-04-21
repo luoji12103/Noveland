@@ -21,12 +21,13 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import Scene, World, WorldMembership
-from sqlalchemy import Table, create_engine
+from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -68,6 +69,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
             "scene_id": str(scene_id),
             "max_turns": 3,
             "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
         },
     )
     conversation_id = create_response.json()["id"]
@@ -144,6 +146,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "mode": "auto_dialogue",
             "scene_id": str(first_scene_id),
             "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
         },
     )
     invalid_world_scope = client.post(
@@ -155,6 +158,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "mode": "manual_chain",
             "scene_id": str(first_scene_id),
             "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
         },
     )
     invalid_scene_scope = client.post(
@@ -165,6 +169,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "scope_type": "scene",
             "mode": "manual_chain",
             "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
         },
     )
     conversation_id = create_conversation.json()["id"]
@@ -221,6 +226,7 @@ def test_conversation_api_stop_and_diagnostics() -> None:
             "scope_type": "world",
             "mode": "manual_chain",
             "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
         },
     )
     conversation_id = create_conversation.json()["id"]
@@ -235,6 +241,92 @@ def test_conversation_api_stop_and_diagnostics() -> None:
     assert diagnostics_response.status_code == 200
     assert diagnostics_response.json()[0]["component"] == "conversation"
     assert diagnostics_response.json()[0]["details"]["conversation_id"] == str(conversation_id)
+
+
+def test_conversation_narrative_generation_and_listing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "writer-world")
+    scene_id = _seed_scene(engine, world_id, "story-room")
+    agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
+    profile_id = _seed_provider_profile(engine)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    prompts: list[str] = []
+
+    def fake_invoke_profile(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            return ProviderCompletion(text="Conversation summary output", raw_response={"ok": True})
+        return ProviderCompletion(text="Chapter draft output", raw_response={"ok": True})
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
+
+    _authenticate(client, owner_token)
+    create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "writer-session",
+            "title": "Writer session",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
+            "max_turns": 1,
+            "policy": _policy_json(),
+            "writer_config": {
+                **_writer_config_json(),
+                "provider_profile_id": str(profile_id),
+                "auto_generate_on_complete": True,
+            },
+        },
+    )
+    conversation_id = create_response.json()["id"]
+    replace_response = client.put(
+        f"/worlds/{world_id}/conversations/{conversation_id}/participants",
+        json=[{"agent_id": str(agent_id), "turn_order": 0, "is_enabled": True}],
+    )
+    seed_response = client.post(
+        f"/worlds/{world_id}/conversations/{conversation_id}/seed",
+        json={"input_text": "Operator seed"},
+    )
+    advance_response = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
+    list_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
+    )
+    regenerate_response = client.post(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative/generate",
+        json={"artifact_set": "summary_and_chapter"},
+    )
+
+    with Session(engine) as session:
+        artifacts = session.scalars(select(NarrativeArtifact)).all()
+
+    assert create_response.status_code == 201
+    assert replace_response.status_code == 200
+    assert seed_response.status_code == 200
+    assert advance_response.status_code == 200
+    assert advance_response.json()["session"]["status"] == "completed"
+    assert list_response.status_code == 200
+    assert regenerate_response.status_code == 200
+    assert [artifact["artifact_kind"] for artifact in list_response.json()] == [
+        "chapter_draft",
+        "conversation_summary",
+    ]
+    assert len(prompts) == 3
+    assert prompts[1].startswith("Write a concise but complete conversation summary.")
+    assert prompts[2].startswith("Write a chapter draft based on this Noveland conversation.")
+    assert len(artifacts) == 2
+    assert {artifact.artifact_kind for artifact in artifacts} == {
+        "conversation_summary",
+        "chapter_draft",
+    }
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -262,6 +354,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
+        cast(Table, NarrativeArtifact.__table__),
     ):
         table.create(engine)
     app = create_app()
@@ -355,10 +448,12 @@ def _seed_agent(
     return agent_id
 
 
-def _seed_provider_profile(engine: Engine) -> None:
+def _seed_provider_profile(engine: Engine) -> uuid.UUID:
+    profile_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ProviderProfile(
+                id=profile_id,
                 profile_key="runtime-profile",
                 name="Runtime Profile",
                 provider_type="openai_compatible",
@@ -370,6 +465,7 @@ def _seed_provider_profile(engine: Engine) -> None:
             ),
         )
         session.commit()
+    return profile_id
 
 
 def _add_membership(
@@ -404,4 +500,13 @@ def _policy_json() -> dict[str, object]:
         "max_consecutive_failed_turns": 2,
         "loop_guard_window": 4,
         "repeat_output_threshold": 3,
+    }
+
+
+def _writer_config_json() -> dict[str, object]:
+    return {
+        "provider_profile_id": None,
+        "auto_generate_on_complete": False,
+        "generate_summary": True,
+        "generate_chapter": True,
     }

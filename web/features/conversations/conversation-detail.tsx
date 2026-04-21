@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   advanceConversation,
+  generateConversationNarrativeArtifacts,
   pauseConversation,
   replaceConversationParticipants,
   resumeConversation,
@@ -14,8 +15,14 @@ import {
   updateConversation,
 } from "@/lib/worlds/client";
 import type { ConversationDetailData } from "@/lib/worlds/server";
-import type { ConversationPolicy, RuntimeDiagnostic } from "@/lib/worlds/types";
-import { formString, messageForError } from "@/features/workspace/form-utils";
+import type {
+  ConversationNarrativeArtifactSet,
+  ConversationPolicy,
+  ConversationWriterConfig,
+  NarrativeArtifact,
+  RuntimeDiagnostic,
+} from "@/lib/worlds/types";
+import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type ConversationDetailProps = {
   worldId: string;
@@ -27,6 +34,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
   const conversation = data.conversation;
   const participantIds = useMemo(
     () => new Set(data.participants.map((participant) => participant.agent_id)),
@@ -100,6 +108,33 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
           policy: policyFromForm(form),
         }),
       "Conversation policy updated.",
+    );
+  }
+
+  async function handleWriterConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      () =>
+        updateConversation(worldId, conversationId, {
+          writer_config: writerConfigFromForm(form),
+        }),
+      "Writer config updated.",
+    );
+  }
+
+  async function handleGenerateNarrative(artifactSet: ConversationNarrativeArtifactSet) {
+    await runAction(
+      async () => {
+        const artifacts = await generateConversationNarrativeArtifacts(
+          worldId,
+          conversationId,
+          artifactSet,
+          conversation?.writer_config.provider_profile_id ?? null,
+        );
+        setNarrativeArtifacts(artifacts);
+      },
+      "Conversation narrative generated.",
     );
   }
 
@@ -278,6 +313,96 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         </section>
       </div>
 
+      <div className="management-columns">
+        <section className="management-panel" aria-labelledby="writer-config-title">
+          <h2 className="section-title" id="writer-config-title">
+            Writer config
+          </h2>
+          {canManage ? (
+            <form className="inline-form" onSubmit={handleWriterConfig}>
+              <input
+                aria-label="Writer provider profile id"
+                className="text-input"
+                name="provider_profile_id"
+                defaultValue={conversation.writer_config.provider_profile_id ?? ""}
+                placeholder="Provider profile id (optional)"
+              />
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.writer_config.auto_generate_on_complete}
+                  name="auto_generate_on_complete"
+                  type="checkbox"
+                  value="true"
+                />
+                Auto generate on complete
+              </label>
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.writer_config.generate_summary}
+                  name="generate_summary"
+                  type="checkbox"
+                  value="true"
+                />
+                Generate summary
+              </label>
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.writer_config.generate_chapter}
+                  name="generate_chapter"
+                  type="checkbox"
+                  value="true"
+                />
+                Generate chapter
+              </label>
+              <button className="primary-button" type="submit" disabled={isBusy}>
+                Save writer config
+              </button>
+            </form>
+          ) : (
+            <p>
+              auto={String(conversation.writer_config.auto_generate_on_complete)} / summary=
+              {String(conversation.writer_config.generate_summary)} / chapter=
+              {String(conversation.writer_config.generate_chapter)}
+            </p>
+          )}
+        </section>
+
+        <section className="management-panel" aria-labelledby="conversation-narrative-title">
+          <h2 className="section-title" id="conversation-narrative-title">
+            Conversation narrative
+          </h2>
+          {canManage ? (
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => handleGenerateNarrative("summary_and_chapter")}
+              >
+                Generate summary + chapter
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => handleGenerateNarrative("summary_only")}
+              >
+                Generate summary
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => handleGenerateNarrative("chapter_only")}
+              >
+                Generate chapter
+              </button>
+            </div>
+          ) : null}
+          <NarrativeArtifactList artifacts={narrativeArtifacts} />
+        </section>
+      </div>
+
       {canManage ? (
         <section className="management-panel" aria-labelledby="conversation-diagnostics-title">
           <h2 className="section-title" id="conversation-diagnostics-title">
@@ -331,6 +456,15 @@ function policyFromForm(form: FormData): ConversationPolicy {
   };
 }
 
+function writerConfigFromForm(form: FormData): ConversationWriterConfig {
+  return {
+    provider_profile_id: optionalFormString(form, "provider_profile_id"),
+    auto_generate_on_complete: form.get("auto_generate_on_complete") === "true",
+    generate_summary: form.get("generate_summary") === "true",
+    generate_chapter: form.get("generate_chapter") === "true",
+  };
+}
+
 function DiagnosticList({ diagnostics }: { diagnostics: RuntimeDiagnostic[] }) {
   if (diagnostics.length === 0) {
     return <p>No diagnostics recorded.</p>;
@@ -346,6 +480,26 @@ function DiagnosticList({ diagnostics }: { diagnostics: RuntimeDiagnostic[] }) {
             </h3>
             <p>{diagnostic.message}</p>
             <p>{diagnostic.occurred_at}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function NarrativeArtifactList({ artifacts }: { artifacts: NarrativeArtifact[] }) {
+  if (artifacts.length === 0) {
+    return <p>No conversation narrative artifacts yet.</p>;
+  }
+
+  return (
+    <div className="resource-list">
+      {artifacts.map((artifact) => (
+        <article className="resource-row" key={artifact.id}>
+          <div>
+            <h3>{artifact.title}</h3>
+            <p>{artifact.artifact_kind}</p>
+            <p>{artifact.content}</p>
           </div>
         </article>
       ))}

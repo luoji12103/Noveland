@@ -19,7 +19,7 @@ Fast orientation for a new coding session.
   - `web/features/auth/` — login form and logout control
   - `web/features/admin/` — platform-level provider and runtime management pages
   - `web/features/agents/` — agent list and focused agent builder pages
-  - `web/features/conversations/` — conversation list/detail pages and transcript controls
+  - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
   - `web/features/worlds/` — world index, overview, and narrative workspace components
   - `web/features/workspace/` — shared workspace shell and form helpers
@@ -37,12 +37,12 @@ Fast orientation for a new coding session.
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
   - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
-  - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, and diagnostics router
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and narrative router
+  - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation
-  - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue
+  - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including optional completed-session narrative auto-generation
   - `noveland.services.runtime.daemon` — database-backed runtime control state and daemon loop orchestration
 - `backend/pyproject.toml` — backend uv workspace manifest
 
@@ -63,13 +63,13 @@ Fast orientation for a new coding session.
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
   - `noveland.calendar.services` — calendar CRUD and due-resolution service
 - `backend/packages/conversations/`
-  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, and stop-condition DTOs
+  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, stop-condition, and writer-config DTOs
   - `noveland.conversations.models` — conversation session, participant, and turn ORM models
-  - `noveland.conversations.services` — deterministic round-robin conversation service, stop-condition handling, diagnostics recording, and transcript persistence
+  - `noveland.conversations.services` — deterministic round-robin conversation service, stop-condition handling, diagnostics recording, transcript persistence, and writer-config mapping
 - `backend/packages/narrative/`
-  - `noveland.narrative.contracts` — narrative artifact contracts
-  - `noveland.narrative.models` — narrative artifact ORM model
-  - `noveland.narrative.services` — narrative artifact create/list service
+  - `noveland.narrative.contracts` — narrative artifact contracts plus conversation narrative generation inputs
+  - `noveland.narrative.models` — narrative artifact ORM model with optional source conversation linkage
+  - `noveland.narrative.services` — narrative artifact create/list helpers and conversation-first writer pipeline
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models
@@ -104,7 +104,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, and conversation policy/stop-condition baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, and narrative writer/summarizer baseline
 
 ## Update rule
 

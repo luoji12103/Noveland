@@ -8,8 +8,10 @@ from noveland.conversations import (
     ConversationAdvanceResult,
     ConversationErrorPolicy,
     ConversationService,
+    ConversationSessionStatus,
 )
 from noveland.conversations.errors import ConversationStateError
+from noveland.narrative import ConversationNarrativeWriterService
 from noveland.services.runtime.agent_loop import AgentRunExecution, AgentRuntimeOrchestrator
 from sqlalchemy.orm import Session
 
@@ -70,7 +72,7 @@ class ConversationRuntimeOrchestrator:
             run = replace(retry_run, diagnostics=retry_diagnostics)
         else:
             run = replace(run, diagnostics={**run.diagnostics, "attempt_count": 1})
-        return self._conversation_service.finalize_turn(
+        result = self._conversation_service.finalize_turn(
             prepared,
             response_text=run.response_text,
             run_id=run.run_id,
@@ -78,6 +80,12 @@ class ConversationRuntimeOrchestrator:
             succeeded=run.status == "succeeded",
             error_text=None if run.status == "succeeded" else _error_text(run.diagnostics),
         )
+        if result.session.status == ConversationSessionStatus.COMPLETED:
+            ConversationNarrativeWriterService(
+                self._session,
+                self._profile_service,
+            ).auto_generate_for_completed_conversation(world_id, session_id)
+        return result
 
     def _run_agent_turn(
         self,

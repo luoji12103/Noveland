@@ -382,6 +382,7 @@ class NarrativeArtifactResponse(BaseModel):
     world_id: uuid.UUID
     agent_id: uuid.UUID | None
     source_run_id: uuid.UUID | None
+    source_conversation_id: uuid.UUID | None
     title: str
     content: str
     artifact_kind: str
@@ -1541,6 +1542,7 @@ def _narrative_artifact_response(
         world_id=artifact.world_id,
         agent_id=artifact.agent_id,
         source_run_id=artifact.source_run_id,
+        source_conversation_id=artifact.source_conversation_id,
         title=artifact.title,
         content=artifact.content,
         artifact_kind=artifact.artifact_kind.value,

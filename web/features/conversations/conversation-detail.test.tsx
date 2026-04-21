@@ -10,6 +10,7 @@ vi.mock("@/lib/worlds/client", async () => {
     replaceConversationParticipants: vi.fn(),
     seedConversation: vi.fn(),
     advanceConversation: vi.fn(),
+    generateConversationNarrativeArtifacts: vi.fn(),
     startConversation: vi.fn(),
     pauseConversation: vi.fn(),
     resumeConversation: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("next/navigation", () => ({
 
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
 import {
+  generateConversationNarrativeArtifacts,
   stopConversation,
   updateConversation,
 } from "@/lib/worlds/client";
@@ -68,6 +70,47 @@ describe("ConversationDetail", () => {
       });
     });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("updates writer config and generates conversation narrative", async () => {
+    vi.mocked(updateConversation).mockResolvedValue(adminData.conversation!);
+    vi.mocked(generateConversationNarrativeArtifacts).mockResolvedValue(
+      adminData.narrativeArtifacts,
+    );
+
+    render(
+      <ConversationDetail
+        worldId="world-1"
+        conversationId="conversation-1"
+        data={adminData}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Auto generate on complete"));
+    fireEvent.click(screen.getByRole("button", { name: "Save writer config" }));
+
+    await waitFor(() => {
+      expect(updateConversation).toHaveBeenCalledWith("world-1", "conversation-1", {
+        writer_config: {
+          provider_profile_id: "profile-1",
+          auto_generate_on_complete: false,
+          generate_summary: true,
+          generate_chapter: true,
+        },
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate summary + chapter" }));
+
+    await waitFor(() => {
+      expect(generateConversationNarrativeArtifacts).toHaveBeenCalledWith(
+        "world-1",
+        "conversation-1",
+        "summary_and_chapter",
+        "profile-1",
+      );
+    });
+    expect(screen.getByText("Conversation summary")).toBeInTheDocument();
   });
 
   it("stops a conversation and hides admin controls for read-only members", async () => {
@@ -162,6 +205,12 @@ const adminData: ConversationDetailData = {
       loop_guard_window: 4,
       repeat_output_threshold: 3,
     },
+    writer_config: {
+      provider_profile_id: "profile-1",
+      auto_generate_on_complete: true,
+      generate_summary: true,
+      generate_chapter: true,
+    },
     terminal_reason: null,
     created_at: "2026-04-21T00:00:00.000Z",
     updated_at: "2026-04-21T00:00:01.000Z",
@@ -207,6 +256,20 @@ const adminData: ConversationDetailData = {
       run_id: "run-1",
       provider_profile_id: null,
       created_at: "2026-04-21T00:00:02.000Z",
+    },
+  ],
+  narrativeArtifacts: [
+    {
+      id: "artifact-1",
+      world_id: "world-1",
+      agent_id: null,
+      source_run_id: null,
+      source_conversation_id: "conversation-1",
+      title: "Conversation summary",
+      content: "Summary body",
+      artifact_kind: "conversation_summary",
+      metadata: { generation_mode: "manual" },
+      created_at: "2026-04-21T00:00:03.000Z",
     },
   ],
 };

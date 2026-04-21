@@ -317,6 +317,12 @@ def _seed_running_conversation(engine: Engine, world_id: uuid.UUID, agent_id: uu
                     "loop_guard_window": 4,
                     "repeat_output_threshold": 3,
                 },
+                writer_config={
+                    "provider_profile_id": None,
+                    "auto_generate_on_complete": False,
+                    "generate_summary": True,
+                    "generate_chapter": True,
+                },
                 terminal_reason=None,
             ),
         )

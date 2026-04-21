@@ -572,7 +572,9 @@ name = "noveland-narrative"
 version = "0.1.0"
 source = { editable = "packages/narrative" }
 dependencies = [
+    { name = "noveland-adapters" },
     { name = "noveland-agents" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
@@ -580,7 +582,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "noveland-adapters", editable = "packages/adapters" },
     { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },

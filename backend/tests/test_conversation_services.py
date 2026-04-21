@@ -19,6 +19,7 @@ from noveland.conversations import (
     ConversationSessionCreate,
     ConversationSessionStatus,
     ConversationTerminalReason,
+    ConversationWriterConfig,
 )
 from noveland.conversations.errors import ConversationStateError
 from noveland.conversations.models import (
@@ -56,6 +57,7 @@ def test_manual_chain_round_robin_and_completion() -> None:
                 opening_prompt="Start from the operator seed.",
                 max_turns=2,
                 policy=_default_policy(),
+                writer_config=_default_writer_config(),
             ),
         )
         service.replace_participants(
@@ -125,6 +127,7 @@ def test_prepare_next_turn_skips_disabled_participant_and_marks_failed_without_a
                 mode=ConversationMode.MANUAL_CHAIN,
                 max_turns=3,
                 policy=_default_policy(),
+                writer_config=_default_writer_config(),
             ),
         )
         service.replace_participants(
@@ -173,6 +176,7 @@ def test_skip_policy_and_failure_threshold_mark_failed() -> None:
                     loop_guard_window=4,
                     repeat_output_threshold=3,
                 ),
+                writer_config=_default_writer_config(),
             ),
         )
         service.replace_participants(
@@ -234,6 +238,7 @@ def test_loop_guard_stops_repeated_output_session() -> None:
                     loop_guard_window=4,
                     repeat_output_threshold=2,
                 ),
+                writer_config=_default_writer_config(),
             ),
         )
         service.replace_participants(
@@ -273,6 +278,15 @@ def _default_policy() -> ConversationPolicyConfig:
         max_consecutive_failed_turns=2,
         loop_guard_window=4,
         repeat_output_threshold=3,
+    )
+
+
+def _default_writer_config() -> ConversationWriterConfig:
+    return ConversationWriterConfig(
+        provider_profile_id=None,
+        auto_generate_on_complete=False,
+        generate_summary=True,
+        generate_chapter=True,
     )
 
 

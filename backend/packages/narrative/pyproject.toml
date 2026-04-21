@@ -8,14 +8,18 @@ version = "0.1.0"
 description = "Narrative orchestration and artifacts package for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "noveland-adapters",
   "noveland-agents",
+  "noveland-conversations",
   "noveland-core",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
 
 [tool.uv.sources]
+noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
+noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

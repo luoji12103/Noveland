@@ -22,6 +22,7 @@ from noveland.conversations.contracts import (
     ConversationTerminalReason,
     ConversationTurnRecord,
     ConversationTurnStatus,
+    ConversationWriterConfig,
     PreparedConversationTurn,
 )
 from noveland.conversations.errors import (
@@ -113,6 +114,7 @@ class ConversationService:
             max_turns=conversation.max_turns,
             next_turn_index=0,
             policy_config=conversation.policy.model_dump(mode="json"),
+            writer_config=conversation.writer_config.model_dump(mode="json"),
             terminal_reason=None,
         )
         self._session.add(model)
@@ -144,6 +146,8 @@ class ConversationService:
             model.max_turns = update.max_turns
         if "policy" in update.model_fields_set and update.policy is not None:
             model.policy_config = update.policy.model_dump(mode="json")
+        if "writer_config" in update.model_fields_set and update.writer_config is not None:
+            model.writer_config = update.writer_config.model_dump(mode="json")
         self._session.flush()
         return _session_record(model)
 
@@ -926,6 +930,7 @@ def _session_record(model: ConversationSession) -> ConversationSessionRecord:
         max_turns=model.max_turns,
         next_turn_index=model.next_turn_index,
         policy=_policy_config(model.policy_config),
+        writer_config=_writer_config(model.writer_config),
         terminal_reason=terminal_reason,
         created_at=_utc(model.created_at),
         updated_at=_utc(model.updated_at),
@@ -963,6 +968,10 @@ def _turn_record(model: ConversationTurn) -> ConversationTurnRecord:
 
 def _policy_config(value: dict[str, object]) -> ConversationPolicyConfig:
     return ConversationPolicyConfig.model_validate(value)
+
+
+def _writer_config(value: dict[str, object]) -> ConversationWriterConfig:
+    return ConversationWriterConfig.model_validate(value)
 
 
 def _normalize_loop_text(value: str) -> str:

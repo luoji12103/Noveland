@@ -1,34 +1,35 @@
 # Active Session Handoff
 
 - Date: 2026-04-21T00:00:00Z
-- Branch: feat/conversation-policies-stop-conditions
-- Objective: Add explicit per-session conversation policies, stop/failure guards, and conversation diagnostics before narrative writer consumption.
+- Branch: feat/narrative-writer-summarizer
+- Objective: Add conversation-first summary/chapter generation, per-session writer configuration, and completed-conversation auto-generation before building a dedicated reader surface.
 - Completed work:
-  - Extended conversation contracts, ORM state, and migration coverage with `policy_config`, `terminal_reason`, `stopped`, and `skipped`.
-  - Added conversation error-policy behavior for skip, retry-once-then-skip, fail, and retry-once-then-fail in both the service layer and runtime daemon turn executor.
-  - Added terminal handling for max-turn completion, no-enabled-participant failure, consecutive failure exhaustion, loop-guard repeated output detection, and operator stop.
-  - Reused `runtime_diagnostic_events` for conversation diagnostics by extending the observability component enum with `conversation`.
-  - Added conversation diagnostics and explicit stop routes to the API, with world-admin/platform-admin visibility only.
-  - Updated the Web conversation workspace with a policy editor, stop control, terminal state display, and recent diagnostics panel.
-  - Hardened route transitions after world, agent, and conversation creation to use full-page navigation where Next client routing was causing flaky post-create state in E2E.
+  - Extended `conversation_sessions` with explicit `writer_config` and surfaced it through create/update/response contracts.
+  - Expanded `narrative_artifacts` with `source_conversation_id` and new `conversation_summary` / `chapter_draft` kinds.
+  - Added `ConversationNarrativeWriterService` with manual generation and completed-session auto-generation, including idempotent summary/chapter creation and provider fallback rules.
+  - Hooked the runtime conversation loop so completed conversations can auto-generate enabled artifacts.
+  - Added conversation narrative list/generate API routes and updated world narrative responses to include `source_conversation_id`.
+  - Updated the Web conversation list/detail flows with writer config editing, narrative generation actions, and related-artifact display.
 - Incomplete work:
-  - Final full regression, commit, and merge back to `main`.
-  - Narrative writer/summarizer pipeline and dedicated reader surface remain the next two planned stages.
+  - Commit and merge back to `main`.
+  - Build the dedicated narrative reader surface on a fresh Stage 3 branch.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
+  - `docker compose -f infra/compose.yaml config`
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
   - `cd web && npm run test:e2e`
+  - `cd web && npm run build`
 - Current risks:
-  - Conversation loop guard is text-normalization based and intentionally simple; semantic loop detection is out of scope.
-  - Conversation diagnostics share the runtime diagnostics table, so long-term retention/partitioning is still a future operational concern.
-  - Auto dialogue still advances at most one turn per runtime loop iteration.
+  - Writer prompt assembly is intentionally fixed-shape and transcript-first; no prompt-studio level customization exists yet.
+  - Auto-generation only fires on transition to `completed`; failed or manually stopped sessions do not generate artifacts in this stage.
+  - Artifact idempotency is enforced in service logic, not by a database uniqueness constraint.
 - Recommended next step:
-  - Run final compose/build gates, commit `feat(conversations): add policies and stop conditions`, merge to `main`, then branch for narrative writer work.
+  - Commit `feat(narrative): add writer summarizer pipeline`, merge to `main`, and branch for the dedicated reader surface.
 - Sensitive areas to avoid casual edits:
   - migration ordering and backwards compatibility
   - provider secret handling and diagnostic redaction
-  - conversation event naming and runtime session state transitions
+  - conversation terminal state transitions and auto-generation trigger points

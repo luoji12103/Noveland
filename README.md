@@ -1,6 +1,6 @@
 # Noveland
 
-Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a backend API, auth/session baseline, world-first Web workspace, multi-agent conversation substrate, runtime host, and local infrastructure.
+Noveland is a persistent virtual-world operating system for AI agents. The repository is in its early implementation phase: the architecture and governance package is in place, and the implementation now includes a backend API, auth/session baseline, world-first Web workspace, multi-agent conversation substrate, conversation-first narrative writer pipeline, runtime host, and local infrastructure.
 
 ## Current Status
 
@@ -180,9 +180,9 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Su
    - 在 `/worlds/{worldId}` 配置 scenes、memberships、clock、schedule rules、replay/snapshots
    - 在 `/worlds/{worldId}/agents` 创建 agent
    - 在 `/worlds/{worldId}/agents/{agentId}` 设置 scene、default provider、persona、observations、calendar、memory，并可手动 run
-   - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session
-   - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume
-   - 在 `/worlds/{worldId}/narrative` 查看或创建 narrative artifacts
+   - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session，并配置 writer 行为
+   - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume，并可生成 summary / chapter
+   - 在 `/worlds/{worldId}/narrative` 查看 narrative artifacts
    - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
    - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
@@ -294,6 +294,8 @@ POST /worlds/{world_id}/conversations/{conversation_id}/advance
 POST /worlds/{world_id}/conversations/{conversation_id}/start
 POST /worlds/{world_id}/conversations/{conversation_id}/pause
 POST /worlds/{world_id}/conversations/{conversation_id}/resume
+GET /worlds/{world_id}/conversations/{conversation_id}/narrative
+POST /worlds/{world_id}/conversations/{conversation_id}/narrative/generate
 ```
 
 Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
@@ -318,7 +320,7 @@ The protected Web workspace reads this API through server-side helpers and same-
 
 The Web workspace is split into `/worlds`, `/worlds/{worldId}`, `/worlds/{worldId}/agents`, `/worlds/{worldId}/agents/{agentId}`, `/worlds/{worldId}/conversations`, `/worlds/{worldId}/conversations/{conversationId}`, `/worlds/{worldId}/narrative`, `/admin/providers`, and `/admin/runtime`.
 
-The protected Web workspace also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, conversation transcript controls, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
+The protected Web workspace also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, conversation transcript controls, per-session writer configuration, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
 
 The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, advances running auto-dialogue conversations one turn per loop, appends agent/runtime/conversation events, optionally writes memory items, and optionally creates narrative artifacts.
 

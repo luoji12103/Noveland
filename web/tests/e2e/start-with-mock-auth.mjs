@@ -224,6 +224,7 @@ const narrativeArtifacts = [
     world_id: worldOneId,
     agent_id: agentGuideId,
     source_run_id: agentRuns[0].run_id,
+    source_conversation_id: null,
     title: "Initial artifact",
     content: "Initial artifact content",
     artifact_kind: "agent_note",
@@ -1272,6 +1273,7 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       world_id: worldId,
       agent_id: body.agent_id ?? null,
       source_run_id: null,
+      source_conversation_id: null,
       title: body.title,
       content: body.content,
       artifact_kind: body.artifact_kind ?? "world_summary",
@@ -1317,6 +1319,12 @@ async function handleConversations(request, response, currentSubject, worldId, c
         max_turns: body.max_turns ?? 12,
         next_turn_index: 0,
         policy: body.policy,
+        writer_config: body.writer_config ?? {
+          provider_profile_id: null,
+          auto_generate_on_complete: false,
+          generate_summary: true,
+          generate_chapter: true,
+        },
         terminal_reason: null,
         created_at: now,
         updated_at: now,
@@ -1345,6 +1353,16 @@ async function handleConversations(request, response, currentSubject, worldId, c
   }
   if (action === "turns" && request.method === "GET") {
     sendJson(response, 200, turnsForSession(conversationId));
+    return;
+  }
+  if (action === "narrative" && request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      narrativeArtifacts
+        .filter((item) => item.world_id === worldId && item.source_conversation_id === conversationId)
+        .sort((left, right) => right.created_at.localeCompare(left.created_at)),
+    );
     return;
   }
 
@@ -1432,6 +1450,11 @@ async function handleConversations(request, response, currentSubject, worldId, c
     sendJson(response, 200, session);
     return;
   }
+  if (action === "narrative" && request.method === "POST") {
+    const body = await readJson(request);
+    sendJson(response, 200, generateConversationNarrative(session, body.artifact_set));
+    return;
+  }
 
   sendJson(response, 405, { detail: "method not allowed" });
 }
@@ -1476,6 +1499,9 @@ function appendAgentConversationTurn(session) {
   if (session.next_turn_index >= session.max_turns) {
     session.status = "completed";
     session.terminal_reason = "max_turns_reached";
+    if (session.writer_config?.auto_generate_on_complete) {
+      generateConversationNarrative(session, writerArtifactSet(session.writer_config));
+    }
   }
   return turn;
 }
@@ -1504,6 +1530,84 @@ function turnsForSession(sessionId) {
   return conversationTurns
     .filter((item) => item.session_id === sessionId)
     .sort((left, right) => left.turn_index - right.turn_index);
+}
+
+function generateConversationNarrative(session, artifactSet) {
+  const generated = [];
+  const summaryArtifact = findConversationArtifact(session.id, "conversation_summary");
+  const chapterArtifact = findConversationArtifact(session.id, "chapter_draft");
+  const summaryEnabled = artifactSet === "summary_and_chapter" || artifactSet === "summary_only";
+  const chapterEnabled = artifactSet === "summary_and_chapter" || artifactSet === "chapter_only";
+
+  if (summaryEnabled) {
+    if (summaryArtifact === undefined) {
+      generated.push(
+        pushNarrativeArtifact({
+          world_id: session.world_id,
+          agent_id: null,
+          source_run_id: null,
+          source_conversation_id: session.id,
+          title: `${session.title} summary`,
+          content: `Summary for ${session.title}`,
+          artifact_kind: "conversation_summary",
+          metadata: { generation_mode: "manual" },
+        }),
+      );
+    } else {
+      generated.push(summaryArtifact);
+    }
+  }
+
+  if (chapterEnabled) {
+    if (chapterArtifact === undefined) {
+      generated.push(
+        pushNarrativeArtifact({
+          world_id: session.world_id,
+          agent_id: null,
+          source_run_id: null,
+          source_conversation_id: session.id,
+          title: `${session.title} chapter draft`,
+          content: `Chapter draft for ${session.title}`,
+          artifact_kind: "chapter_draft",
+          metadata: { generation_mode: "manual" },
+        }),
+      );
+    } else {
+      generated.push(chapterArtifact);
+    }
+  }
+
+  return generated.sort((left, right) => right.created_at.localeCompare(left.created_at));
+}
+
+function pushNarrativeArtifact(fields) {
+  const artifact = {
+    id: randomUUID(),
+    created_at: new Date().toISOString(),
+    ...fields,
+  };
+  narrativeArtifacts.unshift(artifact);
+  return artifact;
+}
+
+function findConversationArtifact(conversationId, artifactKind) {
+  return narrativeArtifacts.find(
+    (item) =>
+      item.source_conversation_id === conversationId && item.artifact_kind === artifactKind,
+  );
+}
+
+function writerArtifactSet(writerConfig) {
+  if (writerConfig.generate_summary && writerConfig.generate_chapter) {
+    return "summary_and_chapter";
+  }
+  if (writerConfig.generate_summary) {
+    return "summary_only";
+  }
+  if (writerConfig.generate_chapter) {
+    return "chapter_only";
+  }
+  return "summary_only";
 }
 
 function clockForWorld(worldId) {

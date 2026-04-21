@@ -14,6 +14,7 @@ import type {
   CalendarEntryCreateInput,
   CalendarEntryUpdateInput,
   ConversationAdvanceResult,
+  ConversationNarrativeArtifactSet,
   ConversationCreateInput,
   ConversationParticipant,
   ConversationParticipantInput,
@@ -476,6 +477,35 @@ export function listConversationTurns(
   return worldRequest<ConversationTurn[]>(
     `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
     { method: "GET" },
+  );
+}
+
+export function listConversationNarrativeArtifacts(
+  worldId: string,
+  conversationId: string,
+): Promise<NarrativeArtifact[]> {
+  return worldRequest<NarrativeArtifact[]>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/narrative`,
+    { method: "GET" },
+  );
+}
+
+export function generateConversationNarrativeArtifacts(
+  worldId: string,
+  conversationId: string,
+  artifact_set: ConversationNarrativeArtifactSet,
+  provider_profile_id?: string | null,
+): Promise<NarrativeArtifact[]> {
+  return worldRequest<NarrativeArtifact[]>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/generate`,
+    {
+      method: "POST",
+      body: {
+        artifact_set,
+        ...(provider_profile_id ? { provider_profile_id } : {}),
+      },
+      csrf: true,
+    },
   );
 }
 

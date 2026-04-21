@@ -15,6 +15,7 @@ from noveland.conversations.contracts import (
     ConversationTerminalReason,
     ConversationTurnRecord,
     ConversationTurnStatus,
+    ConversationWriterConfig,
     PreparedConversationTurn,
 )
 from noveland.conversations.errors import (
@@ -70,6 +71,7 @@ __all__ = [
     "ConversationTurn",
     "ConversationTurnRecord",
     "ConversationTurnStatus",
+    "ConversationWriterConfig",
     "ConversationValidationError",
     "PACKAGE_NAME",
     "PreparedConversationTurn",

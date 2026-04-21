@@ -20,9 +20,17 @@ from noveland.conversations import (
     ConversationSessionStatus,
     ConversationSessionUpdate,
     ConversationTurnRecord,
+    ConversationWriterConfig,
 )
 from noveland.conversations.errors import ConversationStateError, ConversationValidationError
 from noveland.core.settings import load_settings
+from noveland.narrative import (
+    ConversationNarrativeArtifactSet,
+    ConversationNarrativeGenerate,
+    ConversationNarrativeWriterService,
+    NarrativeArtifactRecord,
+    NarrativeGenerationMode,
+)
 from noveland.observability import RuntimeDiagnosticRecord
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -71,6 +79,7 @@ class ConversationCreateRequest(_RequestModel):
     opening_prompt: str = Field(default="", max_length=12_000)
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyRequest
+    writer_config: ConversationWriterConfigRequest
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationCreateRequest:
@@ -87,6 +96,7 @@ class ConversationUpdateRequest(_RequestModel):
     opening_prompt: str | None = Field(default=None, max_length=12_000)
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyRequest | None = None
+    writer_config: ConversationWriterConfigRequest | None = None
 
 
 class ConversationParticipantRequest(_RequestModel):
@@ -99,11 +109,32 @@ class ConversationSeedRequest(_RequestModel):
     input_text: str = Field(min_length=1, max_length=12_000)
 
 
+class ConversationWriterConfigRequest(_RequestModel):
+    provider_profile_id: uuid.UUID | None = None
+    auto_generate_on_complete: bool = False
+    generate_summary: bool = True
+    generate_chapter: bool = True
+
+
+class ConversationNarrativeGenerateRequest(_RequestModel):
+    artifact_set: Literal["summary_and_chapter", "summary_only", "chapter_only"] = (
+        "summary_and_chapter"
+    )
+    provider_profile_id: uuid.UUID | None = None
+
+
 class ConversationPolicyResponse(BaseModel):
     error_policy: str
     max_consecutive_failed_turns: int
     loop_guard_window: int
     repeat_output_threshold: int
+
+
+class ConversationWriterConfigResponse(BaseModel):
+    provider_profile_id: uuid.UUID | None
+    auto_generate_on_complete: bool
+    generate_summary: bool
+    generate_chapter: bool
 
 
 class ConversationSessionResponse(BaseModel):
@@ -120,6 +151,7 @@ class ConversationSessionResponse(BaseModel):
     max_turns: int
     next_turn_index: int
     policy: ConversationPolicyResponse
+    writer_config: ConversationWriterConfigResponse
     terminal_reason: str | None
     created_at: str
     updated_at: str
@@ -165,6 +197,19 @@ class ConversationDiagnosticResponse(BaseModel):
     created_at: str
 
 
+class ConversationNarrativeArtifactResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    source_run_id: uuid.UUID | None
+    source_conversation_id: uuid.UUID | None
+    title: str
+    content: str
+    artifact_kind: str
+    metadata: dict[str, Any]
+    created_at: str
+
+
 class ConversationAdvanceResponse(BaseModel):
     session: ConversationSessionResponse
     turn: ConversationTurnResponse
@@ -204,6 +249,7 @@ def create_conversation(
                 opening_prompt=conversation_create.opening_prompt,
                 max_turns=conversation_create.max_turns,
                 policy=_policy_contract(conversation_create.policy),
+                writer_config=_writer_config_contract(conversation_create.writer_config),
             ),
         )
     except ConversationValidationError as exc:
@@ -245,6 +291,9 @@ def update_conversation(
                 policy=None
                 if conversation_update.policy is None
                 else _policy_contract(conversation_update.policy),
+                writer_config=None
+                if conversation_update.writer_config is None
+                else _writer_config_contract(conversation_update.writer_config),
             ),
         )
     except LookupError as exc:
@@ -345,6 +394,57 @@ def list_conversation_diagnostics(
     except LookupError as exc:
         raise _not_found() from exc
     return [_diagnostic_response(record) for record in records]
+
+
+@router.get(
+    "/{conversation_id}/narrative",
+    response_model=list[ConversationNarrativeArtifactResponse],
+)
+def list_conversation_narrative_artifacts(
+    conversation_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[ConversationNarrativeArtifactResponse]:
+    try:
+        artifacts = ConversationNarrativeWriterService(
+            db_session,
+            ProviderProfileService(db_session, load_settings()),
+        ).list_conversation_artifacts(context.world_id, conversation_id)
+    except LookupError as exc:
+        raise _not_found() from exc
+    return [_narrative_artifact_response(artifact) for artifact in artifacts]
+
+
+@router.post(
+    "/{conversation_id}/narrative/generate",
+    response_model=list[ConversationNarrativeArtifactResponse],
+)
+def generate_conversation_narrative_artifacts(
+    conversation_id: uuid.UUID,
+    generate_request: ConversationNarrativeGenerateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[ConversationNarrativeArtifactResponse]:
+    require_csrf(request)
+    try:
+        artifacts = ConversationNarrativeWriterService(
+            db_session,
+            ProviderProfileService(db_session, load_settings()),
+        ).generate_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=context.world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet(generate_request.artifact_set),
+                provider_profile_id=generate_request.provider_profile_id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+    except LookupError as exc:
+        raise _not_found() from exc
+    except (ConversationValidationError, ConversationStateError, ValueError) as exc:
+        raise _http_error_for_conversation_error(str(exc)) from exc
+    return [_narrative_artifact_response(artifact) for artifact in artifacts]
 
 
 @router.post("/{conversation_id}/seed", response_model=ConversationTurnResponse)
@@ -484,6 +584,17 @@ def _policy_contract(policy: ConversationPolicyRequest) -> ConversationPolicyCon
     )
 
 
+def _writer_config_contract(
+    writer_config: ConversationWriterConfigRequest,
+) -> ConversationWriterConfig:
+    return ConversationWriterConfig(
+        provider_profile_id=writer_config.provider_profile_id,
+        auto_generate_on_complete=writer_config.auto_generate_on_complete,
+        generate_summary=writer_config.generate_summary,
+        generate_chapter=writer_config.generate_chapter,
+    )
+
+
 def _session_response(session: ConversationSessionRecord) -> ConversationSessionResponse:
     return ConversationSessionResponse(
         id=session.id,
@@ -503,6 +614,12 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
             loop_guard_window=session.policy.loop_guard_window,
             repeat_output_threshold=session.policy.repeat_output_threshold,
+        ),
+        writer_config=ConversationWriterConfigResponse(
+            provider_profile_id=session.writer_config.provider_profile_id,
+            auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
+            generate_summary=session.writer_config.generate_summary,
+            generate_chapter=session.writer_config.generate_chapter,
         ),
         terminal_reason=None
         if session.terminal_reason is None
@@ -557,6 +674,23 @@ def _diagnostic_response(record: RuntimeDiagnosticRecord) -> ConversationDiagnos
         run_id=record.run_id,
         provider_profile_id=record.provider_profile_id,
         created_at=record.created_at.isoformat(),
+    )
+
+
+def _narrative_artifact_response(
+    artifact: NarrativeArtifactRecord,
+) -> ConversationNarrativeArtifactResponse:
+    return ConversationNarrativeArtifactResponse(
+        id=artifact.id,
+        world_id=artifact.world_id,
+        agent_id=artifact.agent_id,
+        source_run_id=artifact.source_run_id,
+        source_conversation_id=artifact.source_conversation_id,
+        title=artifact.title,
+        content=artifact.content,
+        artifact_kind=artifact.artifact_kind.value,
+        metadata=artifact.metadata,
+        created_at=artifact.created_at.isoformat(),
     )
 
 

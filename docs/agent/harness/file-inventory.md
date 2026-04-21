@@ -123,7 +123,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260417_0010_agent_observation_persona.py`
 - `backend/migrations/versions/20260419_0011_conversation_workspace_baseline.py`
 - `backend/migrations/versions/20260421_0012_conversation_policies_stop_conditions.py`
+- `backend/migrations/versions/20260421_0013_narrative_writer_summarizer.py`
 - `backend/tests/`
+- `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`
 - `infra/compose.yaml`

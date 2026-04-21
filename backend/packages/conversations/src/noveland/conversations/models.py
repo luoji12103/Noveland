@@ -88,6 +88,11 @@ class ConversationSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
     )
+    writer_config: Mapped[dict[str, object]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
     terminal_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
