@@ -43,6 +43,7 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "agent_presets",
         "agent_observations",
         "agent_personas",
         "agent_runtime_runs",
@@ -92,6 +93,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_scenes_world_scene_key" in constraint_names("scenes", UniqueConstraint)
     assert "uq_agents_world_agent_key" in constraint_names("agents", UniqueConstraint)
+    assert "uq_agent_presets_preset_key" in constraint_names(
+        "agent_presets",
+        UniqueConstraint,
+    )
     assert "uq_agent_personas_agent_id" in constraint_names(
         "agent_personas",
         UniqueConstraint,
@@ -158,6 +163,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         CheckConstraint,
     )
     assert "ck_agents_kind" in constraint_names("agents", CheckConstraint)
+    assert "ck_agent_presets_default_kind" in constraint_names(
+        "agent_presets",
+        CheckConstraint,
+    )
     assert "ck_world_clock_states_status" in constraint_names(
         "world_clock_states",
         CheckConstraint,
@@ -295,7 +304,8 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("worlds") == {"users.id"}
     assert foreign_key_targets("world_memberships") == {"users.id", "worlds.id"}
     assert foreign_key_targets("scenes") == {"worlds.id"}
-    assert foreign_key_targets("agents") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("agents") == {"agent_presets.id", "scenes.id", "worlds.id"}
+    assert foreign_key_targets("agent_presets") == set()
     assert foreign_key_targets("agent_personas") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("agent_observations") == {
         "agents.id",
@@ -356,6 +366,8 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_memberships_world_id" in index_names("world_memberships")
     assert "ix_scenes_world_id" in index_names("scenes")
     assert "ix_agents_world_id" in index_names("agents")
+    assert "ix_agents_source_preset_id" in index_names("agents")
+    assert "ix_agent_presets_is_active" in index_names("agent_presets")
     assert "ix_agent_personas_world_agent" in index_names("agent_personas")
     assert "ix_agent_observations_world_agent_observed" in index_names("agent_observations")
     assert "ix_agent_observations_source_event_id" in index_names("agent_observations")

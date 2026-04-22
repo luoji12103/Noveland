@@ -118,6 +118,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
     second_scene_id = _seed_scene(engine, world_id, "garden")
     in_scene_agent_id = _seed_agent(engine, world_id, "guide", first_scene_id)
     out_of_scene_agent_id = _seed_agent(engine, world_id, "outsider", second_scene_id)
+    profile_id = _seed_provider_profile(engine)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _authenticate(client, owner_token)
 
@@ -127,7 +128,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "agent_key": "planner",
             "display_name": "Planner",
             "kind": "role_agent",
-            "provider_profile_id": str(uuid.uuid4()),
+            "provider_profile_id": str(profile_id),
             "config": {"tone": "direct"},
         },
     )

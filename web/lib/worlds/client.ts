@@ -5,6 +5,9 @@ import type {
   AgentCreateInput,
   AgentObservation,
   AgentObservationCreateInput,
+  AgentPreset,
+  AgentPresetCreateInput,
+  AgentPresetUpdateInput,
   AgentPersona,
   AgentPersonaUpdateInput,
   AgentRun,
@@ -50,6 +53,8 @@ import type {
   WorldReplayState,
   WorldSnapshot,
   WorldUpdateInput,
+  WorldCompositionExport,
+  WorldCompositionImportInput,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -80,6 +85,54 @@ export function updateWorld(worldId: string, input: WorldUpdateInput): Promise<W
 
 export function deactivateWorld(worldId: string): Promise<void> {
   return worldRequest<void>(`/api/worlds/${worldId}`, { method: "DELETE", csrf: true });
+}
+
+export function exportWorldComposition(worldId: string): Promise<WorldCompositionExport> {
+  return worldRequest<WorldCompositionExport>(`/api/worlds/${worldId}/composition-export`, {
+    method: "GET",
+  });
+}
+
+export function importWorldComposition(
+  input: WorldCompositionImportInput,
+): Promise<World> {
+  return apiRequest<World>("/api/world-compositions/import", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listAgentPresets(): Promise<AgentPreset[]> {
+  return apiRequest<AgentPreset[]>("/api/agent-presets", { method: "GET" });
+}
+
+export function createAgentPreset(
+  input: AgentPresetCreateInput,
+): Promise<AgentPreset> {
+  return apiRequest<AgentPreset>("/api/agent-presets", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateAgentPreset(
+  presetId: string,
+  input: AgentPresetUpdateInput,
+): Promise<AgentPreset> {
+  return apiRequest<AgentPreset>(`/api/agent-presets/${presetId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function deactivateAgentPreset(presetId: string): Promise<void> {
+  return apiRequest<void>(`/api/agent-presets/${presetId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
 }
 
 export function getWorldClock(worldId: string): Promise<WorldClock> {

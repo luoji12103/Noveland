@@ -296,3 +296,14 @@
 - Tests added/updated: realtime API/auth/origin tests; streaming proxy tests; runtime admin and conversation detail component coverage for live updates; full backend/web regression suite
 - Docs updated: README, project index, file inventory, task board, change journal
 - Follow-up notes: Stage 1 adds incremental streaming and live conversation control without replacing existing SSR/REST loaders; world members remain read-only on the live WebSocket channel.
+
+## Agent composition presets entry
+
+- Date: 2026-04-22
+- Branch: feat/agent-composition-presets
+- Scope: platform-managed presets and world composition import/export
+- Summary: Added `agent_presets`, preset-aware agent materialization, world composition export/import routes, preset admin UI, preset-aware agent creation, and composition controls in the world overview.
+- Files changed: `/backend/packages/agents/**`, `/backend/services/api/src/noveland/services/api/{app,worlds}.py`, `/backend/migrations/versions/20260422_0014_agent_composition_presets.py`, `/backend/tests/**`, `/web/app/admin/presets/**`, `/web/app/api/agent-presets/**`, `/web/app/api/world-compositions/**`, `/web/features/{admin,agents,worlds}/**`, `/web/lib/{api-proxy.ts,worlds/**}`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: preset API/schema tests; world composition export/import API tests; world client tests for preset/composition routes; component tests for preset admin and agent preset creation flow; Playwright mock-backend coverage for preset management and composition import/export
+- Docs updated: README, project index, file inventory, task board, change journal, active handoff
+- Follow-up notes: presets are materialized only at agent creation/import time, and world composition import always creates a new world instead of merging into an existing one.

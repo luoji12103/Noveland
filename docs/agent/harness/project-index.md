@@ -10,9 +10,12 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
-- `web/app/admin/` — platform-admin pages for provider profiles and runtime control
+- `web/app/admin/` — platform-admin pages for presets, provider profiles, and runtime control
+- `web/app/admin/presets/` — platform-admin preset catalog management page
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
+- `web/app/api/agent-presets/` — same-origin preset admin proxy route handlers
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
+- `web/app/api/world-compositions/` — same-origin world composition import proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
 - `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
@@ -20,8 +23,8 @@ Fast orientation for a new coding session.
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
-  - `web/features/admin/` — platform-level provider and runtime management pages
-  - `web/features/agents/` — agent list and focused agent builder pages
+  - `web/features/admin/` — platform-level preset, provider, and runtime management pages
+  - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
   - `web/features/worlds/` — world index, overview, narrative management workspace, and read-only reader components
@@ -29,6 +32,7 @@ Fast orientation for a new coding session.
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
+  - `web/lib/api-proxy.ts` — shared same-origin proxy helper for preset and composition routes
   - `web/lib/realtime/` — same-origin streaming proxy helper
   - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
@@ -61,9 +65,9 @@ Fast orientation for a new coding session.
   - `noveland.worlds.clock_service` — persistent world clock state and transition audit service
   - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
-  - `noveland.agents.contracts` — persona and filtered observation DTOs
-  - `noveland.agents.models` — agent identity, runtime run, persona, and observation ORM models
-  - `noveland.agents.services` — persona upsert plus filtered observation list/create/refresh helpers
+  - `noveland.agents.contracts` — persona, filtered observation, and agent preset DTOs
+  - `noveland.agents.models` — agent identity, runtime run, persona, observation, and preset ORM models
+  - `noveland.agents.services` — persona/observation helpers plus preset CRUD, provider resolution, and calendar blueprint materialization
 - `backend/packages/calendar/`
   - `noveland.calendar.contracts` — calendar entry and schedule rule contracts
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
@@ -110,7 +114,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, and narrative writer/summarizer baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, and agent composition presets
 
 ## Update rule
 

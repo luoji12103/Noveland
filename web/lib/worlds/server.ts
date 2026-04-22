@@ -4,6 +4,7 @@ import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
   AgentObservation,
+  AgentPreset,
   AgentPersona,
   AgentRun,
   CalendarEntry,
@@ -38,6 +39,7 @@ export type WorldWorkspaceData = {
   scheduleRules: ScheduleRule[];
   worldDiagnostics: RuntimeDiagnostic[];
   canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
   loadError: string | null;
 };
 
@@ -47,6 +49,9 @@ export type AgentWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   providerProfiles: ProviderProfile[];
+  agentPresets: AgentPreset[];
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
   loadError: string | null;
 };
 
@@ -108,6 +113,11 @@ export type RuntimeAdminData = {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
   runtimeDiagnostics: RuntimeDiagnostic[];
+  loadError: string | null;
+};
+
+export type PresetAdminData = {
+  presets: AgentPreset[];
   loadError: string | null;
 };
 
@@ -243,13 +253,14 @@ export async function getWorldsIndexData(): Promise<World[]> {
 
 export async function getWorldWorkspaceData(
   worldId: string,
+  isPlatformAdmin: boolean,
 ): Promise<WorldWorkspaceData> {
   const cookies = await cookieHeader();
   try {
     const worlds = await apiFetch<World[]>("/worlds", cookies);
     const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
     if (selectedWorld === null) {
-      return emptyWorldWorkspaceData(worlds, "Unable to load selected world.");
+      return emptyWorldWorkspaceData(worlds, "Unable to load selected world.", isPlatformAdmin);
     }
     const [
       scenes,
@@ -282,13 +293,14 @@ export async function getWorldWorkspaceData(
       scheduleRules,
       worldDiagnostics: worldDiagnostics ?? [],
       canManageSelectedWorld: memberships !== null,
+      isPlatformAdmin,
       loadError: null,
     };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
     }
-    return emptyWorldWorkspaceData([], "Unable to load world workspace.");
+    return emptyWorldWorkspaceData([], "Unable to load world workspace.", isPlatformAdmin);
   }
 }
 
@@ -298,11 +310,13 @@ export async function getAgentWorkspaceData(
 ): Promise<AgentWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const [worlds, scenes, agents, providerProfiles] = await Promise.all([
+    const [worlds, scenes, agents, memberships, providerProfiles, agentPresets] = await Promise.all([
       apiFetch<World[]>("/worlds", cookies),
       apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       isPlatformAdmin ? apiFetch<ProviderProfile[]>("/provider-profiles", cookies) : [],
+      apiFetch<AgentPreset[]>("/agent-presets", cookies),
     ]);
     return {
       worlds,
@@ -310,6 +324,9 @@ export async function getAgentWorkspaceData(
       scenes,
       agents,
       providerProfiles,
+      agentPresets,
+      canManageSelectedWorld: memberships !== null,
+      isPlatformAdmin,
       loadError: null,
     };
   } catch (error) {
@@ -322,6 +339,9 @@ export async function getAgentWorkspaceData(
       scenes: [],
       agents: [],
       providerProfiles: [],
+      agentPresets: [],
+      canManageSelectedWorld: false,
+      isPlatformAdmin,
       loadError: "Unable to load agents.",
     };
   }
@@ -587,6 +607,24 @@ export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   }
 }
 
+export async function getPresetAdminData(): Promise<PresetAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    return {
+      presets: await apiFetch<AgentPreset[]>("/agent-presets", cookies),
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      presets: [],
+      loadError: "Unable to load presets.",
+    };
+  }
+}
+
 async function cookieHeader(): Promise<string | null> {
   return (await headers()).get("cookie");
 }
@@ -602,7 +640,11 @@ async function apiFetch<T>(path: string, cookieHeader: string | null): Promise<T
   throw new WorldServerError(await errorDetail(response), response.status);
 }
 
-function emptyWorldWorkspaceData(worlds: World[], loadError: string): WorldWorkspaceData {
+function emptyWorldWorkspaceData(
+  worlds: World[],
+  loadError: string,
+  isPlatformAdmin: boolean,
+): WorldWorkspaceData {
   return {
     worlds,
     selectedWorld: null,
@@ -615,6 +657,7 @@ function emptyWorldWorkspaceData(worlds: World[], loadError: string): WorldWorks
     scheduleRules: [],
     worldDiagnostics: [],
     canManageSelectedWorld: false,
+    isPlatformAdmin,
     loadError,
   };
 }

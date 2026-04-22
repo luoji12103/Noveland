@@ -39,7 +39,7 @@
 - Narrative Writer / Summarizer Pipeline
 - Dedicated Narrative Reader Surface
 - Realtime Updates
+- Agent Composition Presets
 
 ## Upcoming Mainline
-- Agent Composition Presets
 - Plugin Runtime Wiring

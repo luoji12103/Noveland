@@ -21,10 +21,13 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/reader/`
 - `web/app/worlds/[worldId]/reader/[artifactId]/`
 - `web/app/admin/`
+- `web/app/admin/presets/`
 - `web/app/admin/providers/`
 - `web/app/admin/runtime/`
+- `web/app/api/agent-presets/`
 - `web/app/api/auth/`
 - `web/app/api/worlds/`
+- `web/app/api/world-compositions/`
 - `web/app/api/runtime/`
 - `web/app/api/runtime/stream/`
 - `web/app/api/provider-profiles/`
@@ -33,7 +36,10 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/`
 - `web/features/`
 - `web/features/admin/`
+- `web/features/admin/preset-admin.test.tsx`
+- `web/features/admin/preset-admin.tsx`
 - `web/features/agents/`
+- `web/features/agents/agent-list.test.tsx`
 - `web/features/auth/`
 - `web/features/conversations/`
 - `web/features/conversations/conversation-detail.test.tsx`
@@ -44,6 +50,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/worlds/narrative-reader.tsx`
 - `web/components/`
 - `web/lib/`
+- `web/lib/api-proxy.ts`
 - `web/lib/auth/`
 - `web/lib/realtime/`
 - `web/lib/realtime.ts`
@@ -81,6 +88,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/agents/src/noveland/agents/contracts.py`
 - `backend/packages/agents/src/noveland/agents/models.py`
 - `backend/packages/agents/src/noveland/agents/services.py`
+- `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`

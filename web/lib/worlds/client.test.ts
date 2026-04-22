@@ -7,14 +7,17 @@ import {
   createAgentMemoryItem,
   createNarrativeArtifact,
   createProviderProfile,
+  createAgentPreset,
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
   getNarrativeArtifact,
   createWorld,
+  deactivateAgentPreset,
   disableAgentMemoryItem,
   disableProviderProfile,
   deactivateScene,
+  exportWorldComposition,
   getRuntimeControl,
   getRuntimeStatus,
   getLatestSnapshot,
@@ -29,6 +32,7 @@ import {
   listAgentMemory,
   listNarrativeArtifacts,
   listConversationNarrativeArtifacts,
+  listAgentPresets,
   listProviderProfiles,
   runAgent,
   refreshAgentObservations,
@@ -38,7 +42,9 @@ import {
   listWorldDiagnostics,
   searchAgentMemory,
   testProviderProfile,
+  importWorldComposition,
   updateAgent,
+  updateAgentPreset,
   updateProviderProfile,
   updateAgentPersona,
   updateRuntimeControl,
@@ -100,6 +106,54 @@ describe("world client", () => {
       "/api/worlds/world-1/member-candidates?limit=20&query=user",
     );
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/scenes/scene-1");
+  });
+
+  it("maps preset and composition requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "preset-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ world: { slug: "first-world" } }))
+      .mockResolvedValueOnce(jsonResponse({ id: "world-2" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentPresets();
+    await createAgentPreset({
+      preset_key: "storyteller",
+      name: "Storyteller",
+      default_kind: "narrative_agent",
+    });
+    await updateAgentPreset("preset-1", { name: "Updated preset" });
+    await deactivateAgentPreset("preset-1");
+    await exportWorldComposition("world-1");
+    await importWorldComposition({
+      slug: "imported-world",
+      name: "Imported World",
+      owner_user_id: "user-1",
+      composition: {
+        world: {
+          slug: "first-world",
+          name: "First World",
+          description: null,
+          rules_config: {},
+          is_active: true,
+        },
+        scenes: [],
+        agents: [],
+        schedule_rules: [],
+        preset_references: [],
+      },
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/agent-presets");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/agent-presets");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/agent-presets/preset-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/agent-presets/preset-1");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/composition-export");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/world-compositions/import");
   });
 
   it("sends clock control requests", async () => {

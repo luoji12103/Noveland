@@ -4,6 +4,7 @@ from noveland.services.api.auth import router as auth_router
 from noveland.services.api.conversations import router as conversations_router
 from noveland.services.api.realtime import router as realtime_router
 from noveland.services.api.runtime import router as runtime_router
+from noveland.services.api.worlds import root_router as worlds_root_router
 from noveland.services.api.worlds import router as worlds_router
 from pydantic import BaseModel
 
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     api = FastAPI(title="Noveland API", version=PROJECT_VERSION)
     api.include_router(auth_router)
     api.include_router(runtime_router)
+    api.include_router(worlds_root_router)
     api.include_router(worlds_router)
     api.include_router(conversations_router)
     api.include_router(realtime_router)

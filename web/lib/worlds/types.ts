@@ -44,12 +44,88 @@ export type Agent = {
   id: string;
   world_id: string;
   home_scene_id: string | null;
+  source_preset_id: string | null;
   agent_key: string;
   display_name: string;
   kind: AgentKind;
   provider_profile_id: string | null;
   config: Record<string, unknown>;
   is_enabled: boolean;
+};
+
+export type AgentPresetCalendarEntry = {
+  title: string;
+  description: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  recurrence_rule: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type AgentPreset = {
+  id: string;
+  preset_key: string;
+  name: string;
+  description: string | null;
+  default_kind: AgentKind;
+  default_provider_profile_key: string | null;
+  persona_text: string;
+  behavior_policy: Record<string, unknown>;
+  calendar_blueprint: AgentPresetCalendarEntry[];
+  advanced_config: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorldCompositionWorld = {
+  slug: string;
+  name: string;
+  description: string | null;
+  rules_config: Record<string, unknown>;
+  is_active: boolean;
+};
+
+export type WorldCompositionScene = {
+  scene_key: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+};
+
+export type WorldCompositionAgent = {
+  agent_key: string;
+  display_name: string;
+  kind: AgentKind;
+  home_scene_key: string | null;
+  source_preset_key: string | null;
+  provider_profile_key: string | null;
+  config: Record<string, unknown>;
+  is_enabled: boolean;
+};
+
+export type WorldCompositionScheduleRule = {
+  rule_key: string;
+  name: string;
+  kind: ScheduleRuleKind;
+  config: Record<string, unknown>;
+  is_enabled: boolean;
+};
+
+export type WorldCompositionPresetReference = {
+  preset_key: string;
+  name: string;
+  default_kind: AgentKind;
+  default_provider_profile_key: string | null;
+  is_active: boolean;
+};
+
+export type WorldCompositionExport = {
+  world: WorldCompositionWorld;
+  scenes: WorldCompositionScene[];
+  agents: WorldCompositionAgent[];
+  schedule_rules: WorldCompositionScheduleRule[];
+  preset_references: WorldCompositionPresetReference[];
 };
 
 export type ConversationScopeType = "scene" | "world";
@@ -443,8 +519,9 @@ export type SceneUpdateInput = {
 export type AgentCreateInput = {
   agent_key: string;
   display_name: string;
-  kind: AgentKind;
+  kind?: AgentKind;
   home_scene_id?: string | null;
+  preset_id?: string | null;
   provider_profile_id?: string | null;
   config?: Record<string, unknown>;
 };
@@ -456,6 +533,41 @@ export type AgentUpdateInput = {
   provider_profile_id?: string | null;
   config?: Record<string, unknown>;
   is_enabled?: boolean;
+};
+
+export type AgentPresetCreateInput = {
+  preset_key: string;
+  name: string;
+  description?: string | null;
+  default_kind: AgentKind;
+  default_provider_profile_key?: string | null;
+  persona_text?: string;
+  behavior_policy?: Record<string, unknown>;
+  calendar_blueprint?: AgentPresetCalendarEntry[];
+  advanced_config?: Record<string, unknown>;
+  is_active?: boolean;
+};
+
+export type AgentPresetUpdateInput = {
+  preset_key?: string;
+  name?: string;
+  description?: string | null;
+  default_kind?: AgentKind;
+  default_provider_profile_key?: string | null;
+  persona_text?: string;
+  behavior_policy?: Record<string, unknown>;
+  calendar_blueprint?: AgentPresetCalendarEntry[];
+  advanced_config?: Record<string, unknown>;
+  is_active?: boolean;
+};
+
+export type WorldCompositionImportInput = {
+  slug: string;
+  name: string;
+  owner_user_id: string;
+  description?: string | null;
+  rules_config?: Record<string, unknown> | null;
+  composition: WorldCompositionExport;
 };
 
 export type ConversationCreateInput = {

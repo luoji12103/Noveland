@@ -184,12 +184,14 @@ NEXT_PUBLIC_NOVELAND_API_WS_BASE_URL=ws://127.0.0.1:8000
 6. 登录后的一般操作顺序：
    - 先在 `/worlds` 创建或选择 world
    - 在 `/worlds/{worldId}` 配置 scenes、memberships、clock、schedule rules、replay/snapshots
-   - 在 `/worlds/{worldId}/agents` 创建 agent
+   - 如需复用 agent 组合，在 `/admin/presets` 创建平台级 preset
+   - 在 `/worlds/{worldId}/agents` 创建 agent，可直接套用 preset
    - 在 `/worlds/{worldId}/agents/{agentId}` 设置 scene、default provider、persona、observations、calendar、memory，并可手动 run
    - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session，并配置 writer 行为
    - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume，并可生成 summary / chapter
    - 在 `/worlds/{worldId}/narrative` 查看 narrative artifacts
    - 在 `/worlds/{worldId}/reader` 以只读方式阅读 summary / chapter，并跳回 source conversation
+   - 如需复制世界骨架，在 `/worlds/{worldId}` 的 `World composition` 面板导出 JSON，并由平台管理员导入为新 world
    - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
    - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
@@ -233,6 +235,17 @@ GET /runtime/stream
 GET /worlds/{world_id}/stream
 GET /worlds/{world_id}/conversations/{conversation_id}/stream
 WS  /worlds/{world_id}/conversations/{conversation_id}/live
+```
+
+Preset and world composition endpoints currently exposed by the API:
+
+```http
+GET /agent-presets
+POST /agent-presets
+PATCH /agent-presets/{preset_id}
+DELETE /agent-presets/{preset_id}
+GET /worlds/{world_id}/composition-export
+POST /world-compositions/import
 ```
 
 This health endpoint does not imply database, messaging, world-clock, replay, auth, or plugin readiness.

@@ -4,8 +4,15 @@ from noveland.agents.contracts import (
     AgentObservationRefreshResult,
     AgentPersonaRecord,
     AgentPersonaUpsert,
+    AgentPresetCalendarEntry,
+    AgentPresetRecord,
+    AgentPresetUpsert,
 )
-from noveland.agents.services import AgentObservationService, AgentPersonaService
+from noveland.agents.services import (
+    AgentObservationService,
+    AgentPersonaService,
+    AgentPresetService,
+)
 
 PACKAGE_NAME = "agents"
 
@@ -14,6 +21,10 @@ __all__ = [
     "AgentObservationRecord",
     "AgentObservationRefreshResult",
     "AgentObservationService",
+    "AgentPresetCalendarEntry",
+    "AgentPresetRecord",
+    "AgentPresetService",
+    "AgentPresetUpsert",
     "AgentPersonaRecord",
     "AgentPersonaService",
     "AgentPersonaUpsert",

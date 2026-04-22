@@ -63,3 +63,50 @@ class AgentObservationRecord(_FrozenContract):
 class AgentObservationRefreshResult(_FrozenContract):
     created_count: int
     observations: list[AgentObservationRecord]
+
+
+class AgentPresetCalendarEntry(_FrozenContract):
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    starts_at: datetime
+    ends_at: datetime | None = None
+    recurrence_rule: str | None = Field(default=None, max_length=240)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("starts_at", "ends_at", mode="after")
+    @classmethod
+    def calendar_times_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("calendar blueprint times must be timezone-aware")
+        return value.astimezone(UTC)
+
+
+class AgentPresetUpsert(_FrozenContract):
+    preset_key: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    default_kind: str = Field(pattern="^(role_agent|narrative_agent)$")
+    default_provider_profile_key: str | None = Field(default=None, max_length=80)
+    persona_text: str = Field(default="", max_length=12_000)
+    behavior_policy: dict[str, Any] = Field(default_factory=dict)
+    calendar_blueprint: list[AgentPresetCalendarEntry] = Field(default_factory=list)
+    advanced_config: dict[str, Any] = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class AgentPresetRecord(_FrozenContract):
+    id: uuid.UUID
+    preset_key: str
+    name: str
+    description: str | None
+    default_kind: str
+    default_provider_profile_key: str | None
+    persona_text: str
+    behavior_policy: dict[str, Any]
+    calendar_blueprint: list[AgentPresetCalendarEntry]
+    advanced_config: dict[str, Any]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime

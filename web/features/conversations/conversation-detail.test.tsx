@@ -191,6 +191,7 @@ const adminData: ConversationDetailData = {
       id: "agent-1",
       world_id: "world-1",
       home_scene_id: null,
+      source_preset_id: null,
       agent_key: "guide",
       display_name: "Guide",
       kind: "role_agent",

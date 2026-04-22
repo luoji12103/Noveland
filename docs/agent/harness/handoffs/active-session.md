@@ -1,17 +1,17 @@
 # Active Session Handoff
 
-- Date: 2026-04-21T00:00:00Z
-- Branch: feat/narrative-reader-surface
-- Objective: Add a dedicated, read-only narrative reader for authenticated world members on top of the conversation-first writer pipeline.
+- Date: 2026-04-22T00:00:00Z
+- Branch: feat/agent-composition-presets
+- Objective: Add platform-managed agent presets plus world composition import/export on top of the realtime workspace baseline.
 - Completed work:
-  - Extended world narrative APIs with optional `artifact_kind`, `source_conversation_id`, and `limit` filters, plus artifact detail lookup by id.
-  - Added reader-specific server loaders and world-reader routes at `/worlds/[worldId]/reader` and `/worlds/[worldId]/reader/[artifactId]`.
-  - Added read-only reader UI for filtered artifact browsing, detail rendering, and source-conversation linking.
-  - Updated workspace navigation and world overview shortcuts to expose the dedicated reader surface.
-  - Added backend/API, client, component, and mock-backend E2E coverage for reader access and rendering.
+  - Added `agent_presets` persistence and `agents.source_preset_id` provenance tracking.
+  - Added preset CRUD APIs, preset-aware agent creation/materialization, and world composition export/import routes.
+  - Added platform-admin preset management UI at `/admin/presets`.
+  - Added preset picker and preview to agent creation plus preset provenance display in the agent builder.
+  - Added world composition export/import UI in the world overview, with client, component, and mock-backend E2E coverage.
 - Incomplete work:
-  - Commit is still pending on this branch.
-  - Branch remains intentionally unmerged; the plan for this round stops on `feat/narrative-reader-surface`.
+  - Commit and merge are still pending on this branch.
+  - Plugin runtime wiring remains the next stage after this closeout.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -23,12 +23,12 @@
   - `cd web && npm run test:e2e`
   - `cd web && npm run build`
 - Current risks:
-  - Reader remains server-rendered and read-only; there is no full-text search, paging, or live update stream yet.
-  - Artifact detail lookup depends on existing world-membership visibility and returns 404 for inaccessible worlds/artifacts.
-  - Reader filters are intentionally narrow in v1 and focus on `conversation_summary` / `chapter_draft` workflows.
+  - Presets are materialized only when an agent is created or a world composition is imported; existing agents do not re-sync when a preset changes.
+  - World composition import assumes referenced preset keys already exist and creates a new world rather than merging into an existing one.
+  - Composition import/export intentionally excludes memberships, auth/session, clock state, events/snapshots, diagnostics, memory, observations, conversations, and narrative artifacts.
 - Recommended next step:
-  - Run final full regression, commit `feat(web): add dedicated narrative reader`, and hold on this branch for review.
+  - Commit `feat(worlds): add agent composition presets`, fast-forward merge to `main`, and start `feat/plugin-runtime-wiring`.
 - Sensitive areas to avoid casual edits:
-  - world-member visibility rules on narrative artifact list/detail routes
-  - source-conversation linkage and reader/detail route stability
-  - provider secret handling and artifact metadata redaction
+  - preset materialization semantics for provider/profile, persona, and calendar defaults
+  - composition import/export exclusion boundaries and provider profile key mapping
+  - provider secret handling; presets and compositions must stay non-secret

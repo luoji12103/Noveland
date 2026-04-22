@@ -31,6 +31,7 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         Index("ix_agents_world_id", "world_id"),
         Index("ix_agents_home_scene_id", "home_scene_id"),
+        Index("ix_agents_source_preset_id", "source_preset_id"),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
@@ -39,6 +40,10 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     home_scene_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scenes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_preset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_presets.id", ondelete="SET NULL"),
         nullable=True,
     )
     agent_key: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -50,6 +55,47 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=dict,
     )
     is_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
+    )
+
+
+class AgentPreset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "agent_presets"
+    __table_args__ = (
+        UniqueConstraint("preset_key", name="uq_agent_presets_preset_key"),
+        CheckConstraint(
+            "default_kind IN ('role_agent', 'narrative_agent')",
+            name="default_kind",
+        ),
+        Index("ix_agent_presets_is_active", "is_active"),
+    )
+
+    preset_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    default_provider_profile_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    persona_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    behavior_policy: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    calendar_blueprint_json: Mapped[list[dict[str, Any]]] = mapped_column(
+        "calendar_blueprint",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    advanced_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    is_active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         server_default=text("true"),

@@ -11,6 +11,8 @@ import {
   createSnapshot,
   deactivateScene,
   deleteMembership,
+  exportWorldComposition,
+  importWorldComposition,
   listMemberCandidates,
   pauseWorldClock,
   resumeWorldClock,
@@ -45,6 +47,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [clock, setClock] = useState(data.clock);
   const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
+  const [exportedComposition, setExportedComposition] = useState("");
+  const [compositionDraft, setCompositionDraft] = useState("");
   const world = data.selectedWorld;
 
   useEffect(() => {
@@ -71,13 +75,15 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     );
   }, [world]);
 
-  async function runAction(action: () => Promise<unknown>, success: string) {
+  async function runAction(action: () => Promise<unknown>, success: string, refresh = true) {
     setIsBusy(true);
     setNotice(null);
     try {
       await action();
       setNotice(success);
-      router.refresh();
+      if (refresh) {
+        router.refresh();
+      }
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -154,6 +160,38 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         formElement.reset();
       },
       "Schedule rule created.",
+    );
+  }
+
+  async function handleExportComposition() {
+    await runAction(async () => {
+      const composition = await exportWorldComposition(selectedWorld.id);
+      const text = JSON.stringify(composition, null, 2);
+      setExportedComposition(text);
+      setCompositionDraft(text);
+    }, "Composition exported.");
+  }
+
+  async function handleImportComposition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        const importedWorld = await importWorldComposition({
+          slug: formString(form, "slug"),
+          name: formString(form, "name"),
+          owner_user_id: formString(form, "owner_user_id"),
+          description: optionalFormString(form, "description"),
+          rules_config:
+            optionalFormString(form, "rules_config") === null
+              ? undefined
+              : jsonObject(formString(form, "rules_config")),
+          composition: JSON.parse(formString(form, "composition")),
+        });
+        window.location.assign(`/worlds/${importedWorld.id}`);
+      },
+      "Composition imported.",
+      false,
     );
   }
 
@@ -511,6 +549,68 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             Reader
           </Link>
         </div>
+      </section>
+
+      <section className="management-panel" aria-labelledby="composition-title">
+        <h2 className="section-title" id="composition-title">
+          World composition
+        </h2>
+        {data.canManageSelectedWorld ? (
+          <div className="button-row">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleExportComposition()}
+            >
+              Export composition
+            </button>
+          </div>
+        ) : (
+          <p>Read-only world composition access.</p>
+        )}
+        <textarea
+          className="text-input"
+          rows={10}
+          readOnly
+          value={exportedComposition}
+          placeholder="Exported composition JSON appears here."
+        />
+        {data.isPlatformAdmin ? (
+          <form className="management-form" onSubmit={handleImportComposition}>
+            <input className="text-input" name="slug" placeholder="imported-world-slug" />
+            <input className="text-input" name="name" placeholder="Imported world name" />
+            <input
+              className="text-input"
+              name="owner_user_id"
+              defaultValue={selectedWorld.owner_user_id}
+              placeholder="Owner user id"
+            />
+            <input className="text-input" name="description" placeholder="Override description" />
+            <textarea
+              className="text-input"
+              name="rules_config"
+              rows={3}
+              defaultValue={JSON.stringify(selectedWorld.rules_config, null, 2)}
+            />
+            <textarea
+              className="text-input"
+              name="composition"
+              rows={10}
+              value={compositionDraft}
+              onChange={(event) => setCompositionDraft(event.target.value)}
+              placeholder="Paste exported composition JSON"
+            />
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Import as new world
+            </button>
+          </form>
+        ) : null}
+        <p>
+          Export includes world metadata, scenes, agents, schedule rules, and preset references.
+          It excludes memberships, auth/session, clock state, events, diagnostics, memory,
+          observations, conversations, and narrative artifacts.
+        </p>
       </section>
 
       <section className="management-panel" aria-labelledby="world-diagnostics-title">

@@ -71,6 +71,43 @@ test("platform admin creates a world", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "E2E World" })).toBeVisible();
 });
 
+test("platform admin manages presets and world composition import/export", async ({ page }) => {
+  await signIn(page);
+
+  await page.goto("/admin/presets");
+  await page.getByPlaceholder("preset-key").fill("storyteller");
+  await page.getByPlaceholder("Preset name").fill("Storyteller");
+  await page.getByPlaceholder("Description").fill("Narrative preset");
+  await page.getByPlaceholder("Persona").fill("Writes clearly.");
+  await page.getByRole("button", { name: "Create preset" }).click();
+  await expect(page.getByRole("heading", { name: "Storyteller" })).toBeVisible();
+
+  await page.goto(`/worlds/${worldOneId}/agents`);
+  await page.locator('select[name="preset_id"]').selectOption({ label: "Storyteller" });
+  await expect(page.getByText("Preset preview")).toBeVisible();
+  await expect(page.getByText("Provider key: none")).toBeVisible();
+  await page.getByPlaceholder("agent-key").fill(`preset-agent-${Date.now()}`);
+  await page.getByPlaceholder("Display name").fill("Preset Agent");
+  await page.getByRole("button", { name: "Create agent" }).click();
+  await expect(page.getByText("Source preset: Storyteller (storyteller)")).toBeVisible();
+  await expect(page.locator('textarea[name="persona_text"]')).toHaveValue("Writes clearly.");
+
+  await page.goto(`/worlds/${worldOneId}`);
+  await page.getByRole("button", { name: "Export composition" }).click();
+  await expect(page.getByText("Composition exported.")).toBeVisible();
+  const exportedComposition = await page.locator('textarea[readonly]').inputValue();
+  expect(exportedComposition).toContain("\"preset_references\"");
+
+  const importedSlug = `imported-${Date.now()}`;
+  await page.getByPlaceholder("imported-world-slug").fill(importedSlug);
+  await page.getByPlaceholder("Imported world name").fill("Imported World");
+  await page.getByPlaceholder("Paste exported composition JSON").fill(exportedComposition);
+  await page.getByRole("button", { name: "Import as new world" }).click();
+
+  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible();
+});
+
 test("world admin manages workspace pages and conversations", async ({ page }) => {
   await signIn(page);
 

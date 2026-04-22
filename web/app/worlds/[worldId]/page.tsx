@@ -18,7 +18,7 @@ export default async function WorldPage({ params }: WorldPageProps) {
   }
 
   const { worldId } = await params;
-  const data = await getWorldWorkspaceData(worldId);
+  const data = await getWorldWorkspaceData(worldId, subject.roles.includes("platform_admin"));
 
   return (
     <WorkspaceShell
