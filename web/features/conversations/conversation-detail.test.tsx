@@ -17,6 +17,22 @@ vi.mock("@/lib/worlds/client", async () => {
   };
 });
 
+vi.mock("@/lib/realtime", () => ({
+  createConversationLiveSocket: vi.fn(() => ({
+    close: vi.fn(),
+    readyState: 3,
+  })),
+  mergeById: <T extends { id: string }>(current: T[], incoming: T[]) => {
+    const byId = new Map(current.map((item) => [item.id, item]));
+    for (const item of incoming) {
+      byId.set(item.id, item);
+    }
+    return Array.from(byId.values());
+  },
+  nextRequestId: vi.fn(() => "request-1"),
+  subscribeToEventStream: vi.fn(() => () => {}),
+}));
+
 const refresh = vi.fn();
 
 vi.mock("next/navigation", () => ({

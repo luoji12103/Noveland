@@ -43,6 +43,23 @@ export async function buildProxyResponse(backendResponse: Response): Promise<Res
   });
 }
 
+export function buildStreamingProxyResponse(backendResponse: Response): Response {
+  const responseHeaders = new Headers();
+  const contentType = backendResponse.headers.get("content-type");
+  if (contentType !== null) {
+    responseHeaders.set("content-type", contentType);
+  } else {
+    responseHeaders.set("content-type", "text/event-stream");
+  }
+  responseHeaders.set("cache-control", "no-store");
+  responseHeaders.set("connection", "keep-alive");
+
+  return new Response(backendResponse.body, {
+    status: backendResponse.status,
+    headers: responseHeaders,
+  });
+}
+
 export function extractSetCookieHeaders(headers: Headers): string[] {
   const headersWithCookies = headers as CookieHeaders;
   const setCookieHeaders = headersWithCookies.getSetCookie?.();

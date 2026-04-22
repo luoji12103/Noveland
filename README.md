@@ -104,6 +104,12 @@ npm run dev
 
 Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Successful sign-in lands on `/worlds`.
 
+For live workspace updates, set the web-facing API WebSocket base URL in local configuration:
+
+```sh
+NEXT_PUBLIC_NOVELAND_API_WS_BASE_URL=ws://127.0.0.1:8000
+```
+
 ## 人工确认步骤
 
 按下面顺序做一轮人工验收，可以覆盖当前主干上最重要的能力：
@@ -218,6 +224,15 @@ Expected response:
 
 ```json
 {"service":"api","status":"ok","version":"0.1.0"}
+```
+
+Realtime transport endpoints currently exposed by the API:
+
+```http
+GET /runtime/stream
+GET /worlds/{world_id}/stream
+GET /worlds/{world_id}/conversations/{conversation_id}/stream
+WS  /worlds/{world_id}/conversations/{conversation_id}/live
 ```
 
 This health endpoint does not imply database, messaging, world-clock, replay, auth, or plugin readiness.

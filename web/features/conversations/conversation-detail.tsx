@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -14,10 +14,22 @@ import {
   stopConversation,
   updateConversation,
 } from "@/lib/worlds/client";
+import {
+  createConversationLiveSocket,
+  mergeById,
+  nextRequestId,
+  subscribeToEventStream,
+} from "@/lib/realtime";
+import type {
+  ConversationLiveMessage,
+  ConversationStreamEnvelope,
+} from "@/lib/realtime";
 import type { ConversationDetailData } from "@/lib/worlds/server";
 import type {
   ConversationNarrativeArtifactSet,
   ConversationPolicy,
+  ConversationSession,
+  ConversationTurn,
   ConversationWriterConfig,
   NarrativeArtifact,
   RuntimeDiagnostic,
@@ -34,11 +46,102 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [conversationState, setConversationState] = useState(data.conversation);
+  const [participants, setParticipants] = useState(data.participants);
+  const [turns, setTurns] = useState(data.turns);
+  const [diagnostics, setDiagnostics] = useState(data.diagnostics);
   const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
-  const conversation = data.conversation;
+  const [liveReady, setLiveReady] = useState(false);
+  const conversation = conversationState;
+  const socketRef = useRef<WebSocket | null>(null);
+
+  const handleLiveMessage = useCallback((message: ConversationLiveMessage) => {
+    if (message.type === "error") {
+      const liveMessage = message.payload.message;
+      setNotice(typeof liveMessage === "string" ? liveMessage : "Live conversation command failed.");
+      setIsBusy(false);
+      return;
+    }
+    if (message.type === "ack") {
+      setNotice("Conversation control command accepted.");
+      setIsBusy(false);
+      return;
+    }
+    if (message.type === "session_snapshot") {
+      const session = message.payload.session as ConversationSession | undefined;
+      const nextParticipants = message.payload.participants as typeof participants | undefined;
+      const nextTurns = message.payload.turns as ConversationTurn[] | undefined;
+      const nextDiagnostics = message.payload.diagnostics as RuntimeDiagnostic[] | undefined;
+      if (session !== undefined) {
+        setConversationState(session);
+      }
+      if (nextParticipants !== undefined) {
+        setParticipants(nextParticipants);
+      }
+      if (nextTurns !== undefined) {
+        setTurns(nextTurns);
+      }
+      if (nextDiagnostics !== undefined) {
+        setDiagnostics(nextDiagnostics);
+      }
+      return;
+    }
+    if (message.type === "turn_appended") {
+      const turn = message.payload as ConversationTurn;
+      setTurns((current) => mergeTurns(current, [turn]));
+      return;
+    }
+    if (message.type === "status_changed") {
+      setConversationState(message.payload as ConversationSession);
+    }
+  }, []);
+
+  useEffect(() => {
+    setConversationState(data.conversation);
+    setParticipants(data.participants);
+    setTurns(data.turns);
+    setDiagnostics(data.diagnostics);
+    setNarrativeArtifacts(data.narrativeArtifacts);
+  }, [data.conversation, data.diagnostics, data.narrativeArtifacts, data.participants, data.turns]);
+
+  useEffect(() => {
+    return subscribeToEventStream<ConversationStreamEnvelope["payload"]>(
+      `/api/worlds/${worldId}/conversations/${conversationId}/stream`,
+      (envelope) => {
+        if (envelope.payload.session !== undefined) {
+          setConversationState(envelope.payload.session);
+        }
+        if (envelope.payload.turns.length > 0) {
+          setTurns((current) => mergeTurns(current, envelope.payload.turns));
+        }
+        if (envelope.payload.diagnostics.length > 0) {
+          setDiagnostics((current) => mergeDiagnostics(current, envelope.payload.diagnostics));
+        }
+      },
+    );
+  }, [conversationId, worldId]);
+
+  useEffect(() => {
+    if (!data.canManageSelectedWorld) {
+      return;
+    }
+    const socket = createConversationLiveSocket(worldId, conversationId, {
+      onOpen: () => setLiveReady(true),
+      onClose: () => setLiveReady(false),
+      onError: () => setLiveReady(false),
+      onMessage: handleLiveMessage,
+    });
+    socketRef.current = socket;
+    return () => {
+      socket.close();
+      socketRef.current = null;
+      setLiveReady(false);
+    };
+  }, [conversationId, data.canManageSelectedWorld, handleLiveMessage, worldId]);
+
   const participantIds = useMemo(
-    () => new Set(data.participants.map((participant) => participant.agent_id)),
-    [data.participants],
+    () => new Set(participants.map((participant) => participant.agent_id)),
+    [participants],
   );
 
   async function runAction(action: () => Promise<unknown>, success: string) {
@@ -53,6 +156,24 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
     } finally {
       setIsBusy(false);
     }
+  }
+
+  function sendLiveCommand(
+    command: "advance" | "start" | "pause" | "resume" | "seed",
+    payload: Record<string, unknown> = {},
+  ) {
+    if (socketRef.current === null || socketRef.current.readyState !== WebSocket.OPEN) {
+      throw new Error("Conversation live control is not connected.");
+    }
+    setIsBusy(true);
+    setNotice(null);
+    socketRef.current.send(
+      JSON.stringify({
+        command,
+        request_id: nextRequestId(),
+        payload,
+      }),
+    );
   }
 
   if (conversation === null) {
@@ -88,15 +209,19 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    await runAction(
-      async () => {
-        await seedConversation(worldId, conversationId, {
-          input_text: formString(form, "input_text"),
-        });
-        formElement.reset();
-      },
-      "Conversation seeded.",
-    );
+    const inputText = formString(form, "input_text");
+    if (liveReady) {
+      sendLiveCommand("seed", { input_text: inputText });
+      formElement.reset();
+      return;
+    }
+    await runAction(async () => {
+      const turn = await seedConversation(worldId, conversationId, {
+        input_text: inputText,
+      });
+      setTurns((current) => mergeTurns(current, [turn]));
+      formElement.reset();
+    }, "Conversation seeded.");
   }
 
   async function handlePolicy(event: FormEvent<HTMLFormElement>) {
@@ -161,7 +286,13 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               type="button"
               disabled={isBusy}
               onClick={() =>
-                runAction(() => advanceConversation(worldId, conversationId), "Turn advanced.")
+                liveReady
+                  ? sendLiveCommand("advance")
+                  : runAction(async () => {
+                      const result = await advanceConversation(worldId, conversationId);
+                      setConversationState(result.session);
+                      setTurns((current) => mergeTurns(current, [result.turn]));
+                    }, "Turn advanced.")
               }
             >
               Advance one turn
@@ -171,7 +302,11 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               type="button"
               disabled={isBusy}
               onClick={() =>
-                runAction(() => startConversation(worldId, conversationId), "Conversation started.")
+                liveReady
+                  ? sendLiveCommand("start")
+                  : runAction(async () => {
+                      setConversationState(await startConversation(worldId, conversationId));
+                    }, "Conversation started.")
               }
             >
               Start auto dialogue
@@ -181,7 +316,11 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               type="button"
               disabled={isBusy}
               onClick={() =>
-                runAction(() => pauseConversation(worldId, conversationId), "Conversation paused.")
+                liveReady
+                  ? sendLiveCommand("pause")
+                  : runAction(async () => {
+                      setConversationState(await pauseConversation(worldId, conversationId));
+                    }, "Conversation paused.")
               }
             >
               Pause
@@ -191,7 +330,11 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               type="button"
               disabled={isBusy}
               onClick={() =>
-                runAction(() => resumeConversation(worldId, conversationId), "Conversation resumed.")
+                liveReady
+                  ? sendLiveCommand("resume")
+                  : runAction(async () => {
+                      setConversationState(await resumeConversation(worldId, conversationId));
+                    }, "Conversation resumed.")
               }
             >
               Resume
@@ -201,7 +344,9 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               type="button"
               disabled={isBusy}
               onClick={() =>
-                runAction(() => stopConversation(worldId, conversationId), "Conversation stopped.")
+                runAction(async () => {
+                  setConversationState(await stopConversation(worldId, conversationId));
+                }, "Conversation stopped.")
               }
             >
               Stop
@@ -282,7 +427,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
             </form>
           ) : null}
           <div className="resource-list">
-            {data.participants.map((participant) => {
+            {participants.map((participant) => {
               const agent = data.agents.find((item) => item.id === participant.agent_id);
               return (
                 <article className="resource-row" key={participant.id}>
@@ -408,7 +553,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
           <h2 className="section-title" id="conversation-diagnostics-title">
             Conversation diagnostics
           </h2>
-          <DiagnosticList diagnostics={data.diagnostics} />
+          <DiagnosticList diagnostics={diagnostics} />
         </section>
       ) : null}
 
@@ -417,7 +562,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
           Transcript
         </h2>
         <div className="resource-list">
-          {data.turns.length === 0 ? (
+          {turns.length === 0 ? (
             <article className="resource-row">
               <div>
                 <h3>No turns yet</h3>
@@ -425,7 +570,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               </div>
             </article>
           ) : (
-            data.turns.map((turn) => {
+            turns.map((turn) => {
               const agent = data.agents.find((item) => item.id === turn.speaker_agent_id);
               return (
                 <article className="resource-row" key={turn.id}>
@@ -444,6 +589,19 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         </div>
       </section>
     </section>
+  );
+}
+
+function mergeTurns(current: ConversationTurn[], incoming: ConversationTurn[]): ConversationTurn[] {
+  return mergeById(current, incoming).sort((left, right) => left.turn_index - right.turn_index);
+}
+
+function mergeDiagnostics(
+  current: RuntimeDiagnostic[],
+  incoming: RuntimeDiagnostic[],
+): RuntimeDiagnostic[] {
+  return mergeById(current, incoming).sort((left, right) =>
+    right.occurred_at.localeCompare(left.occurred_at),
   );
 }
 

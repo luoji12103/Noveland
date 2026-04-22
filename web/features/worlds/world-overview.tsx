@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -18,8 +18,15 @@ import {
   updateWorld,
   upsertMembership,
 } from "@/lib/worlds/client";
+import { subscribeToEventStream } from "@/lib/realtime";
+import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
-import type { MemberCandidate, WorldRole } from "@/lib/worlds/types";
+import type {
+  MemberCandidate,
+  RuntimeDiagnostic,
+  WorldClock,
+  WorldRole,
+} from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
@@ -36,7 +43,33 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [notice, setNotice] = useState(data.loadError);
   const [memberCandidates, setMemberCandidates] = useState<MemberCandidate[]>([]);
   const [isBusy, setIsBusy] = useState(false);
+  const [clock, setClock] = useState(data.clock);
+  const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
   const world = data.selectedWorld;
+
+  useEffect(() => {
+    setClock(data.clock);
+    setWorldDiagnostics(data.worldDiagnostics);
+  }, [data.clock, data.worldDiagnostics]);
+
+  useEffect(() => {
+    if (world === null) {
+      return;
+    }
+    return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
+      `/api/worlds/${world.id}/stream`,
+      (envelope) => {
+        if (envelope.payload.clock !== undefined) {
+          setClock(envelope.payload.clock);
+        }
+        if (envelope.payload.diagnostics.length > 0) {
+          setWorldDiagnostics((current) =>
+            mergeWorldDiagnostics(current, envelope.payload.diagnostics),
+          );
+        }
+      },
+    );
+  }, [world]);
 
   async function runAction(action: () => Promise<unknown>, success: string) {
     setIsBusy(true);
@@ -305,20 +338,20 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           <h2 className="section-title" id="clock-title">
             World clock
           </h2>
-          {data.clock !== null ? (
+          {clock !== null ? (
             <>
               <div className="clock-grid">
                 <div>
                   <p className="metric-label">Status</p>
-                  <p className="metric-value">{data.clock.status}</p>
+                  <p className="metric-value">{clock.status}</p>
                 </div>
                 <div>
                   <p className="metric-label">Effective time</p>
-                  <p>{data.clock.effective_world_time}</p>
+                  <p>{clock.effective_world_time}</p>
                 </div>
                 <div>
                   <p className="metric-label">Revision</p>
-                  <p className="metric-value">{data.clock.revision}</p>
+                  <p className="metric-value">{clock.revision}</p>
                 </div>
               </div>
               {data.canManageSelectedWorld ? (
@@ -485,7 +518,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           World diagnostics
         </h2>
         <ResourceList
-          rows={data.worldDiagnostics.map((diagnostic) => ({
+          rows={worldDiagnostics.map((diagnostic) => ({
             id: diagnostic.id,
             title: `${diagnostic.severity} - ${diagnostic.component}`,
             detail: diagnostic.message,
@@ -493,6 +526,19 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         />
       </section>
     </section>
+  );
+}
+
+function mergeWorldDiagnostics(
+  current: RuntimeDiagnostic[],
+  incoming: RuntimeDiagnostic[],
+): RuntimeDiagnostic[] {
+  const byId = new Map(current.map((diagnostic) => [diagnostic.id, diagnostic]));
+  for (const diagnostic of incoming) {
+    byId.set(diagnostic.id, diagnostic);
+  }
+  return Array.from(byId.values()).sort((left, right) =>
+    right.occurred_at.localeCompare(left.occurred_at),
   );
 }
 

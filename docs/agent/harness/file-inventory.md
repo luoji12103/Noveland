@@ -26,8 +26,11 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/auth/`
 - `web/app/api/worlds/`
 - `web/app/api/runtime/`
+- `web/app/api/runtime/stream/`
 - `web/app/api/provider-profiles/`
 - `web/app/api/provider-profiles/[profileId]/test-call/`
+- `web/app/api/worlds/[worldId]/stream/`
+- `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/`
 - `web/features/`
 - `web/features/admin/`
 - `web/features/agents/`
@@ -42,6 +45,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/components/`
 - `web/lib/`
 - `web/lib/auth/`
+- `web/lib/realtime/`
+- `web/lib/realtime.ts`
 - `web/lib/runtime/`
 - `web/lib/worlds/`
 - `web/tests/e2e/start-with-mock-auth.mjs`
@@ -52,6 +57,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/conversations.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
+- `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
 - `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
@@ -129,6 +135,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260421_0012_conversation_policies_stop_conditions.py`
 - `backend/migrations/versions/20260421_0013_narrative_writer_summarizer.py`
 - `backend/tests/`
+- `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`

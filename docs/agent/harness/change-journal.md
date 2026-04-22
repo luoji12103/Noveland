@@ -285,3 +285,14 @@
 - Tests added/updated: narrative artifact API filter/detail coverage for world members; reader component tests; world client tests for filtered narrative list/detail; mock-backend E2E coverage for reader redirects and member-readable narrative pages
 - Docs updated: README, project index, file inventory, task board, active handoff, change journal
 - Follow-up notes: public sharing, reader search/sorting, reader timeline views, and realtime narrative updates remain future tasks.
+
+## Realtime updates entry
+
+- Date: 2026-04-22
+- Branch: feat/realtime-updates
+- Scope: hybrid SSE updates and conversation live control
+- Summary: Added platform/world/conversation SSE delta routes, conversation live WebSocket control with origin checks, same-origin Next streaming proxies, and local live hydration for runtime, world overview, and conversation detail views.
+- Files changed: `/backend/services/api/src/noveland/services/api/realtime.py`, `/backend/services/api/src/noveland/services/api/app.py`, `/backend/tests/test_api_realtime.py`, `/web/app/api/runtime/stream/**`, `/web/app/api/worlds/[worldId]/stream/**`, `/web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/**`, `/web/features/admin/**`, `/web/features/conversations/**`, `/web/features/worlds/**`, `/web/lib/auth/**`, `/web/lib/realtime.ts`, `/web/lib/realtime/**`, `/web/lib/worlds/types.ts`, `/.env.example`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: realtime API/auth/origin tests; streaming proxy tests; runtime admin and conversation detail component coverage for live updates; full backend/web regression suite
+- Docs updated: README, project index, file inventory, task board, change journal
+- Follow-up notes: Stage 1 adds incremental streaming and live conversation control without replacing existing SSR/REST loaders; world members remain read-only on the live WebSocket channel.

@@ -263,6 +263,47 @@ export type RuntimeDiagnostic = {
   created_at: string;
 };
 
+export type RuntimeProviderProfileSummary = {
+  id: string;
+  profile_key: string;
+  name: string;
+  provider_type: ProviderType;
+  last_tested_at: string | null;
+  last_test_status: "success" | "failed" | null;
+  last_test_error: string | null;
+  is_enabled: boolean;
+};
+
+export type StreamEnvelope<TPayload> = {
+  cursor: string;
+  event_type: string;
+  occurred_at: string;
+  world_id: string | null;
+  conversation_id: string | null;
+  payload: TPayload;
+};
+
+export type RuntimeStreamPayload = {
+  runtime_control?: RuntimeControl;
+  runtime_status?: RuntimeStatus;
+  diagnostics: RuntimeDiagnostic[];
+  provider_profiles: RuntimeProviderProfileSummary[];
+};
+
+export type WorldStreamPayload = {
+  clock?: WorldClock;
+  diagnostics: RuntimeDiagnostic[];
+  agent_runs: AgentRun[];
+  narrative_artifacts: NarrativeArtifact[];
+  conversations: ConversationSession[];
+};
+
+export type ConversationStreamPayload = {
+  session?: ConversationSession;
+  turns: ConversationTurn[];
+  diagnostics: RuntimeDiagnostic[];
+};
+
 export type ProviderType = "openai_compatible" | "anthropic_compatible";
 
 export type ProviderProfile = {

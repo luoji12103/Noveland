@@ -14,7 +14,10 @@ Fast orientation for a new coding session.
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
+- `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
+- `web/app/api/worlds/[worldId]/stream/` — same-origin world SSE proxy route
+- `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
   - `web/features/admin/` — platform-level provider and runtime management pages
@@ -26,6 +29,8 @@ Fast orientation for a new coding session.
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
+  - `web/lib/realtime/` — same-origin streaming proxy helper
+  - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
 - `web/package.json` — frontend scripts and dependency manifest
@@ -37,6 +42,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
   - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
+  - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host

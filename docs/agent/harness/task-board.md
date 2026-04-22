@@ -38,6 +38,8 @@
 - Conversation Policies + Stop Conditions
 - Narrative Writer / Summarizer Pipeline
 - Dedicated Narrative Reader Surface
+- Realtime Updates
 
 ## Upcoming Mainline
-- None selected
+- Agent Composition Presets
+- Plugin Runtime Wiring
