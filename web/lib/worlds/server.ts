@@ -14,6 +14,7 @@ import type {
   MemoryItem,
   Membership,
   NarrativeArtifact,
+  PluginCatalogEntry,
   ProviderProfile,
   RuntimeDiagnostic,
   RuntimeControl,
@@ -33,6 +34,8 @@ export type WorldWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   memberships: Membership[];
+  memoryPlugins: PluginCatalogEntry[];
+  worldRulesPlugins: PluginCatalogEntry[];
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
@@ -50,6 +53,7 @@ export type AgentWorkspaceData = {
   agents: Agent[];
   providerProfiles: ProviderProfile[];
   agentPresets: AgentPreset[];
+  personaPolicyPlugins: PluginCatalogEntry[];
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -80,6 +84,7 @@ export type ConversationDetailData = ConversationListData & {
   turns: ConversationTurn[];
   diagnostics: RuntimeDiagnostic[];
   narrativeArtifacts: NarrativeArtifact[];
+  narrativeWriterPlugins: PluginCatalogEntry[];
 };
 
 export type NarrativeWorkspaceData = {
@@ -113,11 +118,18 @@ export type RuntimeAdminData = {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
   runtimeDiagnostics: RuntimeDiagnostic[];
+  modelProviderPlugins: PluginCatalogEntry[];
   loadError: string | null;
 };
 
 export type PresetAdminData = {
   presets: AgentPreset[];
+  loadError: string | null;
+};
+
+export type ProviderAdminData = {
+  profiles: ProviderProfile[];
+  modelProviderPlugins: PluginCatalogEntry[];
   loadError: string | null;
 };
 
@@ -257,7 +269,11 @@ export async function getWorldWorkspaceData(
 ): Promise<WorldWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const [worlds, memoryPlugins, worldRulesPlugins] = await Promise.all([
+      apiFetch<World[]>("/worlds", cookies),
+      listPluginCatalogForServer("memory_backend", cookies),
+      listPluginCatalogForServer("world_rules", cookies),
+    ]);
     const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
     if (selectedWorld === null) {
       return emptyWorldWorkspaceData(worlds, "Unable to load selected world.", isPlatformAdmin);
@@ -287,6 +303,8 @@ export async function getWorldWorkspaceData(
       scenes,
       agents,
       memberships: memberships ?? [],
+      memoryPlugins,
+      worldRulesPlugins,
       clock,
       replayState,
       latestSnapshot,
@@ -310,13 +328,22 @@ export async function getAgentWorkspaceData(
 ): Promise<AgentWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const [worlds, scenes, agents, memberships, providerProfiles, agentPresets] = await Promise.all([
+    const [
+      worlds,
+      scenes,
+      agents,
+      memberships,
+      providerProfiles,
+      agentPresets,
+      personaPolicyPlugins,
+    ] = await Promise.all([
       apiFetch<World[]>("/worlds", cookies),
       apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       isPlatformAdmin ? apiFetch<ProviderProfile[]>("/provider-profiles", cookies) : [],
       apiFetch<AgentPreset[]>("/agent-presets", cookies),
+      listPluginCatalogForServer("persona_policy", cookies),
     ]);
     return {
       worlds,
@@ -325,6 +352,7 @@ export async function getAgentWorkspaceData(
       agents,
       providerProfiles,
       agentPresets,
+      personaPolicyPlugins,
       canManageSelectedWorld: memberships !== null,
       isPlatformAdmin,
       loadError: null,
@@ -340,6 +368,7 @@ export async function getAgentWorkspaceData(
       agents: [],
       providerProfiles: [],
       agentPresets: [],
+      personaPolicyPlugins: [],
       canManageSelectedWorld: false,
       isPlatformAdmin,
       loadError: "Unable to load agents.",
@@ -424,6 +453,7 @@ export async function getConversationDetailData(
 ): Promise<ConversationDetailData> {
   const listData = await getConversationListData(worldId);
   const cookies = await cookieHeader();
+  const narrativeWriterPlugins = await listPluginCatalogForServer("narrative_writer", cookies);
   const conversation =
     listData.conversations.find((item) => item.id === conversationId) ?? null;
   if (conversation === null) {
@@ -434,6 +464,7 @@ export async function getConversationDetailData(
       turns: [],
       diagnostics: [],
       narrativeArtifacts: [],
+      narrativeWriterPlugins,
     };
   }
   const [participants, turns, diagnostics, narrativeArtifacts] = await Promise.all([
@@ -461,6 +492,7 @@ export async function getConversationDetailData(
     turns,
     diagnostics: diagnostics ?? [],
     narrativeArtifacts,
+    narrativeWriterPlugins,
   };
 }
 
@@ -581,19 +613,36 @@ export async function getNarrativeReaderDetailData(
   }
 }
 
-export async function getProviderAdminData(): Promise<ProviderProfile[]> {
-  return apiFetch<ProviderProfile[]>("/provider-profiles", await cookieHeader());
+export async function getProviderAdminData(): Promise<ProviderAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const [profiles, modelProviderPlugins] = await Promise.all([
+      apiFetch<ProviderProfile[]>("/provider-profiles", cookies),
+      listPluginCatalogForServer("model_provider", cookies),
+    ]);
+    return { profiles, modelProviderPlugins, loadError: null };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      profiles: [],
+      modelProviderPlugins: [],
+      loadError: "Unable to load provider profiles.",
+    };
+  }
 }
 
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [runtimeControl, runtimeStatus, runtimeDiagnostics] = await Promise.all([
+    const [runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins] = await Promise.all([
       apiFetch<RuntimeControl>("/runtime/control", cookies),
       apiFetch<RuntimeStatus>("/runtime/status", cookies),
       apiFetch<RuntimeDiagnostic[]>("/runtime/diagnostics", cookies),
+      listPluginCatalogForServer("model_provider", cookies),
     ]);
-    return { runtimeControl, runtimeStatus, runtimeDiagnostics, loadError: null };
+    return { runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins, loadError: null };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -602,6 +651,7 @@ export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
       runtimeControl: null,
       runtimeStatus: null,
       runtimeDiagnostics: [],
+      modelProviderPlugins: [],
       loadError: "Unable to load runtime state.",
     };
   }
@@ -651,6 +701,8 @@ function emptyWorldWorkspaceData(
     scenes: [],
     agents: [],
     memberships: [],
+    memoryPlugins: [],
+    worldRulesPlugins: [],
     clock: null,
     replayState: null,
     latestSnapshot: null,
@@ -716,6 +768,13 @@ async function apiFetchOptional<T>(path: string, cookieHeader: string | null): P
     }
     throw error;
   }
+}
+
+async function listPluginCatalogForServer(
+  category: PluginCatalogEntry["category"],
+  cookieHeader: string | null,
+): Promise<PluginCatalogEntry[]> {
+  return apiFetch<PluginCatalogEntry[]>(`/plugins/catalog?category=${encodeURIComponent(category)}`, cookieHeader);
 }
 
 function selectedWorldForRequest(worlds: World[], requestedWorldId: string | null): World | null {

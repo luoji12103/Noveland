@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from noveland.plugins.constants import BUILTIN_DEFAULT_PERSONA_POLICY
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -16,6 +17,12 @@ class AgentPersonaUpsert(_FrozenContract):
     agent_id: uuid.UUID
     persona_text: str = Field(default="", max_length=12_000)
     behavior_policy: dict[str, Any] = Field(default_factory=dict)
+    policy_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_PERSONA_POLICY,
+        min_length=1,
+        max_length=120,
+    )
+    policy_plugin_config: dict[str, Any] = Field(default_factory=dict)
     is_enabled: bool = True
 
 
@@ -25,6 +32,8 @@ class AgentPersonaRecord(_FrozenContract):
     agent_id: uuid.UUID
     persona_text: str
     behavior_policy: dict[str, Any]
+    policy_plugin_identifier: str
+    policy_plugin_config: dict[str, Any]
     is_enabled: bool
     created_at: datetime
     updated_at: datetime

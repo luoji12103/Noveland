@@ -10,12 +10,14 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "httpx>=0.28,<0.29",
   "noveland-core",
+  "noveland-plugins",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
 
 [tool.uv.sources]
 noveland-core = { workspace = true }
+noveland-plugins = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

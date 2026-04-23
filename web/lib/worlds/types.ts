@@ -5,6 +5,10 @@ export type World = {
   name: string;
   description: string | null;
   rules_config: Record<string, unknown>;
+  memory_plugin_identifier: string;
+  memory_plugin_config: Record<string, unknown>;
+  world_rules_plugin_identifier: string;
+  world_rules_plugin_config: Record<string, unknown>;
   is_active: boolean;
 };
 
@@ -165,6 +169,8 @@ export type ConversationPolicy = {
 
 export type ConversationWriterConfig = {
   provider_profile_id: string | null;
+  writer_plugin_identifier: string;
+  writer_plugin_config: Record<string, unknown>;
   auto_generate_on_complete: boolean;
   generate_summary: boolean;
   generate_chapter: boolean;
@@ -387,6 +393,8 @@ export type ProviderProfile = {
   profile_key: string;
   name: string;
   provider_type: ProviderType;
+  plugin_identifier: string;
+  plugin_config: Record<string, unknown>;
   base_url: string;
   model_name: string;
   capabilities: Record<string, unknown>;
@@ -427,9 +435,27 @@ export type AgentPersona = {
   agent_id: string;
   persona_text: string;
   behavior_policy: Record<string, unknown>;
+  policy_plugin_identifier: string;
+  policy_plugin_config: Record<string, unknown>;
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type PluginCategory =
+  | "model_provider"
+  | "memory_backend"
+  | "world_rules"
+  | "persona_policy"
+  | "narrative_writer";
+
+export type PluginCatalogEntry = {
+  identifier: string;
+  category: PluginCategory;
+  version: string;
+  config_schema: Record<string, unknown>;
+  capabilities: string[];
+  built_in: boolean;
 };
 
 export type AgentObservation = {
@@ -495,12 +521,20 @@ export type WorldCreateInput = {
   name: string;
   description?: string | null;
   rules_config?: Record<string, unknown>;
+  memory_plugin_identifier?: string;
+  memory_plugin_config?: Record<string, unknown>;
+  world_rules_plugin_identifier?: string;
+  world_rules_plugin_config?: Record<string, unknown>;
 };
 
 export type WorldUpdateInput = {
   name?: string;
   description?: string | null;
   rules_config?: Record<string, unknown>;
+  memory_plugin_identifier?: string;
+  memory_plugin_config?: Record<string, unknown>;
+  world_rules_plugin_identifier?: string;
+  world_rules_plugin_config?: Record<string, unknown>;
   is_active?: boolean;
 };
 
@@ -655,6 +689,8 @@ export type ProviderProfileCreateInput = {
   profile_key: string;
   name: string;
   provider_type: ProviderType;
+  plugin_identifier?: string | null;
+  plugin_config?: Record<string, unknown>;
   base_url: string;
   model_name: string;
   capabilities?: Record<string, unknown>;
@@ -666,6 +702,8 @@ export type ProviderProfileCreateInput = {
 
 export type ProviderProfileUpdateInput = {
   name?: string;
+  plugin_identifier?: string | null;
+  plugin_config?: Record<string, unknown>;
   base_url?: string;
   model_name?: string;
   capabilities?: Record<string, unknown>;
@@ -686,6 +724,8 @@ export type AgentRunCreateInput = {
 export type AgentPersonaUpdateInput = {
   persona_text: string;
   behavior_policy?: Record<string, unknown>;
+  policy_plugin_identifier?: string;
+  policy_plugin_config?: Record<string, unknown>;
   is_enabled?: boolean;
 };
 

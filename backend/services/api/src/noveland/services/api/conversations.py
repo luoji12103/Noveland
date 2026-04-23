@@ -5,6 +5,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from noveland.adapters import ProviderProfileService
+from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent
 from noveland.conversations import (
     ConversationErrorPolicy,
@@ -32,6 +33,10 @@ from noveland.narrative import (
     NarrativeGenerationMode,
 )
 from noveland.observability import RuntimeDiagnosticRecord
+from noveland.plugins.builtins import get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
+from noveland.plugins.errors import PluginConfigValidationError, PluginNotFoundError
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
@@ -111,6 +116,12 @@ class ConversationSeedRequest(_RequestModel):
 
 class ConversationWriterConfigRequest(_RequestModel):
     provider_profile_id: uuid.UUID | None = None
+    writer_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_NARRATIVE_WRITER,
+        min_length=1,
+        max_length=120,
+    )
+    writer_plugin_config: dict[str, Any] = Field(default_factory=dict)
     auto_generate_on_complete: bool = False
     generate_summary: bool = True
     generate_chapter: bool = True
@@ -132,6 +143,8 @@ class ConversationPolicyResponse(BaseModel):
 
 class ConversationWriterConfigResponse(BaseModel):
     provider_profile_id: uuid.UUID | None
+    writer_plugin_identifier: str
+    writer_plugin_config: dict[str, Any]
     auto_generate_on_complete: bool
     generate_summary: bool
     generate_chapter: bool
@@ -236,6 +249,7 @@ def create_conversation(
 ) -> ConversationSessionResponse:
     require_csrf(request)
     _validate_scene_reference(db_session, context.world_id, conversation_create.scene_id)
+    _validate_writer_config_binding(db_session, conversation_create.writer_config)
     try:
         session = ConversationService(db_session).create_session(
             ConversationSessionCreate(
@@ -279,6 +293,8 @@ def update_conversation(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ConversationSessionResponse:
     require_csrf(request)
+    if conversation_update.writer_config is not None:
+        _validate_writer_config_binding(db_session, conversation_update.writer_config)
     try:
         session = ConversationService(db_session).update_session(
             context.world_id,
@@ -589,6 +605,8 @@ def _writer_config_contract(
 ) -> ConversationWriterConfig:
     return ConversationWriterConfig(
         provider_profile_id=writer_config.provider_profile_id,
+        writer_plugin_identifier=writer_config.writer_plugin_identifier,
+        writer_plugin_config=writer_config.writer_plugin_config,
         auto_generate_on_complete=writer_config.auto_generate_on_complete,
         generate_summary=writer_config.generate_summary,
         generate_chapter=writer_config.generate_chapter,
@@ -617,6 +635,8 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
         ),
         writer_config=ConversationWriterConfigResponse(
             provider_profile_id=session.writer_config.provider_profile_id,
+            writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
+            writer_plugin_config=session.writer_config.writer_plugin_config,
             auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
             generate_summary=session.writer_config.generate_summary,
             generate_chapter=session.writer_config.generate_chapter,
@@ -741,3 +761,36 @@ def _http_error_for_conversation_error(detail: str) -> HTTPException:
     ):
         status_code = status.HTTP_409_CONFLICT
     return HTTPException(status_code=status_code, detail=detail)
+
+
+def _validate_writer_config_binding(
+    db_session: Session,
+    writer_config: ConversationWriterConfigRequest,
+) -> None:
+    if writer_config.provider_profile_id is not None:
+        profile = db_session.get(ProviderProfile, writer_config.provider_profile_id)
+        if profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Provider profile not found",
+            )
+    registry = get_builtin_plugin_registry()
+    try:
+        definition = registry.get(writer_config.writer_plugin_identifier)
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if definition.manifest.category is not PluginCategory.NARRATIVE_WRITER:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Writer binding must use a narrative_writer plugin",
+        )
+    try:
+        registry.validate_config(
+            writer_config.writer_plugin_identifier,
+            writer_config.writer_plugin_config,
+        )
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc

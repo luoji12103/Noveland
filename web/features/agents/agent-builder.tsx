@@ -89,6 +89,8 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
         updateAgentPersona(worldId, agentId, {
           persona_text: formString(form, "persona_text"),
           behavior_policy: jsonObject(formString(form, "behavior_policy")),
+          policy_plugin_identifier: formString(form, "policy_plugin_identifier"),
+          policy_plugin_config: jsonObject(formString(form, "policy_plugin_config")),
           is_enabled: form.get("is_enabled") === "on",
         }),
       "Persona saved.",
@@ -238,6 +240,22 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           </h2>
           {data.canManageSelectedWorld ? (
             <form className="inline-form" onSubmit={handlePersona}>
+              <select
+                aria-label="Persona policy plugin"
+                className="text-input"
+                name="policy_plugin_identifier"
+                defaultValue={
+                  data.agentPersona?.policy_plugin_identifier
+                  ?? data.personaPolicyPlugins[0]?.identifier
+                  ?? ""
+                }
+              >
+                {data.personaPolicyPlugins.map((plugin) => (
+                  <option key={plugin.identifier} value={plugin.identifier}>
+                    {plugin.identifier}
+                  </option>
+                ))}
+              </select>
               <textarea
                 className="text-input"
                 name="persona_text"
@@ -250,6 +268,13 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 name="behavior_policy"
                 rows={4}
                 defaultValue={JSON.stringify(data.agentPersona?.behavior_policy ?? {}, null, 2)}
+              />
+              <textarea
+                className="text-input"
+                name="policy_plugin_config"
+                rows={3}
+                defaultValue={JSON.stringify(data.agentPersona?.policy_plugin_config ?? {}, null, 2)}
+                placeholder="Policy plugin config"
               />
               <label className="checkbox-label">
                 <input
@@ -265,6 +290,9 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             </form>
           ) : (
             <>
+              <p>
+                Plugin: {data.agentPersona?.policy_plugin_identifier ?? "No persona plugin configured."}
+              </p>
               <p>{data.agentPersona?.persona_text ?? "No persona configured."}</p>
               <pre>{JSON.stringify(data.agentPersona?.behavior_policy ?? {}, null, 2)}</pre>
             </>

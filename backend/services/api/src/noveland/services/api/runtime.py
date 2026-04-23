@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.adapters import (
+    ProviderConfigurationError,
     ProviderInvocationResult,
     ProviderProfileCreate,
     ProviderProfileRecord,
@@ -23,8 +24,19 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
+from noveland.plugins.builtins import get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginNotFoundError,
+)
+from noveland.plugins.manifest import PluginManifest
 from noveland.services.api.csrf import require_csrf
-from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
+from noveland.services.api.dependencies import (
+    get_current_subject,
+    get_db_session,
+    get_platform_admin_subject,
+)
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -53,6 +65,8 @@ class ProviderProfileCreateRequest(BaseModel):
     profile_key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$", max_length=80)
     name: str = Field(min_length=1, max_length=160)
     provider_type: ProviderType
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] = Field(default_factory=dict)
     base_url: str = Field(min_length=1, max_length=500)
     model_name: str = Field(min_length=1, max_length=200)
     capabilities: dict[str, Any] = Field(default_factory=dict)
@@ -64,6 +78,8 @@ class ProviderProfileCreateRequest(BaseModel):
 
 class ProviderProfileUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] | None = None
     base_url: str | None = Field(default=None, min_length=1, max_length=500)
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     capabilities: dict[str, Any] | None = None
@@ -83,6 +99,8 @@ class ProviderProfileResponse(BaseModel):
     profile_key: str
     name: str
     provider_type: ProviderType
+    plugin_identifier: str
+    plugin_config: dict[str, Any]
     base_url: str
     model_name: str
     capabilities: dict[str, Any]
@@ -102,6 +120,15 @@ class ProviderTestCallResponse(BaseModel):
     text_preview: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+
+
+class PluginCatalogResponse(BaseModel):
+    identifier: str
+    category: PluginCategory
+    version: str
+    config_schema: dict[str, Any]
+    capabilities: tuple[str, ...]
+    built_in: bool
 
 
 class RuntimeDiagnosticResponse(BaseModel):
@@ -176,6 +203,18 @@ def list_runtime_diagnostics(
     ]
 
 
+@router.get("/plugins/catalog", response_model=list[PluginCatalogResponse])
+def list_plugin_catalog(
+    _subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    category: PluginCategory | None = None,
+) -> list[PluginCatalogResponse]:
+    registry = get_builtin_plugin_registry()
+    definitions = (
+        registry.all() if category is None else registry.list_by_category(category)
+    )
+    return [_plugin_catalog_response(definition.manifest) for definition in definitions]
+
+
 @router.get("/provider-profiles", response_model=list[ProviderProfileResponse])
 def list_provider_profiles(
     subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
@@ -199,20 +238,35 @@ def create_provider_profile(
 ) -> ProviderProfileResponse:
     del subject
     require_csrf(request)
-    profile = ProviderProfileService(db_session, load_settings()).create_profile(
-        ProviderProfileCreate(
-            profile_key=profile_create.profile_key,
-            name=profile_create.name,
-            provider_type=profile_create.provider_type,
-            base_url=profile_create.base_url,
-            model_name=profile_create.model_name,
-            capabilities=profile_create.capabilities,
-            api_key_ref=profile_create.api_key_ref,
-            timeout_seconds=profile_create.timeout_seconds,
-            retry_attempts=profile_create.retry_attempts,
-            rate_limit_per_minute=profile_create.rate_limit_per_minute,
-        ),
-    )
+    try:
+        profile = ProviderProfileService(db_session, load_settings()).create_profile(
+            ProviderProfileCreate(
+                profile_key=profile_create.profile_key,
+                name=profile_create.name,
+                provider_type=profile_create.provider_type,
+                plugin_identifier=profile_create.plugin_identifier,
+                plugin_config=profile_create.plugin_config,
+                base_url=profile_create.base_url,
+                model_name=profile_create.model_name,
+                capabilities=profile_create.capabilities,
+                api_key_ref=profile_create.api_key_ref,
+                timeout_seconds=profile_create.timeout_seconds,
+                retry_attempts=profile_create.retry_attempts,
+                rate_limit_per_minute=profile_create.rate_limit_per_minute,
+            ),
+        )
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     return _provider_profile_response(profile)
 
 
@@ -227,20 +281,35 @@ def update_provider_profile(
     del subject
     require_csrf(request)
     model = _provider_profile_or_404(db_session, profile_id)
-    profile = ProviderProfileService(db_session, load_settings()).update_profile(
-        model,
-        ProviderProfileUpdate(
-            name=profile_update.name,
-            base_url=profile_update.base_url,
-            model_name=profile_update.model_name,
-            capabilities=profile_update.capabilities,
-            api_key_ref=profile_update.api_key_ref,
-            timeout_seconds=profile_update.timeout_seconds,
-            retry_attempts=profile_update.retry_attempts,
-            rate_limit_per_minute=profile_update.rate_limit_per_minute,
-            is_enabled=profile_update.is_enabled,
-        ),
-    )
+    try:
+        profile = ProviderProfileService(db_session, load_settings()).update_profile(
+            model,
+            ProviderProfileUpdate(
+                name=profile_update.name,
+                plugin_identifier=profile_update.plugin_identifier,
+                plugin_config=profile_update.plugin_config,
+                base_url=profile_update.base_url,
+                model_name=profile_update.model_name,
+                capabilities=profile_update.capabilities,
+                api_key_ref=profile_update.api_key_ref,
+                timeout_seconds=profile_update.timeout_seconds,
+                retry_attempts=profile_update.retry_attempts,
+                rate_limit_per_minute=profile_update.rate_limit_per_minute,
+                is_enabled=profile_update.is_enabled,
+            ),
+        )
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     return _provider_profile_response(profile)
 
 
@@ -318,6 +387,17 @@ def _provider_test_call_response(result: ProviderInvocationResult) -> ProviderTe
         text_preview=result.text_preview,
         error_code=None if result.error_code is None else result.error_code.value,
         error_message=result.error_message,
+    )
+
+
+def _plugin_catalog_response(manifest: PluginManifest) -> PluginCatalogResponse:
+    return PluginCatalogResponse(
+        identifier=manifest.identifier,
+        category=manifest.category,
+        version=manifest.version,
+        config_schema=manifest.config_schema,
+        capabilities=manifest.capabilities,
+        built_in=manifest.identifier.startswith("builtin."),
     )
 
 

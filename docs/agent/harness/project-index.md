@@ -18,6 +18,7 @@ Fast orientation for a new coding session.
 - `web/app/api/world-compositions/` — same-origin world composition import proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
 - `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
+- `web/app/api/plugins/catalog/` — same-origin plugin catalog proxy route handler
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
 - `web/app/api/worlds/[worldId]/stream/` — same-origin world SSE proxy route
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
@@ -97,7 +98,9 @@ Fast orientation for a new coding session.
   - `noveland.memory.local_pgvector` — local pgvector-backed memory helper with add/list/search/disable
   - `noveland.memory.vector_type` — shared embedding dimension and SQLAlchemy vector type adapter
 - `backend/packages/plugins/`
-  - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
+  - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
+  - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
+  - `noveland.plugins.constants` — stable built-in plugin identifiers used by migrations and bindings
 - `backend/packages/adapters/`
   - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, test-call support, services, and model-provider adapters
   - `noveland.adapters.models` — provider profile ORM model and provider health fields
@@ -114,7 +117,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, and agent composition presets
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, and explicit plugin runtime bindings
 
 ## Update rule
 

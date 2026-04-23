@@ -35,6 +35,10 @@ const worlds = [
     name: "First World",
     description: "A managed world",
     rules_config: {},
+    memory_plugin_identifier: "builtin.local_pgvector_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
     is_active: true,
   },
 ];
@@ -129,6 +133,8 @@ const agentPersonas = new Map([
       agent_id: agentGuideId,
       persona_text: "Careful guide.",
       behavior_policy: { tone: "direct" },
+      policy_plugin_identifier: "builtin.default_persona_policy",
+      policy_plugin_config: {},
       is_enabled: true,
       created_at: "2026-04-17T00:02:00.000Z",
       updated_at: "2026-04-17T00:02:00.000Z",
@@ -155,6 +161,8 @@ const providerProfiles = [
     profile_key: "openai-local",
     name: "OpenAI Local",
     provider_type: "openai_compatible",
+    plugin_identifier: "builtin.openai_compatible",
+    plugin_config: {},
     base_url: "https://api.example.test/v1",
     model_name: "gpt-test",
     capabilities: {},
@@ -261,6 +269,56 @@ const narrativeArtifacts = [
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
+const pluginCatalog = [
+  {
+    identifier: "builtin.openai_compatible",
+    category: "model_provider",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["chat_completion"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.anthropic_compatible",
+    category: "model_provider",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["messages"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.local_pgvector_memory",
+    category: "memory_backend",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["vector_search"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_world_rules",
+    category: "world_rules",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["due_rules"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_persona_policy",
+    category: "persona_policy",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["build_prompt"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_narrative_writer",
+    category: "narrative_writer",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["summary", "chapter"],
+    built_in: true,
+  },
+];
 const conversations = [
   {
     id: seedConversationId,
@@ -283,6 +341,8 @@ const conversations = [
     },
     writer_config: {
       provider_profile_id: null,
+      writer_plugin_identifier: "builtin.default_narrative_writer",
+      writer_plugin_config: {},
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
@@ -405,6 +465,11 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/plugins/catalog") {
+    handlePluginCatalog(url, response);
+    return;
+  }
+
   if (url.pathname === "/provider-profiles") {
     await handleProviderProfiles(request, response);
     return;
@@ -503,6 +568,12 @@ async function handleWorldCollection(request, response) {
       name: body.name,
       description: body.description ?? null,
       rules_config: body.rules_config ?? {},
+      memory_plugin_identifier:
+        body.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
+      memory_plugin_config: body.memory_plugin_config ?? {},
+      world_rules_plugin_identifier:
+        body.world_rules_plugin_identifier ?? "builtin.default_world_rules",
+      world_rules_plugin_config: body.world_rules_plugin_config ?? {},
       is_active: true,
     };
     worlds.push(world);
@@ -897,6 +968,17 @@ function handleRuntimeDiagnostics(request, response) {
   sendJson(response, 200, runtimeDiagnostics);
 }
 
+function handlePluginCatalog(url, response) {
+  const category = url.searchParams.get("category");
+  sendJson(
+    response,
+    200,
+    category === null
+      ? pluginCatalog
+      : pluginCatalog.filter((plugin) => plugin.category === category),
+  );
+}
+
 function handleWorldDiagnostics(request, response, currentSubject, worldId) {
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
@@ -925,6 +1007,12 @@ async function handleProviderProfiles(request, response) {
       profile_key: body.profile_key,
       name: body.name,
       provider_type: body.provider_type,
+      plugin_identifier:
+        body.plugin_identifier
+        ?? (body.provider_type === "anthropic_compatible"
+          ? "builtin.anthropic_compatible"
+          : "builtin.openai_compatible"),
+      plugin_config: body.plugin_config ?? {},
       base_url: body.base_url,
       model_name: body.model_name,
       capabilities: body.capabilities ?? {},
@@ -1073,6 +1161,12 @@ async function handleWorldCompositionImport(request, response) {
     name: body.name,
     description: body.description ?? composition.world.description ?? null,
     rules_config: body.rules_config ?? composition.world.rules_config ?? {},
+    memory_plugin_identifier:
+      composition.world.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
+    memory_plugin_config: composition.world.memory_plugin_config ?? {},
+    world_rules_plugin_identifier:
+      composition.world.world_rules_plugin_identifier ?? "builtin.default_world_rules",
+    world_rules_plugin_config: composition.world.world_rules_plugin_config ?? {},
     is_active: composition.world.is_active,
   };
   worlds.push(world);
@@ -1270,6 +1364,8 @@ async function handlePersona(request, response, currentSubject, worldId, agentId
       agent_id: agentId,
       persona_text: body.persona_text ?? "",
       behavior_policy: body.behavior_policy ?? {},
+      policy_plugin_identifier: body.policy_plugin_identifier ?? "builtin.default_persona_policy",
+      policy_plugin_config: body.policy_plugin_config ?? {},
       is_enabled: body.is_enabled ?? true,
       created_at: agentPersonas.get(agentId)?.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1762,6 +1858,8 @@ async function handleConversations(request, response, currentSubject, worldId, c
         policy: body.policy,
         writer_config: body.writer_config ?? {
           provider_profile_id: null,
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {},
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
@@ -2062,6 +2160,9 @@ function materializePresetForAgent(worldId, agentId, preset) {
     agent_id: agentId,
     persona_text: preset.persona_text ?? "",
     behavior_policy: preset.behavior_policy ?? {},
+    policy_plugin_identifier:
+      currentPersona?.policy_plugin_identifier ?? "builtin.default_persona_policy",
+    policy_plugin_config: currentPersona?.policy_plugin_config ?? {},
     is_enabled: true,
     created_at: currentPersona?.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString(),

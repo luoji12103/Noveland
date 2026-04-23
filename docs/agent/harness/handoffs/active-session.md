@@ -1,17 +1,17 @@
 # Active Session Handoff
 
 - Date: 2026-04-22T00:00:00Z
-- Branch: feat/agent-composition-presets
-- Objective: Add platform-managed agent presets plus world composition import/export on top of the realtime workspace baseline.
+- Branch: feat/plugin-runtime-wiring
+- Objective: Wire provider, memory, world-rules, persona-policy, and narrative-writer execution through the built-in plugin registry with explicit bindings and Web configuration surfaces.
 - Completed work:
-  - Added `agent_presets` persistence and `agents.source_preset_id` provenance tracking.
-  - Added preset CRUD APIs, preset-aware agent creation/materialization, and world composition export/import routes.
-  - Added platform-admin preset management UI at `/admin/presets`.
-  - Added preset picker and preview to agent creation plus preset provenance display in the agent builder.
-  - Added world composition export/import UI in the world overview, with client, component, and mock-backend E2E coverage.
+  - Added explicit plugin binding fields and backfill migration `20260422_0015_plugin_runtime_wiring.py` for provider profiles, worlds, agent personas, and conversation writer config.
+  - Added built-in plugin constants and registry wiring in `noveland.plugins.builtins`, including first-party plugins for model providers, memory backend, world rules, persona policy, and narrative writer.
+  - Routed provider invocation, memory access, due-rule resolution, persona prompt shaping, and conversation narrative writing through `PluginRegistry`.
+  - Added `GET /plugins/catalog` plus plugin-aware provider/world/persona/conversation API validation.
+  - Added Web plugin catalog proxy plus provider/world/persona/writer configuration forms and server loaders.
 - Incomplete work:
   - Commit and merge are still pending on this branch.
-  - Plugin runtime wiring remains the next stage after this closeout.
+  - No follow-on mainline is selected yet after plugin runtime wiring.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -23,12 +23,12 @@
   - `cd web && npm run test:e2e`
   - `cd web && npm run build`
 - Current risks:
-  - Presets are materialized only when an agent is created or a world composition is imported; existing agents do not re-sync when a preset changes.
-  - World composition import assumes referenced preset keys already exist and creates a new world rather than merging into an existing one.
-  - Composition import/export intentionally excludes memberships, auth/session, clock state, events/snapshots, diagnostics, memory, observations, conversations, and narrative artifacts.
+  - Plugin wiring is currently limited to code-registered built-ins; there is no marketplace, hot reload, or remote plugin distribution path.
+  - Built-in plugin bindings are backfilled explicitly, but runtime paths still assume plugin identifiers stay stable across future refactors.
+  - World admins can configure world/persona/writer plugin bindings, while provider plugin bindings remain platform-admin managed.
 - Recommended next step:
-  - Commit `feat(worlds): add agent composition presets`, fast-forward merge to `main`, and start `feat/plugin-runtime-wiring`.
+  - Commit `feat(plugins): wire runtime execution through registry`, keep the branch for review, and then select the next mainline stage.
 - Sensitive areas to avoid casual edits:
-  - preset materialization semantics for provider/profile, persona, and calendar defaults
-  - composition import/export exclusion boundaries and provider profile key mapping
-  - provider secret handling; presets and compositions must stay non-secret
+  - plugin identifier compatibility and migration backfill semantics
+  - provider secret handling; plugin configs and world bindings must stay non-secret
+  - prompt shaping and narrative generation bindings, which now depend on registry category matching

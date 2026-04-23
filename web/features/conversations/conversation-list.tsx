@@ -196,6 +196,8 @@ function policyFromForm(form: FormData): ConversationPolicy {
 function writerConfigFromForm(form: FormData): ConversationWriterConfig {
   return {
     provider_profile_id: optionalFormString(form, "writer_provider_profile_id"),
+    writer_plugin_identifier: "builtin.default_narrative_writer",
+    writer_plugin_config: {},
     auto_generate_on_complete: form.get("writer_auto_generate_on_complete") === "true",
     generate_summary: form.get("writer_generate_summary") === "true",
     generate_chapter: form.get("writer_generate_chapter") === "true",

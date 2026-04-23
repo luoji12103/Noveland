@@ -49,12 +49,16 @@ class AgentPersonaService:
                 agent_id=persona.agent_id,
                 persona_text=persona.persona_text,
                 behavior_policy=persona.behavior_policy,
+                policy_plugin_identifier=persona.policy_plugin_identifier,
+                policy_plugin_config=persona.policy_plugin_config,
                 is_enabled=persona.is_enabled,
             )
             self._session.add(model)
         else:
             model.persona_text = persona.persona_text
             model.behavior_policy = persona.behavior_policy
+            model.policy_plugin_identifier = persona.policy_plugin_identifier
+            model.policy_plugin_config = persona.policy_plugin_config
             model.is_enabled = persona.is_enabled
         self._session.flush()
         return _persona_record(model)
@@ -339,6 +343,8 @@ def _persona_record(model: AgentPersona) -> AgentPersonaRecord:
         agent_id=model.agent_id,
         persona_text=model.persona_text,
         behavior_policy=model.behavior_policy,
+        policy_plugin_identifier=model.policy_plugin_identifier,
+        policy_plugin_config=model.policy_plugin_config,
         is_enabled=model.is_enabled,
         created_at=model.created_at,
         updated_at=model.updated_at,

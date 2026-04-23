@@ -34,7 +34,12 @@ import type {
   NarrativeArtifact,
   RuntimeDiagnostic,
 } from "@/lib/worlds/types";
-import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
+import {
+  formString,
+  jsonObject,
+  messageForError,
+  optionalFormString,
+} from "@/features/workspace/form-utils";
 
 type ConversationDetailProps = {
   worldId: string;
@@ -465,12 +470,32 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
           </h2>
           {canManage ? (
             <form className="inline-form" onSubmit={handleWriterConfig}>
+              <select
+                aria-label="Writer plugin"
+                className="text-input"
+                name="writer_plugin_identifier"
+                defaultValue={conversation.writer_config.writer_plugin_identifier}
+              >
+                {data.narrativeWriterPlugins.map((plugin) => (
+                  <option key={plugin.identifier} value={plugin.identifier}>
+                    {plugin.identifier}
+                  </option>
+                ))}
+              </select>
               <input
                 aria-label="Writer provider profile id"
                 className="text-input"
                 name="provider_profile_id"
                 defaultValue={conversation.writer_config.provider_profile_id ?? ""}
                 placeholder="Provider profile id (optional)"
+              />
+              <textarea
+                aria-label="Writer plugin config"
+                className="text-input"
+                name="writer_plugin_config"
+                rows={3}
+                defaultValue={JSON.stringify(conversation.writer_config.writer_plugin_config, null, 2)}
+                placeholder="{}"
               />
               <label className="checkbox-label">
                 <input
@@ -505,7 +530,8 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
             </form>
           ) : (
             <p>
-              auto={String(conversation.writer_config.auto_generate_on_complete)} / summary=
+              plugin={conversation.writer_config.writer_plugin_identifier} / auto=
+              {String(conversation.writer_config.auto_generate_on_complete)} / summary=
               {String(conversation.writer_config.generate_summary)} / chapter=
               {String(conversation.writer_config.generate_chapter)}
             </p>
@@ -617,6 +643,8 @@ function policyFromForm(form: FormData): ConversationPolicy {
 function writerConfigFromForm(form: FormData): ConversationWriterConfig {
   return {
     provider_profile_id: optionalFormString(form, "provider_profile_id"),
+    writer_plugin_identifier: formString(form, "writer_plugin_identifier"),
+    writer_plugin_config: jsonObject(formString(form, "writer_plugin_config")),
     auto_generate_on_complete: form.get("auto_generate_on_complete") === "true",
     generate_summary: form.get("generate_summary") === "true",
     generate_chapter: form.get("generate_chapter") === "true",

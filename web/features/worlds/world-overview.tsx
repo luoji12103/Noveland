@@ -108,6 +108,10 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         updateWorld(selectedWorld.id, {
           name: formString(form, "name"),
           description: optionalFormString(form, "description"),
+          memory_plugin_identifier: formString(form, "memory_plugin_identifier"),
+          memory_plugin_config: jsonObject(formString(form, "memory_plugin_config")),
+          world_rules_plugin_identifier: formString(form, "world_rules_plugin_identifier"),
+          world_rules_plugin_config: jsonObject(formString(form, "world_rules_plugin_config")),
         }),
       "World saved.",
     );
@@ -231,12 +235,54 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               defaultValue={world.description ?? ""}
               placeholder="Description"
             />
+            <select
+              aria-label="World memory plugin"
+              className="text-input"
+              name="memory_plugin_identifier"
+              defaultValue={world.memory_plugin_identifier}
+            >
+              {data.memoryPlugins.map((plugin) => (
+                <option key={plugin.identifier} value={plugin.identifier}>
+                  {plugin.identifier}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="text-input"
+              name="memory_plugin_config"
+              rows={3}
+              defaultValue={JSON.stringify(world.memory_plugin_config, null, 2)}
+              placeholder="Memory plugin config"
+            />
+            <select
+              aria-label="World rules plugin"
+              className="text-input"
+              name="world_rules_plugin_identifier"
+              defaultValue={world.world_rules_plugin_identifier}
+            >
+              {data.worldRulesPlugins.map((plugin) => (
+                <option key={plugin.identifier} value={plugin.identifier}>
+                  {plugin.identifier}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="text-input"
+              name="world_rules_plugin_config"
+              rows={3}
+              defaultValue={JSON.stringify(world.world_rules_plugin_config, null, 2)}
+              placeholder="World rules plugin config"
+            />
             <button className="primary-button" type="submit" disabled={isBusy}>
               Save world
             </button>
           </form>
         ) : (
-          <p>Read-only world access.</p>
+          <>
+            <p>Read-only world access.</p>
+            <p>Memory plugin: {world.memory_plugin_identifier}</p>
+            <p>World rules plugin: {world.world_rules_plugin_identifier}</p>
+          </>
         )}
       </section>
 

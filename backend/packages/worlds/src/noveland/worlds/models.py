@@ -6,6 +6,10 @@ from decimal import Decimal
 from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from noveland.plugins.constants import (
+    BUILTIN_DEFAULT_WORLD_RULES,
+    BUILTIN_LOCAL_PGVECTOR_MEMORY,
+)
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -39,6 +43,26 @@ class World(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     rules_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    memory_plugin_identifier: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        default=BUILTIN_LOCAL_PGVECTOR_MEMORY,
+    )
+    memory_plugin_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    world_rules_plugin_identifier: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        default=BUILTIN_DEFAULT_WORLD_RULES,
+    )
+    world_rules_plugin_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
         default=dict,

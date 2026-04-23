@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from noveland.plugins.constants import BUILTIN_DEFAULT_PERSONA_POLICY
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -169,6 +170,16 @@ class AgentPersona(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     persona_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     behavior_policy: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    policy_plugin_identifier: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        default=BUILTIN_DEFAULT_PERSONA_POLICY,
+    )
+    policy_plugin_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
         default=dict,

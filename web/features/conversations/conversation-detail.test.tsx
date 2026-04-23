@@ -109,6 +109,8 @@ describe("ConversationDetail", () => {
       expect(updateConversation).toHaveBeenCalledWith("world-1", "conversation-1", {
         writer_config: {
           provider_profile_id: "profile-1",
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {},
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
@@ -173,6 +175,10 @@ const adminData: ConversationDetailData = {
       name: "World 1",
       description: null,
       rules_config: {},
+      memory_plugin_identifier: "builtin.local_pgvector_memory",
+      memory_plugin_config: {},
+      world_rules_plugin_identifier: "builtin.default_world_rules",
+      world_rules_plugin_config: {},
       is_active: true,
     },
   ],
@@ -183,6 +189,10 @@ const adminData: ConversationDetailData = {
     name: "World 1",
     description: null,
     rules_config: {},
+    memory_plugin_identifier: "builtin.local_pgvector_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
     is_active: true,
   },
   scenes: [],
@@ -224,6 +234,8 @@ const adminData: ConversationDetailData = {
     },
     writer_config: {
       provider_profile_id: "profile-1",
+      writer_plugin_identifier: "builtin.default_narrative_writer",
+      writer_plugin_config: {},
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
@@ -287,6 +299,16 @@ const adminData: ConversationDetailData = {
       artifact_kind: "conversation_summary",
       metadata: { generation_mode: "manual" },
       created_at: "2026-04-21T00:00:03.000Z",
+    },
+  ],
+  narrativeWriterPlugins: [
+    {
+      identifier: "builtin.default_narrative_writer",
+      category: "narrative_writer",
+      version: "0.1.0",
+      config_schema: {},
+      capabilities: [],
+      built_in: true,
     },
   ],
 };

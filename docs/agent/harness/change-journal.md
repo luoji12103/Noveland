@@ -220,6 +220,17 @@
 - Docs updated: README, data ownership, architecture map, project index, file inventory, task board, active handoff
 - Follow-up notes: provider timeout/retry/rate-limit hardening, provider test-call health state, and agent observation/persona policy remain separate tasks.
 
+## Plugin runtime wiring entry
+
+- Date: 2026-04-22
+- Branch: feat/plugin-runtime-wiring
+- Scope: explicit plugin bindings and runtime wiring
+- Summary: Added built-in plugin identifiers and registry-backed implementations for model providers, memory backend, world rules, persona policy, and narrative writer; added explicit DB/plugin bindings plus plugin-aware Web configuration surfaces.
+- Files changed: `/backend/packages/plugins/**`, `/backend/packages/adapters/**`, `/backend/packages/agents/**`, `/backend/packages/narrative/**`, `/backend/packages/worlds/**`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`, `/web/app/api/plugins/catalog/**`, `/web/features/admin/**`, `/web/features/agents/**`, `/web/features/conversations/**`, `/web/features/worlds/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/harness/**`
+- Tests added/updated: plugin runtime regression through backend `ruff`, `mypy`, and full `pytest`; frontend `lint`, `typecheck`, `vitest`, `playwright`, and production build coverage updated for plugin-aware loaders and forms
+- Docs updated: project index, file inventory, task board, active handoff
+- Follow-up notes: plugin execution still uses code-registered built-ins only; marketplace, hot reload, and remote installation remain future work.
+
 ## Provider reliability hardening entry
 
 - Date: 2026-04-17

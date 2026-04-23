@@ -4,7 +4,7 @@ import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from noveland.adapters import (
     ProviderConfigurationError,
@@ -21,7 +21,7 @@ from noveland.agents import (
 from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.calendar import CalendarEntryRecord, CalendarService, ScheduleRuleRecord
 from noveland.events import WorldEventAppend, WorldEventStore
-from noveland.memory import VECTOR_DIMENSIONS, LocalPgvectorMemoryBackend, MemoryItemCreate
+from noveland.memory import VECTOR_DIMENSIONS, MemoryBackend, MemoryItemCreate
 from noveland.narrative import (
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
@@ -34,7 +34,21 @@ from noveland.observability import (
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticsService,
 )
+from noveland.plugins.builtins import (
+    MemoryBackendPlugin,
+    PersonaPolicyPlugin,
+    WorldRulesPlugin,
+    get_builtin_plugin_registry,
+)
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.constants import BUILTIN_DEFAULT_PERSONA_POLICY
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginFactoryError,
+    PluginNotFoundError,
+)
 from noveland.worlds.clock_service import WorldClockService
+from noveland.worlds.models import World
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -106,7 +120,7 @@ class AgentRuntimeOrchestrator:
         observation_service.refresh_from_events(world_id, agent_id)
         persona = AgentPersonaService(self._session).get(world_id, agent_id)
         observations = observation_service.list(world_id, agent_id, limit=8)
-        provider_prompt = _agent_prompt(agent, prompt_text, persona, observations)
+        provider_prompt = self._build_agent_prompt(agent, prompt_text, persona, observations)
         prompt_context = {
             "persona_enabled": persona is not None and persona.is_enabled,
             "observation_ids": [str(observation.id) for observation in observations],
@@ -183,7 +197,7 @@ class AgentRuntimeOrchestrator:
             run_model.created_event_id = created_event.id
 
             if create_memory:
-                memory_item = LocalPgvectorMemoryBackend(self._session).add(
+                memory_item = self._memory_backend(world_id).add(
                     MemoryItemCreate(
                         world_id=world_id,
                         agent_id=agent_id,
@@ -301,7 +315,10 @@ class AgentRuntimeOrchestrator:
                 wall_time,
             ).effective_world_time
             due_entries = calendar_service.due_entries(world_id, world_time)
-            due_rules = calendar_service.due_rules(world_id, world_time)
+            due_rules = self._due_rules_plugin(world_id).due_rules(
+                calendar_service.list_rules(world_id),
+                world_time,
+            )
             enabled_agents = self._enabled_agents(world_id)
             due_entries_by_agent = _entries_by_agent(due_entries)
 
@@ -398,6 +415,84 @@ class AgentRuntimeOrchestrator:
             return self._profile_service.get_profile(resolved_profile_id)
         return self._profile_service.first_enabled_profile()
 
+    def _memory_backend(self, world_id: uuid.UUID) -> MemoryBackend:
+        world = self._world_or_404(world_id)
+        return cast(
+            MemoryBackendPlugin,
+            self._plugin_instance(
+                category=PluginCategory.MEMORY_BACKEND,
+                identifier=world.memory_plugin_identifier,
+                raw_config=world.memory_plugin_config,
+            ),
+        ).bind_session(self._session)
+
+    def _due_rules_plugin(self, world_id: uuid.UUID) -> WorldRulesPlugin:
+        world = self._world_or_404(world_id)
+        return cast(
+            WorldRulesPlugin,
+            self._plugin_instance(
+                category=PluginCategory.WORLD_RULES,
+                identifier=world.world_rules_plugin_identifier,
+                raw_config=world.world_rules_plugin_config,
+            ),
+        )
+
+    def _build_agent_prompt(
+        self,
+        agent: Agent,
+        task_prompt: str,
+        persona: AgentPersonaRecord | None,
+        observations: list[AgentObservationRecord],
+    ) -> str:
+        identifier = (
+            BUILTIN_DEFAULT_PERSONA_POLICY
+            if persona is None
+            else persona.policy_plugin_identifier
+        )
+        raw_config = {} if persona is None else persona.policy_plugin_config
+        plugin = cast(
+            PersonaPolicyPlugin,
+            self._plugin_instance(
+                category=PluginCategory.PERSONA_POLICY,
+                identifier=identifier,
+                raw_config=raw_config,
+            ),
+        )
+        return plugin.build_prompt(
+            agent=agent,
+            task_prompt=task_prompt,
+            persona=persona,
+            observations=observations,
+        )
+
+    def _world_or_404(self, world_id: uuid.UUID) -> World:
+        world = self._session.get(World, world_id)
+        if world is None:
+            raise LookupError("World not found")
+        return world
+
+    def _plugin_instance(
+        self,
+        *,
+        category: PluginCategory,
+        identifier: str,
+        raw_config: dict[str, Any],
+    ) -> object:
+        registry = get_builtin_plugin_registry()
+        definition = registry.get(identifier)
+        if definition.manifest.category is not category:
+            raise RuntimeError(
+                f"Plugin binding {identifier} does not match expected category {category.value}",
+            )
+        try:
+            return registry.create(identifier, raw_config)
+        except PluginNotFoundError as exc:
+            raise RuntimeError(str(exc)) from exc
+        except PluginConfigValidationError as exc:
+            raise RuntimeError(str(exc)) from exc
+        except PluginFactoryError as exc:
+            raise RuntimeError(str(exc)) from exc
+
     def _append_event(
         self,
         *,
@@ -483,36 +578,6 @@ def _due_prompt(
         f"Matching schedule rules: {rule_names}. "
         "Respond with one concise operational update."
     )
-
-
-def _agent_prompt(
-    agent: Agent,
-    task_prompt: str,
-    persona: AgentPersonaRecord | None,
-    observations: list[AgentObservationRecord],
-) -> str:
-    lines = [
-        task_prompt,
-        "",
-        f"Agent: {agent.display_name} ({agent.agent_key}).",
-    ]
-    if persona is not None and persona.is_enabled:
-        lines.extend(
-            [
-                "Persona:",
-                persona.persona_text or "No persona text configured.",
-                f"Behavior policy: {persona.behavior_policy}",
-            ],
-        )
-    else:
-        lines.append("Persona: disabled or not configured.")
-    if observations:
-        lines.append("Recent filtered observations:")
-        lines.extend(f"- {observation.content}" for observation in observations[:8])
-    else:
-        lines.append("Recent filtered observations: none.")
-    lines.append("Use only the persona, policy, task, and filtered observations above.")
-    return "\n".join(lines)
 
 
 def _deterministic_embedding(content: str) -> list[float]:

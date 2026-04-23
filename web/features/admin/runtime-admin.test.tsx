@@ -118,5 +118,6 @@ const runtimeData: RuntimeAdminData = {
     runtime_batch_limit: 20,
   },
   runtimeDiagnostics: [],
+  modelProviderPlugins: [],
   loadError: null,
 };

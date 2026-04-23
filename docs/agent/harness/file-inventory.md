@@ -30,6 +30,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/world-compositions/`
 - `web/app/api/runtime/`
 - `web/app/api/runtime/stream/`
+- `web/app/api/plugins/catalog/`
 - `web/app/api/provider-profiles/`
 - `web/app/api/provider-profiles/[profileId]/test-call/`
 - `web/app/api/worlds/[worldId]/stream/`
@@ -89,6 +90,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/agents/src/noveland/agents/models.py`
 - `backend/packages/agents/src/noveland/agents/services.py`
 - `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
+- `backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`
@@ -116,8 +118,10 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/memory/src/noveland/memory/vector_type.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
+- `backend/packages/plugins/src/noveland/plugins/constants.py`
 - `backend/packages/plugins/src/noveland/plugins/definition.py`
 - `backend/packages/plugins/src/noveland/plugins/errors.py`
+- `backend/packages/plugins/src/noveland/plugins/builtins.py`
 - `backend/packages/plugins/src/noveland/plugins/manifest.py`
 - `backend/packages/plugins/src/noveland/plugins/registry.py`
 - `backend/packages/adapters/`

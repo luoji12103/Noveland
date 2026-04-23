@@ -32,6 +32,8 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
+  PluginCatalogEntry,
+  PluginCategory,
   Scene,
   SceneCreateInput,
   SceneUpdateInput,
@@ -378,6 +380,13 @@ export function updateAgentPersona(
     body: input,
     csrf: true,
   });
+}
+
+export function listPluginCatalog(
+  category?: PluginCategory,
+): Promise<PluginCatalogEntry[]> {
+  const query = category === undefined ? "" : `?category=${encodeURIComponent(category)}`;
+  return apiRequest<PluginCatalogEntry[]>(`/api/plugins/catalog${query}`, { method: "GET" });
 }
 
 export function listAgentObservations(

@@ -25,7 +25,7 @@ export default async function ProviderAdminPage() {
     );
   }
 
-  const profiles = await getProviderAdminData();
+  const data = await getProviderAdminData();
 
   return (
     <WorkspaceShell
@@ -33,7 +33,7 @@ export default async function ProviderAdminPage() {
       title="Providers"
       intro="Manage non-secret provider profiles. API keys stay in runtime environment settings."
     >
-      <ProviderAdmin profiles={profiles} />
+      <ProviderAdmin data={data} />
     </WorkspaceShell>
   );
 }

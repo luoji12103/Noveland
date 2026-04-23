@@ -38,7 +38,7 @@ from noveland.core.settings import load_settings
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
 from noveland.memory import (
     VECTOR_DIMENSIONS,
-    LocalPgvectorMemoryBackend,
+    MemoryBackend,
     MemoryItemCreate,
     MemoryItemRecord,
     MemorySearchQuery,
@@ -54,6 +54,17 @@ from noveland.observability import (
     DiagnosticSeverity,
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
+)
+from noveland.plugins.builtins import MemoryBackendPlugin, get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.constants import (
+    BUILTIN_DEFAULT_PERSONA_POLICY,
+    BUILTIN_DEFAULT_WORLD_RULES,
+    BUILTIN_LOCAL_PGVECTOR_MEMORY,
+)
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginNotFoundError,
 )
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
@@ -92,12 +103,28 @@ class WorldCreateRequest(_RequestModel):
     name: str = Field(min_length=1, max_length=160)
     description: str | None = None
     rules_config: dict[str, Any] = Field(default_factory=dict)
+    memory_plugin_identifier: str = Field(
+        default=BUILTIN_LOCAL_PGVECTOR_MEMORY,
+        min_length=1,
+        max_length=120,
+    )
+    memory_plugin_config: dict[str, Any] = Field(default_factory=dict)
+    world_rules_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_WORLD_RULES,
+        min_length=1,
+        max_length=120,
+    )
+    world_rules_plugin_config: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorldUpdateRequest(_RequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = None
     rules_config: dict[str, Any] | None = None
+    memory_plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    memory_plugin_config: dict[str, Any] | None = None
+    world_rules_plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    world_rules_plugin_config: dict[str, Any] | None = None
     is_active: bool | None = None
 
 
@@ -220,6 +247,12 @@ class AgentRunRequest(_RequestModel):
 class AgentPersonaUpdateRequest(_RequestModel):
     persona_text: str = Field(default="", max_length=12_000)
     behavior_policy: dict[str, Any] = Field(default_factory=dict)
+    policy_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_PERSONA_POLICY,
+        min_length=1,
+        max_length=120,
+    )
+    policy_plugin_config: dict[str, Any] = Field(default_factory=dict)
     is_enabled: bool = True
 
 
@@ -268,6 +301,10 @@ class WorldResponse(BaseModel):
     name: str
     description: str | None
     rules_config: dict[str, Any]
+    memory_plugin_identifier: str
+    memory_plugin_config: dict[str, Any]
+    world_rules_plugin_identifier: str
+    world_rules_plugin_config: dict[str, Any]
     is_active: bool
 
 
@@ -496,6 +533,8 @@ class AgentPersonaResponse(BaseModel):
     agent_id: uuid.UUID
     persona_text: str
     behavior_policy: dict[str, Any]
+    policy_plugin_identifier: str
+    policy_plugin_config: dict[str, Any]
     is_enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -850,6 +889,12 @@ def create_world(
 ) -> WorldResponse:
     require_csrf(request)
     _ensure_slug_available(db_session, world_create.slug)
+    _validate_world_plugin_bindings(
+        memory_plugin_identifier=world_create.memory_plugin_identifier,
+        memory_plugin_config=world_create.memory_plugin_config,
+        world_rules_plugin_identifier=world_create.world_rules_plugin_identifier,
+        world_rules_plugin_config=world_create.world_rules_plugin_config,
+    )
     world = World(
         id=uuid.uuid4(),
         owner_user_id=subject.user_id,
@@ -857,6 +902,10 @@ def create_world(
         name=world_create.name,
         description=world_create.description,
         rules_config=world_create.rules_config,
+        memory_plugin_identifier=world_create.memory_plugin_identifier,
+        memory_plugin_config=world_create.memory_plugin_config,
+        world_rules_plugin_identifier=world_create.world_rules_plugin_identifier,
+        world_rules_plugin_config=world_create.world_rules_plugin_config,
         is_active=True,
     )
     db_session.add(world)
@@ -991,12 +1040,48 @@ def update_world(
 ) -> WorldResponse:
     require_csrf(request)
     world = _world_or_404(db_session, context.world_id)
+    next_memory_plugin_identifier = (
+        world.memory_plugin_identifier
+        if "memory_plugin_identifier" not in world_update.model_fields_set
+        or world_update.memory_plugin_identifier is None
+        else world_update.memory_plugin_identifier
+    )
+    next_memory_plugin_config = (
+        world.memory_plugin_config
+        if "memory_plugin_config" not in world_update.model_fields_set
+        else world_update.memory_plugin_config or {}
+    )
+    next_world_rules_plugin_identifier = (
+        world.world_rules_plugin_identifier
+        if "world_rules_plugin_identifier" not in world_update.model_fields_set
+        or world_update.world_rules_plugin_identifier is None
+        else world_update.world_rules_plugin_identifier
+    )
+    next_world_rules_plugin_config = (
+        world.world_rules_plugin_config
+        if "world_rules_plugin_config" not in world_update.model_fields_set
+        else world_update.world_rules_plugin_config or {}
+    )
+    _validate_world_plugin_bindings(
+        memory_plugin_identifier=next_memory_plugin_identifier,
+        memory_plugin_config=next_memory_plugin_config,
+        world_rules_plugin_identifier=next_world_rules_plugin_identifier,
+        world_rules_plugin_config=next_world_rules_plugin_config,
+    )
     if "name" in world_update.model_fields_set:
         world.name = world_update.name or world.name
     if "description" in world_update.model_fields_set:
         world.description = world_update.description
     if "rules_config" in world_update.model_fields_set:
         world.rules_config = world_update.rules_config or {}
+    if "memory_plugin_identifier" in world_update.model_fields_set:
+        world.memory_plugin_identifier = next_memory_plugin_identifier
+    if "memory_plugin_config" in world_update.model_fields_set:
+        world.memory_plugin_config = next_memory_plugin_config
+    if "world_rules_plugin_identifier" in world_update.model_fields_set:
+        world.world_rules_plugin_identifier = next_world_rules_plugin_identifier
+    if "world_rules_plugin_config" in world_update.model_fields_set:
+        world.world_rules_plugin_config = next_world_rules_plugin_config
     if "is_active" in world_update.model_fields_set:
         world.is_active = bool(world_update.is_active)
     db_session.flush()
@@ -1539,7 +1624,10 @@ def list_agent_memory(
     _agent_or_404(db_session, context.world_id, agent_id)
     return [
         _memory_item_response(item)
-        for item in LocalPgvectorMemoryBackend(db_session).list(context.world_id, agent_id)
+        for item in _memory_backend_for_world(db_session, context.world_id).list(
+            context.world_id,
+            agent_id,
+        )
     ]
 
 
@@ -1558,7 +1646,7 @@ def create_agent_memory(
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
     return _memory_item_response(
-        LocalPgvectorMemoryBackend(db_session).add(
+        _memory_backend_for_world(db_session, context.world_id).add(
             MemoryItemCreate(
                 world_id=context.world_id,
                 agent_id=agent_id,
@@ -1584,7 +1672,7 @@ def search_agent_memory(
     _agent_or_404(db_session, context.world_id, agent_id)
     return [
         _memory_item_response(item)
-        for item in LocalPgvectorMemoryBackend(db_session).search(
+        for item in _memory_backend_for_world(db_session, context.world_id).search(
             MemorySearchQuery(
                 world_id=context.world_id,
                 agent_id=agent_id,
@@ -1609,7 +1697,7 @@ def disable_agent_memory(
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
     _memory_item_or_404(db_session, context.world_id, agent_id, memory_id)
-    LocalPgvectorMemoryBackend(db_session).disable(memory_id)
+    _memory_backend_for_world(db_session, context.world_id).disable(memory_id)
 
 
 @router.get(
@@ -1639,6 +1727,13 @@ def upsert_agent_persona(
 ) -> AgentPersonaResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
+    _validate_named_plugin_binding(
+        category=PluginCategory.PERSONA_POLICY,
+        identifier=persona_update.policy_plugin_identifier,
+        raw_config=persona_update.policy_plugin_config,
+        missing_detail="Persona policy plugin is not registered",
+        invalid_detail="Persona policy plugin config is invalid",
+    )
     return _agent_persona_response(
         AgentPersonaService(db_session).upsert(
             AgentPersonaUpsert(
@@ -1646,6 +1741,8 @@ def upsert_agent_persona(
                 agent_id=agent_id,
                 persona_text=persona_update.persona_text,
                 behavior_policy=persona_update.behavior_policy,
+                policy_plugin_identifier=persona_update.policy_plugin_identifier,
+                policy_plugin_config=persona_update.policy_plugin_config,
                 is_enabled=persona_update.is_enabled,
             ),
         ),
@@ -1980,6 +2077,10 @@ def _world_response(world: World) -> WorldResponse:
         name=world.name,
         description=world.description,
         rules_config=world.rules_config,
+        memory_plugin_identifier=world.memory_plugin_identifier,
+        memory_plugin_config=world.memory_plugin_config,
+        world_rules_plugin_identifier=world.world_rules_plugin_identifier,
+        world_rules_plugin_config=world.world_rules_plugin_config,
         is_active=world.is_active,
     )
 
@@ -2150,6 +2251,91 @@ def _provider_profile_or_404(
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return profile
+
+
+def _memory_backend_for_world(
+    db_session: Session,
+    world_id: uuid.UUID,
+) -> MemoryBackend:
+    world = _world_or_404(db_session, world_id)
+    return cast(
+        MemoryBackendPlugin,
+        _create_plugin_binding(
+            category=PluginCategory.MEMORY_BACKEND,
+            identifier=world.memory_plugin_identifier,
+            raw_config=world.memory_plugin_config,
+            missing_detail="Memory backend plugin is not registered",
+            invalid_detail="Memory backend plugin config is invalid",
+        ),
+    ).bind_session(db_session)
+
+
+def _validate_world_plugin_bindings(
+    *,
+    memory_plugin_identifier: str,
+    memory_plugin_config: dict[str, Any],
+    world_rules_plugin_identifier: str,
+    world_rules_plugin_config: dict[str, Any],
+) -> None:
+    _validate_named_plugin_binding(
+        category=PluginCategory.MEMORY_BACKEND,
+        identifier=memory_plugin_identifier,
+        raw_config=memory_plugin_config,
+        missing_detail="Memory backend plugin is not registered",
+        invalid_detail="Memory backend plugin config is invalid",
+    )
+    _validate_named_plugin_binding(
+        category=PluginCategory.WORLD_RULES,
+        identifier=world_rules_plugin_identifier,
+        raw_config=world_rules_plugin_config,
+        missing_detail="World rules plugin is not registered",
+        invalid_detail="World rules plugin config is invalid",
+    )
+
+
+def _validate_named_plugin_binding(
+    *,
+    category: PluginCategory,
+    identifier: str,
+    raw_config: dict[str, Any],
+    missing_detail: str,
+    invalid_detail: str,
+) -> None:
+    registry = get_builtin_plugin_registry()
+    try:
+        definition = registry.get(identifier)
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=missing_detail) from exc
+    if definition.manifest.category is not category:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=invalid_detail,
+        )
+    try:
+        registry.validate_config(identifier, raw_config)
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=invalid_detail,
+        ) from exc
+
+
+def _create_plugin_binding(
+    *,
+    category: PluginCategory,
+    identifier: str,
+    raw_config: dict[str, Any],
+    missing_detail: str,
+    invalid_detail: str,
+) -> object:
+    _validate_named_plugin_binding(
+        category=category,
+        identifier=identifier,
+        raw_config=raw_config,
+        missing_detail=missing_detail,
+        invalid_detail=invalid_detail,
+    )
+    return get_builtin_plugin_registry().create(identifier, raw_config)
 
 
 def _preset_for_agent_create(

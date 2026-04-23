@@ -40,6 +40,7 @@
 - Dedicated Narrative Reader Surface
 - Realtime Updates
 - Agent Composition Presets
+- Plugin Runtime Wiring
 
 ## Upcoming Mainline
-- Plugin Runtime Wiring
+- None selected

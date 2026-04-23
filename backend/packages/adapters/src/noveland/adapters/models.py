@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from noveland.plugins.constants import BUILTIN_OPENAI_COMPATIBLE
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -42,6 +43,16 @@ class ProviderProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     profile_key: Mapped[str] = mapped_column(String(80), nullable=False)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     provider_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    plugin_identifier: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        default=BUILTIN_OPENAI_COMPATIBLE,
+    )
+    plugin_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     model_name: Mapped[str] = mapped_column(String(200), nullable=False)
     capabilities: Mapped[dict[str, Any]] = mapped_column(

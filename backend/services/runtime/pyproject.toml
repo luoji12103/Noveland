@@ -17,6 +17,7 @@ dependencies = [
   "noveland-memory",
   "noveland-narrative",
   "noveland-observability",
+  "noveland-plugins",
   "noveland-worlds",
   "nats-py>=2,<3",
   "sqlalchemy>=2.0,<3",
@@ -35,6 +36,7 @@ noveland-events = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-narrative = { workspace = true }
 noveland-observability = { workspace = true }
+noveland-plugins = { workspace = true }
 noveland-worlds = { workspace = true }
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

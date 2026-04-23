@@ -1,0 +1,6 @@
+BUILTIN_OPENAI_COMPATIBLE = "builtin.openai_compatible"
+BUILTIN_ANTHROPIC_COMPATIBLE = "builtin.anthropic_compatible"
+BUILTIN_LOCAL_PGVECTOR_MEMORY = "builtin.local_pgvector_memory"
+BUILTIN_DEFAULT_WORLD_RULES = "builtin.default_world_rules"
+BUILTIN_DEFAULT_PERSONA_POLICY = "builtin.default_persona_policy"
+BUILTIN_DEFAULT_NARRATIVE_WRITER = "builtin.default_narrative_writer"
