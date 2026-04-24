@@ -9,6 +9,7 @@ from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent
 from noveland.conversations import (
     ConversationErrorPolicy,
+    ConversationMemoryConfig,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
@@ -85,6 +86,9 @@ class ConversationCreateRequest(_RequestModel):
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyRequest
     writer_config: ConversationWriterConfigRequest
+    memory_config: ConversationMemoryConfigRequest = Field(
+        default_factory=lambda: ConversationMemoryConfigRequest(),
+    )
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationCreateRequest:
@@ -102,6 +106,7 @@ class ConversationUpdateRequest(_RequestModel):
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyRequest | None = None
     writer_config: ConversationWriterConfigRequest | None = None
+    memory_config: ConversationMemoryConfigRequest | None = None
 
 
 class ConversationParticipantRequest(_RequestModel):
@@ -127,6 +132,13 @@ class ConversationWriterConfigRequest(_RequestModel):
     generate_chapter: bool = True
 
 
+class ConversationMemoryConfigRequest(_RequestModel):
+    write_turn_memory: bool = True
+    retrieve_memory: bool = True
+    max_context_items: int = Field(default=5, ge=1, le=20)
+    query_window: int = Field(default=8, ge=1, le=50)
+
+
 class ConversationNarrativeGenerateRequest(_RequestModel):
     artifact_set: Literal["summary_and_chapter", "summary_only", "chapter_only"] = (
         "summary_and_chapter"
@@ -150,6 +162,13 @@ class ConversationWriterConfigResponse(BaseModel):
     generate_chapter: bool
 
 
+class ConversationMemoryConfigResponse(BaseModel):
+    write_turn_memory: bool
+    retrieve_memory: bool
+    max_context_items: int
+    query_window: int
+
+
 class ConversationSessionResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
@@ -165,6 +184,7 @@ class ConversationSessionResponse(BaseModel):
     next_turn_index: int
     policy: ConversationPolicyResponse
     writer_config: ConversationWriterConfigResponse
+    memory_config: ConversationMemoryConfigResponse
     terminal_reason: str | None
     created_at: str
     updated_at: str
@@ -264,6 +284,7 @@ def create_conversation(
                 max_turns=conversation_create.max_turns,
                 policy=_policy_contract(conversation_create.policy),
                 writer_config=_writer_config_contract(conversation_create.writer_config),
+                memory_config=_memory_config_contract(conversation_create.memory_config),
             ),
         )
     except ConversationValidationError as exc:
@@ -310,6 +331,9 @@ def update_conversation(
                 writer_config=None
                 if conversation_update.writer_config is None
                 else _writer_config_contract(conversation_update.writer_config),
+                memory_config=None
+                if conversation_update.memory_config is None
+                else _memory_config_contract(conversation_update.memory_config),
             ),
         )
     except LookupError as exc:
@@ -504,9 +528,11 @@ def advance_conversation(
     ):
         raise _conflict("Auto dialogue sessions can only advance manually while paused")
     try:
+        settings = load_settings()
         result = ConversationRuntimeOrchestrator(
             db_session,
-            ProviderProfileService(db_session, load_settings()),
+            ProviderProfileService(db_session, settings),
+            settings,
         ).advance_session(
             context.world_id,
             conversation_id,
@@ -613,6 +639,17 @@ def _writer_config_contract(
     )
 
 
+def _memory_config_contract(
+    memory_config: ConversationMemoryConfigRequest,
+) -> ConversationMemoryConfig:
+    return ConversationMemoryConfig(
+        write_turn_memory=memory_config.write_turn_memory,
+        retrieve_memory=memory_config.retrieve_memory,
+        max_context_items=memory_config.max_context_items,
+        query_window=memory_config.query_window,
+    )
+
+
 def _session_response(session: ConversationSessionRecord) -> ConversationSessionResponse:
     return ConversationSessionResponse(
         id=session.id,
@@ -641,9 +678,13 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             generate_summary=session.writer_config.generate_summary,
             generate_chapter=session.writer_config.generate_chapter,
         ),
-        terminal_reason=None
-        if session.terminal_reason is None
-        else session.terminal_reason.value,
+        memory_config=ConversationMemoryConfigResponse(
+            write_turn_memory=session.memory_config.write_turn_memory,
+            retrieve_memory=session.memory_config.retrieve_memory,
+            max_context_items=session.memory_config.max_context_items,
+            query_window=session.memory_config.query_window,
+        ),
+        terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
     )

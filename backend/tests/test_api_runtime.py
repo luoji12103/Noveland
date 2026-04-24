@@ -15,6 +15,13 @@ from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.models import RuntimeControlState
 from noveland.events.models import WorldEventModel
+from noveland.memory.models import (
+    AgentMemoryItem,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -96,6 +103,54 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert disable_profile.status_code == 204
 
 
+def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    world_id = _seed_world(engine, owner_id, "memory-admin")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _authenticate(client, token)
+
+    create_profile = client.post(
+        "/memory-backend-profiles",
+        json={
+            "profile_key": "local-memory",
+            "name": "Local memory",
+            "backend_kind": "local_pgvector",
+            "vector_store_config": {},
+            "llm_config": {},
+            "embedder_config": {},
+            "reranker_config": {},
+            "secret_refs": {},
+        },
+    )
+    profile_id = uuid.UUID(create_profile.json()["id"])
+    _attach_world_memory_profile(engine, world_id, profile_id)
+    _seed_memory_backend_logs(engine, profile_id, world_id, agent_id)
+
+    list_profiles = client.get("/memory-backend-profiles")
+    health = client.get(f"/memory-backend-profiles/{profile_id}/health")
+    logs = client.get(f"/memory-backend-profiles/{profile_id}/logs?limit=5")
+    eval_smoke = client.post(f"/memory-backend-profiles/{profile_id}/eval-smoke")
+    update_profile = client.patch(
+        f"/memory-backend-profiles/{profile_id}",
+        json={"name": "Local memory updated", "is_enabled": False},
+    )
+
+    assert create_profile.status_code == 201
+    assert list_profiles.status_code == 200
+    assert list_profiles.json()[0]["profile_key"] == "local-memory"
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    assert logs.status_code == 200
+    assert logs.json()["write_logs"][0]["backend"] == "local_pgvector"
+    assert logs.json()["retrieval_logs"][0]["query_text"] == "Stored memory"
+    assert eval_smoke.status_code == 200
+    assert eval_smoke.json()["case_count"] == 1
+    assert eval_smoke.json()["hit_case_count"] == 1
+    assert update_profile.status_code == 200
+    assert update_profile.json()["is_enabled"] is False
+
+
 def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     client, engine = _client_with_database()
     _user_id, token = _seed_user(engine, "member@example.test", platform_admin=False)
@@ -141,9 +196,14 @@ def _create_tables(engine: Engine) -> None:
         Scene.__table__,
         RuntimeControlState.__table__,
         ProviderProfile.__table__,
+        MemoryBackendProfile.__table__,
         Agent.__table__,
         WorldScheduleRule.__table__,
         WorldEventModel.__table__,
+        AgentMemoryItem.__table__,
+        MemoryWriteJob.__table__,
+        MemoryWriteLog.__table__,
+        MemoryRetrievalLog.__table__,
         AgentCalendarEntry.__table__,
         AgentRuntimeRun.__table__,
         RuntimeDiagnosticEvent.__table__,
@@ -198,5 +258,109 @@ def _seed_runtime_diagnostic(engine: Engine) -> None:
                 message="Runtime test diagnostic",
                 details={"token": "secret", "note": "visible"},
             ),
+        )
+        session.commit()
+
+
+def _seed_world(engine: Engine, owner_user_id: uuid.UUID, slug: str) -> uuid.UUID:
+    world_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            World(
+                id=world_id,
+                owner_user_id=owner_user_id,
+                slug=slug,
+                name=slug,
+                rules_config={},
+            ),
+        )
+        session.commit()
+    return world_id
+
+
+def _seed_agent(engine: Engine, world_id: uuid.UUID, agent_key: str) -> uuid.UUID:
+    agent_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=agent_id,
+                world_id=world_id,
+                agent_key=agent_key,
+                display_name=agent_key,
+                kind="role_agent",
+                config={},
+            ),
+        )
+        session.commit()
+    return agent_id
+
+
+def _attach_world_memory_profile(
+    engine: Engine,
+    world_id: uuid.UUID,
+    profile_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        world = session.get(World, world_id)
+        assert world is not None
+        world.memory_backend_profile_id = profile_id
+        session.commit()
+
+
+def _seed_memory_backend_logs(
+    engine: Engine,
+    profile_id: uuid.UUID,
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        memory_item = AgentMemoryItem(
+            world_id=world_id,
+            agent_id=agent_id,
+            content="Stored memory",
+            metadata_json={"source": "runtime"},
+            embedding=[0.5] * 1536,
+            visibility="private",
+            is_active=True,
+        )
+        session.add(memory_item)
+        session.flush()
+        job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=profile_id,
+            source_kind="agent_run",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "Stored memory"},
+            dedupe_key="memory-job-1",
+            status="succeeded",
+            attempt_count=1,
+            next_attempt_at=datetime.now(UTC),
+        )
+        session.add(job)
+        session.flush()
+        session.add(
+            MemoryWriteLog(
+                job_id=job.id,
+                backend="local_pgvector",
+                success=True,
+                latency_ms=5,
+                request_summary={"source": "runtime"},
+                response_summary={"recorded_count": 1},
+                correlation_ids={"world_id": str(world_id), "agent_id": str(agent_id)},
+            )
+        )
+        session.add(
+            MemoryRetrievalLog(
+                world_id=world_id,
+                agent_id=agent_id,
+                backend_profile_id=profile_id,
+                backend="local_pgvector",
+                query_text="Stored memory",
+                hit_count=1,
+                selected_item_ids=[str(memory_item.id)],
+                latency_ms=4,
+                context_item_count=1,
+            )
         )
         session.commit()

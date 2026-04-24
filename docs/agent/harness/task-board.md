@@ -41,6 +41,9 @@
 - Realtime Updates
 - Agent Composition Presets
 - Plugin Runtime Wiring
+- Memory Mem0 OSS Foundation
+- Memory Context Integration
+- Agent Profile Snapshots + Forget / Eval / Ops
 
 ## Upcoming Mainline
 - None selected

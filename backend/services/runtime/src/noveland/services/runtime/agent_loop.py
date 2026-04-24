@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,8 +19,9 @@ from noveland.agents import (
 )
 from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.calendar import CalendarEntryRecord, CalendarService, ScheduleRuleRecord
+from noveland.core.settings import AppSettings
 from noveland.events import WorldEventAppend, WorldEventStore
-from noveland.memory import VECTOR_DIMENSIONS, MemoryBackend, MemoryItemCreate
+from noveland.memory import MemoryContext, MemoryMessage, MemoryService, MemoryTurn
 from noveland.narrative import (
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
@@ -35,7 +35,6 @@ from noveland.observability import (
     RuntimeDiagnosticsService,
 )
 from noveland.plugins.builtins import (
-    MemoryBackendPlugin,
     PersonaPolicyPlugin,
     WorldRulesPlugin,
     get_builtin_plugin_registry,
@@ -85,9 +84,11 @@ class AgentRuntimeOrchestrator:
         self,
         session: Session,
         profile_service: ProviderProfileService,
+        settings: AppSettings,
     ) -> None:
         self._session = session
         self._profile_service = profile_service
+        self._settings = settings
 
     def list_runs(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> list[AgentRunExecution]:
         return [
@@ -112,6 +113,9 @@ class AgentRuntimeOrchestrator:
         source_calendar_entry_id: uuid.UUID | None = None,
         source_schedule_rule_id: uuid.UUID | None = None,
         create_memory: bool = True,
+        retrieve_memory: bool = True,
+        memory_query_text: str | None = None,
+        max_context_items: int = 5,
         create_narrative_artifact: bool = True,
     ) -> AgentRunExecution:
         started_at = datetime.now(UTC)
@@ -120,11 +124,31 @@ class AgentRuntimeOrchestrator:
         observation_service.refresh_from_events(world_id, agent_id)
         persona = AgentPersonaService(self._session).get(world_id, agent_id)
         observations = observation_service.list(world_id, agent_id, limit=8)
-        provider_prompt = self._build_agent_prompt(agent, prompt_text, persona, observations)
+        memory_service = MemoryService(self._session, self._settings)
+        memory_context = (
+            memory_service.build_context(
+                world_id=world_id,
+                agent_id=agent_id,
+                query_text=memory_query_text or prompt_text,
+                max_context_items=max_context_items,
+            )
+            if retrieve_memory
+            else None
+        )
+        provider_prompt = self._build_agent_prompt(
+            agent,
+            prompt_text,
+            persona,
+            observations,
+            memory_context=_memory_context_text(memory_context),
+        )
         prompt_context = {
             "persona_enabled": persona is not None and persona.is_enabled,
             "observation_ids": [str(observation.id) for observation in observations],
             "observation_count": len(observations),
+            "memory_retrieval_enabled": retrieve_memory,
+            "memory_backend": None if memory_context is None else memory_context.backend,
+            "memory_hit_count": 0 if memory_context is None else len(memory_context.items),
         }
         run_model = AgentRuntimeRun(
             world_id=world_id,
@@ -197,26 +221,57 @@ class AgentRuntimeOrchestrator:
             run_model.created_event_id = created_event.id
 
             if create_memory:
-                memory_item = self._memory_backend(world_id).add(
-                    MemoryItemCreate(
+                try:
+                    memory_job = memory_service.record_turn(
+                        MemoryTurn(
+                            world_id=world_id,
+                            agent_id=agent_id,
+                            run_id=run_model.id,
+                            source_event_id=created_event.id,
+                            trigger_source=trigger_source,
+                            messages=[
+                                MemoryMessage(role="assistant", content=completion.text),
+                            ],
+                            metadata={
+                                "run_id": str(run_model.id),
+                                "trigger_source": trigger_source,
+                                "prompt_text": prompt_text,
+                                "source_calendar_entry_id": None
+                                if source_calendar_entry_id is None
+                                else str(source_calendar_entry_id),
+                                "source_schedule_rule_id": None
+                                if source_schedule_rule_id is None
+                                else str(source_schedule_rule_id),
+                            },
+                            dedupe_key=f"agent-run:{run_model.id}",
+                        ),
+                    )
+                    self._append_event(
+                        world_id=world_id,
+                        event_name=MEMORY_ITEM_CREATED_EVENT_NAME,
+                        payload={
+                            "agent_id": str(agent_id),
+                            "memory_job_id": str(memory_job.id),
+                            "run_id": str(run_model.id),
+                        },
+                        actor_ref=RUNTIME_ACTOR_REF,
+                    )
+                except Exception as exc:
+                    self._record_diagnostic(
+                        severity=DiagnosticSeverity.WARNING,
+                        component=DiagnosticComponent.AGENT,
+                        event_type="memory.write_enqueue_failed",
+                        message="Long-term memory write enqueue failed.",
+                        details={
+                            "run_id": str(run_model.id),
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
                         world_id=world_id,
                         agent_id=agent_id,
-                        content=completion.text,
-                        embedding=_deterministic_embedding(completion.text),
-                        metadata={"run_id": str(run_model.id), "trigger_source": trigger_source},
-                        source_event_id=created_event.id,
-                    ),
-                )
-                self._append_event(
-                    world_id=world_id,
-                    event_name=MEMORY_ITEM_CREATED_EVENT_NAME,
-                    payload={
-                        "agent_id": str(agent_id),
-                        "memory_id": str(memory_item.id),
-                        "run_id": str(run_model.id),
-                    },
-                    actor_ref=RUNTIME_ACTOR_REF,
-                )
+                        run_id=run_model.id,
+                        provider_profile_id=provider_profile.id,
+                    )
 
             if create_narrative_artifact:
                 artifact = NarrativeArtifactService(self._session).create_artifact(
@@ -310,10 +365,14 @@ class AgentRuntimeOrchestrator:
             if executed_runs >= batch_limit:
                 break
 
-            world_time = WorldClockService(self._session).view(
-                world_id,
-                wall_time,
-            ).effective_world_time
+            world_time = (
+                WorldClockService(self._session)
+                .view(
+                    world_id,
+                    wall_time,
+                )
+                .effective_world_time
+            )
             due_entries = calendar_service.due_entries(world_id, world_time)
             due_rules = self._due_rules_plugin(world_id).due_rules(
                 calendar_service.list_rules(world_id),
@@ -415,17 +474,6 @@ class AgentRuntimeOrchestrator:
             return self._profile_service.get_profile(resolved_profile_id)
         return self._profile_service.first_enabled_profile()
 
-    def _memory_backend(self, world_id: uuid.UUID) -> MemoryBackend:
-        world = self._world_or_404(world_id)
-        return cast(
-            MemoryBackendPlugin,
-            self._plugin_instance(
-                category=PluginCategory.MEMORY_BACKEND,
-                identifier=world.memory_plugin_identifier,
-                raw_config=world.memory_plugin_config,
-            ),
-        ).bind_session(self._session)
-
     def _due_rules_plugin(self, world_id: uuid.UUID) -> WorldRulesPlugin:
         world = self._world_or_404(world_id)
         return cast(
@@ -443,11 +491,11 @@ class AgentRuntimeOrchestrator:
         task_prompt: str,
         persona: AgentPersonaRecord | None,
         observations: list[AgentObservationRecord],
+        *,
+        memory_context: str | None = None,
     ) -> str:
         identifier = (
-            BUILTIN_DEFAULT_PERSONA_POLICY
-            if persona is None
-            else persona.policy_plugin_identifier
+            BUILTIN_DEFAULT_PERSONA_POLICY if persona is None else persona.policy_plugin_identifier
         )
         raw_config = {} if persona is None else persona.policy_plugin_config
         plugin = cast(
@@ -463,6 +511,7 @@ class AgentRuntimeOrchestrator:
             task_prompt=task_prompt,
             persona=persona,
             observations=observations,
+            memory_context=memory_context,
         )
 
     def _world_or_404(self, world_id: uuid.UUID) -> World:
@@ -580,9 +629,31 @@ def _due_prompt(
     )
 
 
-def _deterministic_embedding(content: str) -> list[float]:
-    digest = hashlib.sha256(content.encode("utf-8")).digest()
-    values = [byte / 255 for byte in digest]
-    repeats = (VECTOR_DIMENSIONS // len(values)) + 1
-    embedding = (values * repeats)[:VECTOR_DIMENSIONS]
-    return [round(value, 6) for value in embedding]
+def _memory_context_text(context: MemoryContext | None) -> str | None:
+    if context is None:
+        return None
+    items = context.items
+    profile_snapshot = context.profile_snapshot
+    lines: list[str] = []
+    if profile_snapshot is not None:
+        if profile_snapshot.aliases:
+            lines.append(f"Aliases: {', '.join(profile_snapshot.aliases)}")
+        if profile_snapshot.identity_notes:
+            lines.append("Identity notes:")
+            lines.extend(f"- {item}" for item in profile_snapshot.identity_notes[:5])
+        if profile_snapshot.durable_preferences:
+            lines.append("Durable preferences:")
+            lines.extend(f"- {item}" for item in profile_snapshot.durable_preferences[:5])
+        if profile_snapshot.long_lived_goals:
+            lines.append("Long-lived goals:")
+            lines.extend(f"- {item}" for item in profile_snapshot.long_lived_goals[:5])
+        if profile_snapshot.language_style_preferences:
+            lines.append("Language/style preferences:")
+            lines.extend(f"- {item}" for item in profile_snapshot.language_style_preferences[:5])
+    if items:
+        lines.append("Retrieved memory items:")
+        for item in items:
+            score = getattr(item, "score", None)
+            prefix = "- " if score is None else f"- [{score:.3f}] "
+            lines.append(f"{prefix}{item.content}")
+    return None if not lines else "\n".join(lines)

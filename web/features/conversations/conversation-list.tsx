@@ -5,7 +5,11 @@ import { FormEvent, useState } from "react";
 
 import { createConversation } from "@/lib/worlds/client";
 import type { ConversationListData } from "@/lib/worlds/server";
-import type { ConversationPolicy, ConversationWriterConfig } from "@/lib/worlds/types";
+import type {
+  ConversationMemoryConfig,
+  ConversationPolicy,
+  ConversationWriterConfig,
+} from "@/lib/worlds/types";
 import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type ConversationListProps = {
@@ -35,6 +39,7 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
         max_turns: Number(formString(form, "max_turns") || "12"),
         policy: policyFromForm(form),
         writer_config: writerConfigFromForm(form),
+        memory_config: memoryConfigFromForm(form),
       });
       formElement.reset();
       window.location.assign(`/worlds/${worldId}/conversations/${session.id}`);
@@ -75,6 +80,26 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
             <input className="text-input" name="max_turns" placeholder="12" />
             <input className="text-input" name="objective" placeholder="Objective" />
             <input className="text-input" name="opening_prompt" placeholder="Opening prompt" />
+            <label className="checkbox-label">
+              <input defaultChecked name="memory_write_turn_memory" type="checkbox" value="true" />
+              Write turn memory
+            </label>
+            <label className="checkbox-label">
+              <input defaultChecked name="memory_retrieve_memory" type="checkbox" value="true" />
+              Retrieve memory
+            </label>
+            <input
+              aria-label="Memory max context items"
+              className="text-input"
+              name="memory_max_context_items"
+              defaultValue="5"
+            />
+            <input
+              aria-label="Memory query window"
+              className="text-input"
+              name="memory_query_window"
+              defaultValue="6"
+            />
             <input
               className="text-input"
               name="writer_provider_profile_id"
@@ -201,5 +226,14 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
     auto_generate_on_complete: form.get("writer_auto_generate_on_complete") === "true",
     generate_summary: form.get("writer_generate_summary") === "true",
     generate_chapter: form.get("writer_generate_chapter") === "true",
+  };
+}
+
+function memoryConfigFromForm(form: FormData): ConversationMemoryConfig {
+  return {
+    write_turn_memory: form.get("memory_write_turn_memory") === "true",
+    retrieve_memory: form.get("memory_retrieve_memory") === "true",
+    max_context_items: Number(formString(form, "memory_max_context_items") || "5"),
+    query_window: Number(formString(form, "memory_query_window") || "6"),
   };
 }

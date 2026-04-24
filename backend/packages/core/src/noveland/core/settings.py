@@ -18,6 +18,10 @@ class AppSettings(BaseSettings):
         default=Path(".local/object-storage"),
         validation_alias="NOVELAND_OBJECT_STORAGE_ROOT",
     )
+    memory_backend_secrets_json: dict[str, str] = Field(
+        default_factory=dict,
+        validation_alias="NOVELAND_MEMORY_BACKEND_SECRETS_JSON",
+    )
     provider_api_keys_json: dict[str, str] = Field(
         default_factory=dict,
         validation_alias="NOVELAND_PROVIDER_API_KEYS_JSON",

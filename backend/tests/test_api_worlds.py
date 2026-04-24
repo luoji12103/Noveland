@@ -24,7 +24,14 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationSession
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
-from noveland.memory.models import AgentMemoryItem
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability import (
     DiagnosticComponent,
@@ -603,51 +610,69 @@ def test_world_admin_manages_agent_memory() -> None:
     agent_id = _seed_agent(engine, world_id, "guide")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    with Session(engine) as session:
+        session.add(
+            AgentMemoryItem(
+                world_id=world_id,
+                agent_id=agent_id,
+                content="Guide likes green tea",
+                metadata_json={"source": "api-test"},
+                embedding=_embedding(),
+                visibility="private",
+                is_active=True,
+            ),
+        )
+        session.commit()
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
-    member_create = client.post(
-        f"/worlds/{world_id}/agents/{agent_id}/memory",
-        json={"content": "blocked", "embedding": _embedding()},
+    member_search = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"query_text": "blocked"},
     )
+    member_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+    )
+    member_forget = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
 
     _authenticate(client, owner_token)
-    create_memory = client.post(
-        f"/worlds/{world_id}/agents/{agent_id}/memory",
-        json={
-            "content": "Stored memory",
-            "embedding": _embedding(),
-            "metadata": {"source": "api-test"},
-        },
+    initial_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+    )
+    refresh_snapshot = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
     )
     list_memory = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
     search_memory = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
-        json={"embedding": _embedding(), "limit": 5},
+        json={"query_text": "green tea", "limit": 5},
     )
-    bad_embedding = client.post(
+    bad_query = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
-        json={"embedding": [1, 2, 3]},
+        json={"query_text": ""},
     )
-    disable_memory = client.delete(
-        f"/worlds/{world_id}/agents/{agent_id}/memory/{create_memory.json()['id']}",
-    )
-    list_after_disable = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    forget_memory = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
+    after_forget = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
 
     assert member_list.status_code == 403
-    assert member_create.status_code == 403
-    assert create_memory.status_code == 201
-    assert create_memory.json()["content"] == "Stored memory"
-    assert create_memory.json()["visibility"] == "private"
-    assert create_memory.json()["metadata"] == {"source": "api-test"}
+    assert member_search.status_code == 403
+    assert member_snapshot.status_code == 403
+    assert member_forget.status_code == 403
+    assert initial_snapshot.status_code == 200
+    assert initial_snapshot.json() is None
+    assert refresh_snapshot.status_code == 200
+    assert refresh_snapshot.json()["durable_preferences"] == ["Guide likes green tea"]
     assert list_memory.status_code == 200
     assert len(list_memory.json()) == 1
+    assert list_memory.json()[0]["content"] == "Guide likes green tea"
+    assert list_memory.json()[0]["metadata"] == {"source": "api-test"}
     assert search_memory.status_code == 200
-    assert search_memory.json()[0]["content"] == "Stored memory"
+    assert search_memory.json()[0]["content"] == "Guide likes green tea"
     assert isinstance(search_memory.json()[0]["score"], float)
-    assert bad_embedding.status_code == 422
-    assert disable_memory.status_code == 204
-    assert list_after_disable.json() == []
+    assert bad_query.status_code == 422
+    assert forget_memory.status_code == 200
+    assert forget_memory.json()["deleted_count"] == 1
+    assert after_forget.json() == []
 
 
 def test_agent_runs_and_narrative_artifacts_api(
@@ -939,6 +964,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, User.__table__),
         cast(Table, AuthSession.__table__),
         cast(Table, PlatformRoleAssignment.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
@@ -953,6 +979,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
         cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),

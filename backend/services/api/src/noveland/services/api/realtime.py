@@ -389,7 +389,11 @@ def _handle_live_command(
                     ]
                 )
             elif command == "advance":
-                result = ConversationRuntimeOrchestrator(session, profile_service).advance_session(
+                result = ConversationRuntimeOrchestrator(
+                    session,
+                    profile_service,
+                    load_settings(),
+                ).advance_session(
                     world_id,
                     conversation_id,
                     allow_running_auto=False,

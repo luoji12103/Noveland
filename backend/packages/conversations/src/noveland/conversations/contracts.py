@@ -86,6 +86,13 @@ class ConversationWriterConfig(_FrozenContract):
     generate_chapter: bool = True
 
 
+class ConversationMemoryConfig(_FrozenContract):
+    write_turn_memory: bool = True
+    retrieve_memory: bool = True
+    max_context_items: int = Field(default=5, ge=1, le=20)
+    query_window: int = Field(default=8, ge=1, le=50)
+
+
 class ConversationSessionCreate(_FrozenContract):
     world_id: uuid.UUID
     scene_id: uuid.UUID | None = None
@@ -98,6 +105,7 @@ class ConversationSessionCreate(_FrozenContract):
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyConfig
     writer_config: ConversationWriterConfig
+    memory_config: ConversationMemoryConfig = Field(default_factory=ConversationMemoryConfig)
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationSessionCreate:
@@ -115,6 +123,7 @@ class ConversationSessionUpdate(_FrozenContract):
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyConfig | None = None
     writer_config: ConversationWriterConfig | None = None
+    memory_config: ConversationMemoryConfig | None = None
 
 
 class ConversationParticipantDefinition(_FrozenContract):
@@ -142,6 +151,7 @@ class ConversationSessionRecord(_FrozenContract):
     next_turn_index: int
     policy: ConversationPolicyConfig
     writer_config: ConversationWriterConfig
+    memory_config: ConversationMemoryConfig
     terminal_reason: ConversationTerminalReason | None
     created_at: datetime
     updated_at: datetime

@@ -5,6 +5,7 @@ export type World = {
   name: string;
   description: string | null;
   rules_config: Record<string, unknown>;
+  memory_backend_profile_id: string | null;
   memory_plugin_identifier: string;
   memory_plugin_config: Record<string, unknown>;
   world_rules_plugin_identifier: string;
@@ -176,6 +177,13 @@ export type ConversationWriterConfig = {
   generate_chapter: boolean;
 };
 
+export type ConversationMemoryConfig = {
+  write_turn_memory: boolean;
+  retrieve_memory: boolean;
+  max_context_items: number;
+  query_window: number;
+};
+
 export type ConversationSession = {
   id: string;
   world_id: string;
@@ -191,6 +199,7 @@ export type ConversationSession = {
   next_turn_index: number;
   policy: ConversationPolicy;
   writer_config: ConversationWriterConfig;
+  memory_config: ConversationMemoryConfig;
   terminal_reason: ConversationTerminalReason | null;
   created_at: string;
   updated_at: string;
@@ -300,11 +309,93 @@ export type MemoryItem = {
   agent_id: string;
   content: string;
   metadata: Record<string, unknown>;
-  embedding: number[];
-  visibility: "private";
-  is_active: boolean;
-  source_event_id: string | null;
+  backend: string;
+  created_at: string | null;
   score: number | null;
+};
+
+export type MemoryProfileSnapshot = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  aliases: string[];
+  identity_notes: string[];
+  durable_preferences: string[];
+  long_lived_goals: string[];
+  language_style_preferences: string[];
+  refreshed_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryBackendProfile = {
+  id: string;
+  profile_key: string;
+  name: string;
+  backend_kind: "mem0_oss" | "local_pgvector";
+  vector_store_config: Record<string, unknown>;
+  llm_config: Record<string, unknown>;
+  embedder_config: Record<string, unknown>;
+  reranker_config: Record<string, unknown>;
+  secret_refs: Record<string, string>;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryBackendHealth = {
+  backend: string;
+  status: "ok" | "degraded" | "unavailable";
+  details: Record<string, unknown>;
+};
+
+export type MemoryWriteLog = {
+  id: string;
+  job_id: string;
+  backend: string;
+  success: boolean;
+  latency_ms: number | null;
+  request_summary: Record<string, unknown>;
+  response_summary: Record<string, unknown>;
+  correlation_ids: Record<string, unknown>;
+  occurred_at: string;
+};
+
+export type MemoryRetrievalLog = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  backend_profile_id: string | null;
+  backend: string;
+  query_text: string;
+  hit_count: number;
+  selected_item_ids: string[];
+  latency_ms: number | null;
+  context_item_count: number;
+  occurred_at: string;
+};
+
+export type MemoryBackendLogs = {
+  write_logs: MemoryWriteLog[];
+  retrieval_logs: MemoryRetrievalLog[];
+};
+
+export type MemoryEvalCaseResult = {
+  label: string;
+  query_text: string;
+  backend: string;
+  hit_count: number;
+  context_item_count: number;
+  latency_ms: number | null;
+};
+
+export type MemoryEvalResult = {
+  backend: string;
+  case_count: number;
+  hit_case_count: number;
+  average_latency_ms: number | null;
+  average_context_items: number;
+  cases: MemoryEvalCaseResult[];
 };
 
 export type RuntimeControl = {
@@ -521,6 +612,7 @@ export type WorldCreateInput = {
   name: string;
   description?: string | null;
   rules_config?: Record<string, unknown>;
+  memory_backend_profile_id?: string | null;
   memory_plugin_identifier?: string;
   memory_plugin_config?: Record<string, unknown>;
   world_rules_plugin_identifier?: string;
@@ -531,6 +623,7 @@ export type WorldUpdateInput = {
   name?: string;
   description?: string | null;
   rules_config?: Record<string, unknown>;
+  memory_backend_profile_id?: string | null;
   memory_plugin_identifier?: string;
   memory_plugin_config?: Record<string, unknown>;
   world_rules_plugin_identifier?: string;
@@ -615,6 +708,7 @@ export type ConversationCreateInput = {
   max_turns?: number;
   policy: ConversationPolicy;
   writer_config: ConversationWriterConfig;
+  memory_config: ConversationMemoryConfig;
 };
 
 export type ConversationUpdateInput = {
@@ -624,6 +718,7 @@ export type ConversationUpdateInput = {
   max_turns?: number;
   policy?: ConversationPolicy;
   writer_config?: ConversationWriterConfig;
+  memory_config?: ConversationMemoryConfig;
 };
 
 export type ConversationParticipantInput = {
@@ -669,16 +764,31 @@ export type ScheduleRuleUpdateInput = {
   is_enabled?: boolean;
 };
 
-export type MemoryItemCreateInput = {
-  content: string;
-  embedding: number[];
-  metadata?: Record<string, unknown>;
-  source_event_id?: string | null;
+export type MemorySearchInput = {
+  query_text: string;
+  limit?: number;
 };
 
-export type MemorySearchInput = {
-  embedding: number[];
-  limit?: number;
+export type MemoryBackendProfileCreateInput = {
+  profile_key: string;
+  name: string;
+  backend_kind: "mem0_oss" | "local_pgvector";
+  vector_store_config?: Record<string, unknown>;
+  llm_config?: Record<string, unknown>;
+  embedder_config?: Record<string, unknown>;
+  reranker_config?: Record<string, unknown>;
+  secret_refs?: Record<string, string>;
+  is_enabled?: boolean;
+};
+
+export type MemoryBackendProfileUpdateInput = {
+  name?: string;
+  vector_store_config?: Record<string, unknown>;
+  llm_config?: Record<string, unknown>;
+  embedder_config?: Record<string, unknown>;
+  reranker_config?: Record<string, unknown>;
+  secret_refs?: Record<string, string>;
+  is_enabled?: boolean;
 };
 
 export type RuntimeControlUpdateInput = {

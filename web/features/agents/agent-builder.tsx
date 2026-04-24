@@ -1,14 +1,17 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
   createAgentCalendarEntry,
-  createAgentMemoryItem,
   createAgentObservation,
+  forgetAgentMemory,
+  listAgentMemory,
+  refreshAgentMemoryProfileSnapshot,
   refreshAgentObservations,
   runAgent,
+  searchAgentMemory,
   updateAgent,
   updateAgentPersona,
 } from "@/lib/worlds/client";
@@ -16,7 +19,6 @@ import type { AgentDetailData } from "@/lib/worlds/server";
 import type { AgentPreset } from "@/lib/worlds/types";
 import {
   formString,
-  jsonNumberArray,
   jsonObject,
   messageForError,
   optionalFormString,
@@ -32,6 +34,8 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
   const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [memoryItems, setMemoryItems] = useState(data.memoryItems);
+  const [memoryProfileSnapshot, setMemoryProfileSnapshot] = useState(data.memoryProfileSnapshot);
   const agent = data.selectedAgent;
   const sourcePreset = useMemo(
     () => data.agentPresets.find((preset) => preset.id === agent?.source_preset_id) ?? null,
@@ -41,6 +45,14 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
     () => new Map(data.providerProfiles.map((profile) => [profile.id, profile.profile_key])),
     [data.providerProfiles],
   );
+
+  useEffect(() => {
+    setMemoryItems(data.memoryItems);
+  }, [data.memoryItems]);
+
+  useEffect(() => {
+    setMemoryProfileSnapshot(data.memoryProfileSnapshot);
+  }, [data.memoryProfileSnapshot]);
 
   async function runAction(action: () => Promise<unknown>, success: string) {
     setIsBusy(true);
@@ -131,21 +143,53 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
     );
   }
 
-  async function handleMemory(event: FormEvent<HTMLFormElement>) {
+  async function handleMemorySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    await runAction(
-      async () => {
-        await createAgentMemoryItem(worldId, agentId, {
-          content: formString(form, "content"),
-          embedding: jsonNumberArray(formString(form, "embedding")),
-          metadata: jsonObject(formString(form, "metadata")),
-        });
-        formElement.reset();
-      },
-      "Memory item added.",
-    );
+    setIsBusy(true);
+    setNotice(null);
+    try {
+      const items = await searchAgentMemory(worldId, agentId, {
+        query_text: formString(form, "query_text"),
+        limit: Number(optionalFormString(form, "limit") ?? "10"),
+      });
+      setMemoryItems(items);
+      setNotice(`Memory search returned ${items.length} item(s).`);
+    } catch (error) {
+      setNotice(messageForError(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRefreshMemory() {
+    setIsBusy(true);
+    setNotice(null);
+    try {
+      const items = await listAgentMemory(worldId, agentId);
+      setMemoryItems(items);
+      setNotice("Memory list refreshed.");
+    } catch (error) {
+      setNotice(messageForError(error));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRefreshMemoryProfileSnapshot() {
+    await runAction(async () => {
+      const snapshot = await refreshAgentMemoryProfileSnapshot(worldId, agentId);
+      setMemoryProfileSnapshot(snapshot);
+    }, "Memory profile snapshot refreshed.");
+  }
+
+  async function handleForgetMemory() {
+    await runAction(async () => {
+      await forgetAgentMemory(worldId, agentId);
+      setMemoryItems([]);
+      setMemoryProfileSnapshot(null);
+    }, "Agent long-term memory forgotten.");
   }
 
   async function handleRun(event: FormEvent<HTMLFormElement>) {
@@ -365,21 +409,57 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           <h2 className="section-title" id="memory-title">
             Memory
           </h2>
+          <p>Long-term memory is written asynchronously by runtime. This view is read-only.</p>
           {data.canManageSelectedWorld ? (
-            <form className="inline-form" onSubmit={handleMemory}>
-              <textarea className="text-input" name="content" placeholder="Memory content" rows={4} />
-              <input className="text-input" name="embedding" placeholder="[1,0,0]" />
-              <textarea className="text-input" name="metadata" placeholder="{}" rows={3} />
-              <button className="primary-button" type="submit">
-                Add memory item
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void handleRefreshMemoryProfileSnapshot()}
+              >
+                Refresh memory profile
               </button>
-            </form>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void handleForgetMemory()}
+              >
+                Forget agent memory
+              </button>
+            </div>
           ) : null}
+          <div className="resource-list">
+            <article className="resource-row">
+              <div>
+                <h3>Profile snapshot</h3>
+                <p>{memoryProfileDetail(memoryProfileSnapshot)}</p>
+              </div>
+            </article>
+          </div>
+          <form className="inline-form" onSubmit={handleMemorySearch}>
+            <textarea className="text-input" name="query_text" placeholder="Search memory context" rows={4} />
+            <input className="text-input" name="limit" placeholder="10" />
+            <div className="button-row">
+              <button className="primary-button" type="submit" disabled={isBusy}>
+                Search memory
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void handleRefreshMemory()}
+              >
+                Refresh memory
+              </button>
+            </div>
+          </form>
           <ResourceList
-            rows={data.memoryItems.map((item) => ({
+            rows={memoryItems.map((item) => ({
               id: item.id,
               title: item.content,
-              detail: item.is_active ? "Active memory" : "Inactive memory",
+              detail: memoryDetail(item),
             }))}
           />
         </section>
@@ -461,4 +541,44 @@ function ResourceList({ rows }: { rows: { id: string; title: string; detail: str
       ))}
     </div>
   );
+}
+
+function memoryDetail(item: AgentDetailData["memoryItems"][number]): string {
+  const parts = [
+    `backend ${item.backend}`,
+    item.created_at ?? "unknown time",
+    item.score === null ? null : `score ${item.score.toFixed(2)}`,
+    attribution(item.metadata),
+  ].filter((part): part is string => part !== null && part !== "");
+  return parts.join(" - ");
+}
+
+function memoryProfileDetail(snapshot: AgentDetailData["memoryProfileSnapshot"]): string {
+  if (snapshot === null) {
+    return "No structured memory profile snapshot yet.";
+  }
+  return [
+    `aliases ${snapshot.aliases.length}`,
+    `identity ${snapshot.identity_notes.length}`,
+    `preferences ${snapshot.durable_preferences.length}`,
+    `goals ${snapshot.long_lived_goals.length}`,
+    `style ${snapshot.language_style_preferences.length}`,
+    `refreshed ${snapshot.refreshed_at}`,
+  ].join(" - ");
+}
+
+function attribution(metadata: Record<string, unknown>): string {
+  if (typeof metadata.turn_id === "string") {
+    return `turn ${metadata.turn_id}`;
+  }
+  if (typeof metadata.run_id === "string") {
+    return `run ${metadata.run_id}`;
+  }
+  if (typeof metadata.source_event_id === "string") {
+    return `event ${metadata.source_event_id}`;
+  }
+  if (typeof metadata.conversation_id === "string") {
+    return `conversation ${metadata.conversation_id}`;
+  }
+  return "";
 }

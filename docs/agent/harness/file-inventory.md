@@ -21,11 +21,13 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/reader/`
 - `web/app/worlds/[worldId]/reader/[artifactId]/`
 - `web/app/admin/`
+- `web/app/admin/memory-backends/`
 - `web/app/admin/presets/`
 - `web/app/admin/providers/`
 - `web/app/admin/runtime/`
 - `web/app/api/agent-presets/`
 - `web/app/api/auth/`
+- `web/app/api/memory-backend-profiles/`
 - `web/app/api/worlds/`
 - `web/app/api/world-compositions/`
 - `web/app/api/runtime/`
@@ -37,6 +39,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/`
 - `web/features/`
 - `web/features/admin/`
+- `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
 - `web/features/admin/preset-admin.tsx`
 - `web/features/agents/`
@@ -75,6 +78,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/core/`
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
+- `backend/packages/core/src/noveland/core/settings.py`
 - `backend/packages/auth/`
 - `backend/packages/auth/src/noveland/auth/contracts.py`
 - `backend/packages/auth/src/noveland/auth/errors.py`
@@ -112,9 +116,14 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/events/src/noveland/events/publisher.py`
 - `backend/packages/events/src/noveland/events/replay.py`
 - `backend/packages/memory/`
+- `backend/packages/memory/src/noveland/memory/backends/`
 - `backend/packages/memory/src/noveland/memory/contracts.py`
+- `backend/packages/memory/src/noveland/memory/errors.py`
+- `backend/packages/memory/src/noveland/memory/evals.py`
 - `backend/packages/memory/src/noveland/memory/local_pgvector.py`
 - `backend/packages/memory/src/noveland/memory/models.py`
+- `backend/packages/memory/src/noveland/memory/service.py`
+- `backend/packages/memory/src/noveland/memory/utils.py`
 - `backend/packages/memory/src/noveland/memory/vector_type.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
@@ -146,6 +155,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260419_0011_conversation_workspace_baseline.py`
 - `backend/migrations/versions/20260421_0012_conversation_policies_stop_conditions.py`
 - `backend/migrations/versions/20260421_0013_narrative_writer_summarizer.py`
+- `backend/migrations/versions/20260423_0016_memory_mem0_oss_foundation.py`
+- `backend/migrations/versions/20260423_0017_memory_context_integration.py`
+- `backend/migrations/versions/20260423_0018_memory_profiles_forget_evals.py`
 - `backend/tests/`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`

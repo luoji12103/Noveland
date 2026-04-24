@@ -20,7 +20,7 @@
 - `conversations/` — world/scene-scoped multi-agent conversation sessions, participants, turns, policies, writer configuration, and deterministic advancement
 - `narrative/` — conversation-first summarizer orchestration, chapter generation, and narrative artifacts
 - `events/` — event contracts, event store, snapshot interfaces, replay
-- `memory/` — memory abstractions and implementations
+- `memory/` — long-term memory abstractions, backend adapters, async write pipeline, retrieval/context assembly, profile snapshots, and eval helpers
 - `plugins/` — plugin interfaces, registry, manifests
 - `adapters/` — provider/storage/transport implementations
 - `storage/` — object storage interfaces and default implementations
@@ -42,4 +42,4 @@
 - `narrative/` conversation transcript consumption and artifact generation
 - `auth/`
 - `plugins/` registry and interface definitions
-- `memory/` namespace isolation
+- `memory/` namespace isolation, backend profile secret refs, async write jobs, and retrieval boundaries

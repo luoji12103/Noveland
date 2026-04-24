@@ -37,13 +37,15 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.settings import load_settings
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
 from noveland.memory import (
-    VECTOR_DIMENSIONS,
-    MemoryBackend,
-    MemoryItemCreate,
+    MemoryBackendProfileService,
+    MemoryDeleteScope,
     MemoryItemRecord,
-    MemorySearchQuery,
+    MemoryProfileSnapshotRecord,
+    MemoryService,
 )
-from noveland.memory.models import AgentMemoryItem
+from noveland.memory import (
+    MemorySearchRequest as MemoryLookupRequest,
+)
 from noveland.narrative import (
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
@@ -55,12 +57,12 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
-from noveland.plugins.builtins import MemoryBackendPlugin, get_builtin_plugin_registry
+from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import (
     BUILTIN_DEFAULT_PERSONA_POLICY,
     BUILTIN_DEFAULT_WORLD_RULES,
-    BUILTIN_LOCAL_PGVECTOR_MEMORY,
+    BUILTIN_MEM0_OSS_MEMORY,
 )
 from noveland.plugins.errors import (
     PluginConfigValidationError,
@@ -104,10 +106,11 @@ class WorldCreateRequest(_RequestModel):
     description: str | None = None
     rules_config: dict[str, Any] = Field(default_factory=dict)
     memory_plugin_identifier: str = Field(
-        default=BUILTIN_LOCAL_PGVECTOR_MEMORY,
+        default=BUILTIN_MEM0_OSS_MEMORY,
         min_length=1,
         max_length=120,
     )
+    memory_backend_profile_id: uuid.UUID | None = None
     memory_plugin_config: dict[str, Any] = Field(default_factory=dict)
     world_rules_plugin_identifier: str = Field(
         default=BUILTIN_DEFAULT_WORLD_RULES,
@@ -122,6 +125,7 @@ class WorldUpdateRequest(_RequestModel):
     description: str | None = None
     rules_config: dict[str, Any] | None = None
     memory_plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    memory_backend_profile_id: uuid.UUID | None = None
     memory_plugin_config: dict[str, Any] | None = None
     world_rules_plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
     world_rules_plugin_config: dict[str, Any] | None = None
@@ -211,30 +215,9 @@ class ScheduleRuleUpdateRequest(_RequestModel):
     is_enabled: bool | None = None
 
 
-class MemoryItemCreateRequest(_RequestModel):
-    content: str = Field(min_length=1)
-    embedding: list[float]
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    source_event_id: uuid.UUID | None = None
-
-    @field_validator("embedding", mode="after")
-    @classmethod
-    def embedding_must_match_dimensions(cls, value: list[float]) -> list[float]:
-        if len(value) != VECTOR_DIMENSIONS:
-            raise ValueError(f"embedding must have {VECTOR_DIMENSIONS} dimensions")
-        return value
-
-
 class MemorySearchRequest(_RequestModel):
-    embedding: list[float]
+    query_text: str = Field(min_length=1, max_length=8_000)
     limit: int = Field(default=10, ge=1, le=50)
-
-    @field_validator("embedding", mode="after")
-    @classmethod
-    def embedding_must_match_dimensions(cls, value: list[float]) -> list[float]:
-        if len(value) != VECTOR_DIMENSIONS:
-            raise ValueError(f"embedding must have {VECTOR_DIMENSIONS} dimensions")
-        return value
 
 
 class AgentRunRequest(_RequestModel):
@@ -302,6 +285,7 @@ class WorldResponse(BaseModel):
     description: str | None
     rules_config: dict[str, Any]
     memory_plugin_identifier: str
+    memory_backend_profile_id: uuid.UUID | None
     memory_plugin_config: dict[str, Any]
     world_rules_plugin_identifier: str
     world_rules_plugin_config: dict[str, Any]
@@ -502,16 +486,33 @@ class ScheduleRuleResponse(BaseModel):
 
 
 class MemoryItemResponse(BaseModel):
-    id: uuid.UUID
+    id: str
     world_id: uuid.UUID
     agent_id: uuid.UUID
     content: str
     metadata: dict[str, Any]
-    embedding: list[float]
-    visibility: str
-    is_active: bool
-    source_event_id: uuid.UUID | None
+    backend: str
+    created_at: datetime | None
     score: float | None = None
+
+
+class MemoryProfileSnapshotResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    aliases: list[str]
+    identity_notes: list[str]
+    durable_preferences: list[str]
+    long_lived_goals: list[str]
+    language_style_preferences: list[str]
+    refreshed_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryDeleteResponse(BaseModel):
+    backend: str
+    deleted_count: int | None = None
 
 
 class AgentRunResponse(BaseModel):
@@ -699,9 +700,7 @@ def update_agent_preset(
             else existing.advanced_config
         ),
         is_active=(
-            existing.is_active
-            if preset_update.is_active is None
-            else preset_update.is_active
+            existing.is_active if preset_update.is_active is None else preset_update.is_active
         ),
     )
     _ensure_preset_key_available(db_session, next_record.preset_key, preset_id=preset_id)
@@ -826,10 +825,7 @@ def import_world_composition(
             db_session,
             exported_agent.provider_profile_key,
         )
-        if (
-            exported_agent.provider_profile_key is not None
-            and explicit_provider_profile_id is None
-        ):
+        if exported_agent.provider_profile_key is not None and explicit_provider_profile_id is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Unknown provider profile: {exported_agent.provider_profile_key}",
@@ -895,6 +891,11 @@ def create_world(
         world_rules_plugin_identifier=world_create.world_rules_plugin_identifier,
         world_rules_plugin_config=world_create.world_rules_plugin_config,
     )
+    memory_backend_profile_id = _resolved_memory_backend_profile_id(
+        db_session,
+        world_create.memory_plugin_identifier,
+        world_create.memory_backend_profile_id,
+    )
     world = World(
         id=uuid.uuid4(),
         owner_user_id=subject.user_id,
@@ -902,6 +903,7 @@ def create_world(
         name=world_create.name,
         description=world_create.description,
         rules_config=world_create.rules_config,
+        memory_backend_profile_id=memory_backend_profile_id,
         memory_plugin_identifier=world_create.memory_plugin_identifier,
         memory_plugin_config=world_create.memory_plugin_config,
         world_rules_plugin_identifier=world_create.world_rules_plugin_identifier,
@@ -935,14 +937,10 @@ def export_world_composition(
 ) -> WorldCompositionExportResponse:
     world = _world_or_404(db_session, context.world_id)
     scenes = db_session.scalars(
-        select(Scene)
-        .where(Scene.world_id == context.world_id)
-        .order_by(Scene.scene_key),
+        select(Scene).where(Scene.world_id == context.world_id).order_by(Scene.scene_key),
     ).all()
     agents = db_session.scalars(
-        select(Agent)
-        .where(Agent.world_id == context.world_id)
-        .order_by(Agent.agent_key),
+        select(Agent).where(Agent.world_id == context.world_id).order_by(Agent.agent_key),
     ).all()
     schedule_rules = db_session.scalars(
         select(WorldScheduleRule)
@@ -952,15 +950,11 @@ def export_world_composition(
 
     provider_profile_ids = [
         profile_id
-        for profile_id in (
-            _provider_profile_id_from_config(agent.config) for agent in agents
-        )
+        for profile_id in (_provider_profile_id_from_config(agent.config) for agent in agents)
         if profile_id is not None
     ]
     profile_map = _provider_profile_key_map(db_session, provider_profile_ids)
-    preset_ids = {
-        agent.source_preset_id for agent in agents if agent.source_preset_id is not None
-    }
+    preset_ids = {agent.source_preset_id for agent in agents if agent.source_preset_id is not None}
     preset_models = (
         []
         if not preset_ids
@@ -978,9 +972,7 @@ def export_world_composition(
             display_name=agent.display_name,
             kind=cast(AgentKind, agent.kind),
             home_scene_key=(
-                None
-                if agent.home_scene_id is None
-                else scene_map.get(agent.home_scene_id)
+                None if agent.home_scene_id is None else scene_map.get(agent.home_scene_id)
             ),
             source_preset_key=_source_preset_key(preset_map, agent.source_preset_id),
             provider_profile_key=_provider_profile_key_from_config(profile_map, agent.config),
@@ -1046,6 +1038,15 @@ def update_world(
         or world_update.memory_plugin_identifier is None
         else world_update.memory_plugin_identifier
     )
+    next_memory_backend_profile_id = (
+        world.memory_backend_profile_id
+        if "memory_backend_profile_id" not in world_update.model_fields_set
+        else _resolved_memory_backend_profile_id(
+            db_session,
+            next_memory_plugin_identifier,
+            world_update.memory_backend_profile_id,
+        )
+    )
     next_memory_plugin_config = (
         world.memory_plugin_config
         if "memory_plugin_config" not in world_update.model_fields_set
@@ -1074,6 +1075,8 @@ def update_world(
         world.description = world_update.description
     if "rules_config" in world_update.model_fields_set:
         world.rules_config = world_update.rules_config or {}
+    if "memory_backend_profile_id" in world_update.model_fields_set:
+        world.memory_backend_profile_id = next_memory_backend_profile_id
     if "memory_plugin_identifier" in world_update.model_fields_set:
         world.memory_plugin_identifier = next_memory_plugin_identifier
     if "memory_plugin_config" in world_update.model_fields_set:
@@ -1425,8 +1428,7 @@ def list_member_candidates(
         select(User, WorldMembership.role)
         .outerjoin(
             WorldMembership,
-            (WorldMembership.user_id == User.id)
-            & (WorldMembership.world_id == context.world_id),
+            (WorldMembership.user_id == User.id) & (WorldMembership.world_id == context.world_id),
         )
         .where(User.is_active.is_(True))
         .order_by(User.email)
@@ -1489,10 +1491,14 @@ def delete_membership(
 ) -> None:
     require_csrf(request)
     membership = _membership_or_404(db_session, context.world_id, user_id)
-    if membership.role == AuthRole.WORLD_ADMIN.value and _world_admin_count(
-        db_session,
-        context.world_id,
-    ) <= 1:
+    if (
+        membership.role == AuthRole.WORLD_ADMIN.value
+        and _world_admin_count(
+            db_session,
+            context.world_id,
+        )
+        <= 1
+    ):
         raise _conflict("Cannot remove the final world admin")
     db_session.delete(membership)
     response.status_code = status.HTTP_204_NO_CONTENT
@@ -1622,41 +1628,11 @@ def list_agent_memory(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    memory_service = MemoryService(db_session, load_settings())
     return [
         _memory_item_response(item)
-        for item in _memory_backend_for_world(db_session, context.world_id).list(
-            context.world_id,
-            agent_id,
-        )
+        for item in memory_service.list_memories(context.world_id, agent_id)
     ]
-
-
-@router.post(
-    "/{world_id}/agents/{agent_id}/memory",
-    response_model=MemoryItemResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_agent_memory(
-    agent_id: uuid.UUID,
-    memory_create: MemoryItemCreateRequest,
-    request: Request,
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
-    db_session: Annotated[Session, Depends(get_db_session)],
-) -> MemoryItemResponse:
-    require_csrf(request)
-    _agent_or_404(db_session, context.world_id, agent_id)
-    return _memory_item_response(
-        _memory_backend_for_world(db_session, context.world_id).add(
-            MemoryItemCreate(
-                world_id=context.world_id,
-                agent_id=agent_id,
-                content=memory_create.content,
-                embedding=memory_create.embedding,
-                metadata=memory_create.metadata,
-                source_event_id=memory_create.source_event_id,
-            ),
-        ),
-    )
 
 
 @router.post(
@@ -1670,34 +1646,72 @@ def search_agent_memory(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    memory_service = MemoryService(db_session, load_settings())
     return [
         _memory_item_response(item)
-        for item in _memory_backend_for_world(db_session, context.world_id).search(
-            MemorySearchQuery(
+        for item in memory_service.search(
+            MemoryLookupRequest(
                 world_id=context.world_id,
                 agent_id=agent_id,
-                embedding=search_request.embedding,
+                query_text=search_request.query_text,
                 limit=search_request.limit,
-            ),
-        )
+            )
+        ).items
     ]
 
 
-@router.delete(
-    "/{world_id}/agents/{agent_id}/memory/{memory_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+@router.get(
+    "/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+    response_model=MemoryProfileSnapshotResponse | None,
 )
-def disable_agent_memory(
+def get_agent_memory_profile_snapshot(
     agent_id: uuid.UUID,
-    memory_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryProfileSnapshotResponse | None:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
+        context.world_id,
+        agent_id,
+    )
+    return None if snapshot is None else _memory_profile_snapshot_response(snapshot)
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
+    response_model=MemoryProfileSnapshotResponse,
+)
+def refresh_agent_memory_profile_snapshot(
+    agent_id: uuid.UUID,
     request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
-) -> None:
+) -> MemoryProfileSnapshotResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    _memory_item_or_404(db_session, context.world_id, agent_id, memory_id)
-    _memory_backend_for_world(db_session, context.world_id).disable(memory_id)
+    snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
+        context.world_id,
+        agent_id,
+    )
+    return _memory_profile_snapshot_response(snapshot)
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/memory/forget",
+    response_model=MemoryDeleteResponse,
+)
+def forget_agent_memory(
+    agent_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryDeleteResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    result = MemoryService(db_session, load_settings()).delete_scope(
+        MemoryDeleteScope(world_id=context.world_id, agent_id=agent_id),
+    )
+    return MemoryDeleteResponse(backend=result.backend, deleted_count=result.deleted_count)
 
 
 @router.get(
@@ -1824,14 +1838,13 @@ def list_agent_runs(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[AgentRunResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    settings = load_settings()
     orchestrator = AgentRuntimeOrchestrator(
         db_session,
-        ProviderProfileService(db_session, load_settings()),
+        ProviderProfileService(db_session, settings),
+        settings,
     )
-    return [
-        _agent_run_response(run)
-        for run in orchestrator.list_runs(context.world_id, agent_id)
-    ]
+    return [_agent_run_response(run) for run in orchestrator.list_runs(context.world_id, agent_id)]
 
 
 @router.post(
@@ -1848,9 +1861,11 @@ def run_agent(
 ) -> AgentRunResponse:
     require_csrf(request)
     agent = _agent_or_404(db_session, context.world_id, agent_id)
+    settings = load_settings()
     orchestrator = AgentRuntimeOrchestrator(
         db_session,
-        ProviderProfileService(db_session, load_settings()),
+        ProviderProfileService(db_session, settings),
+        settings,
     )
     prompt = run_request.prompt or (
         f"Manual operator run for {agent.display_name}. "
@@ -1887,9 +1902,7 @@ def list_narrative_artifacts(
         _narrative_artifact_response(artifact)
         for artifact in NarrativeArtifactService(db_session).list_artifacts(
             context.world_id,
-            artifact_kind=None
-            if artifact_kind is None
-            else NarrativeArtifactKind(artifact_kind),
+            artifact_kind=None if artifact_kind is None else NarrativeArtifactKind(artifact_kind),
             source_conversation_id=source_conversation_id,
             limit=limit,
         )
@@ -1928,9 +1941,11 @@ def create_narrative_artifact(
     require_csrf(request)
     if artifact_create.agent_id is not None:
         _agent_or_404(db_session, context.world_id, artifact_create.agent_id)
+    settings = load_settings()
     artifact = AgentRuntimeOrchestrator(
         db_session,
-        ProviderProfileService(db_session, load_settings()),
+        ProviderProfileService(db_session, settings),
+        settings,
     ).create_narrative_artifact(
         world_id=context.world_id,
         agent_id=artifact_create.agent_id,
@@ -1963,9 +1978,8 @@ def create_agent(
         agent_create.preset_id,
         context.is_platform_admin,
     )
-    effective_kind = (
-        agent_create.kind
-        or (None if preset is None else cast(AgentKind, preset.default_kind))
+    effective_kind = agent_create.kind or (
+        None if preset is None else cast(AgentKind, preset.default_kind)
     )
     if effective_kind is None:
         raise HTTPException(
@@ -2078,6 +2092,7 @@ def _world_response(world: World) -> WorldResponse:
         description=world.description,
         rules_config=world.rules_config,
         memory_plugin_identifier=world.memory_plugin_identifier,
+        memory_backend_profile_id=world.memory_backend_profile_id,
         memory_plugin_config=world.memory_plugin_config,
         world_rules_plugin_identifier=world.world_rules_plugin_identifier,
         world_rules_plugin_config=world.world_rules_plugin_config,
@@ -2253,23 +2268,6 @@ def _provider_profile_or_404(
     return profile
 
 
-def _memory_backend_for_world(
-    db_session: Session,
-    world_id: uuid.UUID,
-) -> MemoryBackend:
-    world = _world_or_404(db_session, world_id)
-    return cast(
-        MemoryBackendPlugin,
-        _create_plugin_binding(
-            category=PluginCategory.MEMORY_BACKEND,
-            identifier=world.memory_plugin_identifier,
-            raw_config=world.memory_plugin_config,
-            missing_detail="Memory backend plugin is not registered",
-            invalid_detail="Memory backend plugin config is invalid",
-        ),
-    ).bind_session(db_session)
-
-
 def _validate_world_plugin_bindings(
     *,
     memory_plugin_identifier: str,
@@ -2291,6 +2289,31 @@ def _validate_world_plugin_bindings(
         missing_detail="World rules plugin is not registered",
         invalid_detail="World rules plugin config is invalid",
     )
+
+
+def _resolved_memory_backend_profile_id(
+    db_session: Session,
+    plugin_identifier: str,
+    profile_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    service = MemoryBackendProfileService(db_session)
+    if profile_id is not None:
+        profile = service.get_profile(profile_id)
+        if profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Memory backend profile not found",
+            )
+        if not profile.is_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Memory backend profile is disabled",
+            )
+        return cast(uuid.UUID, profile.id)
+    if plugin_identifier == BUILTIN_MEM0_OSS_MEMORY:
+        profile = service.first_enabled_profile()
+        return None if profile is None else cast(uuid.UUID, profile.id)
+    return None
 
 
 def _validate_named_plugin_binding(
@@ -2407,12 +2430,16 @@ def _memory_item_response(item: MemoryItemRecord) -> MemoryItemResponse:
         agent_id=item.agent_id,
         content=item.content,
         metadata=item.metadata,
-        embedding=item.embedding,
-        visibility=item.visibility,
-        is_active=item.is_active,
-        source_event_id=item.source_event_id,
+        backend=item.backend,
+        created_at=item.created_at,
         score=item.score,
     )
+
+
+def _memory_profile_snapshot_response(
+    snapshot: MemoryProfileSnapshotRecord,
+) -> MemoryProfileSnapshotResponse:
+    return MemoryProfileSnapshotResponse(**snapshot.model_dump())
 
 
 def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
@@ -2534,22 +2561,6 @@ def _schedule_rule_or_404(
     return rule
 
 
-def _memory_item_or_404(
-    db_session: Session,
-    world_id: uuid.UUID,
-    agent_id: uuid.UUID,
-    memory_id: uuid.UUID,
-) -> AgentMemoryItem:
-    memory_item = db_session.get(AgentMemoryItem, memory_id)
-    if (
-        memory_item is None
-        or memory_item.world_id != world_id
-        or memory_item.agent_id != agent_id
-    ):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory item not found")
-    return memory_item
-
-
 def _user_or_404(db_session: Session, user_id: uuid.UUID) -> User:
     user = db_session.get(User, user_id)
     if user is None or not user.is_active:
@@ -2602,12 +2613,17 @@ def _upsert_membership(
 
 
 def _world_admin_count(db_session: Session, world_id: uuid.UUID) -> int:
-    return db_session.scalar(
-        select(func.count()).select_from(WorldMembership).where(
-            WorldMembership.world_id == world_id,
-            WorldMembership.role == AuthRole.WORLD_ADMIN.value,
-        ),
-    ) or 0
+    return (
+        db_session.scalar(
+            select(func.count())
+            .select_from(WorldMembership)
+            .where(
+                WorldMembership.world_id == world_id,
+                WorldMembership.role == AuthRole.WORLD_ADMIN.value,
+            ),
+        )
+        or 0
+    )
 
 
 def _ensure_slug_available(db_session: Session, slug: str) -> None:

@@ -16,6 +16,7 @@ const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
 const membershipMemberId = "40000000-0000-4000-8000-000000000002";
 const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
+const memoryProfilePrimaryId = "71500000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 const users = [
@@ -35,6 +36,7 @@ const worlds = [
     name: "First World",
     description: "A managed world",
     rules_config: {},
+    memory_backend_profile_id: memoryProfilePrimaryId,
     memory_plugin_identifier: "builtin.local_pgvector_memory",
     memory_plugin_config: {},
     world_rules_plugin_identifier: "builtin.default_world_rules",
@@ -117,11 +119,71 @@ const memoryItems = [
     agent_id: agentGuideId,
     content: "Guide memory",
     metadata: { source: "mock" },
-    embedding: [1, 0, 0],
-    visibility: "private",
-    is_active: true,
-    source_event_id: null,
+    backend: "builtin.mem0_oss_memory",
+    created_at: "2026-04-17T00:03:05.000Z",
     score: null,
+  },
+];
+const memoryProfileSnapshots = new Map([
+  [
+    agentGuideId,
+    {
+      id: "71700000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      agent_id: agentGuideId,
+      aliases: ["Guide"],
+      identity_notes: ["Resident guide for the first world."],
+      durable_preferences: ["Keeps replies concise."],
+      long_lived_goals: ["Help operators move the scene forward."],
+      language_style_preferences: ["Direct and calm."],
+      refreshed_at: "2026-04-17T00:04:00.000Z",
+      created_at: "2026-04-17T00:04:00.000Z",
+      updated_at: "2026-04-17T00:04:00.000Z",
+    },
+  ],
+]);
+const memoryBackendProfiles = [
+  {
+    id: memoryProfilePrimaryId,
+    profile_key: "primary-mem0",
+    name: "Primary Mem0",
+    backend_kind: "mem0_oss",
+    vector_store_config: { provider: "memory" },
+    llm_config: { provider: "mock-llm" },
+    embedder_config: { provider: "mock-embedder" },
+    reranker_config: {},
+    secret_refs: { api_key: "mem0-primary" },
+    is_enabled: true,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const memoryWriteLogs = [
+  {
+    id: "71800000-0000-4000-8000-000000000001",
+    job_id: "71900000-0000-4000-8000-000000000001",
+    backend: "builtin.mem0_oss_memory",
+    success: true,
+    latency_ms: 7,
+    request_summary: { source: "conversation_turn" },
+    response_summary: { stored: 1 },
+    correlation_ids: { world_id: worldOneId, agent_id: agentGuideId },
+    occurred_at: "2026-04-17T00:05:00.000Z",
+  },
+];
+const memoryRetrievalLogs = [
+  {
+    id: "71800000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    backend_profile_id: memoryProfilePrimaryId,
+    backend: "builtin.mem0_oss_memory",
+    query_text: "guide context",
+    hit_count: 1,
+    selected_item_ids: [memoryItems[0].id],
+    latency_ms: 3,
+    context_item_count: 1,
+    occurred_at: "2026-04-17T00:05:05.000Z",
   },
 ];
 const agentPersonas = new Map([
@@ -295,6 +357,14 @@ const pluginCatalog = [
     built_in: true,
   },
   {
+    identifier: "builtin.mem0_oss_memory",
+    category: "memory_backend",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["long_term_memory"],
+    built_in: true,
+  },
+  {
     identifier: "builtin.default_world_rules",
     category: "world_rules",
     version: "0.1.0",
@@ -346,6 +416,12 @@ const conversations = [
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
+    },
+    memory_config: {
+      write_turn_memory: true,
+      retrieve_memory: true,
+      max_context_items: 5,
+      query_window: 4,
     },
     terminal_reason: "max_turns_reached",
     created_at: "2026-04-17T00:02:00.000Z",
@@ -475,6 +551,11 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/memory-backend-profiles") {
+    await handleMemoryBackendProfiles(request, response);
+    return;
+  }
+
   if (url.pathname === "/agent-presets") {
     await handleAgentPresets(request, response);
     return;
@@ -494,6 +575,17 @@ const mockServer = createServer(async (request, response) => {
   if (url.pathname.startsWith("/provider-profiles/")) {
     const providerSegments = url.pathname.split("/");
     await handleProviderProfileItem(request, response, providerSegments[2], providerSegments[3]);
+    return;
+  }
+
+  if (url.pathname.startsWith("/memory-backend-profiles/")) {
+    const memorySegments = url.pathname.split("/");
+    await handleMemoryBackendProfileItem(
+      request,
+      response,
+      memorySegments[2],
+      memorySegments[3],
+    );
     return;
   }
 
@@ -568,6 +660,7 @@ async function handleWorldCollection(request, response) {
       name: body.name,
       description: body.description ?? null,
       rules_config: body.rules_config ?? {},
+      memory_backend_profile_id: body.memory_backend_profile_id ?? memoryProfilePrimaryId,
       memory_plugin_identifier:
         body.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
       memory_plugin_config: body.memory_plugin_config ?? {},
@@ -744,7 +837,15 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       return;
     }
     if (segments[4] === "memory") {
-      await handleMemory(request, response, currentSubject, worldId, agentId, segments[5]);
+      await handleMemory(
+        request,
+        response,
+        currentSubject,
+        worldId,
+        agentId,
+        segments[5],
+        segments[6],
+      );
       return;
     }
     if (segments[4] === "persona") {
@@ -1032,6 +1133,42 @@ async function handleProviderProfiles(request, response) {
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
+async function handleMemoryBackendProfiles(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, memoryBackendProfiles);
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const profile = {
+      id: randomUUID(),
+      profile_key: body.profile_key,
+      name: body.name,
+      backend_kind: body.backend_kind ?? "mem0_oss",
+      vector_store_config: body.vector_store_config ?? {},
+      llm_config: body.llm_config ?? {},
+      embedder_config: body.embedder_config ?? {},
+      reranker_config: body.reranker_config ?? {},
+      secret_refs: body.secret_refs ?? {},
+      is_enabled: body.is_enabled ?? true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    memoryBackendProfiles.unshift(profile);
+    sendJson(response, 201, profile);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
 async function handleAgentPresets(request, response) {
   const currentSubject = subjectForRequest(request);
   if (currentSubject === null) {
@@ -1161,6 +1298,7 @@ async function handleWorldCompositionImport(request, response) {
     name: body.name,
     description: body.description ?? composition.world.description ?? null,
     rules_config: body.rules_config ?? composition.world.rules_config ?? {},
+    memory_backend_profile_id: body.memory_backend_profile_id ?? memoryProfilePrimaryId,
     memory_plugin_identifier:
       composition.world.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
     memory_plugin_config: composition.world.memory_plugin_config ?? {},
@@ -1282,7 +1420,74 @@ async function handleProviderProfileItem(request, response, profileId, action) {
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleMemory(request, response, currentSubject, worldId, agentId, memoryId) {
+async function handleMemoryBackendProfileItem(request, response, profileId, action) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const profile = memoryBackendProfiles.find((item) => item.id === profileId);
+  if (profile === undefined) {
+    sendJson(response, 404, { detail: "Memory backend profile not found" });
+    return;
+  }
+  if (request.method === "GET" && action === "health") {
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      status: "ok",
+      details: { profile_key: profile.profile_key },
+    });
+    return;
+  }
+  if (request.method === "GET" && action === "logs") {
+    sendJson(response, 200, {
+      write_logs: memoryWriteLogs.filter(
+        (entry) => entry.correlation_ids.world_id === worldOneId,
+      ),
+      retrieval_logs: memoryRetrievalLogs.filter(
+        (entry) => entry.backend_profile_id === profile.id,
+      ),
+    });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "eval-smoke") {
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      case_count: 1,
+      hit_case_count: 1,
+      average_latency_ms: 5,
+      average_context_items: 1,
+      cases: [
+        {
+          label: "smoke",
+          query_text: "guide context",
+          backend: "builtin.mem0_oss_memory",
+          hit_count: 1,
+          context_item_count: 1,
+          latency_ms: 5,
+        },
+      ],
+    });
+    return;
+  }
+  if (request.method === "PATCH" && action === undefined) {
+    Object.assign(profile, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, profile);
+    return;
+  }
+  if (request.method === "DELETE" && action === undefined) {
+    profile.is_enabled = false;
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemory(request, response, currentSubject, worldId, agentId, memoryId, action) {
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -1291,53 +1496,65 @@ async function handleMemory(request, response, currentSubject, worldId, agentId,
     sendJson(
       response,
       200,
-      memoryItems.filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active),
+      memoryItems.filter((item) => item.world_id === worldId && item.agent_id === agentId),
     );
+    return;
+  }
+  if (request.method === "POST" && memoryId === "search") {
+    const body = await readJson(request);
+    const limit = Number.isFinite(Number(body.limit)) ? Number(body.limit) : 10;
+    sendJson(
+      response,
+      200,
+      memoryItems
+        .filter((item) => item.world_id === worldId && item.agent_id === agentId)
+        .filter((item) =>
+          typeof body.query_text === "string" && body.query_text.trim() !== ""
+            ? item.content.toLowerCase().includes(body.query_text.toLowerCase())
+            : true,
+        )
+        .map((item, index) => ({ ...item, score: 1 - index * 0.1 }))
+        .slice(0, limit),
+    );
+    return;
+  }
+  if (request.method === "GET" && memoryId === "profile-snapshot") {
+    sendJson(response, 200, memoryProfileSnapshots.get(agentId) ?? null);
     return;
   }
   if (!hasValidCsrf(request)) {
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
     return;
   }
-  if (request.method === "POST" && memoryId === undefined) {
-    const body = await readJson(request);
-    const item = {
-      id: randomUUID(),
+  if (request.method === "POST" && memoryId === "profile-snapshot" && action === "refresh") {
+    const snapshot = {
+      id: memoryProfileSnapshots.get(agentId)?.id ?? randomUUID(),
       world_id: worldId,
       agent_id: agentId,
-      content: body.content,
-      metadata: body.metadata ?? {},
-      embedding: body.embedding ?? [1, 0, 0],
-      visibility: "private",
-      is_active: true,
-      source_event_id: body.source_event_id ?? null,
-      score: null,
+      aliases: ["Guide"],
+      identity_notes: ["Resident guide for the first world."],
+      durable_preferences: ["Keeps replies concise."],
+      long_lived_goals: ["Help operators move the scene forward."],
+      language_style_preferences: ["Direct and calm."],
+      refreshed_at: new Date().toISOString(),
+      created_at: memoryProfileSnapshots.get(agentId)?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
-    memoryItems.unshift(item);
-    sendJson(response, 201, item);
+    memoryProfileSnapshots.set(agentId, snapshot);
+    sendJson(response, 200, snapshot);
     return;
   }
-  if (request.method === "POST" && memoryId === "search") {
-    sendJson(
-      response,
-      200,
-      memoryItems
-        .filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active)
-        .map((item, index) => ({ ...item, score: 1 - index * 0.1 })),
+  if (request.method === "POST" && memoryId === "forget") {
+    const retained = memoryItems.filter(
+      (item) => !(item.world_id === worldId && item.agent_id === agentId),
     );
-    return;
-  }
-  const item = memoryItems.find(
-    (candidate) => candidate.id === memoryId && candidate.world_id === worldId && candidate.agent_id === agentId,
-  );
-  if (item === undefined) {
-    sendJson(response, 404, { detail: "Memory item not found" });
-    return;
-  }
-  if (request.method === "DELETE") {
-    item.is_active = false;
-    response.writeHead(204);
-    response.end();
+    memoryItems.length = 0;
+    memoryItems.push(...retained);
+    memoryProfileSnapshots.delete(agentId);
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      deleted_count: null,
+    });
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -1479,10 +1696,8 @@ async function handleAgentRun(request, response, currentSubject, worldId, agentI
         agent_id: agentId,
         content: run.response_text,
         metadata: { run_id: run.run_id },
-        embedding: [1, 0, 0],
-        visibility: "private",
-        is_active: true,
-        source_event_id: null,
+        backend: "builtin.mem0_oss_memory",
+        created_at: new Date().toISOString(),
         score: null,
       });
     }
@@ -1863,6 +2078,12 @@ async function handleConversations(request, response, currentSubject, worldId, c
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
+        },
+        memory_config: body.memory_config ?? {
+          write_turn_memory: true,
+          retrieve_memory: true,
+          max_context_items: 5,
+          query_window: 4,
         },
         terminal_reason: null,
         created_at: now,

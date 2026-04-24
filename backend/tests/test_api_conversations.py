@@ -21,6 +21,14 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
@@ -340,6 +348,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, User.__table__),
         cast(Table, AuthSession.__table__),
         cast(Table, PlatformRoleAssignment.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
@@ -350,6 +359,11 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
         cast(Table, ConversationSession.__table__),

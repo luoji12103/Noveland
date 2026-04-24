@@ -161,15 +161,18 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Create calendar entry" }).click();
   await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible();
 
-  await page.getByPlaceholder("Memory content").fill("E2E memory");
-  await page.getByPlaceholder("[1,0,0]").fill("[1,0,0]");
-  await page.getByRole("button", { name: "Add memory item" }).click();
-  await expect(page.getByRole("heading", { name: "E2E memory" })).toBeVisible();
+  await expect(page.getByText("Long-term memory is written asynchronously by runtime. This view is read-only.")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh memory profile" }).click();
+  await expect(page.getByText("Memory profile snapshot refreshed.")).toBeVisible();
 
   await page.getByPlaceholder("Manual run prompt").fill("Say hello from runtime");
   await page.getByRole("button", { name: "Run agent" }).click();
   await expect(page.getByText("Agent run completed.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "succeeded" }).first()).toBeVisible();
+  await page.getByPlaceholder("Search memory context").fill("Run output");
+  await page.getByRole("button", { name: "Search memory" }).click();
+  await expect(page.getByText("Memory search returned 1 item(s).")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Run output for/ })).toBeVisible();
 
   await page.goto(`/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`manual-${Date.now()}`);

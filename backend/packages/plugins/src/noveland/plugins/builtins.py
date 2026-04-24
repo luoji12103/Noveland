@@ -21,7 +21,12 @@ from noveland.conversations.contracts import (
     ConversationSpeakerKind,
     ConversationTurnRecord,
 )
-from noveland.memory.contracts import MemoryBackend
+from noveland.core.settings import AppSettings
+from noveland.memory.backends.mem0_oss import Mem0OssMemoryBackend
+from noveland.memory.contracts import (
+    MemoryBackend,
+    MemoryBackendProfileRecord,
+)
 from noveland.memory.local_pgvector import LocalPgvectorMemoryBackend
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import (
@@ -30,6 +35,7 @@ from noveland.plugins.constants import (
     BUILTIN_DEFAULT_PERSONA_POLICY,
     BUILTIN_DEFAULT_WORLD_RULES,
     BUILTIN_LOCAL_PGVECTOR_MEMORY,
+    BUILTIN_MEM0_OSS_MEMORY,
     BUILTIN_OPENAI_COMPATIBLE,
 )
 from noveland.plugins.definition import PluginDefinition
@@ -49,7 +55,13 @@ class ModelProviderPlugin(Protocol):
 
 
 class MemoryBackendPlugin(Protocol):
-    def bind_session(self, session: Session) -> MemoryBackend: ...
+    def create_backend(
+        self,
+        *,
+        profile: MemoryBackendProfileRecord,
+        settings: AppSettings,
+        session: Session,
+    ) -> MemoryBackend: ...
 
 
 class WorldRulesPlugin(Protocol):
@@ -68,6 +80,7 @@ class PersonaPolicyPlugin(Protocol):
         task_prompt: str,
         persona: AgentPersonaRecord | None,
         observations: Sequence[AgentObservationRecord],
+        memory_context: str | None = None,
     ) -> str: ...
 
 
@@ -142,8 +155,30 @@ class LocalPgvectorMemoryPlugin:
     def __init__(self, config: EmptyPluginConfig) -> None:
         del config
 
-    def bind_session(self, session: Session) -> MemoryBackend:
+    def create_backend(
+        self,
+        *,
+        profile: MemoryBackendProfileRecord,
+        settings: AppSettings,
+        session: Session,
+    ) -> MemoryBackend:
+        del profile, settings
         return LocalPgvectorMemoryBackend(session)
+
+
+class Mem0OssMemoryPlugin:
+    def __init__(self, config: EmptyPluginConfig) -> None:
+        del config
+
+    def create_backend(
+        self,
+        *,
+        profile: MemoryBackendProfileRecord,
+        settings: AppSettings,
+        session: Session,
+    ) -> MemoryBackend:
+        del session
+        return Mem0OssMemoryBackend(profile, settings)
 
 
 class DefaultWorldRulesPlugin:
@@ -169,6 +204,7 @@ class DefaultPersonaPolicyPlugin:
         task_prompt: str,
         persona: AgentPersonaRecord | None,
         observations: Sequence[AgentObservationRecord],
+        memory_context: str | None = None,
     ) -> str:
         lines = [
             task_prompt,
@@ -190,7 +226,13 @@ class DefaultPersonaPolicyPlugin:
             lines.extend(f"- {observation.content}" for observation in observations[:8])
         else:
             lines.append("Recent filtered observations: none.")
-        lines.append("Use only the persona, policy, task, and filtered observations above.")
+        if memory_context:
+            lines.extend(["Relevant long-term memory:", memory_context])
+        else:
+            lines.append("Relevant long-term memory: none.")
+        lines.append(
+            "Use only the persona, policy, task, filtered observations, and memory above.",
+        )
         return "\n".join(lines)
 
 
@@ -262,11 +304,36 @@ def get_builtin_plugin_registry() -> PluginRegistry:
             ),
             PluginDefinition.from_config_model(
                 manifest=PluginManifest(
+                    identifier=BUILTIN_MEM0_OSS_MEMORY,
+                    category=PluginCategory.MEMORY_BACKEND,
+                    version="0.1.0",
+                    config_schema=EmptyPluginConfig.model_json_schema(),
+                    capabilities=(
+                        "memory.record_turn",
+                        "memory.record_events",
+                        "memory.list",
+                        "memory.search",
+                        "memory.delete_scope",
+                        "memory.healthcheck",
+                    ),
+                ),
+                config_model=EmptyPluginConfig,
+                implementation_factory=Mem0OssMemoryPlugin,
+            ),
+            PluginDefinition.from_config_model(
+                manifest=PluginManifest(
                     identifier=BUILTIN_LOCAL_PGVECTOR_MEMORY,
                     category=PluginCategory.MEMORY_BACKEND,
                     version="0.1.0",
                     config_schema=EmptyPluginConfig.model_json_schema(),
-                    capabilities=("memory.add", "memory.list", "memory.search", "memory.disable"),
+                    capabilities=(
+                        "memory.record_turn",
+                        "memory.record_events",
+                        "memory.list",
+                        "memory.search",
+                        "memory.delete_scope",
+                        "memory.healthcheck",
+                    ),
                 ),
                 config_model=EmptyPluginConfig,
                 implementation_factory=LocalPgvectorMemoryPlugin,

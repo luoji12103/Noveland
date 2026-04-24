@@ -108,6 +108,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         updateWorld(selectedWorld.id, {
           name: formString(form, "name"),
           description: optionalFormString(form, "description"),
+          memory_backend_profile_id: optionalFormString(form, "memory_backend_profile_id"),
           memory_plugin_identifier: formString(form, "memory_plugin_identifier"),
           memory_plugin_config: jsonObject(formString(form, "memory_plugin_config")),
           world_rules_plugin_identifier: formString(form, "world_rules_plugin_identifier"),
@@ -235,6 +236,21 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               defaultValue={world.description ?? ""}
               placeholder="Description"
             />
+            {data.isPlatformAdmin ? (
+              <select
+                aria-label="World memory backend profile"
+                className="text-input"
+                name="memory_backend_profile_id"
+                defaultValue={world.memory_backend_profile_id ?? ""}
+              >
+                <option value="">No explicit memory backend profile</option>
+                {data.memoryBackendProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name} ({profile.profile_key})
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <select
               aria-label="World memory plugin"
               className="text-input"
@@ -280,6 +296,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         ) : (
           <>
             <p>Read-only world access.</p>
+            <p>Memory backend profile: {world.memory_backend_profile_id ?? "none"}</p>
             <p>Memory plugin: {world.memory_plugin_identifier}</p>
             <p>World rules plugin: {world.world_rules_plugin_identifier}</p>
           </>

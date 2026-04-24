@@ -11,7 +11,11 @@ import type {
   ConversationParticipant,
   ConversationSession,
   ConversationTurn,
+  MemoryBackendProfile,
+  MemoryBackendHealth,
+  MemoryBackendLogs,
   MemoryItem,
+  MemoryProfileSnapshot,
   Membership,
   NarrativeArtifact,
   PluginCatalogEntry,
@@ -34,6 +38,7 @@ export type WorldWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   memberships: Membership[];
+  memoryBackendProfiles: MemoryBackendProfile[];
   memoryPlugins: PluginCatalogEntry[];
   worldRulesPlugins: PluginCatalogEntry[];
   clock: WorldClock | null;
@@ -63,6 +68,7 @@ export type AgentDetailData = AgentWorkspaceData & {
   selectedAgent: Agent | null;
   calendarEntries: CalendarEntry[];
   memoryItems: MemoryItem[];
+  memoryProfileSnapshot: MemoryProfileSnapshot | null;
   agentRuns: AgentRun[];
   agentPersona: AgentPersona | null;
   agentObservations: AgentObservation[];
@@ -130,6 +136,13 @@ export type PresetAdminData = {
 export type ProviderAdminData = {
   profiles: ProviderProfile[];
   modelProviderPlugins: PluginCatalogEntry[];
+  loadError: string | null;
+};
+
+export type MemoryBackendAdminData = {
+  profiles: MemoryBackendProfile[];
+  profileHealth: Record<string, MemoryBackendHealth>;
+  profileLogs: Record<string, MemoryBackendLogs>;
   loadError: string | null;
 };
 
@@ -269,10 +282,13 @@ export async function getWorldWorkspaceData(
 ): Promise<WorldWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const [worlds, memoryPlugins, worldRulesPlugins] = await Promise.all([
+    const [worlds, memoryPlugins, worldRulesPlugins, memoryBackendProfiles] = await Promise.all([
       apiFetch<World[]>("/worlds", cookies),
       listPluginCatalogForServer("memory_backend", cookies),
       listPluginCatalogForServer("world_rules", cookies),
+      isPlatformAdmin
+        ? apiFetch<MemoryBackendProfile[]>("/memory-backend-profiles", cookies)
+        : Promise.resolve<MemoryBackendProfile[]>([]),
     ]);
     const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
     if (selectedWorld === null) {
@@ -303,6 +319,7 @@ export async function getWorldWorkspaceData(
       scenes,
       agents,
       memberships: memberships ?? [],
+      memoryBackendProfiles,
       memoryPlugins,
       worldRulesPlugins,
       clock,
@@ -389,16 +406,23 @@ export async function getAgentDetailData(
       selectedAgent: null,
       calendarEntries: [],
       memoryItems: [],
+      memoryProfileSnapshot: null,
       agentRuns: [],
       agentPersona: null,
       agentObservations: [],
     };
   }
   const cookies = await cookieHeader();
-  const [calendarEntries, memoryItems, agentRuns, agentPersona, agentObservations] =
+  const [calendarEntries, memoryItems, memoryProfileSnapshot, agentRuns, agentPersona, agentObservations] =
     await Promise.all([
       apiFetch<CalendarEntry[]>(`/worlds/${worldId}/agents/${agentId}/calendar`, cookies),
       apiFetchOptional<MemoryItem[]>(`/worlds/${worldId}/agents/${agentId}/memory`, cookies),
+      data.canManageSelectedWorld
+        ? apiFetchOptional<MemoryProfileSnapshot | null>(
+            `/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+            cookies,
+          )
+        : Promise.resolve<MemoryProfileSnapshot | null>(null),
       apiFetch<AgentRun[]>(`/worlds/${worldId}/agents/${agentId}/runs`, cookies),
       apiFetchOptional<AgentPersona | null>(
         `/worlds/${worldId}/agents/${agentId}/persona`,
@@ -414,6 +438,7 @@ export async function getAgentDetailData(
     selectedAgent,
     calendarEntries,
     memoryItems: memoryItems ?? [],
+    memoryProfileSnapshot,
     agentRuns,
     agentPersona,
     agentObservations: agentObservations ?? [],
@@ -675,6 +700,48 @@ export async function getPresetAdminData(): Promise<PresetAdminData> {
   }
 }
 
+export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const profiles = await apiFetch<MemoryBackendProfile[]>("/memory-backend-profiles", cookies);
+    const profilePairs = await Promise.all(
+      profiles.map(async (profile) => [
+        profile.id,
+        {
+          health: await apiFetch<MemoryBackendHealth>(
+            `/memory-backend-profiles/${profile.id}/health`,
+            cookies,
+          ),
+          logs: await apiFetch<MemoryBackendLogs>(
+            `/memory-backend-profiles/${profile.id}/logs`,
+            cookies,
+          ),
+        },
+      ] as const),
+    );
+    return {
+      profiles,
+      profileHealth: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.health]),
+      ),
+      profileLogs: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.logs]),
+      ),
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      profiles: [],
+      profileHealth: {},
+      profileLogs: {},
+      loadError: "Unable to load memory backend profiles.",
+    };
+  }
+}
+
 async function cookieHeader(): Promise<string | null> {
   return (await headers()).get("cookie");
 }
@@ -701,6 +768,7 @@ function emptyWorldWorkspaceData(
     scenes: [],
     agents: [],
     memberships: [],
+    memoryBackendProfiles: [],
     memoryPlugins: [],
     worldRulesPlugins: [],
     clock: null,

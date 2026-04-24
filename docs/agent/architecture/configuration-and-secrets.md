@@ -19,6 +19,7 @@
 
 - database credentials
 - provider API keys
+- memory backend provider/API secrets
 - object storage credentials
 - session/auth secrets
 - messaging credentials
@@ -34,6 +35,7 @@
 - `NOVELAND_NATS_PORT`
 - `NOVELAND_NATS_MONITOR_PORT`
 - `NOVELAND_PROVIDER_API_KEYS_JSON`
+- `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
 - `NOVELAND_RUNTIME_LOOP_INTERVAL_SECONDS`
 - `NOVELAND_RUNTIME_BATCH_LIMIT`
 
@@ -55,6 +57,14 @@
 - Provider test calls use the configured `api_key_ref`, update only non-secret health fields, and record redacted diagnostics.
 - `NOVELAND_RUNTIME_LOOP_INTERVAL_SECONDS` controls the daemon sleep interval between iterations.
 - `NOVELAND_RUNTIME_BATCH_LIMIT` caps how many due agent runs a single daemon iteration will execute.
+
+## Long-term memory baseline
+
+- Memory backend profiles are platform-owned non-secret database records containing backend kind, vector-store config, LLM/embedder/reranker config, secret refs, and enablement state.
+- Worlds bind to long-term memory through `memory_backend_profile_id`; world-level plugin binding remains separate from the full backend profile.
+- Memory backend secrets are not persisted in the database; runtime resolves them from `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`.
+- Long-term memory writes are asynchronous through database-backed memory write jobs; primary runtime and conversation flows enqueue work rather than calling backend SDKs inline.
+- Web and HTTP APIs may manage memory backend profiles and read health/log/eval summaries, but they must never return resolved secret material.
 
 ## Required docs sync
 

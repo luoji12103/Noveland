@@ -26,6 +26,7 @@ import type {
 } from "@/lib/realtime";
 import type { ConversationDetailData } from "@/lib/worlds/server";
 import type {
+  ConversationMemoryConfig,
   ConversationNarrativeArtifactSet,
   ConversationPolicy,
   ConversationSession,
@@ -253,6 +254,18 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
     );
   }
 
+  async function handleMemoryConfig(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      () =>
+        updateConversation(worldId, conversationId, {
+          memory_config: memoryConfigFromForm(form),
+        }),
+      "Memory config updated.",
+    );
+  }
+
   async function handleGenerateNarrative(artifactSet: ConversationNarrativeArtifactSet) {
     await runAction(
       async () => {
@@ -464,6 +477,56 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
       </div>
 
       <div className="management-columns">
+        <section className="management-panel" aria-labelledby="memory-config-title">
+          <h2 className="section-title" id="memory-config-title">
+            Memory config
+          </h2>
+          {canManage ? (
+            <form className="inline-form" onSubmit={handleMemoryConfig}>
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.memory_config.write_turn_memory}
+                  name="write_turn_memory"
+                  type="checkbox"
+                  value="true"
+                />
+                Write turn memory
+              </label>
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.memory_config.retrieve_memory}
+                  name="retrieve_memory"
+                  type="checkbox"
+                  value="true"
+                />
+                Retrieve memory
+              </label>
+              <input
+                aria-label="Conversation memory max context items"
+                className="text-input"
+                name="max_context_items"
+                defaultValue={String(conversation.memory_config.max_context_items)}
+              />
+              <input
+                aria-label="Conversation memory query window"
+                className="text-input"
+                name="query_window"
+                defaultValue={String(conversation.memory_config.query_window)}
+              />
+              <button className="primary-button" type="submit" disabled={isBusy}>
+                Save memory config
+              </button>
+            </form>
+          ) : (
+            <p>
+              write={String(conversation.memory_config.write_turn_memory)} / retrieve=
+              {String(conversation.memory_config.retrieve_memory)} / max=
+              {conversation.memory_config.max_context_items} / window=
+              {conversation.memory_config.query_window}
+            </p>
+          )}
+        </section>
+
         <section className="management-panel" aria-labelledby="writer-config-title">
           <h2 className="section-title" id="writer-config-title">
             Writer config
@@ -648,6 +711,15 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
     auto_generate_on_complete: form.get("auto_generate_on_complete") === "true",
     generate_summary: form.get("generate_summary") === "true",
     generate_chapter: form.get("generate_chapter") === "true",
+  };
+}
+
+function memoryConfigFromForm(form: FormData): ConversationMemoryConfig {
+  return {
+    write_turn_memory: form.get("write_turn_memory") === "true",
+    retrieve_memory: form.get("retrieve_memory") === "true",
+    max_context_items: Number(formString(form, "max_context_items")),
+    query_window: Number(formString(form, "query_window")),
   };
 }
 

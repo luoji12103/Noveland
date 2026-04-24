@@ -3,34 +3,97 @@ from __future__ import annotations
 import math
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
-from noveland.memory.contracts import MemoryItemCreate, MemoryItemRecord, MemorySearchQuery
+from noveland.memory.contracts import (
+    MemoryBackendHealth,
+    MemoryBackendHealthStatus,
+    MemoryDeleteResult,
+    MemoryDeleteScope,
+    MemoryEvent,
+    MemoryItemRecord,
+    MemorySearchRequest,
+    MemorySearchResult,
+    MemoryTurn,
+    MemoryWriteResult,
+)
 from noveland.memory.models import AgentMemoryItem
+from noveland.memory.utils import deterministic_embedding
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+BACKEND_NAME = "local_pgvector"
 
 
 class LocalPgvectorMemoryBackend:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def add(self, item: MemoryItemCreate) -> MemoryItemRecord:
+    def record_turn(self, turn: MemoryTurn) -> MemoryWriteResult:
+        content = " ".join(
+            message.content.strip() for message in turn.messages if message.content.strip()
+        )
+        if not content:
+            return MemoryWriteResult(
+                backend=BACKEND_NAME,
+                source_dedupe_key=turn.dedupe_key,
+                recorded_count=0,
+            )
+
         model = AgentMemoryItem(
             id=uuid.uuid4(),
-            world_id=item.world_id,
-            agent_id=item.agent_id,
-            source_event_id=item.source_event_id,
-            content=item.content,
-            metadata_json=item.metadata,
-            embedding=item.embedding,
+            world_id=turn.world_id,
+            agent_id=turn.agent_id,
+            source_event_id=turn.source_event_id,
+            content=content,
+            metadata_json={
+                **turn.metadata,
+                "conversation_id": None
+                if turn.conversation_id is None
+                else str(turn.conversation_id),
+                "turn_id": None if turn.turn_id is None else str(turn.turn_id),
+                "run_id": None if turn.run_id is None else str(turn.run_id),
+                "trigger_source": turn.trigger_source,
+            },
+            embedding=deterministic_embedding(content),
             visibility="private",
             is_active=True,
         )
         self._session.add(model)
         self._session.flush()
-        return _record(model)
+        return MemoryWriteResult(
+            backend=BACKEND_NAME,
+            source_dedupe_key=turn.dedupe_key,
+            recorded_count=1,
+            backend_ids=[str(model.id)],
+        )
 
-    def list(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
+    def record_events(self, events: Sequence[MemoryEvent]) -> MemoryWriteResult:
+        backend_ids: list[str] = []
+        for event in events:
+            model = AgentMemoryItem(
+                id=uuid.uuid4(),
+                world_id=event.world_id,
+                agent_id=event.agent_id,
+                source_event_id=event.event_id,
+                content=event.content,
+                metadata_json=event.metadata,
+                embedding=deterministic_embedding(event.content),
+                visibility="private",
+                is_active=True,
+            )
+            self._session.add(model)
+            self._session.flush()
+            backend_ids.append(str(model.id))
+        dedupe_key = events[0].dedupe_key if events else "no-events"
+        return MemoryWriteResult(
+            backend=BACKEND_NAME,
+            source_dedupe_key=dedupe_key,
+            recorded_count=len(backend_ids),
+            backend_ids=backend_ids,
+        )
+
+    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
         models = self._session.scalars(
             select(AgentMemoryItem)
             .where(
@@ -42,37 +105,59 @@ class LocalPgvectorMemoryBackend:
         ).all()
         return [_record(model) for model in models]
 
-    def search(self, query: MemorySearchQuery) -> Sequence[MemoryItemRecord]:
+    def search(self, request: MemorySearchRequest) -> MemorySearchResult:
+        started_at = datetime.now(UTC)
+        query_embedding = deterministic_embedding(request.query_text)
         scored = [
-            _record(model, _cosine_similarity(query.embedding, model.embedding))
+            _record(model, _cosine_similarity(query_embedding, model.embedding))
             for model in self._session.scalars(
                 select(AgentMemoryItem).where(
-                    AgentMemoryItem.world_id == query.world_id,
-                    AgentMemoryItem.agent_id == query.agent_id,
+                    AgentMemoryItem.world_id == request.world_id,
+                    AgentMemoryItem.agent_id == request.agent_id,
                     AgentMemoryItem.is_active.is_(True),
                 ),
             ).all()
         ]
-        return sorted(scored, key=lambda item: item.score or 0, reverse=True)[: query.limit]
+        items = sorted(scored, key=lambda item: item.score or 0, reverse=True)[: request.limit]
+        latency_ms = int((datetime.now(UTC) - started_at).total_seconds() * 1000)
+        return MemorySearchResult(
+            backend=BACKEND_NAME,
+            items=items,
+            latency_ms=latency_ms,
+        )
 
-    def disable(self, memory_id: uuid.UUID) -> None:
-        model = self._session.get(AgentMemoryItem, memory_id)
-        if model is not None:
+    def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
+        models = self._session.scalars(
+            select(AgentMemoryItem).where(
+                AgentMemoryItem.world_id == scope.world_id,
+                AgentMemoryItem.agent_id == scope.agent_id,
+                AgentMemoryItem.is_active.is_(True),
+            ),
+        ).all()
+        deleted_count = 0
+        for model in models:
             model.is_active = False
-            self._session.flush()
+            deleted_count += 1
+        self._session.flush()
+        return MemoryDeleteResult(backend=BACKEND_NAME, deleted_count=deleted_count)
+
+    def healthcheck(self) -> MemoryBackendHealth:
+        return MemoryBackendHealth(
+            backend=BACKEND_NAME,
+            status=MemoryBackendHealthStatus.OK,
+            details={},
+        )
 
 
 def _record(model: AgentMemoryItem, score: float | None = None) -> MemoryItemRecord:
     return MemoryItemRecord(
-        id=model.id,
+        id=str(model.id),
         world_id=model.world_id,
         agent_id=model.agent_id,
         content=model.content,
         metadata=model.metadata_json,
-        embedding=model.embedding,
-        visibility=model.visibility,
-        is_active=model.is_active,
-        source_event_id=model.source_event_id,
+        backend=BACKEND_NAME,
+        created_at=_aware_datetime(model.created_at),
         score=score,
     )
 
@@ -84,3 +169,11 @@ def _cosine_similarity(left: list[float], right: list[float]) -> float:
     if left_norm == 0 or right_norm == 0:
         return 0
     return dot / (left_norm * right_norm)
+
+
+def _aware_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

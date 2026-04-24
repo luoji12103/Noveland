@@ -9,7 +9,6 @@ import {
   createAgentCalendarEntry,
   createAgentObservation,
   createAgent,
-  createAgentMemoryItem,
   createNarrativeArtifact,
   createProviderProfile,
   createScene,
@@ -21,7 +20,6 @@ import {
   deactivateScene,
   deactivateWorld,
   deleteMembership,
-  disableAgentMemoryItem,
   disableProviderProfile,
   disableScheduleRule,
   getLatestSnapshot,
@@ -621,29 +619,6 @@ export function WorldManagementDashboard({
     }, "Schedule rule disabled.");
   }
 
-  async function handleCreateMemoryItem(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (selectedWorld === null || selectedAgent === null) {
-      return;
-    }
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const content = formString(form, "content");
-    if (content === "") {
-      setNotice("Memory content is required.");
-      return;
-    }
-    await runAction(async () => {
-      const memoryItem = await createAgentMemoryItem(selectedWorld.id, selectedAgent.id, {
-        content,
-        embedding: jsonNumberArray(formString(form, "embedding")),
-        metadata: jsonObject(formString(form, "metadata")),
-      });
-      setMemoryItems((currentItems) => [memoryItem, ...currentItems]);
-      formElement.reset();
-    }, "Memory item created.");
-  }
-
   async function handleSearchMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (selectedWorld === null || selectedAgent === null) {
@@ -653,31 +628,20 @@ export function WorldManagementDashboard({
     await runAction(async () => {
       setMemoryItems(
         await searchAgentMemory(selectedWorld.id, selectedAgent.id, {
-          embedding: jsonNumberArray(formString(form, "embedding")),
+          query_text: formString(form, "query_text"),
+          limit: optionalNumber(formString(form, "limit")),
         }),
       );
     }, "Memory search completed.");
   }
 
   async function handleRefreshMemory() {
-    if (selectedWorld === null || selectedAgent === null || !canManage) {
+    if (selectedWorld === null || selectedAgent === null) {
       return;
     }
     await runAction(async () => {
       setMemoryItems(await listAgentMemory(selectedWorld.id, selectedAgent.id));
     }, "Memory refreshed.");
-  }
-
-  async function handleDisableMemoryItem(memoryItem: MemoryItem) {
-    if (selectedWorld === null || selectedAgent === null) {
-      return;
-    }
-    await runAction(async () => {
-      await disableAgentMemoryItem(selectedWorld.id, selectedAgent.id, memoryItem.id);
-      setMemoryItems((currentItems) =>
-        currentItems.filter((currentItem) => currentItem.id !== memoryItem.id),
-      );
-    }, "Memory item disabled.");
   }
 
   async function handleUpdatePersona(event: FormEvent<HTMLFormElement>) {
@@ -1143,13 +1107,10 @@ export function WorldManagementDashboard({
             agents={agents}
             selectedAgent={selectedAgent}
             items={memoryItems}
-            canManage={canManage}
             isBusy={isBusy}
             onSelectAgent={handleSelectAgent}
-            onCreate={handleCreateMemoryItem}
             onSearch={handleSearchMemory}
             onRefresh={handleRefreshMemory}
-            onDisable={handleDisableMemoryItem}
           />
 
           <AgentPersonaObservationsPanel
@@ -1728,24 +1689,18 @@ function MemoryPanel({
   agents,
   selectedAgent,
   items,
-  canManage,
   isBusy,
   onSelectAgent,
-  onCreate,
   onSearch,
   onRefresh,
-  onDisable,
 }: {
   agents: Agent[];
   selectedAgent: Agent | null;
   items: MemoryItem[];
-  canManage: boolean;
   isBusy: boolean;
   onSelectAgent: (agentId: string) => void | Promise<void>;
-  onCreate: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   onSearch: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
-  onDisable: (item: MemoryItem) => void | Promise<void>;
 }) {
   return (
     <section className="management-panel" aria-label="Agent memory">
@@ -1762,28 +1717,14 @@ function MemoryPanel({
           </option>
         ))}
       </select>
-      {canManage && selectedAgent !== null ? (
+      {selectedAgent !== null ? (
         <>
-          <form className="management-form" onSubmit={(event) => void onCreate(event)}>
-            <input className="text-input" name="content" placeholder="Memory content" />
-            <textarea
-              className="text-input"
-              name="embedding"
-              placeholder="[1,0,0]"
-              rows={3}
-            />
-            <textarea className="text-input" name="metadata" placeholder="{}" rows={3} />
-            <button className="primary-button" type="submit" disabled={isBusy}>
-              Add memory item
-            </button>
-          </form>
+          <p className="status-detail">
+            Long-term memory is runtime-managed. Manual add and disable are not available.
+          </p>
           <form className="management-form" onSubmit={(event) => void onSearch(event)}>
-            <textarea
-              className="text-input"
-              name="embedding"
-              placeholder="Search embedding"
-              rows={3}
-            />
+            <textarea className="text-input" name="query_text" placeholder="Search memory text" rows={3} />
+            <input className="text-input" name="limit" placeholder="10" />
             <div className="button-row">
               <button className="secondary-button" type="submit" disabled={isBusy}>
                 Search memory
@@ -1800,28 +1741,15 @@ function MemoryPanel({
           </form>
         </>
       ) : (
-        <p className="status-detail">Memory management requires world admin access.</p>
+        <p className="status-detail">Select an agent to inspect long-term memory.</p>
       )}
       <div className="resource-list">
         {items.map((item) => (
           <article className="resource-row" key={item.id}>
             <div>
               <h3>{item.content}</h3>
-              <p>
-                {item.visibility}
-                {item.score === null ? "" : ` - score ${item.score.toFixed(3)}`}
-              </p>
+              <p>{memoryItemDetail(item)}</p>
             </div>
-            {canManage ? (
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={isBusy}
-                onClick={() => void onDisable(item)}
-              >
-                Disable memory item
-              </button>
-            ) : null}
           </article>
         ))}
       </div>
@@ -2327,14 +2255,6 @@ function jsonObject(rawValue: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function jsonNumberArray(rawValue: string): number[] {
-  const parsed = JSON.parse(rawValue) as unknown;
-  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "number")) {
-    throw new Error("Embedding must be a JSON array of numbers.");
-  }
-  return parsed;
-}
-
 function messageForError(error: unknown): string {
   if (error instanceof WorldClientError) {
     if (error.status === 409) {
@@ -2402,4 +2322,33 @@ function compareProviderProfiles(left: ProviderProfile, right: ProviderProfile):
 
 function compareMemberships(left: Membership, right: Membership): number {
   return left.user.email.localeCompare(right.user.email);
+}
+
+function optionalNumber(value: string): number | undefined {
+  if (value.trim() === "") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error("Limit must be a number.");
+  }
+  return parsed;
+}
+
+function memoryItemDetail(item: MemoryItem): string {
+  const parts = [
+    `backend ${item.backend}`,
+    item.created_at === null ? "unknown time" : formatDateTime(item.created_at),
+    item.score === null ? null : `score ${item.score.toFixed(2)}`,
+    typeof item.metadata.turn_id === "string"
+      ? `turn ${item.metadata.turn_id}`
+      : typeof item.metadata.run_id === "string"
+        ? `run ${item.metadata.run_id}`
+        : typeof item.metadata.source_event_id === "string"
+          ? `event ${item.metadata.source_event_id}`
+          : typeof item.metadata.conversation_id === "string"
+            ? `conversation ${item.metadata.conversation_id}`
+            : null,
+  ].filter((part): part is string => part !== null);
+  return parts.join(" - ");
 }

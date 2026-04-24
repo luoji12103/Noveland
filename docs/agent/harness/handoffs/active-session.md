@@ -1,17 +1,19 @@
 # Active Session Handoff
 
-- Date: 2026-04-22T00:00:00Z
-- Branch: feat/plugin-runtime-wiring
-- Objective: Wire provider, memory, world-rules, persona-policy, and narrative-writer execution through the built-in plugin registry with explicit bindings and Web configuration surfaces.
+- Date: 2026-04-24T00:00:00Z
+- Branch: feat/memory-mem0-oss-foundation
+- Objective: Replace the old synchronous pgvector CRUD memory baseline with a Mem0 OSS-first long-term memory stack, including backend profiles, async write jobs/logs, runtime/conversation memory context integration, and stage-1 through stage-3 operator surfaces.
 - Completed work:
-  - Added explicit plugin binding fields and backfill migration `20260422_0015_plugin_runtime_wiring.py` for provider profiles, worlds, agent personas, and conversation writer config.
-  - Added built-in plugin constants and registry wiring in `noveland.plugins.builtins`, including first-party plugins for model providers, memory backend, world rules, persona policy, and narrative writer.
-  - Routed provider invocation, memory access, due-rule resolution, persona prompt shaping, and conversation narrative writing through `PluginRegistry`.
-  - Added `GET /plugins/catalog` plus plugin-aware provider/world/persona/conversation API validation.
-  - Added Web plugin catalog proxy plus provider/world/persona/writer configuration forms and server loaders.
+  - Added memory backend profiles, async memory write jobs, write/retrieval logs, agent profile snapshots, and the three migrations `20260423_0016_memory_mem0_oss_foundation.py`, `20260423_0017_memory_context_integration.py`, and `20260423_0018_memory_profiles_forget_evals.py`.
+  - Reworked `noveland.memory` around `MemoryService`, backend adapters, Mem0 OSS integration boundaries, local pgvector fallback, health/log/eval operators, and typed contracts/errors.
+  - Added `NOVELAND_MEMORY_BACKEND_SECRETS_JSON` settings support and explicit world `memory_backend_profile_id` wiring.
+  - Integrated long-term memory with runtime agent runs and conversations via async job enqueue and prompt memory context, without letting runtime or persona policy import Mem0 directly.
+  - Changed the Web agent memory surface to read-only list/search/profile-snapshot/forget behavior and added `/admin/memory-backends` plus same-origin proxy routes for profile CRUD, health, logs, and eval smoke.
+  - Updated Playwright mock infrastructure to reflect the new memory contract and read-only UI behavior.
+  - Closed out the branch into a single commit after full backend/web regression and doc synchronization.
 - Incomplete work:
-  - Commit and merge are still pending on this branch.
-  - No follow-on mainline is selected yet after plugin runtime wiring.
+  - This branch is committed but not yet merged.
+  - No next mainline has been selected after the long-term memory refactor.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -20,15 +22,16 @@
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
-  - `cd web && npm run test:e2e`
   - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
 - Current risks:
-  - Plugin wiring is currently limited to code-registered built-ins; there is no marketplace, hot reload, or remote plugin distribution path.
-  - Built-in plugin bindings are backfilled explicitly, but runtime paths still assume plugin identifiers stay stable across future refactors.
-  - World admins can configure world/persona/writer plugin bindings, while provider plugin bindings remain platform-admin managed.
+  - The primary long-term memory path is now profile-driven and async, but distributed workers, queue coordination, and production-grade memory backfill are still future work.
+  - `builtin.local_pgvector_memory` remains as fallback/test coverage; canonical long-term behavior assumes Mem0 OSS-style profiles through `MemoryService`.
+  - Web Playwright coverage now depends on the local mock backend matching the evolving memory contracts; keep the mock aligned when API contracts change.
 - Recommended next step:
-  - Commit `feat(plugins): wire runtime execution through registry`, keep the branch for review, and then select the next mainline stage.
+  - Review or merge this branch, then select the next mainline after memory.
 - Sensitive areas to avoid casual edits:
-  - plugin identifier compatibility and migration backfill semantics
-  - provider secret handling; plugin configs and world bindings must stay non-secret
-  - prompt shaping and narrative generation bindings, which now depend on registry category matching
+  - `MemoryService` as the only business entrypoint for long-term memory
+  - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
+  - agent-private memory isolation across world and agent boundaries
+  - migration history for `20260423_0016` through `20260423_0018`

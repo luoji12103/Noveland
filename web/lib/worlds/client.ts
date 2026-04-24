@@ -26,8 +26,14 @@ import type {
   ConversationTurn,
   ConversationUpdateInput,
   MemberCandidate,
+  MemoryBackendProfile,
+  MemoryBackendProfileCreateInput,
+  MemoryBackendProfileUpdateInput,
+  MemoryBackendHealth,
+  MemoryBackendLogs,
+  MemoryEvalResult,
   MemoryItem,
-  MemoryItemCreateInput,
+  MemoryProfileSnapshot,
   MemorySearchInput,
   Membership,
   NarrativeArtifact,
@@ -323,18 +329,6 @@ export function listAgentMemory(worldId: string, agentId: string): Promise<Memor
   });
 }
 
-export function createAgentMemoryItem(
-  worldId: string,
-  agentId: string,
-  input: MemoryItemCreateInput,
-): Promise<MemoryItem> {
-  return worldRequest<MemoryItem>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
-    method: "POST",
-    body: input,
-    csrf: true,
-  });
-}
-
 export function searchAgentMemory(
   worldId: string,
   agentId: string,
@@ -343,19 +337,43 @@ export function searchAgentMemory(
   return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory/search`, {
     method: "POST",
     body: input,
-    csrf: true,
   });
 }
 
-export function disableAgentMemoryItem(
+export function getAgentMemoryProfileSnapshot(
   worldId: string,
   agentId: string,
-  memoryId: string,
-): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/memory/${memoryId}`, {
-    method: "DELETE",
-    csrf: true,
-  });
+): Promise<MemoryProfileSnapshot | null> {
+  return worldRequest<MemoryProfileSnapshot | null>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+    { method: "GET" },
+  );
+}
+
+export function refreshAgentMemoryProfileSnapshot(
+  worldId: string,
+  agentId: string,
+): Promise<MemoryProfileSnapshot> {
+  return worldRequest<MemoryProfileSnapshot>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot/refresh`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function forgetAgentMemory(
+  worldId: string,
+  agentId: string,
+): Promise<{ backend: string; deleted_count: number | null }> {
+  return worldRequest<{ backend: string; deleted_count: number | null }>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/forget`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRun[]> {
@@ -753,6 +771,69 @@ export function listWorldDiagnostics(worldId: string): Promise<RuntimeDiagnostic
 
 export function listProviderProfiles(): Promise<ProviderProfile[]> {
   return apiRequest<ProviderProfile[]>("/api/provider-profiles", { method: "GET" });
+}
+
+export function listMemoryBackendProfiles(): Promise<MemoryBackendProfile[]> {
+  return apiRequest<MemoryBackendProfile[]>("/api/memory-backend-profiles", { method: "GET" });
+}
+
+export function createMemoryBackendProfile(
+  input: MemoryBackendProfileCreateInput,
+): Promise<MemoryBackendProfile> {
+  return apiRequest<MemoryBackendProfile>("/api/memory-backend-profiles", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateMemoryBackendProfile(
+  profileId: string,
+  input: MemoryBackendProfileUpdateInput,
+): Promise<MemoryBackendProfile> {
+  return apiRequest<MemoryBackendProfile>(`/api/memory-backend-profiles/${profileId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function deleteMemoryBackendProfile(profileId: string): Promise<void> {
+  return apiRequest<void>(`/api/memory-backend-profiles/${profileId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
+}
+
+export function getMemoryBackendProfileHealth(
+  profileId: string,
+): Promise<MemoryBackendHealth> {
+  return apiRequest<MemoryBackendHealth>(
+    `/api/memory-backend-profiles/${profileId}/health`,
+    { method: "GET" },
+  );
+}
+
+export function getMemoryBackendProfileLogs(
+  profileId: string,
+  limit = 20,
+): Promise<MemoryBackendLogs> {
+  return apiRequest<MemoryBackendLogs>(
+    `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
+    { method: "GET" },
+  );
+}
+
+export function runMemoryBackendProfileEvalSmoke(
+  profileId: string,
+): Promise<MemoryEvalResult> {
+  return apiRequest<MemoryEvalResult>(
+    `/api/memory-backend-profiles/${profileId}/eval-smoke`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function createProviderProfile(input: ProviderProfileCreateInput): Promise<ProviderProfile> {

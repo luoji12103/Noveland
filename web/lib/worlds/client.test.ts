@@ -4,7 +4,7 @@ import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
   createAgentObservation,
-  createAgentMemoryItem,
+  createMemoryBackendProfile,
   createNarrativeArtifact,
   createProviderProfile,
   createAgentPreset,
@@ -14,7 +14,7 @@ import {
   getNarrativeArtifact,
   createWorld,
   deactivateAgentPreset,
-  disableAgentMemoryItem,
+  deleteMemoryBackendProfile,
   disableProviderProfile,
   deactivateScene,
   exportWorldComposition,
@@ -27,6 +27,7 @@ import {
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
+  listMemoryBackendProfiles,
   pauseWorldClock,
   resumeWorldClock,
   listAgentMemory,
@@ -43,6 +44,7 @@ import {
   searchAgentMemory,
   testProviderProfile,
   importWorldComposition,
+  updateMemoryBackendProfile,
   updateAgent,
   updateAgentPreset,
   updateProviderProfile,
@@ -228,29 +230,45 @@ describe("world client", () => {
   });
 
   it("maps memory requests", async () => {
-    document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1" }]))
-      .mockResolvedValueOnce(jsonResponse({ id: "memory-1" }, 201))
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1", score: 0.9 }]))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await listAgentMemory("world-1", "agent-1");
-    await createAgentMemoryItem("world-1", "agent-1", {
-      content: "Memory",
-      embedding: [1, 0, 0],
-    });
-    await searchAgentMemory("world-1", "agent-1", { embedding: [1, 0, 0], limit: 5 });
-    await disableAgentMemoryItem("world-1", "agent-1", "memory-1");
+    await searchAgentMemory("world-1", "agent-1", { query_text: "green tea", limit: 5 });
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
-    expect(fetchMock.mock.calls[3][0]).toBe(
-      "/api/worlds/world-1/agents/agent-1/memory/memory-1",
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
+    expect(fetchMock.mock.calls[1][1].body).toBe(
+      JSON.stringify({ query_text: "green tea", limit: 5 }),
     );
+  });
+
+  it("maps memory backend profile requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "memory-profile-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listMemoryBackendProfiles();
+    await createMemoryBackendProfile({
+      profile_key: "mem0-default",
+      name: "Mem0 default",
+      backend_kind: "mem0_oss",
+    });
+    await updateMemoryBackendProfile("memory-profile-1", { name: "Updated" });
+    await deleteMemoryBackendProfile("memory-profile-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/memory-backend-profiles");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/memory-backend-profiles");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
   });
 
   it("maps runtime and provider requests", async () => {

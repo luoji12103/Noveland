@@ -20,7 +20,14 @@ from noveland.core.models import RuntimeControlState
 from noveland.core.settings import AppSettings
 from noveland.events import InMemoryWorldEventPublisher
 from noveland.events.models import WorldEventModel
-from noveland.memory.models import AgentMemoryItem
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.runtime.daemon import RuntimeDaemon
@@ -178,6 +185,7 @@ def test_runtime_daemon_advances_running_auto_conversation(
 def _create_tables(engine: Engine) -> None:
     for table in (
         cast(Table, User.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
@@ -194,6 +202,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
     ):

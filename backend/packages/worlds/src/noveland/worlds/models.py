@@ -47,6 +47,10 @@ class World(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         default=dict,
     )
+    memory_backend_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("memory_backend_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     memory_plugin_identifier: Mapped[str] = mapped_column(
         String(120),
         nullable=False,

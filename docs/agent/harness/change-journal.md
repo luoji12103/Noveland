@@ -231,6 +231,17 @@
 - Docs updated: project index, file inventory, task board, active handoff
 - Follow-up notes: plugin execution still uses code-registered built-ins only; marketplace, hot reload, and remote installation remain future work.
 
+## Mem0 OSS-first long-term memory entry
+
+- Date: 2026-04-24
+- Branch: feat/memory-mem0-oss-foundation
+- Scope: long-term memory refactor
+- Summary: Replaced the old synchronous pgvector CRUD memory baseline with a Mem0 OSS-first long-term memory stack, including platform memory backend profiles, async memory write jobs/logs, conversation and runtime memory context integration, read-only web memory surfaces, profile snapshots, forget flows, and eval/health operators.
+- Files changed: `/.env.example`, `/README.md`, `/backend/packages/core/src/noveland/core/settings.py`, `/backend/packages/memory/**`, `/backend/packages/plugins/**`, `/backend/packages/worlds/**`, `/backend/packages/conversations/**`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260423_0016_memory_mem0_oss_foundation.py`, `/backend/migrations/versions/20260423_0017_memory_context_integration.py`, `/backend/migrations/versions/20260423_0018_memory_profiles_forget_evals.py`, `/backend/tests/**`, `/web/app/admin/memory-backends/**`, `/web/app/api/memory-backend-profiles/**`, `/web/features/admin/memory-backend-admin.tsx`, `/web/features/agents/agent-builder.tsx`, `/web/features/conversations/conversation-detail.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/docs/agent/harness/**`
+- Tests added/updated: backend memory backend/service/API/runtime/schema/import tests; web type/client/component coverage for read-only memory and admin memory backend flows; Playwright mock backend updated for memory profiles and read-only memory behavior
+- Docs updated: README, long-memory architecture, technical stack, configuration/secrets, data ownership, module boundaries, plugin architecture, architecture map, project index, file inventory, task board, active handoff
+- Follow-up notes: Mem0 remains behind `MemoryService`; raw event storage still reuses existing world events, conversation turns, and agent runs; distributed job execution and richer profile derivation remain future work.
+
 ## Provider reliability hardening entry
 
 - Date: 2026-04-17

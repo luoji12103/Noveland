@@ -40,13 +40,28 @@ Owns:
 - participant ordering
 - transcript turn persistence
 - deterministic round-robin turn advancement
-- per-session policy and writer configuration
+- per-session policy, writer, and memory configuration
 
 Must not own:
 - LLM provider transport details
 - narrative chapter publication
 - global runtime scheduling policy
 - arbitrary cross-agent private memory reads
+
+## `memory`
+Owns:
+- long-term memory backend profile CRUD
+- async write queueing and processing
+- retrieval and context assembly contracts
+- local write/retrieval audit logs
+- agent profile snapshots
+- forget/delete-scope orchestration across local and backend boundaries
+
+Must not own:
+- runtime loop ownership
+- canonical raw event storage
+- direct UI policy decisions
+- cross-agent visibility expansion outside explicit auth rules
 
 ## `narrative`
 Owns:
