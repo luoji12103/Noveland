@@ -24,14 +24,16 @@
 ## Data and storage
 
 - PostgreSQL 16+
-- pgvector as default memory backend implementation
+- Mem0 OSS-first long-term memory backend profiles
+- local pgvector fallback backend for tests and local fallback paths
 - Local object storage implementation by default
 - Optional S3-compatible adapter
 
 ## Messaging and realtime
 
 - NATS + JetStream
-- WebSocket for dashboard realtime updates
+- SSE for read-side realtime updates
+- WebSocket for conversation control
 
 ## Architecture stance
 

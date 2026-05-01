@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -11,6 +11,8 @@ import {
   createSnapshot,
   deactivateScene,
   deleteMembership,
+  exportWorldComposition,
+  importWorldComposition,
   listMemberCandidates,
   pauseWorldClock,
   resumeWorldClock,
@@ -18,8 +20,15 @@ import {
   updateWorld,
   upsertMembership,
 } from "@/lib/worlds/client";
+import { subscribeToEventStream } from "@/lib/realtime";
+import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
-import type { MemberCandidate, WorldRole } from "@/lib/worlds/types";
+import type {
+  MemberCandidate,
+  RuntimeDiagnostic,
+  WorldClock,
+  WorldRole,
+} from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
@@ -36,15 +45,45 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [notice, setNotice] = useState(data.loadError);
   const [memberCandidates, setMemberCandidates] = useState<MemberCandidate[]>([]);
   const [isBusy, setIsBusy] = useState(false);
+  const [clock, setClock] = useState(data.clock);
+  const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
+  const [exportedComposition, setExportedComposition] = useState("");
+  const [compositionDraft, setCompositionDraft] = useState("");
   const world = data.selectedWorld;
 
-  async function runAction(action: () => Promise<unknown>, success: string) {
+  useEffect(() => {
+    setClock(data.clock);
+    setWorldDiagnostics(data.worldDiagnostics);
+  }, [data.clock, data.worldDiagnostics]);
+
+  useEffect(() => {
+    if (world === null) {
+      return;
+    }
+    return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
+      `/api/worlds/${world.id}/stream`,
+      (envelope) => {
+        if (envelope.payload.clock !== undefined) {
+          setClock(envelope.payload.clock);
+        }
+        if (envelope.payload.diagnostics.length > 0) {
+          setWorldDiagnostics((current) =>
+            mergeWorldDiagnostics(current, envelope.payload.diagnostics),
+          );
+        }
+      },
+    );
+  }, [world]);
+
+  async function runAction(action: () => Promise<unknown>, success: string, refresh = true) {
     setIsBusy(true);
     setNotice(null);
     try {
       await action();
       setNotice(success);
-      router.refresh();
+      if (refresh) {
+        router.refresh();
+      }
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -69,6 +108,11 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         updateWorld(selectedWorld.id, {
           name: formString(form, "name"),
           description: optionalFormString(form, "description"),
+          memory_backend_profile_id: optionalFormString(form, "memory_backend_profile_id"),
+          memory_plugin_identifier: formString(form, "memory_plugin_identifier"),
+          memory_plugin_config: jsonObject(formString(form, "memory_plugin_config")),
+          world_rules_plugin_identifier: formString(form, "world_rules_plugin_identifier"),
+          world_rules_plugin_config: jsonObject(formString(form, "world_rules_plugin_config")),
         }),
       "World saved.",
     );
@@ -124,6 +168,38 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     );
   }
 
+  async function handleExportComposition() {
+    await runAction(async () => {
+      const composition = await exportWorldComposition(selectedWorld.id);
+      const text = JSON.stringify(composition, null, 2);
+      setExportedComposition(text);
+      setCompositionDraft(text);
+    }, "Composition exported.");
+  }
+
+  async function handleImportComposition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        const importedWorld = await importWorldComposition({
+          slug: formString(form, "slug"),
+          name: formString(form, "name"),
+          owner_user_id: formString(form, "owner_user_id"),
+          description: optionalFormString(form, "description"),
+          rules_config:
+            optionalFormString(form, "rules_config") === null
+              ? undefined
+              : jsonObject(formString(form, "rules_config")),
+          composition: JSON.parse(formString(form, "composition")),
+        });
+        window.location.assign(`/worlds/${importedWorld.id}`);
+      },
+      "Composition imported.",
+      false,
+    );
+  }
+
   return (
     <section className="management-section">
       {notice !== null ? <p className="management-notice">{notice}</p> : null}
@@ -160,12 +236,70 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               defaultValue={world.description ?? ""}
               placeholder="Description"
             />
+            {data.isPlatformAdmin ? (
+              <select
+                aria-label="World memory backend profile"
+                className="text-input"
+                name="memory_backend_profile_id"
+                defaultValue={world.memory_backend_profile_id ?? ""}
+              >
+                <option value="">No explicit memory backend profile</option>
+                {data.memoryBackendProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name} ({profile.profile_key})
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <select
+              aria-label="World memory plugin"
+              className="text-input"
+              name="memory_plugin_identifier"
+              defaultValue={world.memory_plugin_identifier}
+            >
+              {data.memoryPlugins.map((plugin) => (
+                <option key={plugin.identifier} value={plugin.identifier}>
+                  {plugin.identifier}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="text-input"
+              name="memory_plugin_config"
+              rows={3}
+              defaultValue={JSON.stringify(world.memory_plugin_config, null, 2)}
+              placeholder="Memory plugin config"
+            />
+            <select
+              aria-label="World rules plugin"
+              className="text-input"
+              name="world_rules_plugin_identifier"
+              defaultValue={world.world_rules_plugin_identifier}
+            >
+              {data.worldRulesPlugins.map((plugin) => (
+                <option key={plugin.identifier} value={plugin.identifier}>
+                  {plugin.identifier}
+                </option>
+              ))}
+            </select>
+            <textarea
+              className="text-input"
+              name="world_rules_plugin_config"
+              rows={3}
+              defaultValue={JSON.stringify(world.world_rules_plugin_config, null, 2)}
+              placeholder="World rules plugin config"
+            />
             <button className="primary-button" type="submit" disabled={isBusy}>
               Save world
             </button>
           </form>
         ) : (
-          <p>Read-only world access.</p>
+          <>
+            <p>Read-only world access.</p>
+            <p>Memory backend profile: {world.memory_backend_profile_id ?? "none"}</p>
+            <p>Memory plugin: {world.memory_plugin_identifier}</p>
+            <p>World rules plugin: {world.world_rules_plugin_identifier}</p>
+          </>
         )}
       </section>
 
@@ -305,20 +439,20 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           <h2 className="section-title" id="clock-title">
             World clock
           </h2>
-          {data.clock !== null ? (
+          {clock !== null ? (
             <>
               <div className="clock-grid">
                 <div>
                   <p className="metric-label">Status</p>
-                  <p className="metric-value">{data.clock.status}</p>
+                  <p className="metric-value">{clock.status}</p>
                 </div>
                 <div>
                   <p className="metric-label">Effective time</p>
-                  <p>{data.clock.effective_world_time}</p>
+                  <p>{clock.effective_world_time}</p>
                 </div>
                 <div>
                   <p className="metric-label">Revision</p>
-                  <p className="metric-value">{data.clock.revision}</p>
+                  <p className="metric-value">{clock.revision}</p>
                 </div>
               </div>
               {data.canManageSelectedWorld ? (
@@ -480,12 +614,74 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         </div>
       </section>
 
+      <section className="management-panel" aria-labelledby="composition-title">
+        <h2 className="section-title" id="composition-title">
+          World composition
+        </h2>
+        {data.canManageSelectedWorld ? (
+          <div className="button-row">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleExportComposition()}
+            >
+              Export composition
+            </button>
+          </div>
+        ) : (
+          <p>Read-only world composition access.</p>
+        )}
+        <textarea
+          className="text-input"
+          rows={10}
+          readOnly
+          value={exportedComposition}
+          placeholder="Exported composition JSON appears here."
+        />
+        {data.isPlatformAdmin ? (
+          <form className="management-form" onSubmit={handleImportComposition}>
+            <input className="text-input" name="slug" placeholder="imported-world-slug" />
+            <input className="text-input" name="name" placeholder="Imported world name" />
+            <input
+              className="text-input"
+              name="owner_user_id"
+              defaultValue={selectedWorld.owner_user_id}
+              placeholder="Owner user id"
+            />
+            <input className="text-input" name="description" placeholder="Override description" />
+            <textarea
+              className="text-input"
+              name="rules_config"
+              rows={3}
+              defaultValue={JSON.stringify(selectedWorld.rules_config, null, 2)}
+            />
+            <textarea
+              className="text-input"
+              name="composition"
+              rows={10}
+              value={compositionDraft}
+              onChange={(event) => setCompositionDraft(event.target.value)}
+              placeholder="Paste exported composition JSON"
+            />
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Import as new world
+            </button>
+          </form>
+        ) : null}
+        <p>
+          Export includes world metadata, scenes, agents, schedule rules, and preset references.
+          It excludes memberships, auth/session, clock state, events, diagnostics, memory,
+          observations, conversations, and narrative artifacts.
+        </p>
+      </section>
+
       <section className="management-panel" aria-labelledby="world-diagnostics-title">
         <h2 className="section-title" id="world-diagnostics-title">
           World diagnostics
         </h2>
         <ResourceList
-          rows={data.worldDiagnostics.map((diagnostic) => ({
+          rows={worldDiagnostics.map((diagnostic) => ({
             id: diagnostic.id,
             title: `${diagnostic.severity} - ${diagnostic.component}`,
             detail: diagnostic.message,
@@ -493,6 +689,19 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         />
       </section>
     </section>
+  );
+}
+
+function mergeWorldDiagnostics(
+  current: RuntimeDiagnostic[],
+  incoming: RuntimeDiagnostic[],
+): RuntimeDiagnostic[] {
+  const byId = new Map(current.map((diagnostic) => [diagnostic.id, diagnostic]));
+  for (const diagnostic of incoming) {
+    byId.set(diagnostic.id, diagnostic);
+  }
+  return Array.from(byId.values()).sort((left, right) =>
+    right.occurred_at.localeCompare(left.occurred_at),
   );
 }
 

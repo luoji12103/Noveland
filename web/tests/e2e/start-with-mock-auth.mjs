@@ -16,6 +16,7 @@ const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
 const membershipMemberId = "40000000-0000-4000-8000-000000000002";
 const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
+const memoryProfilePrimaryId = "71500000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 const users = [
@@ -35,6 +36,11 @@ const worlds = [
     name: "First World",
     description: "A managed world",
     rules_config: {},
+    memory_backend_profile_id: memoryProfilePrimaryId,
+    memory_plugin_identifier: "builtin.local_pgvector_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
     is_active: true,
   },
 ];
@@ -53,6 +59,7 @@ const agents = [
     id: agentGuideId,
     world_id: worldOneId,
     home_scene_id: sceneHomeId,
+    source_preset_id: null,
     agent_key: "guide",
     display_name: "Guide",
     kind: "role_agent",
@@ -61,6 +68,7 @@ const agents = [
     is_enabled: true,
   },
 ];
+const agentPresets = [];
 const memberships = [
   membership(membershipOwnerId, worldOneId, adminUserId, "world_admin"),
   membership(membershipMemberId, worldOneId, memberUserId, "human_user"),
@@ -111,11 +119,92 @@ const memoryItems = [
     agent_id: agentGuideId,
     content: "Guide memory",
     metadata: { source: "mock" },
-    embedding: [1, 0, 0],
-    visibility: "private",
-    is_active: true,
-    source_event_id: null,
+    backend: "builtin.mem0_oss_memory",
+    created_at: "2026-04-17T00:03:05.000Z",
     score: null,
+  },
+];
+const memoryProfileSnapshots = new Map([
+  [
+    agentGuideId,
+    {
+      id: "71700000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      agent_id: agentGuideId,
+      aliases: ["Guide"],
+      identity_notes: ["Resident guide for the first world."],
+      durable_preferences: ["Keeps replies concise."],
+      long_lived_goals: ["Help operators move the scene forward."],
+      language_style_preferences: ["Direct and calm."],
+      refreshed_at: "2026-04-17T00:04:00.000Z",
+      created_at: "2026-04-17T00:04:00.000Z",
+      updated_at: "2026-04-17T00:04:00.000Z",
+    },
+  ],
+]);
+const memoryBackendProfiles = [
+  {
+    id: memoryProfilePrimaryId,
+    profile_key: "primary-mem0",
+    name: "Primary Mem0",
+    backend_kind: "mem0_oss",
+    vector_store_config: { provider: "memory" },
+    llm_config: { provider: "mock-llm" },
+    embedder_config: { provider: "mock-embedder" },
+    reranker_config: {},
+    secret_refs: { api_key: "mem0-primary" },
+    is_enabled: true,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const memoryWriteLogs = [
+  {
+    id: "71800000-0000-4000-8000-000000000001",
+    job_id: "71900000-0000-4000-8000-000000000001",
+    backend: "builtin.mem0_oss_memory",
+    success: true,
+    latency_ms: 7,
+    request_summary: { source: "conversation_turn" },
+    response_summary: { stored: 1 },
+    correlation_ids: { world_id: worldOneId, agent_id: agentGuideId },
+    occurred_at: "2026-04-17T00:05:00.000Z",
+  },
+];
+const memoryWriteJobs = [
+  {
+    id: "71900000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    backend_profile_id: memoryProfilePrimaryId,
+    backend_profile_key: "primary-mem0",
+    backend_profile_name: "Primary Mem0",
+    backend_kind: "mem0_oss",
+    source_kind: "conversation_turn",
+    source_id: "72000000-0000-4000-8000-000000000001",
+    dedupe_key: "mock-memory-job-1",
+    status: "failed",
+    attempt_count: 2,
+    next_attempt_at: "2026-04-17T00:10:00.000Z",
+    last_error: "mock backend timeout",
+    processed_at: null,
+    created_at: "2026-04-17T00:04:30.000Z",
+    updated_at: "2026-04-17T00:05:30.000Z",
+  },
+];
+const memoryRetrievalLogs = [
+  {
+    id: "71800000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    backend_profile_id: memoryProfilePrimaryId,
+    backend: "builtin.mem0_oss_memory",
+    query_text: "guide context",
+    hit_count: 1,
+    selected_item_ids: [memoryItems[0].id],
+    latency_ms: 3,
+    context_item_count: 1,
+    occurred_at: "2026-04-17T00:05:05.000Z",
   },
 ];
 const agentPersonas = new Map([
@@ -127,6 +216,8 @@ const agentPersonas = new Map([
       agent_id: agentGuideId,
       persona_text: "Careful guide.",
       behavior_policy: { tone: "direct" },
+      policy_plugin_identifier: "builtin.default_persona_policy",
+      policy_plugin_config: {},
       is_enabled: true,
       created_at: "2026-04-17T00:02:00.000Z",
       updated_at: "2026-04-17T00:02:00.000Z",
@@ -153,6 +244,8 @@ const providerProfiles = [
     profile_key: "openai-local",
     name: "OpenAI Local",
     provider_type: "openai_compatible",
+    plugin_identifier: "builtin.openai_compatible",
+    plugin_config: {},
     base_url: "https://api.example.test/v1",
     model_name: "gpt-test",
     capabilities: {},
@@ -259,6 +352,64 @@ const narrativeArtifacts = [
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
+const pluginCatalog = [
+  {
+    identifier: "builtin.openai_compatible",
+    category: "model_provider",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["chat_completion"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.anthropic_compatible",
+    category: "model_provider",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["messages"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.local_pgvector_memory",
+    category: "memory_backend",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["vector_search"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.mem0_oss_memory",
+    category: "memory_backend",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["long_term_memory"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_world_rules",
+    category: "world_rules",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["due_rules"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_persona_policy",
+    category: "persona_policy",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["build_prompt"],
+    built_in: true,
+  },
+  {
+    identifier: "builtin.default_narrative_writer",
+    category: "narrative_writer",
+    version: "0.1.0",
+    config_schema: {},
+    capabilities: ["summary", "chapter"],
+    built_in: true,
+  },
+];
 const conversations = [
   {
     id: seedConversationId,
@@ -281,9 +432,17 @@ const conversations = [
     },
     writer_config: {
       provider_profile_id: null,
+      writer_plugin_identifier: "builtin.default_narrative_writer",
+      writer_plugin_config: {},
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
+    },
+    memory_config: {
+      write_turn_memory: true,
+      retrieve_memory: true,
+      max_context_items: 5,
+      query_window: 4,
     },
     terminal_reason: "max_turns_reached",
     created_at: "2026-04-17T00:02:00.000Z",
@@ -403,14 +562,57 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/plugins/catalog") {
+    handlePluginCatalog(url, response);
+    return;
+  }
+
   if (url.pathname === "/provider-profiles") {
     await handleProviderProfiles(request, response);
+    return;
+  }
+
+  if (url.pathname === "/memory-backend-profiles") {
+    await handleMemoryBackendProfiles(request, response);
+    return;
+  }
+
+  if (url.pathname === "/agent-presets") {
+    await handleAgentPresets(request, response);
+    return;
+  }
+
+  if (url.pathname.startsWith("/agent-presets/")) {
+    const presetSegments = url.pathname.split("/");
+    await handleAgentPresetItem(request, response, presetSegments[2]);
+    return;
+  }
+
+  if (url.pathname === "/world-compositions/import") {
+    await handleWorldCompositionImport(request, response);
     return;
   }
 
   if (url.pathname.startsWith("/provider-profiles/")) {
     const providerSegments = url.pathname.split("/");
     await handleProviderProfileItem(request, response, providerSegments[2], providerSegments[3]);
+    return;
+  }
+
+  if (url.pathname.startsWith("/memory-backend-profiles/")) {
+    const memorySegments = url.pathname.split("/");
+    await handleMemoryBackendProfileItem(
+      request,
+      response,
+      memorySegments[2],
+      memorySegments[3],
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith("/memory-write-jobs/")) {
+    const memoryJobSegments = url.pathname.split("/");
+    await handleMemoryWriteJobItem(request, response, memoryJobSegments[2], memoryJobSegments[3]);
     return;
   }
 
@@ -485,6 +687,13 @@ async function handleWorldCollection(request, response) {
       name: body.name,
       description: body.description ?? null,
       rules_config: body.rules_config ?? {},
+      memory_backend_profile_id: body.memory_backend_profile_id ?? memoryProfilePrimaryId,
+      memory_plugin_identifier:
+        body.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
+      memory_plugin_config: body.memory_plugin_config ?? {},
+      world_rules_plugin_identifier:
+        body.world_rules_plugin_identifier ?? "builtin.default_world_rules",
+      world_rules_plugin_config: body.world_rules_plugin_config ?? {},
       is_active: true,
     };
     worlds.push(world);
@@ -555,6 +764,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "diagnostics") {
     handleWorldDiagnostics(request, response, currentSubject, worldId);
+    return;
+  }
+  if (resource === "composition-export") {
+    handleWorldCompositionExport(request, response, currentSubject, worldId);
     return;
   }
   if (resource === "conversations") {
@@ -651,7 +864,15 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       return;
     }
     if (segments[4] === "memory") {
-      await handleMemory(request, response, currentSubject, worldId, agentId, segments[5]);
+      await handleMemory(
+        request,
+        response,
+        currentSubject,
+        worldId,
+        agentId,
+        segments[5],
+        segments[6],
+      );
       return;
     }
     if (segments[4] === "persona") {
@@ -689,24 +910,39 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       sendJson(response, 409, { detail: "Agent key already exists" });
       return;
     }
+    const preset =
+      body.preset_id == null
+        ? null
+        : agentPresets.find((item) => item.id === body.preset_id && item.is_active) ?? null;
+    if (body.preset_id != null && preset === null) {
+      sendJson(response, 404, { detail: "Not found" });
+      return;
+    }
+    const presetProviderProfile =
+      preset?.default_provider_profile_key == null
+        ? null
+        : providerProfiles.find((item) => item.profile_key === preset.default_provider_profile_key) ?? null;
+    const providerProfileId = body.provider_profile_id ?? presetProviderProfile?.id ?? null;
     const agent = {
       id: randomUUID(),
       world_id: worldId,
       home_scene_id: body.home_scene_id ?? null,
+      source_preset_id: preset?.id ?? null,
       agent_key: body.agent_key,
       display_name: body.display_name,
-      kind: body.kind,
-      provider_profile_id: body.provider_profile_id ?? null,
+      kind: body.kind ?? preset?.default_kind ?? "role_agent",
+      provider_profile_id: providerProfileId,
       config: {
+        ...(preset?.advanced_config ?? {}),
         ...(body.config ?? {}),
-        ...(body.provider_profile_id === undefined || body.provider_profile_id === null
+        ...(providerProfileId === undefined || providerProfileId === null
           ? {}
-          : { provider_profile_id: body.provider_profile_id }),
+          : { provider_profile_id: providerProfileId }),
       },
       is_enabled: true,
     };
     agents.push(agent);
-    calendarEntries.push(...[]);
+    materializePresetForAgent(worldId, agent.id, preset);
     sendJson(response, 201, agent);
     return;
   }
@@ -740,6 +976,87 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
+function handleWorldCompositionExport(request, response, currentSubject, worldId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const world = worlds.find((item) => item.id === worldId);
+  sendJson(response, 200, {
+    world: {
+      slug: world.slug,
+      name: world.name,
+      description: world.description,
+      rules_config: world.rules_config,
+      is_active: world.is_active,
+    },
+    scenes: scenes
+      .filter((scene) => scene.world_id === worldId)
+      .map((scene) => ({
+        scene_key: scene.scene_key,
+        name: scene.name,
+        description: scene.description,
+        is_active: scene.is_active,
+      })),
+    agents: agents
+      .filter((agent) => agent.world_id === worldId)
+      .map((agent) => ({
+        agent_key: agent.agent_key,
+        display_name: agent.display_name,
+        kind: agent.kind,
+        home_scene_key:
+          agent.home_scene_id == null
+            ? null
+            : scenes.find((scene) => scene.id === agent.home_scene_id)?.scene_key ?? null,
+        source_preset_key:
+          agent.source_preset_id == null
+            ? null
+            : agentPresets.find((preset) => preset.id === agent.source_preset_id)?.preset_key ?? null,
+        provider_profile_key:
+          agent.provider_profile_id == null
+            ? null
+            : providerProfiles.find((profile) => profile.id === agent.provider_profile_id)?.profile_key ?? null,
+        config: agent.config,
+        is_enabled: agent.is_enabled,
+      })),
+    schedule_rules: scheduleRules
+      .filter((rule) => rule.world_id === worldId)
+      .map((rule) => ({
+        rule_key: rule.rule_key,
+        name: rule.name,
+        kind: rule.kind,
+        config: rule.config,
+        is_enabled: rule.is_enabled,
+      })),
+    preset_references: Array.from(
+      new Map(
+        agents
+          .filter((agent) => agent.world_id === worldId && agent.source_preset_id !== null)
+          .map((agent) => {
+            const preset = agentPresets.find((item) => item.id === agent.source_preset_id);
+            return [
+              preset?.preset_key,
+              preset == null
+                ? null
+                : {
+                    preset_key: preset.preset_key,
+                    name: preset.name,
+                    default_kind: preset.default_kind,
+                    default_provider_profile_key: preset.default_provider_profile_key,
+                    is_active: preset.is_active,
+                  },
+            ];
+          })
+          .filter((entry) => entry[1] !== null),
+      ).values(),
+    ),
+  });
+}
+
 async function handleRuntimeControl(request, response) {
   if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
     sendJson(response, 403, { detail: "Forbidden" });
@@ -768,6 +1085,13 @@ function handleRuntimeStatus(response) {
     ...runtimeControl,
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
+    memory_write_jobs: {
+      pending_count: memoryWriteJobs.filter((job) => job.status === "pending").length,
+      processing_count: memoryWriteJobs.filter((job) => job.status === "processing").length,
+      succeeded_count: memoryWriteJobs.filter((job) => job.status === "succeeded").length,
+      failed_count: memoryWriteJobs.filter((job) => job.status === "failed").length,
+      due_count: memoryWriteJobs.filter((job) => ["pending", "failed"].includes(job.status)).length,
+    },
   });
 }
 
@@ -777,6 +1101,17 @@ function handleRuntimeDiagnostics(request, response) {
     return;
   }
   sendJson(response, 200, runtimeDiagnostics);
+}
+
+function handlePluginCatalog(url, response) {
+  const category = url.searchParams.get("category");
+  sendJson(
+    response,
+    200,
+    category === null
+      ? pluginCatalog
+      : pluginCatalog.filter((plugin) => plugin.category === category),
+  );
 }
 
 function handleWorldDiagnostics(request, response, currentSubject, worldId) {
@@ -807,6 +1142,12 @@ async function handleProviderProfiles(request, response) {
       profile_key: body.profile_key,
       name: body.name,
       provider_type: body.provider_type,
+      plugin_identifier:
+        body.plugin_identifier
+        ?? (body.provider_type === "anthropic_compatible"
+          ? "builtin.anthropic_compatible"
+          : "builtin.openai_compatible"),
+      plugin_config: body.plugin_config ?? {},
       base_url: body.base_url,
       model_name: body.model_name,
       capabilities: body.capabilities ?? {},
@@ -824,6 +1165,252 @@ async function handleProviderProfiles(request, response) {
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemoryBackendProfiles(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, memoryBackendProfiles);
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const profile = {
+      id: randomUUID(),
+      profile_key: body.profile_key,
+      name: body.name,
+      backend_kind: body.backend_kind ?? "mem0_oss",
+      vector_store_config: body.vector_store_config ?? {},
+      llm_config: body.llm_config ?? {},
+      embedder_config: body.embedder_config ?? {},
+      reranker_config: body.reranker_config ?? {},
+      secret_refs: body.secret_refs ?? {},
+      is_enabled: body.is_enabled ?? true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    memoryBackendProfiles.unshift(profile);
+    sendJson(response, 201, profile);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAgentPresets(request, response) {
+  const currentSubject = subjectForRequest(request);
+  if (currentSubject === null) {
+    sendJson(response, 401, { detail: "Invalid or missing session" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      isPlatformAdmin(currentSubject)
+        ? agentPresets
+        : agentPresets.filter((preset) => preset.is_active),
+    );
+    return;
+  }
+  if (!isPlatformAdmin(currentSubject)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    if (agentPresets.some((preset) => preset.preset_key === body.preset_key)) {
+      sendJson(response, 409, { detail: "Preset key already exists" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const preset = {
+      id: randomUUID(),
+      preset_key: body.preset_key,
+      name: body.name,
+      description: body.description ?? null,
+      default_kind: body.default_kind,
+      default_provider_profile_key: body.default_provider_profile_key ?? null,
+      persona_text: body.persona_text ?? "",
+      behavior_policy: body.behavior_policy ?? {},
+      calendar_blueprint: body.calendar_blueprint ?? [],
+      advanced_config: body.advanced_config ?? {},
+      is_active: body.is_active ?? true,
+      created_at: now,
+      updated_at: now,
+    };
+    agentPresets.push(preset);
+    sendJson(response, 201, preset);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAgentPresetItem(request, response, presetId) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const preset = agentPresets.find((item) => item.id === presetId);
+  if (preset === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(preset, await readJson(request), {
+      updated_at: new Date().toISOString(),
+    });
+    sendJson(response, 200, preset);
+    return;
+  }
+  if (request.method === "DELETE") {
+    preset.is_active = false;
+    preset.updated_at = new Date().toISOString();
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleWorldCompositionImport(request, response) {
+  const currentSubject = subjectForRequest(request);
+  if (currentSubject === null) {
+    sendJson(response, 401, { detail: "Invalid or missing session" });
+    return;
+  }
+  if (!isPlatformAdmin(currentSubject)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method !== "POST") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+
+  const body = await readJson(request);
+  const owner = users.find((user) => user.id === body.owner_user_id && user.is_active);
+  if (owner === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (worlds.some((world) => world.slug === body.slug)) {
+    sendJson(response, 409, { detail: "World slug already exists" });
+    return;
+  }
+
+  const composition = body.composition;
+  for (const presetReference of composition.preset_references ?? []) {
+    if (!agentPresets.some((preset) => preset.preset_key === presetReference.preset_key)) {
+      sendJson(response, 422, { detail: `Unknown agent preset: ${presetReference.preset_key}` });
+      return;
+    }
+  }
+
+  const world = {
+    id: randomUUID(),
+    owner_user_id: owner.id,
+    slug: body.slug,
+    name: body.name,
+    description: body.description ?? composition.world.description ?? null,
+    rules_config: body.rules_config ?? composition.world.rules_config ?? {},
+    memory_backend_profile_id: body.memory_backend_profile_id ?? memoryProfilePrimaryId,
+    memory_plugin_identifier:
+      composition.world.memory_plugin_identifier ?? "builtin.local_pgvector_memory",
+    memory_plugin_config: composition.world.memory_plugin_config ?? {},
+    world_rules_plugin_identifier:
+      composition.world.world_rules_plugin_identifier ?? "builtin.default_world_rules",
+    world_rules_plugin_config: composition.world.world_rules_plugin_config ?? {},
+    is_active: composition.world.is_active,
+  };
+  worlds.push(world);
+  memberships.push(membership(randomUUID(), world.id, owner.id, "world_admin"));
+  clocks.set(world.id, clockForWorld(world.id));
+  replaySequences.set(world.id, 0);
+
+  const sceneKeyToId = new Map();
+  for (const scene of composition.scenes ?? []) {
+    const createdScene = {
+      id: randomUUID(),
+      world_id: world.id,
+      scene_key: scene.scene_key,
+      name: scene.name,
+      description: scene.description ?? null,
+      is_active: scene.is_active,
+    };
+    scenes.push(createdScene);
+    sceneKeyToId.set(scene.scene_key, createdScene.id);
+  }
+
+  for (const rule of composition.schedule_rules ?? []) {
+    scheduleRules.push({
+      id: randomUUID(),
+      world_id: world.id,
+      rule_key: rule.rule_key,
+      name: rule.name,
+      kind: rule.kind,
+      config: rule.config ?? {},
+      is_enabled: rule.is_enabled,
+    });
+  }
+
+  for (const exportedAgent of composition.agents ?? []) {
+    const preset =
+      exportedAgent.source_preset_key === null
+        ? null
+        : agentPresets.find((item) => item.preset_key === exportedAgent.source_preset_key) ?? null;
+    const providerProfile =
+      exportedAgent.provider_profile_key === null
+        ? null
+        : providerProfiles.find((item) => item.profile_key === exportedAgent.provider_profile_key) ?? null;
+    const presetProviderProfile =
+      preset?.default_provider_profile_key == null
+        ? null
+        : providerProfiles.find((item) => item.profile_key === preset.default_provider_profile_key) ?? null;
+    const providerProfileId = providerProfile?.id ?? presetProviderProfile?.id ?? null;
+    const config = {
+      ...(preset?.advanced_config ?? {}),
+      ...(exportedAgent.config ?? {}),
+      ...(providerProfileId === null ? {} : { provider_profile_id: providerProfileId }),
+    };
+    const agent = {
+      id: randomUUID(),
+      world_id: world.id,
+      home_scene_id:
+        exportedAgent.home_scene_key === null
+          ? null
+          : (sceneKeyToId.get(exportedAgent.home_scene_key) ?? null),
+      source_preset_id: preset?.id ?? null,
+      agent_key: exportedAgent.agent_key,
+      display_name: exportedAgent.display_name,
+      kind: exportedAgent.kind ?? preset?.default_kind ?? "role_agent",
+      provider_profile_id: providerProfileId,
+      config,
+      is_enabled: exportedAgent.is_enabled,
+    };
+    agents.push(agent);
+    materializePresetForAgent(world.id, agent.id, preset);
+  }
+
+  sendJson(response, 201, world);
 }
 
 async function handleProviderProfileItem(request, response, profileId, action) {
@@ -867,7 +1454,106 @@ async function handleProviderProfileItem(request, response, profileId, action) {
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleMemory(request, response, currentSubject, worldId, agentId, memoryId) {
+async function handleMemoryBackendProfileItem(request, response, profileId, action) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const profile = memoryBackendProfiles.find((item) => item.id === profileId);
+  if (profile === undefined) {
+    sendJson(response, 404, { detail: "Memory backend profile not found" });
+    return;
+  }
+  if (request.method === "GET" && action === "health") {
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      status: "ok",
+      details: { profile_key: profile.profile_key },
+    });
+    return;
+  }
+  if (request.method === "GET" && action === "logs") {
+    sendJson(response, 200, {
+      write_logs: memoryWriteLogs.filter(
+        (entry) => entry.correlation_ids.world_id === worldOneId,
+      ),
+      retrieval_logs: memoryRetrievalLogs.filter(
+        (entry) => entry.backend_profile_id === profile.id,
+      ),
+    });
+    return;
+  }
+  if (request.method === "GET" && action === "jobs") {
+    sendJson(response, 200, {
+      jobs: memoryWriteJobs.filter((entry) => entry.backend_profile_id === profile.id),
+    });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "eval-smoke") {
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      case_count: 1,
+      hit_case_count: 1,
+      average_latency_ms: 5,
+      average_context_items: 1,
+      cases: [
+        {
+          label: "smoke",
+          query_text: "guide context",
+          backend: "builtin.mem0_oss_memory",
+          hit_count: 1,
+          context_item_count: 1,
+          latency_ms: 5,
+        },
+      ],
+    });
+    return;
+  }
+  if (request.method === "PATCH" && action === undefined) {
+    Object.assign(profile, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, profile);
+    return;
+  }
+  if (request.method === "DELETE" && action === undefined) {
+    profile.is_enabled = false;
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemoryWriteJobItem(request, response, jobId, action) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const job = memoryWriteJobs.find((item) => item.id === jobId);
+  if (job === undefined) {
+    sendJson(response, 404, { detail: "Memory write job not found" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "retry") {
+    job.status = "pending";
+    job.next_attempt_at = new Date().toISOString();
+    job.last_error = null;
+    job.processed_at = null;
+    job.updated_at = new Date().toISOString();
+    sendJson(response, 200, job);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemory(request, response, currentSubject, worldId, agentId, memoryId, action) {
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -876,53 +1562,65 @@ async function handleMemory(request, response, currentSubject, worldId, agentId,
     sendJson(
       response,
       200,
-      memoryItems.filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active),
+      memoryItems.filter((item) => item.world_id === worldId && item.agent_id === agentId),
     );
+    return;
+  }
+  if (request.method === "POST" && memoryId === "search") {
+    const body = await readJson(request);
+    const limit = Number.isFinite(Number(body.limit)) ? Number(body.limit) : 10;
+    sendJson(
+      response,
+      200,
+      memoryItems
+        .filter((item) => item.world_id === worldId && item.agent_id === agentId)
+        .filter((item) =>
+          typeof body.query_text === "string" && body.query_text.trim() !== ""
+            ? item.content.toLowerCase().includes(body.query_text.toLowerCase())
+            : true,
+        )
+        .map((item, index) => ({ ...item, score: 1 - index * 0.1 }))
+        .slice(0, limit),
+    );
+    return;
+  }
+  if (request.method === "GET" && memoryId === "profile-snapshot") {
+    sendJson(response, 200, memoryProfileSnapshots.get(agentId) ?? null);
     return;
   }
   if (!hasValidCsrf(request)) {
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
     return;
   }
-  if (request.method === "POST" && memoryId === undefined) {
-    const body = await readJson(request);
-    const item = {
-      id: randomUUID(),
+  if (request.method === "POST" && memoryId === "profile-snapshot" && action === "refresh") {
+    const snapshot = {
+      id: memoryProfileSnapshots.get(agentId)?.id ?? randomUUID(),
       world_id: worldId,
       agent_id: agentId,
-      content: body.content,
-      metadata: body.metadata ?? {},
-      embedding: body.embedding ?? [1, 0, 0],
-      visibility: "private",
-      is_active: true,
-      source_event_id: body.source_event_id ?? null,
-      score: null,
+      aliases: ["Guide"],
+      identity_notes: ["Resident guide for the first world."],
+      durable_preferences: ["Keeps replies concise."],
+      long_lived_goals: ["Help operators move the scene forward."],
+      language_style_preferences: ["Direct and calm."],
+      refreshed_at: new Date().toISOString(),
+      created_at: memoryProfileSnapshots.get(agentId)?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
-    memoryItems.unshift(item);
-    sendJson(response, 201, item);
+    memoryProfileSnapshots.set(agentId, snapshot);
+    sendJson(response, 200, snapshot);
     return;
   }
-  if (request.method === "POST" && memoryId === "search") {
-    sendJson(
-      response,
-      200,
-      memoryItems
-        .filter((item) => item.world_id === worldId && item.agent_id === agentId && item.is_active)
-        .map((item, index) => ({ ...item, score: 1 - index * 0.1 })),
+  if (request.method === "POST" && memoryId === "forget") {
+    const retained = memoryItems.filter(
+      (item) => !(item.world_id === worldId && item.agent_id === agentId),
     );
-    return;
-  }
-  const item = memoryItems.find(
-    (candidate) => candidate.id === memoryId && candidate.world_id === worldId && candidate.agent_id === agentId,
-  );
-  if (item === undefined) {
-    sendJson(response, 404, { detail: "Memory item not found" });
-    return;
-  }
-  if (request.method === "DELETE") {
-    item.is_active = false;
-    response.writeHead(204);
-    response.end();
+    memoryItems.length = 0;
+    memoryItems.push(...retained);
+    memoryProfileSnapshots.delete(agentId);
+    sendJson(response, 200, {
+      backend: "builtin.mem0_oss_memory",
+      deleted_count: null,
+    });
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -949,6 +1647,8 @@ async function handlePersona(request, response, currentSubject, worldId, agentId
       agent_id: agentId,
       persona_text: body.persona_text ?? "",
       behavior_policy: body.behavior_policy ?? {},
+      policy_plugin_identifier: body.policy_plugin_identifier ?? "builtin.default_persona_policy",
+      policy_plugin_config: body.policy_plugin_config ?? {},
       is_enabled: body.is_enabled ?? true,
       created_at: agentPersonas.get(agentId)?.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1062,10 +1762,8 @@ async function handleAgentRun(request, response, currentSubject, worldId, agentI
         agent_id: agentId,
         content: run.response_text,
         metadata: { run_id: run.run_id },
-        embedding: [1, 0, 0],
-        visibility: "private",
-        is_active: true,
-        source_event_id: null,
+        backend: "builtin.mem0_oss_memory",
+        created_at: new Date().toISOString(),
         score: null,
       });
     }
@@ -1441,9 +2139,17 @@ async function handleConversations(request, response, currentSubject, worldId, c
         policy: body.policy,
         writer_config: body.writer_config ?? {
           provider_profile_id: null,
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {},
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
+        },
+        memory_config: body.memory_config ?? {
+          write_turn_memory: true,
+          retrieve_memory: true,
+          max_context_items: 5,
+          query_window: 4,
         },
         terminal_reason: null,
         created_at: now,
@@ -1728,6 +2434,41 @@ function writerArtifactSet(writerConfig) {
     return "chapter_only";
   }
   return "summary_only";
+}
+
+function materializePresetForAgent(worldId, agentId, preset) {
+  if (preset == null) {
+    return;
+  }
+  const currentPersona = agentPersonas.get(agentId);
+  agentPersonas.set(agentId, {
+    id: currentPersona?.id ?? randomUUID(),
+    world_id: worldId,
+    agent_id: agentId,
+    persona_text: preset.persona_text ?? "",
+    behavior_policy: preset.behavior_policy ?? {},
+    policy_plugin_identifier:
+      currentPersona?.policy_plugin_identifier ?? "builtin.default_persona_policy",
+    policy_plugin_config: currentPersona?.policy_plugin_config ?? {},
+    is_enabled: true,
+    created_at: currentPersona?.created_at ?? new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  for (const blueprintEntry of preset.calendar_blueprint ?? []) {
+    calendarEntries.push({
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      title: blueprintEntry.title,
+      description: blueprintEntry.description ?? null,
+      starts_at: new Date(blueprintEntry.starts_at).toISOString(),
+      ends_at:
+        blueprintEntry.ends_at == null ? null : new Date(blueprintEntry.ends_at).toISOString(),
+      recurrence_rule: blueprintEntry.recurrence_rule ?? null,
+      status: "active",
+      metadata: blueprintEntry.metadata ?? {},
+    });
+  }
 }
 
 function clockForWorld(worldId) {

@@ -5,6 +5,9 @@ import type {
   AgentCreateInput,
   AgentObservation,
   AgentObservationCreateInput,
+  AgentPreset,
+  AgentPresetCreateInput,
+  AgentPresetUpdateInput,
   AgentPersona,
   AgentPersonaUpdateInput,
   AgentRun,
@@ -23,12 +26,23 @@ import type {
   ConversationTurn,
   ConversationUpdateInput,
   MemberCandidate,
+  MemoryBackendProfile,
+  MemoryBackendProfileCreateInput,
+  MemoryBackendProfileUpdateInput,
+  MemoryBackendHealth,
+  MemoryBackendLogs,
+  MemoryWriteJob,
+  MemoryWriteJobList,
+  MemoryWriteJobStatus,
+  MemoryEvalResult,
   MemoryItem,
-  MemoryItemCreateInput,
+  MemoryProfileSnapshot,
   MemorySearchInput,
   Membership,
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
+  PluginCatalogEntry,
+  PluginCategory,
   Scene,
   SceneCreateInput,
   SceneUpdateInput,
@@ -50,6 +64,8 @@ import type {
   WorldReplayState,
   WorldSnapshot,
   WorldUpdateInput,
+  WorldCompositionExport,
+  WorldCompositionImportInput,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -80,6 +96,54 @@ export function updateWorld(worldId: string, input: WorldUpdateInput): Promise<W
 
 export function deactivateWorld(worldId: string): Promise<void> {
   return worldRequest<void>(`/api/worlds/${worldId}`, { method: "DELETE", csrf: true });
+}
+
+export function exportWorldComposition(worldId: string): Promise<WorldCompositionExport> {
+  return worldRequest<WorldCompositionExport>(`/api/worlds/${worldId}/composition-export`, {
+    method: "GET",
+  });
+}
+
+export function importWorldComposition(
+  input: WorldCompositionImportInput,
+): Promise<World> {
+  return apiRequest<World>("/api/world-compositions/import", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listAgentPresets(): Promise<AgentPreset[]> {
+  return apiRequest<AgentPreset[]>("/api/agent-presets", { method: "GET" });
+}
+
+export function createAgentPreset(
+  input: AgentPresetCreateInput,
+): Promise<AgentPreset> {
+  return apiRequest<AgentPreset>("/api/agent-presets", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateAgentPreset(
+  presetId: string,
+  input: AgentPresetUpdateInput,
+): Promise<AgentPreset> {
+  return apiRequest<AgentPreset>(`/api/agent-presets/${presetId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function deactivateAgentPreset(presetId: string): Promise<void> {
+  return apiRequest<void>(`/api/agent-presets/${presetId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
 }
 
 export function getWorldClock(worldId: string): Promise<WorldClock> {
@@ -268,18 +332,6 @@ export function listAgentMemory(worldId: string, agentId: string): Promise<Memor
   });
 }
 
-export function createAgentMemoryItem(
-  worldId: string,
-  agentId: string,
-  input: MemoryItemCreateInput,
-): Promise<MemoryItem> {
-  return worldRequest<MemoryItem>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
-    method: "POST",
-    body: input,
-    csrf: true,
-  });
-}
-
 export function searchAgentMemory(
   worldId: string,
   agentId: string,
@@ -288,19 +340,43 @@ export function searchAgentMemory(
   return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory/search`, {
     method: "POST",
     body: input,
-    csrf: true,
   });
 }
 
-export function disableAgentMemoryItem(
+export function getAgentMemoryProfileSnapshot(
   worldId: string,
   agentId: string,
-  memoryId: string,
-): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/memory/${memoryId}`, {
-    method: "DELETE",
-    csrf: true,
-  });
+): Promise<MemoryProfileSnapshot | null> {
+  return worldRequest<MemoryProfileSnapshot | null>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+    { method: "GET" },
+  );
+}
+
+export function refreshAgentMemoryProfileSnapshot(
+  worldId: string,
+  agentId: string,
+): Promise<MemoryProfileSnapshot> {
+  return worldRequest<MemoryProfileSnapshot>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot/refresh`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function forgetAgentMemory(
+  worldId: string,
+  agentId: string,
+): Promise<{ backend: string; deleted_count: number | null }> {
+  return worldRequest<{ backend: string; deleted_count: number | null }>(
+    `/api/worlds/${worldId}/agents/${agentId}/memory/forget`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRun[]> {
@@ -325,6 +401,13 @@ export function updateAgentPersona(
     body: input,
     csrf: true,
   });
+}
+
+export function listPluginCatalog(
+  category?: PluginCategory,
+): Promise<PluginCatalogEntry[]> {
+  const query = category === undefined ? "" : `?category=${encodeURIComponent(category)}`;
+  return apiRequest<PluginCatalogEntry[]>(`/api/plugins/catalog${query}`, { method: "GET" });
 }
 
 export function listAgentObservations(
@@ -691,6 +774,94 @@ export function listWorldDiagnostics(worldId: string): Promise<RuntimeDiagnostic
 
 export function listProviderProfiles(): Promise<ProviderProfile[]> {
   return apiRequest<ProviderProfile[]>("/api/provider-profiles", { method: "GET" });
+}
+
+export function listMemoryBackendProfiles(): Promise<MemoryBackendProfile[]> {
+  return apiRequest<MemoryBackendProfile[]>("/api/memory-backend-profiles", { method: "GET" });
+}
+
+export function createMemoryBackendProfile(
+  input: MemoryBackendProfileCreateInput,
+): Promise<MemoryBackendProfile> {
+  return apiRequest<MemoryBackendProfile>("/api/memory-backend-profiles", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateMemoryBackendProfile(
+  profileId: string,
+  input: MemoryBackendProfileUpdateInput,
+): Promise<MemoryBackendProfile> {
+  return apiRequest<MemoryBackendProfile>(`/api/memory-backend-profiles/${profileId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function deleteMemoryBackendProfile(profileId: string): Promise<void> {
+  return apiRequest<void>(`/api/memory-backend-profiles/${profileId}`, {
+    method: "DELETE",
+    csrf: true,
+  });
+}
+
+export function getMemoryBackendProfileHealth(
+  profileId: string,
+): Promise<MemoryBackendHealth> {
+  return apiRequest<MemoryBackendHealth>(
+    `/api/memory-backend-profiles/${profileId}/health`,
+    { method: "GET" },
+  );
+}
+
+export function getMemoryBackendProfileLogs(
+  profileId: string,
+  limit = 20,
+): Promise<MemoryBackendLogs> {
+  return apiRequest<MemoryBackendLogs>(
+    `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
+    { method: "GET" },
+  );
+}
+
+export function listMemoryBackendProfileJobs(
+  profileId: string,
+  options: { status?: MemoryWriteJobStatus; limit?: number } = {},
+): Promise<MemoryWriteJobList> {
+  const search = new URLSearchParams();
+  if (options.status !== undefined) {
+    search.set("status", options.status);
+  }
+  if (options.limit !== undefined) {
+    search.set("limit", String(options.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return apiRequest<MemoryWriteJobList>(
+    `/api/memory-backend-profiles/${profileId}/jobs${suffix}`,
+    { method: "GET" },
+  );
+}
+
+export function retryMemoryWriteJob(jobId: string): Promise<MemoryWriteJob> {
+  return apiRequest<MemoryWriteJob>(`/api/memory-write-jobs/${jobId}/retry`, {
+    method: "POST",
+    csrf: true,
+  });
+}
+
+export function runMemoryBackendProfileEvalSmoke(
+  profileId: string,
+): Promise<MemoryEvalResult> {
+  return apiRequest<MemoryEvalResult>(
+    `/api/memory-backend-profiles/${profileId}/eval-smoke`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function createProviderProfile(input: ProviderProfileCreateInput): Promise<ProviderProfile> {

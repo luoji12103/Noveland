@@ -220,6 +220,28 @@
 - Docs updated: README, data ownership, architecture map, project index, file inventory, task board, active handoff
 - Follow-up notes: provider timeout/retry/rate-limit hardening, provider test-call health state, and agent observation/persona policy remain separate tasks.
 
+## Plugin runtime wiring entry
+
+- Date: 2026-04-22
+- Branch: feat/plugin-runtime-wiring
+- Scope: explicit plugin bindings and runtime wiring
+- Summary: Added built-in plugin identifiers and registry-backed implementations for model providers, memory backend, world rules, persona policy, and narrative writer; added explicit DB/plugin bindings plus plugin-aware Web configuration surfaces.
+- Files changed: `/backend/packages/plugins/**`, `/backend/packages/adapters/**`, `/backend/packages/agents/**`, `/backend/packages/narrative/**`, `/backend/packages/worlds/**`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`, `/web/app/api/plugins/catalog/**`, `/web/features/admin/**`, `/web/features/agents/**`, `/web/features/conversations/**`, `/web/features/worlds/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/harness/**`
+- Tests added/updated: plugin runtime regression through backend `ruff`, `mypy`, and full `pytest`; frontend `lint`, `typecheck`, `vitest`, `playwright`, and production build coverage updated for plugin-aware loaders and forms
+- Docs updated: project index, file inventory, task board, active handoff
+- Follow-up notes: plugin execution still uses code-registered built-ins only; marketplace, hot reload, and remote installation remain future work.
+
+## Mem0 OSS-first long-term memory entry
+
+- Date: 2026-04-24
+- Branch: feat/memory-mem0-oss-foundation
+- Scope: long-term memory refactor
+- Summary: Replaced the old synchronous pgvector CRUD memory baseline with a Mem0 OSS-first long-term memory stack, including platform memory backend profiles, async memory write jobs/logs, conversation and runtime memory context integration, read-only web memory surfaces, profile snapshots, forget flows, and eval/health operators.
+- Files changed: `/.env.example`, `/README.md`, `/backend/packages/core/src/noveland/core/settings.py`, `/backend/packages/memory/**`, `/backend/packages/plugins/**`, `/backend/packages/worlds/**`, `/backend/packages/conversations/**`, `/backend/services/api/**`, `/backend/services/runtime/**`, `/backend/migrations/versions/20260423_0016_memory_mem0_oss_foundation.py`, `/backend/migrations/versions/20260423_0017_memory_context_integration.py`, `/backend/migrations/versions/20260423_0018_memory_profiles_forget_evals.py`, `/backend/tests/**`, `/web/app/admin/memory-backends/**`, `/web/app/api/memory-backend-profiles/**`, `/web/features/admin/memory-backend-admin.tsx`, `/web/features/agents/agent-builder.tsx`, `/web/features/conversations/conversation-detail.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/docs/agent/harness/**`
+- Tests added/updated: backend memory backend/service/API/runtime/schema/import tests; web type/client/component coverage for read-only memory and admin memory backend flows; Playwright mock backend updated for memory profiles and read-only memory behavior
+- Docs updated: README, long-memory architecture, technical stack, configuration/secrets, data ownership, module boundaries, plugin architecture, architecture map, project index, file inventory, task board, active handoff
+- Follow-up notes: Mem0 remains behind `MemoryService`; raw event storage still reuses existing world events, conversation turns, and agent runs; distributed job execution and richer profile derivation remain future work.
+
 ## Provider reliability hardening entry
 
 - Date: 2026-04-17
@@ -285,3 +307,36 @@
 - Tests added/updated: narrative artifact API filter/detail coverage for world members; reader component tests; world client tests for filtered narrative list/detail; mock-backend E2E coverage for reader redirects and member-readable narrative pages
 - Docs updated: README, project index, file inventory, task board, active handoff, change journal
 - Follow-up notes: public sharing, reader search/sorting, reader timeline views, and realtime narrative updates remain future tasks.
+
+## Realtime updates entry
+
+- Date: 2026-04-22
+- Branch: feat/realtime-updates
+- Scope: hybrid SSE updates and conversation live control
+- Summary: Added platform/world/conversation SSE delta routes, conversation live WebSocket control with origin checks, same-origin Next streaming proxies, and local live hydration for runtime, world overview, and conversation detail views.
+- Files changed: `/backend/services/api/src/noveland/services/api/realtime.py`, `/backend/services/api/src/noveland/services/api/app.py`, `/backend/tests/test_api_realtime.py`, `/web/app/api/runtime/stream/**`, `/web/app/api/worlds/[worldId]/stream/**`, `/web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/**`, `/web/features/admin/**`, `/web/features/conversations/**`, `/web/features/worlds/**`, `/web/lib/auth/**`, `/web/lib/realtime.ts`, `/web/lib/realtime/**`, `/web/lib/worlds/types.ts`, `/.env.example`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: realtime API/auth/origin tests; streaming proxy tests; runtime admin and conversation detail component coverage for live updates; full backend/web regression suite
+- Docs updated: README, project index, file inventory, task board, change journal
+- Follow-up notes: Stage 1 adds incremental streaming and live conversation control without replacing existing SSR/REST loaders; world members remain read-only on the live WebSocket channel.
+
+## Agent composition presets entry
+
+- Date: 2026-04-22
+- Branch: feat/agent-composition-presets
+- Scope: platform-managed presets and world composition import/export
+- Summary: Added `agent_presets`, preset-aware agent materialization, world composition export/import routes, preset admin UI, preset-aware agent creation, and composition controls in the world overview.
+- Files changed: `/backend/packages/agents/**`, `/backend/services/api/src/noveland/services/api/{app,worlds}.py`, `/backend/migrations/versions/20260422_0014_agent_composition_presets.py`, `/backend/tests/**`, `/web/app/admin/presets/**`, `/web/app/api/agent-presets/**`, `/web/app/api/world-compositions/**`, `/web/features/{admin,agents,worlds}/**`, `/web/lib/{api-proxy.ts,worlds/**}`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: preset API/schema tests; world composition export/import API tests; world client tests for preset/composition routes; component tests for preset admin and agent preset creation flow; Playwright mock-backend coverage for preset management and composition import/export
+- Docs updated: README, project index, file inventory, task board, change journal, active handoff
+- Follow-up notes: presets are materialized only at agent creation/import time, and world composition import always creates a new world instead of merging into an existing one.
+
+## Runtime memory ops entry
+
+- Date: 2026-05-01
+- Branch: feat/runtime-memory-ops
+- Scope: memory write job observability and retry operators
+- Summary: Added platform-admin memory write job listing/retry APIs, runtime status memory job counts, daemon loop processed-memory-job result reporting, and Web memory backend job/failure controls.
+- Files changed: `/backend/packages/memory/**`, `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/services/runtime/src/noveland/services/runtime/daemon.py`, `/backend/tests/**`, `/web/app/api/memory-backend-profiles/[profileId]/jobs/**`, `/web/app/api/memory-write-jobs/**`, `/web/features/admin/memory-backend-admin.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: memory service job list/summary/retry tests; runtime API permission/retry/status tests; runtime daemon processed-memory-job assertions; Web client and Playwright mock-backend coverage for memory job listing/retry.
+- Docs updated: README, project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: Memory jobs still use the v1 database-backed queue; distributed workers, production queue coordination, and richer backfill remain future work.

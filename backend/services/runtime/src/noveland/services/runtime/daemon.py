@@ -10,6 +10,7 @@ from noveland.core.database import create_engine_from_settings, create_session_f
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import AppSettings
 from noveland.events import WorldEventPublisher
+from noveland.memory import MemoryService
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -39,6 +40,7 @@ class RuntimeLoopResult:
     desired_state: str
     advanced_worlds: int
     executed_runs: int
+    processed_memory_jobs: int
 
 
 class RuntimeControlService:
@@ -117,6 +119,7 @@ class RuntimeDaemon:
                     desired_state=control.desired_state,
                     advanced_worlds=0,
                     executed_runs=0,
+                    processed_memory_jobs=0,
                 )
 
             control_service.mark_loop_started()
@@ -134,20 +137,34 @@ class RuntimeDaemon:
                 tick_result = RuntimeClockTicker(session, self._publisher).run_once(wall_time)
                 world_ids = sorted({event.world_id for event in tick_result.events}, key=str)
                 profile_service = ProviderProfileService(session, self._settings)
-                executed_runs = AgentRuntimeOrchestrator(
-                    session,
-                    profile_service,
-                ).run_due_agents(
-                    world_ids,
-                    wall_time=wall_time,
-                    batch_limit=self._settings.runtime_batch_limit,
-                ).executed_runs
+                executed_runs = (
+                    AgentRuntimeOrchestrator(
+                        session,
+                        profile_service,
+                        self._settings,
+                    )
+                    .run_due_agents(
+                        world_ids,
+                        wall_time=wall_time,
+                        batch_limit=self._settings.runtime_batch_limit,
+                    )
+                    .executed_runs
+                )
                 remaining_capacity = max(self._settings.runtime_batch_limit - executed_runs, 0)
-                conversation_turns = ConversationRuntimeOrchestrator(
-                    session,
-                    profile_service,
-                ).advance_running_sessions(remaining_capacity).executed_turns
+                conversation_turns = (
+                    ConversationRuntimeOrchestrator(
+                        session,
+                        profile_service,
+                        self._settings,
+                    )
+                    .advance_running_sessions(remaining_capacity)
+                    .executed_turns
+                )
                 executed_runs += conversation_turns
+                processed_memory_jobs = MemoryService(
+                    session,
+                    self._settings,
+                ).process_due_jobs(self._settings.runtime_batch_limit)
                 view = control_service.mark_loop_finished()
                 diagnostics.record(
                     RuntimeDiagnosticCreate(
@@ -159,6 +176,7 @@ class RuntimeDaemon:
                             "advanced_worlds": tick_result.advanced_worlds,
                             "executed_runs": executed_runs,
                             "executed_conversation_turns": conversation_turns,
+                            "processed_memory_jobs": processed_memory_jobs,
                             "published_events": tick_result.published_events,
                         },
                     ),
@@ -168,6 +186,7 @@ class RuntimeDaemon:
                     desired_state=view.desired_state,
                     advanced_worlds=tick_result.advanced_worlds,
                     executed_runs=executed_runs,
+                    processed_memory_jobs=processed_memory_jobs,
                 )
             except Exception as exc:
                 view = control_service.mark_loop_finished(str(exc))
@@ -189,6 +208,7 @@ class RuntimeDaemon:
                     desired_state=view.desired_state,
                     advanced_worlds=0,
                     executed_runs=0,
+                    processed_memory_jobs=0,
                 )
 
     def run_loop(self, max_iterations: int | None = None) -> int:

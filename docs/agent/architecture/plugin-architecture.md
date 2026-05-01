@@ -26,6 +26,15 @@ To allow stable extension points without rewriting the kernel.
 - category-specific runtime method contracts are intentionally deferred
 - plugin failures currently surface through typed exceptions; admin diagnostics and logging integration are later work
 
+## Current runtime wiring
+
+- `model_provider` bindings are resolved from provider profiles and validated through `PluginRegistry` before provider invocation.
+- `memory_backend` bindings are resolved behind `MemoryService`; business code uses the service facade, not backend SDK or adapter types directly.
+- `world_rules` bindings govern schedule-resolution wiring for world-owned rules.
+- `persona_policy` bindings shape agent prompt construction, including memory context integration.
+- `narrative_writer` bindings drive conversation-first summary and chapter generation.
+- Built-in implementations remain code-registered first-party plugins; there is still no marketplace, hot loading, or dynamic code upload path.
+
 ## Required plugin shape
 
 Each plugin should define:

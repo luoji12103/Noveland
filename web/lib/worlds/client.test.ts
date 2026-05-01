@@ -4,17 +4,20 @@ import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
   createAgentObservation,
-  createAgentMemoryItem,
+  createMemoryBackendProfile,
   createNarrativeArtifact,
   createProviderProfile,
+  createAgentPreset,
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
   getNarrativeArtifact,
   createWorld,
-  disableAgentMemoryItem,
+  deactivateAgentPreset,
+  deleteMemoryBackendProfile,
   disableProviderProfile,
   deactivateScene,
+  exportWorldComposition,
   getRuntimeControl,
   getRuntimeStatus,
   getLatestSnapshot,
@@ -24,21 +27,28 @@ import {
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
+  listMemoryBackendProfiles,
+  listMemoryBackendProfileJobs,
   pauseWorldClock,
   resumeWorldClock,
   listAgentMemory,
   listNarrativeArtifacts,
   listConversationNarrativeArtifacts,
+  listAgentPresets,
   listProviderProfiles,
   runAgent,
   refreshAgentObservations,
+  retryMemoryWriteJob,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
   listWorldDiagnostics,
   searchAgentMemory,
   testProviderProfile,
+  importWorldComposition,
+  updateMemoryBackendProfile,
   updateAgent,
+  updateAgentPreset,
   updateProviderProfile,
   updateAgentPersona,
   updateRuntimeControl,
@@ -100,6 +110,54 @@ describe("world client", () => {
       "/api/worlds/world-1/member-candidates?limit=20&query=user",
     );
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/scenes/scene-1");
+  });
+
+  it("maps preset and composition requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "preset-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ world: { slug: "first-world" } }))
+      .mockResolvedValueOnce(jsonResponse({ id: "world-2" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentPresets();
+    await createAgentPreset({
+      preset_key: "storyteller",
+      name: "Storyteller",
+      default_kind: "narrative_agent",
+    });
+    await updateAgentPreset("preset-1", { name: "Updated preset" });
+    await deactivateAgentPreset("preset-1");
+    await exportWorldComposition("world-1");
+    await importWorldComposition({
+      slug: "imported-world",
+      name: "Imported World",
+      owner_user_id: "user-1",
+      composition: {
+        world: {
+          slug: "first-world",
+          name: "First World",
+          description: null,
+          rules_config: {},
+          is_active: true,
+        },
+        scenes: [],
+        agents: [],
+        schedule_rules: [],
+        preset_references: [],
+      },
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/agent-presets");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/agent-presets");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/agent-presets/preset-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/agent-presets/preset-1");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/composition-export");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/world-compositions/import");
   });
 
   it("sends clock control requests", async () => {
@@ -174,29 +232,53 @@ describe("world client", () => {
   });
 
   it("maps memory requests", async () => {
-    document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1" }]))
-      .mockResolvedValueOnce(jsonResponse({ id: "memory-1" }, 201))
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1", score: 0.9 }]))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await listAgentMemory("world-1", "agent-1");
-    await createAgentMemoryItem("world-1", "agent-1", {
-      content: "Memory",
-      embedding: [1, 0, 0],
-    });
-    await searchAgentMemory("world-1", "agent-1", { embedding: [1, 0, 0], limit: 5 });
-    await disableAgentMemoryItem("world-1", "agent-1", "memory-1");
+    await searchAgentMemory("world-1", "agent-1", { query_text: "green tea", limit: 5 });
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
-    expect(fetchMock.mock.calls[3][0]).toBe(
-      "/api/worlds/world-1/agents/agent-1/memory/memory-1",
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
+    expect(fetchMock.mock.calls[1][1].body).toBe(
+      JSON.stringify({ query_text: "green tea", limit: 5 }),
     );
+  });
+
+  it("maps memory backend profile requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "memory-profile-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ jobs: [{ id: "job-1", status: "failed" }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "job-1", status: "pending" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listMemoryBackendProfiles();
+    await createMemoryBackendProfile({
+      profile_key: "mem0-default",
+      name: "Mem0 default",
+      backend_kind: "mem0_oss",
+    });
+    await updateMemoryBackendProfile("memory-profile-1", { name: "Updated" });
+    await deleteMemoryBackendProfile("memory-profile-1");
+    await listMemoryBackendProfileJobs("memory-profile-1", { status: "failed", limit: 5 });
+    await retryMemoryWriteJob("job-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/memory-backend-profiles");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/memory-backend-profiles");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
+    expect(fetchMock.mock.calls[4][0]).toBe(
+      "/api/memory-backend-profiles/memory-profile-1/jobs?status=failed&limit=5",
+    );
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/memory-write-jobs/job-1/retry");
   });
 
   it("maps runtime and provider requests", async () => {

@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 
+from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SESSION_KEY_PATTERN = r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$"
@@ -74,9 +75,22 @@ class ConversationPolicyConfig(_FrozenContract):
 
 class ConversationWriterConfig(_FrozenContract):
     provider_profile_id: uuid.UUID | None = None
+    writer_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_NARRATIVE_WRITER,
+        min_length=1,
+        max_length=120,
+    )
+    writer_plugin_config: dict[str, object] = Field(default_factory=dict)
     auto_generate_on_complete: bool = False
     generate_summary: bool = True
     generate_chapter: bool = True
+
+
+class ConversationMemoryConfig(_FrozenContract):
+    write_turn_memory: bool = True
+    retrieve_memory: bool = True
+    max_context_items: int = Field(default=5, ge=1, le=20)
+    query_window: int = Field(default=8, ge=1, le=50)
 
 
 class ConversationSessionCreate(_FrozenContract):
@@ -91,6 +105,7 @@ class ConversationSessionCreate(_FrozenContract):
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyConfig
     writer_config: ConversationWriterConfig
+    memory_config: ConversationMemoryConfig = Field(default_factory=ConversationMemoryConfig)
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationSessionCreate:
@@ -108,6 +123,7 @@ class ConversationSessionUpdate(_FrozenContract):
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyConfig | None = None
     writer_config: ConversationWriterConfig | None = None
+    memory_config: ConversationMemoryConfig | None = None
 
 
 class ConversationParticipantDefinition(_FrozenContract):
@@ -135,6 +151,7 @@ class ConversationSessionRecord(_FrozenContract):
     next_turn_index: int
     policy: ConversationPolicyConfig
     writer_config: ConversationWriterConfig
+    memory_config: ConversationMemoryConfig
     terminal_reason: ConversationTerminalReason | None
     created_at: datetime
     updated_at: datetime

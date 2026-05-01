@@ -5,14 +5,19 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from noveland.adapters.models import ProviderProfile
 from noveland.agents.contracts import (
     AgentObservationCreate,
     AgentObservationRecord,
     AgentObservationRefreshResult,
     AgentPersonaRecord,
     AgentPersonaUpsert,
+    AgentPresetCalendarEntry,
+    AgentPresetRecord,
+    AgentPresetUpsert,
 )
-from noveland.agents.models import AgentObservation, AgentPersona
+from noveland.agents.models import AgentObservation, AgentPersona, AgentPreset
+from noveland.calendar.models import AgentCalendarEntry
 from noveland.events.models import WorldEventModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -44,12 +49,16 @@ class AgentPersonaService:
                 agent_id=persona.agent_id,
                 persona_text=persona.persona_text,
                 behavior_policy=persona.behavior_policy,
+                policy_plugin_identifier=persona.policy_plugin_identifier,
+                policy_plugin_config=persona.policy_plugin_config,
                 is_enabled=persona.is_enabled,
             )
             self._session.add(model)
         else:
             model.persona_text = persona.persona_text
             model.behavior_policy = persona.behavior_policy
+            model.policy_plugin_identifier = persona.policy_plugin_identifier
+            model.policy_plugin_config = persona.policy_plugin_config
             model.is_enabled = persona.is_enabled
         self._session.flush()
         return _persona_record(model)
@@ -161,6 +170,120 @@ class AgentObservationService:
         return len(observations)
 
 
+class AgentPresetService:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list(self, *, include_inactive: bool) -> list[AgentPresetRecord]:
+        statement = select(AgentPreset).order_by(AgentPreset.preset_key)
+        if not include_inactive:
+            statement = statement.where(AgentPreset.is_active.is_(True))
+        return [_preset_record(model) for model in self._session.scalars(statement).all()]
+
+    def get(
+        self,
+        preset_id: uuid.UUID,
+        *,
+        include_inactive: bool,
+    ) -> AgentPresetRecord | None:
+        statement = select(AgentPreset).where(AgentPreset.id == preset_id)
+        if not include_inactive:
+            statement = statement.where(AgentPreset.is_active.is_(True))
+        model = self._session.scalars(statement).one_or_none()
+        return None if model is None else _preset_record(model)
+
+    def get_by_key(
+        self,
+        preset_key: str,
+        *,
+        include_inactive: bool,
+    ) -> AgentPresetRecord | None:
+        statement = select(AgentPreset).where(AgentPreset.preset_key == preset_key)
+        if not include_inactive:
+            statement = statement.where(AgentPreset.is_active.is_(True))
+        model = self._session.scalars(statement).one_or_none()
+        return None if model is None else _preset_record(model)
+
+    def create(self, preset: AgentPresetUpsert) -> AgentPresetRecord:
+        model = AgentPreset(
+            preset_key=preset.preset_key,
+            name=preset.name,
+            description=preset.description,
+            default_kind=preset.default_kind,
+            default_provider_profile_key=preset.default_provider_profile_key,
+            persona_text=preset.persona_text,
+            behavior_policy=preset.behavior_policy,
+            calendar_blueprint_json=_calendar_blueprint_json(preset.calendar_blueprint),
+            advanced_config=preset.advanced_config,
+            is_active=preset.is_active,
+        )
+        self._session.add(model)
+        self._session.flush()
+        return _preset_record(model)
+
+    def update(self, preset_id: uuid.UUID, preset: AgentPresetUpsert) -> AgentPresetRecord | None:
+        model = self._session.scalars(
+            select(AgentPreset).where(AgentPreset.id == preset_id),
+        ).one_or_none()
+        if model is None:
+            return None
+        model.preset_key = preset.preset_key
+        model.name = preset.name
+        model.description = preset.description
+        model.default_kind = preset.default_kind
+        model.default_provider_profile_key = preset.default_provider_profile_key
+        model.persona_text = preset.persona_text
+        model.behavior_policy = preset.behavior_policy
+        model.calendar_blueprint_json = _calendar_blueprint_json(preset.calendar_blueprint)
+        model.advanced_config = preset.advanced_config
+        model.is_active = preset.is_active
+        self._session.flush()
+        return _preset_record(model)
+
+    def deactivate(self, preset_id: uuid.UUID) -> AgentPresetRecord | None:
+        model = self._session.scalars(
+            select(AgentPreset).where(AgentPreset.id == preset_id),
+        ).one_or_none()
+        if model is None:
+            return None
+        model.is_active = False
+        self._session.flush()
+        return _preset_record(model)
+
+    def resolve_provider_profile_id(self, profile_key: str | None) -> uuid.UUID | None:
+        if profile_key is None or profile_key == "":
+            return None
+        model = self._session.scalars(
+            select(ProviderProfile).where(ProviderProfile.profile_key == profile_key),
+        ).one_or_none()
+        return None if model is None else model.id
+
+    def materialize_calendar_blueprint(
+        self,
+        *,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        blueprint: Sequence[AgentPresetCalendarEntry],
+    ) -> Sequence[AgentCalendarEntry]:
+        created: list[AgentCalendarEntry] = []
+        for entry in blueprint:
+            model = AgentCalendarEntry(
+                world_id=world_id,
+                agent_id=agent_id,
+                title=entry.title,
+                description=entry.description,
+                starts_at=entry.starts_at,
+                ends_at=entry.ends_at,
+                recurrence_rule=entry.recurrence_rule,
+                status="active",
+                metadata_json=entry.metadata,
+            )
+            self._session.add(model)
+            created.append(model)
+        self._session.flush()
+        return created
+
+
 def _observation_from_event(
     event: WorldEventModel,
     agent_id: uuid.UUID,
@@ -220,6 +343,8 @@ def _persona_record(model: AgentPersona) -> AgentPersonaRecord:
         agent_id=model.agent_id,
         persona_text=model.persona_text,
         behavior_policy=model.behavior_policy,
+        policy_plugin_identifier=model.policy_plugin_identifier,
+        policy_plugin_config=model.policy_plugin_config,
         is_enabled=model.is_enabled,
         created_at=model.created_at,
         updated_at=model.updated_at,
@@ -239,3 +364,30 @@ def _observation_record(model: AgentObservation) -> AgentObservationRecord:
         consumed_at=model.consumed_at,
         created_at=model.created_at,
     )
+
+
+def _preset_record(model: AgentPreset) -> AgentPresetRecord:
+    return AgentPresetRecord(
+        id=model.id,
+        preset_key=model.preset_key,
+        name=model.name,
+        description=model.description,
+        default_kind=model.default_kind,
+        default_provider_profile_key=model.default_provider_profile_key,
+        persona_text=model.persona_text,
+        behavior_policy=model.behavior_policy,
+        calendar_blueprint=[
+            AgentPresetCalendarEntry.model_validate(entry)
+            for entry in model.calendar_blueprint_json
+        ],
+        advanced_config=model.advanced_config,
+        is_active=model.is_active,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _calendar_blueprint_json(
+    blueprint: list[AgentPresetCalendarEntry],
+) -> list[dict[str, Any]]:
+    return [entry.model_dump(mode="json") for entry in blueprint]

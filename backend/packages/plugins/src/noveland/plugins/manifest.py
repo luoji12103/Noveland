@@ -4,7 +4,7 @@ from typing import Any
 from noveland.plugins.categories import PluginCategory
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
+IDENTIFIER_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 
 
 class PluginManifest(BaseModel):
@@ -22,7 +22,7 @@ class PluginManifest(BaseModel):
         if not IDENTIFIER_PATTERN.fullmatch(value):
             raise ValueError(
                 "identifier must use lowercase slug or dotted form, "
-                "for example 'builtin.openai' or 'local-memory'"
+                "for example 'builtin.openai_compatible' or 'local-memory'"
             )
         return value
 

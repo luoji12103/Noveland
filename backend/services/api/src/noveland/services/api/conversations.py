@@ -5,9 +5,11 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from noveland.adapters import ProviderProfileService
+from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent
 from noveland.conversations import (
     ConversationErrorPolicy,
+    ConversationMemoryConfig,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
@@ -32,6 +34,10 @@ from noveland.narrative import (
     NarrativeGenerationMode,
 )
 from noveland.observability import RuntimeDiagnosticRecord
+from noveland.plugins.builtins import get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
+from noveland.plugins.errors import PluginConfigValidationError, PluginNotFoundError
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
@@ -80,6 +86,9 @@ class ConversationCreateRequest(_RequestModel):
     max_turns: int = Field(default=12, ge=1, le=200)
     policy: ConversationPolicyRequest
     writer_config: ConversationWriterConfigRequest
+    memory_config: ConversationMemoryConfigRequest = Field(
+        default_factory=lambda: ConversationMemoryConfigRequest(),
+    )
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationCreateRequest:
@@ -97,6 +106,7 @@ class ConversationUpdateRequest(_RequestModel):
     max_turns: int | None = Field(default=None, ge=1, le=200)
     policy: ConversationPolicyRequest | None = None
     writer_config: ConversationWriterConfigRequest | None = None
+    memory_config: ConversationMemoryConfigRequest | None = None
 
 
 class ConversationParticipantRequest(_RequestModel):
@@ -111,9 +121,22 @@ class ConversationSeedRequest(_RequestModel):
 
 class ConversationWriterConfigRequest(_RequestModel):
     provider_profile_id: uuid.UUID | None = None
+    writer_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_NARRATIVE_WRITER,
+        min_length=1,
+        max_length=120,
+    )
+    writer_plugin_config: dict[str, Any] = Field(default_factory=dict)
     auto_generate_on_complete: bool = False
     generate_summary: bool = True
     generate_chapter: bool = True
+
+
+class ConversationMemoryConfigRequest(_RequestModel):
+    write_turn_memory: bool = True
+    retrieve_memory: bool = True
+    max_context_items: int = Field(default=5, ge=1, le=20)
+    query_window: int = Field(default=8, ge=1, le=50)
 
 
 class ConversationNarrativeGenerateRequest(_RequestModel):
@@ -132,9 +155,18 @@ class ConversationPolicyResponse(BaseModel):
 
 class ConversationWriterConfigResponse(BaseModel):
     provider_profile_id: uuid.UUID | None
+    writer_plugin_identifier: str
+    writer_plugin_config: dict[str, Any]
     auto_generate_on_complete: bool
     generate_summary: bool
     generate_chapter: bool
+
+
+class ConversationMemoryConfigResponse(BaseModel):
+    write_turn_memory: bool
+    retrieve_memory: bool
+    max_context_items: int
+    query_window: int
 
 
 class ConversationSessionResponse(BaseModel):
@@ -152,6 +184,7 @@ class ConversationSessionResponse(BaseModel):
     next_turn_index: int
     policy: ConversationPolicyResponse
     writer_config: ConversationWriterConfigResponse
+    memory_config: ConversationMemoryConfigResponse
     terminal_reason: str | None
     created_at: str
     updated_at: str
@@ -236,6 +269,7 @@ def create_conversation(
 ) -> ConversationSessionResponse:
     require_csrf(request)
     _validate_scene_reference(db_session, context.world_id, conversation_create.scene_id)
+    _validate_writer_config_binding(db_session, conversation_create.writer_config)
     try:
         session = ConversationService(db_session).create_session(
             ConversationSessionCreate(
@@ -250,6 +284,7 @@ def create_conversation(
                 max_turns=conversation_create.max_turns,
                 policy=_policy_contract(conversation_create.policy),
                 writer_config=_writer_config_contract(conversation_create.writer_config),
+                memory_config=_memory_config_contract(conversation_create.memory_config),
             ),
         )
     except ConversationValidationError as exc:
@@ -279,6 +314,8 @@ def update_conversation(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ConversationSessionResponse:
     require_csrf(request)
+    if conversation_update.writer_config is not None:
+        _validate_writer_config_binding(db_session, conversation_update.writer_config)
     try:
         session = ConversationService(db_session).update_session(
             context.world_id,
@@ -294,6 +331,9 @@ def update_conversation(
                 writer_config=None
                 if conversation_update.writer_config is None
                 else _writer_config_contract(conversation_update.writer_config),
+                memory_config=None
+                if conversation_update.memory_config is None
+                else _memory_config_contract(conversation_update.memory_config),
             ),
         )
     except LookupError as exc:
@@ -488,9 +528,11 @@ def advance_conversation(
     ):
         raise _conflict("Auto dialogue sessions can only advance manually while paused")
     try:
+        settings = load_settings()
         result = ConversationRuntimeOrchestrator(
             db_session,
-            ProviderProfileService(db_session, load_settings()),
+            ProviderProfileService(db_session, settings),
+            settings,
         ).advance_session(
             context.world_id,
             conversation_id,
@@ -589,9 +631,22 @@ def _writer_config_contract(
 ) -> ConversationWriterConfig:
     return ConversationWriterConfig(
         provider_profile_id=writer_config.provider_profile_id,
+        writer_plugin_identifier=writer_config.writer_plugin_identifier,
+        writer_plugin_config=writer_config.writer_plugin_config,
         auto_generate_on_complete=writer_config.auto_generate_on_complete,
         generate_summary=writer_config.generate_summary,
         generate_chapter=writer_config.generate_chapter,
+    )
+
+
+def _memory_config_contract(
+    memory_config: ConversationMemoryConfigRequest,
+) -> ConversationMemoryConfig:
+    return ConversationMemoryConfig(
+        write_turn_memory=memory_config.write_turn_memory,
+        retrieve_memory=memory_config.retrieve_memory,
+        max_context_items=memory_config.max_context_items,
+        query_window=memory_config.query_window,
     )
 
 
@@ -617,13 +672,19 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
         ),
         writer_config=ConversationWriterConfigResponse(
             provider_profile_id=session.writer_config.provider_profile_id,
+            writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
+            writer_plugin_config=session.writer_config.writer_plugin_config,
             auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
             generate_summary=session.writer_config.generate_summary,
             generate_chapter=session.writer_config.generate_chapter,
         ),
-        terminal_reason=None
-        if session.terminal_reason is None
-        else session.terminal_reason.value,
+        memory_config=ConversationMemoryConfigResponse(
+            write_turn_memory=session.memory_config.write_turn_memory,
+            retrieve_memory=session.memory_config.retrieve_memory,
+            max_context_items=session.memory_config.max_context_items,
+            query_window=session.memory_config.query_window,
+        ),
+        terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
     )
@@ -741,3 +802,36 @@ def _http_error_for_conversation_error(detail: str) -> HTTPException:
     ):
         status_code = status.HTTP_409_CONFLICT
     return HTTPException(status_code=status_code, detail=detail)
+
+
+def _validate_writer_config_binding(
+    db_session: Session,
+    writer_config: ConversationWriterConfigRequest,
+) -> None:
+    if writer_config.provider_profile_id is not None:
+        profile = db_session.get(ProviderProfile, writer_config.provider_profile_id)
+        if profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Provider profile not found",
+            )
+    registry = get_builtin_plugin_registry()
+    try:
+        definition = registry.get(writer_config.writer_plugin_identifier)
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if definition.manifest.category is not PluginCategory.NARRATIVE_WRITER:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Writer binding must use a narrative_writer plugin",
+        )
+    try:
+        registry.validate_config(
+            writer_config.writer_plugin_identifier,
+            writer_config.writer_plugin_config,
+        )
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc

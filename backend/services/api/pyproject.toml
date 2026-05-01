@@ -19,6 +19,7 @@ dependencies = [
   "noveland-memory",
   "noveland-narrative",
   "noveland-observability",
+  "noveland-plugins",
   "noveland-service-runtime",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
@@ -41,6 +42,7 @@ noveland-events = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-narrative = { workspace = true }
 noveland-observability = { workspace = true }
+noveland-plugins = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-worlds = { workspace = true }
 

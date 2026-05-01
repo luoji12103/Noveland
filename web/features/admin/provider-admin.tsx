@@ -9,23 +9,27 @@ import {
   testProviderProfile,
   updateProviderProfile,
 } from "@/lib/worlds/client";
-import type { ProviderProfile } from "@/lib/worlds/types";
+import type { ProviderAdminData } from "@/lib/worlds/server";
+import type { PluginCatalogEntry, ProviderProfile } from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
   messageForError,
   numberFormValue,
   optionalNumberFormValue,
+  optionalFormString,
 } from "@/features/workspace/form-utils";
 
 type ProviderAdminProps = {
-  profiles: ProviderProfile[];
+  data: ProviderAdminData;
 };
 
-export function ProviderAdmin({ profiles }: ProviderAdminProps) {
+export function ProviderAdmin({ data }: ProviderAdminProps) {
   const router = useRouter();
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const profiles = data.profiles;
+  const modelProviderPlugins = data.modelProviderPlugins;
 
   async function runAction(action: () => Promise<unknown>, success: string) {
     setIsBusy(true);
@@ -53,6 +57,8 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
           provider_type: formString(form, "provider_type") as
             | "openai_compatible"
             | "anthropic_compatible",
+          plugin_identifier: optionalFormString(form, "plugin_identifier"),
+          plugin_config: jsonObject(formString(form, "plugin_config")),
           base_url: formString(form, "base_url"),
           model_name: formString(form, "model_name"),
           api_key_ref: formString(form, "api_key_ref"),
@@ -74,6 +80,8 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
       () =>
         updateProviderProfile(profileId, {
           name: formString(form, "name"),
+          plugin_identifier: optionalFormString(form, "plugin_identifier"),
+          plugin_config: jsonObject(formString(form, "plugin_config")),
           base_url: formString(form, "base_url"),
           model_name: formString(form, "model_name"),
           api_key_ref: formString(form, "api_key_ref"),
@@ -102,17 +110,32 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
             <option value="openai_compatible">openai_compatible</option>
             <option value="anthropic_compatible">anthropic_compatible</option>
           </select>
+          <select
+            aria-label="Provider plugin"
+            className="text-input"
+            name="plugin_identifier"
+            defaultValue=""
+          >
+            <option value="">Select provider plugin</option>
+            {modelProviderPlugins.map((plugin) => (
+              <option key={plugin.identifier} value={plugin.identifier}>
+                {plugin.identifier}
+              </option>
+            ))}
+          </select>
           <input className="text-input" name="base_url" placeholder="https://api.example.test/v1" />
           <input className="text-input" name="model_name" placeholder="Model name" />
           <input className="text-input" name="api_key_ref" placeholder="api-key-ref" />
           <input className="text-input" name="timeout_seconds" placeholder="20" />
           <input className="text-input" name="retry_attempts" placeholder="1" />
           <input className="text-input" name="rate_limit_per_minute" placeholder="Rate limit" />
+          <textarea className="text-input" name="plugin_config" placeholder="{}" rows={3} />
           <textarea className="text-input" name="capabilities" placeholder="{}" rows={3} />
           <button className="primary-button" type="submit" disabled={isBusy}>
             Create provider profile
           </button>
         </form>
+        <PluginHint plugins={modelProviderPlugins} />
       </section>
 
       <section className="management-panel" aria-labelledby="providers-title">
@@ -136,6 +159,7 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
                     {profile.profile_key} - {profile.provider_type} -{" "}
                     {profile.is_enabled ? "Enabled" : "Disabled"}
                   </p>
+                  <p>Plugin: {profile.plugin_identifier}</p>
                   <p>
                     Test: {profile.last_test_status ?? "not run"}
                     {profile.last_test_error !== null ? ` - ${profile.last_test_error}` : ""}
@@ -145,6 +169,18 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
                     onSubmit={(event) => handleUpdateProfile(event, profile.id)}
                   >
                     <input className="text-input" name="name" defaultValue={profile.name} />
+                    <select
+                      aria-label={`Provider plugin ${profile.name}`}
+                      className="text-input"
+                      name="plugin_identifier"
+                      defaultValue={profile.plugin_identifier}
+                    >
+                      {modelProviderPlugins.map((plugin) => (
+                        <option key={plugin.identifier} value={plugin.identifier}>
+                          {plugin.identifier}
+                        </option>
+                      ))}
+                    </select>
                     <input className="text-input" name="base_url" defaultValue={profile.base_url} />
                     <input
                       className="text-input"
@@ -170,6 +206,12 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
                       className="text-input"
                       name="rate_limit_per_minute"
                       defaultValue={profile.rate_limit_per_minute ?? ""}
+                    />
+                    <textarea
+                      className="text-input"
+                      name="plugin_config"
+                      rows={3}
+                      defaultValue={JSON.stringify(profile.plugin_config, null, 2)}
                     />
                     <textarea
                       className="text-input"
@@ -217,5 +259,24 @@ export function ProviderAdmin({ profiles }: ProviderAdminProps) {
         </div>
       </section>
     </section>
+  );
+}
+
+function PluginHint({ plugins }: { plugins: PluginCatalogEntry[] }) {
+  if (plugins.length === 0) {
+    return <p>No provider plugins available.</p>;
+  }
+
+  return (
+    <div className="resource-list">
+      {plugins.map((plugin) => (
+        <article className="resource-row" key={plugin.identifier}>
+          <div>
+            <h3>{plugin.identifier}</h3>
+            <p>{plugin.capabilities.join(", ") || "No capabilities declared."}</p>
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }

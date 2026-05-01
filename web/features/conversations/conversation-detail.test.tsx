@@ -17,6 +17,22 @@ vi.mock("@/lib/worlds/client", async () => {
   };
 });
 
+vi.mock("@/lib/realtime", () => ({
+  createConversationLiveSocket: vi.fn(() => ({
+    close: vi.fn(),
+    readyState: 3,
+  })),
+  mergeById: <T extends { id: string }>(current: T[], incoming: T[]) => {
+    const byId = new Map(current.map((item) => [item.id, item]));
+    for (const item of incoming) {
+      byId.set(item.id, item);
+    }
+    return Array.from(byId.values());
+  },
+  nextRequestId: vi.fn(() => "request-1"),
+  subscribeToEventStream: vi.fn(() => () => {}),
+}));
+
 const refresh = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -93,6 +109,8 @@ describe("ConversationDetail", () => {
       expect(updateConversation).toHaveBeenCalledWith("world-1", "conversation-1", {
         writer_config: {
           provider_profile_id: "profile-1",
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {},
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
@@ -157,6 +175,11 @@ const adminData: ConversationDetailData = {
       name: "World 1",
       description: null,
       rules_config: {},
+      memory_backend_profile_id: null,
+      memory_plugin_identifier: "builtin.local_pgvector_memory",
+      memory_plugin_config: {},
+      world_rules_plugin_identifier: "builtin.default_world_rules",
+      world_rules_plugin_config: {},
       is_active: true,
     },
   ],
@@ -167,6 +190,11 @@ const adminData: ConversationDetailData = {
     name: "World 1",
     description: null,
     rules_config: {},
+    memory_backend_profile_id: null,
+    memory_plugin_identifier: "builtin.local_pgvector_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
     is_active: true,
   },
   scenes: [],
@@ -175,6 +203,7 @@ const adminData: ConversationDetailData = {
       id: "agent-1",
       world_id: "world-1",
       home_scene_id: null,
+      source_preset_id: null,
       agent_key: "guide",
       display_name: "Guide",
       kind: "role_agent",
@@ -207,9 +236,17 @@ const adminData: ConversationDetailData = {
     },
     writer_config: {
       provider_profile_id: "profile-1",
+      writer_plugin_identifier: "builtin.default_narrative_writer",
+      writer_plugin_config: {},
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
+    },
+    memory_config: {
+      write_turn_memory: true,
+      retrieve_memory: true,
+      max_context_items: 5,
+      query_window: 4,
     },
     terminal_reason: null,
     created_at: "2026-04-21T00:00:00.000Z",
@@ -270,6 +307,16 @@ const adminData: ConversationDetailData = {
       artifact_kind: "conversation_summary",
       metadata: { generation_mode: "manual" },
       created_at: "2026-04-21T00:00:03.000Z",
+    },
+  ],
+  narrativeWriterPlugins: [
+    {
+      identifier: "builtin.default_narrative_writer",
+      category: "narrative_writer",
+      version: "0.1.0",
+      config_schema: {},
+      capabilities: [],
+      built_in: true,
     },
   ],
 };

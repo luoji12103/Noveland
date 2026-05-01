@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters import ProviderCompletion, ProviderProfileService
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
+from noveland.agents.models import (
+    Agent,
+    AgentObservation,
+    AgentPersona,
+    AgentPreset,
+    AgentRuntimeRun,
+)
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -18,7 +24,14 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationSession
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
-from noveland.memory.models import AgentMemoryItem
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability import (
     DiagnosticComponent,
@@ -326,6 +339,206 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert delete_original_admin.status_code == 204
 
 
+def test_platform_admin_manages_agent_presets_and_world_admin_lists_active_presets() -> None:
+    client, engine = _client_with_database()
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "preset-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _seed_provider_profile(engine, profile_key="preset-provider")
+
+    _authenticate(client, platform_token)
+    create_preset = client.post(
+        "/agent-presets",
+        json={
+            "preset_key": "storyteller",
+            "name": "Storyteller",
+            "default_kind": "narrative_agent",
+            "default_provider_profile_key": "preset-provider",
+            "persona_text": "Writes as a storyteller.",
+            "behavior_policy": {"tone": "gentle"},
+            "calendar_blueprint": [
+                {
+                    "title": "Morning check-in",
+                    "starts_at": "2030-01-01T08:00:00Z",
+                    "metadata": {"source": "preset"},
+                }
+            ],
+            "advanced_config": {"style": "baseline"},
+        },
+    )
+    preset_id = create_preset.json()["id"]
+    active_list_for_admin = client.get("/agent-presets")
+    deactivate_preset = client.patch(
+        f"/agent-presets/{preset_id}",
+        json={"is_active": False, "name": "Storyteller Disabled"},
+    )
+    inactive_list_for_admin = client.get("/agent-presets")
+
+    _authenticate(client, owner_token)
+    active_list_for_world_admin = client.get("/agent-presets")
+
+    assert create_preset.status_code == 201
+    assert active_list_for_admin.status_code == 200
+    assert active_list_for_admin.json()[0]["preset_key"] == "storyteller"
+    assert deactivate_preset.status_code == 200
+    assert deactivate_preset.json()["is_active"] is False
+    assert inactive_list_for_admin.status_code == 200
+    assert inactive_list_for_admin.json()[0]["name"] == "Storyteller Disabled"
+    assert active_list_for_world_admin.status_code == 200
+    assert active_list_for_world_admin.json() == []
+
+
+def test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping() -> None:
+    client, engine = _client_with_database()
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "agent-preset-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _seed_provider_profile(engine, profile_key="preset-provider")
+
+    _authenticate(client, platform_token)
+    preset_response = client.post(
+        "/agent-presets",
+        json={
+            "preset_key": "narrator",
+            "name": "Narrator",
+            "default_kind": "narrative_agent",
+            "default_provider_profile_key": "preset-provider",
+            "persona_text": "Always narrates in scene.",
+            "behavior_policy": {"voice": "omniscient"},
+            "calendar_blueprint": [
+                {
+                    "title": "Narrative pulse",
+                    "starts_at": "2030-01-01T09:00:00Z",
+                    "metadata": {"kind": "pulse"},
+                }
+            ],
+            "advanced_config": {"style": "baseline", "length": "short"},
+        },
+    )
+    preset_id = preset_response.json()["id"]
+
+    _authenticate(client, owner_token)
+    create_agent = client.post(
+        f"/worlds/{world_id}/agents",
+        json={
+            "agent_key": "narrator",
+            "display_name": "Narrator",
+            "preset_id": preset_id,
+            "config": {"style": "override", "temperature": 0.2},
+        },
+    )
+    agent_id = create_agent.json()["id"]
+    persona = client.get(f"/worlds/{world_id}/agents/{agent_id}/persona")
+    calendar = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+
+    assert create_agent.status_code == 201
+    assert create_agent.json()["kind"] == "narrative_agent"
+    assert create_agent.json()["source_preset_id"] == preset_id
+    assert create_agent.json()["provider_profile_id"] == str(
+        _provider_profile_id_by_key(engine, "preset-provider"),
+    )
+    assert create_agent.json()["config"]["style"] == "override"
+    assert create_agent.json()["config"]["length"] == "short"
+    assert create_agent.json()["config"]["temperature"] == 0.2
+    assert persona.status_code == 200
+    assert persona.json()["persona_text"] == "Always narrates in scene."
+    assert calendar.status_code == 200
+    assert [entry["title"] for entry in calendar.json()] == ["Narrative pulse"]
+
+
+def test_world_composition_export_and_import_round_trip() -> None:
+    client, engine = _client_with_database()
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    import_owner_id, import_owner_token = _seed_user(engine, "import-owner@example.test")
+    world_id = _seed_world(engine, owner_id, "composition-source")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    profile_id = _seed_provider_profile(engine, profile_key="composition-provider")
+    preset_id = _seed_agent_preset(
+        engine,
+        preset_key="story-preset",
+        default_provider_profile_key="composition-provider",
+    )
+    scene_id = _seed_scene(engine, world_id, "hall")
+    _seed_schedule_rule(engine, world_id)
+    _seed_agent(
+        engine,
+        world_id,
+        "story-agent",
+        scene_id=scene_id,
+        source_preset_id=preset_id,
+        provider_profile_id=profile_id,
+    )
+
+    _authenticate(client, owner_token)
+    export_response = client.get(f"/worlds/{world_id}/composition-export")
+    forbidden_import = client.post(
+        "/world-compositions/import",
+        json={
+            "slug": "forbidden-import",
+            "name": "Forbidden Import",
+            "owner_user_id": str(import_owner_id),
+            "composition": export_response.json(),
+        },
+    )
+
+    _authenticate(client, platform_token)
+    import_response = client.post(
+        "/world-compositions/import",
+        json={
+            "slug": "composition-imported",
+            "name": "Composition Imported",
+            "owner_user_id": str(import_owner_id),
+            "composition": export_response.json(),
+        },
+    )
+    imported_world_id = uuid.UUID(import_response.json()["id"])
+
+    _authenticate(client, import_owner_token)
+    imported_scenes = client.get(f"/worlds/{imported_world_id}/scenes")
+    imported_agents = client.get(f"/worlds/{imported_world_id}/agents")
+    imported_rules = client.get(f"/worlds/{imported_world_id}/schedule-rules")
+    imported_persona = client.get(
+        f"/worlds/{imported_world_id}/agents/{imported_agents.json()[0]['id']}/persona"
+    )
+    imported_calendar = client.get(
+        f"/worlds/{imported_world_id}/agents/{imported_agents.json()[0]['id']}/calendar"
+    )
+
+    assert export_response.status_code == 200
+    assert "memberships" not in export_response.json()
+    assert export_response.json()["agents"][0]["source_preset_key"] == "story-preset"
+    assert export_response.json()["agents"][0]["provider_profile_key"] == "composition-provider"
+    assert forbidden_import.status_code == 403
+    assert import_response.status_code == 201
+    assert import_response.json()["slug"] == "composition-imported"
+    assert imported_scenes.status_code == 200
+    assert imported_scenes.json()[0]["scene_key"] == "hall"
+    assert imported_agents.status_code == 200
+    assert imported_agents.json()[0]["source_preset_id"] == str(preset_id)
+    assert imported_agents.json()[0]["provider_profile_id"] == str(profile_id)
+    assert imported_rules.status_code == 200
+    assert imported_rules.json()[0]["rule_key"] == "weekday"
+    assert imported_persona.status_code == 200
+    assert imported_persona.json()["persona_text"] == "Preset persona"
+    assert imported_calendar.status_code == 200
+    assert imported_calendar.json()[0]["title"] == "Preset briefing"
+
+
 def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -397,51 +610,69 @@ def test_world_admin_manages_agent_memory() -> None:
     agent_id = _seed_agent(engine, world_id, "guide")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    with Session(engine) as session:
+        session.add(
+            AgentMemoryItem(
+                world_id=world_id,
+                agent_id=agent_id,
+                content="Guide likes green tea",
+                metadata_json={"source": "api-test"},
+                embedding=_embedding(),
+                visibility="private",
+                is_active=True,
+            ),
+        )
+        session.commit()
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
-    member_create = client.post(
-        f"/worlds/{world_id}/agents/{agent_id}/memory",
-        json={"content": "blocked", "embedding": _embedding()},
+    member_search = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"query_text": "blocked"},
     )
+    member_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+    )
+    member_forget = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
 
     _authenticate(client, owner_token)
-    create_memory = client.post(
-        f"/worlds/{world_id}/agents/{agent_id}/memory",
-        json={
-            "content": "Stored memory",
-            "embedding": _embedding(),
-            "metadata": {"source": "api-test"},
-        },
+    initial_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+    )
+    refresh_snapshot = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
     )
     list_memory = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
     search_memory = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
-        json={"embedding": _embedding(), "limit": 5},
+        json={"query_text": "green tea", "limit": 5},
     )
-    bad_embedding = client.post(
+    bad_query = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
-        json={"embedding": [1, 2, 3]},
+        json={"query_text": ""},
     )
-    disable_memory = client.delete(
-        f"/worlds/{world_id}/agents/{agent_id}/memory/{create_memory.json()['id']}",
-    )
-    list_after_disable = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    forget_memory = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
+    after_forget = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
 
     assert member_list.status_code == 403
-    assert member_create.status_code == 403
-    assert create_memory.status_code == 201
-    assert create_memory.json()["content"] == "Stored memory"
-    assert create_memory.json()["visibility"] == "private"
-    assert create_memory.json()["metadata"] == {"source": "api-test"}
+    assert member_search.status_code == 403
+    assert member_snapshot.status_code == 403
+    assert member_forget.status_code == 403
+    assert initial_snapshot.status_code == 200
+    assert initial_snapshot.json() is None
+    assert refresh_snapshot.status_code == 200
+    assert refresh_snapshot.json()["durable_preferences"] == ["Guide likes green tea"]
     assert list_memory.status_code == 200
     assert len(list_memory.json()) == 1
+    assert list_memory.json()[0]["content"] == "Guide likes green tea"
+    assert list_memory.json()[0]["metadata"] == {"source": "api-test"}
     assert search_memory.status_code == 200
-    assert search_memory.json()[0]["content"] == "Stored memory"
+    assert search_memory.json()[0]["content"] == "Guide likes green tea"
     assert isinstance(search_memory.json()[0]["score"], float)
-    assert bad_embedding.status_code == 422
-    assert disable_memory.status_code == 204
-    assert list_after_disable.json() == []
+    assert bad_query.status_code == 422
+    assert forget_memory.status_code == 200
+    assert forget_memory.json()["deleted_count"] == 1
+    assert after_forget.json() == []
 
 
 def test_agent_runs_and_narrative_artifacts_api(
@@ -733,11 +964,13 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, User.__table__),
         cast(Table, AuthSession.__table__),
         cast(Table, PlatformRoleAssignment.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
+        cast(Table, AgentPreset.__table__),
         cast(Table, Agent.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
@@ -746,6 +979,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
         cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),
@@ -816,17 +1053,31 @@ def _seed_scene(engine: Engine, world_id: uuid.UUID, scene_key: str) -> uuid.UUI
     return scene_id
 
 
-def _seed_agent(engine: Engine, world_id: uuid.UUID, agent_key: str) -> uuid.UUID:
+def _seed_agent(
+    engine: Engine,
+    world_id: uuid.UUID,
+    agent_key: str,
+    *,
+    scene_id: uuid.UUID | None = None,
+    source_preset_id: uuid.UUID | None = None,
+    provider_profile_id: uuid.UUID | None = None,
+) -> uuid.UUID:
     agent_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             Agent(
                 id=agent_id,
                 world_id=world_id,
+                home_scene_id=scene_id,
+                source_preset_id=source_preset_id,
                 agent_key=agent_key,
                 display_name=agent_key,
                 kind="role_agent",
-                config={},
+                config=(
+                    {}
+                    if provider_profile_id is None
+                    else {"provider_profile_id": str(provider_profile_id)}
+                ),
             ),
         )
         session.commit()
@@ -851,11 +1102,17 @@ def _add_membership(
         session.commit()
 
 
-def _seed_provider_profile(engine: Engine) -> None:
+def _seed_provider_profile(
+    engine: Engine,
+    *,
+    profile_key: str = "runtime-profile",
+) -> uuid.UUID:
+    profile_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ProviderProfile(
-                profile_key="runtime-profile",
+                id=profile_id,
+                profile_key=profile_key,
                 name="Runtime Profile",
                 provider_type="openai_compatible",
                 base_url="https://api.example.test/v1",
@@ -866,6 +1123,67 @@ def _seed_provider_profile(engine: Engine) -> None:
             ),
         )
         session.commit()
+    return profile_id
+
+
+def _provider_profile_id_by_key(engine: Engine, profile_key: str) -> uuid.UUID:
+    with Session(engine) as session:
+        return session.scalars(
+            select(ProviderProfile.id).where(ProviderProfile.profile_key == profile_key),
+        ).one()
+
+
+def _seed_agent_preset(
+    engine: Engine,
+    *,
+    preset_key: str,
+    default_provider_profile_key: str | None,
+) -> uuid.UUID:
+    preset_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            AgentPreset(
+                id=preset_id,
+                preset_key=preset_key,
+                name=preset_key,
+                default_kind="role_agent",
+                default_provider_profile_key=default_provider_profile_key,
+                persona_text="Preset persona",
+                behavior_policy={"tone": "direct"},
+                calendar_blueprint_json=[
+                    {
+                        "title": "Preset briefing",
+                        "description": None,
+                        "starts_at": "2030-01-01T07:00:00Z",
+                        "ends_at": None,
+                        "recurrence_rule": None,
+                        "metadata": {"source": "preset"},
+                    }
+                ],
+                advanced_config={"style": "preset"},
+                is_active=True,
+            ),
+        )
+        session.commit()
+    return preset_id
+
+
+def _seed_schedule_rule(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    rule_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            WorldScheduleRule(
+                id=rule_id,
+                world_id=world_id,
+                rule_key="weekday",
+                name="Weekday",
+                kind="weekday",
+                config={"window": "day"},
+                is_enabled=True,
+            )
+        )
+        session.commit()
+    return rule_id
 
 
 def _seed_conversation(engine: Engine, world_id: uuid.UUID, session_key: str) -> uuid.UUID:

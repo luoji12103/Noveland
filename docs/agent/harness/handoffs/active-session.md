@@ -1,18 +1,23 @@
 # Active Session Handoff
 
-- Date: 2026-04-21T00:00:00Z
-- Branch: feat/narrative-reader-surface
-- Objective: Add a dedicated, read-only narrative reader for authenticated world members on top of the conversation-first writer pipeline.
+- Date: 2026-05-01T08:21:21Z
+- Branch: feat/runtime-memory-ops
+- Objective: Add Runtime/Memory Ops visibility for async memory write jobs, including platform-admin job listing, retry operators, runtime status counts, and Web memory backend failure controls.
 - Completed work:
-  - Extended world narrative APIs with optional `artifact_kind`, `source_conversation_id`, and `limit` filters, plus artifact detail lookup by id.
-  - Added reader-specific server loaders and world-reader routes at `/worlds/[worldId]/reader` and `/worlds/[worldId]/reader/[artifactId]`.
-  - Added read-only reader UI for filtered artifact browsing, detail rendering, and source-conversation linking.
-  - Updated workspace navigation and world overview shortcuts to expose the dedicated reader surface.
-  - Added backend/API, client, component, and mock-backend E2E coverage for reader access and rendering.
+  - Fast-forward merged `feat/memory-mem0-oss-foundation` into local `main` after the full merge-readiness gate passed.
+  - Added memory write job contracts, `MemoryService` list/status/retry methods, and platform-admin API routes for profile job listing and failed-job retry.
+  - Added memory write job counts to runtime status and processed-memory-job counts to runtime daemon iteration results and diagnostics.
+  - Added same-origin Next proxy routes and Web client helpers for memory write jobs.
+  - Extended `/admin/memory-backends` with job/failure counts, failed-job details, and retry controls.
+  - Updated Playwright mock infrastructure and E2E flow for memory job retry.
 - Incomplete work:
-  - Commit is still pending on this branch.
-  - Branch remains intentionally unmerged; the plan for this round stops on `feat/narrative-reader-surface`.
+  - No next mainline has been selected after Runtime/Memory Ops.
 - Tests run:
+  - `cd backend && uv run ruff check packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd backend && uv run mypy packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test -- features/admin/runtime-admin.test.tsx`
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
@@ -20,15 +25,16 @@
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
   - `cd web && npm run test`
-  - `cd web && npm run test:e2e`
   - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
 - Current risks:
-  - Reader remains server-rendered and read-only; there is no full-text search, paging, or live update stream yet.
-  - Artifact detail lookup depends on existing world-membership visibility and returns 404 for inaccessible worlds/artifacts.
-  - Reader filters are intentionally narrow in v1 and focus on `conversation_summary` / `chapter_draft` workflows.
+  - The primary long-term memory path is now profile-driven and async, but distributed workers, queue coordination, and production-grade memory backfill are still future work.
+  - `builtin.local_pgvector_memory` remains as fallback/test coverage; canonical long-term behavior assumes Mem0 OSS-style profiles through `MemoryService`.
+  - Web Playwright coverage now depends on the local mock backend matching the evolving memory job contracts; keep the mock aligned when API contracts change.
 - Recommended next step:
-  - Run final full regression, commit `feat(web): add dedicated narrative reader`, and hold on this branch for review.
+  - Review or merge this branch, then select the next mainline.
 - Sensitive areas to avoid casual edits:
-  - world-member visibility rules on narrative artifact list/detail routes
-  - source-conversation linkage and reader/detail route stability
-  - provider secret handling and artifact metadata redaction
+  - `MemoryService` as the only business entrypoint for long-term memory
+  - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
+  - agent-private memory isolation across world and agent boundaries
+  - migration history for `20260423_0016` through `20260423_0018`

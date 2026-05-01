@@ -10,15 +10,25 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
-- `web/app/admin/` — platform-admin pages for provider profiles and runtime control
+- `web/app/admin/` — platform-admin pages for presets, provider profiles, and runtime control
+- `web/app/admin/memory-backends/` — platform-admin memory backend profile, health, log, job retry, and eval surface
+- `web/app/admin/presets/` — platform-admin preset catalog management page
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
+- `web/app/api/memory-backend-profiles/` — same-origin memory backend profile, health, log, job list, and eval proxy route handlers
+- `web/app/api/memory-write-jobs/` — same-origin memory write job retry proxy route handlers
+- `web/app/api/agent-presets/` — same-origin preset admin proxy route handlers
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
+- `web/app/api/world-compositions/` — same-origin world composition import proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
+- `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
+- `web/app/api/plugins/catalog/` — same-origin plugin catalog proxy route handler
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
+- `web/app/api/worlds/[worldId]/stream/` — same-origin world SSE proxy route
+- `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
-  - `web/features/admin/` — platform-level provider and runtime management pages
-  - `web/features/agents/` — agent list and focused agent builder pages
+  - `web/features/admin/` — platform-level preset, provider, runtime, and memory backend management pages
+  - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
   - `web/features/worlds/` — world index, overview, narrative management workspace, and read-only reader components
@@ -26,6 +36,9 @@ Fast orientation for a new coding session.
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
+  - `web/lib/api-proxy.ts` — shared same-origin proxy helper for preset and composition routes
+  - `web/lib/realtime/` — same-origin streaming proxy helper
+  - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
 - `web/package.json` — frontend scripts and dependency manifest
@@ -36,14 +49,15 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
+  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, memory backend profile, and memory write job operator router
+  - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
-  - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory writes, and narrative artifact creation
-  - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including optional completed-session narrative auto-generation
-  - `noveland.services.runtime.daemon` — database-backed runtime control state and daemon loop orchestration
+  - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
+  - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including conversation memory configuration and optional completed-session narrative auto-generation
+  - `noveland.services.runtime.daemon` — database-backed runtime control state, daemon loop orchestration, and due memory job processing status
 - `backend/pyproject.toml` — backend uv workspace manifest
 
 ### Backend packages
@@ -55,17 +69,17 @@ Fast orientation for a new coding session.
   - `noveland.worlds.clock_service` — persistent world clock state and transition audit service
   - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
-  - `noveland.agents.contracts` — persona and filtered observation DTOs
-  - `noveland.agents.models` — agent identity, runtime run, persona, and observation ORM models
-  - `noveland.agents.services` — persona upsert plus filtered observation list/create/refresh helpers
+  - `noveland.agents.contracts` — persona, filtered observation, and agent preset DTOs
+  - `noveland.agents.models` — agent identity, runtime run, persona, observation, and preset ORM models
+  - `noveland.agents.services` — persona/observation helpers plus preset CRUD, provider resolution, and calendar blueprint materialization
 - `backend/packages/calendar/`
   - `noveland.calendar.contracts` — calendar entry and schedule rule contracts
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
   - `noveland.calendar.services` — calendar CRUD and due-resolution service
 - `backend/packages/conversations/`
-  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, stop-condition, and writer-config DTOs
+  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, stop-condition, writer-config, and memory-config DTOs
   - `noveland.conversations.models` — conversation session, participant, and turn ORM models
-  - `noveland.conversations.services` — deterministic round-robin conversation service, stop-condition handling, diagnostics recording, transcript persistence, and writer-config mapping
+  - `noveland.conversations.services` — deterministic round-robin conversation service, stop-condition handling, diagnostics recording, transcript persistence, writer-config mapping, and memory-config mapping
 - `backend/packages/narrative/`
   - `noveland.narrative.contracts` — narrative artifact contracts plus conversation narrative generation inputs
   - `noveland.narrative.models` — narrative artifact ORM model with optional source conversation linkage
@@ -82,12 +96,18 @@ Fast orientation for a new coding session.
   - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
-  - `noveland.memory.contracts` — memory item and search contracts plus backend protocol
-  - `noveland.memory.models` — agent memory ORM model
-  - `noveland.memory.local_pgvector` — local pgvector-backed memory helper with add/list/search/disable
+  - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, and backend contracts
+  - `noveland.memory.errors` — typed long-term memory validation and execution errors
+  - `noveland.memory.models` — memory backend profiles, write jobs/logs, retrieval logs, agent profile snapshots, and local fallback memory ORM models
+  - `noveland.memory.service` — `MemoryService` facade for profile CRUD, context retrieval, async write processing, write job listing/retry/status, forget, health, logs, and eval flows
+  - `noveland.memory.evals` — smoke-eval helpers for backend contract coverage
+  - `noveland.memory.backends/` — abstract backend protocol plus fake and Mem0 OSS adapters
+  - `noveland.memory.local_pgvector` — local pgvector fallback backend and deterministic local search implementation
   - `noveland.memory.vector_type` — shared embedding dimension and SQLAlchemy vector type adapter
 - `backend/packages/plugins/`
-  - `noveland.plugins` — plugin registry, manifest, config validation, and typed errors
+  - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
+  - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
+  - `noveland.plugins.constants` — stable built-in plugin identifiers used by migrations and bindings
 - `backend/packages/adapters/`
   - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, test-call support, services, and model-provider adapters
   - `noveland.adapters.models` — provider profile ORM model and provider health fields
@@ -104,7 +124,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, memory, agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, and narrative writer/summarizer baseline
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, and explicit plugin runtime bindings
 
 ## Update rule
 

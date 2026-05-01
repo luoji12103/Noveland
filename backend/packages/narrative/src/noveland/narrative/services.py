@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from noveland.adapters import (
     ProviderCompletion,
@@ -12,9 +12,7 @@ from noveland.adapters import (
 from noveland.agents.models import Agent
 from noveland.conversations import ConversationService, ConversationSessionStatus
 from noveland.conversations.contracts import (
-    ConversationParticipantRecord,
     ConversationSessionRecord,
-    ConversationSpeakerKind,
     ConversationTurnRecord,
 )
 from noveland.narrative.contracts import (
@@ -26,6 +24,13 @@ from noveland.narrative.contracts import (
     NarrativeGenerationMode,
 )
 from noveland.narrative.models import NarrativeArtifact
+from noveland.plugins.builtins import NarrativeWriterPlugin, get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginFactoryError,
+    PluginNotFoundError,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -163,6 +168,10 @@ class ConversationNarrativeWriterService:
         provider = self._resolve_provider(
             generate.provider_profile_id or session.writer_config.provider_profile_id,
         )
+        writer_plugin = self._resolve_writer_plugin(
+            session.writer_config.writer_plugin_identifier,
+            session.writer_config.writer_plugin_config,
+        )
 
         artifacts: list[NarrativeArtifactRecord] = []
         summary_artifact = self._artifact_service.get_conversation_artifact(
@@ -185,7 +194,12 @@ class ConversationNarrativeWriterService:
             if summary_artifact is None:
                 summary_text = self._profile_service.invoke_profile(
                     provider,
-                    _summary_prompt(session, participants, turns, agents_by_id),
+                    writer_plugin.build_summary_prompt(
+                        session=session,
+                        participants=participants,
+                        turns=turns,
+                        agents_by_id=agents_by_id,
+                    ),
                 ).text.strip()
                 summary_artifact = self._artifact_service.create_artifact(
                     NarrativeArtifactCreate(
@@ -206,7 +220,12 @@ class ConversationNarrativeWriterService:
         elif needs_chapter and summary_text is None:
             summary_text = self._profile_service.invoke_profile(
                 provider,
-                _summary_prompt(session, participants, turns, agents_by_id),
+                writer_plugin.build_summary_prompt(
+                    session=session,
+                    participants=participants,
+                    turns=turns,
+                    agents_by_id=agents_by_id,
+                ),
             ).text.strip()
 
         if needs_chapter:
@@ -223,12 +242,12 @@ class ConversationNarrativeWriterService:
                         title=f"{session.title} chapter draft",
                         content=self._profile_service.invoke_profile(
                             provider,
-                            _chapter_prompt(
-                                session,
-                                participants,
-                                turns,
-                                agents_by_id,
-                                summary_text or "No summary available.",
+                            writer_plugin.build_chapter_prompt(
+                                session=session,
+                                participants=participants,
+                                turns=turns,
+                                agents_by_id=agents_by_id,
+                                summary_text=summary_text or "No summary available.",
                             ),
                         ).text.strip(),
                         artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
@@ -288,6 +307,27 @@ class ConversationNarrativeWriterService:
             raise ProviderConfigurationError("No enabled provider profile is available")
         return profile
 
+    def _resolve_writer_plugin(
+        self,
+        identifier: str,
+        raw_config: dict[str, object],
+    ) -> NarrativeWriterPlugin:
+        registry = get_builtin_plugin_registry()
+        definition = registry.get(identifier)
+        if definition.manifest.category is not PluginCategory.NARRATIVE_WRITER:
+            raise ProviderConfigurationError("Writer binding must use a narrative_writer plugin")
+        try:
+            return cast(
+                NarrativeWriterPlugin,
+                registry.create(identifier, raw_config),
+            )
+        except PluginNotFoundError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        except PluginConfigValidationError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        except PluginFactoryError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+
     def _agents_by_id(
         self,
         world_id: uuid.UUID,
@@ -314,100 +354,6 @@ def _artifact_set_from_writer_config(
     if session.writer_config.generate_chapter:
         return ConversationNarrativeArtifactSet.CHAPTER_ONLY
     return None
-
-
-def _summary_prompt(
-    session: ConversationSessionRecord,
-    participants: list[ConversationParticipantRecord],
-    turns: list[ConversationTurnRecord],
-    agents_by_id: dict[uuid.UUID, Agent],
-) -> str:
-    return "\n".join(
-        [
-            "Write a concise but complete conversation summary.",
-            _conversation_context(session, participants, turns, agents_by_id),
-            "Output plain text only.",
-        ],
-    )
-
-
-def _chapter_prompt(
-    session: ConversationSessionRecord,
-    participants: list[ConversationParticipantRecord],
-    turns: list[ConversationTurnRecord],
-    agents_by_id: dict[uuid.UUID, Agent],
-    summary_text: str,
-) -> str:
-    return "\n".join(
-        [
-            "Write a chapter draft based on this Noveland conversation.",
-            _conversation_context(session, participants, turns, agents_by_id),
-            "Conversation summary:",
-            summary_text,
-            "Output plain text only.",
-        ],
-    )
-
-
-def _conversation_context(
-    session: ConversationSessionRecord,
-    participants: list[ConversationParticipantRecord],
-    turns: list[ConversationTurnRecord],
-    agents_by_id: dict[uuid.UUID, Agent],
-) -> str:
-    participant_lines = _participant_lines(participants, agents_by_id)
-    transcript_lines = _transcript_lines(turns, agents_by_id)
-    terminal_reason = (
-        "None"
-        if session.terminal_reason is None
-        else session.terminal_reason.value
-    )
-    return "\n".join(
-        [
-            f"Session title: {session.title}",
-            f"Objective: {session.objective or 'No explicit objective.'}",
-            (
-                f"Scope metadata: scope_type={session.scope_type.value}; "
-                f"scene_id={session.scene_id}"
-            ),
-            f"Terminal status: {session.status.value}",
-            f"Terminal reason: {terminal_reason}",
-            "Participants:",
-            *(participant_lines or ["- none"]),
-            "Transcript:",
-            *(transcript_lines or ["- no turns recorded"]),
-        ],
-    )
-
-
-def _participant_lines(
-    participants: list[ConversationParticipantRecord],
-    agents_by_id: dict[uuid.UUID, Agent],
-) -> list[str]:
-    lines: list[str] = []
-    for participant in participants:
-        agent = agents_by_id.get(participant.agent_id)
-        if agent is None:
-            continue
-        lines.append(
-            f"- {agent.display_name} ({agent.agent_key}) order={participant.turn_order}",
-        )
-    return lines
-
-
-def _transcript_lines(
-    turns: list[ConversationTurnRecord],
-    agents_by_id: dict[uuid.UUID, Agent],
-) -> list[str]:
-    lines: list[str] = []
-    for turn in turns:
-        speaker = "operator"
-        if turn.speaker_kind == ConversationSpeakerKind.AGENT and turn.speaker_agent_id is not None:
-            agent = agents_by_id.get(turn.speaker_agent_id)
-            speaker = agent.display_name if agent is not None else str(turn.speaker_agent_id)
-        body = turn.output_text or turn.error_text or turn.input_text
-        lines.append(f"{turn.turn_index}. {speaker} [{turn.status.value}]: {body}")
-    return lines
 
 
 def _metadata(

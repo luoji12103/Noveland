@@ -8,6 +8,7 @@ from noveland.agents.models import Agent
 from noveland.conversations.contracts import (
     ConversationAdvanceResult,
     ConversationErrorPolicy,
+    ConversationMemoryConfig,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
@@ -115,6 +116,7 @@ class ConversationService:
             next_turn_index=0,
             policy_config=conversation.policy.model_dump(mode="json"),
             writer_config=conversation.writer_config.model_dump(mode="json"),
+            memory_config=conversation.memory_config.model_dump(mode="json"),
             terminal_reason=None,
         )
         self._session.add(model)
@@ -148,6 +150,8 @@ class ConversationService:
             model.policy_config = update.policy.model_dump(mode="json")
         if "writer_config" in update.model_fields_set and update.writer_config is not None:
             model.writer_config = update.writer_config.model_dump(mode="json")
+        if "memory_config" in update.model_fields_set and update.memory_config is not None:
+            model.memory_config = update.memory_config.model_dump(mode="json")
         self._session.flush()
         return _session_record(model)
 
@@ -598,7 +602,9 @@ class ConversationService:
             )
 
         transcript_lines = []
-        for turn in turns[-TRANSCRIPT_WINDOW:]:
+        memory_config = _memory_config(session_model.memory_config)
+        transcript_window = min(memory_config.query_window, TRANSCRIPT_WINDOW)
+        for turn in turns[-transcript_window:]:
             speaker = "operator"
             if turn.speaker_agent_id is not None:
                 agent = agents_by_id.get(turn.speaker_agent_id)
@@ -931,6 +937,7 @@ def _session_record(model: ConversationSession) -> ConversationSessionRecord:
         next_turn_index=model.next_turn_index,
         policy=_policy_config(model.policy_config),
         writer_config=_writer_config(model.writer_config),
+        memory_config=_memory_config(model.memory_config),
         terminal_reason=terminal_reason,
         created_at=_utc(model.created_at),
         updated_at=_utc(model.updated_at),
@@ -972,6 +979,10 @@ def _policy_config(value: dict[str, object]) -> ConversationPolicyConfig:
 
 def _writer_config(value: dict[str, object]) -> ConversationWriterConfig:
     return ConversationWriterConfig.model_validate(value)
+
+
+def _memory_config(value: dict[str, object]) -> ConversationMemoryConfig:
+    return ConversationMemoryConfig.model_validate(value)
 
 
 def _normalize_loop_text(value: str) -> str:

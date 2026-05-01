@@ -71,6 +71,43 @@ test("platform admin creates a world", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "E2E World" })).toBeVisible();
 });
 
+test("platform admin manages presets and world composition import/export", async ({ page }) => {
+  await signIn(page);
+
+  await page.goto("/admin/presets");
+  await page.getByPlaceholder("preset-key").fill("storyteller");
+  await page.getByPlaceholder("Preset name").fill("Storyteller");
+  await page.getByPlaceholder("Description").fill("Narrative preset");
+  await page.getByPlaceholder("Persona").fill("Writes clearly.");
+  await page.getByRole("button", { name: "Create preset" }).click();
+  await expect(page.getByRole("heading", { name: "Storyteller" })).toBeVisible();
+
+  await page.goto(`/worlds/${worldOneId}/agents`);
+  await page.locator('select[name="preset_id"]').selectOption({ label: "Storyteller" });
+  await expect(page.getByText("Preset preview")).toBeVisible();
+  await expect(page.getByText("Provider key: none")).toBeVisible();
+  await page.getByPlaceholder("agent-key").fill(`preset-agent-${Date.now()}`);
+  await page.getByPlaceholder("Display name").fill("Preset Agent");
+  await page.getByRole("button", { name: "Create agent" }).click();
+  await expect(page.getByText("Source preset: Storyteller (storyteller)")).toBeVisible();
+  await expect(page.locator('textarea[name="persona_text"]')).toHaveValue("Writes clearly.");
+
+  await page.goto(`/worlds/${worldOneId}`);
+  await page.getByRole("button", { name: "Export composition" }).click();
+  await expect(page.getByText("Composition exported.")).toBeVisible();
+  const exportedComposition = await page.locator('textarea[readonly]').inputValue();
+  expect(exportedComposition).toContain("\"preset_references\"");
+
+  const importedSlug = `imported-${Date.now()}`;
+  await page.getByPlaceholder("imported-world-slug").fill(importedSlug);
+  await page.getByPlaceholder("Imported world name").fill("Imported World");
+  await page.getByPlaceholder("Paste exported composition JSON").fill(exportedComposition);
+  await page.getByRole("button", { name: "Import as new world" }).click();
+
+  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible();
+});
+
 test("world admin manages workspace pages and conversations", async ({ page }) => {
   await signIn(page);
 
@@ -124,15 +161,18 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Create calendar entry" }).click();
   await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible();
 
-  await page.getByPlaceholder("Memory content").fill("E2E memory");
-  await page.getByPlaceholder("[1,0,0]").fill("[1,0,0]");
-  await page.getByRole("button", { name: "Add memory item" }).click();
-  await expect(page.getByRole("heading", { name: "E2E memory" })).toBeVisible();
+  await expect(page.getByText("Long-term memory is written asynchronously by runtime. This view is read-only.")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh memory profile" }).click();
+  await expect(page.getByText("Memory profile snapshot refreshed.")).toBeVisible();
 
   await page.getByPlaceholder("Manual run prompt").fill("Say hello from runtime");
   await page.getByRole("button", { name: "Run agent" }).click();
   await expect(page.getByText("Agent run completed.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "succeeded" }).first()).toBeVisible();
+  await page.getByPlaceholder("Search memory context").fill("Run output");
+  await page.getByRole("button", { name: "Search memory" }).click();
+  await expect(page.getByText("Memory search returned 1 item(s).")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Run output for/ })).toBeVisible();
 
   await page.goto(`/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`manual-${Date.now()}`);
@@ -183,6 +223,14 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByPlaceholder("api-key-ref").fill("openai-local");
   await page.getByRole("button", { name: "Create provider profile" }).click();
   await expect(page.getByRole("heading", { name: "E2E Provider" })).toBeVisible();
+
+  await page.goto("/admin/memory-backends");
+  await expect(page.getByRole("heading", { name: "Primary Mem0" })).toBeVisible();
+  await expect(page.getByText("Jobs: 1 / failed 1")).toBeVisible();
+  await expect(page.getByText("Error: mock backend timeout")).toBeVisible();
+  await page.getByRole("button", { name: "Retry job" }).click();
+  await expect(page.getByText("Memory write job queued for retry.")).toBeVisible();
+  await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible();
 });
 
 test("world member sees read-only workspace pages", async ({ page }) => {

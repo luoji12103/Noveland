@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { updateRuntimeControl } from "@/lib/worlds/client";
 import type { RuntimeAdminData } from "@/lib/worlds/server";
+import { subscribeToEventStream } from "@/lib/realtime";
+import type { RuntimeStreamEnvelope } from "@/lib/realtime";
+import type { RuntimeDiagnostic } from "@/lib/worlds/types";
 import { messageForError } from "@/features/workspace/form-utils";
 
 type RuntimeAdminProps = {
@@ -12,17 +14,51 @@ type RuntimeAdminProps = {
 };
 
 export function RuntimeAdmin({ data }: RuntimeAdminProps) {
-  const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [runtimeControl, setRuntimeControl] = useState(data.runtimeControl);
+  const [runtimeStatus, setRuntimeStatus] = useState(data.runtimeStatus);
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(data.runtimeDiagnostics);
+  const memoryWriteJobs = runtimeStatus?.memory_write_jobs ?? {
+    pending_count: 0,
+    processing_count: 0,
+    succeeded_count: 0,
+    failed_count: 0,
+    due_count: 0,
+  };
+
+  useEffect(() => {
+    setRuntimeControl(data.runtimeControl);
+    setRuntimeStatus(data.runtimeStatus);
+    setRuntimeDiagnostics(data.runtimeDiagnostics);
+  }, [data.runtimeControl, data.runtimeDiagnostics, data.runtimeStatus]);
+
+  useEffect(() => {
+    return subscribeToEventStream<RuntimeStreamEnvelope["payload"]>(
+      "/api/runtime/stream",
+      (envelope) => {
+        if (envelope.payload.runtime_control !== undefined) {
+          setRuntimeControl(envelope.payload.runtime_control);
+        }
+        if (envelope.payload.runtime_status !== undefined) {
+          setRuntimeStatus(envelope.payload.runtime_status);
+        }
+        if (envelope.payload.diagnostics.length > 0) {
+          setRuntimeDiagnostics((current) =>
+            mergeDiagnostics(current, envelope.payload.diagnostics),
+          );
+        }
+      },
+    );
+  }, []);
 
   async function setDesiredState(desiredState: "running" | "stopped") {
     setIsBusy(true);
     setNotice(null);
     try {
-      await updateRuntimeControl({ desired_state: desiredState });
+      const nextControl = await updateRuntimeControl({ desired_state: desiredState });
+      setRuntimeControl(nextControl);
       setNotice(desiredState === "running" ? "Runtime start requested." : "Runtime stop requested.");
-      router.refresh();
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -41,17 +77,25 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         <div className="dashboard-grid">
           <div className="metric">
             <p className="metric-label">Desired state</p>
-            <p className="metric-value">{data.runtimeControl?.desired_state ?? "unknown"}</p>
+            <p className="metric-value">{runtimeControl?.desired_state ?? "unknown"}</p>
           </div>
           <div className="metric">
             <p className="metric-label">Loop interval</p>
             <p className="metric-value">
-              {data.runtimeStatus?.runtime_loop_interval_seconds ?? "-"}s
+              {runtimeStatus?.runtime_loop_interval_seconds ?? "-"}s
             </p>
           </div>
           <div className="metric">
             <p className="metric-label">Batch limit</p>
-            <p className="metric-value">{data.runtimeStatus?.runtime_batch_limit ?? "-"}</p>
+            <p className="metric-value">{runtimeStatus?.runtime_batch_limit ?? "-"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Memory jobs</p>
+            <p className="metric-value">
+              {runtimeStatus === null
+                ? "-"
+                : `${memoryWriteJobs.due_count} due / ${memoryWriteJobs.failed_count} failed`}
+            </p>
           </div>
         </div>
         <div className="button-row">
@@ -78,9 +122,22 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         <h2 className="section-title" id="diagnostics-title">
           Runtime diagnostics
         </h2>
-        <DiagnosticList diagnostics={data.runtimeDiagnostics} />
+        <DiagnosticList diagnostics={runtimeDiagnostics} />
       </section>
     </section>
+  );
+}
+
+function mergeDiagnostics(
+  current: RuntimeDiagnostic[],
+  incoming: RuntimeDiagnostic[],
+): RuntimeDiagnostic[] {
+  const byId = new Map(current.map((diagnostic) => [diagnostic.id, diagnostic]));
+  for (const diagnostic of incoming) {
+    byId.set(diagnostic.id, diagnostic);
+  }
+  return Array.from(byId.values()).sort((left, right) =>
+    right.occurred_at.localeCompare(left.occurred_at),
   );
 }
 

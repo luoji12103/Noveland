@@ -4,11 +4,22 @@ import uuid
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import httpx
 from noveland.adapters.models import ProviderProfile
 from noveland.core.settings import AppSettings
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.constants import (
+    BUILTIN_ANTHROPIC_COMPATIBLE,
+    BUILTIN_OPENAI_COMPATIBLE,
+)
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginFactoryError,
+    PluginNotFoundError,
+)
+from noveland.plugins.registry import PluginRegistry
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -69,6 +80,8 @@ class ProviderProfileCreate(_FrozenContract):
     )
     name: str = Field(min_length=1, max_length=160)
     provider_type: ProviderType
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] = Field(default_factory=dict)
     base_url: str = Field(min_length=1, max_length=500)
     model_name: str = Field(min_length=1, max_length=200)
     capabilities: dict[str, Any] = Field(default_factory=dict)
@@ -80,6 +93,8 @@ class ProviderProfileCreate(_FrozenContract):
 
 class ProviderProfileUpdate(_FrozenContract):
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] | None = None
     base_url: str | None = Field(default=None, min_length=1, max_length=500)
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     capabilities: dict[str, Any] | None = None
@@ -95,6 +110,8 @@ class ProviderProfileRecord(_FrozenContract):
     profile_key: str
     name: str
     provider_type: ProviderType
+    plugin_identifier: str | None = None
+    plugin_config: dict[str, Any] = Field(default_factory=dict)
     base_url: str
     model_name: str
     capabilities: dict[str, Any]
@@ -124,6 +141,15 @@ class ProviderInvocationResult(_FrozenContract):
 class ModelProvider(Protocol):
     def complete(self, prompt: str) -> ProviderCompletion:
         """Generate one completion for the given prompt."""
+
+
+class _ModelProviderPlugin(Protocol):
+    def create_provider(
+        self,
+        profile: ProviderProfileRecord,
+        api_key: str,
+        transport: httpx.BaseTransport | None = None,
+    ) -> ModelProvider: ...
 
 
 class ProviderProfileService:
@@ -160,10 +186,21 @@ class ProviderProfileService:
     def create_profile(self, profile_create: ProviderProfileCreate) -> ProviderProfileRecord:
         if self._profile_key_exists(profile_create.profile_key):
             raise ProviderConfigurationError("Provider profile key already exists")
+        plugin_identifier = (
+            profile_create.plugin_identifier
+            or _default_provider_plugin_identifier(profile_create.provider_type)
+        )
+        _validate_provider_plugin_binding(
+            plugin_identifier,
+            profile_create.plugin_config,
+            provider_type=profile_create.provider_type,
+        )
         model = ProviderProfile(
             profile_key=profile_create.profile_key,
             name=profile_create.name,
             provider_type=profile_create.provider_type.value,
+            plugin_identifier=plugin_identifier,
+            plugin_config=profile_create.plugin_config,
             base_url=profile_create.base_url,
             model_name=profile_create.model_name,
             capabilities=profile_create.capabilities,
@@ -184,6 +221,13 @@ class ProviderProfileService:
     ) -> ProviderProfileRecord:
         if "name" in profile_update.model_fields_set and profile_update.name is not None:
             model.name = profile_update.name
+        if (
+            "plugin_identifier" in profile_update.model_fields_set
+            and profile_update.plugin_identifier is not None
+        ):
+            model.plugin_identifier = profile_update.plugin_identifier
+        if "plugin_config" in profile_update.model_fields_set:
+            model.plugin_config = profile_update.plugin_config or {}
         if "base_url" in profile_update.model_fields_set and profile_update.base_url is not None:
             model.base_url = profile_update.base_url
         if (
@@ -212,6 +256,11 @@ class ProviderProfileService:
             model.rate_limit_per_minute = profile_update.rate_limit_per_minute
         if "is_enabled" in profile_update.model_fields_set:
             model.is_enabled = bool(profile_update.is_enabled)
+        _validate_provider_plugin_binding(
+            model.plugin_identifier,
+            model.plugin_config,
+            provider_type=ProviderType(model.provider_type),
+        )
         self._session.flush()
         return _record(model)
 
@@ -224,7 +273,22 @@ class ProviderProfileService:
         if api_key is None or api_key == "":
             raise ProviderConfigurationError("Provider API key ref is not configured")
         _rate_limiter.check(profile)
-        provider = _provider_for_profile(profile, api_key, self._transport)
+        registry = _plugin_registry()
+        plugin_identifier = profile.plugin_identifier or _default_provider_plugin_identifier(
+            profile.provider_type,
+        )
+        try:
+            plugin = cast(
+                _ModelProviderPlugin,
+                registry.create(plugin_identifier, profile.plugin_config),
+            )
+        except PluginNotFoundError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        except PluginConfigValidationError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        except PluginFactoryError as exc:
+            raise ProviderConfigurationError(str(exc)) from exc
+        provider = plugin.create_provider(profile, api_key, self._transport)
         return provider.complete(prompt)
 
     def test_profile(
@@ -360,24 +424,14 @@ class AnthropicCompatibleProvider:
         return ProviderCompletion(text=text, raw_response=raw_response)
 
 
-def _provider_for_profile(
-    profile: ProviderProfileRecord,
-    api_key: str,
-    transport: httpx.BaseTransport | None,
-) -> ModelProvider:
-    if profile.provider_type is ProviderType.OPENAI_COMPATIBLE:
-        return OpenAICompatibleProvider(profile, api_key, transport)
-    if profile.provider_type is ProviderType.ANTHROPIC_COMPATIBLE:
-        return AnthropicCompatibleProvider(profile, api_key, transport)
-    raise ProviderConfigurationError("Unsupported provider type")
-
-
 def _record(model: ProviderProfile) -> ProviderProfileRecord:
     return ProviderProfileRecord(
         id=model.id,
         profile_key=model.profile_key,
         name=model.name,
         provider_type=ProviderType(model.provider_type),
+        plugin_identifier=model.plugin_identifier,
+        plugin_config=model.plugin_config,
         base_url=model.base_url,
         model_name=model.model_name,
         capabilities=model.capabilities,
@@ -508,6 +562,45 @@ def _latency_ms(started_at: datetime) -> int:
 
 def _text_preview(value: str) -> str:
     return value if len(value) <= 500 else f"{value[:500]}..."
+
+
+def _default_provider_plugin_identifier(provider_type: ProviderType) -> str:
+    if provider_type is ProviderType.ANTHROPIC_COMPATIBLE:
+        return BUILTIN_ANTHROPIC_COMPATIBLE
+    return BUILTIN_OPENAI_COMPATIBLE
+
+
+def _validate_provider_plugin_binding(
+    identifier: str,
+    raw_config: dict[str, Any],
+    *,
+    provider_type: ProviderType,
+) -> None:
+    registry = _plugin_registry()
+    definition = registry.get(identifier)
+    if definition.manifest.category is not PluginCategory.MODEL_PROVIDER:
+        raise ProviderConfigurationError("Plugin binding must use a model_provider plugin")
+    if (
+        identifier == BUILTIN_OPENAI_COMPATIBLE
+        and provider_type is not ProviderType.OPENAI_COMPATIBLE
+    ):
+        raise ProviderConfigurationError(
+            "openai-compatible profiles must use the builtin.openai_compatible plugin",
+        )
+    if (
+        identifier == BUILTIN_ANTHROPIC_COMPATIBLE
+        and provider_type is not ProviderType.ANTHROPIC_COMPATIBLE
+    ):
+        raise ProviderConfigurationError(
+            "anthropic-compatible profiles must use the builtin.anthropic_compatible plugin",
+        )
+    registry.validate_config(identifier, raw_config)
+
+
+def _plugin_registry() -> PluginRegistry:
+    from noveland.plugins.builtins import get_builtin_plugin_registry
+
+    return get_builtin_plugin_registry()
 
 
 class _ProviderRateLimiter:

@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.adapters import (
+    ProviderConfigurationError,
     ProviderInvocationResult,
     ProviderProfileCreate,
     ProviderProfileRecord,
@@ -16,6 +17,23 @@ from noveland.adapters import (
 from noveland.adapters.models import ProviderProfile
 from noveland.auth import AuthenticatedSubject
 from noveland.core.settings import load_settings
+from noveland.memory import (
+    MemoryBackendHealth,
+    MemoryBackendKind,
+    MemoryBackendProfileCreate,
+    MemoryBackendProfileRecord,
+    MemoryBackendProfileService,
+    MemoryBackendProfileUpdate,
+    MemoryEvalResult,
+    MemoryRetrievalLogRecord,
+    MemoryService,
+    MemoryWriteJobRecord,
+    MemoryWriteJobStatus,
+    MemoryWriteJobStatusSummary,
+    MemoryWriteLogRecord,
+)
+from noveland.memory.errors import MemoryValidationError
+from noveland.memory.models import MemoryBackendProfile
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -23,8 +41,19 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
+from noveland.plugins.builtins import get_builtin_plugin_registry
+from noveland.plugins.categories import PluginCategory
+from noveland.plugins.errors import (
+    PluginConfigValidationError,
+    PluginNotFoundError,
+)
+from noveland.plugins.manifest import PluginManifest
 from noveland.services.api.csrf import require_csrf
-from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
+from noveland.services.api.dependencies import (
+    get_current_subject,
+    get_db_session,
+    get_platform_admin_subject,
+)
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -40,9 +69,18 @@ class RuntimeControlResponse(BaseModel):
     last_error: str | None
 
 
+class MemoryWriteJobStatusSummaryResponse(BaseModel):
+    pending_count: int
+    processing_count: int
+    succeeded_count: int
+    failed_count: int
+    due_count: int
+
+
 class RuntimeStatusResponse(RuntimeControlResponse):
     runtime_loop_interval_seconds: int
     runtime_batch_limit: int
+    memory_write_jobs: MemoryWriteJobStatusSummaryResponse
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -53,6 +91,8 @@ class ProviderProfileCreateRequest(BaseModel):
     profile_key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$", max_length=80)
     name: str = Field(min_length=1, max_length=160)
     provider_type: ProviderType
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] = Field(default_factory=dict)
     base_url: str = Field(min_length=1, max_length=500)
     model_name: str = Field(min_length=1, max_length=200)
     capabilities: dict[str, Any] = Field(default_factory=dict)
@@ -64,6 +104,8 @@ class ProviderProfileCreateRequest(BaseModel):
 
 class ProviderProfileUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
+    plugin_identifier: str | None = Field(default=None, min_length=1, max_length=120)
+    plugin_config: dict[str, Any] | None = None
     base_url: str | None = Field(default=None, min_length=1, max_length=500)
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     capabilities: dict[str, Any] | None = None
@@ -83,6 +125,8 @@ class ProviderProfileResponse(BaseModel):
     profile_key: str
     name: str
     provider_type: ProviderType
+    plugin_identifier: str
+    plugin_config: dict[str, Any]
     base_url: str
     model_name: str
     capabilities: dict[str, Any]
@@ -102,6 +146,131 @@ class ProviderTestCallResponse(BaseModel):
     text_preview: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+
+
+class MemoryBackendProfileCreateRequest(BaseModel):
+    profile_key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$", max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    backend_kind: MemoryBackendKind
+    vector_store_config: dict[str, Any] = Field(default_factory=dict)
+    llm_config: dict[str, Any] = Field(default_factory=dict)
+    embedder_config: dict[str, Any] = Field(default_factory=dict)
+    reranker_config: dict[str, Any] = Field(default_factory=dict)
+    secret_refs: dict[str, str] = Field(default_factory=dict)
+    is_enabled: bool = True
+
+
+class MemoryBackendProfileUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    vector_store_config: dict[str, Any] | None = None
+    llm_config: dict[str, Any] | None = None
+    embedder_config: dict[str, Any] | None = None
+    reranker_config: dict[str, Any] | None = None
+    secret_refs: dict[str, str] | None = None
+    is_enabled: bool | None = None
+
+
+class MemoryBackendProfileResponse(BaseModel):
+    id: uuid.UUID
+    profile_key: str
+    name: str
+    backend_kind: MemoryBackendKind
+    vector_store_config: dict[str, Any]
+    llm_config: dict[str, Any]
+    embedder_config: dict[str, Any]
+    reranker_config: dict[str, Any]
+    secret_refs: dict[str, str]
+    is_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryBackendHealthResponse(BaseModel):
+    backend: str
+    status: str
+    details: dict[str, Any]
+
+
+class MemoryWriteLogResponse(BaseModel):
+    id: uuid.UUID
+    job_id: uuid.UUID
+    backend: str
+    success: bool
+    latency_ms: int | None
+    request_summary: dict[str, Any]
+    response_summary: dict[str, Any]
+    correlation_ids: dict[str, Any]
+    occurred_at: datetime
+
+
+class MemoryRetrievalLogResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    backend_profile_id: uuid.UUID | None
+    backend: str
+    query_text: str
+    hit_count: int
+    selected_item_ids: list[str]
+    latency_ms: int | None
+    context_item_count: int
+    occurred_at: datetime
+
+
+class MemoryBackendLogsResponse(BaseModel):
+    write_logs: list[MemoryWriteLogResponse]
+    retrieval_logs: list[MemoryRetrievalLogResponse]
+
+
+class MemoryWriteJobResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    backend_profile_id: uuid.UUID
+    backend_profile_key: str
+    backend_profile_name: str
+    backend_kind: MemoryBackendKind
+    source_kind: str
+    source_id: uuid.UUID
+    dedupe_key: str
+    status: MemoryWriteJobStatus
+    attempt_count: int
+    next_attempt_at: datetime
+    last_error: str | None
+    processed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryWriteJobListResponse(BaseModel):
+    jobs: list[MemoryWriteJobResponse]
+
+
+class MemoryEvalCaseResponse(BaseModel):
+    label: str
+    query_text: str
+    backend: str
+    hit_count: int
+    context_item_count: int
+    latency_ms: int | None
+
+
+class MemoryEvalResponse(BaseModel):
+    backend: str
+    case_count: int
+    hit_case_count: int
+    average_latency_ms: int | None
+    average_context_items: float
+    cases: list[MemoryEvalCaseResponse]
+
+
+class PluginCatalogResponse(BaseModel):
+    identifier: str
+    category: PluginCategory
+    version: str
+    config_schema: dict[str, Any]
+    capabilities: tuple[str, ...]
+    built_in: bool
 
 
 class RuntimeDiagnosticResponse(BaseModel):
@@ -150,9 +319,11 @@ def get_runtime_status(
     del subject
     settings = load_settings()
     view = get_runtime_control_view(db_session)
+    memory_summary = MemoryService(db_session, settings).write_job_status_summary()
     return RuntimeStatusResponse(
         runtime_loop_interval_seconds=settings.runtime_loop_interval_seconds,
         runtime_batch_limit=settings.runtime_batch_limit,
+        memory_write_jobs=_memory_write_job_status_summary_response(memory_summary),
         **_runtime_control_response(view).model_dump(),
     )
 
@@ -176,6 +347,16 @@ def list_runtime_diagnostics(
     ]
 
 
+@router.get("/plugins/catalog", response_model=list[PluginCatalogResponse])
+def list_plugin_catalog(
+    _subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    category: PluginCategory | None = None,
+) -> list[PluginCatalogResponse]:
+    registry = get_builtin_plugin_registry()
+    definitions = registry.all() if category is None else registry.list_by_category(category)
+    return [_plugin_catalog_response(definition.manifest) for definition in definitions]
+
+
 @router.get("/provider-profiles", response_model=list[ProviderProfileResponse])
 def list_provider_profiles(
     subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
@@ -184,6 +365,247 @@ def list_provider_profiles(
     del subject
     service = ProviderProfileService(db_session, load_settings())
     return [_provider_profile_response(profile) for profile in service.list_profiles()]
+
+
+@router.get("/memory-backend-profiles", response_model=list[MemoryBackendProfileResponse])
+def list_memory_backend_profiles(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[MemoryBackendProfileResponse]:
+    del subject
+    service = MemoryBackendProfileService(db_session)
+    return [_memory_backend_profile_response(profile) for profile in service.list_profiles()]
+
+
+@router.post(
+    "/memory-backend-profiles",
+    response_model=MemoryBackendProfileResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_memory_backend_profile(
+    profile_create: MemoryBackendProfileCreateRequest,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryBackendProfileResponse:
+    del subject
+    require_csrf(request)
+    try:
+        profile = MemoryBackendProfileService(db_session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key=profile_create.profile_key,
+                name=profile_create.name,
+                backend_kind=profile_create.backend_kind,
+                vector_store_config=profile_create.vector_store_config,
+                llm_config=profile_create.llm_config,
+                embedder_config=profile_create.embedder_config,
+                reranker_config=profile_create.reranker_config,
+                secret_refs=profile_create.secret_refs,
+                is_enabled=profile_create.is_enabled,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    return _memory_backend_profile_response(profile)
+
+
+@router.patch(
+    "/memory-backend-profiles/{profile_id}",
+    response_model=MemoryBackendProfileResponse,
+)
+def update_memory_backend_profile(
+    profile_id: uuid.UUID,
+    profile_update: MemoryBackendProfileUpdateRequest,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryBackendProfileResponse:
+    del subject
+    require_csrf(request)
+    service = MemoryBackendProfileService(db_session)
+    model = db_session.get(MemoryBackendProfile, profile_id)
+    if model is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    try:
+        profile = service.update_profile(
+            model,
+            MemoryBackendProfileUpdate(
+                name=profile_update.name,
+                vector_store_config=profile_update.vector_store_config,
+                llm_config=profile_update.llm_config,
+                embedder_config=profile_update.embedder_config,
+                reranker_config=profile_update.reranker_config,
+                secret_refs=profile_update.secret_refs,
+                is_enabled=profile_update.is_enabled,
+            ),
+        )
+        return _memory_backend_profile_response(profile)
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete(
+    "/memory-backend-profiles/{profile_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_memory_backend_profile(
+    profile_id: uuid.UUID,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    del subject
+    require_csrf(request)
+    model = db_session.get(MemoryBackendProfile, profile_id)
+    if model is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    MemoryBackendProfileService(db_session).delete_profile(model)
+
+
+@router.get(
+    "/memory-backend-profiles/{profile_id}/health",
+    response_model=MemoryBackendHealthResponse,
+)
+def get_memory_backend_profile_health(
+    profile_id: uuid.UUID,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryBackendHealthResponse:
+    del subject
+    try:
+        health = MemoryService(db_session, load_settings()).profile_health(profile_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _memory_backend_health_response(health)
+
+
+@router.get(
+    "/memory-backend-profiles/{profile_id}/logs",
+    response_model=MemoryBackendLogsResponse,
+)
+def get_memory_backend_profile_logs(
+    profile_id: uuid.UUID,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> MemoryBackendLogsResponse:
+    del subject
+    service = MemoryService(db_session, load_settings())
+    if MemoryBackendProfileService(db_session).get_profile(profile_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return MemoryBackendLogsResponse(
+        write_logs=[
+            _memory_write_log_response(record)
+            for record in service.list_write_logs(profile_id=profile_id, limit=limit)
+        ],
+        retrieval_logs=[
+            _memory_retrieval_log_response(record)
+            for record in service.list_retrieval_logs(profile_id=profile_id, limit=limit)
+        ],
+    )
+
+
+@router.get(
+    "/memory-backend-profiles/{profile_id}/jobs",
+    response_model=MemoryWriteJobListResponse,
+)
+def list_memory_backend_profile_jobs(
+    profile_id: uuid.UUID,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    status_filter: Annotated[
+        MemoryWriteJobStatus | None,
+        Query(alias="status"),
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> MemoryWriteJobListResponse:
+    del subject
+    service = MemoryService(db_session, load_settings())
+    if MemoryBackendProfileService(db_session).get_profile(profile_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return MemoryWriteJobListResponse(
+        jobs=[
+            _memory_write_job_response(record)
+            for record in service.list_write_jobs(
+                profile_id=profile_id,
+                status=status_filter,
+                limit=limit,
+            )
+        ],
+    )
+
+
+@router.post(
+    "/memory-write-jobs/{job_id}/retry",
+    response_model=MemoryWriteJobResponse,
+)
+def retry_memory_write_job(
+    job_id: uuid.UUID,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryWriteJobResponse:
+    del subject
+    require_csrf(request)
+    service = MemoryService(db_session, load_settings())
+    try:
+        job = service.retry_write_job(job_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.INFO,
+            component=DiagnosticComponent.RUNTIME,
+            event_type="memory.write_job_retry_requested",
+            message="Memory write job retry requested.",
+            details={
+                "job_id": str(job.id),
+                "backend_profile_id": str(job.backend_profile_id),
+                "backend_profile_key": job.backend_profile_key,
+                "source_kind": job.source_kind.value,
+                "source_id": str(job.source_id),
+                "attempt_count": job.attempt_count,
+            },
+            world_id=job.world_id,
+            agent_id=job.agent_id,
+        ),
+    )
+    return _memory_write_job_response(job)
+
+
+@router.post(
+    "/memory-backend-profiles/{profile_id}/eval-smoke",
+    response_model=MemoryEvalResponse,
+)
+def run_memory_backend_profile_eval_smoke(
+    profile_id: uuid.UUID,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryEvalResponse:
+    del subject
+    require_csrf(request)
+    try:
+        result = MemoryService(db_session, load_settings()).run_eval_smoke(profile_id=profile_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _memory_eval_response(result)
 
 
 @router.post(
@@ -199,20 +621,35 @@ def create_provider_profile(
 ) -> ProviderProfileResponse:
     del subject
     require_csrf(request)
-    profile = ProviderProfileService(db_session, load_settings()).create_profile(
-        ProviderProfileCreate(
-            profile_key=profile_create.profile_key,
-            name=profile_create.name,
-            provider_type=profile_create.provider_type,
-            base_url=profile_create.base_url,
-            model_name=profile_create.model_name,
-            capabilities=profile_create.capabilities,
-            api_key_ref=profile_create.api_key_ref,
-            timeout_seconds=profile_create.timeout_seconds,
-            retry_attempts=profile_create.retry_attempts,
-            rate_limit_per_minute=profile_create.rate_limit_per_minute,
-        ),
-    )
+    try:
+        profile = ProviderProfileService(db_session, load_settings()).create_profile(
+            ProviderProfileCreate(
+                profile_key=profile_create.profile_key,
+                name=profile_create.name,
+                provider_type=profile_create.provider_type,
+                plugin_identifier=profile_create.plugin_identifier,
+                plugin_config=profile_create.plugin_config,
+                base_url=profile_create.base_url,
+                model_name=profile_create.model_name,
+                capabilities=profile_create.capabilities,
+                api_key_ref=profile_create.api_key_ref,
+                timeout_seconds=profile_create.timeout_seconds,
+                retry_attempts=profile_create.retry_attempts,
+                rate_limit_per_minute=profile_create.rate_limit_per_minute,
+            ),
+        )
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     return _provider_profile_response(profile)
 
 
@@ -227,20 +664,35 @@ def update_provider_profile(
     del subject
     require_csrf(request)
     model = _provider_profile_or_404(db_session, profile_id)
-    profile = ProviderProfileService(db_session, load_settings()).update_profile(
-        model,
-        ProviderProfileUpdate(
-            name=profile_update.name,
-            base_url=profile_update.base_url,
-            model_name=profile_update.model_name,
-            capabilities=profile_update.capabilities,
-            api_key_ref=profile_update.api_key_ref,
-            timeout_seconds=profile_update.timeout_seconds,
-            retry_attempts=profile_update.retry_attempts,
-            rate_limit_per_minute=profile_update.rate_limit_per_minute,
-            is_enabled=profile_update.is_enabled,
-        ),
-    )
+    try:
+        profile = ProviderProfileService(db_session, load_settings()).update_profile(
+            model,
+            ProviderProfileUpdate(
+                name=profile_update.name,
+                plugin_identifier=profile_update.plugin_identifier,
+                plugin_config=profile_update.plugin_config,
+                base_url=profile_update.base_url,
+                model_name=profile_update.model_name,
+                capabilities=profile_update.capabilities,
+                api_key_ref=profile_update.api_key_ref,
+                timeout_seconds=profile_update.timeout_seconds,
+                retry_attempts=profile_update.retry_attempts,
+                rate_limit_per_minute=profile_update.rate_limit_per_minute,
+                is_enabled=profile_update.is_enabled,
+            ),
+        )
+    except PluginNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PluginConfigValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ProviderConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     return _provider_profile_response(profile)
 
 
@@ -311,6 +763,53 @@ def _provider_profile_response(profile: ProviderProfileRecord) -> ProviderProfil
     return ProviderProfileResponse(**profile.model_dump())
 
 
+def _memory_backend_profile_response(
+    profile: MemoryBackendProfileRecord,
+) -> MemoryBackendProfileResponse:
+    return MemoryBackendProfileResponse(**profile.model_dump())
+
+
+def _memory_backend_health_response(
+    health: MemoryBackendHealth,
+) -> MemoryBackendHealthResponse:
+    return MemoryBackendHealthResponse(
+        backend=health.backend,
+        status=health.status.value,
+        details=health.details,
+    )
+
+
+def _memory_write_log_response(record: MemoryWriteLogRecord) -> MemoryWriteLogResponse:
+    return MemoryWriteLogResponse(**record.model_dump())
+
+
+def _memory_write_job_response(record: MemoryWriteJobRecord) -> MemoryWriteJobResponse:
+    return MemoryWriteJobResponse(**record.model_dump())
+
+
+def _memory_write_job_status_summary_response(
+    summary: MemoryWriteJobStatusSummary,
+) -> MemoryWriteJobStatusSummaryResponse:
+    return MemoryWriteJobStatusSummaryResponse(**summary.model_dump())
+
+
+def _memory_retrieval_log_response(
+    record: MemoryRetrievalLogRecord,
+) -> MemoryRetrievalLogResponse:
+    return MemoryRetrievalLogResponse(**record.model_dump())
+
+
+def _memory_eval_response(result: MemoryEvalResult) -> MemoryEvalResponse:
+    return MemoryEvalResponse(
+        backend=result.backend,
+        case_count=result.case_count,
+        hit_case_count=result.hit_case_count,
+        average_latency_ms=result.average_latency_ms,
+        average_context_items=result.average_context_items,
+        cases=[MemoryEvalCaseResponse(**case.model_dump()) for case in result.cases],
+    )
+
+
 def _provider_test_call_response(result: ProviderInvocationResult) -> ProviderTestCallResponse:
     return ProviderTestCallResponse(
         status=result.status.value,
@@ -318,6 +817,17 @@ def _provider_test_call_response(result: ProviderInvocationResult) -> ProviderTe
         text_preview=result.text_preview,
         error_code=None if result.error_code is None else result.error_code.value,
         error_message=result.error_message,
+    )
+
+
+def _plugin_catalog_response(manifest: PluginManifest) -> PluginCatalogResponse:
+    return PluginCatalogResponse(
+        identifier=manifest.identifier,
+        category=manifest.category,
+        version=manifest.version,
+        config_schema=manifest.config_schema,
+        capabilities=manifest.capabilities,
+        built_in=manifest.identifier.startswith("builtin."),
     )
 
 

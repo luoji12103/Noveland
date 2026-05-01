@@ -1,6 +1,7 @@
 from noveland.conversations.contracts import (
     ConversationAdvanceResult,
     ConversationErrorPolicy,
+    ConversationMemoryConfig,
     ConversationMode,
     ConversationParticipantDefinition,
     ConversationParticipantRecord,
@@ -52,6 +53,7 @@ __all__ = [
     "ConversationAdvanceResult",
     "ConversationError",
     "ConversationErrorPolicy",
+    "ConversationMemoryConfig",
     "ConversationMode",
     "ConversationParticipant",
     "ConversationParticipantDefinition",

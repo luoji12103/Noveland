@@ -4,15 +4,22 @@ import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
   AgentObservation,
+  AgentPreset,
   AgentPersona,
   AgentRun,
   CalendarEntry,
   ConversationParticipant,
   ConversationSession,
   ConversationTurn,
+  MemoryBackendProfile,
+  MemoryBackendHealth,
+  MemoryBackendLogs,
+  MemoryWriteJobList,
   MemoryItem,
+  MemoryProfileSnapshot,
   Membership,
   NarrativeArtifact,
+  PluginCatalogEntry,
   ProviderProfile,
   RuntimeDiagnostic,
   RuntimeControl,
@@ -32,12 +39,16 @@ export type WorldWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   memberships: Membership[];
+  memoryBackendProfiles: MemoryBackendProfile[];
+  memoryPlugins: PluginCatalogEntry[];
+  worldRulesPlugins: PluginCatalogEntry[];
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
   scheduleRules: ScheduleRule[];
   worldDiagnostics: RuntimeDiagnostic[];
   canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
   loadError: string | null;
 };
 
@@ -47,6 +58,10 @@ export type AgentWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   providerProfiles: ProviderProfile[];
+  agentPresets: AgentPreset[];
+  personaPolicyPlugins: PluginCatalogEntry[];
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
   loadError: string | null;
 };
 
@@ -54,6 +69,7 @@ export type AgentDetailData = AgentWorkspaceData & {
   selectedAgent: Agent | null;
   calendarEntries: CalendarEntry[];
   memoryItems: MemoryItem[];
+  memoryProfileSnapshot: MemoryProfileSnapshot | null;
   agentRuns: AgentRun[];
   agentPersona: AgentPersona | null;
   agentObservations: AgentObservation[];
@@ -75,6 +91,7 @@ export type ConversationDetailData = ConversationListData & {
   turns: ConversationTurn[];
   diagnostics: RuntimeDiagnostic[];
   narrativeArtifacts: NarrativeArtifact[];
+  narrativeWriterPlugins: PluginCatalogEntry[];
 };
 
 export type NarrativeWorkspaceData = {
@@ -108,6 +125,26 @@ export type RuntimeAdminData = {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
   runtimeDiagnostics: RuntimeDiagnostic[];
+  modelProviderPlugins: PluginCatalogEntry[];
+  loadError: string | null;
+};
+
+export type PresetAdminData = {
+  presets: AgentPreset[];
+  loadError: string | null;
+};
+
+export type ProviderAdminData = {
+  profiles: ProviderProfile[];
+  modelProviderPlugins: PluginCatalogEntry[];
+  loadError: string | null;
+};
+
+export type MemoryBackendAdminData = {
+  profiles: MemoryBackendProfile[];
+  profileHealth: Record<string, MemoryBackendHealth>;
+  profileLogs: Record<string, MemoryBackendLogs>;
+  profileJobs: Record<string, MemoryWriteJobList>;
   loadError: string | null;
 };
 
@@ -243,13 +280,21 @@ export async function getWorldsIndexData(): Promise<World[]> {
 
 export async function getWorldWorkspaceData(
   worldId: string,
+  isPlatformAdmin: boolean,
 ): Promise<WorldWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const [worlds, memoryPlugins, worldRulesPlugins, memoryBackendProfiles] = await Promise.all([
+      apiFetch<World[]>("/worlds", cookies),
+      listPluginCatalogForServer("memory_backend", cookies),
+      listPluginCatalogForServer("world_rules", cookies),
+      isPlatformAdmin
+        ? apiFetch<MemoryBackendProfile[]>("/memory-backend-profiles", cookies)
+        : Promise.resolve<MemoryBackendProfile[]>([]),
+    ]);
     const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
     if (selectedWorld === null) {
-      return emptyWorldWorkspaceData(worlds, "Unable to load selected world.");
+      return emptyWorldWorkspaceData(worlds, "Unable to load selected world.", isPlatformAdmin);
     }
     const [
       scenes,
@@ -276,19 +321,23 @@ export async function getWorldWorkspaceData(
       scenes,
       agents,
       memberships: memberships ?? [],
+      memoryBackendProfiles,
+      memoryPlugins,
+      worldRulesPlugins,
       clock,
       replayState,
       latestSnapshot,
       scheduleRules,
       worldDiagnostics: worldDiagnostics ?? [],
       canManageSelectedWorld: memberships !== null,
+      isPlatformAdmin,
       loadError: null,
     };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
     }
-    return emptyWorldWorkspaceData([], "Unable to load world workspace.");
+    return emptyWorldWorkspaceData([], "Unable to load world workspace.", isPlatformAdmin);
   }
 }
 
@@ -298,11 +347,22 @@ export async function getAgentWorkspaceData(
 ): Promise<AgentWorkspaceData> {
   const cookies = await cookieHeader();
   try {
-    const [worlds, scenes, agents, providerProfiles] = await Promise.all([
+    const [
+      worlds,
+      scenes,
+      agents,
+      memberships,
+      providerProfiles,
+      agentPresets,
+      personaPolicyPlugins,
+    ] = await Promise.all([
       apiFetch<World[]>("/worlds", cookies),
       apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       isPlatformAdmin ? apiFetch<ProviderProfile[]>("/provider-profiles", cookies) : [],
+      apiFetch<AgentPreset[]>("/agent-presets", cookies),
+      listPluginCatalogForServer("persona_policy", cookies),
     ]);
     return {
       worlds,
@@ -310,6 +370,10 @@ export async function getAgentWorkspaceData(
       scenes,
       agents,
       providerProfiles,
+      agentPresets,
+      personaPolicyPlugins,
+      canManageSelectedWorld: memberships !== null,
+      isPlatformAdmin,
       loadError: null,
     };
   } catch (error) {
@@ -322,6 +386,10 @@ export async function getAgentWorkspaceData(
       scenes: [],
       agents: [],
       providerProfiles: [],
+      agentPresets: [],
+      personaPolicyPlugins: [],
+      canManageSelectedWorld: false,
+      isPlatformAdmin,
       loadError: "Unable to load agents.",
     };
   }
@@ -340,16 +408,23 @@ export async function getAgentDetailData(
       selectedAgent: null,
       calendarEntries: [],
       memoryItems: [],
+      memoryProfileSnapshot: null,
       agentRuns: [],
       agentPersona: null,
       agentObservations: [],
     };
   }
   const cookies = await cookieHeader();
-  const [calendarEntries, memoryItems, agentRuns, agentPersona, agentObservations] =
+  const [calendarEntries, memoryItems, memoryProfileSnapshot, agentRuns, agentPersona, agentObservations] =
     await Promise.all([
       apiFetch<CalendarEntry[]>(`/worlds/${worldId}/agents/${agentId}/calendar`, cookies),
       apiFetchOptional<MemoryItem[]>(`/worlds/${worldId}/agents/${agentId}/memory`, cookies),
+      data.canManageSelectedWorld
+        ? apiFetchOptional<MemoryProfileSnapshot | null>(
+            `/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+            cookies,
+          )
+        : Promise.resolve<MemoryProfileSnapshot | null>(null),
       apiFetch<AgentRun[]>(`/worlds/${worldId}/agents/${agentId}/runs`, cookies),
       apiFetchOptional<AgentPersona | null>(
         `/worlds/${worldId}/agents/${agentId}/persona`,
@@ -365,6 +440,7 @@ export async function getAgentDetailData(
     selectedAgent,
     calendarEntries,
     memoryItems: memoryItems ?? [],
+    memoryProfileSnapshot,
     agentRuns,
     agentPersona,
     agentObservations: agentObservations ?? [],
@@ -404,6 +480,7 @@ export async function getConversationDetailData(
 ): Promise<ConversationDetailData> {
   const listData = await getConversationListData(worldId);
   const cookies = await cookieHeader();
+  const narrativeWriterPlugins = await listPluginCatalogForServer("narrative_writer", cookies);
   const conversation =
     listData.conversations.find((item) => item.id === conversationId) ?? null;
   if (conversation === null) {
@@ -414,6 +491,7 @@ export async function getConversationDetailData(
       turns: [],
       diagnostics: [],
       narrativeArtifacts: [],
+      narrativeWriterPlugins,
     };
   }
   const [participants, turns, diagnostics, narrativeArtifacts] = await Promise.all([
@@ -441,6 +519,7 @@ export async function getConversationDetailData(
     turns,
     diagnostics: diagnostics ?? [],
     narrativeArtifacts,
+    narrativeWriterPlugins,
   };
 }
 
@@ -561,19 +640,36 @@ export async function getNarrativeReaderDetailData(
   }
 }
 
-export async function getProviderAdminData(): Promise<ProviderProfile[]> {
-  return apiFetch<ProviderProfile[]>("/provider-profiles", await cookieHeader());
+export async function getProviderAdminData(): Promise<ProviderAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const [profiles, modelProviderPlugins] = await Promise.all([
+      apiFetch<ProviderProfile[]>("/provider-profiles", cookies),
+      listPluginCatalogForServer("model_provider", cookies),
+    ]);
+    return { profiles, modelProviderPlugins, loadError: null };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      profiles: [],
+      modelProviderPlugins: [],
+      loadError: "Unable to load provider profiles.",
+    };
+  }
 }
 
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [runtimeControl, runtimeStatus, runtimeDiagnostics] = await Promise.all([
+    const [runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins] = await Promise.all([
       apiFetch<RuntimeControl>("/runtime/control", cookies),
       apiFetch<RuntimeStatus>("/runtime/status", cookies),
       apiFetch<RuntimeDiagnostic[]>("/runtime/diagnostics", cookies),
+      listPluginCatalogForServer("model_provider", cookies),
     ]);
-    return { runtimeControl, runtimeStatus, runtimeDiagnostics, loadError: null };
+    return { runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins, loadError: null };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -582,7 +678,76 @@ export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
       runtimeControl: null,
       runtimeStatus: null,
       runtimeDiagnostics: [],
+      modelProviderPlugins: [],
       loadError: "Unable to load runtime state.",
+    };
+  }
+}
+
+export async function getPresetAdminData(): Promise<PresetAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    return {
+      presets: await apiFetch<AgentPreset[]>("/agent-presets", cookies),
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      presets: [],
+      loadError: "Unable to load presets.",
+    };
+  }
+}
+
+export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const profiles = await apiFetch<MemoryBackendProfile[]>("/memory-backend-profiles", cookies);
+    const profilePairs = await Promise.all(
+      profiles.map(async (profile) => [
+        profile.id,
+        {
+          health: await apiFetch<MemoryBackendHealth>(
+            `/memory-backend-profiles/${profile.id}/health`,
+            cookies,
+          ),
+          logs: await apiFetch<MemoryBackendLogs>(
+            `/memory-backend-profiles/${profile.id}/logs`,
+            cookies,
+          ),
+          jobs: await apiFetch<MemoryWriteJobList>(
+            `/memory-backend-profiles/${profile.id}/jobs?limit=20`,
+            cookies,
+          ),
+        },
+      ] as const),
+    );
+    return {
+      profiles,
+      profileHealth: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.health]),
+      ),
+      profileLogs: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.logs]),
+      ),
+      profileJobs: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.jobs]),
+      ),
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return {
+      profiles: [],
+      profileHealth: {},
+      profileLogs: {},
+      profileJobs: {},
+      loadError: "Unable to load memory backend profiles.",
     };
   }
 }
@@ -602,19 +767,27 @@ async function apiFetch<T>(path: string, cookieHeader: string | null): Promise<T
   throw new WorldServerError(await errorDetail(response), response.status);
 }
 
-function emptyWorldWorkspaceData(worlds: World[], loadError: string): WorldWorkspaceData {
+function emptyWorldWorkspaceData(
+  worlds: World[],
+  loadError: string,
+  isPlatformAdmin: boolean,
+): WorldWorkspaceData {
   return {
     worlds,
     selectedWorld: null,
     scenes: [],
     agents: [],
     memberships: [],
+    memoryBackendProfiles: [],
+    memoryPlugins: [],
+    worldRulesPlugins: [],
     clock: null,
     replayState: null,
     latestSnapshot: null,
     scheduleRules: [],
     worldDiagnostics: [],
     canManageSelectedWorld: false,
+    isPlatformAdmin,
     loadError,
   };
 }
@@ -673,6 +846,13 @@ async function apiFetchOptional<T>(path: string, cookieHeader: string | null): P
     }
     throw error;
   }
+}
+
+async function listPluginCatalogForServer(
+  category: PluginCatalogEntry["category"],
+  cookieHeader: string | null,
+): Promise<PluginCatalogEntry[]> {
+  return apiFetch<PluginCatalogEntry[]>(`/plugins/catalog?category=${encodeURIComponent(category)}`, cookieHeader);
 }
 
 function selectedWorldForRequest(worlds: World[], requestedWorldId: string | null): World | null {

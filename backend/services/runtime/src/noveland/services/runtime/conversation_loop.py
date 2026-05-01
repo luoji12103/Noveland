@@ -7,10 +7,12 @@ from noveland.adapters import ProviderProfileService
 from noveland.conversations import (
     ConversationAdvanceResult,
     ConversationErrorPolicy,
+    ConversationMemoryConfig,
     ConversationService,
     ConversationSessionStatus,
 )
 from noveland.conversations.errors import ConversationStateError
+from noveland.core.settings import AppSettings
 from noveland.narrative import ConversationNarrativeWriterService
 from noveland.services.runtime.agent_loop import AgentRunExecution, AgentRuntimeOrchestrator
 from sqlalchemy.orm import Session
@@ -26,11 +28,13 @@ class ConversationRuntimeOrchestrator:
         self,
         session: Session,
         profile_service: ProviderProfileService,
+        settings: AppSettings,
     ) -> None:
         self._session = session
         self._profile_service = profile_service
+        self._settings = settings
         self._conversation_service = ConversationService(session)
-        self._agent_orchestrator = AgentRuntimeOrchestrator(session, profile_service)
+        self._agent_orchestrator = AgentRuntimeOrchestrator(session, profile_service, settings)
 
     def advance_session(
         self,
@@ -51,20 +55,18 @@ class ConversationRuntimeOrchestrator:
             agent_id=prepared.speaker_agent_id,
             prompt_text=prepared.prompt_text,
             trigger_source=trigger_source,
+            memory_config=prepared.session.memory_config,
         )
-        if (
-            run.status != "succeeded"
-            and policy.error_policy
-            in {
-                ConversationErrorPolicy.RETRY_ONCE_THEN_FAIL,
-                ConversationErrorPolicy.RETRY_ONCE_THEN_SKIP,
-            }
-        ):
+        if run.status != "succeeded" and policy.error_policy in {
+            ConversationErrorPolicy.RETRY_ONCE_THEN_FAIL,
+            ConversationErrorPolicy.RETRY_ONCE_THEN_SKIP,
+        }:
             retry_run = self._run_agent_turn(
                 world_id=world_id,
                 agent_id=prepared.speaker_agent_id,
                 prompt_text=prepared.prompt_text,
                 trigger_source=f"{trigger_source}:retry",
+                memory_config=prepared.session.memory_config,
             )
             retry_diagnostics = dict(retry_run.diagnostics)
             retry_diagnostics["attempt_count"] = 2
@@ -94,13 +96,17 @@ class ConversationRuntimeOrchestrator:
         agent_id: uuid.UUID,
         prompt_text: str,
         trigger_source: str,
+        memory_config: ConversationMemoryConfig,
     ) -> AgentRunExecution:
         return self._agent_orchestrator.run_agent(
             world_id=world_id,
             agent_id=agent_id,
             prompt_text=prompt_text,
             trigger_source=trigger_source,
-            create_memory=False,
+            create_memory=memory_config.write_turn_memory,
+            retrieve_memory=memory_config.retrieve_memory,
+            memory_query_text=prompt_text,
+            max_context_items=memory_config.max_context_items,
             create_narrative_artifact=False,
         )
 

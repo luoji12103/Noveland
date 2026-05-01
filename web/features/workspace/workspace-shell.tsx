@@ -66,6 +66,8 @@ export function WorkspaceShell({
         ) : null}
         {isPlatformAdmin ? (
           <>
+            <Link href="/admin/memory-backends">Memory backends</Link>
+            <Link href="/admin/presets">Presets</Link>
             <Link href="/admin/providers">Providers</Link>
             <Link href="/admin/runtime">Runtime</Link>
           </>

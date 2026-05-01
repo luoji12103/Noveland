@@ -43,15 +43,21 @@ def foreign_key_targets(table_name: str) -> set[str]:
 def test_core_schema_tables_are_registered() -> None:
     assert {
         "agents",
+        "agent_presets",
         "agent_observations",
         "agent_personas",
         "agent_runtime_runs",
         "agent_calendar_entries",
         "agent_memory_items",
+        "agent_profile_snapshots",
         "auth_sessions",
         "conversation_participants",
         "conversation_sessions",
         "conversation_turns",
+        "memory_backend_profiles",
+        "memory_retrieval_logs",
+        "memory_write_jobs",
+        "memory_write_logs",
         "platform_settings",
         "platform_role_assignments",
         "provider_profiles",
@@ -92,6 +98,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_scenes_world_scene_key" in constraint_names("scenes", UniqueConstraint)
     assert "uq_agents_world_agent_key" in constraint_names("agents", UniqueConstraint)
+    assert "uq_agent_presets_preset_key" in constraint_names(
+        "agent_presets",
+        UniqueConstraint,
+    )
     assert "uq_agent_personas_agent_id" in constraint_names(
         "agent_personas",
         UniqueConstraint,
@@ -111,6 +121,18 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_world_events_world_sequence" in constraint_names(
         "world_events",
+        UniqueConstraint,
+    )
+    assert "uq_memory_backend_profiles_profile_key" in constraint_names(
+        "memory_backend_profiles",
+        UniqueConstraint,
+    )
+    assert "uq_memory_write_jobs_dedupe_key" in constraint_names(
+        "memory_write_jobs",
+        UniqueConstraint,
+    )
+    assert "uq_agent_profile_snapshots_world_agent" in constraint_names(
+        "agent_profile_snapshots",
         UniqueConstraint,
     )
     assert "uq_conversation_sessions_world_session_key" in constraint_names(
@@ -158,6 +180,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         CheckConstraint,
     )
     assert "ck_agents_kind" in constraint_names("agents", CheckConstraint)
+    assert "ck_agent_presets_default_kind" in constraint_names(
+        "agent_presets",
+        CheckConstraint,
+    )
     assert "ck_world_clock_states_status" in constraint_names(
         "world_clock_states",
         CheckConstraint,
@@ -292,10 +318,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("user_credentials") == {"users.id"}
     assert foreign_key_targets("auth_sessions") == {"users.id"}
     assert foreign_key_targets("platform_role_assignments") == {"users.id"}
-    assert foreign_key_targets("worlds") == {"users.id"}
+    assert foreign_key_targets("worlds") == {"memory_backend_profiles.id", "users.id"}
     assert foreign_key_targets("world_memberships") == {"users.id", "worlds.id"}
     assert foreign_key_targets("scenes") == {"worlds.id"}
-    assert foreign_key_targets("agents") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("agents") == {"agent_presets.id", "scenes.id", "worlds.id"}
+    assert foreign_key_targets("agent_presets") == set()
     assert foreign_key_targets("agent_personas") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("agent_observations") == {
         "agents.id",
@@ -323,6 +350,19 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "world_events.id",
         "worlds.id",
     }
+    assert foreign_key_targets("memory_backend_profiles") == set()
+    assert foreign_key_targets("memory_write_jobs") == {
+        "agents.id",
+        "memory_backend_profiles.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("memory_write_logs") == {"memory_write_jobs.id"}
+    assert foreign_key_targets("memory_retrieval_logs") == {
+        "agents.id",
+        "memory_backend_profiles.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("agent_profile_snapshots") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("provider_profiles") == set()
     assert foreign_key_targets("runtime_control_states") == set()
     assert foreign_key_targets("agent_runtime_runs") == {
@@ -356,6 +396,8 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_memberships_world_id" in index_names("world_memberships")
     assert "ix_scenes_world_id" in index_names("scenes")
     assert "ix_agents_world_id" in index_names("agents")
+    assert "ix_agents_source_preset_id" in index_names("agents")
+    assert "ix_agent_presets_is_active" in index_names("agent_presets")
     assert "ix_agent_personas_world_agent" in index_names("agent_personas")
     assert "ix_agent_observations_world_agent_observed" in index_names("agent_observations")
     assert "ix_agent_observations_source_event_id" in index_names("agent_observations")
@@ -389,6 +431,14 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_memory_items_world_agent" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_world_agent_active" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_source_event_id" in index_names("agent_memory_items")
+    assert "ix_memory_write_jobs_status_next_attempt_at" in index_names("memory_write_jobs")
+    assert "ix_memory_write_jobs_world_agent" in index_names("memory_write_jobs")
+    assert "ix_memory_write_jobs_backend_profile_id" in index_names("memory_write_jobs")
+    assert "ix_memory_write_logs_job_id" in index_names("memory_write_logs")
+    assert "ix_memory_write_logs_occurred_at" in index_names("memory_write_logs")
+    assert "ix_memory_retrieval_logs_world_agent" in index_names("memory_retrieval_logs")
+    assert "ix_memory_retrieval_logs_occurred_at" in index_names("memory_retrieval_logs")
+    assert "ix_agent_profile_snapshots_world_agent" in index_names("agent_profile_snapshots")
     assert "ix_agent_runtime_runs_world_agent_started_at" in index_names("agent_runtime_runs")
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
@@ -411,9 +461,13 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
 
 
 def test_conversation_schema_includes_policy_and_terminal_columns() -> None:
-    assert {"policy_config", "writer_config", "terminal_reason"} <= column_names(
+    assert {"policy_config", "writer_config", "memory_config", "terminal_reason"} <= column_names(
         "conversation_sessions",
     )
+
+
+def test_world_schema_includes_memory_backend_profile_column() -> None:
+    assert {"memory_backend_profile_id"} <= column_names("worlds")
 
 
 def test_narrative_schema_includes_conversation_source_column() -> None:

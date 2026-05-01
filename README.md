@@ -8,6 +8,7 @@ Noveland is a persistent virtual-world operating system for AI agents. The repos
 - Backend stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.x, Alembic, uv
 - Frontend stack: Next.js, TypeScript, React, Tailwind CSS, Vitest, Playwright
 - Local services: PostgreSQL 16 with pgvector, NATS with JetStream
+- Long-term memory: Mem0 OSS-first backend profiles, async write jobs, read-only agent memory search, profile snapshots, forget/eval operators, and job retry observability
 - License: TBD
 
 ## Local Setup
@@ -104,6 +105,18 @@ npm run dev
 
 Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Successful sign-in lands on `/worlds`.
 
+For live workspace updates, set the web-facing API WebSocket base URL in local configuration:
+
+```sh
+NEXT_PUBLIC_NOVELAND_API_WS_BASE_URL=ws://127.0.0.1:8000
+```
+
+For long-term memory backends, keep provider secrets out of the database and provide them through local configuration:
+
+```sh
+NOVELAND_MEMORY_BACKEND_SECRETS_JSON={}
+```
+
 ## 人工确认步骤
 
 按下面顺序做一轮人工验收，可以覆盖当前主干上最重要的能力：
@@ -142,7 +155,7 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Su
    - 创建 auto dialogue conversation，Start 后由 `noveland-runtime --daemon` 逐轮推进
    - 创建 provider profile，并执行 `Test provider`
    - 手动运行 agent，确认 run、memory、narrative artifact、diagnostics 有更新
-   - 启动 runtime，确认 runtime status 和 diagnostics 有变化
+   - 启动 runtime，确认 runtime status、memory write job counts 和 diagnostics 有变化
 6. 如需验证 API 面，额外确认：
    - `GET /health` 返回固定 contract
    - `/auth/*` 登录、当前用户、登出正常
@@ -178,13 +191,16 @@ Open `http://127.0.0.1:3000/login` and sign in with the seeded admin account. Su
 6. 登录后的一般操作顺序：
    - 先在 `/worlds` 创建或选择 world
    - 在 `/worlds/{worldId}` 配置 scenes、memberships、clock、schedule rules、replay/snapshots
-   - 在 `/worlds/{worldId}/agents` 创建 agent
-   - 在 `/worlds/{worldId}/agents/{agentId}` 设置 scene、default provider、persona、observations、calendar、memory，并可手动 run
+   - 如需复用 agent 组合，在 `/admin/presets` 创建平台级 preset
+   - 在 `/worlds/{worldId}/agents` 创建 agent，可直接套用 preset
+   - 在 `/worlds/{worldId}/agents/{agentId}` 设置 scene、default provider、persona、observations、calendar，查看只读 memory/search/profile snapshot，并可手动 run
    - 在 `/worlds/{worldId}/conversations` 创建 manual chain 或 auto dialogue session，并配置 writer 行为
    - 在 `/worlds/{worldId}/conversations/{conversationId}` 添加 participants，seed transcript，advance/start/pause/resume，并可生成 summary / chapter
    - 在 `/worlds/{worldId}/narrative` 查看 narrative artifacts
    - 在 `/worlds/{worldId}/reader` 以只读方式阅读 summary / chapter，并跳回 source conversation
+   - 如需复制世界骨架，在 `/worlds/{worldId}` 的 `World composition` 面板导出 JSON，并由平台管理员导入为新 world
    - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
+   - 在 `/admin/memory-backends` 配置 memory backend profile，查看 health / logs / jobs，必要时 retry failed memory write job，并执行 eval smoke
    - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
    ```sh
@@ -218,6 +234,45 @@ Expected response:
 
 ```json
 {"service":"api","status":"ok","version":"0.1.0"}
+```
+
+Realtime transport endpoints currently exposed by the API:
+
+```http
+GET /runtime/stream
+GET /worlds/{world_id}/stream
+GET /worlds/{world_id}/conversations/{conversation_id}/stream
+WS  /worlds/{world_id}/conversations/{conversation_id}/live
+```
+
+Preset and world composition endpoints currently exposed by the API:
+
+```http
+GET /agent-presets
+POST /agent-presets
+PATCH /agent-presets/{preset_id}
+DELETE /agent-presets/{preset_id}
+GET /worlds/{world_id}/composition-export
+POST /world-compositions/import
+```
+
+Memory backend and long-term memory endpoints currently exposed by the API:
+
+```http
+GET /memory-backend-profiles
+POST /memory-backend-profiles
+PATCH /memory-backend-profiles/{profile_id}
+DELETE /memory-backend-profiles/{profile_id}
+GET /memory-backend-profiles/{profile_id}/health
+GET /memory-backend-profiles/{profile_id}/logs
+GET /memory-backend-profiles/{profile_id}/jobs
+POST /memory-backend-profiles/{profile_id}/eval-smoke
+POST /memory-write-jobs/{job_id}/retry
+GET /worlds/{world_id}/agents/{agent_id}/memory
+POST /worlds/{world_id}/agents/{agent_id}/memory/search
+GET /worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot
+POST /worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh
+POST /worlds/{world_id}/agents/{agent_id}/memory/forget
 ```
 
 This health endpoint does not imply database, messaging, world-clock, replay, auth, or plugin readiness.

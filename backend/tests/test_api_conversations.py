@@ -21,6 +21,14 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
@@ -118,6 +126,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
     second_scene_id = _seed_scene(engine, world_id, "garden")
     in_scene_agent_id = _seed_agent(engine, world_id, "guide", first_scene_id)
     out_of_scene_agent_id = _seed_agent(engine, world_id, "outsider", second_scene_id)
+    profile_id = _seed_provider_profile(engine)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _authenticate(client, owner_token)
 
@@ -127,7 +136,7 @@ def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provide
             "agent_key": "planner",
             "display_name": "Planner",
             "kind": "role_agent",
-            "provider_profile_id": str(uuid.uuid4()),
+            "provider_profile_id": str(profile_id),
             "config": {"tone": "direct"},
         },
     )
@@ -339,6 +348,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, User.__table__),
         cast(Table, AuthSession.__table__),
         cast(Table, PlatformRoleAssignment.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
@@ -349,6 +359,11 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
         cast(Table, ConversationSession.__table__),
