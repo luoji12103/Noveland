@@ -1,7 +1,7 @@
 # Active Session Handoff
 
 - Date: 2026-05-01T08:21:21Z
-- Branch: feat/memory-mem0-oss-foundation
+- Branch: main
 - Objective: Replace the old synchronous pgvector CRUD memory baseline with a Mem0 OSS-first long-term memory stack, including backend profiles, async write jobs/logs, runtime/conversation memory context integration, and stage-1 through stage-3 operator surfaces.
 - Completed work:
   - Added memory backend profiles, async memory write jobs, write/retrieval logs, agent profile snapshots, and the three migrations `20260423_0016_memory_mem0_oss_foundation.py`, `20260423_0017_memory_context_integration.py`, and `20260423_0018_memory_profiles_forget_evals.py`.
@@ -11,10 +11,9 @@
   - Changed the Web agent memory surface to read-only list/search/profile-snapshot/forget behavior and added `/admin/memory-backends` plus same-origin proxy routes for profile CRUD, health, logs, and eval smoke.
   - Updated Playwright mock infrastructure to reflect the new memory contract and read-only UI behavior.
   - Closed out the branch into a single commit after full backend/web regression and doc synchronization.
-  - Re-ran the full merge-readiness gate on 2026-05-01; the branch is ready to merge into local `main`.
+  - Re-ran the full merge-readiness gate on 2026-05-01 and fast-forward merged `feat/memory-mem0-oss-foundation` into local `main`.
 - Incomplete work:
-  - This branch is committed and merge-ready but not yet merged at the time of this handoff update.
-  - Runtime/Memory Ops is selected as the next mainline after the long-term memory refactor merge.
+  - Runtime/Memory Ops has been selected as the next mainline but not started yet.
 - Tests run:
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
@@ -30,7 +29,7 @@
   - `builtin.local_pgvector_memory` remains as fallback/test coverage; canonical long-term behavior assumes Mem0 OSS-style profiles through `MemoryService`.
   - Web Playwright coverage now depends on the local mock backend matching the evolving memory contracts; keep the mock aligned when API contracts change.
 - Recommended next step:
-  - Merge this branch into local `main`, then start the Runtime/Memory Ops mainline for memory write job observability, retry operators, and runtime processing status.
+  - Start the Runtime/Memory Ops mainline for memory write job observability, retry operators, and runtime processing status.
 - Sensitive areas to avoid casual edits:
   - `MemoryService` as the only business entrypoint for long-term memory
   - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
