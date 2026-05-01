@@ -46,4 +46,4 @@
 - Agent Profile Snapshots + Forget / Eval / Ops
 
 ## Upcoming Mainline
-- None selected
+- Runtime/Memory Ops
