@@ -28,7 +28,9 @@ from noveland.memory.contracts import (
     MemorySearchRequest,
     MemorySearchResult,
     MemoryTurn,
+    MemoryWriteJobRecord,
     MemoryWriteJobStatus,
+    MemoryWriteJobStatusSummary,
     MemoryWriteLogRecord,
     MemoryWriteSourceKind,
 )
@@ -53,7 +55,7 @@ from noveland.plugins.errors import (
     PluginNotFoundError,
 )
 from noveland.worlds.models import World
-from sqlalchemy import Select, join, select
+from sqlalchemy import Select, func, join, select
 from sqlalchemy.orm import Session
 
 
@@ -444,6 +446,77 @@ class MemoryService:
             )
         return [_write_log_record(model) for model in self._session.scalars(statement).all()]
 
+    def list_write_jobs(
+        self,
+        *,
+        profile_id: uuid.UUID | None = None,
+        status: MemoryWriteJobStatus | None = None,
+        limit: int = 20,
+    ) -> list[MemoryWriteJobRecord]:
+        safe_limit = max(1, min(limit, 100))
+        statement = (
+            select(MemoryWriteJob, MemoryBackendProfile)
+            .join(
+                MemoryBackendProfile,
+                MemoryWriteJob.backend_profile_id == MemoryBackendProfile.id,
+            )
+            .order_by(MemoryWriteJob.created_at.desc())
+            .limit(safe_limit)
+        )
+        if profile_id is not None:
+            statement = statement.where(MemoryWriteJob.backend_profile_id == profile_id)
+        if status is not None:
+            statement = statement.where(MemoryWriteJob.status == status.value)
+        return [
+            _write_job_record(job, profile)
+            for job, profile in self._session.execute(statement).all()
+        ]
+
+    def write_job_status_summary(self) -> MemoryWriteJobStatusSummary:
+        now = datetime.now(UTC)
+        rows = self._session.execute(
+            select(MemoryWriteJob.status, func.count(MemoryWriteJob.id)).group_by(
+                MemoryWriteJob.status,
+            ),
+        ).all()
+        counts = {str(status): int(count) for status, count in rows}
+        due_count = self._session.scalar(
+            select(func.count(MemoryWriteJob.id)).where(
+                MemoryWriteJob.status.in_(
+                    [MemoryWriteJobStatus.PENDING.value, MemoryWriteJobStatus.FAILED.value],
+                ),
+                MemoryWriteJob.next_attempt_at <= now,
+            ),
+        )
+        return MemoryWriteJobStatusSummary(
+            pending_count=counts.get(MemoryWriteJobStatus.PENDING.value, 0),
+            processing_count=counts.get(MemoryWriteJobStatus.PROCESSING.value, 0),
+            succeeded_count=counts.get(MemoryWriteJobStatus.SUCCEEDED.value, 0),
+            failed_count=counts.get(MemoryWriteJobStatus.FAILED.value, 0),
+            due_count=0 if due_count is None else int(due_count),
+        )
+
+    def retry_write_job(self, job_id: uuid.UUID) -> MemoryWriteJobRecord:
+        row = self._session.execute(
+            select(MemoryWriteJob, MemoryBackendProfile)
+            .join(
+                MemoryBackendProfile,
+                MemoryWriteJob.backend_profile_id == MemoryBackendProfile.id,
+            )
+            .where(MemoryWriteJob.id == job_id),
+        ).one_or_none()
+        if row is None:
+            raise LookupError("Memory write job not found")
+        job, profile = row
+        if job.status != MemoryWriteJobStatus.FAILED.value:
+            raise MemoryValidationError("Only failed memory write jobs can be retried")
+        job.status = MemoryWriteJobStatus.PENDING.value
+        job.next_attempt_at = datetime.now(UTC)
+        job.last_error = None
+        job.processed_at = None
+        self._session.flush()
+        return _write_job_record(job, profile)
+
     def list_retrieval_logs(
         self,
         *,
@@ -670,6 +743,31 @@ def _write_log_record(model: MemoryWriteLog) -> MemoryWriteLogRecord:
         response_summary=model.response_summary,
         correlation_ids=model.correlation_ids,
         occurred_at=_aware_datetime(model.occurred_at),
+    )
+
+
+def _write_job_record(
+    model: MemoryWriteJob,
+    profile: MemoryBackendProfile,
+) -> MemoryWriteJobRecord:
+    return MemoryWriteJobRecord(
+        id=model.id,
+        world_id=model.world_id,
+        agent_id=model.agent_id,
+        backend_profile_id=model.backend_profile_id,
+        backend_profile_key=profile.profile_key,
+        backend_profile_name=profile.name,
+        backend_kind=MemoryBackendKind(profile.backend_kind),
+        source_kind=MemoryWriteSourceKind(model.source_kind),
+        source_id=model.source_id,
+        dedupe_key=model.dedupe_key,
+        status=MemoryWriteJobStatus(model.status),
+        attempt_count=model.attempt_count,
+        next_attempt_at=_aware_datetime(model.next_attempt_at),
+        last_error=model.last_error,
+        processed_at=None if model.processed_at is None else _aware_datetime(model.processed_at),
+        created_at=_aware_datetime(model.created_at),
+        updated_at=_aware_datetime(model.updated_at),
     )
 
 

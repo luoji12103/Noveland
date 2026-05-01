@@ -171,6 +171,27 @@ const memoryWriteLogs = [
     occurred_at: "2026-04-17T00:05:00.000Z",
   },
 ];
+const memoryWriteJobs = [
+  {
+    id: "71900000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    backend_profile_id: memoryProfilePrimaryId,
+    backend_profile_key: "primary-mem0",
+    backend_profile_name: "Primary Mem0",
+    backend_kind: "mem0_oss",
+    source_kind: "conversation_turn",
+    source_id: "72000000-0000-4000-8000-000000000001",
+    dedupe_key: "mock-memory-job-1",
+    status: "failed",
+    attempt_count: 2,
+    next_attempt_at: "2026-04-17T00:10:00.000Z",
+    last_error: "mock backend timeout",
+    processed_at: null,
+    created_at: "2026-04-17T00:04:30.000Z",
+    updated_at: "2026-04-17T00:05:30.000Z",
+  },
+];
 const memoryRetrievalLogs = [
   {
     id: "71800000-0000-4000-8000-000000000002",
@@ -586,6 +607,12 @@ const mockServer = createServer(async (request, response) => {
       memorySegments[2],
       memorySegments[3],
     );
+    return;
+  }
+
+  if (url.pathname.startsWith("/memory-write-jobs/")) {
+    const memoryJobSegments = url.pathname.split("/");
+    await handleMemoryWriteJobItem(request, response, memoryJobSegments[2], memoryJobSegments[3]);
     return;
   }
 
@@ -1058,6 +1085,13 @@ function handleRuntimeStatus(response) {
     ...runtimeControl,
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
+    memory_write_jobs: {
+      pending_count: memoryWriteJobs.filter((job) => job.status === "pending").length,
+      processing_count: memoryWriteJobs.filter((job) => job.status === "processing").length,
+      succeeded_count: memoryWriteJobs.filter((job) => job.status === "succeeded").length,
+      failed_count: memoryWriteJobs.filter((job) => job.status === "failed").length,
+      due_count: memoryWriteJobs.filter((job) => ["pending", "failed"].includes(job.status)).length,
+    },
   });
 }
 
@@ -1449,6 +1483,12 @@ async function handleMemoryBackendProfileItem(request, response, profileId, acti
     });
     return;
   }
+  if (request.method === "GET" && action === "jobs") {
+    sendJson(response, 200, {
+      jobs: memoryWriteJobs.filter((entry) => entry.backend_profile_id === profile.id),
+    });
+    return;
+  }
   if (!hasValidCsrf(request)) {
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
     return;
@@ -1482,6 +1522,32 @@ async function handleMemoryBackendProfileItem(request, response, profileId, acti
     profile.is_enabled = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleMemoryWriteJobItem(request, response, jobId, action) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const job = memoryWriteJobs.find((item) => item.id === jobId);
+  if (job === undefined) {
+    sendJson(response, 404, { detail: "Memory write job not found" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "retry") {
+    job.status = "pending";
+    job.next_attempt_at = new Date().toISOString();
+    job.last_error = null;
+    job.processed_at = null;
+    job.updated_at = new Date().toISOString();
+    sendJson(response, 200, job);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });

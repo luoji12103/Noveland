@@ -223,6 +223,14 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByPlaceholder("api-key-ref").fill("openai-local");
   await page.getByRole("button", { name: "Create provider profile" }).click();
   await expect(page.getByRole("heading", { name: "E2E Provider" })).toBeVisible();
+
+  await page.goto("/admin/memory-backends");
+  await expect(page.getByRole("heading", { name: "Primary Mem0" })).toBeVisible();
+  await expect(page.getByText("Jobs: 1 / failed 1")).toBeVisible();
+  await expect(page.getByText("Error: mock backend timeout")).toBeVisible();
+  await page.getByRole("button", { name: "Retry job" }).click();
+  await expect(page.getByText("Memory write job queued for retry.")).toBeVisible();
+  await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible();
 });
 
 test("world member sees read-only workspace pages", async ({ page }) => {

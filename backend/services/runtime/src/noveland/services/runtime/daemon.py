@@ -40,6 +40,7 @@ class RuntimeLoopResult:
     desired_state: str
     advanced_worlds: int
     executed_runs: int
+    processed_memory_jobs: int
 
 
 class RuntimeControlService:
@@ -118,6 +119,7 @@ class RuntimeDaemon:
                     desired_state=control.desired_state,
                     advanced_worlds=0,
                     executed_runs=0,
+                    processed_memory_jobs=0,
                 )
 
             control_service.mark_loop_started()
@@ -184,6 +186,7 @@ class RuntimeDaemon:
                     desired_state=view.desired_state,
                     advanced_worlds=tick_result.advanced_worlds,
                     executed_runs=executed_runs,
+                    processed_memory_jobs=processed_memory_jobs,
                 )
             except Exception as exc:
                 view = control_service.mark_loop_finished(str(exc))
@@ -205,6 +208,7 @@ class RuntimeDaemon:
                     desired_state=view.desired_state,
                     advanced_worlds=0,
                     executed_runs=0,
+                    processed_memory_jobs=0,
                 )
 
     def run_loop(self, max_iterations: int | None = None) -> int:

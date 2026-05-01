@@ -90,6 +90,7 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     assert result.desired_state == "running"
     assert result.advanced_worlds == 1
     assert result.executed_runs == 1
+    assert result.processed_memory_jobs == 1
 
     with Session(engine) as session:
         control = session.scalars(select(RuntimeControlState)).one()
@@ -125,6 +126,10 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
         "runtime.iteration_finished",
         "agent.run_succeeded",
     }
+    finished_diagnostic = next(
+        event for event in diagnostics if event.event_type == "runtime.iteration_finished"
+    )
+    assert finished_diagnostic.details["processed_memory_jobs"] == 1
 
 
 def test_runtime_daemon_advances_running_auto_conversation(
@@ -176,6 +181,7 @@ def test_runtime_daemon_advances_running_auto_conversation(
         ).all()
 
     assert result.executed_runs == 1
+    assert result.processed_memory_jobs == 1
     assert session_model.next_turn_index == 1
     assert len(turns) == 1
     assert turns[0].speaker_kind == "agent"

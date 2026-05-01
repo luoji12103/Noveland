@@ -18,6 +18,14 @@ import { updateRuntimeControl } from "@/lib/worlds/client";
 import type { RuntimeAdminData } from "@/lib/worlds/server";
 import type { RuntimeStreamEnvelope } from "@/lib/realtime";
 
+const emptyMemoryWriteJobs = {
+  pending_count: 0,
+  processing_count: 0,
+  succeeded_count: 0,
+  failed_count: 0,
+  due_count: 0,
+};
+
 describe("RuntimeAdmin", () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -54,6 +62,7 @@ describe("RuntimeAdmin", () => {
           last_error: null,
           runtime_loop_interval_seconds: 5,
           runtime_batch_limit: 20,
+          memory_write_jobs: emptyMemoryWriteJobs,
         },
         diagnostics: [
           {
@@ -78,6 +87,7 @@ describe("RuntimeAdmin", () => {
     await waitFor(() => {
       expect(screen.getByText("running")).toBeInTheDocument();
       expect(screen.getByText("Iteration finished.")).toBeInTheDocument();
+      expect(screen.getByText("0 due / 0 failed")).toBeInTheDocument();
     });
   });
 
@@ -116,6 +126,7 @@ const runtimeData: RuntimeAdminData = {
     last_error: null,
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
+    memory_write_jobs: emptyMemoryWriteJobs,
   },
   runtimeDiagnostics: [],
   modelProviderPlugins: [],

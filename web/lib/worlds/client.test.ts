@@ -28,6 +28,7 @@ import {
   listAgentRuns,
   listAgentObservations,
   listMemoryBackendProfiles,
+  listMemoryBackendProfileJobs,
   pauseWorldClock,
   resumeWorldClock,
   listAgentMemory,
@@ -37,6 +38,7 @@ import {
   listProviderProfiles,
   runAgent,
   refreshAgentObservations,
+  retryMemoryWriteJob,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
@@ -253,7 +255,9 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-profile-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ jobs: [{ id: "job-1", status: "failed" }] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "job-1", status: "pending" }));
     vi.stubGlobal("fetch", fetchMock);
 
     await listMemoryBackendProfiles();
@@ -264,11 +268,17 @@ describe("world client", () => {
     });
     await updateMemoryBackendProfile("memory-profile-1", { name: "Updated" });
     await deleteMemoryBackendProfile("memory-profile-1");
+    await listMemoryBackendProfileJobs("memory-profile-1", { status: "failed", limit: 5 });
+    await retryMemoryWriteJob("job-1");
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/memory-backend-profiles");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/memory-backend-profiles");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
     expect(fetchMock.mock.calls[3][0]).toBe("/api/memory-backend-profiles/memory-profile-1");
+    expect(fetchMock.mock.calls[4][0]).toBe(
+      "/api/memory-backend-profiles/memory-profile-1/jobs?status=failed&limit=5",
+    );
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/memory-write-jobs/job-1/retry");
   });
 
   it("maps runtime and provider requests", async () => {

@@ -24,6 +24,7 @@ from noveland.memory import (
     MemorySearchRequest,
     MemoryService,
     MemoryTurn,
+    MemoryWriteJobStatus,
     run_memory_eval_cases,
 )
 from noveland.memory.models import (
@@ -313,6 +314,72 @@ def test_memory_service_delete_scope_scrubs_logs_and_snapshots() -> None:
         created_at=snapshot.created_at,
         updated_at=snapshot.updated_at,
     )
+
+
+def test_memory_service_lists_summarizes_and_retries_write_jobs() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+
+    with Session(engine) as session:
+        profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="local-memory",
+                name="Local memory",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        failed_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=profile.id,
+            source_kind="agent_run",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "failed memory"},
+            dedupe_key="failed-job",
+            status="failed",
+            attempt_count=2,
+            next_attempt_at=datetime.now(UTC),
+            last_error="backend timeout",
+        )
+        succeeded_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=profile.id,
+            source_kind="conversation_turn",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "stored memory"},
+            dedupe_key="succeeded-job",
+            status="succeeded",
+            attempt_count=1,
+            next_attempt_at=datetime.now(UTC),
+            processed_at=datetime.now(UTC),
+        )
+        session.add_all([failed_job, succeeded_job])
+        session.flush()
+        failed_job_id = failed_job.id
+
+        service = MemoryService(session, AppSettings())
+        failed_jobs = service.list_write_jobs(
+            profile_id=profile.id,
+            status=MemoryWriteJobStatus.FAILED,
+        )
+        summary_before_retry = service.write_job_status_summary()
+        retried = service.retry_write_job(failed_job_id)
+        summary_after_retry = service.write_job_status_summary()
+        session.commit()
+
+    assert [job.id for job in failed_jobs] == [failed_job_id]
+    assert failed_jobs[0].backend_profile_key == "local-memory"
+    assert summary_before_retry.failed_count == 1
+    assert summary_before_retry.succeeded_count == 1
+    assert summary_before_retry.due_count == 1
+    assert retried.status == MemoryWriteJobStatus.PENDING
+    assert retried.last_error is None
+    assert summary_after_retry.pending_count == 1
+    assert summary_after_retry.failed_count == 0
+    assert summary_after_retry.succeeded_count == 1
 
 
 def _engine() -> Engine:

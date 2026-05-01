@@ -31,6 +31,9 @@ import type {
   MemoryBackendProfileUpdateInput,
   MemoryBackendHealth,
   MemoryBackendLogs,
+  MemoryWriteJob,
+  MemoryWriteJobList,
+  MemoryWriteJobStatus,
   MemoryEvalResult,
   MemoryItem,
   MemoryProfileSnapshot,
@@ -822,6 +825,31 @@ export function getMemoryBackendProfileLogs(
     `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
     { method: "GET" },
   );
+}
+
+export function listMemoryBackendProfileJobs(
+  profileId: string,
+  options: { status?: MemoryWriteJobStatus; limit?: number } = {},
+): Promise<MemoryWriteJobList> {
+  const search = new URLSearchParams();
+  if (options.status !== undefined) {
+    search.set("status", options.status);
+  }
+  if (options.limit !== undefined) {
+    search.set("limit", String(options.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return apiRequest<MemoryWriteJobList>(
+    `/api/memory-backend-profiles/${profileId}/jobs${suffix}`,
+    { method: "GET" },
+  );
+}
+
+export function retryMemoryWriteJob(jobId: string): Promise<MemoryWriteJob> {
+  return apiRequest<MemoryWriteJob>(`/api/memory-write-jobs/${jobId}/retry`, {
+    method: "POST",
+    csrf: true,
+  });
 }
 
 export function runMemoryBackendProfileEvalSmoke(

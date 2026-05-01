@@ -27,6 +27,9 @@ from noveland.memory import (
     MemoryEvalResult,
     MemoryRetrievalLogRecord,
     MemoryService,
+    MemoryWriteJobRecord,
+    MemoryWriteJobStatus,
+    MemoryWriteJobStatusSummary,
     MemoryWriteLogRecord,
 )
 from noveland.memory.errors import MemoryValidationError
@@ -66,9 +69,18 @@ class RuntimeControlResponse(BaseModel):
     last_error: str | None
 
 
+class MemoryWriteJobStatusSummaryResponse(BaseModel):
+    pending_count: int
+    processing_count: int
+    succeeded_count: int
+    failed_count: int
+    due_count: int
+
+
 class RuntimeStatusResponse(RuntimeControlResponse):
     runtime_loop_interval_seconds: int
     runtime_batch_limit: int
+    memory_write_jobs: MemoryWriteJobStatusSummaryResponse
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -210,6 +222,30 @@ class MemoryBackendLogsResponse(BaseModel):
     retrieval_logs: list[MemoryRetrievalLogResponse]
 
 
+class MemoryWriteJobResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    backend_profile_id: uuid.UUID
+    backend_profile_key: str
+    backend_profile_name: str
+    backend_kind: MemoryBackendKind
+    source_kind: str
+    source_id: uuid.UUID
+    dedupe_key: str
+    status: MemoryWriteJobStatus
+    attempt_count: int
+    next_attempt_at: datetime
+    last_error: str | None
+    processed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MemoryWriteJobListResponse(BaseModel):
+    jobs: list[MemoryWriteJobResponse]
+
+
 class MemoryEvalCaseResponse(BaseModel):
     label: str
     query_text: str
@@ -283,9 +319,11 @@ def get_runtime_status(
     del subject
     settings = load_settings()
     view = get_runtime_control_view(db_session)
+    memory_summary = MemoryService(db_session, settings).write_job_status_summary()
     return RuntimeStatusResponse(
         runtime_loop_interval_seconds=settings.runtime_loop_interval_seconds,
         runtime_batch_limit=settings.runtime_batch_limit,
+        memory_write_jobs=_memory_write_job_status_summary_response(memory_summary),
         **_runtime_control_response(view).model_dump(),
     )
 
@@ -476,6 +514,79 @@ def get_memory_backend_profile_logs(
             for record in service.list_retrieval_logs(profile_id=profile_id, limit=limit)
         ],
     )
+
+
+@router.get(
+    "/memory-backend-profiles/{profile_id}/jobs",
+    response_model=MemoryWriteJobListResponse,
+)
+def list_memory_backend_profile_jobs(
+    profile_id: uuid.UUID,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    status_filter: Annotated[
+        MemoryWriteJobStatus | None,
+        Query(alias="status"),
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> MemoryWriteJobListResponse:
+    del subject
+    service = MemoryService(db_session, load_settings())
+    if MemoryBackendProfileService(db_session).get_profile(profile_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return MemoryWriteJobListResponse(
+        jobs=[
+            _memory_write_job_response(record)
+            for record in service.list_write_jobs(
+                profile_id=profile_id,
+                status=status_filter,
+                limit=limit,
+            )
+        ],
+    )
+
+
+@router.post(
+    "/memory-write-jobs/{job_id}/retry",
+    response_model=MemoryWriteJobResponse,
+)
+def retry_memory_write_job(
+    job_id: uuid.UUID,
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryWriteJobResponse:
+    del subject
+    require_csrf(request)
+    service = MemoryService(db_session, load_settings())
+    try:
+        job = service.retry_write_job(job_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.INFO,
+            component=DiagnosticComponent.RUNTIME,
+            event_type="memory.write_job_retry_requested",
+            message="Memory write job retry requested.",
+            details={
+                "job_id": str(job.id),
+                "backend_profile_id": str(job.backend_profile_id),
+                "backend_profile_key": job.backend_profile_key,
+                "source_kind": job.source_kind.value,
+                "source_id": str(job.source_id),
+                "attempt_count": job.attempt_count,
+            },
+            world_id=job.world_id,
+            agent_id=job.agent_id,
+        ),
+    )
+    return _memory_write_job_response(job)
 
 
 @router.post(
@@ -670,6 +781,16 @@ def _memory_backend_health_response(
 
 def _memory_write_log_response(record: MemoryWriteLogRecord) -> MemoryWriteLogResponse:
     return MemoryWriteLogResponse(**record.model_dump())
+
+
+def _memory_write_job_response(record: MemoryWriteJobRecord) -> MemoryWriteJobResponse:
+    return MemoryWriteJobResponse(**record.model_dump())
+
+
+def _memory_write_job_status_summary_response(
+    summary: MemoryWriteJobStatusSummary,
+) -> MemoryWriteJobStatusSummaryResponse:
+    return MemoryWriteJobStatusSummaryResponse(**summary.model_dump())
 
 
 def _memory_retrieval_log_response(

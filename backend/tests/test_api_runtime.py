@@ -82,6 +82,7 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert control.json()["desired_state"] == "stopped"
     assert status.status_code == 200
     assert status.json()["runtime_loop_interval_seconds"] == 5
+    assert status.json()["memory_write_jobs"]["failed_count"] == 0
     assert diagnostics.status_code == 200
     assert diagnostics.json()[0]["event_type"] == "runtime.test"
     assert diagnostics.json()[0]["details"]["token"] == "[redacted]"
@@ -125,11 +126,14 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     )
     profile_id = uuid.UUID(create_profile.json()["id"])
     _attach_world_memory_profile(engine, world_id, profile_id)
-    _seed_memory_backend_logs(engine, profile_id, world_id, agent_id)
+    failed_job_id = _seed_memory_backend_logs(engine, profile_id, world_id, agent_id)
 
     list_profiles = client.get("/memory-backend-profiles")
     health = client.get(f"/memory-backend-profiles/{profile_id}/health")
     logs = client.get(f"/memory-backend-profiles/{profile_id}/logs?limit=5")
+    jobs = client.get(f"/memory-backend-profiles/{profile_id}/jobs?status=failed&limit=5")
+    retry_job = client.post(f"/memory-write-jobs/{failed_job_id}/retry")
+    status_after_retry = client.get("/runtime/status")
     eval_smoke = client.post(f"/memory-backend-profiles/{profile_id}/eval-smoke")
     update_profile = client.patch(
         f"/memory-backend-profiles/{profile_id}",
@@ -144,6 +148,15 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     assert logs.status_code == 200
     assert logs.json()["write_logs"][0]["backend"] == "local_pgvector"
     assert logs.json()["retrieval_logs"][0]["query_text"] == "Stored memory"
+    assert jobs.status_code == 200
+    assert jobs.json()["jobs"][0]["id"] == str(failed_job_id)
+    assert jobs.json()["jobs"][0]["last_error"] == "backend timeout"
+    assert retry_job.status_code == 200
+    assert retry_job.json()["status"] == "pending"
+    assert retry_job.json()["last_error"] is None
+    assert status_after_retry.status_code == 200
+    assert status_after_retry.json()["memory_write_jobs"]["pending_count"] == 1
+    assert status_after_retry.json()["memory_write_jobs"]["failed_count"] == 0
     assert eval_smoke.status_code == 200
     assert eval_smoke.json()["case_count"] == 1
     assert eval_smoke.json()["hit_case_count"] == 1
@@ -159,10 +172,14 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     control = client.get("/runtime/control")
     diagnostics = client.get("/runtime/diagnostics")
     profiles = client.get("/provider-profiles")
+    memory_jobs = client.get(f"/memory-backend-profiles/{uuid.uuid4()}/jobs")
+    retry_memory_job = client.post(f"/memory-write-jobs/{uuid.uuid4()}/retry")
 
     assert control.status_code == 403
     assert diagnostics.status_code == 403
     assert profiles.status_code == 403
+    assert memory_jobs.status_code == 403
+    assert retry_memory_job.status_code == 403
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -312,7 +329,7 @@ def _seed_memory_backend_logs(
     profile_id: uuid.UUID,
     world_id: uuid.UUID,
     agent_id: uuid.UUID,
-) -> None:
+) -> uuid.UUID:
     with Session(engine) as session:
         memory_item = AgentMemoryItem(
             world_id=world_id,
@@ -339,6 +356,22 @@ def _seed_memory_backend_logs(
         )
         session.add(job)
         session.flush()
+        failed_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=profile_id,
+            source_kind="conversation_turn",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "Failed memory"},
+            dedupe_key="memory-job-failed",
+            status="failed",
+            attempt_count=2,
+            next_attempt_at=datetime.now(UTC),
+            last_error="backend timeout",
+        )
+        session.add(failed_job)
+        session.flush()
+        failed_job_id = failed_job.id
         session.add(
             MemoryWriteLog(
                 job_id=job.id,
@@ -364,3 +397,4 @@ def _seed_memory_backend_logs(
             )
         )
         session.commit()
+    return failed_job_id

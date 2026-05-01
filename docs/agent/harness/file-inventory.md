@@ -28,6 +28,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/agent-presets/`
 - `web/app/api/auth/`
 - `web/app/api/memory-backend-profiles/`
+- `web/app/api/memory-backend-profiles/[profileId]/jobs/`
+- `web/app/api/memory-write-jobs/`
 - `web/app/api/worlds/`
 - `web/app/api/world-compositions/`
 - `web/app/api/runtime/`

@@ -361,6 +361,40 @@ export type MemoryWriteLog = {
   occurred_at: string;
 };
 
+export type MemoryWriteJobStatus = "pending" | "processing" | "succeeded" | "failed";
+
+export type MemoryWriteJobStatusSummary = {
+  pending_count: number;
+  processing_count: number;
+  succeeded_count: number;
+  failed_count: number;
+  due_count: number;
+};
+
+export type MemoryWriteJob = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  backend_profile_id: string;
+  backend_profile_key: string;
+  backend_profile_name: string;
+  backend_kind: "mem0_oss" | "local_pgvector";
+  source_kind: "agent_run" | "conversation_turn" | "world_event";
+  source_id: string;
+  dedupe_key: string;
+  status: MemoryWriteJobStatus;
+  attempt_count: number;
+  next_attempt_at: string;
+  last_error: string | null;
+  processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryWriteJobList = {
+  jobs: MemoryWriteJob[];
+};
+
 export type MemoryRetrievalLog = {
   id: string;
   world_id: string;
@@ -409,6 +443,7 @@ export type RuntimeControl = {
 export type RuntimeStatus = RuntimeControl & {
   runtime_loop_interval_seconds: number;
   runtime_batch_limit: number;
+  memory_write_jobs: MemoryWriteJobStatusSummary;
 };
 
 export type DiagnosticSeverity = "info" | "warning" | "error";

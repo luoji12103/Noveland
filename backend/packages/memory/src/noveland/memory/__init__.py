@@ -51,7 +51,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "MemoryService": ("noveland.memory.service", "MemoryService"),
     "MemoryTurn": ("noveland.memory.contracts", "MemoryTurn"),
     "MemoryWriteLogRecord": ("noveland.memory.contracts", "MemoryWriteLogRecord"),
+    "MemoryWriteJobRecord": ("noveland.memory.contracts", "MemoryWriteJobRecord"),
     "MemoryWriteJobStatus": ("noveland.memory.contracts", "MemoryWriteJobStatus"),
+    "MemoryWriteJobStatusSummary": (
+        "noveland.memory.contracts",
+        "MemoryWriteJobStatusSummary",
+    ),
     "MemoryWriteSourceKind": ("noveland.memory.contracts", "MemoryWriteSourceKind"),
     "VECTOR_DIMENSIONS": ("noveland.memory.vector_type", "VECTOR_DIMENSIONS"),
     "deterministic_embedding": ("noveland.memory.utils", "deterministic_embedding"),

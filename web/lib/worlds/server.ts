@@ -14,6 +14,7 @@ import type {
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
+  MemoryWriteJobList,
   MemoryItem,
   MemoryProfileSnapshot,
   Membership,
@@ -143,6 +144,7 @@ export type MemoryBackendAdminData = {
   profiles: MemoryBackendProfile[];
   profileHealth: Record<string, MemoryBackendHealth>;
   profileLogs: Record<string, MemoryBackendLogs>;
+  profileJobs: Record<string, MemoryWriteJobList>;
   loadError: string | null;
 };
 
@@ -716,6 +718,10 @@ export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminDat
             `/memory-backend-profiles/${profile.id}/logs`,
             cookies,
           ),
+          jobs: await apiFetch<MemoryWriteJobList>(
+            `/memory-backend-profiles/${profile.id}/jobs?limit=20`,
+            cookies,
+          ),
         },
       ] as const),
     );
@@ -727,6 +733,9 @@ export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminDat
       profileLogs: Object.fromEntries(
         profilePairs.map(([profileId, data]) => [profileId, data.logs]),
       ),
+      profileJobs: Object.fromEntries(
+        profilePairs.map(([profileId, data]) => [profileId, data.jobs]),
+      ),
       loadError: null,
     };
   } catch (error) {
@@ -737,6 +746,7 @@ export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminDat
       profiles: [],
       profileHealth: {},
       profileLogs: {},
+      profileJobs: {},
       loadError: "Unable to load memory backend profiles.",
     };
   }

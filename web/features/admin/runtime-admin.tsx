@@ -19,6 +19,13 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
   const [runtimeControl, setRuntimeControl] = useState(data.runtimeControl);
   const [runtimeStatus, setRuntimeStatus] = useState(data.runtimeStatus);
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(data.runtimeDiagnostics);
+  const memoryWriteJobs = runtimeStatus?.memory_write_jobs ?? {
+    pending_count: 0,
+    processing_count: 0,
+    succeeded_count: 0,
+    failed_count: 0,
+    due_count: 0,
+  };
 
   useEffect(() => {
     setRuntimeControl(data.runtimeControl);
@@ -81,6 +88,14 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
           <div className="metric">
             <p className="metric-label">Batch limit</p>
             <p className="metric-value">{runtimeStatus?.runtime_batch_limit ?? "-"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Memory jobs</p>
+            <p className="metric-value">
+              {runtimeStatus === null
+                ? "-"
+                : `${memoryWriteJobs.due_count} due / ${memoryWriteJobs.failed_count} failed`}
+            </p>
           </div>
         </div>
         <div className="button-row">

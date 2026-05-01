@@ -1,20 +1,23 @@
 # Active Session Handoff
 
 - Date: 2026-05-01T08:21:21Z
-- Branch: main
-- Objective: Replace the old synchronous pgvector CRUD memory baseline with a Mem0 OSS-first long-term memory stack, including backend profiles, async write jobs/logs, runtime/conversation memory context integration, and stage-1 through stage-3 operator surfaces.
+- Branch: feat/runtime-memory-ops
+- Objective: Add Runtime/Memory Ops visibility for async memory write jobs, including platform-admin job listing, retry operators, runtime status counts, and Web memory backend failure controls.
 - Completed work:
-  - Added memory backend profiles, async memory write jobs, write/retrieval logs, agent profile snapshots, and the three migrations `20260423_0016_memory_mem0_oss_foundation.py`, `20260423_0017_memory_context_integration.py`, and `20260423_0018_memory_profiles_forget_evals.py`.
-  - Reworked `noveland.memory` around `MemoryService`, backend adapters, Mem0 OSS integration boundaries, local pgvector fallback, health/log/eval operators, and typed contracts/errors.
-  - Added `NOVELAND_MEMORY_BACKEND_SECRETS_JSON` settings support and explicit world `memory_backend_profile_id` wiring.
-  - Integrated long-term memory with runtime agent runs and conversations via async job enqueue and prompt memory context, without letting runtime or persona policy import Mem0 directly.
-  - Changed the Web agent memory surface to read-only list/search/profile-snapshot/forget behavior and added `/admin/memory-backends` plus same-origin proxy routes for profile CRUD, health, logs, and eval smoke.
-  - Updated Playwright mock infrastructure to reflect the new memory contract and read-only UI behavior.
-  - Closed out the branch into a single commit after full backend/web regression and doc synchronization.
-  - Re-ran the full merge-readiness gate on 2026-05-01 and fast-forward merged `feat/memory-mem0-oss-foundation` into local `main`.
+  - Fast-forward merged `feat/memory-mem0-oss-foundation` into local `main` after the full merge-readiness gate passed.
+  - Added memory write job contracts, `MemoryService` list/status/retry methods, and platform-admin API routes for profile job listing and failed-job retry.
+  - Added memory write job counts to runtime status and processed-memory-job counts to runtime daemon iteration results and diagnostics.
+  - Added same-origin Next proxy routes and Web client helpers for memory write jobs.
+  - Extended `/admin/memory-backends` with job/failure counts, failed-job details, and retry controls.
+  - Updated Playwright mock infrastructure and E2E flow for memory job retry.
 - Incomplete work:
-  - Runtime/Memory Ops has been selected as the next mainline but not started yet.
+  - No next mainline has been selected after Runtime/Memory Ops.
 - Tests run:
+  - `cd backend && uv run ruff check packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd backend && uv run mypy packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test -- features/admin/runtime-admin.test.tsx`
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
   - `cd backend && uv run pytest`
@@ -27,9 +30,9 @@
 - Current risks:
   - The primary long-term memory path is now profile-driven and async, but distributed workers, queue coordination, and production-grade memory backfill are still future work.
   - `builtin.local_pgvector_memory` remains as fallback/test coverage; canonical long-term behavior assumes Mem0 OSS-style profiles through `MemoryService`.
-  - Web Playwright coverage now depends on the local mock backend matching the evolving memory contracts; keep the mock aligned when API contracts change.
+  - Web Playwright coverage now depends on the local mock backend matching the evolving memory job contracts; keep the mock aligned when API contracts change.
 - Recommended next step:
-  - Start the Runtime/Memory Ops mainline for memory write job observability, retry operators, and runtime processing status.
+  - Review or merge this branch, then select the next mainline.
 - Sensitive areas to avoid casual edits:
   - `MemoryService` as the only business entrypoint for long-term memory
   - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`

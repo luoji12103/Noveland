@@ -329,3 +329,14 @@
 - Tests added/updated: preset API/schema tests; world composition export/import API tests; world client tests for preset/composition routes; component tests for preset admin and agent preset creation flow; Playwright mock-backend coverage for preset management and composition import/export
 - Docs updated: README, project index, file inventory, task board, change journal, active handoff
 - Follow-up notes: presets are materialized only at agent creation/import time, and world composition import always creates a new world instead of merging into an existing one.
+
+## Runtime memory ops entry
+
+- Date: 2026-05-01
+- Branch: feat/runtime-memory-ops
+- Scope: memory write job observability and retry operators
+- Summary: Added platform-admin memory write job listing/retry APIs, runtime status memory job counts, daemon loop processed-memory-job result reporting, and Web memory backend job/failure controls.
+- Files changed: `/backend/packages/memory/**`, `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/services/runtime/src/noveland/services/runtime/daemon.py`, `/backend/tests/**`, `/web/app/api/memory-backend-profiles/[profileId]/jobs/**`, `/web/app/api/memory-write-jobs/**`, `/web/features/admin/memory-backend-admin.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/**`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: memory service job list/summary/retry tests; runtime API permission/retry/status tests; runtime daemon processed-memory-job assertions; Web client and Playwright mock-backend coverage for memory job listing/retry.
+- Docs updated: README, project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: Memory jobs still use the v1 database-backed queue; distributed workers, production queue coordination, and richer backfill remain future work.

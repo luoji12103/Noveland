@@ -313,6 +313,13 @@ const adminData: WorldDashboardData = {
     last_error: null,
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
+    memory_write_jobs: {
+      pending_count: 0,
+      processing_count: 0,
+      succeeded_count: 0,
+      failed_count: 0,
+      due_count: 0,
+    },
   },
   runtimeDiagnostics: [
     {

@@ -233,6 +233,43 @@ class MemoryWriteLogRecord(_FrozenContract):
         return value.astimezone(UTC)
 
 
+class MemoryWriteJobRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    backend_profile_id: uuid.UUID
+    backend_profile_key: str
+    backend_profile_name: str
+    backend_kind: MemoryBackendKind
+    source_kind: MemoryWriteSourceKind
+    source_id: uuid.UUID
+    dedupe_key: str
+    status: MemoryWriteJobStatus
+    attempt_count: int = Field(ge=0)
+    next_attempt_at: datetime
+    last_error: str | None = None
+    processed_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("next_attempt_at", "processed_at", "created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetimes(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamps must be timezone-aware")
+        return value.astimezone(UTC)
+
+
+class MemoryWriteJobStatusSummary(_FrozenContract):
+    pending_count: int = Field(ge=0)
+    processing_count: int = Field(ge=0)
+    succeeded_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    due_count: int = Field(ge=0)
+
+
 class MemoryRetrievalLogRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID

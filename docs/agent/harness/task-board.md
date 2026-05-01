@@ -44,6 +44,7 @@
 - Memory Mem0 OSS Foundation
 - Memory Context Integration
 - Agent Profile Snapshots + Forget / Eval / Ops
+- Runtime/Memory Ops
 
 ## Upcoming Mainline
-- Runtime/Memory Ops
+- None selected

@@ -11,10 +11,11 @@ Fast orientation for a new coding session.
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
 - `web/app/admin/` — platform-admin pages for presets, provider profiles, and runtime control
-- `web/app/admin/memory-backends/` — platform-admin memory backend profile, health, log, and eval surface
+- `web/app/admin/memory-backends/` — platform-admin memory backend profile, health, log, job retry, and eval surface
 - `web/app/admin/presets/` — platform-admin preset catalog management page
 - `web/app/api/auth/` — same-origin auth proxy route handlers for the web app
-- `web/app/api/memory-backend-profiles/` — same-origin memory backend profile, health, log, and eval proxy route handlers
+- `web/app/api/memory-backend-profiles/` — same-origin memory backend profile, health, log, job list, and eval proxy route handlers
+- `web/app/api/memory-write-jobs/` — same-origin memory write job retry proxy route handlers
 - `web/app/api/agent-presets/` — same-origin preset admin proxy route handlers
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
 - `web/app/api/world-compositions/` — same-origin world composition import proxy route handlers
@@ -48,7 +49,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, and provider profile router
+  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, memory backend profile, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and filtered narrative artifact router
@@ -56,7 +57,7 @@ Fast orientation for a new coding session.
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
   - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including conversation memory configuration and optional completed-session narrative auto-generation
-  - `noveland.services.runtime.daemon` — database-backed runtime control state, daemon loop orchestration, and due memory job processing
+  - `noveland.services.runtime.daemon` — database-backed runtime control state, daemon loop orchestration, and due memory job processing status
 - `backend/pyproject.toml` — backend uv workspace manifest
 
 ### Backend packages
@@ -95,10 +96,10 @@ Fast orientation for a new coding session.
   - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
-  - `noveland.memory.contracts` — long-term memory profile, lookup, log, snapshot, eval, and backend contracts
+  - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, and backend contracts
   - `noveland.memory.errors` — typed long-term memory validation and execution errors
   - `noveland.memory.models` — memory backend profiles, write jobs/logs, retrieval logs, agent profile snapshots, and local fallback memory ORM models
-  - `noveland.memory.service` — `MemoryService` facade for profile CRUD, context retrieval, async write processing, forget, health, logs, and eval flows
+  - `noveland.memory.service` — `MemoryService` facade for profile CRUD, context retrieval, async write processing, write job listing/retry/status, forget, health, logs, and eval flows
   - `noveland.memory.evals` — smoke-eval helpers for backend contract coverage
   - `noveland.memory.backends/` — abstract backend protocol plus fake and Mem0 OSS adapters
   - `noveland.memory.local_pgvector` — local pgvector fallback backend and deterministic local search implementation

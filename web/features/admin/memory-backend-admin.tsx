@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   createMemoryBackendProfile,
   deleteMemoryBackendProfile,
+  retryMemoryWriteJob,
   runMemoryBackendProfileEvalSmoke,
   updateMemoryBackendProfile,
 } from "@/lib/worlds/client";
@@ -94,6 +95,13 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
     }
   }
 
+  async function handleRetryJob(jobId: string) {
+    await runAction(
+      () => retryMemoryWriteJob(jobId),
+      "Memory write job queued for retry.",
+    );
+  }
+
   return (
     <section className="management-section">
       {notice !== null ? <p className="management-notice">{notice}</p> : null}
@@ -149,6 +157,10 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
                     Health: {data.profileHealth[profile.id]?.status ?? "unknown"} / write logs{" "}
                     {data.profileLogs[profile.id]?.write_logs.length ?? 0} / retrieval logs{" "}
                     {data.profileLogs[profile.id]?.retrieval_logs.length ?? 0}
+                  </p>
+                  <p>
+                    Jobs: {data.profileJobs[profile.id]?.jobs.length ?? 0} / failed{" "}
+                    {data.profileJobs[profile.id]?.jobs.filter((job) => job.status === "failed").length ?? 0}
                   </p>
                   <form className="inline-form" onSubmit={(event) => handleUpdate(event, profile.id)}>
                     <input className="text-input" name="name" defaultValue={profile.name} />
@@ -219,11 +231,49 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
                       ? "not run in this session"
                       : `${evalResultsByProfileId[profile.id].hit_case_count}/${evalResultsByProfileId[profile.id].case_count} hits, avg latency ${evalResultsByProfileId[profile.id].average_latency_ms ?? 0}ms`}
                   </p>
+                  <div className="resource-list" aria-label={`${profile.name} memory jobs`}>
+                    {(data.profileJobs[profile.id]?.jobs ?? []).length === 0 ? (
+                      <article className="resource-row">
+                        <div>
+                          <h4>No memory write jobs</h4>
+                          <p>Runtime and conversation writes will appear here after they enqueue memory work.</p>
+                        </div>
+                      </article>
+                    ) : (
+                      data.profileJobs[profile.id]?.jobs.map((job) => (
+                        <article className="resource-row" key={job.id}>
+                          <div>
+                            <h4>
+                              {job.source_kind} - {job.status}
+                            </h4>
+                            <p>
+                              Attempts {job.attempt_count} / next {new Date(job.next_attempt_at).toLocaleString()}
+                            </p>
+                            <p>
+                              World {job.world_id} / agent {job.agent_id}
+                            </p>
+                            {job.last_error === null ? null : <p>Error: {job.last_error}</p>}
+                          </div>
+                          {job.status === "failed" ? (
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => void handleRetryJob(job.id)}
+                            >
+                              Retry job
+                            </button>
+                          ) : null}
+                        </article>
+                      ))
+                    )}
+                  </div>
                   <pre>
                     {JSON.stringify(
                       {
                         health: data.profileHealth[profile.id] ?? null,
                         logs: data.profileLogs[profile.id] ?? { write_logs: [], retrieval_logs: [] },
+                        jobs: data.profileJobs[profile.id] ?? { jobs: [] },
                       },
                       null,
                       2,
