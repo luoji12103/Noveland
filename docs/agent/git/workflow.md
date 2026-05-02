@@ -13,6 +13,8 @@
 - `hotfix/<scope>-<topic>`
 - `release/<version>` when release freezing becomes necessary
 
+Branch names should describe the feature, outcome, or subsystem being changed. Do not name future branches after roadmap phase numbers.
+
 ## Strategy
 
 - keep branches short-lived

@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Provider/Replay Ops Hardening
+- None
 
 ## Blocked
 - None
@@ -46,6 +46,8 @@
 - Agent Profile Snapshots + Forget / Eval / Ops
 - Runtime/Memory Ops
 - Runtime/Provider/Memory Ops Hardening
+- Provider Secrets Validation
+- Runtime Recovery Playbook
 
 ## Upcoming Mainline
-- Roadmap phases 6-10 are active on `feat/roadmap-6-10-ops-replay`; next candidate will be selected after phase 10 closeout.
+- Event/Replay/Clock Ops, covering roadmap phases 8-12. Use a feature-named branch such as `feat/event-replay-clock-ops`, not a phase-number branch name.

@@ -1,52 +1,67 @@
 # Active Session Handoff
 
-- Date: 2026-05-02T13:27:21Z
-- Branch: feat/roadmap-6-10-ops-replay
-- Objective: Implement roadmap phases 6-10 as a single Provider/Replay Ops Hardening mainline with functional commits and no push.
-- Scope:
-  - Phase 6: Provider Secrets Validation.
-  - Phase 7: Runtime Recovery Playbook.
-  - Phase 8: Event Stream Audit Views.
-  - Phase 9: Snapshot Integrity Checks.
-  - Phase 10: Replay UI v1.
+- Date: 2026-05-02T18:01:12Z
+- Branch: main
+- Objective: Close out the merged provider secret validation and runtime recovery playbook work, then prepare the next roadmap bundle without starting implementation.
+- Current repository state:
+  - Local `main` includes the phases 1-5 ops hardening commits.
+  - Local `main` now also includes provider secret-ref health validation and the runtime recovery playbook.
+  - No push has been performed.
+  - Future implementation branches must be named by feature/outcome, not roadmap phase numbers.
 - Completed work:
-  - Created the implementation branch from local `main`.
-  - Selected `Provider/Replay Ops Hardening` as the active task-board mainline.
+  - Merged `feat/roadmap-6-10-ops-replay` into local `main` by fast-forward.
+  - Added explicit provider health secret-ref metadata: `api_key_ref`, `secret_ref_status`, and `secret_ref_message`.
+  - Preserved `missing_secret_ref` for compatibility.
+  - Updated provider admin UI, Web types, tests, and the mock backend so secret-ref status is visible without exposing secret values.
+  - Added `docs/agent/operations/runtime-recovery.md` and linked it from README and agent docs.
+  - Ran targeted provider/API checks before merge:
+    - `cd backend && uv run pytest tests/test_api_runtime.py -q`
+    - `cd backend && uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
+    - `cd backend && uv run mypy packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
+    - `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
 - Incomplete work:
-  - Provider health still needs explicit secret-ref status fields while preserving existing compatibility fields.
-  - Runtime recovery playbook needs to be added under `docs/agent/operations/`.
-  - World-admin event audit API and Web audit surface need implementation.
-  - Snapshot integrity API and replay workspace UI need implementation.
-  - Functional commits, targeted tests, final regression checks, and closeout documentation are still pending.
-- Planned commit batches:
-  - `docs(agent): start roadmap phases 6-10`
-  - `feat(providers): validate secret refs in health`
-  - `docs(ops): add runtime recovery playbook`
+  - No implementation has started for event audit, snapshot integrity, replay UI v1, clock ops, or schedule preview.
+  - Full backend/web regression was not rerun after the docs merge; run it before opening a review or pushing if required.
+- Next planned mainline:
+  - Name: `Event/Replay/Clock Ops`
+  - Recommended branch: `feat/event-replay-clock-ops`
+  - Roadmap coverage: phases 8-12.
+- Planned scope for the next feature branch:
+  - Phase 8: Event Stream Audit Views.
+    - Add a world-admin event audit API and Web panel.
+    - Filters should cover event name, actor ref, sequence bounds, wall-time bounds, and limit.
+    - Keep event payload access world-admin only.
+  - Phase 9: Snapshot Integrity Checks.
+    - Add a derived integrity report for latest event sequence versus latest snapshot metadata.
+    - Detect no snapshot, stale snapshot, schema mismatch, missing/invalid payload, and future cover sequence.
+    - Do not implement destructive restore.
+  - Phase 10: Replay UI v1.
+    - Upgrade the world overview replay/snapshot panel.
+    - Clearly distinguish live clock state from reconstructed replay state.
+    - Show applied/unhandled event counts, latest snapshot metadata, and integrity issues.
+  - Phase 11: World Clock Ops.
+    - Improve clock status visibility and audit context.
+    - Use existing clock transitions/events where possible; avoid schema changes unless the implementation proves they are needed.
+    - Show effective time, revision, pause/run history, and drift-sensitive details in operator surfaces.
+  - Phase 12: Schedule Rule Preview.
+    - Add dry-run preview for schedule rule effects before saving.
+    - Show affected agents/events/time windows without persisting changes.
+    - Keep saved schedule-rule behavior backward compatible.
+- Suggested commit batches for the next branch:
+  - `docs(agent): start event replay clock ops`
   - `feat(events): add world event audit surface`
   - `feat(replay): report snapshot integrity`
   - `feat(web): improve replay audit workspace`
-  - `docs(agent): close phases 6-10 handoff`
-- Planned checks:
-  - `cd backend && uv run pytest tests/test_api_runtime.py tests/test_api_worlds.py tests/test_replay_snapshot.py`
-  - `cd web && npm run test -- features/admin/provider-admin.test.tsx features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
-  - `cd backend && uv run ruff check .`
-  - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test`
-  - `cd web && npm run build`
-  - `cd web && npm run test:e2e`
-  - `docker compose -f infra/compose.yaml config`
-  - `git diff --check`
-- Current risks:
-  - Event payloads can contain operational or narrative details; the audit surface must stay world-admin only.
-  - Snapshot integrity is derived from existing rows and must not introduce restore execution or destructive recovery controls.
-  - Provider secret validation must never expose configured secret values, only ref metadata and status.
-  - Web mock backend routes must remain aligned with new provider health, event audit, and snapshot integrity responses.
+  - `feat(worlds): harden clock ops visibility`
+  - `feat(calendar): preview schedule rule effects`
+  - `docs(agent): close event replay clock ops`
+- Suggested targeted checks for the next branch:
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_replay_snapshot.py tests/test_world_clock_service.py tests/test_calendar_services.py`
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
+  - Run `ruff`, `mypy`, full backend pytest, Web lint/typecheck/test/build, Playwright, Compose config, and `git diff --check` before closeout.
 - Sensitive areas to avoid casual edits:
-  - `MemoryService` as the only business entrypoint for long-term memory.
-  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`.
   - event/snapshot semantics and replay compatibility.
   - auth/world access checks and world clock state transitions.
-  - migration history for `20260423_0016` through `20260423_0018`.
+  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`.
+  - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`.
+  - `MemoryService` as the only business entrypoint for long-term memory.
