@@ -117,6 +117,156 @@ def test_replay_service_creates_inline_snapshot_from_current_state() -> None:
     assert snapshot.payload["applied_event_count"] == 1
 
 
+def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "integrity-healthy")
+
+    with Session(engine) as session:
+        no_snapshot = WorldReplayService(session).snapshot_integrity(world_id)
+        WorldEventStore(session).append_event(
+            _clock_event(world_id, revision=1, sequence_time="2030-01-01T00:00:00+00:00"),
+        )
+        snapshot = WorldReplayService(session).create_snapshot(world_id, "user:test")
+        session.commit()
+
+    with Session(engine) as session:
+        healthy = WorldReplayService(session).snapshot_integrity(world_id)
+
+    assert no_snapshot.status == "warning"
+    assert no_snapshot.latest_snapshot_id is None
+    assert no_snapshot.issues == ["No valid snapshot exists."]
+    assert healthy.status == "ok"
+    assert healthy.latest_snapshot_id == snapshot.id
+    assert healthy.latest_event_sequence == 2
+    assert healthy.covers_event_sequence == 1
+    assert healthy.event_gap == 0
+    assert healthy.issues == []
+
+
+def test_snapshot_integrity_reports_stale_snapshot() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "integrity-stale")
+
+    with Session(engine) as session:
+        event_store = WorldEventStore(session)
+        event_store.append_event(
+            _clock_event(world_id, revision=1, sequence_time="2030-01-01T00:00:00+00:00"),
+        )
+        WorldReplayService(session).create_snapshot(world_id, "user:test")
+        event_store.append_event(
+            _clock_event(world_id, revision=2, sequence_time="2030-01-01T00:01:00+00:00"),
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        report = WorldReplayService(session).snapshot_integrity(world_id)
+
+    assert report.status == "warning"
+    assert report.latest_event_sequence == 3
+    assert report.covers_event_sequence == 1
+    assert report.event_gap == 2
+    assert report.issues == ["Snapshot is stale relative to the latest event."]
+
+
+def test_snapshot_integrity_reports_schema_payload_and_future_sequence_errors() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    schema_world_id = _seed_world(engine, user_id, "integrity-schema")
+    missing_payload_world_id = _seed_world(engine, user_id, "integrity-missing-payload")
+    invalid_payload_world_id = _seed_world(engine, user_id, "integrity-invalid-payload")
+    future_world_id = _seed_world(engine, user_id, "integrity-future")
+
+    with Session(engine) as session:
+        event_store = WorldEventStore(session)
+        schema_event = event_store.append_event(
+            _clock_event(
+                schema_world_id,
+                revision=1,
+                sequence_time="2030-01-01T00:00:00+00:00",
+            ),
+        )
+        event_store.record_snapshot(
+            WorldSnapshotCreate(
+                world_id=schema_world_id,
+                covers_event_sequence=schema_event.sequence,
+                schema_version="world_state.v0",
+                payload=_snapshot_payload(schema_event.sequence),
+                actor_ref="system:test",
+            ),
+        )
+        missing_payload_event = event_store.append_event(
+            _clock_event(
+                missing_payload_world_id,
+                revision=1,
+                sequence_time="2030-01-01T00:00:00+00:00",
+            ),
+        )
+        event_store.record_snapshot(
+            WorldSnapshotCreate(
+                world_id=missing_payload_world_id,
+                covers_event_sequence=missing_payload_event.sequence,
+                schema_version=WORLD_STATE_SCHEMA_VERSION,
+                payload_uri="object://snapshot/missing-payload",
+                actor_ref="system:test",
+            ),
+        )
+        invalid_payload_event = event_store.append_event(
+            _clock_event(
+                invalid_payload_world_id,
+                revision=1,
+                sequence_time="2030-01-01T00:00:00+00:00",
+            ),
+        )
+        event_store.record_snapshot(
+            WorldSnapshotCreate(
+                world_id=invalid_payload_world_id,
+                covers_event_sequence=invalid_payload_event.sequence,
+                schema_version=WORLD_STATE_SCHEMA_VERSION,
+                payload={"source_sequence": "invalid"},
+                actor_ref="system:test",
+            ),
+        )
+        event_store.append_event(
+            _clock_event(
+                future_world_id,
+                revision=1,
+                sequence_time="2030-01-01T00:00:00+00:00",
+            ),
+        )
+        event_store.record_snapshot(
+            WorldSnapshotCreate(
+                world_id=future_world_id,
+                covers_event_sequence=99,
+                schema_version=WORLD_STATE_SCHEMA_VERSION,
+                payload=_snapshot_payload(99),
+                actor_ref="system:test",
+            ),
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        schema_report = WorldReplayService(session).snapshot_integrity(schema_world_id)
+        missing_payload_report = WorldReplayService(session).snapshot_integrity(
+            missing_payload_world_id,
+        )
+        invalid_payload_report = WorldReplayService(session).snapshot_integrity(
+            invalid_payload_world_id,
+        )
+        future_report = WorldReplayService(session).snapshot_integrity(future_world_id)
+
+    assert schema_report.status == "error"
+    assert schema_report.schema_version == "world_state.v0"
+    assert "schema version" in schema_report.issues[0]
+    assert missing_payload_report.status == "error"
+    assert missing_payload_report.issues == ["Snapshot payload is missing."]
+    assert invalid_payload_report.status == "error"
+    assert invalid_payload_report.issues == ["Snapshot payload is not a valid replay payload."]
+    assert future_report.status == "error"
+    assert future_report.issues == ["Snapshot covers a future event sequence."]
+
+
 def _clock_event(
     world_id: uuid.UUID,
     *,
@@ -138,6 +288,16 @@ def _clock_event(
         world_time=datetime(2030, 1, 1, 0, revision - 1, tzinfo=UTC),
         actor_ref="system:test",
     )
+
+
+def _snapshot_payload(source_sequence: int) -> dict[str, object]:
+    return {
+        "schema_version": WORLD_STATE_SCHEMA_VERSION,
+        "source_sequence": source_sequence,
+        "clock": None,
+        "applied_event_count": 1,
+        "unhandled_event_count": 0,
+    }
 
 
 def _engine() -> Engine:

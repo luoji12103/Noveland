@@ -142,6 +142,14 @@ class WorldEventStore:
             return None
         return _snapshot_record_from_model(snapshot_model)
 
+    def latest_event_sequence(self, world_id: uuid.UUID) -> int:
+        latest_sequence = self._session.execute(
+            select(func.max(WorldEventModel.sequence)).where(
+                WorldEventModel.world_id == world_id,
+            ),
+        ).scalar_one()
+        return int(latest_sequence or 0)
+
     def _next_sequence(self, world_id: uuid.UUID) -> int:
         worlds_table = Base.metadata.tables["worlds"]
         locked_world = self._session.execute(

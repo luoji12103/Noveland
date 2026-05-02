@@ -67,6 +67,7 @@ import type {
   WorldRole,
   WorldReplayState,
   WorldSnapshot,
+  WorldSnapshotIntegrity,
   WorldUpdateInput,
   WorldCompositionExport,
   WorldCompositionImportInput,
@@ -213,6 +214,12 @@ export function createSnapshot(worldId: string): Promise<WorldSnapshot> {
   return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots`, {
     method: "POST",
     csrf: true,
+  });
+}
+
+export function getSnapshotIntegrity(worldId: string): Promise<WorldSnapshotIntegrity> {
+  return worldRequest<WorldSnapshotIntegrity>(`/api/worlds/${worldId}/snapshots/integrity`, {
+    method: "GET",
   });
 }
 

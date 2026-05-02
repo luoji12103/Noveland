@@ -35,7 +35,12 @@ from noveland.calendar import (
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.settings import load_settings
-from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
+from noveland.events import (
+    WorldReplayService,
+    WorldReplayState,
+    WorldSnapshotIntegrityReport,
+    WorldSnapshotRecord,
+)
 from noveland.events.models import WorldEventModel
 from noveland.memory import (
     MemoryBackendProfileService,
@@ -1232,6 +1237,18 @@ def latest_snapshot(
     if snapshot is None:
         return None
     return _snapshot_response(snapshot)
+
+
+@router.get(
+    "/{world_id}/snapshots/integrity",
+    response_model=WorldSnapshotIntegrityReport,
+)
+def snapshot_integrity(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldSnapshotIntegrityReport:
+    _world_or_404(db_session, context.world_id)
+    return WorldReplayService(db_session).snapshot_integrity(context.world_id)
 
 
 @router.get("/{world_id}/events", response_model=list[WorldEventResponse])

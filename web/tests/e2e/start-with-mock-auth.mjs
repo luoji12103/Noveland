@@ -2156,6 +2156,14 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
     sendJson(response, 200, snapshots.get(worldId) ?? null);
     return;
   }
+  if (request.method === "GET" && action === "integrity") {
+    if (!canManageWorld(currentSubject, worldId)) {
+      sendJson(response, 403, { detail: "Forbidden" });
+      return;
+    }
+    sendJson(response, 200, snapshotIntegrityForWorld(worldId));
+    return;
+  }
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -2724,6 +2732,42 @@ function appendWorldEvent(worldId, input) {
   events.push(event);
   worldEvents.set(worldId, events);
   return event;
+}
+
+function snapshotIntegrityForWorld(worldId) {
+  const events = worldEvents.get(worldId) ?? [];
+  const latestEventSequence = events.at(-1)?.sequence ?? 0;
+  const latestSnapshot = snapshots.get(worldId) ?? null;
+  if (latestSnapshot === null) {
+    return {
+      world_id: worldId,
+      status: "warning",
+      latest_event_sequence: latestEventSequence,
+      latest_snapshot_id: null,
+      covers_event_sequence: null,
+      schema_version: null,
+      event_gap: null,
+      issues: ["No valid snapshot exists."],
+    };
+  }
+  const latestReplayEvent = [...events]
+    .reverse()
+    .find((event) => event.event_name !== "world.snapshot_created");
+  const latestReplaySequence =
+    latestReplayEvent === undefined
+      ? latestSnapshot.covers_event_sequence
+      : latestReplayEvent.sequence;
+  const eventGap = Math.max(latestReplaySequence - latestSnapshot.covers_event_sequence, 0);
+  return {
+    world_id: worldId,
+    status: eventGap > 0 ? "warning" : "ok",
+    latest_event_sequence: latestEventSequence,
+    latest_snapshot_id: latestSnapshot.id,
+    covers_event_sequence: latestSnapshot.covers_event_sequence,
+    schema_version: latestSnapshot.schema_version,
+    event_gap: eventGap,
+    issues: eventGap > 0 ? ["Snapshot is stale relative to the latest event."] : [],
+  };
 }
 
 function projectClock(clock) {

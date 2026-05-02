@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
-from noveland.events.contracts import SNAPSHOT_EVENT_NAME, WorldSnapshotCreate, WorldSnapshotRecord
+from noveland.events.contracts import (
+    SNAPSHOT_EVENT_NAME,
+    WorldEventRecord,
+    WorldSnapshotCreate,
+    WorldSnapshotRecord,
+)
 from noveland.events.event_store import WorldEventStore
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
 WORLD_STATE_SCHEMA_VERSION = "world_state.v1"
@@ -38,6 +44,25 @@ class WorldReplayState(BaseModel):
 
     def snapshot_payload(self) -> dict[str, Any]:
         return self.model_dump(mode="json", exclude={"world_id"})
+
+
+class SnapshotIntegrityStatus(StrEnum):
+    OK = "ok"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+class WorldSnapshotIntegrityReport(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    world_id: uuid.UUID
+    status: SnapshotIntegrityStatus
+    latest_event_sequence: int = Field(ge=0)
+    latest_snapshot_id: uuid.UUID | None = None
+    covers_event_sequence: int | None = Field(default=None, ge=0)
+    schema_version: str | None = None
+    event_gap: int | None = Field(default=None, ge=0)
+    issues: list[str] = Field(default_factory=list)
 
 
 class WorldReplayService:
@@ -94,6 +119,53 @@ class WorldReplayService:
     def latest_snapshot(self, world_id: uuid.UUID) -> WorldSnapshotRecord | None:
         return self._event_store.latest_snapshot(world_id)
 
+    def snapshot_integrity(self, world_id: uuid.UUID) -> WorldSnapshotIntegrityReport:
+        latest_event_sequence = self._event_store.latest_event_sequence(world_id)
+        latest_snapshot = self._event_store.latest_snapshot(world_id)
+        if latest_snapshot is None:
+            return WorldSnapshotIntegrityReport(
+                world_id=world_id,
+                status=SnapshotIntegrityStatus.WARNING,
+                latest_event_sequence=latest_event_sequence,
+                issues=["No valid snapshot exists."],
+            )
+
+        issues: list[str] = []
+        if latest_snapshot.schema_version != WORLD_STATE_SCHEMA_VERSION:
+            issues.append(
+                f"Snapshot schema version `{latest_snapshot.schema_version}` "
+                f"does not match `{WORLD_STATE_SCHEMA_VERSION}`.",
+            )
+        if latest_snapshot.payload is None:
+            issues.append("Snapshot payload is missing.")
+        elif not _snapshot_payload_is_valid(world_id, latest_snapshot):
+            issues.append("Snapshot payload is not a valid replay payload.")
+        if latest_snapshot.covers_event_sequence > latest_event_sequence:
+            issues.append("Snapshot covers a future event sequence.")
+
+        event_gap = _replay_relevant_event_gap(
+            latest_snapshot.covers_event_sequence,
+            self._event_store.list_events_after(world_id, latest_snapshot.covers_event_sequence),
+        )
+        if any(_is_error_issue(issue) for issue in issues):
+            integrity_status = SnapshotIntegrityStatus.ERROR
+        elif event_gap > 0:
+            integrity_status = SnapshotIntegrityStatus.WARNING
+            issues.append("Snapshot is stale relative to the latest event.")
+        else:
+            integrity_status = SnapshotIntegrityStatus.OK
+
+        return WorldSnapshotIntegrityReport(
+            world_id=world_id,
+            status=integrity_status,
+            latest_event_sequence=latest_event_sequence,
+            latest_snapshot_id=latest_snapshot.id,
+            covers_event_sequence=latest_snapshot.covers_event_sequence,
+            schema_version=latest_snapshot.schema_version,
+            event_gap=event_gap,
+            issues=issues,
+        )
+
 
 def _state_from_snapshot(
     world_id: uuid.UUID,
@@ -124,6 +196,36 @@ def _state_from_snapshot(
         clock=clock,
         applied_event_count=_nonnegative_int(payload.get("applied_event_count")),
         unhandled_event_count=_nonnegative_int(payload.get("unhandled_event_count")),
+    )
+
+
+def _snapshot_payload_is_valid(world_id: uuid.UUID, snapshot: WorldSnapshotRecord) -> bool:
+    if snapshot.payload is None:
+        return False
+    try:
+        payload = {**snapshot.payload, "world_id": world_id}
+        state = WorldReplayState.model_validate(payload)
+    except ValidationError:
+        return False
+    return state.source_sequence == snapshot.covers_event_sequence
+
+
+def _replay_relevant_event_gap(
+    covers_event_sequence: int,
+    events: list[WorldEventRecord],
+) -> int:
+    latest_relevant_sequence = covers_event_sequence
+    for event in events:
+        if event.event_name != SNAPSHOT_EVENT_NAME:
+            latest_relevant_sequence = event.sequence
+    return max(latest_relevant_sequence - covers_event_sequence, 0)
+
+
+def _is_error_issue(issue: str) -> bool:
+    return (
+        "schema version" in issue
+        or "payload" in issue
+        or "future event sequence" in issue
     )
 
 

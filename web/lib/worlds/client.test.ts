@@ -24,6 +24,7 @@ import {
   getLatestSnapshot,
   getAgentPersona,
   getReplayState,
+  getSnapshotIntegrity,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
   listRuntimeDiagnostics,
@@ -191,12 +192,14 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse({ source_sequence: 3 }))
       .mockResolvedValueOnce(jsonResponse(null))
       .mockResolvedValueOnce(jsonResponse({ id: "snapshot-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok" }))
       .mockResolvedValueOnce(jsonResponse([{ sequence: 3 }]));
     vi.stubGlobal("fetch", fetchMock);
 
     await getReplayState("world-1");
     await getLatestSnapshot("world-1");
     await createSnapshot("world-1");
+    await getSnapshotIntegrity("world-1");
     await listWorldEvents("world-1", {
       event_name: "agent.run_succeeded",
       actor_ref: "agent:guide",
@@ -208,7 +211,8 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/replay/state");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/snapshots/latest");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/snapshots");
-    expect(fetchMock.mock.calls[3][0]).toBe(
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/snapshots/integrity");
+    expect(fetchMock.mock.calls[4][0]).toBe(
       "/api/worlds/world-1/events?event_name=agent.run_succeeded&actor_ref=agent%3Aguide&sequence_after=1&wall_time_from=2026-04-17T00%3A00%3A00Z&limit=10",
     );
     expect((fetchMock.mock.calls[2][1].headers as Headers).get("X-CSRF-Token")).toBe(

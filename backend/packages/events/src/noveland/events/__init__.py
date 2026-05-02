@@ -26,8 +26,10 @@ from noveland.events.replay import (
     CLOCK_ADVANCED_EVENT_NAME,
     WORLD_STATE_SCHEMA_VERSION,
     ClockReplayState,
+    SnapshotIntegrityStatus,
     WorldReplayService,
     WorldReplayState,
+    WorldSnapshotIntegrityReport,
 )
 
 PACKAGE_NAME = "events"
@@ -46,6 +48,7 @@ __all__ = [
     "NatsWorldEventPublisher",
     "PublishedWorldEvent",
     "SnapshotValidationError",
+    "SnapshotIntegrityStatus",
     "WorldEventEnvelope",
     "WorldEventAppend",
     "WorldEventPublisher",
@@ -54,6 +57,7 @@ __all__ = [
     "WorldReplayService",
     "WorldReplayState",
     "WorldSnapshotCreate",
+    "WorldSnapshotIntegrityReport",
     "WorldSnapshotRecord",
     "WorldSnapshotStatus",
     "subject_for_world",

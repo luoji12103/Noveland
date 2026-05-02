@@ -762,6 +762,7 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     _authenticate(client, member_token)
     replay = client.get(f"/worlds/{world_id}/replay/state")
     latest_before = client.get(f"/worlds/{world_id}/snapshots/latest")
+    member_integrity = client.get(f"/worlds/{world_id}/snapshots/integrity")
     member_create = client.post(f"/worlds/{world_id}/snapshots")
 
     _authenticate_session_only(client, owner_token)
@@ -769,16 +770,19 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     _authenticate(client, owner_token)
     created = client.post(f"/worlds/{world_id}/snapshots")
     latest_after = client.get(f"/worlds/{world_id}/snapshots/latest")
+    integrity_after = client.get(f"/worlds/{world_id}/snapshots/integrity")
     replay_after = client.get(f"/worlds/{world_id}/replay/state")
 
     _authenticate(client, stranger_token)
     hidden_replay = client.get(f"/worlds/{world_id}/replay/state")
+    hidden_integrity = client.get(f"/worlds/{world_id}/snapshots/integrity")
 
     assert replay.status_code == 200
     assert replay.json()["clock"]["revision"] == 1
     assert replay.json()["applied_event_count"] == 1
     assert latest_before.status_code == 200
     assert latest_before.json() is None
+    assert member_integrity.status_code == 403
     assert member_create.status_code == 403
     assert missing_csrf.status_code == 403
     assert created.status_code == 201
@@ -786,8 +790,13 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert created.json()["schema_version"] == "world_state.v1"
     assert latest_after.status_code == 200
     assert latest_after.json()["id"] == created.json()["id"]
+    assert integrity_after.status_code == 200
+    assert integrity_after.json()["status"] == "ok"
+    assert integrity_after.json()["latest_snapshot_id"] == created.json()["id"]
+    assert integrity_after.json()["event_gap"] == 0
     assert replay_after.json()["source_sequence"] == 2
     assert hidden_replay.status_code == 404
+    assert hidden_integrity.status_code == 404
 
 
 def test_world_event_audit_requires_admin_and_filters_events() -> None:

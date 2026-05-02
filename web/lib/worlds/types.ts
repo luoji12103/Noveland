@@ -278,6 +278,17 @@ export type WorldSnapshot = {
   created_at: string;
 };
 
+export type WorldSnapshotIntegrity = {
+  world_id: string;
+  status: "ok" | "warning" | "error";
+  latest_event_sequence: number;
+  latest_snapshot_id: string | null;
+  covers_event_sequence: number | null;
+  schema_version: string | null;
+  event_gap: number | null;
+  issues: string[];
+};
+
 export type WorldEventAuditEntry = {
   id: string;
   world_id: string;
