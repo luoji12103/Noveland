@@ -249,6 +249,10 @@ class MemoryWriteJobRecord(_FrozenContract):
     next_attempt_at: datetime
     last_error: str | None = None
     processed_at: datetime | None = None
+    is_retryable: bool
+    terminal_reason: str | None = None
+    last_log_success: bool | None = None
+    age_seconds: int = Field(ge=0)
     created_at: datetime
     updated_at: datetime
 
@@ -268,6 +272,36 @@ class MemoryWriteJobStatusSummary(_FrozenContract):
     succeeded_count: int = Field(ge=0)
     failed_count: int = Field(ge=0)
     due_count: int = Field(ge=0)
+    retryable_failed_count: int = Field(ge=0)
+    terminal_failed_count: int = Field(ge=0)
+    stalled_processing_count: int = Field(ge=0)
+
+
+class MemoryBackfillSourceSummary(_FrozenContract):
+    source_kind: MemoryWriteSourceKind
+    candidate_count: int = Field(ge=0)
+    skipped_existing_count: int = Field(ge=0)
+    skipped_no_profile_count: int = Field(ge=0)
+    skipped_disabled_profile_count: int = Field(ge=0)
+
+
+class MemoryBackfillWorldSummary(_FrozenContract):
+    world_id: uuid.UUID
+    backend_profile_id: uuid.UUID | None = None
+    backend_profile_key: str | None = None
+    candidate_count: int = Field(ge=0)
+    skipped_existing_count: int = Field(ge=0)
+    skipped_no_profile_count: int = Field(ge=0)
+    skipped_disabled_profile_count: int = Field(ge=0)
+
+
+class MemoryBackfillDryRunResult(_FrozenContract):
+    candidate_count: int = Field(ge=0)
+    skipped_existing_count: int = Field(ge=0)
+    skipped_no_profile_count: int = Field(ge=0)
+    skipped_disabled_profile_count: int = Field(ge=0)
+    source_summaries: list[MemoryBackfillSourceSummary] = Field(default_factory=list)
+    world_summaries: list[MemoryBackfillWorldSummary] = Field(default_factory=list)
 
 
 class MemoryRetrievalLogRecord(_FrozenContract):

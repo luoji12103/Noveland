@@ -13,6 +13,7 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
 from noveland.events.models import WorldEventModel
 from noveland.memory.models import (
@@ -66,6 +67,7 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
         f"/provider-profiles/{create_profile.json()['id']}/test-call",
         json={"prompt": "Reply with OK."},
     )
+    provider_health = client.get("/provider-profiles/health")
     update_profile = client.patch(
         f"/provider-profiles/{create_profile.json()['id']}",
         json={
@@ -83,6 +85,8 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert status.status_code == 200
     assert status.json()["runtime_loop_interval_seconds"] == 5
     assert status.json()["memory_write_jobs"]["failed_count"] == 0
+    assert status.json()["runtime_health"]["status"] == "stopped"
+    assert status.json()["runtime_health"]["recent_error_count"] == 0
     assert diagnostics.status_code == 200
     assert diagnostics.json()[0]["event_type"] == "runtime.test"
     assert diagnostics.json()[0]["details"]["token"] == "[redacted]"
@@ -95,6 +99,11 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert test_profile.status_code == 200
     assert test_profile.json()["status"] == "failed"
     assert test_profile.json()["error_code"] == "configuration"
+    assert provider_health.status_code == 200
+    assert provider_health.json()[0]["profile_key"] == "openai-local"
+    assert provider_health.json()[0]["health"] == "configuration_error"
+    assert provider_health.json()[0]["missing_secret_ref"] is True
+    assert provider_health.json()[0]["recent_error_count"] == 1
     assert update_profile.status_code == 200
     assert update_profile.json()["name"] == "OpenAI Updated"
     assert update_profile.json()["timeout_seconds"] == 15
@@ -134,6 +143,7 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     jobs = client.get(f"/memory-backend-profiles/{profile_id}/jobs?status=failed&limit=5")
     retry_job = client.post(f"/memory-write-jobs/{failed_job_id}/retry")
     status_after_retry = client.get("/runtime/status")
+    dry_run = client.get("/memory-backfill/dry-run?limit=20")
     eval_smoke = client.post(f"/memory-backend-profiles/{profile_id}/eval-smoke")
     update_profile = client.patch(
         f"/memory-backend-profiles/{profile_id}",
@@ -151,12 +161,23 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     assert jobs.status_code == 200
     assert jobs.json()["jobs"][0]["id"] == str(failed_job_id)
     assert jobs.json()["jobs"][0]["last_error"] == "backend timeout"
+    assert jobs.json()["jobs"][0]["is_retryable"] is True
+    assert jobs.json()["jobs"][0]["terminal_reason"] is None
+    assert jobs.json()["jobs"][0]["last_log_success"] is False
     assert retry_job.status_code == 200
     assert retry_job.json()["status"] == "pending"
     assert retry_job.json()["last_error"] is None
     assert status_after_retry.status_code == 200
     assert status_after_retry.json()["memory_write_jobs"]["pending_count"] == 1
     assert status_after_retry.json()["memory_write_jobs"]["failed_count"] == 0
+    assert status_after_retry.json()["memory_write_jobs"]["retryable_failed_count"] == 0
+    assert status_after_retry.json()["runtime_health"]["status"] == "stopped"
+    assert dry_run.status_code == 200
+    assert dry_run.json()["candidate_count"] == 1
+    assert dry_run.json()["skipped_existing_count"] == 0
+    assert {
+        summary["source_kind"]: summary for summary in dry_run.json()["source_summaries"]
+    }["agent_run"]["candidate_count"] == 1
     assert eval_smoke.status_code == 200
     assert eval_smoke.json()["case_count"] == 1
     assert eval_smoke.json()["hit_case_count"] == 1
@@ -172,14 +193,18 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     control = client.get("/runtime/control")
     diagnostics = client.get("/runtime/diagnostics")
     profiles = client.get("/provider-profiles")
+    provider_health = client.get("/provider-profiles/health")
     memory_jobs = client.get(f"/memory-backend-profiles/{uuid.uuid4()}/jobs")
     retry_memory_job = client.post(f"/memory-write-jobs/{uuid.uuid4()}/retry")
+    memory_backfill = client.get("/memory-backfill/dry-run")
 
     assert control.status_code == 403
     assert diagnostics.status_code == 403
     assert profiles.status_code == 403
+    assert provider_health.status_code == 403
     assert memory_jobs.status_code == 403
     assert retry_memory_job.status_code == 403
+    assert memory_backfill.status_code == 403
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -216,6 +241,8 @@ def _create_tables(engine: Engine) -> None:
         MemoryBackendProfile.__table__,
         Agent.__table__,
         WorldScheduleRule.__table__,
+        ConversationSession.__table__,
+        ConversationTurn.__table__,
         WorldEventModel.__table__,
         AgentMemoryItem.__table__,
         MemoryWriteJob.__table__,
@@ -372,6 +399,18 @@ def _seed_memory_backend_logs(
         session.add(failed_job)
         session.flush()
         failed_job_id = failed_job.id
+        agent_run = AgentRuntimeRun(
+            world_id=world_id,
+            agent_id=agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Store this memory.",
+            response_text="Stored memory response.",
+            diagnostics={},
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
+        )
+        session.add(agent_run)
         session.add(
             MemoryWriteLog(
                 job_id=job.id,
@@ -380,6 +419,17 @@ def _seed_memory_backend_logs(
                 latency_ms=5,
                 request_summary={"source": "runtime"},
                 response_summary={"recorded_count": 1},
+                correlation_ids={"world_id": str(world_id), "agent_id": str(agent_id)},
+            )
+        )
+        session.add(
+            MemoryWriteLog(
+                job_id=failed_job.id,
+                backend="local_pgvector",
+                success=False,
+                latency_ms=None,
+                request_summary={"source": "runtime"},
+                response_summary={"error": "backend timeout"},
                 correlation_ids={"world_id": str(world_id), "agent_id": str(agent_id)},
             )
         )

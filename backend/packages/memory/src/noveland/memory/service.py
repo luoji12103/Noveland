@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, cast
 
+from noveland.agents.models import AgentRuntimeRun
+from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.settings import AppSettings
+from noveland.events.models import WorldEventModel
 from noveland.memory.backends.mem0_oss import BACKEND_NAME as MEM0_OSS_BACKEND_NAME
 from noveland.memory.contracts import (
     AgentProfileSnapshot,
@@ -15,6 +19,9 @@ from noveland.memory.contracts import (
     MemoryBackendProfileCreate,
     MemoryBackendProfileRecord,
     MemoryBackendProfileUpdate,
+    MemoryBackfillDryRunResult,
+    MemoryBackfillSourceSummary,
+    MemoryBackfillWorldSummary,
     MemoryContext,
     MemoryContextItem,
     MemoryDeleteResult,
@@ -55,8 +62,17 @@ from noveland.plugins.errors import (
     PluginNotFoundError,
 )
 from noveland.worlds.models import World
-from sqlalchemy import Select, func, join, select
+from sqlalchemy import Select, and_, func, join, or_, select
 from sqlalchemy.orm import Session
+
+MEMORY_BACKFILL_EVENT_NAMES = frozenset(
+    {
+        "agent.run_completed",
+        "calendar.entry_due",
+        "narrative.artifact_created",
+        "memory.item_created",
+    },
+)
 
 
 class _MemoryBackendPlugin(Protocol):
@@ -468,7 +484,7 @@ class MemoryService:
         if status is not None:
             statement = statement.where(MemoryWriteJob.status == status.value)
         return [
-            _write_job_record(job, profile)
+            _write_job_record(job, profile, self._settings, self._session)
             for job, profile in self._session.execute(statement).all()
         ]
 
@@ -480,12 +496,29 @@ class MemoryService:
             ),
         ).all()
         counts = {str(status): int(count) for status, count in rows}
-        due_count = self._session.scalar(
+        failed_rows = self._session.execute(
+            select(MemoryWriteJob, MemoryBackendProfile)
+            .join(
+                MemoryBackendProfile,
+                MemoryWriteJob.backend_profile_id == MemoryBackendProfile.id,
+            )
+            .where(MemoryWriteJob.status == MemoryWriteJobStatus.FAILED.value),
+        ).all()
+        retryable_failed_count = sum(
+            1 for job, profile in failed_rows if _is_retryable(job, profile, self._settings)
+        )
+        terminal_failed_count = len(failed_rows) - retryable_failed_count
+        due_pending_count = self._session.scalar(
             select(func.count(MemoryWriteJob.id)).where(
-                MemoryWriteJob.status.in_(
-                    [MemoryWriteJobStatus.PENDING.value, MemoryWriteJobStatus.FAILED.value],
-                ),
+                MemoryWriteJob.status == MemoryWriteJobStatus.PENDING.value,
                 MemoryWriteJob.next_attempt_at <= now,
+            ),
+        )
+        stalled_threshold = now - timedelta(seconds=self._settings.memory_job_stalled_after_seconds)
+        stalled_processing_count = self._session.scalar(
+            select(func.count(MemoryWriteJob.id)).where(
+                MemoryWriteJob.status == MemoryWriteJobStatus.PROCESSING.value,
+                MemoryWriteJob.updated_at <= stalled_threshold,
             ),
         )
         return MemoryWriteJobStatusSummary(
@@ -493,7 +526,13 @@ class MemoryService:
             processing_count=counts.get(MemoryWriteJobStatus.PROCESSING.value, 0),
             succeeded_count=counts.get(MemoryWriteJobStatus.SUCCEEDED.value, 0),
             failed_count=counts.get(MemoryWriteJobStatus.FAILED.value, 0),
-            due_count=0 if due_count is None else int(due_count),
+            due_count=(0 if due_pending_count is None else int(due_pending_count))
+            + retryable_failed_count,
+            retryable_failed_count=retryable_failed_count,
+            terminal_failed_count=terminal_failed_count,
+            stalled_processing_count=0
+            if stalled_processing_count is None
+            else int(stalled_processing_count),
         )
 
     def retry_write_job(self, job_id: uuid.UUID) -> MemoryWriteJobRecord:
@@ -510,12 +549,152 @@ class MemoryService:
         job, profile = row
         if job.status != MemoryWriteJobStatus.FAILED.value:
             raise MemoryValidationError("Only failed memory write jobs can be retried")
+        if not _is_retryable(job, profile, self._settings):
+            reason = _terminal_reason(job, profile, self._settings) or "job is not retryable"
+            raise MemoryValidationError(f"Memory write job cannot be retried: {reason}")
         job.status = MemoryWriteJobStatus.PENDING.value
         job.next_attempt_at = datetime.now(UTC)
         job.last_error = None
         job.processed_at = None
         self._session.flush()
-        return _write_job_record(job, profile)
+        return _write_job_record(job, profile, self._settings, self._session)
+
+    def dry_run_backfill(self, limit: int = 500) -> MemoryBackfillDryRunResult:
+        safe_limit = max(1, min(limit, 2000))
+        source_stats: dict[str, dict[str, int]] = defaultdict(_empty_backfill_stats)
+        world_stats: dict[uuid.UUID, dict[str, Any]] = {}
+
+        def record(
+            *,
+            source_kind: MemoryWriteSourceKind,
+            world: World | None,
+            dedupe_key: str,
+            skip_reason: str | None,
+        ) -> None:
+            source_bucket = source_stats[source_kind.value]
+            world_model = world
+            if world_model is not None:
+                world_key = world_model.id
+                if world_key in world_stats:
+                    target = world_stats[world_key]
+                else:
+                    profile = (
+                        None
+                        if world_model.memory_backend_profile_id is None
+                        else self._profile_service.get_profile(
+                            world_model.memory_backend_profile_id,
+                        )
+                    )
+                    world_stats[world_key] = {
+                        "world_id": world_key,
+                        "backend_profile_id": None if profile is None else profile.id,
+                        "backend_profile_key": None if profile is None else profile.profile_key,
+                        **_empty_backfill_stats(),
+                    }
+                    target = world_stats[world_key]
+            else:
+                target = None
+            if self._dedupe_exists(dedupe_key):
+                source_bucket["skipped_existing_count"] += 1
+                if target is not None:
+                    target["skipped_existing_count"] += 1
+                return
+            if skip_reason is None:
+                source_bucket["candidate_count"] += 1
+                if target is not None:
+                    target["candidate_count"] += 1
+                return
+            source_bucket[skip_reason] += 1
+            if target is not None:
+                target[skip_reason] += 1
+
+        for run in self._session.scalars(
+            select(AgentRuntimeRun)
+            .where(
+                AgentRuntimeRun.status == "succeeded",
+                AgentRuntimeRun.response_text.is_not(None),
+            )
+            .order_by(AgentRuntimeRun.started_at.desc())
+            .limit(safe_limit),
+        ).all():
+            world = self._session.get(World, run.world_id)
+            record(
+                source_kind=MemoryWriteSourceKind.AGENT_RUN,
+                world=world,
+                dedupe_key=f"agent-run:{run.id}",
+                skip_reason=None if world is None else self._backfill_skip_reason(world),
+            )
+
+        for turn in self._session.scalars(
+            select(ConversationTurn)
+            .where(
+                ConversationTurn.status == "succeeded",
+                ConversationTurn.output_text.is_not(None),
+            )
+            .order_by(ConversationTurn.created_at.desc())
+            .limit(safe_limit),
+        ).all():
+            session_model = self._session.get(ConversationSession, turn.session_id)
+            world = (
+                None
+                if session_model is None
+                else self._session.get(World, session_model.world_id)
+            )
+            record(
+                source_kind=MemoryWriteSourceKind.CONVERSATION_TURN,
+                world=world,
+                dedupe_key=f"conversation-turn:{turn.id}",
+                skip_reason=None if world is None else self._backfill_skip_reason(world),
+            )
+
+        for event in self._session.scalars(
+            select(WorldEventModel)
+            .where(WorldEventModel.event_name.in_(MEMORY_BACKFILL_EVENT_NAMES))
+            .order_by(WorldEventModel.wall_time.desc())
+            .limit(safe_limit),
+        ).all():
+            world = self._session.get(World, event.world_id)
+            record(
+                source_kind=MemoryWriteSourceKind.WORLD_EVENT,
+                world=world,
+                dedupe_key=f"world-event:{event.id}",
+                skip_reason=None if world is None else self._backfill_skip_reason(world),
+            )
+
+        totals = _empty_backfill_stats()
+        for source_kind in MemoryWriteSourceKind:
+            source_stats[source_kind.value]
+        for bucket in source_stats.values():
+            for key in totals:
+                totals[key] += bucket[key]
+        return MemoryBackfillDryRunResult(
+            candidate_count=totals["candidate_count"],
+            skipped_existing_count=totals["skipped_existing_count"],
+            skipped_no_profile_count=totals["skipped_no_profile_count"],
+            skipped_disabled_profile_count=totals["skipped_disabled_profile_count"],
+            source_summaries=[
+                MemoryBackfillSourceSummary(
+                    source_kind=MemoryWriteSourceKind(source_kind),
+                    candidate_count=stats["candidate_count"],
+                    skipped_existing_count=stats["skipped_existing_count"],
+                    skipped_no_profile_count=stats["skipped_no_profile_count"],
+                    skipped_disabled_profile_count=stats["skipped_disabled_profile_count"],
+                )
+                for source_kind, stats in sorted(source_stats.items())
+            ],
+            world_summaries=[
+                MemoryBackfillWorldSummary(
+                    world_id=stats["world_id"],
+                    backend_profile_id=stats["backend_profile_id"],
+                    backend_profile_key=stats["backend_profile_key"],
+                    candidate_count=stats["candidate_count"],
+                    skipped_existing_count=stats["skipped_existing_count"],
+                    skipped_no_profile_count=stats["skipped_no_profile_count"],
+                    skipped_disabled_profile_count=stats["skipped_disabled_profile_count"],
+                )
+                for stats in sorted(world_stats.values(), key=lambda item: str(item["world_id"]))
+            ],
+        )
 
     def list_retrieval_logs(
         self,
@@ -571,11 +750,28 @@ class MemoryService:
             return []
         statement: Select[tuple[MemoryWriteJob]] = (
             select(MemoryWriteJob)
+            .join(World, MemoryWriteJob.world_id == World.id)
+            .outerjoin(
+                MemoryBackendProfile,
+                MemoryWriteJob.backend_profile_id == MemoryBackendProfile.id,
+            )
             .where(
-                MemoryWriteJob.status.in_(
-                    [MemoryWriteJobStatus.PENDING.value, MemoryWriteJobStatus.FAILED.value],
-                ),
                 MemoryWriteJob.next_attempt_at <= datetime.now(UTC),
+                or_(
+                    MemoryBackendProfile.is_enabled.is_(True),
+                    and_(
+                        MemoryBackendProfile.id.is_(None),
+                        World.memory_backend_profile_id.is_(None),
+                        World.memory_plugin_identifier == BUILTIN_LOCAL_PGVECTOR_MEMORY,
+                    ),
+                ),
+                (
+                    (MemoryWriteJob.status == MemoryWriteJobStatus.PENDING.value)
+                    | (
+                        (MemoryWriteJob.status == MemoryWriteJobStatus.FAILED.value)
+                        & (MemoryWriteJob.attempt_count < self._settings.memory_job_max_attempts)
+                    )
+                ),
             )
             .order_by(MemoryWriteJob.created_at.asc())
             .limit(safe_limit)
@@ -649,6 +845,27 @@ class MemoryService:
 
     def _eval_search(self, request: MemorySearchRequest) -> MemorySearchResult:
         return self._backend_for_scope(request.world_id).search(request)
+
+    def _dedupe_exists(self, dedupe_key: str) -> bool:
+        return (
+            self._session.scalars(
+                select(MemoryWriteJob.id).where(MemoryWriteJob.dedupe_key == dedupe_key),
+            ).first()
+            is not None
+        )
+
+    def _backfill_skip_reason(self, world: World) -> str | None:
+        profile_id = world.memory_backend_profile_id
+        if profile_id is None:
+            if world.memory_plugin_identifier == BUILTIN_LOCAL_PGVECTOR_MEMORY:
+                return None
+            return "skipped_no_profile_count"
+        profile = self._profile_service.get_profile(profile_id)
+        if profile is None:
+            return "skipped_no_profile_count"
+        if not profile.is_enabled:
+            return "skipped_disabled_profile_count"
+        return None
 
     def _scrub_local_scope_data(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> None:
         for job in self._session.scalars(
@@ -749,7 +966,11 @@ def _write_log_record(model: MemoryWriteLog) -> MemoryWriteLogRecord:
 def _write_job_record(
     model: MemoryWriteJob,
     profile: MemoryBackendProfile,
+    settings: AppSettings,
+    session: Session,
 ) -> MemoryWriteJobRecord:
+    last_log_success = _last_write_log_success(session, model)
+    now = datetime.now(UTC)
     return MemoryWriteJobRecord(
         id=model.id,
         world_id=model.world_id,
@@ -766,9 +987,57 @@ def _write_job_record(
         next_attempt_at=_aware_datetime(model.next_attempt_at),
         last_error=model.last_error,
         processed_at=None if model.processed_at is None else _aware_datetime(model.processed_at),
+        is_retryable=_is_retryable(model, profile, settings),
+        terminal_reason=_terminal_reason(model, profile, settings),
+        last_log_success=last_log_success,
+        age_seconds=max(0, int((now - _aware_datetime(model.created_at)).total_seconds())),
         created_at=_aware_datetime(model.created_at),
         updated_at=_aware_datetime(model.updated_at),
     )
+
+
+def _is_retryable(
+    model: MemoryWriteJob,
+    profile: MemoryBackendProfile,
+    settings: AppSettings,
+) -> bool:
+    return (
+        model.status == MemoryWriteJobStatus.FAILED.value
+        and _terminal_reason(model, profile, settings) is None
+    )
+
+
+def _terminal_reason(
+    model: MemoryWriteJob,
+    profile: MemoryBackendProfile,
+    settings: AppSettings,
+) -> str | None:
+    if model.status != MemoryWriteJobStatus.FAILED.value:
+        return None
+    if not profile.is_enabled:
+        return "backend profile disabled"
+    if model.attempt_count >= settings.memory_job_max_attempts:
+        return "max attempts reached"
+    return None
+
+
+def _last_write_log_success(session: Session, model: MemoryWriteJob) -> bool | None:
+    latest = session.scalars(
+        select(MemoryWriteLog)
+        .where(MemoryWriteLog.job_id == model.id)
+        .order_by(MemoryWriteLog.occurred_at.desc())
+        .limit(1),
+    ).first()
+    return None if latest is None else latest.success
+
+
+def _empty_backfill_stats() -> dict[str, int]:
+    return {
+        "candidate_count": 0,
+        "skipped_existing_count": 0,
+        "skipped_no_profile_count": 0,
+        "skipped_disabled_profile_count": 0,
+    }
 
 
 def _retrieval_log_record(model: MemoryRetrievalLog) -> MemoryRetrievalLogRecord:

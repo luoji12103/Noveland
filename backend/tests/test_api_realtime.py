@@ -18,6 +18,7 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.core.models import RuntimeControlState
+from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob, MemoryWriteLog
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -192,9 +193,12 @@ def _create_tables(engine: Engine) -> None:
         WorldMembership.__table__,
         WorldClockStateModel.__table__,
         ProviderProfile.__table__,
+        MemoryBackendProfile.__table__,
         ConversationSession.__table__,
         ConversationParticipant.__table__,
         ConversationTurn.__table__,
+        MemoryWriteJob.__table__,
+        MemoryWriteLog.__table__,
         RuntimeControlState.__table__,
         RuntimeDiagnosticEvent.__table__,
     ):

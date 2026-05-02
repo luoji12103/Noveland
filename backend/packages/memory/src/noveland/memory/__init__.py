@@ -32,6 +32,18 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "noveland.memory.contracts",
         "MemoryBackendProfileUpdate",
     ),
+    "MemoryBackfillDryRunResult": (
+        "noveland.memory.contracts",
+        "MemoryBackfillDryRunResult",
+    ),
+    "MemoryBackfillSourceSummary": (
+        "noveland.memory.contracts",
+        "MemoryBackfillSourceSummary",
+    ),
+    "MemoryBackfillWorldSummary": (
+        "noveland.memory.contracts",
+        "MemoryBackfillWorldSummary",
+    ),
     "MemoryContext": ("noveland.memory.contracts", "MemoryContext"),
     "MemoryDeleteResult": ("noveland.memory.contracts", "MemoryDeleteResult"),
     "MemoryDeleteScope": ("noveland.memory.contracts", "MemoryDeleteScope"),

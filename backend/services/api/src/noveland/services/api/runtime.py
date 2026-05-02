@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from noveland.adapters import (
     ProviderConfigurationError,
+    ProviderHealthStatus,
     ProviderInvocationResult,
     ProviderProfileCreate,
+    ProviderProfileHealthRecord,
     ProviderProfileRecord,
     ProviderProfileService,
     ProviderProfileUpdate,
@@ -24,6 +26,9 @@ from noveland.memory import (
     MemoryBackendProfileRecord,
     MemoryBackendProfileService,
     MemoryBackendProfileUpdate,
+    MemoryBackfillDryRunResult,
+    MemoryBackfillSourceSummary,
+    MemoryBackfillWorldSummary,
     MemoryEvalResult,
     MemoryRetrievalLogRecord,
     MemoryService,
@@ -41,6 +46,7 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.errors import (
@@ -56,6 +62,7 @@ from noveland.services.api.dependencies import (
 )
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="", tags=["runtime"])
@@ -75,12 +82,24 @@ class MemoryWriteJobStatusSummaryResponse(BaseModel):
     succeeded_count: int
     failed_count: int
     due_count: int
+    retryable_failed_count: int
+    terminal_failed_count: int
+    stalled_processing_count: int
+
+
+class RuntimeHealthResponse(BaseModel):
+    status: Literal["healthy", "stopped", "degraded", "failed"]
+    reason: str
+    recent_diagnostic_count: int
+    recent_error_count: int
+    heartbeat_age_seconds: int | None
 
 
 class RuntimeStatusResponse(RuntimeControlResponse):
     runtime_loop_interval_seconds: int
     runtime_batch_limit: int
     memory_write_jobs: MemoryWriteJobStatusSummaryResponse
+    runtime_health: RuntimeHealthResponse
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -146,6 +165,21 @@ class ProviderTestCallResponse(BaseModel):
     text_preview: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+
+
+class ProviderHealthResponse(BaseModel):
+    id: uuid.UUID
+    profile_key: str
+    name: str
+    provider_type: ProviderType
+    is_enabled: bool
+    health: ProviderHealthStatus
+    last_tested_at: datetime | None
+    last_test_status: str | None
+    last_test_error: str | None
+    missing_secret_ref: bool
+    recent_diagnostic_count: int
+    recent_error_count: int
 
 
 class MemoryBackendProfileCreateRequest(BaseModel):
@@ -238,12 +272,43 @@ class MemoryWriteJobResponse(BaseModel):
     next_attempt_at: datetime
     last_error: str | None
     processed_at: datetime | None
+    is_retryable: bool
+    terminal_reason: str | None
+    last_log_success: bool | None
+    age_seconds: int
     created_at: datetime
     updated_at: datetime
 
 
 class MemoryWriteJobListResponse(BaseModel):
     jobs: list[MemoryWriteJobResponse]
+
+
+class MemoryBackfillSourceSummaryResponse(BaseModel):
+    source_kind: str
+    candidate_count: int
+    skipped_existing_count: int
+    skipped_no_profile_count: int
+    skipped_disabled_profile_count: int
+
+
+class MemoryBackfillWorldSummaryResponse(BaseModel):
+    world_id: uuid.UUID
+    backend_profile_id: uuid.UUID | None
+    backend_profile_key: str | None
+    candidate_count: int
+    skipped_existing_count: int
+    skipped_no_profile_count: int
+    skipped_disabled_profile_count: int
+
+
+class MemoryBackfillDryRunResponse(BaseModel):
+    candidate_count: int
+    skipped_existing_count: int
+    skipped_no_profile_count: int
+    skipped_disabled_profile_count: int
+    source_summaries: list[MemoryBackfillSourceSummaryResponse]
+    world_summaries: list[MemoryBackfillWorldSummaryResponse]
 
 
 class MemoryEvalCaseResponse(BaseModel):
@@ -320,10 +385,12 @@ def get_runtime_status(
     settings = load_settings()
     view = get_runtime_control_view(db_session)
     memory_summary = MemoryService(db_session, settings).write_job_status_summary()
+    runtime_health = _runtime_health_response(db_session, view, memory_summary, settings)
     return RuntimeStatusResponse(
         runtime_loop_interval_seconds=settings.runtime_loop_interval_seconds,
         runtime_batch_limit=settings.runtime_batch_limit,
         memory_write_jobs=_memory_write_job_status_summary_response(memory_summary),
+        runtime_health=runtime_health,
         **_runtime_control_response(view).model_dump(),
     )
 
@@ -365,6 +432,18 @@ def list_provider_profiles(
     del subject
     service = ProviderProfileService(db_session, load_settings())
     return [_provider_profile_response(profile) for profile in service.list_profiles()]
+
+
+@router.get("/provider-profiles/health", response_model=list[ProviderHealthResponse])
+def list_provider_profile_health(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[ProviderHealthResponse]:
+    del subject
+    settings = load_settings()
+    service = ProviderProfileService(db_session, settings)
+    counts = _provider_diagnostic_counts(db_session)
+    return [_provider_health_response(record) for record in service.health_records(counts)]
 
 
 @router.get("/memory-backend-profiles", response_model=list[MemoryBackendProfileResponse])
@@ -589,6 +668,17 @@ def retry_memory_write_job(
     return _memory_write_job_response(job)
 
 
+@router.get("/memory-backfill/dry-run", response_model=MemoryBackfillDryRunResponse)
+def dry_run_memory_backfill(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> MemoryBackfillDryRunResponse:
+    del subject
+    result = MemoryService(db_session, load_settings()).dry_run_backfill(limit=limit)
+    return _memory_backfill_dry_run_response(result)
+
+
 @router.post(
     "/memory-backend-profiles/{profile_id}/eval-smoke",
     response_model=MemoryEvalResponse,
@@ -763,6 +853,10 @@ def _provider_profile_response(profile: ProviderProfileRecord) -> ProviderProfil
     return ProviderProfileResponse(**profile.model_dump())
 
 
+def _provider_health_response(record: ProviderProfileHealthRecord) -> ProviderHealthResponse:
+    return ProviderHealthResponse(**record.model_dump())
+
+
 def _memory_backend_profile_response(
     profile: MemoryBackendProfileRecord,
 ) -> MemoryBackendProfileResponse:
@@ -791,6 +885,43 @@ def _memory_write_job_status_summary_response(
     summary: MemoryWriteJobStatusSummary,
 ) -> MemoryWriteJobStatusSummaryResponse:
     return MemoryWriteJobStatusSummaryResponse(**summary.model_dump())
+
+
+def _memory_backfill_dry_run_response(
+    result: MemoryBackfillDryRunResult,
+) -> MemoryBackfillDryRunResponse:
+    return MemoryBackfillDryRunResponse(
+        candidate_count=result.candidate_count,
+        skipped_existing_count=result.skipped_existing_count,
+        skipped_no_profile_count=result.skipped_no_profile_count,
+        skipped_disabled_profile_count=result.skipped_disabled_profile_count,
+        source_summaries=[
+            _memory_backfill_source_summary_response(summary)
+            for summary in result.source_summaries
+        ],
+        world_summaries=[
+            _memory_backfill_world_summary_response(summary)
+            for summary in result.world_summaries
+        ],
+    )
+
+
+def _memory_backfill_source_summary_response(
+    summary: MemoryBackfillSourceSummary,
+) -> MemoryBackfillSourceSummaryResponse:
+    return MemoryBackfillSourceSummaryResponse(
+        source_kind=summary.source_kind.value,
+        candidate_count=summary.candidate_count,
+        skipped_existing_count=summary.skipped_existing_count,
+        skipped_no_profile_count=summary.skipped_no_profile_count,
+        skipped_disabled_profile_count=summary.skipped_disabled_profile_count,
+    )
+
+
+def _memory_backfill_world_summary_response(
+    summary: MemoryBackfillWorldSummary,
+) -> MemoryBackfillWorldSummaryResponse:
+    return MemoryBackfillWorldSummaryResponse(**summary.model_dump())
 
 
 def _memory_retrieval_log_response(
@@ -839,6 +970,95 @@ def _runtime_control_response(view: Any) -> RuntimeControlResponse:
         last_run_finished_at=view.last_run_finished_at,
         last_error=view.last_error,
     )
+
+
+def _runtime_health_response(
+    db_session: Session,
+    view: Any,
+    memory_summary: MemoryWriteJobStatusSummary,
+    settings: Any,
+) -> RuntimeHealthResponse:
+    recent_diagnostic_count, recent_error_count = _runtime_diagnostic_counts(db_session)
+    heartbeat_age_seconds: int | None = None
+    if view.last_heartbeat_at is not None:
+        heartbeat_age_seconds = max(
+            0,
+            int((datetime.now(UTC) - _aware_datetime(view.last_heartbeat_at)).total_seconds()),
+        )
+    if view.desired_state == "stopped":
+        status_value: Literal["healthy", "stopped", "degraded", "failed"] = "stopped"
+        reason = "Runtime desired state is stopped."
+    elif view.last_error is not None:
+        status_value = "failed"
+        reason = view.last_error
+    elif heartbeat_age_seconds is None:
+        status_value = "degraded"
+        reason = "Runtime has not recorded a heartbeat."
+    elif heartbeat_age_seconds > settings.runtime_loop_interval_seconds * 3:
+        status_value = "degraded"
+        reason = "Runtime heartbeat is stale."
+    elif recent_error_count > 0:
+        status_value = "degraded"
+        reason = "Recent runtime errors were recorded."
+    elif memory_summary.terminal_failed_count > 0 or memory_summary.stalled_processing_count > 0:
+        status_value = "degraded"
+        reason = "Memory queue has terminal failures or stalled jobs."
+    else:
+        status_value = "healthy"
+        reason = "Runtime is running without recent blocking errors."
+    return RuntimeHealthResponse(
+        status=status_value,
+        reason=reason,
+        recent_diagnostic_count=recent_diagnostic_count,
+        recent_error_count=recent_error_count,
+        heartbeat_age_seconds=heartbeat_age_seconds,
+    )
+
+
+def _runtime_diagnostic_counts(db_session: Session) -> tuple[int, int]:
+    since = datetime.now(UTC) - timedelta(hours=1)
+    rows = db_session.execute(
+        select(RuntimeDiagnosticEvent.severity, func.count(RuntimeDiagnosticEvent.id))
+        .where(
+            RuntimeDiagnosticEvent.component == DiagnosticComponent.RUNTIME.value,
+            RuntimeDiagnosticEvent.occurred_at >= since,
+        )
+        .group_by(RuntimeDiagnosticEvent.severity),
+    ).all()
+    counts = {str(severity): int(count) for severity, count in rows}
+    return sum(counts.values()), counts.get(DiagnosticSeverity.ERROR.value, 0)
+
+
+def _provider_diagnostic_counts(db_session: Session) -> dict[uuid.UUID, tuple[int, int]]:
+    since = datetime.now(UTC) - timedelta(hours=24)
+    rows = db_session.execute(
+        select(
+            RuntimeDiagnosticEvent.provider_profile_id,
+            RuntimeDiagnosticEvent.severity,
+            func.count(RuntimeDiagnosticEvent.id),
+        )
+        .where(
+            RuntimeDiagnosticEvent.component == DiagnosticComponent.PROVIDER.value,
+            RuntimeDiagnosticEvent.provider_profile_id.is_not(None),
+            RuntimeDiagnosticEvent.occurred_at >= since,
+        )
+        .group_by(RuntimeDiagnosticEvent.provider_profile_id, RuntimeDiagnosticEvent.severity),
+    ).all()
+    totals: dict[uuid.UUID, list[int]] = {}
+    for profile_id, severity, count in rows:
+        if profile_id is None:
+            continue
+        bucket = totals.setdefault(profile_id, [0, 0])
+        bucket[0] += int(count)
+        if severity == DiagnosticSeverity.ERROR.value:
+            bucket[1] += int(count)
+    return {profile_id: (counts[0], counts[1]) for profile_id, counts in totals.items()}
+
+
+def _aware_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _diagnostic_response(record: RuntimeDiagnosticRecord) -> RuntimeDiagnosticResponse:

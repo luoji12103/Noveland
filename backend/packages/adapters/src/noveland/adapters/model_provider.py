@@ -44,6 +44,14 @@ class ProviderTestStatus(StrEnum):
     FAILED = "failed"
 
 
+class ProviderHealthStatus(StrEnum):
+    OK = "ok"
+    UNTESTED = "untested"
+    CONFIGURATION_ERROR = "configuration_error"
+    DEGRADED = "degraded"
+    DISABLED = "disabled"
+
+
 class ProviderError(RuntimeError):
     """Base error for provider profile and invocation failures."""
 
@@ -138,6 +146,21 @@ class ProviderInvocationResult(_FrozenContract):
     error_message: str | None = None
 
 
+class ProviderProfileHealthRecord(_FrozenContract):
+    id: uuid.UUID
+    profile_key: str
+    name: str
+    provider_type: ProviderType
+    is_enabled: bool
+    health: ProviderHealthStatus
+    last_tested_at: datetime | None
+    last_test_status: ProviderTestStatus | None
+    last_test_error: str | None
+    missing_secret_ref: bool
+    recent_diagnostic_count: int = Field(ge=0)
+    recent_error_count: int = Field(ge=0)
+
+
 class ModelProvider(Protocol):
     def complete(self, prompt: str) -> ProviderCompletion:
         """Generate one completion for the given prompt."""
@@ -169,6 +192,20 @@ class ProviderProfileService:
             for model in self._session.scalars(
                 select(ProviderProfile).order_by(ProviderProfile.profile_key),
             ).all()
+        ]
+
+    def health_records(
+        self,
+        recent_diagnostic_counts: dict[uuid.UUID, tuple[int, int]] | None = None,
+    ) -> list[ProviderProfileHealthRecord]:
+        counts = recent_diagnostic_counts or {}
+        return [
+            _health_record(
+                profile,
+                self._settings,
+                counts.get(profile.id, (0, 0)),
+            )
+            for profile in self.list_profiles()
         ]
 
     def get_profile(self, profile_id: uuid.UUID) -> ProviderProfileRecord | None:
@@ -446,6 +483,46 @@ def _record(model: ProviderProfile) -> ProviderProfileRecord:
         last_test_error=model.last_test_error,
         is_enabled=model.is_enabled,
     )
+
+
+def _health_record(
+    profile: ProviderProfileRecord,
+    settings: AppSettings,
+    diagnostic_counts: tuple[int, int],
+) -> ProviderProfileHealthRecord:
+    diagnostic_count, error_count = diagnostic_counts
+    missing_secret_ref = settings.provider_api_keys_json.get(profile.api_key_ref) in {None, ""}
+    if not profile.is_enabled:
+        health = ProviderHealthStatus.DISABLED
+    elif missing_secret_ref or _is_configuration_error(profile.last_test_error):
+        health = ProviderHealthStatus.CONFIGURATION_ERROR
+    elif profile.last_test_status is None:
+        health = ProviderHealthStatus.UNTESTED
+    elif profile.last_test_status == ProviderTestStatus.FAILED or error_count > 0:
+        health = ProviderHealthStatus.DEGRADED
+    else:
+        health = ProviderHealthStatus.OK
+    return ProviderProfileHealthRecord(
+        id=profile.id,
+        profile_key=profile.profile_key,
+        name=profile.name,
+        provider_type=profile.provider_type,
+        is_enabled=profile.is_enabled,
+        health=health,
+        last_tested_at=profile.last_tested_at,
+        last_test_status=profile.last_test_status,
+        last_test_error=profile.last_test_error,
+        missing_secret_ref=missing_secret_ref,
+        recent_diagnostic_count=diagnostic_count,
+        recent_error_count=error_count,
+    )
+
+
+def _is_configuration_error(error: str | None) -> bool:
+    if error is None:
+        return False
+    lowered = error.lower()
+    return "api key" in lowered or "not configured" in lowered or "configuration" in lowered
 
 
 def _base_headers(api_key: str) -> dict[str, str]:

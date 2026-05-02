@@ -4,7 +4,7 @@ import asyncio
 import base64
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -20,7 +20,9 @@ from noveland.conversations.errors import ConversationStateError, ConversationVa
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import load_settings
+from noveland.memory import MemoryService
 from noveland.narrative.models import NarrativeArtifact
+from noveland.observability import DiagnosticComponent, DiagnosticSeverity
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.authorization import (
     require_platform_admin,
@@ -31,7 +33,7 @@ from noveland.services.api.dependencies import get_session_factory
 from noveland.services.runtime import ConversationRuntimeOrchestrator
 from noveland.services.runtime.daemon import get_runtime_control_view
 from noveland.worlds.clock_service import WorldClockService
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from starlette.responses import StreamingResponse
 
 router = APIRouter(tags=["realtime"])
@@ -185,7 +187,7 @@ def collect_runtime_stream_delta(cursor: str | None) -> dict[str, Any] | None:
         }
         if control_changed:
             payload["runtime_control"] = _runtime_control_payload(view)
-            payload["runtime_status"] = _runtime_status_payload(view, settings)
+            payload["runtime_status"] = _runtime_status_payload(view, settings, session)
 
         next_cursor = _encode_cursor(
             {
@@ -819,11 +821,77 @@ def _runtime_control_payload(view: Any) -> dict[str, Any]:
     )
 
 
-def _runtime_status_payload(view: Any, settings: Any) -> dict[str, Any]:
+def _runtime_status_payload(view: Any, settings: Any, session: Any | None = None) -> dict[str, Any]:
     payload = _runtime_control_payload(view)
     payload["runtime_loop_interval_seconds"] = settings.runtime_loop_interval_seconds
     payload["runtime_batch_limit"] = settings.runtime_batch_limit
+    if session is not None:
+        memory_summary = MemoryService(session, settings).write_job_status_summary()
+        payload["memory_write_jobs"] = memory_summary.model_dump()
+        payload["runtime_health"] = _runtime_health_payload(
+            session,
+            view,
+            memory_summary,
+            settings,
+        )
     return payload
+
+
+def _runtime_health_payload(
+    session: Any,
+    view: Any,
+    memory_summary: Any,
+    settings: Any,
+) -> dict[str, Any]:
+    recent_diagnostic_count, recent_error_count = _runtime_diagnostic_counts(session)
+    heartbeat_age_seconds: int | None = None
+    if view.last_heartbeat_at is not None:
+        heartbeat_age_seconds = max(
+            0,
+            int((datetime.now(UTC) - _aware_datetime(view.last_heartbeat_at)).total_seconds()),
+        )
+    if view.desired_state == "stopped":
+        status_value = "stopped"
+        reason = "Runtime desired state is stopped."
+    elif view.last_error is not None:
+        status_value = "failed"
+        reason = view.last_error
+    elif heartbeat_age_seconds is None:
+        status_value = "degraded"
+        reason = "Runtime has not recorded a heartbeat."
+    elif heartbeat_age_seconds > settings.runtime_loop_interval_seconds * 3:
+        status_value = "degraded"
+        reason = "Runtime heartbeat is stale."
+    elif recent_error_count > 0:
+        status_value = "degraded"
+        reason = "Recent runtime errors were recorded."
+    elif memory_summary.terminal_failed_count > 0 or memory_summary.stalled_processing_count > 0:
+        status_value = "degraded"
+        reason = "Memory queue has terminal failures or stalled jobs."
+    else:
+        status_value = "healthy"
+        reason = "Runtime is running without recent blocking errors."
+    return {
+        "status": status_value,
+        "reason": reason,
+        "recent_diagnostic_count": recent_diagnostic_count,
+        "recent_error_count": recent_error_count,
+        "heartbeat_age_seconds": heartbeat_age_seconds,
+    }
+
+
+def _runtime_diagnostic_counts(session: Any) -> tuple[int, int]:
+    since = datetime.now(UTC) - timedelta(hours=1)
+    rows = session.execute(
+        select(RuntimeDiagnosticEvent.severity, func.count(RuntimeDiagnosticEvent.id))
+        .where(
+            RuntimeDiagnosticEvent.component == DiagnosticComponent.RUNTIME.value,
+            RuntimeDiagnosticEvent.occurred_at >= since,
+        )
+        .group_by(RuntimeDiagnosticEvent.severity),
+    ).all()
+    counts = {str(severity): int(count) for severity, count in rows}
+    return sum(counts.values()), counts.get(DiagnosticSeverity.ERROR.value, 0)
 
 
 def _provider_profile_payload(model: ProviderProfile) -> dict[str, Any]:
@@ -1056,6 +1124,12 @@ def _parse_datetime(value: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def _aware_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _origin_allowed(origin: str | None, request_url: str) -> bool:

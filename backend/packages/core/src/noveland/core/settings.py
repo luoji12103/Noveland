@@ -38,6 +38,18 @@ class AppSettings(BaseSettings):
         le=500,
         validation_alias="NOVELAND_RUNTIME_BATCH_LIMIT",
     )
+    memory_job_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        validation_alias="NOVELAND_MEMORY_JOB_MAX_ATTEMPTS",
+    )
+    memory_job_stalled_after_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=86400,
+        validation_alias="NOVELAND_MEMORY_JOB_STALLED_AFTER_SECONDS",
+    )
 
 
 @lru_cache(maxsize=1)

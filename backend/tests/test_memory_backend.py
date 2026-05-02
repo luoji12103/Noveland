@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import pytest
-from noveland.agents.models import Agent
+from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth.models import User
+from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.settings import AppSettings
 from noveland.events.models import WorldEventModel
 from noveland.memory import (
@@ -27,6 +28,7 @@ from noveland.memory import (
     MemoryWriteJobStatus,
     run_memory_eval_cases,
 )
+from noveland.memory.errors import MemoryValidationError
 from noveland.memory.models import (
     AgentMemoryItem,
     AgentProfileSnapshotModel,
@@ -35,6 +37,7 @@ from noveland.memory.models import (
     MemoryWriteJob,
     MemoryWriteLog,
 )
+from noveland.plugins.constants import BUILTIN_MEM0_OSS_MEMORY
 from noveland.worlds.models import World
 from pydantic import ValidationError
 from sqlalchemy import Table, create_engine, select
@@ -359,6 +362,17 @@ def test_memory_service_lists_summarizes_and_retries_write_jobs() -> None:
         session.add_all([failed_job, succeeded_job])
         session.flush()
         failed_job_id = failed_job.id
+        session.add(
+            MemoryWriteLog(
+                job_id=failed_job.id,
+                backend="local_pgvector",
+                success=False,
+                latency_ms=None,
+                request_summary={"source_kind": "agent_run"},
+                response_summary={"error": "backend timeout"},
+                correlation_ids={"world_id": str(world_id), "agent_id": str(agent_id)},
+            )
+        )
 
         service = MemoryService(session, AppSettings())
         failed_jobs = service.list_write_jobs(
@@ -372,14 +386,254 @@ def test_memory_service_lists_summarizes_and_retries_write_jobs() -> None:
 
     assert [job.id for job in failed_jobs] == [failed_job_id]
     assert failed_jobs[0].backend_profile_key == "local-memory"
+    assert failed_jobs[0].is_retryable is True
+    assert failed_jobs[0].terminal_reason is None
+    assert failed_jobs[0].last_log_success is False
+    assert failed_jobs[0].age_seconds >= 0
     assert summary_before_retry.failed_count == 1
     assert summary_before_retry.succeeded_count == 1
     assert summary_before_retry.due_count == 1
+    assert summary_before_retry.retryable_failed_count == 1
+    assert summary_before_retry.terminal_failed_count == 0
+    assert summary_before_retry.stalled_processing_count == 0
     assert retried.status == MemoryWriteJobStatus.PENDING
     assert retried.last_error is None
     assert summary_after_retry.pending_count == 1
     assert summary_after_retry.failed_count == 0
     assert summary_after_retry.succeeded_count == 1
+
+
+def test_memory_service_marks_terminal_and_stalled_write_jobs() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    now = datetime.now(UTC)
+
+    with Session(engine) as session:
+        enabled_profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="enabled-memory",
+                name="Enabled memory",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        disabled_profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="disabled-memory",
+                name="Disabled memory",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+                is_enabled=False,
+            )
+        )
+        max_attempt_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=enabled_profile.id,
+            source_kind="agent_run",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "maxed out memory"},
+            dedupe_key="maxed-job",
+            status="failed",
+            attempt_count=3,
+            next_attempt_at=now,
+            last_error="repeated timeout",
+        )
+        disabled_profile_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=disabled_profile.id,
+            source_kind="conversation_turn",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "disabled backend memory"},
+            dedupe_key="disabled-job",
+            status="failed",
+            attempt_count=1,
+            next_attempt_at=now,
+            last_error="backend disabled",
+        )
+        stalled_job = MemoryWriteJob(
+            world_id=world_id,
+            agent_id=agent_id,
+            backend_profile_id=enabled_profile.id,
+            source_kind="world_event",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "stalled memory"},
+            dedupe_key="stalled-job",
+            status="processing",
+            attempt_count=1,
+            next_attempt_at=now,
+            created_at=now - timedelta(minutes=10),
+            updated_at=now - timedelta(minutes=10),
+        )
+        session.add_all([max_attempt_job, disabled_profile_job, stalled_job])
+        session.flush()
+        max_attempt_job_id = max_attempt_job.id
+        disabled_profile_job_id = disabled_profile_job.id
+
+        settings = AppSettings(
+            memory_job_max_attempts=3,
+            memory_job_stalled_after_seconds=60,
+        )
+        service = MemoryService(session, settings)
+        summary = service.write_job_status_summary()
+        failed_jobs = {
+            job.dedupe_key: job
+            for job in service.list_write_jobs(status=MemoryWriteJobStatus.FAILED)
+        }
+
+        with pytest.raises(MemoryValidationError, match="max attempts reached"):
+            service.retry_write_job(max_attempt_job_id)
+        with pytest.raises(MemoryValidationError, match="backend profile disabled"):
+            service.retry_write_job(disabled_profile_job_id)
+        session.commit()
+
+    assert summary.failed_count == 2
+    assert summary.retryable_failed_count == 0
+    assert summary.terminal_failed_count == 2
+    assert summary.stalled_processing_count == 1
+    assert failed_jobs["maxed-job"].is_retryable is False
+    assert failed_jobs["maxed-job"].terminal_reason == "max attempts reached"
+    assert failed_jobs["disabled-job"].is_retryable is False
+    assert failed_jobs["disabled-job"].terminal_reason == "backend profile disabled"
+
+
+def test_memory_backfill_dry_run_reports_candidates_and_skips_without_enqueuing() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    enabled_world_id = _seed_world(engine, user_id)
+    disabled_world_id = _seed_world(engine, user_id)
+    no_profile_world_id = _seed_world(engine, user_id)
+    enabled_agent_id = _seed_agent(engine, enabled_world_id)
+    disabled_agent_id = _seed_agent(engine, disabled_world_id)
+    no_profile_agent_id = _seed_agent(engine, no_profile_world_id)
+    now = datetime.now(UTC)
+
+    with Session(engine) as session:
+        enabled_profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="enabled-backfill",
+                name="Enabled backfill",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        disabled_profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="disabled-backfill",
+                name="Disabled backfill",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+                is_enabled=False,
+            )
+        )
+        enabled_world = session.get(World, enabled_world_id)
+        disabled_world = session.get(World, disabled_world_id)
+        no_profile_world = session.get(World, no_profile_world_id)
+        assert enabled_world is not None
+        assert disabled_world is not None
+        assert no_profile_world is not None
+        enabled_world.memory_backend_profile_id = enabled_profile.id
+        disabled_world.memory_backend_profile_id = disabled_profile.id
+        no_profile_world.memory_plugin_identifier = BUILTIN_MEM0_OSS_MEMORY
+
+        enabled_run = AgentRuntimeRun(
+            world_id=enabled_world_id,
+            agent_id=enabled_agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Remember this",
+            response_text="Backfill agent memory",
+            diagnostics={},
+            started_at=now,
+            finished_at=now,
+        )
+        disabled_run = AgentRuntimeRun(
+            world_id=disabled_world_id,
+            agent_id=disabled_agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Remember this",
+            response_text="Disabled profile memory",
+            diagnostics={},
+            started_at=now,
+            finished_at=now,
+        )
+        no_profile_run = AgentRuntimeRun(
+            world_id=no_profile_world_id,
+            agent_id=no_profile_agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Remember this",
+            response_text="No profile memory",
+            diagnostics={},
+            started_at=now,
+            finished_at=now,
+        )
+        conversation = ConversationSession(
+            world_id=enabled_world_id,
+            session_key="backfill-conversation",
+            title="Backfill conversation",
+            scope_type="world",
+            mode="auto_dialogue",
+            status="running",
+            objective="test",
+            opening_prompt="test",
+            max_turns=3,
+            next_turn_index=1,
+            policy_config={},
+            writer_config={},
+            memory_config={},
+        )
+        session.add_all([enabled_run, disabled_run, no_profile_run, conversation])
+        session.flush()
+        turn = ConversationTurn(
+            session_id=conversation.id,
+            turn_index=0,
+            speaker_kind="agent",
+            speaker_agent_id=enabled_agent_id,
+            input_text="input",
+            output_text="Backfill conversation memory",
+            status="succeeded",
+        )
+        event = WorldEventModel(
+            world_id=enabled_world_id,
+            sequence=1,
+            event_name="agent.run_completed",
+            payload={"content": "Backfill event memory"},
+            wall_time=now,
+            actor_ref="agent:guide",
+        )
+        session.add_all([turn, event])
+        session.flush()
+        existing_job = MemoryWriteJob(
+            world_id=enabled_world_id,
+            agent_id=enabled_agent_id,
+            backend_profile_id=enabled_profile.id,
+            source_kind="world_event",
+            source_id=event.id,
+            payload_json={"content": "Backfill event memory"},
+            dedupe_key=f"world-event:{event.id}",
+            status="succeeded",
+            attempt_count=1,
+            next_attempt_at=now,
+        )
+        session.add(existing_job)
+        session.flush()
+
+        result = MemoryService(session, AppSettings()).dry_run_backfill()
+        job_count = session.query(MemoryWriteJob).count()
+        session.commit()
+
+    source_summaries = {summary.source_kind.value: summary for summary in result.source_summaries}
+    assert result.candidate_count == 2
+    assert result.skipped_existing_count == 1
+    assert result.skipped_disabled_profile_count == 1
+    assert result.skipped_no_profile_count == 1
+    assert source_summaries["agent_run"].candidate_count == 1
+    assert source_summaries["agent_run"].skipped_disabled_profile_count == 1
+    assert source_summaries["agent_run"].skipped_no_profile_count == 1
+    assert source_summaries["conversation_turn"].candidate_count == 1
+    assert source_summaries["world_event"].skipped_existing_count == 1
+    assert job_count == 1
 
 
 def _engine() -> Engine:
@@ -392,6 +646,9 @@ def _engine() -> Engine:
         cast(Table, User.__table__),
         cast(Table, World.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationTurn.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, MemoryBackendProfile.__table__),
         cast(Table, AgentMemoryItem.__table__),
