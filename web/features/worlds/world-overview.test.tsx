@@ -35,6 +35,9 @@ describe("WorldOverview", () => {
     render(<WorldOverview data={workspaceData} />);
 
     expect(screen.getByRole("heading", { name: "Event audit" })).toBeInTheDocument();
+    expect(screen.getByText("Reconstructed clock")).toBeInTheDocument();
+    expect(screen.getByText("Snapshot integrity")).toBeInTheDocument();
+    expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
 
@@ -149,6 +152,16 @@ const workspaceData: WorldWorkspaceData = {
     unhandled_event_count: 0,
   },
   latestSnapshot: null,
+  snapshotIntegrity: {
+    world_id: "world-1",
+    status: "ok",
+    latest_event_sequence: 1,
+    latest_snapshot_id: null,
+    covers_event_sequence: null,
+    schema_version: null,
+    event_gap: 0,
+    issues: [],
+  },
   worldEventAudit: [eventRow("event-1", 1, "agent.run_succeeded")],
   scheduleRules: [],
   worldDiagnostics: [],

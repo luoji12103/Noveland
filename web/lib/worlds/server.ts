@@ -34,6 +34,7 @@ import type {
   WorldEventAuditEntry,
   WorldReplayState,
   WorldSnapshot,
+  WorldSnapshotIntegrity,
 } from "@/lib/worlds/types";
 
 export type WorldWorkspaceData = {
@@ -48,6 +49,7 @@ export type WorldWorkspaceData = {
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
+  snapshotIntegrity: WorldSnapshotIntegrity | null;
   worldEventAudit: WorldEventAuditEntry[];
   scheduleRules: ScheduleRule[];
   worldDiagnostics: RuntimeDiagnostic[];
@@ -310,6 +312,7 @@ export async function getWorldWorkspaceData(
       clock,
       replayState,
       latestSnapshot,
+      snapshotIntegrity,
       worldEventAudit,
       scheduleRules,
       worldDiagnostics,
@@ -320,6 +323,7 @@ export async function getWorldWorkspaceData(
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
       apiFetch<WorldReplayState>(`/worlds/${worldId}/replay/state`, cookies),
       apiFetch<WorldSnapshot | null>(`/worlds/${worldId}/snapshots/latest`, cookies),
+      apiFetchOptional<WorldSnapshotIntegrity>(`/worlds/${worldId}/snapshots/integrity`, cookies),
       apiFetchOptional<WorldEventAuditEntry[]>(`/worlds/${worldId}/events?limit=10`, cookies),
       apiFetch<ScheduleRule[]>(`/worlds/${worldId}/schedule-rules`, cookies),
       apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${worldId}/diagnostics`, cookies),
@@ -336,6 +340,7 @@ export async function getWorldWorkspaceData(
       clock,
       replayState,
       latestSnapshot,
+      snapshotIntegrity,
       worldEventAudit: worldEventAudit ?? [],
       scheduleRules,
       worldDiagnostics: worldDiagnostics ?? [],
@@ -801,6 +806,7 @@ function emptyWorldWorkspaceData(
     clock: null,
     replayState: null,
     latestSnapshot: null,
+    snapshotIntegrity: null,
     worldEventAudit: [],
     scheduleRules: [],
     worldDiagnostics: [],

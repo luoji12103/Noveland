@@ -570,14 +570,59 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           <h2 className="section-title" id="replay-title">
             Replay and snapshots
           </h2>
-          <p>Replay sequence: {data.replayState?.source_sequence ?? 0}</p>
-          <p>Unhandled events: {data.replayState?.unhandled_event_count ?? 0}</p>
-          <p>
-            Latest snapshot:{" "}
-            {data.latestSnapshot === null
-              ? "none"
-              : `covers sequence ${data.latestSnapshot.covers_event_sequence}`}
-          </p>
+          <div className="dashboard-grid">
+            <div className="metric">
+              <p className="metric-label">Live clock</p>
+              <p className="metric-value">{clock?.status ?? "unknown"}</p>
+              <p>Revision {clock?.revision ?? "n/a"}</p>
+              <p>{clock?.effective_world_time ?? "No live clock state"}</p>
+            </div>
+            <div className="metric">
+              <p className="metric-label">Reconstructed clock</p>
+              <p className="metric-value">{data.replayState?.clock?.status ?? "none"}</p>
+              <p>Revision {data.replayState?.clock?.revision ?? "n/a"}</p>
+              <p>Source sequence {data.replayState?.source_sequence ?? 0}</p>
+            </div>
+            <div className="metric">
+              <p className="metric-label">Replay events</p>
+              <p className="metric-value">{data.replayState?.applied_event_count ?? 0}</p>
+              <p>Unhandled {data.replayState?.unhandled_event_count ?? 0}</p>
+            </div>
+            <div className="metric">
+              <p className="metric-label">Snapshot integrity</p>
+              <p className="metric-value">{data.snapshotIntegrity?.status ?? "unknown"}</p>
+              <p>Gap {data.snapshotIntegrity?.event_gap ?? "n/a"}</p>
+              <p>Latest event {data.snapshotIntegrity?.latest_event_sequence ?? "n/a"}</p>
+            </div>
+          </div>
+          <div className="resource-list">
+            <article className="resource-row">
+              <div>
+                <h3>Latest snapshot</h3>
+                {data.latestSnapshot === null ? (
+                  <p>none</p>
+                ) : (
+                  <>
+                    <p>
+                      {data.latestSnapshot.status} - covers sequence{" "}
+                      {data.latestSnapshot.covers_event_sequence}
+                    </p>
+                    <p>
+                      {data.latestSnapshot.schema_version} - {data.latestSnapshot.created_at}
+                    </p>
+                  </>
+                )}
+              </div>
+            </article>
+            {data.snapshotIntegrity?.issues.map((issue) => (
+              <article className="resource-row" key={issue}>
+                <div>
+                  <h3>Integrity issue</h3>
+                  <p>{issue}</p>
+                </div>
+              </article>
+            ))}
+          </div>
           {data.canManageSelectedWorld ? (
             <button
               className="primary-button"
