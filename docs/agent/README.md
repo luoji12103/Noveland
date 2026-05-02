@@ -13,7 +13,8 @@ It exists to keep the project stable while the implementation is still evolving.
 5. `engineering/file-creation-rules.md`
 6. `git/workflow.md`
 7. `harness/project-index.md`
-8. `harness/handoffs/active-session.md`
+8. `harness/roadmap.md`
+9. `harness/handoffs/active-session.md`
 
 ## Project stance
 
@@ -37,6 +38,7 @@ It exists to keep the project stable while the implementation is still evolving.
 - `harness/project-index.md`
 - `harness/file-inventory.md`
 - `harness/ownership-map.md`
+- `harness/roadmap.md`
 - `harness/task-board.md`
 - `harness/change-journal.md`
 - `harness/debug-journal.md`

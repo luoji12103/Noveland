@@ -4,6 +4,11 @@
 
 Fast orientation for a new coding session.
 
+## Planning sources
+
+- `docs/agent/harness/roadmap.md` — long-term project roadmap and candidate mainline bundles; not the active task board.
+- `docs/agent/harness/task-board.md` — current execution state only.
+
 ## Current entrypoints
 
 ### Web
