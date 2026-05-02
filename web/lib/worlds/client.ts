@@ -62,6 +62,8 @@ import type {
   World,
   WorldCreateInput,
   WorldClock,
+  WorldEventAuditEntry,
+  WorldEventAuditFilters,
   WorldRole,
   WorldReplayState,
   WorldSnapshot,
@@ -211,6 +213,38 @@ export function createSnapshot(worldId: string): Promise<WorldSnapshot> {
   return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots`, {
     method: "POST",
     csrf: true,
+  });
+}
+
+export function listWorldEvents(
+  worldId: string,
+  filters: WorldEventAuditFilters = {},
+): Promise<WorldEventAuditEntry[]> {
+  const search = new URLSearchParams();
+  if (filters.event_name) {
+    search.set("event_name", filters.event_name);
+  }
+  if (filters.actor_ref) {
+    search.set("actor_ref", filters.actor_ref);
+  }
+  if (filters.sequence_after !== undefined && filters.sequence_after !== null) {
+    search.set("sequence_after", String(filters.sequence_after));
+  }
+  if (filters.sequence_before !== undefined && filters.sequence_before !== null) {
+    search.set("sequence_before", String(filters.sequence_before));
+  }
+  if (filters.wall_time_from) {
+    search.set("wall_time_from", filters.wall_time_from);
+  }
+  if (filters.wall_time_to) {
+    search.set("wall_time_to", filters.wall_time_to);
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return worldRequest<WorldEventAuditEntry[]>(`/api/worlds/${worldId}/events${suffix}`, {
+    method: "GET",
   });
 }
 

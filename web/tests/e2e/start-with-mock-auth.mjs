@@ -356,6 +356,26 @@ const narrativeArtifacts = [
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
+const worldEvents = new Map([
+  [
+    worldOneId,
+    [
+      {
+        id: "76000000-0000-4000-8000-000000000001",
+        world_id: worldOneId,
+        sequence: 1,
+        event_name: "world.clock_advanced",
+        payload: { revision: 1, status: "running" },
+        wall_time: "2026-04-17T00:02:00.000Z",
+        world_time: "2030-01-01T00:00:00.000Z",
+        actor_ref: "system:runtime",
+        causation_event_id: null,
+        correlation_id: null,
+        created_at: "2026-04-17T00:02:00.000Z",
+      },
+    ],
+  ],
+]);
 const pluginCatalog = [
   {
     identifier: "builtin.openai_compatible",
@@ -714,6 +734,7 @@ async function handleWorldCollection(request, response) {
     memberships.push(membership(randomUUID(), world.id, currentSubject.user_id, "world_admin"));
     clocks.set(world.id, clockForWorld(world.id));
     replaySequences.set(world.id, 0);
+    worldEvents.set(world.id, []);
     sendJson(response, 201, world);
     return;
   }
@@ -774,6 +795,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "snapshots") {
     await handleSnapshots(request, response, currentSubject, worldId, segments[3]);
+    return;
+  }
+  if (resource === "events") {
+    handleWorldEvents(request, response, currentSubject, worldId, url);
     return;
   }
   if (resource === "diagnostics") {
@@ -1464,6 +1489,7 @@ async function handleWorldCompositionImport(request, response) {
   memberships.push(membership(randomUUID(), world.id, owner.id, "world_admin"));
   clocks.set(world.id, clockForWorld(world.id));
   replaySequences.set(world.id, 0);
+  worldEvents.set(world.id, []);
 
   const sceneKeyToId = new Map();
   for (const scene of composition.scenes ?? []) {
@@ -2154,10 +2180,62 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
     };
     snapshots.set(worldId, snapshot);
     replaySequences.set(worldId, replay.source_sequence + 1);
+    appendWorldEvent(worldId, {
+      event_name: "world.snapshot_created",
+      payload: {
+        covers_event_sequence: snapshot.covers_event_sequence,
+        schema_version: snapshot.schema_version,
+        status: snapshot.status,
+        payload_uri: snapshot.payload_uri,
+      },
+      actor_ref: `user:${currentSubject.user_id}`,
+    });
     sendJson(response, 201, snapshot);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleWorldEvents(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method !== "GET") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 100);
+  let events = [...(worldEvents.get(worldId) ?? [])];
+  const eventName = url.searchParams.get("event_name");
+  const actorRef = url.searchParams.get("actor_ref");
+  const sequenceAfter = url.searchParams.get("sequence_after");
+  const sequenceBefore = url.searchParams.get("sequence_before");
+  const wallTimeFrom = url.searchParams.get("wall_time_from");
+  const wallTimeTo = url.searchParams.get("wall_time_to");
+  if (eventName !== null) {
+    events = events.filter((event) => event.event_name === eventName);
+  }
+  if (actorRef !== null) {
+    events = events.filter((event) => event.actor_ref === actorRef);
+  }
+  if (sequenceAfter !== null) {
+    events = events.filter((event) => event.sequence > Number(sequenceAfter));
+  }
+  if (sequenceBefore !== null) {
+    events = events.filter((event) => event.sequence < Number(sequenceBefore));
+  }
+  if (wallTimeFrom !== null) {
+    events = events.filter((event) => event.wall_time >= wallTimeFrom);
+  }
+  if (wallTimeTo !== null) {
+    events = events.filter((event) => event.wall_time <= wallTimeTo);
+  }
+  sendJson(
+    response,
+    200,
+    events.sort((left, right) => right.sequence - left.sequence).slice(0, limit),
+  );
 }
 
 async function handleNarrativeArtifacts(request, response, currentSubject, worldId, artifactId, url) {
@@ -2626,6 +2704,26 @@ function replayForWorld(worldId) {
     applied_event_count: sourceSequence === 0 ? 0 : 1,
     unhandled_event_count: 0,
   };
+}
+
+function appendWorldEvent(worldId, input) {
+  const events = worldEvents.get(worldId) ?? [];
+  const event = {
+    id: randomUUID(),
+    world_id: worldId,
+    sequence: events.length + 1,
+    event_name: input.event_name,
+    payload: input.payload ?? {},
+    wall_time: new Date().toISOString(),
+    world_time: input.world_time ?? null,
+    actor_ref: input.actor_ref ?? "system:mock",
+    causation_event_id: null,
+    correlation_id: null,
+    created_at: new Date().toISOString(),
+  };
+  events.push(event);
+  worldEvents.set(worldId, events);
+  return event;
 }
 
 function projectClock(clock) {

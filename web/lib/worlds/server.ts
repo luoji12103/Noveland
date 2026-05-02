@@ -31,6 +31,7 @@ import type {
   World,
   WorldClock,
   WorldDashboardData,
+  WorldEventAuditEntry,
   WorldReplayState,
   WorldSnapshot,
 } from "@/lib/worlds/types";
@@ -47,6 +48,7 @@ export type WorldWorkspaceData = {
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
+  worldEventAudit: WorldEventAuditEntry[];
   scheduleRules: ScheduleRule[];
   worldDiagnostics: RuntimeDiagnostic[];
   canManageSelectedWorld: boolean;
@@ -244,6 +246,7 @@ export async function getWorldDashboardData(
       clock,
       replayState,
       latestSnapshot,
+      worldEventAudit: [],
       selectedAgentId: selectedAgent?.id ?? null,
       calendarEntries,
       scheduleRules,
@@ -307,6 +310,7 @@ export async function getWorldWorkspaceData(
       clock,
       replayState,
       latestSnapshot,
+      worldEventAudit,
       scheduleRules,
       worldDiagnostics,
     ] = await Promise.all([
@@ -316,6 +320,7 @@ export async function getWorldWorkspaceData(
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
       apiFetch<WorldReplayState>(`/worlds/${worldId}/replay/state`, cookies),
       apiFetch<WorldSnapshot | null>(`/worlds/${worldId}/snapshots/latest`, cookies),
+      apiFetchOptional<WorldEventAuditEntry[]>(`/worlds/${worldId}/events?limit=10`, cookies),
       apiFetch<ScheduleRule[]>(`/worlds/${worldId}/schedule-rules`, cookies),
       apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${worldId}/diagnostics`, cookies),
     ]);
@@ -331,6 +336,7 @@ export async function getWorldWorkspaceData(
       clock,
       replayState,
       latestSnapshot,
+      worldEventAudit: worldEventAudit ?? [],
       scheduleRules,
       worldDiagnostics: worldDiagnostics ?? [],
       canManageSelectedWorld: memberships !== null,
@@ -795,6 +801,7 @@ function emptyWorldWorkspaceData(
     clock: null,
     replayState: null,
     latestSnapshot: null,
+    worldEventAudit: [],
     scheduleRules: [],
     worldDiagnostics: [],
     canManageSelectedWorld: false,
@@ -897,6 +904,7 @@ function emptyDashboardData(
     clock: null,
     replayState: null,
     latestSnapshot: null,
+    worldEventAudit: [],
     selectedAgentId: null,
     calendarEntries: [],
     scheduleRules: [],

@@ -129,6 +129,7 @@ const emptyData: WorldDashboardData = {
   clock: null,
   replayState: null,
   latestSnapshot: null,
+  worldEventAudit: [],
   selectedAgentId: null,
   calendarEntries: [],
   scheduleRules: [],
@@ -198,6 +199,7 @@ const adminData: WorldDashboardData = {
     unhandled_event_count: 0,
   },
   latestSnapshot: null,
+  worldEventAudit: [],
   selectedAgentId: null,
   calendarEntries: [],
   scheduleRules: [
@@ -476,6 +478,7 @@ const readOnlyData: WorldDashboardData = {
     created_by_event_id: "event-2",
     created_at: "2026-04-17T00:02:00.000Z",
   },
+  worldEventAudit: [],
   selectedAgentId: "agent-1",
   calendarEntries: [
     {

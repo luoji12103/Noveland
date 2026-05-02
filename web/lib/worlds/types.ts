@@ -278,6 +278,30 @@ export type WorldSnapshot = {
   created_at: string;
 };
 
+export type WorldEventAuditEntry = {
+  id: string;
+  world_id: string;
+  sequence: number;
+  event_name: string;
+  payload: Record<string, unknown>;
+  wall_time: string;
+  world_time: string | null;
+  actor_ref: string;
+  causation_event_id: string | null;
+  correlation_id: string | null;
+  created_at: string;
+};
+
+export type WorldEventAuditFilters = {
+  event_name?: string | null;
+  actor_ref?: string | null;
+  sequence_after?: number | null;
+  sequence_before?: number | null;
+  wall_time_from?: string | null;
+  wall_time_to?: string | null;
+  limit?: number;
+};
+
 export type CalendarEntry = {
   id: string;
   world_id: string;
@@ -695,6 +719,7 @@ export type WorldDashboardData = {
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
+  worldEventAudit: WorldEventAuditEntry[];
   selectedAgentId: string | null;
   calendarEntries: CalendarEntry[];
   scheduleRules: ScheduleRule[];

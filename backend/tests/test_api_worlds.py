@@ -790,6 +790,89 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert hidden_replay.status_code == 404
 
 
+def test_world_event_audit_requires_admin_and_filters_events() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
+    world_id = _seed_world(engine, owner_id, "event-audit-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    correlation_id = uuid.uuid4()
+    _seed_world_event(
+        engine,
+        world_id,
+        event_name="agent.run_succeeded",
+        actor_ref="agent:guide",
+        minute=1,
+        payload={"source": "agent", "output": "ok"},
+        correlation_id=correlation_id,
+    )
+    _seed_world_event(
+        engine,
+        world_id,
+        event_name="conversation.turn_completed",
+        actor_ref="conversation:seed",
+        minute=2,
+        payload={"turn": 1},
+    )
+    _seed_world_event(
+        engine,
+        world_id,
+        event_name="agent.run_failed",
+        actor_ref="agent:guide",
+        minute=3,
+        payload={"error": "provider timeout"},
+    )
+
+    _authenticate(client, member_token)
+    member_events = client.get(f"/worlds/{world_id}/events")
+
+    _authenticate(client, owner_token)
+    all_events = client.get(f"/worlds/{world_id}/events")
+    by_event_name = client.get(
+        f"/worlds/{world_id}/events",
+        params={"event_name": "agent.run_succeeded"},
+    )
+    by_actor = client.get(f"/worlds/{world_id}/events", params={"actor_ref": "agent:guide"})
+    by_sequence = client.get(
+        f"/worlds/{world_id}/events",
+        params={"sequence_after": 1, "sequence_before": 3},
+    )
+    by_wall_time = client.get(
+        f"/worlds/{world_id}/events",
+        params={
+            "wall_time_from": "2026-04-17T12:02:00Z",
+            "wall_time_to": "2026-04-17T12:03:00Z",
+        },
+    )
+    limited = client.get(f"/worlds/{world_id}/events", params={"limit": 1})
+    limit_too_high = client.get(f"/worlds/{world_id}/events", params={"limit": 101})
+
+    _authenticate(client, stranger_token)
+    hidden_events = client.get(f"/worlds/{world_id}/events")
+
+    assert member_events.status_code == 403
+    assert all_events.status_code == 200
+    assert [event["sequence"] for event in all_events.json()] == [3, 2, 1]
+    assert all_events.json()[2]["payload"]["output"] == "ok"
+    assert all_events.json()[2]["correlation_id"] == str(correlation_id)
+    assert by_event_name.status_code == 200
+    assert [event["event_name"] for event in by_event_name.json()] == ["agent.run_succeeded"]
+    assert by_actor.status_code == 200
+    assert [event["sequence"] for event in by_actor.json()] == [3, 1]
+    assert by_sequence.status_code == 200
+    assert [event["event_name"] for event in by_sequence.json()] == [
+        "conversation.turn_completed",
+    ]
+    assert by_wall_time.status_code == 200
+    assert [event["sequence"] for event in by_wall_time.json()] == [3, 2]
+    assert limited.status_code == 200
+    assert [event["sequence"] for event in limited.json()] == [3]
+    assert limit_too_high.status_code == 422
+    assert hidden_events.status_code == 404
+
+
 def test_world_diagnostics_require_world_admin() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -1302,6 +1385,31 @@ def _seed_clock_event(engine: Engine, world_id: uuid.UUID, revision: int) -> Non
                 wall_time=datetime(2026, 4, 17, 12, revision, tzinfo=UTC),
                 world_time=datetime(2030, 1, 1, 0, revision - 1, tzinfo=UTC),
                 actor_ref="system:test",
+            ),
+        )
+        session.commit()
+
+
+def _seed_world_event(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    event_name: str,
+    actor_ref: str,
+    minute: int,
+    payload: dict[str, object],
+    correlation_id: uuid.UUID | None = None,
+) -> None:
+    with Session(engine) as session:
+        WorldEventStore(session).append_event(
+            WorldEventAppend(
+                world_id=world_id,
+                event_name=event_name,
+                payload=payload,
+                wall_time=datetime(2026, 4, 17, 12, minute, tzinfo=UTC),
+                world_time=datetime(2030, 1, 1, 0, minute, tzinfo=UTC),
+                actor_ref=actor_ref,
+                correlation_id=correlation_id,
             ),
         )
         session.commit()

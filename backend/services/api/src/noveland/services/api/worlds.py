@@ -36,6 +36,7 @@ from noveland.calendar import (
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.core.settings import load_settings
 from noveland.events import WorldReplayService, WorldReplayState, WorldSnapshotRecord
+from noveland.events.models import WorldEventModel
 from noveland.memory import (
     MemoryBackendProfileService,
     MemoryDeleteScope,
@@ -587,6 +588,20 @@ class WorldSnapshotResponse(BaseModel):
     payload_uri: str | None
     metadata: dict[str, Any]
     created_by_event_id: uuid.UUID
+    created_at: datetime
+
+
+class WorldEventResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    sequence: int
+    event_name: str
+    payload: dict[str, Any]
+    wall_time: datetime
+    world_time: datetime | None
+    actor_ref: str
+    causation_event_id: uuid.UUID | None
+    correlation_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -1217,6 +1232,42 @@ def latest_snapshot(
     if snapshot is None:
         return None
     return _snapshot_response(snapshot)
+
+
+@router.get("/{world_id}/events", response_model=list[WorldEventResponse])
+def list_world_events(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    event_name: Annotated[str | None, Query(min_length=3, max_length=120)] = None,
+    actor_ref: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    sequence_after: Annotated[int | None, Query(ge=0)] = None,
+    sequence_before: Annotated[int | None, Query(ge=1)] = None,
+    wall_time_from: datetime | None = None,
+    wall_time_to: datetime | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[WorldEventResponse]:
+    _world_or_404(db_session, context.world_id)
+    wall_time_from = _optional_query_time(wall_time_from, "wall_time_from")
+    wall_time_to = _optional_query_time(wall_time_to, "wall_time_to")
+    statement = select(WorldEventModel).where(WorldEventModel.world_id == context.world_id)
+    if event_name is not None:
+        statement = statement.where(WorldEventModel.event_name == event_name)
+    if actor_ref is not None:
+        statement = statement.where(WorldEventModel.actor_ref == actor_ref)
+    if sequence_after is not None:
+        statement = statement.where(WorldEventModel.sequence > sequence_after)
+    if sequence_before is not None:
+        statement = statement.where(WorldEventModel.sequence < sequence_before)
+    if wall_time_from is not None:
+        statement = statement.where(WorldEventModel.wall_time >= wall_time_from)
+    if wall_time_to is not None:
+        statement = statement.where(WorldEventModel.wall_time <= wall_time_to)
+    return [
+        _world_event_response(event)
+        for event in db_session.scalars(
+            statement.order_by(WorldEventModel.sequence.desc()).limit(limit),
+        ).all()
+    ]
 
 
 @router.get("/{world_id}/schedule-rules", response_model=list[ScheduleRuleResponse])
@@ -2499,6 +2550,22 @@ def _diagnostic_response(record: RuntimeDiagnosticRecord) -> RuntimeDiagnosticRe
     return RuntimeDiagnosticResponse(**record.model_dump())
 
 
+def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
+    return WorldEventResponse(
+        id=event.id,
+        world_id=event.world_id,
+        sequence=event.sequence,
+        event_name=event.event_name,
+        payload=event.payload,
+        wall_time=event.wall_time,
+        world_time=event.world_time,
+        actor_ref=event.actor_ref,
+        causation_event_id=event.causation_event_id,
+        correlation_id=event.correlation_id,
+        created_at=event.created_at,
+    )
+
+
 def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
     return WorldSnapshotResponse(
         id=snapshot.id,
@@ -2697,3 +2764,15 @@ def _timezone_aware(value: datetime, field_name: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")
     return value.astimezone(UTC)
+
+
+def _optional_query_time(value: datetime | None, field_name: str) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        return _timezone_aware(value, field_name)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc

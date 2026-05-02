@@ -14,6 +14,7 @@ import {
   exportWorldComposition,
   importWorldComposition,
   listMemberCandidates,
+  listWorldEvents,
   pauseWorldClock,
   resumeWorldClock,
   skipWorldClock,
@@ -26,6 +27,7 @@ import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type {
   MemberCandidate,
   RuntimeDiagnostic,
+  WorldEventAuditEntry,
   WorldClock,
   WorldRole,
 } from "@/lib/worlds/types";
@@ -47,6 +49,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [clock, setClock] = useState(data.clock);
   const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
+  const [worldEventAudit, setWorldEventAudit] = useState(data.worldEventAudit);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
   const world = data.selectedWorld;
@@ -54,7 +57,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   useEffect(() => {
     setClock(data.clock);
     setWorldDiagnostics(data.worldDiagnostics);
-  }, [data.clock, data.worldDiagnostics]);
+    setWorldEventAudit(data.worldEventAudit);
+  }, [data.clock, data.worldDiagnostics, data.worldEventAudit]);
 
   useEffect(() => {
     if (world === null) {
@@ -196,6 +200,28 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         window.location.assign(`/worlds/${importedWorld.id}`);
       },
       "Composition imported.",
+      false,
+    );
+  }
+
+  async function handleEventAuditFilter(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setWorldEventAudit(
+          await listWorldEvents(selectedWorld.id, {
+            event_name: optionalFormString(form, "event_name"),
+            actor_ref: optionalFormString(form, "actor_ref"),
+            sequence_after: optionalPositiveInteger(form, "sequence_after"),
+            sequence_before: optionalPositiveInteger(form, "sequence_before"),
+            wall_time_from: optionalFormString(form, "wall_time_from"),
+            wall_time_to: optionalFormString(form, "wall_time_to"),
+            limit: optionalPositiveInteger(form, "limit") ?? 10,
+          }),
+        );
+      },
+      "Event audit loaded.",
       false,
     );
   }
@@ -614,6 +640,50 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         </div>
       </section>
 
+      {data.canManageSelectedWorld ? (
+        <section className="management-panel" aria-labelledby="event-audit-title">
+          <h2 className="section-title" id="event-audit-title">
+            Event audit
+          </h2>
+          <form className="inline-form" onSubmit={handleEventAuditFilter}>
+            <input className="text-input" name="event_name" placeholder="event.name" />
+            <input className="text-input" name="actor_ref" placeholder="actor:ref" />
+            <input className="text-input" name="sequence_after" placeholder="After sequence" />
+            <input className="text-input" name="sequence_before" placeholder="Before sequence" />
+            <input className="text-input" name="wall_time_from" placeholder="Wall time from" />
+            <input className="text-input" name="wall_time_to" placeholder="Wall time to" />
+            <input className="text-input" name="limit" placeholder="Limit" defaultValue="10" />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Filter events
+            </button>
+          </form>
+          <div className="resource-list">
+            {worldEventAudit.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>No audit events</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : (
+              worldEventAudit.map((event) => (
+                <article className="resource-row" key={event.id}>
+                  <div>
+                    <h3>
+                      #{event.sequence} {event.event_name}
+                    </h3>
+                    <p>
+                      {event.actor_ref} - {event.wall_time}
+                    </p>
+                    <p>{formatPayload(event)}</p>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+      ) : null}
+
       <section className="management-panel" aria-labelledby="composition-title">
         <h2 className="section-title" id="composition-title">
           World composition
@@ -703,6 +773,23 @@ function mergeWorldDiagnostics(
   return Array.from(byId.values()).sort((left, right) =>
     right.occurred_at.localeCompare(left.occurred_at),
   );
+}
+
+function optionalPositiveInteger(form: FormData, key: string): number | null {
+  const value = optionalFormString(form, key);
+  if (value === null) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatPayload(event: WorldEventAuditEntry): string {
+  const payload = JSON.stringify(event.payload);
+  if (payload.length <= 160) {
+    return payload;
+  }
+  return `${payload.slice(0, 157)}...`;
 }
 
 function ResourceList({ rows }: { rows: { id: string; title: string; detail: string }[] }) {
