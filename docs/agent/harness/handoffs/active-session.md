@@ -1,40 +1,85 @@
 # Active Session Handoff
 
-- Date: 2026-05-01T08:21:21Z
-- Branch: feat/runtime-memory-ops
-- Objective: Add Runtime/Memory Ops visibility for async memory write jobs, including platform-admin job listing, retry operators, runtime status counts, and Web memory backend failure controls.
+- Date: 2026-05-02T07:22:14Z
+- Branch: main
+- Objective: Implement roadmap phases 1-5 as a single Runtime/Provider/Memory Ops Hardening mainline while preserving the existing roadmap documentation diff.
 - Completed work:
-  - Fast-forward merged `feat/memory-mem0-oss-foundation` into local `main` after the full merge-readiness gate passed.
-  - Added memory write job contracts, `MemoryService` list/status/retry methods, and platform-admin API routes for profile job listing and failed-job retry.
-  - Added memory write job counts to runtime status and processed-memory-job counts to runtime daemon iteration results and diagnostics.
-  - Added same-origin Next proxy routes and Web client helpers for memory write jobs.
-  - Extended `/admin/memory-backends` with job/failure counts, failed-job details, and retry controls.
-  - Updated Playwright mock infrastructure and E2E flow for memory job retry.
+  - Reviewed and kept the existing long-term roadmap documentation changes intact.
+  - Added `runtime_health` to `/runtime/status` and runtime SSE status payloads, including derived health, heartbeat age, recent diagnostic counts, recent error counts, and memory queue degradation signals.
+  - Extended memory write job contracts with retryability, terminal reason, latest log success, age, retryable/terminal/stalled summary counts, and settings for max attempts and stalled processing age.
+  - Hardened memory retry behavior so only failed, retryable jobs can be reset; disabled profile and max-attempt jobs return `422` through the API.
+  - Added platform-admin `GET /memory-backfill/dry-run` as planning-only dry-run coverage for agent runs, conversation turns, and memory-worthy world events using future execution dedupe keys.
+  - Added provider profile health summaries at `GET /provider-profiles/health`, including missing secret-ref state, recent diagnostics, and derived health.
+  - Updated Web server loaders, same-origin proxy routes, clients, types, admin runtime, admin memory backend, admin provider UI, and mock backend coverage for the new operator surfaces.
+  - Fixed runtime memory processing compatibility for local fallback memory profiles by allowing due-job lookup to resolve fallback worlds without a concrete profile row.
+  - Updated README endpoint/manual verification notes plus task-board and change-journal state.
 - Incomplete work:
-  - No next mainline has been selected after Runtime/Memory Ops.
+  - Memory backfill is dry-run only; there is no enqueue/execute button or write path in this phase.
+  - Local commits have been created; no push has been performed.
+- Exact files changed:
+  - `README.md`
+  - `backend/packages/core/src/noveland/core/settings.py`
+  - `backend/packages/memory/src/noveland/memory/__init__.py`
+  - `backend/packages/memory/src/noveland/memory/contracts.py`
+  - `backend/packages/memory/src/noveland/memory/service.py`
+  - `backend/packages/adapters/src/noveland/adapters/__init__.py`
+  - `backend/packages/adapters/src/noveland/adapters/model_provider.py`
+  - `backend/services/api/src/noveland/services/api/runtime.py`
+  - `backend/services/api/src/noveland/services/api/realtime.py`
+  - `backend/tests/test_api_realtime.py`
+  - `backend/tests/test_api_runtime.py`
+  - `backend/tests/test_memory_backend.py`
+  - `web/app/api/memory-backfill/dry-run/route.ts`
+  - `web/app/api/provider-profiles/health/route.ts`
+  - `web/features/admin/memory-backend-admin.tsx`
+  - `web/features/admin/memory-backend-admin.test.tsx`
+  - `web/features/admin/provider-admin.tsx`
+  - `web/features/admin/provider-admin.test.tsx`
+  - `web/features/admin/runtime-admin.tsx`
+  - `web/features/admin/runtime-admin.test.tsx`
+  - `web/features/dashboard/world-management-dashboard.test.tsx`
+  - `web/lib/worlds/client.ts`
+  - `web/lib/worlds/client.test.ts`
+  - `web/lib/worlds/server.ts`
+  - `web/lib/worlds/types.ts`
+  - `web/tests/e2e/start-with-mock-auth.mjs`
+  - `docs/agent/README.md`
+  - `docs/agent/harness/roadmap.md`
+  - `docs/agent/harness/project-index.md`
+  - `docs/agent/harness/file-inventory.md`
+  - `docs/agent/harness/task-board.md`
+  - `docs/agent/harness/change-journal.md`
+  - `docs/agent/harness/handoffs/active-session.md`
 - Tests run:
-  - `cd backend && uv run ruff check packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
-  - `cd backend && uv run mypy packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py services/runtime/src/noveland/services/runtime/daemon.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
   - `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test -- features/admin/runtime-admin.test.tsx`
+  - `cd backend && uv run pytest tests/test_api_realtime.py`
+  - `cd backend && uv run ruff check packages/core/src/noveland/core/settings.py packages/memory/src/noveland/memory/contracts.py packages/memory/src/noveland/memory/service.py packages/memory/src/noveland/memory/__init__.py packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py services/api/src/noveland/services/api/realtime.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - `cd backend && uv run mypy packages/core/src/noveland/core/settings.py packages/memory/src/noveland/memory/contracts.py packages/memory/src/noveland/memory/service.py packages/memory/src/noveland/memory/__init__.py packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py services/api/src/noveland/services/api/realtime.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest`
-  - `docker compose -f infra/compose.yaml config`
+  - `cd backend && uv run pytest` returned `119 passed, 6 skipped`.
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
-  - `cd web && npm run test`
+  - `cd web && npm run test -- features/admin/runtime-admin.test.tsx features/admin/memory-backend-admin.test.tsx features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
+  - `cd web && npm run test` returned `16 passed / 46 tests`.
   - `cd web && npm run build`
-  - `cd web && npm run test:e2e`
+  - `cd web && npm run test:e2e` returned `10 passed`.
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
 - Current risks:
-  - The primary long-term memory path is now profile-driven and async, but distributed workers, queue coordination, and production-grade memory backfill are still future work.
-  - `builtin.local_pgvector_memory` remains as fallback/test coverage; canonical long-term behavior assumes Mem0 OSS-style profiles through `MemoryService`.
-  - Web Playwright coverage now depends on the local mock backend matching the evolving memory job contracts; keep the mock aligned when API contracts change.
+  - Memory backfill execution still needs explicit idempotency, throttling, and operator controls before any enqueue path is added.
+  - Runtime health is derived from existing diagnostics/control state and queue counts; it is useful for operators but is not a replacement for process supervision.
+  - Provider health detects missing refs through `NOVELAND_PROVIDER_API_KEYS_JSON` and diagnostics, but deeper secret validation and recovery playbooks remain future phases.
+  - Web Playwright coverage depends on the mock backend staying aligned with the new provider health and memory backfill routes.
 - Recommended next step:
-  - Review or merge this branch, then select the next mainline.
+  - Review the local commits, then push or open review when ready.
+  - Next likely roadmap candidate: phase 6 `Provider Secrets Validation`, followed by phase 7 `Runtime Recovery Playbook`.
 - Sensitive areas to avoid casual edits:
   - `MemoryService` as the only business entrypoint for long-term memory
   - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
+  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`
   - agent-private memory isolation across world and agent boundaries
+  - plugin registry and runtime binding behavior
+  - event/snapshot semantics and replay compatibility
+  - auth/world access checks and world clock state transitions
   - migration history for `20260423_0016` through `20260423_0018`

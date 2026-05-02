@@ -8,7 +8,7 @@ Noveland is a persistent virtual-world operating system for AI agents. The repos
 - Backend stack: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.x, Alembic, uv
 - Frontend stack: Next.js, TypeScript, React, Tailwind CSS, Vitest, Playwright
 - Local services: PostgreSQL 16 with pgvector, NATS with JetStream
-- Long-term memory: Mem0 OSS-first backend profiles, async write jobs, read-only agent memory search, profile snapshots, forget/eval operators, and job retry observability
+- Long-term memory: Mem0 OSS-first backend profiles, async write jobs, read-only agent memory search, profile snapshots, forget/eval operators, job retry observability, and backfill dry-run planning
 - License: TBD
 
 ## Local Setup
@@ -153,7 +153,7 @@ NOVELAND_MEMORY_BACKEND_SECRETS_JSON={}
    - 在 agent builder 中设置 default provider、persona、observation、calendar 和 memory
    - 创建 conversation，添加 participants，seed transcript，手动 advance 一轮
    - 创建 auto dialogue conversation，Start 后由 `noveland-runtime --daemon` 逐轮推进
-   - 创建 provider profile，并执行 `Test provider`
+   - 创建 provider profile，并执行 `Test provider`，确认 provider health 状态可读
    - 手动运行 agent，确认 run、memory、narrative artifact、diagnostics 有更新
    - 启动 runtime，确认 runtime status、memory write job counts 和 diagnostics 有变化
 6. 如需验证 API 面，额外确认：
@@ -200,7 +200,7 @@ NOVELAND_MEMORY_BACKEND_SECRETS_JSON={}
    - 在 `/worlds/{worldId}/reader` 以只读方式阅读 summary / chapter，并跳回 source conversation
    - 如需复制世界骨架，在 `/worlds/{worldId}` 的 `World composition` 面板导出 JSON，并由平台管理员导入为新 world
    - 在 `/admin/providers` 配置 provider profile，并先做 `Test provider`
-   - 在 `/admin/memory-backends` 配置 memory backend profile，查看 health / logs / jobs，必要时 retry failed memory write job，并执行 eval smoke
+   - 在 `/admin/memory-backends` 配置 memory backend profile，查看 health / logs / jobs / backfill dry-run，必要时 retry failed memory write job，并执行 eval smoke
    - 在 `/admin/runtime` 启停 runtime desired state
 7. 常用回归命令：
    ```sh
@@ -268,6 +268,7 @@ GET /memory-backend-profiles/{profile_id}/logs
 GET /memory-backend-profiles/{profile_id}/jobs
 POST /memory-backend-profiles/{profile_id}/eval-smoke
 POST /memory-write-jobs/{job_id}/retry
+GET /memory-backfill/dry-run
 GET /worlds/{world_id}/agents/{agent_id}/memory
 POST /worlds/{world_id}/agents/{agent_id}/memory/search
 GET /worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot
@@ -365,6 +366,7 @@ PATCH /runtime/control
 GET /runtime/status
 GET /runtime/diagnostics
 GET /provider-profiles
+GET /provider-profiles/health
 POST /provider-profiles
 PATCH /provider-profiles/{profile_id}
 POST /provider-profiles/{profile_id}/test-call

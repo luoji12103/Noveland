@@ -340,3 +340,25 @@
 - Tests added/updated: memory service job list/summary/retry tests; runtime API permission/retry/status tests; runtime daemon processed-memory-job assertions; Web client and Playwright mock-backend coverage for memory job listing/retry.
 - Docs updated: README, project index, file inventory, task board, active handoff, change journal
 - Follow-up notes: Memory jobs still use the v1 database-backed queue; distributed workers, production queue coordination, and richer backfill remain future work.
+
+## Long-term roadmap document entry
+
+- Date: 2026-05-01
+- Branch: main
+- Scope: docs/agent roadmap planning
+- Summary: Added a long-term Noveland roadmap with 50 mainline-sized phases, candidate bundles, and maintenance rules while keeping debug, checks, tests, and docs as phase acceptance criteria instead of separate roadmap stages.
+- Files changed: `/docs/agent/harness/roadmap.md`, `/docs/agent/README.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A; documentation-only planning update.
+- Docs updated: roadmap, README, project index, file inventory, task board, active handoff, change journal
+- Follow-up notes: Select the next implementation mainline from the roadmap when ready; do not treat all 50 phases as active task-board work.
+
+## Runtime/provider/memory ops hardening entry
+
+- Date: 2026-05-02
+- Branch: main
+- Scope: roadmap phases 1-5 ops hardening
+- Summary: Implemented the first roadmap bundle across runtime status health, memory queue reliability metadata, memory backfill dry-run planning, and provider health summaries without adding a new queue or bypassing `MemoryService`.
+- Files changed: `/backend/packages/core/src/noveland/core/settings.py`, `/backend/packages/memory/**`, `/backend/packages/adapters/**`, `/backend/services/api/src/noveland/services/api/{runtime,realtime}.py`, `/backend/tests/**`, `/web/app/api/{memory-backfill,provider-profiles}/**`, `/web/features/admin/**`, `/web/lib/worlds/**`, `/web/features/dashboard/world-management-dashboard.test.tsx`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: runtime API/realtime tests for health payloads; memory backend tests for retryable, terminal, stalled, and dry-run behavior; provider/admin Web tests; world client tests; mock backend coverage for new admin routes.
+- Docs updated: README, task board, change journal, active handoff.
+- Follow-up notes: Memory backfill remains planning-only; processing still uses the v1 database-backed queue. Next likely roadmap candidate is provider secret validation and recovery playbooks.

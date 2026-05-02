@@ -45,6 +45,7 @@
 - Memory Context Integration
 - Agent Profile Snapshots + Forget / Eval / Ops
 - Runtime/Memory Ops
+- Runtime/Provider/Memory Ops Hardening
 
 ## Upcoming Mainline
-- None selected
+- None selected; likely next candidate is roadmap phase 6 `Provider Secrets Validation`
