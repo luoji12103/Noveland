@@ -87,7 +87,7 @@ from noveland.services.api.dependencies import (
 from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
-from noveland.worlds.models import Scene, World, WorldMembership
+from noveland.worlds.models import Scene, World, WorldClockTransitionModel, WorldMembership
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -581,6 +581,23 @@ class WorldClockResponse(BaseModel):
     wall_time_anchor: datetime | None
     speed_multiplier: str
     revision: int
+
+
+class WorldClockTransitionResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    transition_type: str
+    previous_status: str | None
+    new_status: str
+    previous_world_time: datetime | None
+    new_world_time: datetime
+    wall_time: datetime
+    previous_revision: int | None
+    new_revision: int
+    actor_ref: str | None
+    correlation_id: str | None
+    reason: str | None
+    created_at: datetime
 
 
 class WorldSnapshotResponse(BaseModel):
@@ -1130,6 +1147,24 @@ def get_clock(
 ) -> WorldClockResponse:
     _world_or_404(db_session, context.world_id)
     return _clock_response(WorldClockService(db_session).view(context.world_id))
+
+
+@router.get("/{world_id}/clock/transitions", response_model=list[WorldClockTransitionResponse])
+def list_clock_transitions(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[WorldClockTransitionResponse]:
+    _world_or_404(db_session, context.world_id)
+    return [
+        _clock_transition_response(transition)
+        for transition in db_session.scalars(
+            select(WorldClockTransitionModel)
+            .where(WorldClockTransitionModel.world_id == context.world_id)
+            .order_by(WorldClockTransitionModel.new_revision.desc())
+            .limit(limit),
+        ).all()
+    ]
 
 
 @router.post("/{world_id}/clock/pause", response_model=WorldClockResponse)
@@ -2560,6 +2595,27 @@ def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
         wall_time_anchor=state.wall_time_anchor,
         speed_multiplier=str(state.speed_multiplier),
         revision=state.revision,
+    )
+
+
+def _clock_transition_response(
+    transition: WorldClockTransitionModel,
+) -> WorldClockTransitionResponse:
+    return WorldClockTransitionResponse(
+        id=transition.id,
+        world_id=transition.world_id,
+        transition_type=transition.transition_type,
+        previous_status=transition.previous_status,
+        new_status=transition.new_status,
+        previous_world_time=transition.previous_world_time,
+        new_world_time=transition.new_world_time,
+        wall_time=transition.wall_time,
+        previous_revision=transition.previous_revision,
+        new_revision=transition.new_revision,
+        actor_ref=transition.actor_ref,
+        correlation_id=transition.correlation_id,
+        reason=transition.reason,
+        created_at=transition.created_at,
     )
 
 

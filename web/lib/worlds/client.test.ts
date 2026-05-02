@@ -27,6 +27,7 @@ import {
   getSnapshotIntegrity,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
+  listClockTransitions,
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
@@ -170,12 +171,14 @@ describe("world client", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse({ status: "paused" }))
       .mockResolvedValueOnce(jsonResponse({ status: "running" }))
-      .mockResolvedValueOnce(jsonResponse({ status: "running" }));
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse([{ transition_type: "resume" }]));
     vi.stubGlobal("fetch", fetchMock);
 
     await pauseWorldClock("world-1", "rest");
     await resumeWorldClock("world-1", "2", "go");
     await skipWorldClock("world-1", "2030-01-01T00:00:00Z");
+    await listClockTransitions("world-1", 5);
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/clock/pause");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/clock/resume");
@@ -183,6 +186,9 @@ describe("world client", () => {
       JSON.stringify({ speed_multiplier: "2", reason: "go" }),
     );
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/clock/skip");
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      "/api/worlds/world-1/clock/transitions?limit=5",
+    );
   });
 
   it("maps replay and snapshot requests", async () => {

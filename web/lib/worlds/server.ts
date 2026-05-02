@@ -30,6 +30,7 @@ import type {
   ScheduleRule,
   World,
   WorldClock,
+  WorldClockTransition,
   WorldDashboardData,
   WorldEventAuditEntry,
   WorldReplayState,
@@ -47,6 +48,7 @@ export type WorldWorkspaceData = {
   memoryPlugins: PluginCatalogEntry[];
   worldRulesPlugins: PluginCatalogEntry[];
   clock: WorldClock | null;
+  clockTransitions: WorldClockTransition[];
   replayState: WorldReplayState | null;
   latestSnapshot: WorldSnapshot | null;
   snapshotIntegrity: WorldSnapshotIntegrity | null;
@@ -310,6 +312,7 @@ export async function getWorldWorkspaceData(
       agents,
       memberships,
       clock,
+      clockTransitions,
       replayState,
       latestSnapshot,
       snapshotIntegrity,
@@ -321,6 +324,10 @@ export async function getWorldWorkspaceData(
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
+      apiFetchOptional<WorldClockTransition[]>(
+        `/worlds/${worldId}/clock/transitions?limit=5`,
+        cookies,
+      ),
       apiFetch<WorldReplayState>(`/worlds/${worldId}/replay/state`, cookies),
       apiFetch<WorldSnapshot | null>(`/worlds/${worldId}/snapshots/latest`, cookies),
       apiFetchOptional<WorldSnapshotIntegrity>(`/worlds/${worldId}/snapshots/integrity`, cookies),
@@ -338,6 +345,7 @@ export async function getWorldWorkspaceData(
       memoryPlugins,
       worldRulesPlugins,
       clock,
+      clockTransitions: clockTransitions ?? [],
       replayState,
       latestSnapshot,
       snapshotIntegrity,
@@ -804,6 +812,7 @@ function emptyWorldWorkspaceData(
     memoryPlugins: [],
     worldRulesPlugins: [],
     clock: null,
+    clockTransitions: [],
     replayState: null,
     latestSnapshot: null,
     snapshotIntegrity: null,

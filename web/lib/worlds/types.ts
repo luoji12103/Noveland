@@ -245,6 +245,23 @@ export type WorldClock = {
   revision: number;
 };
 
+export type WorldClockTransition = {
+  id: string;
+  world_id: string;
+  transition_type: string;
+  previous_status: string | null;
+  new_status: string;
+  previous_world_time: string | null;
+  new_world_time: string;
+  wall_time: string;
+  previous_revision: number | null;
+  new_revision: number;
+  actor_ref: string | null;
+  correlation_id: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
 export type ReplayClock = {
   status: string;
   current_world_time: string | null;

@@ -35,6 +35,7 @@ describe("WorldOverview", () => {
     render(<WorldOverview data={workspaceData} />);
 
     expect(screen.getByRole("heading", { name: "Event audit" })).toBeInTheDocument();
+    expect(screen.getByText("resume to revision 1")).toBeInTheDocument();
     expect(screen.getByText("Reconstructed clock")).toBeInTheDocument();
     expect(screen.getByText("Snapshot integrity")).toBeInTheDocument();
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
@@ -143,6 +144,24 @@ const workspaceData: WorldWorkspaceData = {
     speed_multiplier: "1",
     revision: 0,
   },
+  clockTransitions: [
+    {
+      id: "transition-1",
+      world_id: "world-1",
+      transition_type: "resume",
+      previous_status: "paused",
+      new_status: "running",
+      previous_world_time: "2030-01-01T00:00:00.000Z",
+      new_world_time: "2030-01-01T00:01:00.000Z",
+      wall_time: "2026-04-17T12:00:00.000Z",
+      previous_revision: 0,
+      new_revision: 1,
+      actor_ref: "user:user-1",
+      correlation_id: null,
+      reason: "start",
+      created_at: "2026-04-17T12:00:00.000Z",
+    },
+  ],
   replayState: {
     world_id: "world-1",
     schema_version: "world_state.v1",

@@ -356,6 +356,29 @@ const narrativeArtifacts = [
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
 const snapshots = new Map();
+const clockTransitions = new Map([
+  [
+    worldOneId,
+    [
+      {
+        id: "75000000-0000-4000-8000-000000000001",
+        world_id: worldOneId,
+        transition_type: "initialize",
+        previous_status: null,
+        new_status: "paused",
+        previous_world_time: null,
+        new_world_time: "2026-04-17T00:00:00.000Z",
+        wall_time: "2026-04-17T00:00:00.000Z",
+        previous_revision: null,
+        new_revision: 0,
+        actor_ref: "system:mock",
+        correlation_id: null,
+        reason: "mock init",
+        created_at: "2026-04-17T00:00:00.000Z",
+      },
+    ],
+  ],
+]);
 const worldEvents = new Map([
   [
     worldOneId,
@@ -735,6 +758,7 @@ async function handleWorldCollection(request, response) {
     clocks.set(world.id, clockForWorld(world.id));
     replaySequences.set(world.id, 0);
     worldEvents.set(world.id, []);
+    clockTransitions.set(world.id, []);
     sendJson(response, 201, world);
     return;
   }
@@ -1490,6 +1514,7 @@ async function handleWorldCompositionImport(request, response) {
   clocks.set(world.id, clockForWorld(world.id));
   replaySequences.set(world.id, 0);
   worldEvents.set(world.id, []);
+  clockTransitions.set(world.id, []);
 
   const sceneKeyToId = new Map();
   for (const scene of composition.scenes ?? []) {
@@ -2109,6 +2134,14 @@ async function handleClock(request, response, currentSubject, worldId, action) {
     sendJson(response, 200, projectClock(currentClock));
     return;
   }
+  if (request.method === "GET" && action === "transitions") {
+    if (!canManageWorld(currentSubject, worldId)) {
+      sendJson(response, 403, { detail: "Forbidden" });
+      return;
+    }
+    sendJson(response, 200, clockTransitionsForWorld(worldId));
+    return;
+  }
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -2140,6 +2173,7 @@ async function handleClock(request, response, currentSubject, worldId, action) {
     return;
   }
   clocks.set(worldId, nextClock);
+  appendClockTransition(worldId, currentClock, nextClock, action, currentSubject, body.reason);
   sendJson(response, 200, nextClock);
 }
 
@@ -2768,6 +2802,33 @@ function snapshotIntegrityForWorld(worldId) {
     event_gap: eventGap,
     issues: eventGap > 0 ? ["Snapshot is stale relative to the latest event."] : [],
   };
+}
+
+function clockTransitionsForWorld(worldId) {
+  return [...(clockTransitions.get(worldId) ?? [])].sort(
+    (left, right) => right.new_revision - left.new_revision,
+  );
+}
+
+function appendClockTransition(worldId, previousClock, nextClock, action, currentSubject, reason) {
+  const transitions = clockTransitions.get(worldId) ?? [];
+  transitions.push({
+    id: randomUUID(),
+    world_id: worldId,
+    transition_type: action,
+    previous_status: previousClock.status,
+    new_status: nextClock.status,
+    previous_world_time: previousClock.effective_world_time ?? previousClock.current_world_time,
+    new_world_time: nextClock.effective_world_time ?? nextClock.current_world_time,
+    wall_time: new Date().toISOString(),
+    previous_revision: previousClock.revision,
+    new_revision: nextClock.revision,
+    actor_ref: `user:${currentSubject.user_id}`,
+    correlation_id: null,
+    reason: reason ?? null,
+    created_at: new Date().toISOString(),
+  });
+  clockTransitions.set(worldId, transitions);
 }
 
 function projectClock(clock) {

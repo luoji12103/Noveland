@@ -62,6 +62,7 @@ import type {
   World,
   WorldCreateInput,
   WorldClock,
+  WorldClockTransition,
   WorldEventAuditEntry,
   WorldEventAuditFilters,
   WorldRole,
@@ -196,6 +197,13 @@ export function skipWorldClock(
     body: { target_world_time, ...(reason === undefined ? {} : { reason }) },
     csrf: true,
   });
+}
+
+export function listClockTransitions(worldId: string, limit = 20): Promise<WorldClockTransition[]> {
+  return worldRequest<WorldClockTransition[]>(
+    `/api/worlds/${worldId}/clock/transitions?limit=${encodeURIComponent(String(limit))}`,
+    { method: "GET" },
+  );
 }
 
 export function getReplayState(worldId: string): Promise<WorldReplayState> {

@@ -153,6 +153,7 @@ def test_clock_api_allows_members_to_read_and_admins_to_control_clock() -> None:
 
     _authenticate(client, member_token)
     read_clock = client.get(f"/worlds/{world_id}/clock")
+    member_transitions = client.get(f"/worlds/{world_id}/clock/transitions")
     blocked_resume = client.post(
         f"/worlds/{world_id}/clock/resume",
         json={"speed_multiplier": "2"},
@@ -171,9 +172,11 @@ def test_clock_api_allows_members_to_read_and_admins_to_control_clock() -> None:
         f"/worlds/{world_id}/clock/skip",
         json={"target_world_time": "2030-01-01T00:00:00Z"},
     )
+    transitions = client.get(f"/worlds/{world_id}/clock/transitions", params={"limit": 3})
 
     assert read_clock.status_code == 200
     assert read_clock.json()["status"] == "paused"
+    assert member_transitions.status_code == 403
     assert blocked_resume.status_code == 403
     assert missing_csrf.status_code == 403
     assert resume.status_code == 200
@@ -185,6 +188,14 @@ def test_clock_api_allows_members_to_read_and_admins_to_control_clock() -> None:
     assert pause.json()["status"] == "paused"
     assert skip.status_code == 200
     assert skip.json()["current_world_time"].startswith("2030-01-01T00:00:00")
+    assert transitions.status_code == 200
+    assert [item["transition_type"] for item in transitions.json()] == [
+        "skip",
+        "pause",
+        "advance",
+    ]
+    assert transitions.json()[0]["new_revision"] == 4
+    assert transitions.json()[0]["actor_ref"] == f"user:{owner_id}"
     assert _clock_revision(engine, world_id) == 4
 
 

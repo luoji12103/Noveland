@@ -560,6 +560,34 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                   </form>
                 </div>
               ) : null}
+              {data.canManageSelectedWorld ? (
+                <div className="resource-list">
+                  {data.clockTransitions.length === 0 ? (
+                    <article className="resource-row">
+                      <div>
+                        <h3>No clock transitions</h3>
+                        <p>No records are available.</p>
+                      </div>
+                    </article>
+                  ) : (
+                    data.clockTransitions.map((transition) => (
+                      <article className="resource-row" key={transition.id}>
+                        <div>
+                          <h3>
+                            {transition.transition_type} to revision{" "}
+                            {transition.new_revision}
+                          </h3>
+                          <p>
+                            {transition.previous_status ?? "none"} to{" "}
+                            {transition.new_status} - {transition.wall_time}
+                          </p>
+                          <p>{transition.reason ?? transition.actor_ref ?? "No reason"}</p>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              ) : null}
             </>
           ) : (
             <p>Clock state unavailable.</p>
