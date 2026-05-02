@@ -8,6 +8,7 @@ Fast orientation for a new coding session.
 
 - `docs/agent/harness/roadmap.md` — long-term project roadmap and candidate mainline bundles; not the active task board.
 - `docs/agent/harness/task-board.md` — current execution state only.
+- `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 
 ## Current entrypoints
 

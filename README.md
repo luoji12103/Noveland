@@ -87,6 +87,8 @@ Run the long-lived runtime loop from `backend/`:
 uv run noveland-runtime --daemon
 ```
 
+Runtime recovery reference: `docs/agent/operations/runtime-recovery.md`.
+
 Run frontend checks from `web/`:
 
 ```sh

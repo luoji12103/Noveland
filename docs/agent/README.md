@@ -14,7 +14,8 @@ It exists to keep the project stable while the implementation is still evolving.
 6. `git/workflow.md`
 7. `harness/project-index.md`
 8. `harness/roadmap.md`
-9. `harness/handoffs/active-session.md`
+9. `operations/runtime-recovery.md`
+10. `harness/handoffs/active-session.md`
 
 ## Project stance
 
@@ -43,6 +44,7 @@ It exists to keep the project stable while the implementation is still evolving.
 - `harness/change-journal.md`
 - `harness/debug-journal.md`
 - `harness/handoffs/active-session.md`
+- `operations/runtime-recovery.md`
 
 ## Definitions
 

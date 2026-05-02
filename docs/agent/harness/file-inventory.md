@@ -167,6 +167,8 @@ Track key structural files and prevent unregistered sprawl.
 - `infra/`
 - `infra/compose.yaml`
 - `docs/agent/`
+- `docs/agent/operations/`
+- `docs/agent/operations/runtime-recovery.md`
 - `docs/agent/harness/roadmap.md`
 
 ## Update rule
