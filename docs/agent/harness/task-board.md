@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Provider/Replay Ops Hardening
 
 ## Blocked
 - None
@@ -48,4 +48,4 @@
 - Runtime/Provider/Memory Ops Hardening
 
 ## Upcoming Mainline
-- None selected; likely next candidate is roadmap phase 6 `Provider Secrets Validation`
+- Roadmap phases 6-10 are active on `feat/roadmap-6-10-ops-replay`; next candidate will be selected after phase 10 closeout.

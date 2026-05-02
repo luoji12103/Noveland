@@ -1,85 +1,52 @@
 # Active Session Handoff
 
-- Date: 2026-05-02T07:22:14Z
-- Branch: main
-- Objective: Implement roadmap phases 1-5 as a single Runtime/Provider/Memory Ops Hardening mainline while preserving the existing roadmap documentation diff.
+- Date: 2026-05-02T13:27:21Z
+- Branch: feat/roadmap-6-10-ops-replay
+- Objective: Implement roadmap phases 6-10 as a single Provider/Replay Ops Hardening mainline with functional commits and no push.
+- Scope:
+  - Phase 6: Provider Secrets Validation.
+  - Phase 7: Runtime Recovery Playbook.
+  - Phase 8: Event Stream Audit Views.
+  - Phase 9: Snapshot Integrity Checks.
+  - Phase 10: Replay UI v1.
 - Completed work:
-  - Reviewed and kept the existing long-term roadmap documentation changes intact.
-  - Added `runtime_health` to `/runtime/status` and runtime SSE status payloads, including derived health, heartbeat age, recent diagnostic counts, recent error counts, and memory queue degradation signals.
-  - Extended memory write job contracts with retryability, terminal reason, latest log success, age, retryable/terminal/stalled summary counts, and settings for max attempts and stalled processing age.
-  - Hardened memory retry behavior so only failed, retryable jobs can be reset; disabled profile and max-attempt jobs return `422` through the API.
-  - Added platform-admin `GET /memory-backfill/dry-run` as planning-only dry-run coverage for agent runs, conversation turns, and memory-worthy world events using future execution dedupe keys.
-  - Added provider profile health summaries at `GET /provider-profiles/health`, including missing secret-ref state, recent diagnostics, and derived health.
-  - Updated Web server loaders, same-origin proxy routes, clients, types, admin runtime, admin memory backend, admin provider UI, and mock backend coverage for the new operator surfaces.
-  - Fixed runtime memory processing compatibility for local fallback memory profiles by allowing due-job lookup to resolve fallback worlds without a concrete profile row.
-  - Updated README endpoint/manual verification notes plus task-board and change-journal state.
+  - Created the implementation branch from local `main`.
+  - Selected `Provider/Replay Ops Hardening` as the active task-board mainline.
 - Incomplete work:
-  - Memory backfill is dry-run only; there is no enqueue/execute button or write path in this phase.
-  - Local commits have been created; no push has been performed.
-- Exact files changed:
-  - `README.md`
-  - `backend/packages/core/src/noveland/core/settings.py`
-  - `backend/packages/memory/src/noveland/memory/__init__.py`
-  - `backend/packages/memory/src/noveland/memory/contracts.py`
-  - `backend/packages/memory/src/noveland/memory/service.py`
-  - `backend/packages/adapters/src/noveland/adapters/__init__.py`
-  - `backend/packages/adapters/src/noveland/adapters/model_provider.py`
-  - `backend/services/api/src/noveland/services/api/runtime.py`
-  - `backend/services/api/src/noveland/services/api/realtime.py`
-  - `backend/tests/test_api_realtime.py`
-  - `backend/tests/test_api_runtime.py`
-  - `backend/tests/test_memory_backend.py`
-  - `web/app/api/memory-backfill/dry-run/route.ts`
-  - `web/app/api/provider-profiles/health/route.ts`
-  - `web/features/admin/memory-backend-admin.tsx`
-  - `web/features/admin/memory-backend-admin.test.tsx`
-  - `web/features/admin/provider-admin.tsx`
-  - `web/features/admin/provider-admin.test.tsx`
-  - `web/features/admin/runtime-admin.tsx`
-  - `web/features/admin/runtime-admin.test.tsx`
-  - `web/features/dashboard/world-management-dashboard.test.tsx`
-  - `web/lib/worlds/client.ts`
-  - `web/lib/worlds/client.test.ts`
-  - `web/lib/worlds/server.ts`
-  - `web/lib/worlds/types.ts`
-  - `web/tests/e2e/start-with-mock-auth.mjs`
-  - `docs/agent/README.md`
-  - `docs/agent/harness/roadmap.md`
-  - `docs/agent/harness/project-index.md`
-  - `docs/agent/harness/file-inventory.md`
-  - `docs/agent/harness/task-board.md`
-  - `docs/agent/harness/change-journal.md`
-  - `docs/agent/harness/handoffs/active-session.md`
-- Tests run:
-  - `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
-  - `cd backend && uv run pytest tests/test_api_realtime.py`
-  - `cd backend && uv run ruff check packages/core/src/noveland/core/settings.py packages/memory/src/noveland/memory/contracts.py packages/memory/src/noveland/memory/service.py packages/memory/src/noveland/memory/__init__.py packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py services/api/src/noveland/services/api/realtime.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
-  - `cd backend && uv run mypy packages/core/src/noveland/core/settings.py packages/memory/src/noveland/memory/contracts.py packages/memory/src/noveland/memory/service.py packages/memory/src/noveland/memory/__init__.py packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py services/api/src/noveland/services/api/realtime.py tests/test_memory_backend.py tests/test_api_runtime.py tests/test_runtime_daemon.py`
+  - Provider health still needs explicit secret-ref status fields while preserving existing compatibility fields.
+  - Runtime recovery playbook needs to be added under `docs/agent/operations/`.
+  - World-admin event audit API and Web audit surface need implementation.
+  - Snapshot integrity API and replay workspace UI need implementation.
+  - Functional commits, targeted tests, final regression checks, and closeout documentation are still pending.
+- Planned commit batches:
+  - `docs(agent): start roadmap phases 6-10`
+  - `feat(providers): validate secret refs in health`
+  - `docs(ops): add runtime recovery playbook`
+  - `feat(events): add world event audit surface`
+  - `feat(replay): report snapshot integrity`
+  - `feat(web): improve replay audit workspace`
+  - `docs(agent): close phases 6-10 handoff`
+- Planned checks:
+  - `cd backend && uv run pytest tests/test_api_runtime.py tests/test_api_worlds.py tests/test_replay_snapshot.py`
+  - `cd web && npm run test -- features/admin/provider-admin.test.tsx features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest` returned `119 passed, 6 skipped`.
+  - `cd backend && uv run pytest`
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
-  - `cd web && npm run test -- features/admin/runtime-admin.test.tsx features/admin/memory-backend-admin.test.tsx features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
-  - `cd web && npm run test` returned `16 passed / 46 tests`.
+  - `cd web && npm run test`
   - `cd web && npm run build`
-  - `cd web && npm run test:e2e` returned `10 passed`.
+  - `cd web && npm run test:e2e`
   - `docker compose -f infra/compose.yaml config`
   - `git diff --check`
 - Current risks:
-  - Memory backfill execution still needs explicit idempotency, throttling, and operator controls before any enqueue path is added.
-  - Runtime health is derived from existing diagnostics/control state and queue counts; it is useful for operators but is not a replacement for process supervision.
-  - Provider health detects missing refs through `NOVELAND_PROVIDER_API_KEYS_JSON` and diagnostics, but deeper secret validation and recovery playbooks remain future phases.
-  - Web Playwright coverage depends on the mock backend staying aligned with the new provider health and memory backfill routes.
-- Recommended next step:
-  - Review the local commits, then push or open review when ready.
-  - Next likely roadmap candidate: phase 6 `Provider Secrets Validation`, followed by phase 7 `Runtime Recovery Playbook`.
+  - Event payloads can contain operational or narrative details; the audit surface must stay world-admin only.
+  - Snapshot integrity is derived from existing rows and must not introduce restore execution or destructive recovery controls.
+  - Provider secret validation must never expose configured secret values, only ref metadata and status.
+  - Web mock backend routes must remain aligned with new provider health, event audit, and snapshot integrity responses.
 - Sensitive areas to avoid casual edits:
-  - `MemoryService` as the only business entrypoint for long-term memory
-  - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`
-  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`
-  - agent-private memory isolation across world and agent boundaries
-  - plugin registry and runtime binding behavior
-  - event/snapshot semantics and replay compatibility
-  - auth/world access checks and world clock state transitions
-  - migration history for `20260423_0016` through `20260423_0018`
+  - `MemoryService` as the only business entrypoint for long-term memory.
+  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`.
+  - event/snapshot semantics and replay compatibility.
+  - auth/world access checks and world clock state transitions.
+  - migration history for `20260423_0016` through `20260423_0018`.
