@@ -922,6 +922,33 @@ export type ScheduleRuleUpdateInput = {
   is_enabled?: boolean;
 };
 
+export type ScheduleRulePreviewInput = {
+  kind: ScheduleRuleKind;
+  config?: Record<string, unknown>;
+  start_world_time?: string | null;
+  horizon_hours?: number;
+  limit?: number;
+};
+
+export type ScheduleRulePreviewMatch = {
+  world_time: string;
+  reason: string;
+  affected_agent_count: number;
+  affected_agent_ids: string[];
+};
+
+export type ScheduleRulePreview = {
+  world_id: string;
+  kind: ScheduleRuleKind;
+  config: Record<string, unknown>;
+  start_world_time: string;
+  horizon_hours: number;
+  match_count: number;
+  affected_agent_count: number;
+  affected_agent_ids: string[];
+  matches: ScheduleRulePreviewMatch[];
+};
+
 export type MemorySearchInput = {
   query_text: string;
   limit?: number;

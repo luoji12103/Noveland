@@ -2023,6 +2023,11 @@ async function handleScheduleRules(request, response, currentSubject, worldId, r
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
     return;
   }
+  if (request.method === "POST" && ruleId === "preview") {
+    const body = await readJson(request);
+    sendJson(response, 200, scheduleRulePreview(worldId, body));
+    return;
+  }
   if (request.method === "POST" && ruleId === undefined) {
     const body = await readJson(request);
     if (scheduleRules.some((rule) => rule.world_id === worldId && rule.rule_key === body.rule_key)) {
@@ -2059,6 +2064,57 @@ async function handleScheduleRules(request, response, currentSubject, worldId, r
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function scheduleRulePreview(worldId, body) {
+  const baseTime = new Date(body.start_world_time ?? projectClock(clocks.get(worldId) ?? clockForWorld(worldId)).effective_world_time);
+  const horizonHours = Number(body.horizon_hours ?? 48);
+  const limit = Number(body.limit ?? 10);
+  const affectedAgentIds = agents
+    .filter((agent) => agent.world_id === worldId && agent.is_enabled)
+    .map((agent) => agent.id);
+  const matches = [];
+  let matchCount = 0;
+  for (let offset = 0; offset <= horizonHours; offset += 1) {
+    const worldTime = new Date(baseTime.getTime() + offset * 60 * 60 * 1000);
+    const reason = scheduleRuleMatchReason(body.kind, body.config ?? {}, worldTime);
+    if (reason === null) {
+      continue;
+    }
+    matchCount += 1;
+    if (matches.length < limit) {
+      matches.push({
+        world_time: worldTime.toISOString(),
+        reason,
+        affected_agent_count: affectedAgentIds.length,
+        affected_agent_ids: affectedAgentIds,
+      });
+    }
+  }
+  return {
+    world_id: worldId,
+    kind: body.kind,
+    config: body.config ?? {},
+    start_world_time: baseTime.toISOString(),
+    horizon_hours: horizonHours,
+    match_count: matchCount,
+    affected_agent_count: affectedAgentIds.length,
+    affected_agent_ids: affectedAgentIds,
+    matches,
+  };
+}
+
+function scheduleRuleMatchReason(kind, config, worldTime) {
+  if (kind === "weekday" && worldTime.getUTCDay() >= 1 && worldTime.getUTCDay() <= 5) {
+    return "weekday";
+  }
+  if (kind === "weekend" && (worldTime.getUTCDay() === 0 || worldTime.getUTCDay() === 6)) {
+    return "weekend";
+  }
+  if (kind === "timetable" && Array.isArray(config.hours) && config.hours.includes(worldTime.getUTCHours())) {
+    return `hour ${worldTime.getUTCHours()}`;
+  }
+  return null;
 }
 
 async function handleMemberships(request, response, currentSubject, worldId, userId) {

@@ -31,6 +31,7 @@ from noveland.calendar import (
     CalendarService,
     ScheduleRuleCreate,
     ScheduleRuleKind,
+    ScheduleRulePreviewResult,
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
@@ -219,6 +220,24 @@ class ScheduleRuleUpdateRequest(_RequestModel):
     kind: Literal["weekday", "weekend", "timetable"] | None = None
     config: dict[str, Any] | None = None
     is_enabled: bool | None = None
+
+
+class ScheduleRulePreviewRequest(_RequestModel):
+    kind: Literal["weekday", "weekend", "timetable"]
+    config: dict[str, Any] = Field(default_factory=dict)
+    start_world_time: datetime | None = None
+    horizon_hours: int = Field(default=48, ge=1, le=168)
+    limit: int = Field(default=10, ge=1, le=50)
+
+    @field_validator("start_world_time", mode="after")
+    @classmethod
+    def start_world_time_must_be_timezone_aware(
+        cls,
+        value: datetime | None,
+    ) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "start_world_time")
 
 
 class MemorySearchRequest(_RequestModel):
@@ -489,6 +508,25 @@ class ScheduleRuleResponse(BaseModel):
     kind: str
     config: dict[str, Any]
     is_enabled: bool
+
+
+class ScheduleRulePreviewMatchResponse(BaseModel):
+    world_time: datetime
+    reason: str
+    affected_agent_count: int
+    affected_agent_ids: list[uuid.UUID]
+
+
+class ScheduleRulePreviewResponse(BaseModel):
+    world_id: uuid.UUID
+    kind: str
+    config: dict[str, Any]
+    start_world_time: datetime
+    horizon_hours: int
+    match_count: int
+    affected_agent_count: int
+    affected_agent_ids: list[uuid.UUID]
+    matches: list[ScheduleRulePreviewMatchResponse]
 
 
 class MemoryItemResponse(BaseModel):
@@ -1332,6 +1370,40 @@ def list_schedule_rules(
         _schedule_rule_response(rule)
         for rule in CalendarService(db_session).list_rules(context.world_id)
     ]
+
+
+@router.post(
+    "/{world_id}/schedule-rules/preview",
+    response_model=ScheduleRulePreviewResponse,
+)
+def preview_schedule_rule(
+    preview_request: ScheduleRulePreviewRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ScheduleRulePreviewResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    start_world_time = (
+        preview_request.start_world_time
+        or WorldClockService(db_session).view(context.world_id).effective_world_time
+    )
+    preview = CalendarService(db_session).preview_rule(
+        kind=ScheduleRuleKind(preview_request.kind),
+        config=preview_request.config,
+        start_world_time=start_world_time,
+        horizon_hours=preview_request.horizon_hours,
+        limit=preview_request.limit,
+    )
+    affected_agent_ids = [
+        agent_id
+        for agent_id in db_session.scalars(
+            select(Agent.id)
+            .where(Agent.world_id == context.world_id, Agent.is_enabled.is_(True))
+            .order_by(Agent.agent_key),
+        ).all()
+    ]
+    return _schedule_rule_preview_response(context.world_id, preview, affected_agent_ids)
 
 
 @router.post(
@@ -2523,6 +2595,32 @@ def _schedule_rule_response(rule: ScheduleRuleResponse | Any) -> ScheduleRuleRes
         kind=rule.kind.value if hasattr(rule.kind, "value") else str(rule.kind),
         config=rule.config,
         is_enabled=rule.is_enabled,
+    )
+
+
+def _schedule_rule_preview_response(
+    world_id: uuid.UUID,
+    preview: ScheduleRulePreviewResult,
+    affected_agent_ids: list[uuid.UUID],
+) -> ScheduleRulePreviewResponse:
+    return ScheduleRulePreviewResponse(
+        world_id=world_id,
+        kind=preview.kind.value,
+        config=preview.config,
+        start_world_time=preview.start_world_time,
+        horizon_hours=preview.horizon_hours,
+        match_count=preview.match_count,
+        affected_agent_count=len(affected_agent_ids),
+        affected_agent_ids=affected_agent_ids,
+        matches=[
+            ScheduleRulePreviewMatchResponse(
+                world_time=match.world_time,
+                reason=match.reason,
+                affected_agent_count=len(affected_agent_ids),
+                affected_agent_ids=affected_agent_ids,
+            )
+            for match in preview.matches
+        ],
     )
 
 

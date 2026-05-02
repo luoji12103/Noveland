@@ -5,6 +5,8 @@ from noveland.calendar.contracts import (
     CalendarEntryUpdate,
     ScheduleRuleCreate,
     ScheduleRuleKind,
+    ScheduleRulePreviewMatch,
+    ScheduleRulePreviewResult,
     ScheduleRuleRecord,
     ScheduleRuleUpdate,
 )
@@ -21,6 +23,8 @@ __all__ = [
     "CalendarService",
     "ScheduleRuleCreate",
     "ScheduleRuleKind",
+    "ScheduleRulePreviewMatch",
+    "ScheduleRulePreviewResult",
     "ScheduleRuleRecord",
     "ScheduleRuleUpdate",
 ]

@@ -565,8 +565,22 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
         f"/worlds/{world_id}/schedule-rules",
         json={"rule_key": "weekday", "name": "Weekday", "kind": "weekday"},
     )
+    member_preview = client.post(
+        f"/worlds/{world_id}/schedule-rules/preview",
+        json={"kind": "weekday"},
+    )
 
     _authenticate(client, owner_token)
+    preview_rule = client.post(
+        f"/worlds/{world_id}/schedule-rules/preview",
+        json={
+            "kind": "timetable",
+            "config": {"hours": [8]},
+            "start_world_time": "2030-01-01T07:00:00Z",
+            "horizon_hours": 2,
+            "limit": 5,
+        },
+    )
     create_rule = client.post(
         f"/worlds/{world_id}/schedule-rules",
         json={"rule_key": "weekday", "name": "Weekday", "kind": "weekday"},
@@ -599,6 +613,12 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
 
     assert member_rules.status_code == 200
     assert member_create_rule.status_code == 403
+    assert member_preview.status_code == 403
+    assert preview_rule.status_code == 200
+    assert preview_rule.json()["kind"] == "timetable"
+    assert preview_rule.json()["match_count"] == 1
+    assert preview_rule.json()["affected_agent_count"] == 1
+    assert preview_rule.json()["matches"][0]["world_time"].startswith("2030-01-01T08:00:00")
     assert create_rule.status_code == 201
     assert duplicate_rule.status_code == 409
     assert update_rule.status_code == 200

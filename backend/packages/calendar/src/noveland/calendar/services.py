@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from noveland.calendar.contracts import (
     CalendarEntryCreate,
@@ -11,6 +11,8 @@ from noveland.calendar.contracts import (
     CalendarEntryUpdate,
     ScheduleRuleCreate,
     ScheduleRuleKind,
+    ScheduleRulePreviewMatch,
+    ScheduleRulePreviewResult,
     ScheduleRuleRecord,
     ScheduleRuleUpdate,
 )
@@ -152,17 +154,72 @@ class CalendarService:
         ).all()
         return [_rule_record(rule) for rule in rules if _rule_matches(rule, normalized_world_time)]
 
+    def preview_rule(
+        self,
+        *,
+        kind: ScheduleRuleKind,
+        config: dict[str, object],
+        start_world_time: datetime,
+        horizon_hours: int,
+        limit: int,
+    ) -> ScheduleRulePreviewResult:
+        normalized_start = _utc(start_world_time)
+        matches: list[ScheduleRulePreviewMatch] = []
+        match_count = 0
+        for offset in range(horizon_hours + 1):
+            world_time = normalized_start + timedelta(hours=offset)
+            if _rule_input_matches(kind, config, world_time):
+                match_count += 1
+                if len(matches) < limit:
+                    matches.append(
+                        ScheduleRulePreviewMatch(
+                            world_time=world_time,
+                            reason=_rule_match_reason(kind, config, world_time),
+                        ),
+                    )
+        return ScheduleRulePreviewResult(
+            kind=kind,
+            config=config,
+            start_world_time=normalized_start,
+            horizon_hours=horizon_hours,
+            match_count=match_count,
+            matches=matches,
+        )
+
 
 def _rule_matches(rule: WorldScheduleRule, world_time: datetime) -> bool:
     kind = ScheduleRuleKind(rule.kind)
+    return _rule_input_matches(kind, rule.config, world_time)
+
+
+def _rule_input_matches(
+    kind: ScheduleRuleKind,
+    config: dict[str, object],
+    world_time: datetime,
+) -> bool:
     if kind is ScheduleRuleKind.WEEKDAY:
         return world_time.weekday() < 5
     if kind is ScheduleRuleKind.WEEKEND:
         return world_time.weekday() >= 5
-    hours = rule.config.get("hours")
+    hours = config.get("hours")
     if isinstance(hours, Sequence) and not isinstance(hours, str | bytes):
         return world_time.hour in {int(hour) for hour in hours}
     return False
+
+
+def _rule_match_reason(
+    kind: ScheduleRuleKind,
+    config: dict[str, object],
+    world_time: datetime,
+) -> str:
+    if kind is ScheduleRuleKind.WEEKDAY:
+        return "weekday"
+    if kind is ScheduleRuleKind.WEEKEND:
+        return "weekend"
+    hours = config.get("hours")
+    if isinstance(hours, Sequence) and not isinstance(hours, str | bytes):
+        return f"hour {world_time.hour}"
+    return "no match"
 
 
 def _entry_record(entry: AgentCalendarEntry) -> CalendarEntryRecord:

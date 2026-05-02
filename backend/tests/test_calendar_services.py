@@ -100,6 +100,30 @@ def test_schedule_rules_match_weekday_weekend_and_timetable() -> None:
     assert {rule.rule_key for rule in weekend_rules} == {"weekend-rule", "hour-rule"}
 
 
+def test_schedule_rule_preview_dry_runs_without_persisting_rule() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+
+    with Session(engine) as session:
+        service = CalendarService(session)
+        preview = service.preview_rule(
+            kind=ScheduleRuleKind.TIMETABLE,
+            config={"hours": [8, 10]},
+            start_world_time=datetime(2030, 1, 1, 7, tzinfo=UTC),
+            horizon_hours=4,
+            limit=1,
+        )
+        rules_after_preview = service.list_rules(world_id)
+        session.commit()
+
+    assert preview.match_count == 2
+    assert len(preview.matches) == 1
+    assert preview.matches[0].world_time == datetime(2030, 1, 1, 8, tzinfo=UTC)
+    assert preview.matches[0].reason == "hour 8"
+    assert rules_after_preview == []
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

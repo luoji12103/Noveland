@@ -104,3 +104,17 @@ class ScheduleRuleRecord(_FrozenContract):
     kind: ScheduleRuleKind
     config: dict[str, Any]
     is_enabled: bool
+
+
+class ScheduleRulePreviewMatch(_FrozenContract):
+    world_time: datetime
+    reason: str
+
+
+class ScheduleRulePreviewResult(_FrozenContract):
+    kind: ScheduleRuleKind
+    config: dict[str, Any]
+    start_world_time: datetime
+    horizon_hours: int = Field(ge=1)
+    match_count: int = Field(ge=0)
+    matches: list[ScheduleRulePreviewMatch]

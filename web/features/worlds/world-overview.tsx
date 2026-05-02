@@ -16,6 +16,7 @@ import {
   listMemberCandidates,
   listWorldEvents,
   pauseWorldClock,
+  previewScheduleRule,
   resumeWorldClock,
   skipWorldClock,
   updateWorld,
@@ -27,6 +28,7 @@ import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type {
   MemberCandidate,
   RuntimeDiagnostic,
+  ScheduleRulePreview,
   WorldEventAuditEntry,
   WorldClock,
   WorldRole,
@@ -50,6 +52,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [clock, setClock] = useState(data.clock);
   const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
   const [worldEventAudit, setWorldEventAudit] = useState(data.worldEventAudit);
+  const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
   const world = data.selectedWorld;
@@ -169,6 +172,26 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         formElement.reset();
       },
       "Schedule rule created.",
+    );
+  }
+
+  async function handlePreviewRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setSchedulePreview(
+          await previewScheduleRule(selectedWorld.id, {
+            kind: formString(form, "kind") as "weekday" | "weekend" | "timetable",
+            config: jsonObject(formString(form, "config")),
+            start_world_time: optionalFormString(form, "start_world_time"),
+            horizon_hours: optionalPositiveInteger(form, "horizon_hours") ?? 48,
+            limit: optionalPositiveInteger(form, "limit") ?? 10,
+          }),
+        );
+      },
+      "Schedule preview loaded.",
+      false,
     );
   }
 
@@ -668,19 +691,59 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           Schedule rules
         </h2>
         {data.canManageSelectedWorld ? (
-          <form className="management-form" onSubmit={handleCreateRule}>
-            <input className="text-input" name="rule_key" placeholder="rule-key" />
-            <input className="text-input" name="name" placeholder="Rule name" />
-            <select className="text-input" name="kind" defaultValue="weekday">
-              <option value="weekday">weekday</option>
-              <option value="weekend">weekend</option>
-              <option value="timetable">timetable</option>
-            </select>
-            <input className="text-input" name="config" placeholder="{}" />
-            <button className="primary-button" type="submit" disabled={isBusy}>
-              Create schedule rule
-            </button>
-          </form>
+          <>
+            <form className="management-form" onSubmit={handleCreateRule}>
+              <input className="text-input" name="rule_key" placeholder="rule-key" />
+              <input className="text-input" name="name" placeholder="Rule name" />
+              <select className="text-input" name="kind" defaultValue="weekday">
+                <option value="weekday">weekday</option>
+                <option value="weekend">weekend</option>
+                <option value="timetable">timetable</option>
+              </select>
+              <input className="text-input" name="config" placeholder="{}" />
+              <button className="primary-button" type="submit" disabled={isBusy}>
+                Create schedule rule
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handlePreviewRule}>
+              <select className="text-input" name="kind" defaultValue="weekday">
+                <option value="weekday">weekday</option>
+                <option value="weekend">weekend</option>
+                <option value="timetable">timetable</option>
+              </select>
+              <input
+                className="text-input"
+                name="config"
+                defaultValue="{}"
+                placeholder='{"hours":[8]}'
+              />
+              <input
+                className="text-input"
+                name="start_world_time"
+                placeholder="2030-01-01T07:00:00Z"
+              />
+              <input className="text-input" name="horizon_hours" placeholder="Horizon hours" />
+              <input className="text-input" name="limit" placeholder="Limit" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Preview schedule
+              </button>
+            </form>
+          </>
+        ) : null}
+        {schedulePreview !== null ? (
+          <section>
+            <p>
+              Preview matches {schedulePreview.match_count} windows for{" "}
+              {schedulePreview.affected_agent_count} agents.
+            </p>
+            <ResourceList
+              rows={schedulePreview.matches.map((match) => ({
+                id: match.world_time,
+                title: match.world_time,
+                detail: `${match.reason} - ${match.affected_agent_count} agents`,
+              }))}
+            />
+          </section>
         ) : null}
         <ResourceList
           rows={data.scheduleRules.map((rule) => ({

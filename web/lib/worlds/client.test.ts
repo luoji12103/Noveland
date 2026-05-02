@@ -34,6 +34,7 @@ import {
   listMemoryBackendProfiles,
   listMemoryBackendProfileJobs,
   pauseWorldClock,
+  previewScheduleRule,
   resumeWorldClock,
   listAgentMemory,
   listNarrativeArtifacts,
@@ -232,6 +233,7 @@ describe("world client", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ rule_key: "weekday" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ match_count: 1 }))
       .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }))
       .mockResolvedValueOnce(jsonResponse({ id: "entry-1" }, 201))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
@@ -239,6 +241,12 @@ describe("world client", () => {
 
     await listScheduleRules("world-1");
     await createScheduleRule("world-1", { rule_key: "weekday", name: "Weekday", kind: "weekday" });
+    await previewScheduleRule("world-1", {
+      kind: "timetable",
+      config: { hours: [8] },
+      start_world_time: "2030-01-01T07:00:00Z",
+      horizon_hours: 4,
+    });
     await updateScheduleRule("world-1", "rule-1", { is_enabled: false });
     await createAgentCalendarEntry("world-1", "agent-1", {
       title: "Morning scene",
@@ -248,9 +256,10 @@ describe("world client", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/schedule-rules");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/schedule-rules");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/schedule-rules/rule-1");
-    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/agents/agent-1/calendar");
-    expect(fetchMock.mock.calls[4][0]).toBe(
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/schedule-rules/preview");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/schedule-rules/rule-1");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/agents/agent-1/calendar");
+    expect(fetchMock.mock.calls[5][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/calendar/entry-1",
     );
   });

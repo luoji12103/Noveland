@@ -16,11 +16,12 @@ vi.mock("@/lib/worlds/client", async () => {
   return {
     ...actual,
     listWorldEvents: vi.fn(),
+    previewScheduleRule: vi.fn(),
   };
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
-import { listWorldEvents } from "@/lib/worlds/client";
+import { listWorldEvents, previewScheduleRule } from "@/lib/worlds/client";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type { WorldEventAuditEntry } from "@/lib/worlds/types";
 
@@ -31,6 +32,24 @@ describe("WorldOverview", () => {
 
   it("renders and filters world event audit rows for world admins", async () => {
     vi.mocked(listWorldEvents).mockResolvedValue([eventRow("event-2", 2, "agent.run_failed")]);
+    vi.mocked(previewScheduleRule).mockResolvedValue({
+      world_id: "world-1",
+      kind: "timetable",
+      config: { hours: [8] },
+      start_world_time: "2030-01-01T07:00:00.000Z",
+      horizon_hours: 4,
+      match_count: 1,
+      affected_agent_count: 1,
+      affected_agent_ids: ["agent-1"],
+      matches: [
+        {
+          world_time: "2030-01-01T08:00:00.000Z",
+          reason: "hour 8",
+          affected_agent_count: 1,
+          affected_agent_ids: ["agent-1"],
+        },
+      ],
+    });
 
     render(<WorldOverview data={workspaceData} />);
 
@@ -61,6 +80,13 @@ describe("WorldOverview", () => {
         limit: 10,
       }),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview schedule" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Preview matches 1 windows for 1 agents.")).toBeInTheDocument();
+    });
+    expect(screen.getByText("hour 8 - 1 agents")).toBeInTheDocument();
   });
 });
 

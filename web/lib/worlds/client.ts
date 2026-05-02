@@ -58,6 +58,8 @@ import type {
   RuntimeStatus,
   ScheduleRule,
   ScheduleRuleCreateInput,
+  ScheduleRulePreview,
+  ScheduleRulePreviewInput,
   ScheduleRuleUpdateInput,
   World,
   WorldCreateInput,
@@ -352,6 +354,17 @@ export function createScheduleRule(
   input: ScheduleRuleCreateInput,
 ): Promise<ScheduleRule> {
   return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function previewScheduleRule(
+  worldId: string,
+  input: ScheduleRulePreviewInput,
+): Promise<ScheduleRulePreview> {
+  return worldRequest<ScheduleRulePreview>(`/api/worlds/${worldId}/schedule-rules/preview`, {
     method: "POST",
     body: input,
     csrf: true,
