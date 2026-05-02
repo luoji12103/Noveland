@@ -1225,6 +1225,9 @@ function handleProviderProfileHealth(request, response) {
               ? "degraded"
               : "ok"
           : "disabled",
+        api_key_ref: profile.api_key_ref,
+        secret_ref_status: "configured",
+        secret_ref_message: null,
         last_tested_at: profile.last_tested_at,
         last_test_status: profile.last_test_status,
         last_test_error: profile.last_test_error,

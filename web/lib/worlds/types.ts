@@ -584,6 +584,8 @@ export type ProviderHealthStatus =
   | "degraded"
   | "disabled";
 
+export type ProviderSecretRefStatus = "configured" | "missing" | "empty";
+
 export type ProviderHealth = {
   id: string;
   profile_key: string;
@@ -591,6 +593,9 @@ export type ProviderHealth = {
   provider_type: ProviderType;
   is_enabled: boolean;
   health: ProviderHealthStatus;
+  api_key_ref: string;
+  secret_ref_status: ProviderSecretRefStatus;
+  secret_ref_message: string | null;
   last_tested_at: string | null;
   last_test_status: "success" | "failed" | null;
   last_test_error: string | null;

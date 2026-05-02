@@ -21,6 +21,8 @@ describe("ProviderAdmin", () => {
 
     expect(screen.getByText("configuration_error")).toBeInTheDocument();
     expect(screen.getByText("missing")).toBeInTheDocument();
+    expect(screen.getByText("missing-ref")).toBeInTheDocument();
+    expect(screen.getByText("`missing-ref` is not present in NOVELAND_PROVIDER_API_KEYS_JSON.")).toBeInTheDocument();
     expect(screen.getByText("Recent errors")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
@@ -56,6 +58,9 @@ const providerData: ProviderAdminData = {
       provider_type: "openai_compatible",
       is_enabled: true,
       health: "configuration_error",
+      api_key_ref: "missing-ref",
+      secret_ref_status: "missing",
+      secret_ref_message: "`missing-ref` is not present in NOVELAND_PROVIDER_API_KEYS_JSON.",
       last_tested_at: null,
       last_test_status: null,
       last_test_error: null,

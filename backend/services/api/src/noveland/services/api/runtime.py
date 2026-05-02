@@ -14,6 +14,7 @@ from noveland.adapters import (
     ProviderProfileRecord,
     ProviderProfileService,
     ProviderProfileUpdate,
+    ProviderSecretRefStatus,
     ProviderType,
 )
 from noveland.adapters.models import ProviderProfile
@@ -174,6 +175,9 @@ class ProviderHealthResponse(BaseModel):
     provider_type: ProviderType
     is_enabled: bool
     health: ProviderHealthStatus
+    api_key_ref: str
+    secret_ref_status: ProviderSecretRefStatus
+    secret_ref_message: str | None
     last_tested_at: datetime | None
     last_test_status: str | None
     last_test_error: str | None

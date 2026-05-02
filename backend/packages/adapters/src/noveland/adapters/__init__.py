@@ -15,6 +15,7 @@ from noveland.adapters.model_provider import (
     ProviderProfileService,
     ProviderProfileUpdate,
     ProviderProfileValidationError,
+    ProviderSecretRefStatus,
     ProviderTestStatus,
     ProviderType,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "ProviderProfileService",
     "ProviderProfileUpdate",
     "ProviderProfileValidationError",
+    "ProviderSecretRefStatus",
     "ProviderTestStatus",
     "ProviderType",
 ]

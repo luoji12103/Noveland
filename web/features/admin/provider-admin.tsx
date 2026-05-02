@@ -280,7 +280,9 @@ function ProviderHealthSummary({
       </div>
       <div className="metric">
         <p className="metric-label">Secret ref</p>
-        <p className="metric-value">{health.missing_secret_ref ? "missing" : "configured"}</p>
+        <p className="metric-value">{health.secret_ref_status}</p>
+        <p>{health.api_key_ref}</p>
+        {health.secret_ref_message !== null ? <p>{health.secret_ref_message}</p> : null}
       </div>
       <div className="metric">
         <p className="metric-label">Recent diagnostics</p>

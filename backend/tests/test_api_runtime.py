@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent, AgentRuntimeRun
@@ -15,6 +16,7 @@ from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
+from noveland.core.settings import load_settings
 from noveland.events.models import WorldEventModel
 from noveland.memory.models import (
     AgentMemoryItem,
@@ -102,6 +104,9 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert provider_health.status_code == 200
     assert provider_health.json()[0]["profile_key"] == "openai-local"
     assert provider_health.json()[0]["health"] == "configuration_error"
+    assert provider_health.json()[0]["api_key_ref"] == "openai-local"
+    assert provider_health.json()[0]["secret_ref_status"] == "missing"
+    assert "NOVELAND_PROVIDER_API_KEYS_JSON" in provider_health.json()[0]["secret_ref_message"]
     assert provider_health.json()[0]["missing_secret_ref"] is True
     assert provider_health.json()[0]["recent_error_count"] == 1
     assert update_profile.status_code == 200
@@ -205,6 +210,57 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     assert memory_jobs.status_code == 403
     assert retry_memory_job.status_code == 403
     assert memory_backfill.status_code == 403
+
+
+def test_provider_health_reports_secret_ref_statuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "NOVELAND_PROVIDER_API_KEYS_JSON",
+        '{"configured-ref":"secret-key","empty-ref":""}',
+    )
+    load_settings.cache_clear()
+    try:
+        client, engine = _client_with_database()
+        _user_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+        _authenticate(client, token)
+        for profile_key, api_key_ref in (
+            ("configured-provider", "configured-ref"),
+            ("empty-provider", "empty-ref"),
+            ("missing-provider", "missing-ref"),
+        ):
+            response = client.post(
+                "/provider-profiles",
+                json={
+                    "profile_key": profile_key,
+                    "name": profile_key,
+                    "provider_type": "openai_compatible",
+                    "base_url": "https://api.example.test/v1",
+                    "model_name": "gpt-test",
+                    "capabilities": {},
+                    "api_key_ref": api_key_ref,
+                },
+            )
+            assert response.status_code == 201
+
+        health = client.get("/provider-profiles/health")
+
+        assert health.status_code == 200
+        assert "secret-key" not in health.text
+        records = {record["profile_key"]: record for record in health.json()}
+        assert records["configured-provider"]["api_key_ref"] == "configured-ref"
+        assert records["configured-provider"]["secret_ref_status"] == "configured"
+        assert records["configured-provider"]["secret_ref_message"] is None
+        assert records["configured-provider"]["missing_secret_ref"] is False
+        assert records["configured-provider"]["health"] == "untested"
+        assert records["empty-provider"]["secret_ref_status"] == "empty"
+        assert records["empty-provider"]["missing_secret_ref"] is True
+        assert records["empty-provider"]["health"] == "configuration_error"
+        assert "empty" in records["empty-provider"]["secret_ref_message"]
+        assert records["missing-provider"]["secret_ref_status"] == "missing"
+        assert records["missing-provider"]["missing_secret_ref"] is True
+        assert records["missing-provider"]["health"] == "configuration_error"
+        assert "missing-ref" in records["missing-provider"]["secret_ref_message"]
+    finally:
+        load_settings.cache_clear()
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:

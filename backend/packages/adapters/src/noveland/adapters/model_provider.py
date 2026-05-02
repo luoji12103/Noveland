@@ -52,6 +52,12 @@ class ProviderHealthStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class ProviderSecretRefStatus(StrEnum):
+    CONFIGURED = "configured"
+    MISSING = "missing"
+    EMPTY = "empty"
+
+
 class ProviderError(RuntimeError):
     """Base error for provider profile and invocation failures."""
 
@@ -153,6 +159,9 @@ class ProviderProfileHealthRecord(_FrozenContract):
     provider_type: ProviderType
     is_enabled: bool
     health: ProviderHealthStatus
+    api_key_ref: str
+    secret_ref_status: ProviderSecretRefStatus
+    secret_ref_message: str | None
     last_tested_at: datetime | None
     last_test_status: ProviderTestStatus | None
     last_test_error: str | None
@@ -491,7 +500,8 @@ def _health_record(
     diagnostic_counts: tuple[int, int],
 ) -> ProviderProfileHealthRecord:
     diagnostic_count, error_count = diagnostic_counts
-    missing_secret_ref = settings.provider_api_keys_json.get(profile.api_key_ref) in {None, ""}
+    secret_ref_status, secret_ref_message = _secret_ref_status(profile, settings)
+    missing_secret_ref = secret_ref_status != ProviderSecretRefStatus.CONFIGURED
     if not profile.is_enabled:
         health = ProviderHealthStatus.DISABLED
     elif missing_secret_ref or _is_configuration_error(profile.last_test_error):
@@ -509,6 +519,9 @@ def _health_record(
         provider_type=profile.provider_type,
         is_enabled=profile.is_enabled,
         health=health,
+        api_key_ref=profile.api_key_ref,
+        secret_ref_status=secret_ref_status,
+        secret_ref_message=secret_ref_message,
         last_tested_at=profile.last_tested_at,
         last_test_status=profile.last_test_status,
         last_test_error=profile.last_test_error,
@@ -516,6 +529,23 @@ def _health_record(
         recent_diagnostic_count=diagnostic_count,
         recent_error_count=error_count,
     )
+
+
+def _secret_ref_status(
+    profile: ProviderProfileRecord,
+    settings: AppSettings,
+) -> tuple[ProviderSecretRefStatus, str | None]:
+    if profile.api_key_ref not in settings.provider_api_keys_json:
+        return (
+            ProviderSecretRefStatus.MISSING,
+            f"`{profile.api_key_ref}` is not present in NOVELAND_PROVIDER_API_KEYS_JSON.",
+        )
+    if settings.provider_api_keys_json[profile.api_key_ref] == "":
+        return (
+            ProviderSecretRefStatus.EMPTY,
+            f"`{profile.api_key_ref}` is present in NOVELAND_PROVIDER_API_KEYS_JSON but empty.",
+        )
+    return ProviderSecretRefStatus.CONFIGURED, None
 
 
 def _is_configuration_error(error: str | None) -> bool:
