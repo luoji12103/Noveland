@@ -373,3 +373,14 @@
 - Tests added/updated: provider health API coverage for configured, missing, and empty secret refs; provider admin rendering coverage for secret-ref status; Web client coverage remains aligned with provider health route mapping.
 - Docs updated: README, runtime recovery playbook, project index, file inventory, task board, change journal, active handoff, and git workflow branch naming rule.
 - Follow-up notes: Future branches must be named by feature/outcome rather than roadmap phase numbers. Next planned mainline is `Event/Replay/Clock Ops` on `feat/event-replay-clock-ops`, covering roadmap phases 8-12.
+
+## Event/replay/clock ops entry
+
+- Date: 2026-05-02
+- Branch: feat/event-replay-clock-ops
+- Scope: roadmap phases 8-12 event audit, snapshot integrity, replay workspace, clock ops visibility, and schedule preview
+- Summary: Added a world-admin event audit API and Web panel; derived snapshot integrity reporting; a richer replay/snapshot workspace that separates live clock state from reconstructed replay state; clock transition audit visibility; and dry-run schedule rule preview without persisting rules or runtime work.
+- Files changed: `/backend/packages/events/**`, `/backend/packages/calendar/**`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/**`, `/web/features/worlds/**`, `/web/features/dashboard/world-management-dashboard.test.tsx`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: event audit API filtering/permission tests; snapshot integrity service/API tests; clock transition API tests; schedule preview service/API tests; world overview component coverage; Web client route mapping; full mock-backend alignment.
+- Docs updated: README endpoint list, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Snapshot integrity is read-only and does not restore data. Schedule preview is dry-run only. Next likely mainline is `Agent/Conversation Diagnostics Ops` covering roadmap phases 13-17.

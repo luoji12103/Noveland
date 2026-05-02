@@ -1,53 +1,56 @@
 # Active Session Handoff
 
-- Date: 2026-05-02T18:16:42Z
+- Date: 2026-05-02T18:52:25Z
 - Branch: feat/event-replay-clock-ops
-- Objective: Implement the Event/Replay/Clock Ops roadmap bundle across phases 8-12 with functional commits and no push.
-- Scope:
-  - Phase 8: Event Stream Audit Views.
-  - Phase 9: Snapshot Integrity Checks.
-  - Phase 10: Replay UI v1.
-  - Phase 11: World Clock Ops.
-  - Phase 12: Schedule Rule Preview.
+- Objective: Close out the Event/Replay/Clock Ops roadmap bundle across phases 8-12.
 - Completed work:
-  - Created `feat/event-replay-clock-ops` from local `main`.
-  - Marked `Event/Replay/Clock Ops` as the active task-board mainline.
-- Incomplete work:
-  - World-admin event audit API and Web panel.
-  - Snapshot integrity API and integrity service logic.
-  - Replay/snapshot workspace upgrade.
-  - Clock operations visibility improvements.
-  - Schedule rule dry-run preview.
-  - Functional commits, targeted tests, final regression checks, and closeout documentation.
-- Planned commit batches:
-  - `docs(agent): start event replay clock ops`
-  - `feat(events): add world event audit surface`
-  - `feat(replay): report snapshot integrity`
-  - `feat(web): improve replay audit workspace`
-  - `feat(worlds): harden clock ops visibility`
-  - `feat(calendar): preview schedule rule effects`
-  - `docs(agent): close event replay clock ops`
-- Planned targeted checks:
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_replay_snapshot.py tests/test_world_clock_service.py tests/test_calendar_services.py`
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
+  - Added world-admin `GET /worlds/{world_id}/events` with filters for event name, actor ref, sequence bounds, wall-time bounds, and limit.
+  - Added Web world overview event audit filtering and compact payload display.
+  - Added read-only snapshot integrity reporting at `GET /worlds/{world_id}/snapshots/integrity`.
+  - Added snapshot integrity service coverage for no snapshot, healthy snapshot, stale snapshot, schema mismatch, missing payload, invalid payload, and future cover sequence.
+  - Upgraded the replay/snapshot workspace to show live clock state separately from reconstructed replay state.
+  - Added world-admin `GET /worlds/{world_id}/clock/transitions` and Web clock transition history.
+  - Added dry-run schedule rule preview at `POST /worlds/{world_id}/schedule-rules/preview`.
+  - Added Web schedule preview controls and results without persisting rules or enqueueing runtime work.
+  - Updated mock backend routes for event audit, snapshot integrity, clock transitions, and schedule preview.
+  - Updated README endpoint list plus agent project index, file inventory, task board, and change journal.
+- Commits created on this branch:
+  - `f12cab8 docs(agent): start event replay clock ops`
+  - `a1efaa4 feat(events): add world event audit surface`
+  - `f10cffc feat(replay): report snapshot integrity`
+  - `51583e7 feat(web): improve replay audit workspace`
+  - `1370aac feat(worlds): harden clock ops visibility`
+  - `b17006f feat(calendar): preview schedule rule effects`
+- Tests run:
+  - `cd backend && uv run pytest tests/test_api_worlds.py -q`
+  - `cd backend && uv run pytest tests/test_replay_snapshot.py tests/test_api_worlds.py -q`
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_world_clock_service.py -q`
+  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py -q`
   - `cd backend && uv run ruff check .`
   - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest`
+  - `cd backend && uv run pytest` returned `125 passed, 6 skipped`.
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts`
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
   - `cd web && npm run lint`
   - `cd web && npm run typecheck`
-  - `cd web && npm run test`
+  - `cd web && npm run test` returned `17 passed / 47 tests`.
   - `cd web && npm run build`
-  - `cd web && npm run test:e2e`
+  - `cd web && npm run test:e2e` returned `10 passed`.
   - `docker compose -f infra/compose.yaml config`
   - `git diff --check`
+- Incomplete work:
+  - No push has been performed.
+  - Event audit is read-only inspection only; no event export or saved filter presets.
+  - Snapshot integrity does not restore or repair snapshots.
+  - Schedule rule preview samples hourly windows only and follows current v1 rule semantics.
 - Current risks:
-  - Event payloads can contain operational or narrative details; event audit must remain world-admin only.
-  - Snapshot integrity must remain read-only and derived; no destructive restore or migration is planned.
-  - Replay UI must clearly distinguish live clock state from reconstructed replay state.
-  - Schedule preview must not persist rule changes or enqueue runtime work.
-  - Web mock backend must stay aligned with new world event, snapshot integrity, clock ops, and schedule preview routes.
-- Branch naming rule:
-  - Future branches are named by feature/outcome, not roadmap phase numbers.
+  - Event payloads are exposed to world admins; keep this endpoint world-admin only.
+  - Snapshot integrity treats `world.snapshot_created` as non-stale by design so newly created snapshots are not immediately warned.
+  - Schedule preview should stay dry-run until execution controls, conflict detection, and audit trails are expanded.
+  - Web Playwright coverage depends on `web/tests/e2e/start-with-mock-auth.mjs` staying aligned with new world ops routes.
+- Recommended next mainline:
+  - `Agent/Conversation Diagnostics Ops`, likely covering roadmap phases 13-17.
+  - Suggested feature branch name: `feat/agent-conversation-diagnostics-ops`.
 - Sensitive areas to avoid casual edits:
   - event/snapshot semantics and replay compatibility.
   - auth/world access checks and world clock state transitions.

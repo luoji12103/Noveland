@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Event/Replay/Clock Ops
+- None
 
 ## Blocked
 - None
@@ -48,6 +48,7 @@
 - Runtime/Provider/Memory Ops Hardening
 - Provider Secrets Validation
 - Runtime Recovery Playbook
+- Event/Replay/Clock Ops
 
 ## Upcoming Mainline
-- None selected; roadmap phases 8-12 are active on `feat/event-replay-clock-ops`.
+- None selected; likely next candidate is `Agent/Conversation Diagnostics Ops` covering roadmap phases 13-17 on a feature-named branch.

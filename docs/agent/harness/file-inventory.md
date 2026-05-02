@@ -52,6 +52,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/dashboard/`
 - `web/features/workspace/`
 - `web/features/worlds/`
+- `web/features/worlds/world-overview.test.tsx`
+- `web/features/worlds/world-overview.tsx`
 - `web/features/worlds/narrative-reader.test.tsx`
 - `web/features/worlds/narrative-reader.tsx`
 - `web/components/`

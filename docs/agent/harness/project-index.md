@@ -58,7 +58,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, memory backend profile, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, memory, persona/observations, clock, replay, snapshots, diagnostics, agent runs, and filtered narrative artifact router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
@@ -95,7 +95,7 @@ Fast orientation for a new coding session.
   - `noveland.events.models` — world event log and snapshot metadata ORM models
   - `noveland.events.event_store` — minimal world event append/list/snapshot helper
   - `noveland.events.publisher` — world event envelope and NATS/in-memory publisher interfaces
-  - `noveland.events.replay` — replay state reconstruction and inline snapshot creation service
+  - `noveland.events.replay` — replay state reconstruction, inline snapshot creation, and snapshot integrity reporting service
 - `backend/packages/auth/`
   - `noveland.auth` — auth/session contracts, services, and typed errors
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models
