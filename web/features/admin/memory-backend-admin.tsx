@@ -106,6 +106,56 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
     <section className="management-section">
       {notice !== null ? <p className="management-notice">{notice}</p> : null}
 
+      <section className="management-panel" aria-labelledby="memory-backfill-title">
+        <h2 className="section-title" id="memory-backfill-title">
+          Memory backfill dry-run
+        </h2>
+        {data.backfillDryRun === null ? (
+          <p>Backfill planning is unavailable.</p>
+        ) : (
+          <>
+            <div className="dashboard-grid">
+              <div className="metric">
+                <p className="metric-label">Candidates</p>
+                <p className="metric-value">{data.backfillDryRun.candidate_count}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Already queued</p>
+                <p className="metric-value">{data.backfillDryRun.skipped_existing_count}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">No profile</p>
+                <p className="metric-value">{data.backfillDryRun.skipped_no_profile_count}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Disabled profile</p>
+                <p className="metric-value">
+                  {data.backfillDryRun.skipped_disabled_profile_count}
+                </p>
+              </div>
+            </div>
+            <p className="management-notice">
+              Planning only. This dry-run does not enqueue memory write jobs.
+            </p>
+            <div className="resource-list">
+              {data.backfillDryRun.source_summaries.map((summary) => (
+                <article className="resource-row" key={summary.source_kind}>
+                  <div>
+                    <h3>{summary.source_kind}</h3>
+                    <p>
+                      candidates {summary.candidate_count} / existing{" "}
+                      {summary.skipped_existing_count} / no profile{" "}
+                      {summary.skipped_no_profile_count} / disabled{" "}
+                      {summary.skipped_disabled_profile_count}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="management-panel" aria-labelledby="create-memory-profile-title">
         <h2 className="section-title" id="create-memory-profile-title">
           Create memory backend profile
@@ -250,15 +300,27 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
                               Attempts {job.attempt_count} / next {new Date(job.next_attempt_at).toLocaleString()}
                             </p>
                             <p>
+                              Retry: {job.is_retryable ? "retryable" : "not retryable"} / age{" "}
+                              {job.age_seconds}s / last log{" "}
+                              {job.last_log_success === null
+                                ? "none"
+                                : job.last_log_success
+                                  ? "success"
+                                  : "failed"}
+                            </p>
+                            <p>
                               World {job.world_id} / agent {job.agent_id}
                             </p>
                             {job.last_error === null ? null : <p>Error: {job.last_error}</p>}
+                            {job.terminal_reason === null ? null : (
+                              <p>Terminal reason: {job.terminal_reason}</p>
+                            )}
                           </div>
                           {job.status === "failed" ? (
                             <button
                               className="secondary-button"
                               type="button"
-                              disabled={isBusy}
+                              disabled={isBusy || !job.is_retryable}
                               onClick={() => void handleRetryJob(job.id)}
                             >
                               Retry job

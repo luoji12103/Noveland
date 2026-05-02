@@ -14,12 +14,14 @@ import type {
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
+  MemoryBackfillDryRun,
   MemoryWriteJobList,
   MemoryItem,
   MemoryProfileSnapshot,
   Membership,
   NarrativeArtifact,
   PluginCatalogEntry,
+  ProviderHealth,
   ProviderProfile,
   RuntimeDiagnostic,
   RuntimeControl,
@@ -136,6 +138,7 @@ export type PresetAdminData = {
 
 export type ProviderAdminData = {
   profiles: ProviderProfile[];
+  providerHealth: ProviderHealth[];
   modelProviderPlugins: PluginCatalogEntry[];
   loadError: string | null;
 };
@@ -145,6 +148,7 @@ export type MemoryBackendAdminData = {
   profileHealth: Record<string, MemoryBackendHealth>;
   profileLogs: Record<string, MemoryBackendLogs>;
   profileJobs: Record<string, MemoryWriteJobList>;
+  backfillDryRun: MemoryBackfillDryRun | null;
   loadError: string | null;
 };
 
@@ -643,17 +647,19 @@ export async function getNarrativeReaderDetailData(
 export async function getProviderAdminData(): Promise<ProviderAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [profiles, modelProviderPlugins] = await Promise.all([
+    const [profiles, providerHealth, modelProviderPlugins] = await Promise.all([
       apiFetch<ProviderProfile[]>("/provider-profiles", cookies),
+      apiFetch<ProviderHealth[]>("/provider-profiles/health", cookies),
       listPluginCatalogForServer("model_provider", cookies),
     ]);
-    return { profiles, modelProviderPlugins, loadError: null };
+    return { profiles, providerHealth, modelProviderPlugins, loadError: null };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
     }
     return {
       profiles: [],
+      providerHealth: [],
       modelProviderPlugins: [],
       loadError: "Unable to load provider profiles.",
     };
@@ -736,6 +742,10 @@ export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminDat
       profileJobs: Object.fromEntries(
         profilePairs.map(([profileId, data]) => [profileId, data.jobs]),
       ),
+      backfillDryRun: await apiFetch<MemoryBackfillDryRun>(
+        "/memory-backfill/dry-run?limit=500",
+        cookies,
+      ),
       loadError: null,
     };
   } catch (error) {
@@ -747,6 +757,7 @@ export async function getMemoryBackendAdminData(): Promise<MemoryBackendAdminDat
       profileHealth: {},
       profileLogs: {},
       profileJobs: {},
+      backfillDryRun: null,
       loadError: "Unable to load memory backend profiles.",
     };
   }

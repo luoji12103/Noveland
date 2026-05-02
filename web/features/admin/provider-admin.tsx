@@ -29,6 +29,7 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
   const [notice, setNotice] = useState<string | null>(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
   const profiles = data.profiles;
+  const healthByProfileId = new Map(data.providerHealth.map((health) => [health.id, health]));
   const modelProviderPlugins = data.modelProviderPlugins;
 
   async function runAction(action: () => Promise<unknown>, success: string) {
@@ -155,6 +156,7 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
               <article className="resource-row" key={profile.id}>
                 <div>
                   <h3>{profile.name}</h3>
+                  <ProviderHealthSummary health={healthByProfileId.get(profile.id)} />
                   <p>
                     {profile.profile_key} - {profile.provider_type} -{" "}
                     {profile.is_enabled ? "Enabled" : "Disabled"}
@@ -259,6 +261,36 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
         </div>
       </section>
     </section>
+  );
+}
+
+function ProviderHealthSummary({
+  health,
+}: {
+  health: ProviderAdminData["providerHealth"][number] | undefined;
+}) {
+  if (health === undefined) {
+    return <p>Health: unknown</p>;
+  }
+  return (
+    <div className="dashboard-grid">
+      <div className="metric">
+        <p className="metric-label">Health</p>
+        <p className="metric-value">{health.health}</p>
+      </div>
+      <div className="metric">
+        <p className="metric-label">Secret ref</p>
+        <p className="metric-value">{health.missing_secret_ref ? "missing" : "configured"}</p>
+      </div>
+      <div className="metric">
+        <p className="metric-label">Recent diagnostics</p>
+        <p className="metric-value">{health.recent_diagnostic_count}</p>
+      </div>
+      <div className="metric">
+        <p className="metric-label">Recent errors</p>
+        <p className="metric-value">{health.recent_error_count}</p>
+      </div>
+    </div>
   );
 }
 

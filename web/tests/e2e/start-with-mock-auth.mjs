@@ -188,6 +188,10 @@ const memoryWriteJobs = [
     next_attempt_at: "2026-04-17T00:10:00.000Z",
     last_error: "mock backend timeout",
     processed_at: null,
+    is_retryable: true,
+    terminal_reason: null,
+    last_log_success: true,
+    age_seconds: 300,
     created_at: "2026-04-17T00:04:30.000Z",
     updated_at: "2026-04-17T00:05:30.000Z",
   },
@@ -569,6 +573,16 @@ const mockServer = createServer(async (request, response) => {
 
   if (url.pathname === "/provider-profiles") {
     await handleProviderProfiles(request, response);
+    return;
+  }
+
+  if (url.pathname === "/provider-profiles/health") {
+    handleProviderProfileHealth(request, response);
+    return;
+  }
+
+  if (url.pathname === "/memory-backfill/dry-run") {
+    handleMemoryBackfillDryRun(request, response);
     return;
   }
 
@@ -1090,7 +1104,25 @@ function handleRuntimeStatus(response) {
       processing_count: memoryWriteJobs.filter((job) => job.status === "processing").length,
       succeeded_count: memoryWriteJobs.filter((job) => job.status === "succeeded").length,
       failed_count: memoryWriteJobs.filter((job) => job.status === "failed").length,
-      due_count: memoryWriteJobs.filter((job) => ["pending", "failed"].includes(job.status)).length,
+      due_count: memoryWriteJobs.filter((job) => ["pending", "failed"].includes(job.status))
+        .length,
+      retryable_failed_count: memoryWriteJobs.filter(
+        (job) => job.status === "failed" && job.is_retryable,
+      ).length,
+      terminal_failed_count: memoryWriteJobs.filter(
+        (job) => job.status === "failed" && !job.is_retryable,
+      ).length,
+      stalled_processing_count: 0,
+    },
+    runtime_health: {
+      status: runtimeControl.desired_state === "running" ? "healthy" : "stopped",
+      reason:
+        runtimeControl.desired_state === "running"
+          ? "Runtime is running without recent blocking errors."
+          : "Runtime desired state is stopped.",
+      recent_diagnostic_count: runtimeDiagnostics.length,
+      recent_error_count: runtimeDiagnostics.filter((item) => item.severity === "error").length,
+      heartbeat_age_seconds: runtimeControl.last_heartbeat_at === null ? null : 1,
     },
   });
 }
@@ -1165,6 +1197,90 @@ async function handleProviderProfiles(request, response) {
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleProviderProfileHealth(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  sendJson(
+    response,
+    200,
+    providerProfiles.map((profile) => {
+      const diagnostics = runtimeDiagnostics.filter(
+        (item) => item.provider_profile_id === profile.id,
+      );
+      const errorCount = diagnostics.filter((item) => item.severity === "error").length;
+      return {
+        id: profile.id,
+        profile_key: profile.profile_key,
+        name: profile.name,
+        provider_type: profile.provider_type,
+        is_enabled: profile.is_enabled,
+        health: profile.is_enabled
+          ? profile.last_test_status === null
+            ? "untested"
+            : errorCount > 0 || profile.last_test_status === "failed"
+              ? "degraded"
+              : "ok"
+          : "disabled",
+        last_tested_at: profile.last_tested_at,
+        last_test_status: profile.last_test_status,
+        last_test_error: profile.last_test_error,
+        missing_secret_ref: false,
+        recent_diagnostic_count: diagnostics.length,
+        recent_error_count: errorCount,
+      };
+    }),
+  );
+}
+
+function handleMemoryBackfillDryRun(request, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  sendJson(response, 200, {
+    candidate_count: 3,
+    skipped_existing_count: 1,
+    skipped_no_profile_count: 0,
+    skipped_disabled_profile_count: 0,
+    source_summaries: [
+      {
+        source_kind: "agent_run",
+        candidate_count: 1,
+        skipped_existing_count: 1,
+        skipped_no_profile_count: 0,
+        skipped_disabled_profile_count: 0,
+      },
+      {
+        source_kind: "conversation_turn",
+        candidate_count: 1,
+        skipped_existing_count: 0,
+        skipped_no_profile_count: 0,
+        skipped_disabled_profile_count: 0,
+      },
+      {
+        source_kind: "world_event",
+        candidate_count: 1,
+        skipped_existing_count: 0,
+        skipped_no_profile_count: 0,
+        skipped_disabled_profile_count: 0,
+      },
+    ],
+    world_summaries: [
+      {
+        world_id: worldOneId,
+        backend_profile_id: memoryProfilePrimaryId,
+        backend_profile_key: "primary-mem0",
+        candidate_count: 3,
+        skipped_existing_count: 1,
+        skipped_no_profile_count: 0,
+        skipped_disabled_profile_count: 0,
+      },
+    ],
+  });
 }
 
 async function handleMemoryBackendProfiles(request, response) {

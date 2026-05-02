@@ -24,6 +24,25 @@ const emptyMemoryWriteJobs = {
   succeeded_count: 0,
   failed_count: 0,
   due_count: 0,
+  retryable_failed_count: 0,
+  terminal_failed_count: 0,
+  stalled_processing_count: 0,
+};
+
+const stoppedRuntimeHealth = {
+  status: "stopped" as const,
+  reason: "Runtime desired state is stopped.",
+  recent_diagnostic_count: 0,
+  recent_error_count: 0,
+  heartbeat_age_seconds: null,
+};
+
+const healthyRuntimeHealth = {
+  status: "healthy" as const,
+  reason: "Runtime is running without recent blocking errors.",
+  recent_diagnostic_count: 1,
+  recent_error_count: 0,
+  heartbeat_age_seconds: 1,
 };
 
 describe("RuntimeAdmin", () => {
@@ -63,6 +82,7 @@ describe("RuntimeAdmin", () => {
           runtime_loop_interval_seconds: 5,
           runtime_batch_limit: 20,
           memory_write_jobs: emptyMemoryWriteJobs,
+          runtime_health: healthyRuntimeHealth,
         },
         diagnostics: [
           {
@@ -88,6 +108,7 @@ describe("RuntimeAdmin", () => {
       expect(screen.getByText("running")).toBeInTheDocument();
       expect(screen.getByText("Iteration finished.")).toBeInTheDocument();
       expect(screen.getByText("0 due / 0 failed")).toBeInTheDocument();
+      expect(screen.getByText("healthy")).toBeInTheDocument();
     });
   });
 
@@ -127,6 +148,7 @@ const runtimeData: RuntimeAdminData = {
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
     memory_write_jobs: emptyMemoryWriteJobs,
+    runtime_health: stoppedRuntimeHealth,
   },
   runtimeDiagnostics: [],
   modelProviderPlugins: [],

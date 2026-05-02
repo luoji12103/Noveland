@@ -25,7 +25,11 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
     succeeded_count: 0,
     failed_count: 0,
     due_count: 0,
+    retryable_failed_count: 0,
+    terminal_failed_count: 0,
+    stalled_processing_count: 0,
   };
+  const runtimeHealth = runtimeStatus?.runtime_health ?? null;
 
   useEffect(() => {
     setRuntimeControl(data.runtimeControl);
@@ -76,8 +80,21 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         </h2>
         <div className="dashboard-grid">
           <div className="metric">
+            <p className="metric-label">Runtime health</p>
+            <p className="metric-value">{runtimeHealth?.status ?? "unknown"}</p>
+          </div>
+          <div className="metric">
             <p className="metric-label">Desired state</p>
             <p className="metric-value">{runtimeControl?.desired_state ?? "unknown"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Heartbeat age</p>
+            <p className="metric-value">
+              {runtimeHealth?.heartbeat_age_seconds === null ||
+              runtimeHealth?.heartbeat_age_seconds === undefined
+                ? "-"
+                : `${runtimeHealth.heartbeat_age_seconds}s`}
+            </p>
           </div>
           <div className="metric">
             <p className="metric-label">Loop interval</p>
@@ -95,6 +112,59 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
               {runtimeStatus === null
                 ? "-"
                 : `${memoryWriteJobs.due_count} due / ${memoryWriteJobs.failed_count} failed`}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Terminal memory jobs</p>
+            <p className="metric-value">
+              {runtimeStatus === null
+                ? "-"
+                : `${memoryWriteJobs.terminal_failed_count} terminal / ${memoryWriteJobs.stalled_processing_count} stalled`}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Recent runtime errors</p>
+            <p className="metric-value">{runtimeHealth?.recent_error_count ?? "-"}</p>
+          </div>
+        </div>
+        {runtimeHealth === null ? null : (
+          <p className="management-notice">
+            {runtimeHealth.reason} Recent diagnostics: {runtimeHealth.recent_diagnostic_count}.
+          </p>
+        )}
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Pending</p>
+            <p className="metric-value">{memoryWriteJobs.pending_count}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Processing</p>
+            <p className="metric-value">{memoryWriteJobs.processing_count}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Retryable failed</p>
+            <p className="metric-value">{memoryWriteJobs.retryable_failed_count}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Succeeded</p>
+            <p className="metric-value">{memoryWriteJobs.succeeded_count}</p>
+          </div>
+        </div>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Last started</p>
+            <p className="metric-value">
+              {runtimeStatus?.last_run_started_at === null || runtimeStatus === null
+                ? "-"
+                : new Date(runtimeStatus.last_run_started_at).toLocaleString()}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Last finished</p>
+            <p className="metric-value">
+              {runtimeStatus?.last_run_finished_at === null || runtimeStatus === null
+                ? "-"
+                : new Date(runtimeStatus.last_run_finished_at).toLocaleString()}
             </p>
           </div>
         </div>

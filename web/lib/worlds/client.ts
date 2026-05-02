@@ -29,6 +29,7 @@ import type {
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
   MemoryBackendProfileUpdateInput,
+  MemoryBackfillDryRun,
   MemoryBackendHealth,
   MemoryBackendLogs,
   MemoryWriteJob,
@@ -46,6 +47,7 @@ import type {
   Scene,
   SceneCreateInput,
   SceneUpdateInput,
+  ProviderHealth,
   ProviderProfile,
   ProviderProfileCreateInput,
   ProviderTestCallResult,
@@ -776,6 +778,10 @@ export function listProviderProfiles(): Promise<ProviderProfile[]> {
   return apiRequest<ProviderProfile[]>("/api/provider-profiles", { method: "GET" });
 }
 
+export function listProviderHealth(): Promise<ProviderHealth[]> {
+  return apiRequest<ProviderHealth[]>("/api/provider-profiles/health", { method: "GET" });
+}
+
 export function listMemoryBackendProfiles(): Promise<MemoryBackendProfile[]> {
   return apiRequest<MemoryBackendProfile[]>("/api/memory-backend-profiles", { method: "GET" });
 }
@@ -823,6 +829,13 @@ export function getMemoryBackendProfileLogs(
 ): Promise<MemoryBackendLogs> {
   return apiRequest<MemoryBackendLogs>(
     `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
+    { method: "GET" },
+  );
+}
+
+export function dryRunMemoryBackfill(limit = 500): Promise<MemoryBackfillDryRun> {
+  return apiRequest<MemoryBackfillDryRun>(
+    `/api/memory-backfill/dry-run?limit=${encodeURIComponent(String(limit))}`,
     { method: "GET" },
   );
 }

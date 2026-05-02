@@ -16,6 +16,7 @@ import {
   deactivateAgentPreset,
   deleteMemoryBackendProfile,
   disableProviderProfile,
+  dryRunMemoryBackfill,
   deactivateScene,
   exportWorldComposition,
   getRuntimeControl,
@@ -36,6 +37,7 @@ import {
   listConversationNarrativeArtifacts,
   listAgentPresets,
   listProviderProfiles,
+  listProviderHealth,
   runAgent,
   refreshAgentObservations,
   retryMemoryWriteJob,
@@ -257,7 +259,8 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse({ id: "memory-profile-1" }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(jsonResponse({ jobs: [{ id: "job-1", status: "failed" }] }))
-      .mockResolvedValueOnce(jsonResponse({ id: "job-1", status: "pending" }));
+      .mockResolvedValueOnce(jsonResponse({ id: "job-1", status: "pending" }))
+      .mockResolvedValueOnce(jsonResponse({ candidate_count: 1 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await listMemoryBackendProfiles();
@@ -270,6 +273,7 @@ describe("world client", () => {
     await deleteMemoryBackendProfile("memory-profile-1");
     await listMemoryBackendProfileJobs("memory-profile-1", { status: "failed", limit: 5 });
     await retryMemoryWriteJob("job-1");
+    await dryRunMemoryBackfill(25);
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/memory-backend-profiles");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/memory-backend-profiles");
@@ -279,6 +283,7 @@ describe("world client", () => {
       "/api/memory-backend-profiles/memory-profile-1/jobs?status=failed&limit=5",
     );
     expect(fetchMock.mock.calls[5][0]).toBe("/api/memory-write-jobs/job-1/retry");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/memory-backfill/dry-run?limit=25");
   });
 
   it("maps runtime and provider requests", async () => {
@@ -297,6 +302,7 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse([{ event_type: "runtime.iteration_failed" }]))
       .mockResolvedValueOnce(jsonResponse([{ event_type: "agent.run_succeeded" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: "profile-1", health: "ok" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }))
       .mockResolvedValueOnce(jsonResponse({ status: "success", latency_ms: 10 }))
@@ -309,6 +315,7 @@ describe("world client", () => {
     await listRuntimeDiagnostics();
     await listWorldDiagnostics("world-1");
     await listProviderProfiles();
+    await listProviderHealth();
     await createProviderProfile({
       profile_key: "openai-local",
       name: "OpenAI Local",
@@ -329,10 +336,11 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[3][0]).toBe("/api/runtime/diagnostics");
     expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/diagnostics");
     expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles/profile-1");
-    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1/test-call");
-    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles/health");
+    expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[10][0]).toBe("/api/provider-profiles/profile-1");
   });
 
   it("maps runs and narrative requests", async () => {

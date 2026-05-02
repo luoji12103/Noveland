@@ -369,6 +369,9 @@ export type MemoryWriteJobStatusSummary = {
   succeeded_count: number;
   failed_count: number;
   due_count: number;
+  retryable_failed_count: number;
+  terminal_failed_count: number;
+  stalled_processing_count: number;
 };
 
 export type MemoryWriteJob = {
@@ -387,6 +390,10 @@ export type MemoryWriteJob = {
   next_attempt_at: string;
   last_error: string | null;
   processed_at: string | null;
+  is_retryable: boolean;
+  terminal_reason: string | null;
+  last_log_success: boolean | null;
+  age_seconds: number;
   created_at: string;
   updated_at: string;
 };
@@ -432,6 +439,33 @@ export type MemoryEvalResult = {
   cases: MemoryEvalCaseResult[];
 };
 
+export type MemoryBackfillSourceSummary = {
+  source_kind: "agent_run" | "conversation_turn" | "world_event";
+  candidate_count: number;
+  skipped_existing_count: number;
+  skipped_no_profile_count: number;
+  skipped_disabled_profile_count: number;
+};
+
+export type MemoryBackfillWorldSummary = {
+  world_id: string;
+  backend_profile_id: string | null;
+  backend_profile_key: string | null;
+  candidate_count: number;
+  skipped_existing_count: number;
+  skipped_no_profile_count: number;
+  skipped_disabled_profile_count: number;
+};
+
+export type MemoryBackfillDryRun = {
+  candidate_count: number;
+  skipped_existing_count: number;
+  skipped_no_profile_count: number;
+  skipped_disabled_profile_count: number;
+  source_summaries: MemoryBackfillSourceSummary[];
+  world_summaries: MemoryBackfillWorldSummary[];
+};
+
 export type RuntimeControl = {
   desired_state: "running" | "stopped";
   last_heartbeat_at: string | null;
@@ -440,10 +474,19 @@ export type RuntimeControl = {
   last_error: string | null;
 };
 
+export type RuntimeHealth = {
+  status: "healthy" | "stopped" | "degraded" | "failed";
+  reason: string;
+  recent_diagnostic_count: number;
+  recent_error_count: number;
+  heartbeat_age_seconds: number | null;
+};
+
 export type RuntimeStatus = RuntimeControl & {
   runtime_loop_interval_seconds: number;
   runtime_batch_limit: number;
   memory_write_jobs: MemoryWriteJobStatusSummary;
+  runtime_health: RuntimeHealth;
 };
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
@@ -532,6 +575,28 @@ export type ProviderProfile = {
   last_test_status: "success" | "failed" | null;
   last_test_error: string | null;
   is_enabled: boolean;
+};
+
+export type ProviderHealthStatus =
+  | "ok"
+  | "untested"
+  | "configuration_error"
+  | "degraded"
+  | "disabled";
+
+export type ProviderHealth = {
+  id: string;
+  profile_key: string;
+  name: string;
+  provider_type: ProviderType;
+  is_enabled: boolean;
+  health: ProviderHealthStatus;
+  last_tested_at: string | null;
+  last_test_status: "success" | "failed" | null;
+  last_test_error: string | null;
+  missing_secret_ref: boolean;
+  recent_diagnostic_count: number;
+  recent_error_count: number;
 };
 
 export type ProviderTestCallResult = {
