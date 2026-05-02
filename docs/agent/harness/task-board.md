@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Event/Replay/Clock Ops
 
 ## Blocked
 - None
@@ -50,4 +50,4 @@
 - Runtime Recovery Playbook
 
 ## Upcoming Mainline
-- Event/Replay/Clock Ops, covering roadmap phases 8-12. Use a feature-named branch such as `feat/event-replay-clock-ops`, not a phase-number branch name.
+- None selected; roadmap phases 8-12 are active on `feat/event-replay-clock-ops`.

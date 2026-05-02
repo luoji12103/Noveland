@@ -1,53 +1,25 @@
 # Active Session Handoff
 
-- Date: 2026-05-02T18:01:12Z
-- Branch: main
-- Objective: Close out the merged provider secret validation and runtime recovery playbook work, then prepare the next roadmap bundle without starting implementation.
-- Current repository state:
-  - Local `main` includes the phases 1-5 ops hardening commits.
-  - Local `main` now also includes provider secret-ref health validation and the runtime recovery playbook.
-  - No push has been performed.
-  - Future implementation branches must be named by feature/outcome, not roadmap phase numbers.
-- Completed work:
-  - Merged `feat/roadmap-6-10-ops-replay` into local `main` by fast-forward.
-  - Added explicit provider health secret-ref metadata: `api_key_ref`, `secret_ref_status`, and `secret_ref_message`.
-  - Preserved `missing_secret_ref` for compatibility.
-  - Updated provider admin UI, Web types, tests, and the mock backend so secret-ref status is visible without exposing secret values.
-  - Added `docs/agent/operations/runtime-recovery.md` and linked it from README and agent docs.
-  - Ran targeted provider/API checks before merge:
-    - `cd backend && uv run pytest tests/test_api_runtime.py -q`
-    - `cd backend && uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
-    - `cd backend && uv run mypy packages/adapters/src/noveland/adapters/model_provider.py packages/adapters/src/noveland/adapters/__init__.py services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
-    - `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
-- Incomplete work:
-  - No implementation has started for event audit, snapshot integrity, replay UI v1, clock ops, or schedule preview.
-  - Full backend/web regression was not rerun after the docs merge; run it before opening a review or pushing if required.
-- Next planned mainline:
-  - Name: `Event/Replay/Clock Ops`
-  - Recommended branch: `feat/event-replay-clock-ops`
-  - Roadmap coverage: phases 8-12.
-- Planned scope for the next feature branch:
+- Date: 2026-05-02T18:16:42Z
+- Branch: feat/event-replay-clock-ops
+- Objective: Implement the Event/Replay/Clock Ops roadmap bundle across phases 8-12 with functional commits and no push.
+- Scope:
   - Phase 8: Event Stream Audit Views.
-    - Add a world-admin event audit API and Web panel.
-    - Filters should cover event name, actor ref, sequence bounds, wall-time bounds, and limit.
-    - Keep event payload access world-admin only.
   - Phase 9: Snapshot Integrity Checks.
-    - Add a derived integrity report for latest event sequence versus latest snapshot metadata.
-    - Detect no snapshot, stale snapshot, schema mismatch, missing/invalid payload, and future cover sequence.
-    - Do not implement destructive restore.
   - Phase 10: Replay UI v1.
-    - Upgrade the world overview replay/snapshot panel.
-    - Clearly distinguish live clock state from reconstructed replay state.
-    - Show applied/unhandled event counts, latest snapshot metadata, and integrity issues.
   - Phase 11: World Clock Ops.
-    - Improve clock status visibility and audit context.
-    - Use existing clock transitions/events where possible; avoid schema changes unless the implementation proves they are needed.
-    - Show effective time, revision, pause/run history, and drift-sensitive details in operator surfaces.
   - Phase 12: Schedule Rule Preview.
-    - Add dry-run preview for schedule rule effects before saving.
-    - Show affected agents/events/time windows without persisting changes.
-    - Keep saved schedule-rule behavior backward compatible.
-- Suggested commit batches for the next branch:
+- Completed work:
+  - Created `feat/event-replay-clock-ops` from local `main`.
+  - Marked `Event/Replay/Clock Ops` as the active task-board mainline.
+- Incomplete work:
+  - World-admin event audit API and Web panel.
+  - Snapshot integrity API and integrity service logic.
+  - Replay/snapshot workspace upgrade.
+  - Clock operations visibility improvements.
+  - Schedule rule dry-run preview.
+  - Functional commits, targeted tests, final regression checks, and closeout documentation.
+- Planned commit batches:
   - `docs(agent): start event replay clock ops`
   - `feat(events): add world event audit surface`
   - `feat(replay): report snapshot integrity`
@@ -55,13 +27,30 @@
   - `feat(worlds): harden clock ops visibility`
   - `feat(calendar): preview schedule rule effects`
   - `docs(agent): close event replay clock ops`
-- Suggested targeted checks for the next branch:
+- Planned targeted checks:
   - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_replay_snapshot.py tests/test_world_clock_service.py tests/test_calendar_services.py`
   - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
-  - Run `ruff`, `mypy`, full backend pytest, Web lint/typecheck/test/build, Playwright, Compose config, and `git diff --check` before closeout.
+  - `cd backend && uv run ruff check .`
+  - `cd backend && uv run mypy .`
+  - `cd backend && uv run pytest`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run build`
+  - `cd web && npm run test:e2e`
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
+- Current risks:
+  - Event payloads can contain operational or narrative details; event audit must remain world-admin only.
+  - Snapshot integrity must remain read-only and derived; no destructive restore or migration is planned.
+  - Replay UI must clearly distinguish live clock state from reconstructed replay state.
+  - Schedule preview must not persist rule changes or enqueue runtime work.
+  - Web mock backend must stay aligned with new world event, snapshot integrity, clock ops, and schedule preview routes.
+- Branch naming rule:
+  - Future branches are named by feature/outcome, not roadmap phase numbers.
 - Sensitive areas to avoid casual edits:
   - event/snapshot semantics and replay compatibility.
   - auth/world access checks and world clock state transitions.
-  - provider profile secret refs versus `NOVELAND_PROVIDER_API_KEYS_JSON`.
-  - memory backend profile secret refs versus `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`.
+  - schedule rule persistence and runtime due-resolution semantics.
+  - provider and memory secret refs.
   - `MemoryService` as the only business entrypoint for long-term memory.
