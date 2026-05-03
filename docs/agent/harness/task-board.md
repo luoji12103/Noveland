@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Calendar/Agent Diagnostics Ops
 
 ## Blocked
 - None
@@ -51,4 +51,4 @@
 - Event/Replay/Clock Ops
 
 ## Upcoming Mainline
-- None selected; likely next candidate is `Agent/Conversation Diagnostics Ops` covering roadmap phases 13-17 on a feature-named branch.
+- None selected until the Calendar/Agent Diagnostics Ops bundle closes.

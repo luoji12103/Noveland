@@ -1,59 +1,33 @@
 # Active Session Handoff
 
-- Date: 2026-05-02T18:52:25Z
-- Branch: feat/event-replay-clock-ops
-- Objective: Close out the Event/Replay/Clock Ops roadmap bundle across phases 8-12.
-- Completed work:
-  - Added world-admin `GET /worlds/{world_id}/events` with filters for event name, actor ref, sequence bounds, wall-time bounds, and limit.
-  - Added Web world overview event audit filtering and compact payload display.
-  - Added read-only snapshot integrity reporting at `GET /worlds/{world_id}/snapshots/integrity`.
-  - Added snapshot integrity service coverage for no snapshot, healthy snapshot, stale snapshot, schema mismatch, missing payload, invalid payload, and future cover sequence.
-  - Upgraded the replay/snapshot workspace to show live clock state separately from reconstructed replay state.
-  - Added world-admin `GET /worlds/{world_id}/clock/transitions` and Web clock transition history.
-  - Added dry-run schedule rule preview at `POST /worlds/{world_id}/schedule-rules/preview`.
-  - Added Web schedule preview controls and results without persisting rules or enqueueing runtime work.
-  - Updated mock backend routes for event audit, snapshot integrity, clock transitions, and schedule preview.
-  - Updated README endpoint list plus agent project index, file inventory, task board, and change journal.
-- Commits created on this branch:
-  - `f12cab8 docs(agent): start event replay clock ops`
-  - `a1efaa4 feat(events): add world event audit surface`
-  - `f10cffc feat(replay): report snapshot integrity`
-  - `51583e7 feat(web): improve replay audit workspace`
-  - `1370aac feat(worlds): harden clock ops visibility`
-  - `b17006f feat(calendar): preview schedule rule effects`
-- Tests run:
-  - `cd backend && uv run pytest tests/test_api_worlds.py -q`
-  - `cd backend && uv run pytest tests/test_replay_snapshot.py tests/test_api_worlds.py -q`
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_world_clock_service.py -q`
-  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py -q`
-  - `cd backend && uv run ruff check .`
-  - `cd backend && uv run mypy .`
-  - `cd backend && uv run pytest` returned `125 passed, 6 skipped`.
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts`
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test` returned `17 passed / 47 tests`.
-  - `cd web && npm run build`
-  - `cd web && npm run test:e2e` returned `10 passed`.
-  - `docker compose -f infra/compose.yaml config`
-  - `git diff --check`
-- Incomplete work:
+- Date: 2026-05-03T06:52:26Z
+- Branch: feat/calendar-agent-diagnostics-ops
+- Objective: Implement the Calendar/Agent Diagnostics Ops roadmap bundle across phases 13-17.
+- Starting state:
+  - `feat/event-replay-clock-ops` was fast-forward merged into local `main`.
+  - New work started from local `main` on `feat/calendar-agent-diagnostics-ops`.
   - No push has been performed.
-  - Event audit is read-only inspection only; no event export or saved filter presets.
-  - Snapshot integrity does not restore or repair snapshots.
-  - Schedule rule preview samples hourly windows only and follows current v1 rule semantics.
+- Planned work:
+  - Add world-admin calendar conflict detection at `GET /worlds/{world_id}/calendar/conflicts`.
+  - Add world-admin agent run inspector at `GET /worlds/{world_id}/agents/{agent_id}/runs/{run_id}`.
+  - Add persona policy validation at `POST /worlds/{world_id}/agents/{agent_id}/persona/validate` and apply it before persona saves.
+  - Add observation traceability columns with Alembic migration `20260503_0019_observation_traceability.py`.
+  - Add conversation diagnostics summary at `GET /worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary`.
+  - Update Web clients, same-origin proxy coverage, mock backend, world overview, agent builder/dashboard, and conversation detail surfaces.
+- Planned commit batches:
+  - `docs(agent): start calendar agent diagnostics ops`
+  - `feat(calendar): detect calendar and schedule conflicts`
+  - `feat(agents): add agent run inspector`
+  - `feat(agents): validate persona policy controls`
+  - `feat(observations): add observation traceability fields`
+  - `feat(conversations): surface conversation diagnostics`
+  - `docs(agent): close calendar agent diagnostics ops`
+- Planned checks:
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_calendar_services.py tests/test_agent_observations.py tests/test_api_conversations.py tests/test_conversation_services.py tests/test_schema_metadata.py`
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx features/agents/agent-builder.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts`
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, and `git diff --check`.
 - Current risks:
-  - Event payloads are exposed to world admins; keep this endpoint world-admin only.
-  - Snapshot integrity treats `world.snapshot_created` as non-stale by design so newly created snapshots are not immediately warned.
-  - Schedule preview should stay dry-run until execution controls, conflict detection, and audit trails are expanded.
-  - Web Playwright coverage depends on `web/tests/e2e/start-with-mock-auth.mjs` staying aligned with new world ops routes.
-- Recommended next mainline:
-  - `Agent/Conversation Diagnostics Ops`, likely covering roadmap phases 13-17.
-  - Suggested feature branch name: `feat/agent-conversation-diagnostics-ops`.
-- Sensitive areas to avoid casual edits:
-  - event/snapshot semantics and replay compatibility.
-  - auth/world access checks and world clock state transitions.
-  - schedule rule persistence and runtime due-resolution semantics.
-  - provider and memory secret refs.
-  - `MemoryService` as the only business entrypoint for long-term memory.
+  - Calendar conflict detection must remain read-only and follow current hourly v1 schedule semantics.
+  - Agent run and conversation diagnostic surfaces must redact secret-like values.
+  - Observation traceability includes a schema migration; update model metadata, migration history, and schema tests together.
+  - Keep event/snapshot semantics, world access checks, and `MemoryService` boundaries unchanged unless directly required.
