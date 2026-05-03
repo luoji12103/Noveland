@@ -10,6 +10,7 @@ import type {
   CalendarConflictReport,
   CalendarEntry,
   ConversationParticipant,
+  ConversationDiagnosticsSummary,
   ConversationSession,
   ConversationTurn,
   MemoryBackendProfile,
@@ -100,6 +101,7 @@ export type ConversationDetailData = ConversationListData & {
   participants: ConversationParticipant[];
   turns: ConversationTurn[];
   diagnostics: RuntimeDiagnostic[];
+  diagnosticsSummary: ConversationDiagnosticsSummary | null;
   narrativeArtifacts: NarrativeArtifact[];
   narrativeWriterPlugins: PluginCatalogEntry[];
 };
@@ -518,11 +520,18 @@ export async function getConversationDetailData(
       participants: [],
       turns: [],
       diagnostics: [],
+      diagnosticsSummary: null,
       narrativeArtifacts: [],
       narrativeWriterPlugins,
     };
   }
-  const [participants, turns, diagnostics, narrativeArtifacts] = await Promise.all([
+  const [
+    participants,
+    turns,
+    diagnostics,
+    diagnosticsSummary,
+    narrativeArtifacts,
+  ] = await Promise.all([
     apiFetch<ConversationParticipant[]>(
       `/worlds/${worldId}/conversations/${conversationId}/participants`,
       cookies,
@@ -533,6 +542,10 @@ export async function getConversationDetailData(
     ),
     apiFetchOptional<RuntimeDiagnostic[]>(
       `/worlds/${worldId}/conversations/${conversationId}/diagnostics`,
+      cookies,
+    ),
+    apiFetchOptional<ConversationDiagnosticsSummary>(
+      `/worlds/${worldId}/conversations/${conversationId}/diagnostics/summary`,
       cookies,
     ),
     apiFetch<NarrativeArtifact[]>(
@@ -546,6 +559,7 @@ export async function getConversationDetailData(
     participants,
     turns,
     diagnostics: diagnostics ?? [],
+    diagnosticsSummary,
     narrativeArtifacts,
     narrativeWriterPlugins,
   };

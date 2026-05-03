@@ -22,6 +22,7 @@ import type {
   ConversationAdvanceResult,
   ConversationNarrativeArtifactSet,
   ConversationCreateInput,
+  ConversationDiagnosticsSummary,
   ConversationParticipant,
   ConversationParticipantInput,
   ConversationSeedInput,
@@ -710,6 +711,16 @@ export function listConversationTurns(
 ): Promise<ConversationTurn[]> {
   return worldRequest<ConversationTurn[]>(
     `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
+    { method: "GET" },
+  );
+}
+
+export function getConversationDiagnosticsSummary(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationDiagnosticsSummary> {
+  return worldRequest<ConversationDiagnosticsSummary>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/diagnostics/summary`,
     { method: "GET" },
   );
 }

@@ -11,6 +11,7 @@ import {
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
+  getConversationDiagnosticsSummary,
   getCalendarConflicts,
   getAgentRunDetail,
   getNarrativeArtifact,
@@ -429,6 +430,17 @@ describe("world client", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/runs/run-1",
+    );
+  });
+
+  it("maps conversation diagnostics summary requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ operator_message: "ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getConversationDiagnosticsSummary("world-1", "conversation-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/worlds/world-1/conversations/conversation-1/diagnostics/summary",
     );
   });
 

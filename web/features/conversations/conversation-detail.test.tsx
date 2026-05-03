@@ -65,6 +65,9 @@ describe("ConversationDetail", () => {
     );
 
     expect(screen.getByText("Conversation diagnostics")).toBeInTheDocument();
+    expect(
+      screen.getByText("Recent provider diagnostics may explain degraded conversation behavior."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Conversation turn skipped after speaker failure.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Conversation error policy"), {
@@ -295,6 +298,16 @@ const adminData: ConversationDetailData = {
       created_at: "2026-04-21T00:00:02.000Z",
     },
   ],
+  diagnosticsSummary: {
+    session_status: "running",
+    terminal_reason: null,
+    last_turn_status: "skipped",
+    last_turn_error: "upstream timeout",
+    provider_diagnostic_count: 1,
+    memory_diagnostic_count: 0,
+    recent_diagnostics: [],
+    operator_message: "Recent provider diagnostics may explain degraded conversation behavior.",
+  },
   narrativeArtifacts: [
     {
       id: "artifact-1",
@@ -325,4 +338,5 @@ const readOnlyData: ConversationDetailData = {
   ...adminData,
   canManageSelectedWorld: false,
   diagnostics: [],
+  diagnosticsSummary: null,
 };

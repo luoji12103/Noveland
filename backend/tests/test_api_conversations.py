@@ -243,6 +243,9 @@ def test_conversation_api_stop_and_diagnostics() -> None:
     diagnostics_response = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics",
     )
+    diagnostics_summary = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary",
+    )
 
     assert stop_response.status_code == 200
     assert stop_response.json()["status"] == "stopped"
@@ -250,6 +253,11 @@ def test_conversation_api_stop_and_diagnostics() -> None:
     assert diagnostics_response.status_code == 200
     assert diagnostics_response.json()[0]["component"] == "conversation"
     assert diagnostics_response.json()[0]["details"]["conversation_id"] == str(conversation_id)
+    assert diagnostics_summary.status_code == 200
+    assert diagnostics_summary.json()["terminal_reason"] == "operator_stopped"
+    assert diagnostics_summary.json()["operator_message"] == (
+        "Conversation ended because operator_stopped."
+    )
 
 
 def test_conversation_narrative_generation_and_listing(

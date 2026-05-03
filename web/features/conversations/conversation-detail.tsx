@@ -642,6 +642,26 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
           <h2 className="section-title" id="conversation-diagnostics-title">
             Conversation diagnostics
           </h2>
+          {data.diagnosticsSummary !== null ? (
+            <div className="status-grid">
+              <article>
+                <p className="metric-label">Summary</p>
+                <p>{data.diagnosticsSummary.operator_message}</p>
+              </article>
+              <article>
+                <p className="metric-label">Last turn</p>
+                <p>{data.diagnosticsSummary.last_turn_status ?? "none"}</p>
+              </article>
+              <article>
+                <p className="metric-label">Provider issues</p>
+                <p>{data.diagnosticsSummary.provider_diagnostic_count}</p>
+              </article>
+              <article>
+                <p className="metric-label">Memory issues</p>
+                <p>{data.diagnosticsSummary.memory_diagnostic_count}</p>
+              </article>
+            </div>
+          ) : null}
           <DiagnosticList diagnostics={diagnostics} />
         </section>
       ) : null}

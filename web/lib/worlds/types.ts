@@ -235,6 +235,17 @@ export type ConversationAdvanceResult = {
   turn: ConversationTurn;
 };
 
+export type ConversationDiagnosticsSummary = {
+  session_status: ConversationSessionStatus;
+  terminal_reason: ConversationTerminalReason | null;
+  last_turn_status: ConversationTurnStatus | null;
+  last_turn_error: string | null;
+  provider_diagnostic_count: number;
+  memory_diagnostic_count: number;
+  recent_diagnostics: RuntimeDiagnostic[];
+  operator_message: string;
+};
+
 export type WorldClock = {
   world_id: string;
   status: "running" | "paused";

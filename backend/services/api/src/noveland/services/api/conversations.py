@@ -230,6 +230,17 @@ class ConversationDiagnosticResponse(BaseModel):
     created_at: str
 
 
+class ConversationDiagnosticsSummaryResponse(BaseModel):
+    session_status: str
+    terminal_reason: str | None
+    last_turn_status: str | None
+    last_turn_error: str | None
+    provider_diagnostic_count: int
+    memory_diagnostic_count: int
+    recent_diagnostics: list[ConversationDiagnosticResponse]
+    operator_message: str
+
+
 class ConversationNarrativeArtifactResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
@@ -434,6 +445,51 @@ def list_conversation_diagnostics(
     except LookupError as exc:
         raise _not_found() from exc
     return [_diagnostic_response(record) for record in records]
+
+
+@router.get(
+    "/{conversation_id}/diagnostics/summary",
+    response_model=ConversationDiagnosticsSummaryResponse,
+)
+def get_conversation_diagnostics_summary(
+    conversation_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ConversationDiagnosticsSummaryResponse:
+    service = ConversationService(db_session)
+    try:
+        session = service.get_session(context.world_id, conversation_id)
+        turns = service.list_turns(context.world_id, conversation_id)
+        diagnostics = service.list_diagnostics(context.world_id, conversation_id, limit=20)
+    except LookupError as exc:
+        raise _not_found() from exc
+    last_turn = turns[-1] if turns else None
+    provider_count = sum(
+        1
+        for diagnostic in diagnostics
+        if diagnostic.component.value == "provider" or "provider" in diagnostic.event_type
+    )
+    memory_count = sum(
+        1
+        for diagnostic in diagnostics
+        if diagnostic.component.value == "memory" or "memory" in diagnostic.event_type
+    )
+    return ConversationDiagnosticsSummaryResponse(
+        session_status=session.status.value,
+        terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
+        last_turn_status=None if last_turn is None else last_turn.status.value,
+        last_turn_error=None if last_turn is None else last_turn.error_text,
+        provider_diagnostic_count=provider_count,
+        memory_diagnostic_count=memory_count,
+        recent_diagnostics=[_diagnostic_response(record) for record in diagnostics[:5]],
+        operator_message=_conversation_operator_message(
+            session,
+            last_turn,
+            diagnostics,
+            provider_count,
+            memory_count,
+        ),
+    )
 
 
 @router.get(
@@ -736,6 +792,26 @@ def _diagnostic_response(record: RuntimeDiagnosticRecord) -> ConversationDiagnos
         provider_profile_id=record.provider_profile_id,
         created_at=record.created_at.isoformat(),
     )
+
+
+def _conversation_operator_message(
+    session: ConversationSessionRecord,
+    last_turn: ConversationTurnRecord | None,
+    diagnostics: list[RuntimeDiagnosticRecord],
+    provider_count: int,
+    memory_count: int,
+) -> str:
+    if session.terminal_reason is not None:
+        return f"Conversation ended because {session.terminal_reason.value}."
+    if last_turn is not None and last_turn.status.value == "failed":
+        return last_turn.error_text or "Last conversation turn failed."
+    if provider_count > 0:
+        return "Recent provider diagnostics may explain degraded conversation behavior."
+    if memory_count > 0:
+        return "Recent memory diagnostics may explain missing or failed memory context."
+    if diagnostics:
+        return diagnostics[0].message
+    return "No blocking conversation diagnostics are currently recorded."
 
 
 def _narrative_artifact_response(
