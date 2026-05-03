@@ -384,3 +384,14 @@
 - Tests added/updated: event audit API filtering/permission tests; snapshot integrity service/API tests; clock transition API tests; schedule preview service/API tests; world overview component coverage; Web client route mapping; full mock-backend alignment.
 - Docs updated: README endpoint list, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Snapshot integrity is read-only and does not restore data. Schedule preview is dry-run only. Next likely mainline is `Agent/Conversation Diagnostics Ops` covering roadmap phases 13-17.
+
+## Calendar/agent diagnostics ops entry
+
+- Date: 2026-05-03
+- Branch: feat/calendar-agent-diagnostics-ops
+- Scope: roadmap phases 13-17 calendar conflicts, agent run inspection, persona policy validation, observation traceability, and conversation diagnostics
+- Summary: Added read-only calendar conflict detection, world-admin agent run inspection, reusable persona policy validation, persisted observation traceability fields, and conversation diagnostics summaries.
+- Files changed: `/backend/packages/{agents,calendar}/**`, `/backend/services/api/src/noveland/services/api/{worlds,conversations}.py`, `/backend/services/runtime/src/noveland/services/runtime/agent_loop.py`, `/backend/migrations/versions/20260503_0019_observation_traceability.py`, `/backend/tests/**`, `/web/features/{agents,conversations,dashboard,worlds}/**`, `/web/lib/worlds/**`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: calendar conflict service/API tests; agent run detail API and Web client tests; persona validation API/Web client coverage; observation schema/runtime/API tests; conversation diagnostics summary API/component/client coverage.
+- Docs updated: README endpoint list, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Calendar conflict detection is read-only and hourly-sampled. Observation traceability requires applying migration `20260503_0019`. Next roadmap mainline is not selected yet.

@@ -320,13 +320,16 @@ POST /worlds/{world_id}/agents/{agent_id}/memory
 POST /worlds/{world_id}/agents/{agent_id}/memory/search
 DELETE /worlds/{world_id}/agents/{agent_id}/memory/{memory_id}
 GET /worlds/{world_id}/agents/{agent_id}/runs
+GET /worlds/{world_id}/agents/{agent_id}/runs/{run_id}
 POST /worlds/{world_id}/agents/{agent_id}/run
 GET /worlds/{world_id}/agents/{agent_id}/persona
+POST /worlds/{world_id}/agents/{agent_id}/persona/validate
 PATCH /worlds/{world_id}/agents/{agent_id}/persona
 GET /worlds/{world_id}/agents/{agent_id}/observations
 POST /worlds/{world_id}/agents/{agent_id}/observations
 POST /worlds/{world_id}/agents/{agent_id}/observations/refresh
 GET /worlds/{world_id}/schedule-rules
+GET /worlds/{world_id}/calendar/conflicts
 POST /worlds/{world_id}/schedule-rules
 POST /worlds/{world_id}/schedule-rules/preview
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
@@ -353,6 +356,7 @@ PATCH /worlds/{world_id}/conversations/{conversation_id}
 GET /worlds/{world_id}/conversations/{conversation_id}/participants
 PUT /worlds/{world_id}/conversations/{conversation_id}/participants
 GET /worlds/{world_id}/conversations/{conversation_id}/turns
+GET /worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary
 POST /worlds/{world_id}/conversations/{conversation_id}/seed
 POST /worlds/{world_id}/conversations/{conversation_id}/advance
 POST /worlds/{world_id}/conversations/{conversation_id}/start

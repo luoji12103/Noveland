@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Calendar/Agent Diagnostics Ops
+- None
 
 ## Blocked
 - None
@@ -49,6 +49,7 @@
 - Provider Secrets Validation
 - Runtime Recovery Playbook
 - Event/Replay/Clock Ops
+- Calendar/Agent Diagnostics Ops
 
 ## Upcoming Mainline
-- None selected until the Calendar/Agent Diagnostics Ops bundle closes.
+- None selected; next candidate should be chosen from `roadmap.md` after review.

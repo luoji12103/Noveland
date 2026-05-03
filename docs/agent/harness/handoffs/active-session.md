@@ -1,33 +1,44 @@
 # Active Session Handoff
 
-- Date: 2026-05-03T06:52:26Z
+- Date: 2026-05-03T08:35:00Z
 - Branch: feat/calendar-agent-diagnostics-ops
-- Objective: Implement the Calendar/Agent Diagnostics Ops roadmap bundle across phases 13-17.
+- Objective: Close out the Calendar/Agent Diagnostics Ops roadmap bundle across phases 13-17.
 - Starting state:
   - `feat/event-replay-clock-ops` was fast-forward merged into local `main`.
   - New work started from local `main` on `feat/calendar-agent-diagnostics-ops`.
   - No push has been performed.
-- Planned work:
-  - Add world-admin calendar conflict detection at `GET /worlds/{world_id}/calendar/conflicts`.
-  - Add world-admin agent run inspector at `GET /worlds/{world_id}/agents/{agent_id}/runs/{run_id}`.
-  - Add persona policy validation at `POST /worlds/{world_id}/agents/{agent_id}/persona/validate` and apply it before persona saves.
-  - Add observation traceability columns with Alembic migration `20260503_0019_observation_traceability.py`.
-  - Add conversation diagnostics summary at `GET /worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary`.
-  - Update Web clients, same-origin proxy coverage, mock backend, world overview, agent builder/dashboard, and conversation detail surfaces.
-- Planned commit batches:
+- Completed work:
+  - Added world-admin calendar conflict detection at `GET /worlds/{world_id}/calendar/conflicts`.
+  - Added world-admin agent run inspector at `GET /worlds/{world_id}/agents/{agent_id}/runs/{run_id}`.
+  - Added persona policy validation at `POST /worlds/{world_id}/agents/{agent_id}/persona/validate` and enforced the same validation before persona saves.
+  - Added observation traceability columns with Alembic migration `20260503_0019_observation_traceability.py`.
+  - Added conversation diagnostics summary at `GET /worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary`.
+  - Updated Web clients, world overview, agent builder/dashboard, and conversation detail surfaces.
+- Commits created on this branch:
   - `docs(agent): start calendar agent diagnostics ops`
   - `feat(calendar): detect calendar and schedule conflicts`
   - `feat(agents): add agent run inspector`
   - `feat(agents): validate persona policy controls`
   - `feat(observations): add observation traceability fields`
   - `feat(conversations): surface conversation diagnostics`
-  - `docs(agent): close calendar agent diagnostics ops`
-- Planned checks:
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_calendar_services.py tests/test_agent_observations.py tests/test_api_conversations.py tests/test_conversation_services.py tests/test_schema_metadata.py`
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx features/agents/agent-builder.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts`
+- Tests run:
+  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py -q` returned `23 passed`.
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_runtime_daemon.py -q` returned `20 passed`.
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_agent_observations.py -q` returned `19 passed`.
+  - `cd backend && uv run pytest tests/test_agent_observations.py tests/test_runtime_daemon.py tests/test_schema_metadata.py -q` returned `11 passed`.
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_agent_observations.py tests/test_runtime_daemon.py tests/test_schema_metadata.py -q` returned `29 passed`.
+  - `cd backend && uv run pytest tests/test_api_conversations.py tests/test_conversation_services.py -q` returned `8 passed`.
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_calendar_services.py tests/test_agent_observations.py tests/test_api_conversations.py tests/test_conversation_services.py tests/test_schema_metadata.py` returned `40 passed`.
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts` returned `16 passed`.
+  - `cd web && npm run test -- features/agents/agent-list.test.tsx features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts` returned `22 passed`.
+  - `cd web && npm run test -- features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts` returned `20 passed`.
+  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx features/agents/agent-list.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts` returned `27 passed`.
+- Remaining checks:
   - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, and `git diff --check`.
 - Current risks:
   - Calendar conflict detection must remain read-only and follow current hourly v1 schedule semantics.
   - Agent run and conversation diagnostic surfaces must redact secret-like values.
   - Observation traceability includes a schema migration; update model metadata, migration history, and schema tests together.
   - Keep event/snapshot semantics, world access checks, and `MemoryService` boundaries unchanged unless directly required.
+- Recommended next mainline:
+  - None selected yet; choose the next roadmap bundle after final quality gate and merge readiness review.
