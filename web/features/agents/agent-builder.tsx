@@ -7,6 +7,7 @@ import {
   createAgentCalendarEntry,
   createAgentObservation,
   forgetAgentMemory,
+  getAgentRunDetail,
   listAgentMemory,
   refreshAgentMemoryProfileSnapshot,
   refreshAgentObservations,
@@ -16,7 +17,7 @@ import {
   updateAgentPersona,
 } from "@/lib/worlds/client";
 import type { AgentDetailData } from "@/lib/worlds/server";
-import type { AgentPreset } from "@/lib/worlds/types";
+import type { AgentPreset, AgentRunDetail } from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
@@ -36,6 +37,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [memoryItems, setMemoryItems] = useState(data.memoryItems);
   const [memoryProfileSnapshot, setMemoryProfileSnapshot] = useState(data.memoryProfileSnapshot);
+  const [selectedRunDetail, setSelectedRunDetail] = useState<AgentRunDetail | null>(null);
   const agent = data.selectedAgent;
   const sourcePreset = useMemo(
     () => data.agentPresets.find((preset) => preset.id === agent?.source_preset_id) ?? null,
@@ -54,6 +56,10 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
     setMemoryProfileSnapshot(data.memoryProfileSnapshot);
   }, [data.memoryProfileSnapshot]);
 
+  useEffect(() => {
+    setSelectedRunDetail(null);
+  }, [agentId]);
+
   async function runAction(action: () => Promise<unknown>, success: string) {
     setIsBusy(true);
     setNotice(null);
@@ -66,6 +72,12 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function inspectRun(runId: string) {
+    await runAction(async () => {
+      setSelectedRunDetail(await getAgentRunDetail(worldId, agentId, runId));
+    }, "Agent run detail loaded.");
   }
 
   if (agent === null) {
@@ -485,13 +497,47 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             </button>
           </form>
         ) : null}
-        <ResourceList
-          rows={data.agentRuns.map((run) => ({
-            id: run.run_id,
-            title: run.status,
-            detail: run.response_text ?? run.prompt_text,
-          }))}
-        />
+        {data.agentRuns.length === 0 ? (
+          <ResourceList rows={[]} />
+        ) : (
+          <div className="resource-list">
+            {data.agentRuns.map((run) => (
+              <article className="resource-row" key={run.run_id}>
+                <div>
+                  <h3>{run.status}</h3>
+                  <p>{run.trigger_source}</p>
+                  <p>{run.response_text ?? run.prompt_text}</p>
+                </div>
+                {data.canManageSelectedWorld ? (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void inspectRun(run.run_id)}
+                  >
+                    Inspect run
+                  </button>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+        {selectedRunDetail !== null ? (
+          <section aria-labelledby="run-inspector-title">
+            <h3 id="run-inspector-title">Run inspector</h3>
+            <p className="status-detail">
+              Provider: {selectedRunDetail.provider_profile?.profile_key ?? "none"}
+            </p>
+            <p className="status-detail">
+              Sources: {selectedRunDetail.run.source_calendar_entry_id ?? "no calendar"} /{" "}
+              {selectedRunDetail.run.source_schedule_rule_id ?? "no schedule"}
+            </p>
+            <p className="status-detail">
+              Conversation turns: {selectedRunDetail.conversation_turns.length}
+            </p>
+            <pre>{JSON.stringify(selectedRunDetail.run.diagnostics, null, 2)}</pre>
+          </section>
+        ) : null}
       </section>
     </section>
   );

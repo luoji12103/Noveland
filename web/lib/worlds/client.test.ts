@@ -12,6 +12,7 @@ import {
   createSnapshot,
   generateConversationNarrativeArtifacts,
   getCalendarConflicts,
+  getAgentRunDetail,
   getNarrativeArtifact,
   createWorld,
   deactivateAgentPreset,
@@ -416,6 +417,17 @@ describe("world client", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       "/api/worlds/world-1/calendar/conflicts?start_world_time=2030-01-01T00%3A00%3A00Z&horizon_hours=24&limit=10",
+    );
+  });
+
+  it("maps agent run detail requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ run: { run_id: "run-1" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getAgentRunDetail("world-1", "agent-1", "run-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/runs/run-1",
     );
   });
 

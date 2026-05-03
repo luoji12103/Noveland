@@ -38,6 +38,7 @@ from noveland.calendar import (
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.conversations.models import ConversationTurn
 from noveland.core.settings import load_settings
 from noveland.events import (
     WorldReplayService,
@@ -66,6 +67,7 @@ from noveland.observability import (
     DiagnosticSeverity,
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
+    redact_diagnostic_details,
 )
 from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
@@ -595,9 +597,39 @@ class AgentRunResponse(BaseModel):
     prompt_text: str
     response_text: str | None
     provider_profile_id: uuid.UUID | None
+    trigger_source: str
+    source_calendar_entry_id: uuid.UUID | None
+    source_schedule_rule_id: uuid.UUID | None
+    created_event_id: uuid.UUID | None
     diagnostics: dict[str, Any]
     started_at: datetime
     finished_at: datetime | None
+
+
+class AgentRunProviderSummaryResponse(BaseModel):
+    id: uuid.UUID
+    profile_key: str
+    name: str
+    provider_type: str
+    model_name: str
+    is_enabled: bool
+
+
+class AgentRunConversationTurnResponse(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    turn_index: int
+    speaker_kind: str
+    speaker_agent_id: uuid.UUID | None
+    status: str
+    error_text: str | None
+    created_at: datetime
+
+
+class AgentRunDetailResponse(BaseModel):
+    run: AgentRunResponse
+    provider_profile: AgentRunProviderSummaryResponse | None
+    conversation_turns: list[AgentRunConversationTurnResponse]
 
 
 class AgentPersonaResponse(BaseModel):
@@ -2077,6 +2109,64 @@ def list_agent_runs(
     return [_agent_run_response(run) for run in orchestrator.list_runs(context.world_id, agent_id)]
 
 
+@router.get(
+    "/{world_id}/agents/{agent_id}/runs/{run_id}",
+    response_model=AgentRunDetailResponse,
+)
+def get_agent_run_detail(
+    agent_id: uuid.UUID,
+    run_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentRunDetailResponse:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    settings = load_settings()
+    orchestrator = AgentRuntimeOrchestrator(
+        db_session,
+        ProviderProfileService(db_session, settings),
+        settings,
+    )
+    run = orchestrator.get_run(context.world_id, agent_id, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    provider_profile = (
+        None
+        if run.provider_profile_id is None
+        else ProviderProfileService(db_session, settings).get_profile(run.provider_profile_id)
+    )
+    turns = db_session.scalars(
+        select(ConversationTurn)
+        .where(ConversationTurn.run_id == run.run_id)
+        .order_by(ConversationTurn.created_at.asc()),
+    ).all()
+    return AgentRunDetailResponse(
+        run=_agent_run_response(run),
+        provider_profile=None
+        if provider_profile is None
+        else AgentRunProviderSummaryResponse(
+            id=provider_profile.id,
+            profile_key=provider_profile.profile_key,
+            name=provider_profile.name,
+            provider_type=provider_profile.provider_type.value,
+            model_name=provider_profile.model_name,
+            is_enabled=provider_profile.is_enabled,
+        ),
+        conversation_turns=[
+            AgentRunConversationTurnResponse(
+                id=turn.id,
+                session_id=turn.session_id,
+                turn_index=turn.turn_index,
+                speaker_kind=turn.speaker_kind,
+                speaker_agent_id=turn.speaker_agent_id,
+                status=turn.status,
+                error_text=turn.error_text,
+                created_at=turn.created_at,
+            )
+            for turn in turns
+        ],
+    )
+
+
 @router.post(
     "/{world_id}/agents/{agent_id}/run",
     response_model=AgentRunResponse,
@@ -2747,7 +2837,11 @@ def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
         prompt_text=run.prompt_text,
         response_text=run.response_text,
         provider_profile_id=run.provider_profile_id,
-        diagnostics=run.diagnostics,
+        trigger_source=run.trigger_source,
+        source_calendar_entry_id=run.source_calendar_entry_id,
+        source_schedule_rule_id=run.source_schedule_rule_id,
+        created_event_id=run.created_event_id,
+        diagnostics=redact_diagnostic_details(run.diagnostics),
         started_at=run.started_at,
         finished_at=run.finished_at,
     )

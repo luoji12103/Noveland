@@ -12,6 +12,7 @@ import type {
   AgentPersonaUpdateInput,
   AgentRun,
   AgentRunCreateInput,
+  AgentRunDetail,
   AgentUpdateInput,
   CalendarEntry,
   CalendarEntryCreateInput,
@@ -470,6 +471,17 @@ export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRu
   return worldRequest<AgentRun[]>(`/api/worlds/${worldId}/agents/${agentId}/runs`, {
     method: "GET",
   });
+}
+
+export function getAgentRunDetail(
+  worldId: string,
+  agentId: string,
+  runId: string,
+): Promise<AgentRunDetail> {
+  return worldRequest<AgentRunDetail>(
+    `/api/worlds/${worldId}/agents/${agentId}/runs/${runId}`,
+    { method: "GET" },
+  );
 }
 
 export function getAgentPersona(worldId: string, agentId: string): Promise<AgentPersona | null> {

@@ -69,6 +69,10 @@ class AgentRunExecution:
     prompt_text: str
     response_text: str | None
     provider_profile_id: uuid.UUID | None
+    trigger_source: str
+    source_calendar_entry_id: uuid.UUID | None
+    source_schedule_rule_id: uuid.UUID | None
+    created_event_id: uuid.UUID | None
     diagnostics: dict[str, Any]
     started_at: datetime
     finished_at: datetime | None
@@ -102,6 +106,21 @@ class AgentRuntimeOrchestrator:
                 .order_by(AgentRuntimeRun.started_at.desc()),
             ).all()
         ]
+
+    def get_run(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        run_id: uuid.UUID,
+    ) -> AgentRunExecution | None:
+        model = self._session.scalars(
+            select(AgentRuntimeRun).where(
+                AgentRuntimeRun.id == run_id,
+                AgentRuntimeRun.world_id == world_id,
+                AgentRuntimeRun.agent_id == agent_id,
+            ),
+        ).one_or_none()
+        return None if model is None else _run_record(model)
 
     def run_agent(
         self,
@@ -606,6 +625,10 @@ def _run_record(model: AgentRuntimeRun) -> AgentRunExecution:
         prompt_text=model.prompt_text,
         response_text=model.response_text,
         provider_profile_id=model.provider_profile_id,
+        trigger_source=model.trigger_source,
+        source_calendar_entry_id=model.source_calendar_entry_id,
+        source_schedule_rule_id=model.source_schedule_rule_id,
+        created_event_id=model.created_event_id,
         diagnostics=model.diagnostics,
         started_at=model.started_at,
         finished_at=model.finished_at,

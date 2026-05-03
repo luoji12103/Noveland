@@ -700,9 +700,39 @@ export type AgentRun = {
   prompt_text: string;
   response_text: string | null;
   provider_profile_id: string | null;
+  trigger_source: string;
+  source_calendar_entry_id: string | null;
+  source_schedule_rule_id: string | null;
+  created_event_id: string | null;
   diagnostics: Record<string, unknown>;
   started_at: string;
   finished_at: string | null;
+};
+
+export type AgentRunProviderSummary = {
+  id: string;
+  profile_key: string;
+  name: string;
+  provider_type: ProviderType;
+  model_name: string;
+  is_enabled: boolean;
+};
+
+export type AgentRunConversationTurn = {
+  id: string;
+  session_id: string;
+  turn_index: number;
+  speaker_kind: string;
+  speaker_agent_id: string | null;
+  status: string;
+  error_text: string | null;
+  created_at: string;
+};
+
+export type AgentRunDetail = {
+  run: AgentRun;
+  provider_profile: AgentRunProviderSummary | null;
+  conversation_turns: AgentRunConversationTurn[];
 };
 
 export type AgentPersona = {

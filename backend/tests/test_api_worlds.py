@@ -21,7 +21,7 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
-from noveland.conversations.models import ConversationSession
+from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import (
@@ -771,6 +771,14 @@ def test_agent_runs_and_narrative_artifacts_api(
         json={"prompt": "Operator run"},
     )
     list_runs = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
+    run_detail = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
+    )
+    _authenticate(client, member_token)
+    member_run_detail = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
+    )
+    _authenticate(client, owner_token)
     create_artifact = client.post(
         f"/worlds/{world_id}/narrative-artifacts",
         json={
@@ -787,6 +795,7 @@ def test_agent_runs_and_narrative_artifacts_api(
     assert member_list_artifacts.status_code == 200
     assert member_list_artifacts.json() == []
     assert member_run.status_code == 403
+    assert member_run_detail.status_code == 403
     assert member_create_artifact.status_code == 403
     assert run_response.status_code == 201
     assert run_response.json()["status"] == "succeeded"
@@ -794,6 +803,10 @@ def test_agent_runs_and_narrative_artifacts_api(
     assert run_response.json()["diagnostics"]["profile_key"] == "runtime-profile"
     assert list_runs.status_code == 200
     assert list_runs.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert run_detail.status_code == 200
+    assert run_detail.json()["run"]["trigger_source"] == "manual"
+    assert run_detail.json()["provider_profile"]["profile_key"] == "runtime-profile"
+    assert run_detail.json()["conversation_turns"] == []
     assert create_artifact.status_code == 201
     assert create_artifact.json()["artifact_kind"] == "world_summary"
     assert [item["title"] for item in list_artifacts.json()] == [
@@ -1131,6 +1144,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
