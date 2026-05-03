@@ -25,12 +25,12 @@ from noveland.agents.models import Agent, AgentPreset
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
 from noveland.calendar import (
+    CalendarConflictRecord,
+    CalendarConflictReport,
+    CalendarConflictSource,
     CalendarEntryCreate,
     CalendarEntryStatus,
     CalendarEntryUpdate,
-    CalendarConflictReport,
-    CalendarConflictRecord,
-    CalendarConflictSource,
     CalendarService,
     ScheduleRuleCreate,
     ScheduleRuleKind,

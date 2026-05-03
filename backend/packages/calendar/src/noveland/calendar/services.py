@@ -5,14 +5,15 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import TypedDict
 
+from noveland.agents.models import Agent
 from noveland.calendar.contracts import (
+    CalendarConflictRecord,
+    CalendarConflictReport,
+    CalendarConflictSource,
     CalendarEntryCreate,
     CalendarEntryRecord,
     CalendarEntryStatus,
     CalendarEntryUpdate,
-    CalendarConflictRecord,
-    CalendarConflictReport,
-    CalendarConflictSource,
     ScheduleRuleCreate,
     ScheduleRuleKind,
     ScheduleRulePreviewMatch,
@@ -21,7 +22,6 @@ from noveland.calendar.contracts import (
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
-from noveland.agents.models import Agent
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -243,21 +243,24 @@ class CalendarService:
                 if len(conflicts) >= limit:
                     return _conflict_report(world_id, normalized_start, horizon_hours, conflicts)
 
-        for index, left in enumerate(rule_windows):
-            for right in rule_windows[index + 1 :]:
-                if left["agent_id"] != right["agent_id"] or left["starts_at"] != right["starts_at"]:
+        for index, left_window in enumerate(rule_windows):
+            for right_window in rule_windows[index + 1 :]:
+                if (
+                    left_window["agent_id"] != right_window["agent_id"]
+                    or left_window["starts_at"] != right_window["starts_at"]
+                ):
                     continue
                 conflicts.append(
                     CalendarConflictRecord(
                         conflict_type="schedule_rule_overlap",
                         world_id=world_id,
-                        agent_id=left["agent_id"],
-                        starts_at=left["starts_at"],
-                        ends_at=left["ends_at"],
+                        agent_id=left_window["agent_id"],
+                        starts_at=left_window["starts_at"],
+                        ends_at=left_window["ends_at"],
                         reason="schedule rules match the same hourly window for the same agent",
                         sources=[
-                            _rule_conflict_source(left),
-                            _rule_conflict_source(right),
+                            _rule_conflict_source(left_window),
+                            _rule_conflict_source(right_window),
                         ],
                     ),
                 )
