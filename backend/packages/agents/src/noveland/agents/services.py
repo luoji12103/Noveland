@@ -104,6 +104,8 @@ class AgentObservationService:
             content=observation.content,
             metadata_json=observation.metadata,
             observed_at=observation.observed_at,
+            confidence_score=observation.confidence_score,
+            review_status=observation.review_status,
         )
         self._session.add(model)
         self._session.flush()
@@ -157,6 +159,7 @@ class AgentObservationService:
         self,
         observation_ids: Sequence[uuid.UUID],
         consumed_at: datetime | None = None,
+        run_id: uuid.UUID | None = None,
     ) -> int:
         if not observation_ids:
             return 0
@@ -166,6 +169,8 @@ class AgentObservationService:
         ).all()
         for observation in observations:
             observation.consumed_at = timestamp
+            observation.runtime_use_count += 1
+            observation.last_used_run_id = run_id
         self._session.flush()
         return len(observations)
 
@@ -362,6 +367,10 @@ def _observation_record(model: AgentObservation) -> AgentObservationRecord:
         metadata=model.metadata_json,
         observed_at=model.observed_at,
         consumed_at=model.consumed_at,
+        confidence_score=model.confidence_score,
+        review_status=model.review_status,
+        runtime_use_count=model.runtime_use_count,
+        last_used_run_id=model.last_used_run_id,
         created_at=model.created_at,
     )
 

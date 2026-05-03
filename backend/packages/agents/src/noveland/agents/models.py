@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -196,8 +197,19 @@ class AgentObservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "agent_observations"
     __table_args__ = (
         CheckConstraint("observation_type <> ''", name="observation_type_present"),
+        CheckConstraint(
+            "review_status IN ('unreviewed', 'approved', 'rejected')",
+            name="review_status",
+        ),
+        CheckConstraint(
+            "confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)",
+            name="confidence_score_range",
+        ),
+        CheckConstraint("runtime_use_count >= 0", name="runtime_use_count_non_negative"),
         Index("ix_agent_observations_world_agent_observed", "world_id", "agent_id", "observed_at"),
         Index("ix_agent_observations_source_event_id", "source_event_id"),
+        Index("ix_agent_observations_world_agent_review", "world_id", "agent_id", "review_status"),
+        Index("ix_agent_observations_last_used_run_id", "last_used_run_id"),
         Index(
             "uq_agent_observations_agent_source_event",
             "agent_id",
@@ -230,3 +242,20 @@ class AgentObservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(nullable=True)
+    review_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'unreviewed'"),
+        default="unreviewed",
+    )
+    runtime_use_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    last_used_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_runtime_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )

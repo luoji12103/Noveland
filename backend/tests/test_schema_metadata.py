@@ -268,6 +268,18 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "agent_observations",
         CheckConstraint,
     )
+    assert "ck_agent_observations_review_status" in constraint_names(
+        "agent_observations",
+        CheckConstraint,
+    )
+    assert "ck_agent_observations_confidence_score_range" in constraint_names(
+        "agent_observations",
+        CheckConstraint,
+    )
+    assert "ck_agent_observations_runtime_use_count_non_negative" in constraint_names(
+        "agent_observations",
+        CheckConstraint,
+    )
     assert "ck_provider_profiles_provider_type" in constraint_names(
         "provider_profiles",
         CheckConstraint,
@@ -326,6 +338,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("agent_personas") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("agent_observations") == {
         "agents.id",
+        "agent_runtime_runs.id",
         "world_events.id",
         "worlds.id",
     }
@@ -401,6 +414,8 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_personas_world_agent" in index_names("agent_personas")
     assert "ix_agent_observations_world_agent_observed" in index_names("agent_observations")
     assert "ix_agent_observations_source_event_id" in index_names("agent_observations")
+    assert "ix_agent_observations_world_agent_review" in index_names("agent_observations")
+    assert "ix_agent_observations_last_used_run_id" in index_names("agent_observations")
     assert "uq_agent_observations_agent_source_event" in index_names("agent_observations")
     assert "ix_world_clock_states_world_id" in index_names("world_clock_states")
     assert "ix_world_clock_transitions_world_id" in index_names("world_clock_transitions")

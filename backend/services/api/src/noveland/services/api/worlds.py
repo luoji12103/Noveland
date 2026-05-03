@@ -284,6 +284,8 @@ class AgentObservationCreateRequest(_RequestModel):
     content: str = Field(min_length=1, max_length=12_000)
     metadata: dict[str, Any] = Field(default_factory=dict)
     observed_at: datetime | None = None
+    confidence_score: float | None = Field(default=None, ge=0, le=1)
+    review_status: Literal["unreviewed", "approved", "rejected"] = "unreviewed"
 
     @field_validator("observed_at", mode="after")
     @classmethod
@@ -665,6 +667,10 @@ class AgentObservationResponse(BaseModel):
     metadata: dict[str, Any]
     observed_at: datetime
     consumed_at: datetime | None
+    confidence_score: float | None
+    review_status: str
+    runtime_use_count: int
+    last_used_run_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -2094,6 +2100,8 @@ def create_agent_observation(
                 content=observation_create.content,
                 metadata=observation_create.metadata,
                 observed_at=observation_create.observed_at or datetime.now(UTC),
+                confidence_score=observation_create.confidence_score,
+                review_status=observation_create.review_status,
             ),
         ),
     )

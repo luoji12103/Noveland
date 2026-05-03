@@ -136,6 +136,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           observation_type: formString(form, "observation_type") || "manual",
           content: formString(form, "content"),
           metadata: jsonObject(formString(form, "metadata")),
+          confidence_score: optionalNumber(form, "confidence_score"),
         });
         formElement.reset();
       },
@@ -384,6 +385,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 <input className="text-input" name="observation_type" placeholder="manual" />
                 <textarea className="text-input" name="content" placeholder="Observation" rows={4} />
                 <textarea className="text-input" name="metadata" placeholder="{}" rows={3} />
+                <input className="text-input" name="confidence_score" placeholder="Confidence 0-1" />
                 <button className="primary-button" type="submit">
                   Add observation
                 </button>
@@ -406,7 +408,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             rows={data.agentObservations.map((observation) => ({
               id: observation.id,
               title: observation.observation_type,
-              detail: observation.content,
+              detail: `${observation.content} - ${observation.review_status} - used ${observation.runtime_use_count}`,
             }))}
           />
         </section>
@@ -570,6 +572,15 @@ function personaInputFromForm(form: FormData) {
     policy_plugin_config: jsonObject(formString(form, "policy_plugin_config")),
     is_enabled: form.get("is_enabled") === "on",
   };
+}
+
+function optionalNumber(form: FormData, key: string): number | null {
+  const value = optionalFormString(form, key);
+  if (value === null) {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function presetOverrideSummary(

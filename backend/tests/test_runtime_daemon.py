@@ -97,6 +97,7 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
         runs = session.scalars(select(AgentRuntimeRun)).all()
         memories = session.scalars(select(AgentMemoryItem)).all()
         artifacts = session.scalars(select(NarrativeArtifact)).all()
+        observations = session.scalars(select(AgentObservation)).all()
         events = session.scalars(
             select(WorldEventModel).order_by(WorldEventModel.sequence),
         ).all()
@@ -113,6 +114,9 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     assert memories[0].content.startswith("Runtime response for:")
     assert len(artifacts) == 1
     assert artifacts[0].title == "guide runtime note"
+    assert observations
+    assert all(observation.runtime_use_count == 1 for observation in observations)
+    assert all(observation.last_used_run_id == runs[0].id for observation in observations)
     assert [event.event_name for event in events] == [
         "world.clock_advanced",
         "calendar.entry_due",

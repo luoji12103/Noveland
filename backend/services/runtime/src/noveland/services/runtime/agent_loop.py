@@ -368,6 +368,10 @@ class AgentRuntimeOrchestrator:
             )
             run_model.created_event_id = failed_event.id
 
+        observation_service.mark_consumed(
+            [observation.id for observation in observations],
+            run_id=run_model.id,
+        )
         self._session.flush()
         return _run_record(run_model)
 

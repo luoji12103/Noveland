@@ -1033,7 +1033,12 @@ def test_agent_persona_and_observation_api_requires_world_admin() -> None:
     )
     manual_observation = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/observations",
-        json={"content": "Operator observation", "observation_type": "manual"},
+        json={
+            "content": "Operator observation",
+            "observation_type": "manual",
+            "confidence_score": 0.75,
+            "review_status": "approved",
+        },
     )
     refreshed = client.post(f"/worlds/{world_id}/agents/{agent_id}/observations/refresh")
     listed = client.get(f"/worlds/{world_id}/agents/{agent_id}/observations")
@@ -1053,6 +1058,10 @@ def test_agent_persona_and_observation_api_requires_world_admin() -> None:
     assert upsert_persona.json()["behavior_policy"] == {"tone": "direct"}
     assert manual_observation.status_code == 201
     assert manual_observation.json()["content"] == "Operator observation"
+    assert manual_observation.json()["confidence_score"] == 0.75
+    assert manual_observation.json()["review_status"] == "approved"
+    assert manual_observation.json()["runtime_use_count"] == 0
+    assert manual_observation.json()["last_used_run_id"] is None
     assert refreshed.status_code == 200
     assert any(item["observation_type"] == "world.clock_advanced" for item in refreshed.json())
     assert listed.status_code == 200

@@ -90,6 +90,8 @@ def test_persona_upsert_and_observation_refresh_are_agent_scoped_and_idempotent(
         consumed_observation = session.get(AgentObservation, manual.id)
         assert consumed_observation is not None
         assert consumed_observation.consumed_at is not None
+        assert consumed_observation.review_status == "unreviewed"
+        assert consumed_observation.runtime_use_count == 1
 
 
 def _create_tables(engine: Engine) -> None:

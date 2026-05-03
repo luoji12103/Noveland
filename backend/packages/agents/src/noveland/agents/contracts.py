@@ -47,6 +47,8 @@ class AgentObservationCreate(_FrozenContract):
     metadata: dict[str, Any] = Field(default_factory=dict)
     observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     source_event_id: uuid.UUID | None = None
+    confidence_score: float | None = Field(default=None, ge=0, le=1)
+    review_status: str = Field(default="unreviewed", pattern="^(unreviewed|approved|rejected)$")
 
     @field_validator("observed_at", mode="after")
     @classmethod
@@ -66,6 +68,10 @@ class AgentObservationRecord(_FrozenContract):
     metadata: dict[str, Any]
     observed_at: datetime
     consumed_at: datetime | None
+    confidence_score: float | None
+    review_status: str
+    runtime_use_count: int
+    last_used_run_id: uuid.UUID | None
     created_at: datetime
 
 

@@ -2059,8 +2059,13 @@ function AgentPersonaObservationsPanel({
               <h3>{observation.observation_type}</h3>
               <p>{observation.content}</p>
               <p className="status-detail">{formatDateTime(observation.observed_at)}</p>
+              <p className="status-detail">
+                {observation.review_status} - used {observation.runtime_use_count}
+              </p>
             </div>
-            <p className="status-detail">{observation.source_event_id ?? "manual"}</p>
+            <p className="status-detail">
+              {observation.last_used_run_id ?? observation.source_event_id ?? "manual"}
+            </p>
           </article>
         ))}
       </div>

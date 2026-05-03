@@ -784,6 +784,10 @@ export type AgentObservation = {
   metadata: Record<string, unknown>;
   observed_at: string;
   consumed_at: string | null;
+  confidence_score: number | null;
+  review_status: "unreviewed" | "approved" | "rejected";
+  runtime_use_count: number;
+  last_used_run_id: string | null;
   created_at: string;
 };
 
@@ -1103,6 +1107,8 @@ export type AgentObservationCreateInput = {
   content: string;
   metadata?: Record<string, unknown>;
   observed_at?: string | null;
+  confidence_score?: number | null;
+  review_status?: "unreviewed" | "approved" | "rejected";
 };
 
 export type NarrativeArtifactCreateInput = {
