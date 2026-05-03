@@ -748,6 +748,16 @@ export type AgentPersona = {
   updated_at: string;
 };
 
+export type PersonaPolicyValidationIssue = {
+  field: string;
+  message: string;
+};
+
+export type PersonaPolicyValidation = {
+  valid: boolean;
+  issues: PersonaPolicyValidationIssue[];
+};
+
 export type PluginCategory =
   | "model_provider"
   | "memory_backend"

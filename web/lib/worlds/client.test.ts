@@ -59,6 +59,7 @@ import {
   updateAgentPreset,
   updateProviderProfile,
   updateAgentPersona,
+  validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
 } from "@/lib/worlds/client";
@@ -457,6 +458,7 @@ describe("world client", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse(null))
       .mockResolvedValueOnce(jsonResponse({ id: "persona-1" }))
+      .mockResolvedValueOnce(jsonResponse({ valid: true, issues: [] }))
       .mockResolvedValueOnce(jsonResponse([{ id: "observation-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "observation-2" }, 201))
       .mockResolvedValueOnce(jsonResponse([{ id: "observation-1" }, { id: "observation-2" }]));
@@ -468,15 +470,21 @@ describe("world client", () => {
       behavior_policy: { tone: "direct" },
       is_enabled: true,
     });
+    await validateAgentPersona("world-1", "agent-1", {
+      persona_text: "Careful guide.",
+      behavior_policy: { tone: "direct" },
+      is_enabled: true,
+    });
     await listAgentObservations("world-1", "agent-1");
     await createAgentObservation("world-1", "agent-1", { content: "Manual note" });
     await refreshAgentObservations("world-1", "agent-1");
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/persona");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/persona");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/observations");
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/agents/agent-1/persona/validate");
     expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/agents/agent-1/observations");
-    expect(fetchMock.mock.calls[4][0]).toBe(
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/agents/agent-1/observations");
+    expect(fetchMock.mock.calls[5][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/observations/refresh",
     );
   });

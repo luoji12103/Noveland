@@ -15,6 +15,7 @@ import {
   searchAgentMemory,
   updateAgent,
   updateAgentPersona,
+  validateAgentPersona,
 } from "@/lib/worlds/client";
 import type { AgentDetailData } from "@/lib/worlds/server";
 import type { AgentPreset, AgentRunDetail } from "@/lib/worlds/types";
@@ -110,15 +111,19 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
     const form = new FormData(event.currentTarget);
     await runAction(
       () =>
-        updateAgentPersona(worldId, agentId, {
-          persona_text: formString(form, "persona_text"),
-          behavior_policy: jsonObject(formString(form, "behavior_policy")),
-          policy_plugin_identifier: formString(form, "policy_plugin_identifier"),
-          policy_plugin_config: jsonObject(formString(form, "policy_plugin_config")),
-          is_enabled: form.get("is_enabled") === "on",
-        }),
+        updateAgentPersona(worldId, agentId, personaInputFromForm(form)),
       "Persona saved.",
     );
+  }
+
+  async function handleValidatePersona(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    await runAction(async () => {
+      const validation = await validateAgentPersona(worldId, agentId, personaInputFromForm(form));
+      if (!validation.valid) {
+        throw new Error(validation.issues.map((issue) => issue.message).join(" "));
+      }
+    }, "Persona policy is valid.");
   }
 
   async function handleObservation(event: FormEvent<HTMLFormElement>) {
@@ -340,9 +345,23 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 />
                 Persona enabled
               </label>
-              <button className="primary-button" type="submit">
-                Save persona
-              </button>
+              <div className="button-row">
+                <button className="primary-button" type="submit">
+                  Save persona
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={(event) => {
+                    const form = event.currentTarget.form;
+                    if (form !== null) {
+                      void handleValidatePersona(form);
+                    }
+                  }}
+                >
+                  Validate persona
+                </button>
+              </div>
             </form>
           ) : (
             <>
@@ -541,6 +560,16 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
       </section>
     </section>
   );
+}
+
+function personaInputFromForm(form: FormData) {
+  return {
+    persona_text: formString(form, "persona_text"),
+    behavior_policy: jsonObject(formString(form, "behavior_policy")),
+    policy_plugin_identifier: formString(form, "policy_plugin_identifier"),
+    policy_plugin_config: jsonObject(formString(form, "policy_plugin_config")),
+    is_enabled: form.get("is_enabled") === "on",
+  };
 }
 
 function presetOverrideSummary(

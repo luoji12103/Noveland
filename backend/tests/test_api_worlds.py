@@ -990,10 +990,39 @@ def test_agent_persona_and_observation_api_requires_world_admin() -> None:
 
     _authenticate(client, member_token)
     member_persona = client.get(f"/worlds/{world_id}/agents/{agent_id}/persona")
+    member_validate_persona = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/persona/validate",
+        json={"persona_text": "Blocked"},
+    )
     member_observations = client.get(f"/worlds/{world_id}/agents/{agent_id}/observations")
 
     _authenticate(client, owner_token)
     empty_persona = client.get(f"/worlds/{world_id}/agents/{agent_id}/persona")
+    valid_persona = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/persona/validate",
+        json={
+            "persona_text": "Careful guide.",
+            "behavior_policy": {"tone": "direct"},
+            "is_enabled": True,
+        },
+    )
+    invalid_persona = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/persona/validate",
+        json={
+            "persona_text": "",
+            "behavior_policy": {"required": ["direct"], "disabled": ["direct"]},
+            "policy_plugin_config": {"unexpected": True},
+            "is_enabled": True,
+        },
+    )
+    invalid_save = client.patch(
+        f"/worlds/{world_id}/agents/{agent_id}/persona",
+        json={
+            "persona_text": "",
+            "behavior_policy": {"required": ["direct"], "disabled": ["direct"]},
+            "is_enabled": True,
+        },
+    )
     upsert_persona = client.patch(
         f"/worlds/{world_id}/agents/{agent_id}/persona",
         json={
@@ -1010,9 +1039,15 @@ def test_agent_persona_and_observation_api_requires_world_admin() -> None:
     listed = client.get(f"/worlds/{world_id}/agents/{agent_id}/observations")
 
     assert member_persona.status_code == 403
+    assert member_validate_persona.status_code == 403
     assert member_observations.status_code == 403
     assert empty_persona.status_code == 200
     assert empty_persona.json() is None
+    assert valid_persona.status_code == 200
+    assert valid_persona.json()["valid"] is True
+    assert invalid_persona.status_code == 200
+    assert invalid_persona.json()["valid"] is False
+    assert invalid_save.status_code == 422
     assert upsert_persona.status_code == 200
     assert upsert_persona.json()["persona_text"] == "Careful guide."
     assert upsert_persona.json()["behavior_policy"] == {"tone": "direct"}

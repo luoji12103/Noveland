@@ -45,6 +45,7 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
+  PersonaPolicyValidation,
   PluginCatalogEntry,
   PluginCategory,
   Scene,
@@ -500,6 +501,21 @@ export function updateAgentPersona(
     body: input,
     csrf: true,
   });
+}
+
+export function validateAgentPersona(
+  worldId: string,
+  agentId: string,
+  input: AgentPersonaUpdateInput,
+): Promise<PersonaPolicyValidation> {
+  return worldRequest<PersonaPolicyValidation>(
+    `/api/worlds/${worldId}/agents/${agentId}/persona/validate`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function listPluginCatalog(

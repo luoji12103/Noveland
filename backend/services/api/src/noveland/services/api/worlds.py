@@ -269,6 +269,16 @@ class AgentPersonaUpdateRequest(_RequestModel):
     is_enabled: bool = True
 
 
+class PersonaPolicyValidationIssue(BaseModel):
+    field: str
+    message: str
+
+
+class PersonaPolicyValidationResponse(BaseModel):
+    valid: bool
+    issues: list[PersonaPolicyValidationIssue]
+
+
 class AgentObservationCreateRequest(_RequestModel):
     observation_type: str = Field(default="manual", min_length=1, max_length=80)
     content: str = Field(min_length=1, max_length=12_000)
@@ -2003,13 +2013,12 @@ def upsert_agent_persona(
 ) -> AgentPersonaResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    _validate_named_plugin_binding(
-        category=PluginCategory.PERSONA_POLICY,
-        identifier=persona_update.policy_plugin_identifier,
-        raw_config=persona_update.policy_plugin_config,
-        missing_detail="Persona policy plugin is not registered",
-        invalid_detail="Persona policy plugin config is invalid",
-    )
+    validation = _validate_persona_policy(persona_update)
+    if not validation.valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[issue.model_dump() for issue in validation.issues],
+        )
     return _agent_persona_response(
         AgentPersonaService(db_session).upsert(
             AgentPersonaUpsert(
@@ -2023,6 +2032,22 @@ def upsert_agent_persona(
             ),
         ),
     )
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/persona/validate",
+    response_model=PersonaPolicyValidationResponse,
+)
+def validate_agent_persona(
+    agent_id: uuid.UUID,
+    persona_update: AgentPersonaUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PersonaPolicyValidationResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    return _validate_persona_policy(persona_update)
 
 
 @router.get(
@@ -2661,6 +2686,49 @@ def _validate_named_plugin_binding(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=invalid_detail,
         ) from exc
+
+
+def _validate_persona_policy(
+    persona_update: AgentPersonaUpdateRequest,
+) -> PersonaPolicyValidationResponse:
+    issues: list[PersonaPolicyValidationIssue] = []
+    if persona_update.is_enabled and persona_update.persona_text.strip() == "":
+        issues.append(
+            PersonaPolicyValidationIssue(
+                field="persona_text",
+                message="Enabled persona policy requires persona text.",
+            ),
+        )
+    disabled = persona_update.behavior_policy.get("disabled")
+    required = persona_update.behavior_policy.get("required")
+    if isinstance(disabled, list) and isinstance(required, list):
+        overlap = {str(item) for item in disabled} & {str(item) for item in required}
+        if overlap:
+            issues.append(
+                PersonaPolicyValidationIssue(
+                    field="behavior_policy",
+                    message=(
+                        "Behavior policy has contradictory disabled/required values: "
+                        f"{sorted(overlap)}."
+                    ),
+                ),
+            )
+    try:
+        _validate_named_plugin_binding(
+            category=PluginCategory.PERSONA_POLICY,
+            identifier=persona_update.policy_plugin_identifier,
+            raw_config=persona_update.policy_plugin_config,
+            missing_detail="Persona policy plugin is not registered",
+            invalid_detail="Persona policy plugin config is invalid",
+        )
+    except HTTPException as exc:
+        issues.append(
+            PersonaPolicyValidationIssue(
+                field="policy_plugin_identifier",
+                message=str(exc.detail),
+            ),
+        )
+    return PersonaPolicyValidationResponse(valid=len(issues) == 0, issues=issues)
 
 
 def _create_plugin_binding(
