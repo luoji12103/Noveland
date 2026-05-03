@@ -28,6 +28,9 @@ from noveland.calendar import (
     CalendarEntryCreate,
     CalendarEntryStatus,
     CalendarEntryUpdate,
+    CalendarConflictReport,
+    CalendarConflictRecord,
+    CalendarConflictSource,
     CalendarService,
     ScheduleRuleCreate,
     ScheduleRuleKind,
@@ -527,6 +530,31 @@ class ScheduleRulePreviewResponse(BaseModel):
     affected_agent_count: int
     affected_agent_ids: list[uuid.UUID]
     matches: list[ScheduleRulePreviewMatchResponse]
+
+
+class CalendarConflictSourceResponse(BaseModel):
+    source_kind: str
+    source_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    label: str
+
+
+class CalendarConflictResponse(BaseModel):
+    conflict_type: str
+    world_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    starts_at: datetime
+    ends_at: datetime
+    reason: str
+    sources: list[CalendarConflictSourceResponse]
+
+
+class CalendarConflictReportResponse(BaseModel):
+    world_id: uuid.UUID
+    start_world_time: datetime
+    horizon_hours: int
+    conflict_count: int
+    conflicts: list[CalendarConflictResponse]
 
 
 class MemoryItemResponse(BaseModel):
@@ -1370,6 +1398,33 @@ def list_schedule_rules(
         _schedule_rule_response(rule)
         for rule in CalendarService(db_session).list_rules(context.world_id)
     ]
+
+
+@router.get(
+    "/{world_id}/calendar/conflicts",
+    response_model=CalendarConflictReportResponse,
+)
+def list_calendar_conflicts(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    start_world_time: Annotated[datetime | None, Query()] = None,
+    horizon_hours: Annotated[int, Query(ge=1, le=720)] = 168,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> CalendarConflictReportResponse:
+    _world_or_404(db_session, context.world_id)
+    if start_world_time is not None:
+        start_world_time = _timezone_aware(start_world_time, "start_world_time")
+    start_time = start_world_time or WorldClockService(db_session).view(
+        context.world_id,
+    ).effective_world_time
+    return _calendar_conflict_report_response(
+        CalendarService(db_session).detect_conflicts(
+            world_id=context.world_id,
+            start_world_time=start_time,
+            horizon_hours=horizon_hours,
+            limit=limit,
+        ),
+    )
 
 
 @router.post(
@@ -2621,6 +2676,46 @@ def _schedule_rule_preview_response(
             )
             for match in preview.matches
         ],
+    )
+
+
+def _calendar_conflict_report_response(
+    report: CalendarConflictReport,
+) -> CalendarConflictReportResponse:
+    return CalendarConflictReportResponse(
+        world_id=report.world_id,
+        start_world_time=report.start_world_time,
+        horizon_hours=report.horizon_hours,
+        conflict_count=report.conflict_count,
+        conflicts=[
+            _calendar_conflict_response(conflict)
+            for conflict in report.conflicts
+        ],
+    )
+
+
+def _calendar_conflict_response(
+    conflict: CalendarConflictRecord,
+) -> CalendarConflictResponse:
+    return CalendarConflictResponse(
+        conflict_type=conflict.conflict_type,
+        world_id=conflict.world_id,
+        agent_id=conflict.agent_id,
+        starts_at=conflict.starts_at,
+        ends_at=conflict.ends_at,
+        reason=conflict.reason,
+        sources=[_calendar_conflict_source_response(source) for source in conflict.sources],
+    )
+
+
+def _calendar_conflict_source_response(
+    source: CalendarConflictSource,
+) -> CalendarConflictSourceResponse:
+    return CalendarConflictSourceResponse(
+        source_kind=source.source_kind,
+        source_id=source.source_id,
+        agent_id=source.agent_id,
+        label=source.label,
     )
 
 

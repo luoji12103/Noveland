@@ -13,6 +13,7 @@ import {
   deleteMembership,
   exportWorldComposition,
   importWorldComposition,
+  getCalendarConflicts,
   listMemberCandidates,
   listWorldEvents,
   pauseWorldClock,
@@ -29,6 +30,7 @@ import type {
   MemberCandidate,
   RuntimeDiagnostic,
   ScheduleRulePreview,
+  CalendarConflictReport,
   WorldEventAuditEntry,
   WorldClock,
   WorldRole,
@@ -52,6 +54,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [clock, setClock] = useState(data.clock);
   const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
   const [worldEventAudit, setWorldEventAudit] = useState(data.worldEventAudit);
+  const [calendarConflicts, setCalendarConflicts] = useState(data.calendarConflicts);
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
@@ -61,7 +64,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     setClock(data.clock);
     setWorldDiagnostics(data.worldDiagnostics);
     setWorldEventAudit(data.worldEventAudit);
-  }, [data.clock, data.worldDiagnostics, data.worldEventAudit]);
+    setCalendarConflicts(data.calendarConflicts);
+  }, [data.calendarConflicts, data.clock, data.worldDiagnostics, data.worldEventAudit]);
 
   useEffect(() => {
     if (world === null) {
@@ -191,6 +195,24 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         );
       },
       "Schedule preview loaded.",
+      false,
+    );
+  }
+
+  async function handleRefreshConflicts(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setCalendarConflicts(
+          await getCalendarConflicts(selectedWorld.id, {
+            start_world_time: optionalFormString(form, "start_world_time"),
+            horizon_hours: optionalPositiveInteger(form, "horizon_hours") ?? 168,
+            limit: optionalPositiveInteger(form, "limit") ?? 50,
+          }),
+        );
+      },
+      "Calendar conflicts loaded.",
       false,
     );
   }
@@ -745,6 +767,24 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             />
           </section>
         ) : null}
+        <section aria-labelledby="calendar-conflicts-title">
+          <h3 id="calendar-conflicts-title">Calendar conflicts</h3>
+          {data.canManageSelectedWorld ? (
+            <form className="management-form" onSubmit={handleRefreshConflicts}>
+              <input
+                className="text-input"
+                name="start_world_time"
+                placeholder="2030-01-01T07:00:00Z"
+              />
+              <input className="text-input" name="horizon_hours" placeholder="Horizon hours" />
+              <input className="text-input" name="limit" placeholder="Limit" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Check conflicts
+              </button>
+            </form>
+          ) : null}
+          <CalendarConflictsView report={calendarConflicts} />
+        </section>
         <ResourceList
           rows={data.scheduleRules.map((rule) => ({
             id: rule.id,
@@ -926,6 +966,26 @@ function formatPayload(event: WorldEventAuditEntry): string {
     return payload;
   }
   return `${payload.slice(0, 157)}...`;
+}
+
+function CalendarConflictsView({ report }: { report: CalendarConflictReport | null }) {
+  if (report === null) {
+    return <p className="status-detail">Conflict report unavailable.</p>;
+  }
+  if (report.conflicts.length === 0) {
+    return <p className="status-detail">No conflicts in the selected window.</p>;
+  }
+  return (
+    <ResourceList
+      rows={report.conflicts.map((conflict, index) => ({
+        id: `${conflict.conflict_type}-${conflict.starts_at}-${index}`,
+        title: `${conflict.conflict_type} at ${conflict.starts_at}`,
+        detail: `${conflict.reason} - ${conflict.sources
+          .map((source) => source.label)
+          .join(" / ")}`,
+      }))}
+    />
+  );
 }
 
 function ResourceList({ rows }: { rows: { id: string; title: string; detail: string }[] }) {

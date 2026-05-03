@@ -118,3 +118,30 @@ class ScheduleRulePreviewResult(_FrozenContract):
     horizon_hours: int = Field(ge=1)
     match_count: int = Field(ge=0)
     matches: list[ScheduleRulePreviewMatch]
+
+
+class CalendarConflictSource(_FrozenContract):
+    source_kind: str = Field(pattern="^(calendar_entry|schedule_rule)$")
+    source_id: uuid.UUID
+    agent_id: uuid.UUID | None = None
+    label: str
+
+
+class CalendarConflictRecord(_FrozenContract):
+    conflict_type: str = Field(
+        pattern="^(calendar_entry_overlap|schedule_rule_overlap|schedule_rule_calendar_overlap)$",
+    )
+    world_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    starts_at: datetime
+    ends_at: datetime
+    reason: str
+    sources: list[CalendarConflictSource] = Field(min_length=2)
+
+
+class CalendarConflictReport(_FrozenContract):
+    world_id: uuid.UUID
+    start_world_time: datetime
+    horizon_hours: int = Field(ge=1)
+    conflict_count: int = Field(ge=0)
+    conflicts: list[CalendarConflictRecord]

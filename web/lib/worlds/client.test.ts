@@ -11,6 +11,7 @@ import {
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
+  getCalendarConflicts,
   getNarrativeArtifact,
   createWorld,
   deactivateAgentPreset,
@@ -401,6 +402,21 @@ describe("world client", () => {
       "/api/worlds/world-1/conversations/conversation-1/narrative/generate",
     );
     expect(fetchMock.mock.calls[5][0]).toBe("/api/worlds/world-1/narrative-artifacts");
+  });
+
+  it("maps calendar conflict requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ conflict_count: 0 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getCalendarConflicts("world-1", {
+      start_world_time: "2030-01-01T00:00:00Z",
+      horizon_hours: 24,
+      limit: 10,
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/worlds/world-1/calendar/conflicts?start_world_time=2030-01-01T00%3A00%3A00Z&horizon_hours=24&limit=10",
+    );
   });
 
   it("maps narrative reader filter and detail requests", async () => {

@@ -7,6 +7,7 @@ import type {
   AgentPreset,
   AgentPersona,
   AgentRun,
+  CalendarConflictReport,
   CalendarEntry,
   ConversationParticipant,
   ConversationSession,
@@ -53,6 +54,7 @@ export type WorldWorkspaceData = {
   latestSnapshot: WorldSnapshot | null;
   snapshotIntegrity: WorldSnapshotIntegrity | null;
   worldEventAudit: WorldEventAuditEntry[];
+  calendarConflicts: CalendarConflictReport | null;
   scheduleRules: ScheduleRule[];
   worldDiagnostics: RuntimeDiagnostic[];
   canManageSelectedWorld: boolean;
@@ -317,6 +319,7 @@ export async function getWorldWorkspaceData(
       latestSnapshot,
       snapshotIntegrity,
       worldEventAudit,
+      calendarConflicts,
       scheduleRules,
       worldDiagnostics,
     ] = await Promise.all([
@@ -332,6 +335,7 @@ export async function getWorldWorkspaceData(
       apiFetch<WorldSnapshot | null>(`/worlds/${worldId}/snapshots/latest`, cookies),
       apiFetchOptional<WorldSnapshotIntegrity>(`/worlds/${worldId}/snapshots/integrity`, cookies),
       apiFetchOptional<WorldEventAuditEntry[]>(`/worlds/${worldId}/events?limit=10`, cookies),
+      apiFetchOptional<CalendarConflictReport>(`/worlds/${worldId}/calendar/conflicts`, cookies),
       apiFetch<ScheduleRule[]>(`/worlds/${worldId}/schedule-rules`, cookies),
       apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${worldId}/diagnostics`, cookies),
     ]);
@@ -350,6 +354,7 @@ export async function getWorldWorkspaceData(
       latestSnapshot,
       snapshotIntegrity,
       worldEventAudit: worldEventAudit ?? [],
+      calendarConflicts,
       scheduleRules,
       worldDiagnostics: worldDiagnostics ?? [],
       canManageSelectedWorld: memberships !== null,
@@ -817,6 +822,7 @@ function emptyWorldWorkspaceData(
     latestSnapshot: null,
     snapshotIntegrity: null,
     worldEventAudit: [],
+    calendarConflicts: null,
     scheduleRules: [],
     worldDiagnostics: [],
     canManageSelectedWorld: false,

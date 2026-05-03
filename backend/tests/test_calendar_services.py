@@ -124,6 +124,67 @@ def test_schedule_rule_preview_dry_runs_without_persisting_rule() -> None:
     assert rules_after_preview == []
 
 
+def test_calendar_service_detects_entry_rule_and_rule_conflicts() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+
+    with Session(engine) as session:
+        service = CalendarService(session)
+        service.create_entry(
+            CalendarEntryCreate(
+                world_id=world_id,
+                agent_id=agent_id,
+                title="Briefing",
+                starts_at=datetime(2030, 1, 1, 8, tzinfo=UTC),
+                ends_at=datetime(2030, 1, 1, 10, tzinfo=UTC),
+            ),
+        )
+        service.create_entry(
+            CalendarEntryCreate(
+                world_id=world_id,
+                agent_id=agent_id,
+                title="Debrief",
+                starts_at=datetime(2030, 1, 1, 9, tzinfo=UTC),
+                ends_at=datetime(2030, 1, 1, 11, tzinfo=UTC),
+            ),
+        )
+        service.create_rule(
+            ScheduleRuleCreate(
+                world_id=world_id,
+                rule_key="hour-a",
+                name="Hour A",
+                kind=ScheduleRuleKind.TIMETABLE,
+                config={"hours": [9]},
+            ),
+        )
+        service.create_rule(
+            ScheduleRuleCreate(
+                world_id=world_id,
+                rule_key="hour-b",
+                name="Hour B",
+                kind=ScheduleRuleKind.TIMETABLE,
+                config={"hours": [9]},
+            ),
+        )
+        report = service.detect_conflicts(
+            world_id=world_id,
+            start_world_time=datetime(2030, 1, 1, 7, tzinfo=UTC),
+            horizon_hours=4,
+            limit=20,
+        )
+        session.commit()
+
+    conflict_types = {conflict.conflict_type for conflict in report.conflicts}
+    assert report.conflict_count == len(report.conflicts)
+    assert {
+        "calendar_entry_overlap",
+        "schedule_rule_overlap",
+        "schedule_rule_calendar_overlap",
+    } <= conflict_types
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

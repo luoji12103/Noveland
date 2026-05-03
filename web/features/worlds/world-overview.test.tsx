@@ -15,13 +15,14 @@ vi.mock("@/lib/worlds/client", async () => {
   );
   return {
     ...actual,
+    getCalendarConflicts: vi.fn(),
     listWorldEvents: vi.fn(),
     previewScheduleRule: vi.fn(),
   };
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
-import { listWorldEvents, previewScheduleRule } from "@/lib/worlds/client";
+import { getCalendarConflicts, listWorldEvents, previewScheduleRule } from "@/lib/worlds/client";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type { WorldEventAuditEntry } from "@/lib/worlds/types";
 
@@ -32,6 +33,36 @@ describe("WorldOverview", () => {
 
   it("renders and filters world event audit rows for world admins", async () => {
     vi.mocked(listWorldEvents).mockResolvedValue([eventRow("event-2", 2, "agent.run_failed")]);
+    vi.mocked(getCalendarConflicts).mockResolvedValue({
+      world_id: "world-1",
+      start_world_time: "2030-01-01T00:00:00.000Z",
+      horizon_hours: 168,
+      conflict_count: 1,
+      conflicts: [
+        {
+          conflict_type: "calendar_entry_overlap",
+          world_id: "world-1",
+          agent_id: "agent-1",
+          starts_at: "2030-01-01T08:00:00.000Z",
+          ends_at: "2030-01-01T09:00:00.000Z",
+          reason: "calendar entries overlap for the same agent",
+          sources: [
+            {
+              source_kind: "calendar_entry",
+              source_id: "entry-1",
+              agent_id: "agent-1",
+              label: "Briefing",
+            },
+            {
+              source_kind: "calendar_entry",
+              source_id: "entry-2",
+              agent_id: "agent-1",
+              label: "Debrief",
+            },
+          ],
+        },
+      ],
+    });
     vi.mocked(previewScheduleRule).mockResolvedValue({
       world_id: "world-1",
       kind: "timetable",
@@ -57,6 +88,7 @@ describe("WorldOverview", () => {
     expect(screen.getByText("resume to revision 1")).toBeInTheDocument();
     expect(screen.getByText("Reconstructed clock")).toBeInTheDocument();
     expect(screen.getByText("Snapshot integrity")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Calendar conflicts" })).toBeInTheDocument();
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
@@ -87,6 +119,17 @@ describe("WorldOverview", () => {
       expect(screen.getByText("Preview matches 1 windows for 1 agents.")).toBeInTheDocument();
     });
     expect(screen.getByText("hour 8 - 1 agents")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Check conflicts" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/calendar_entry_overlap/)).toBeInTheDocument();
+    });
+    expect(getCalendarConflicts).toHaveBeenCalledWith("world-1", {
+      start_world_time: null,
+      horizon_hours: 168,
+      limit: 50,
+    });
   });
 });
 
@@ -208,6 +251,13 @@ const workspaceData: WorldWorkspaceData = {
     issues: [],
   },
   worldEventAudit: [eventRow("event-1", 1, "agent.run_succeeded")],
+  calendarConflicts: {
+    world_id: "world-1",
+    start_world_time: "2030-01-01T00:00:00.000Z",
+    horizon_hours: 168,
+    conflict_count: 0,
+    conflicts: [],
+  },
   scheduleRules: [],
   worldDiagnostics: [],
   canManageSelectedWorld: true,

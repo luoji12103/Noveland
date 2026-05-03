@@ -3,12 +3,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 
 from noveland.calendar.contracts import (
     CalendarEntryCreate,
     CalendarEntryRecord,
     CalendarEntryStatus,
     CalendarEntryUpdate,
+    CalendarConflictRecord,
+    CalendarConflictReport,
+    CalendarConflictSource,
     ScheduleRuleCreate,
     ScheduleRuleKind,
     ScheduleRulePreviewMatch,
@@ -17,8 +21,18 @@ from noveland.calendar.contracts import (
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.agents.models import Agent
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+
+class _RuleWindow(TypedDict):
+    agent_id: uuid.UUID
+    rule_id: uuid.UUID
+    rule_key: str
+    name: str
+    starts_at: datetime
+    ends_at: datetime
 
 
 class CalendarService:
@@ -186,6 +200,157 @@ class CalendarService:
             matches=matches,
         )
 
+    def detect_conflicts(
+        self,
+        *,
+        world_id: uuid.UUID,
+        start_world_time: datetime,
+        horizon_hours: int,
+        limit: int,
+    ) -> CalendarConflictReport:
+        normalized_start = _utc(start_world_time)
+        end_world_time = normalized_start + timedelta(hours=horizon_hours)
+        entries = self._active_entries_in_window(world_id, normalized_start, end_world_time)
+        rule_windows = self._rule_windows(world_id, normalized_start, horizon_hours)
+        conflicts: list[CalendarConflictRecord] = []
+
+        for index, left in enumerate(entries):
+            for right in entries[index + 1 :]:
+                if left.agent_id != right.agent_id or not _ranges_overlap(
+                    left.starts_at,
+                    left.ends_at or left.starts_at + timedelta(hours=1),
+                    right.starts_at,
+                    right.ends_at or right.starts_at + timedelta(hours=1),
+                ):
+                    continue
+                conflicts.append(
+                    CalendarConflictRecord(
+                        conflict_type="calendar_entry_overlap",
+                        world_id=world_id,
+                        agent_id=left.agent_id,
+                        starts_at=max(left.starts_at, right.starts_at),
+                        ends_at=min(
+                            left.ends_at or left.starts_at + timedelta(hours=1),
+                            right.ends_at or right.starts_at + timedelta(hours=1),
+                        ),
+                        reason="calendar entries overlap for the same agent",
+                        sources=[
+                            _entry_conflict_source(left),
+                            _entry_conflict_source(right),
+                        ],
+                    ),
+                )
+                if len(conflicts) >= limit:
+                    return _conflict_report(world_id, normalized_start, horizon_hours, conflicts)
+
+        for index, left in enumerate(rule_windows):
+            for right in rule_windows[index + 1 :]:
+                if left["agent_id"] != right["agent_id"] or left["starts_at"] != right["starts_at"]:
+                    continue
+                conflicts.append(
+                    CalendarConflictRecord(
+                        conflict_type="schedule_rule_overlap",
+                        world_id=world_id,
+                        agent_id=left["agent_id"],
+                        starts_at=left["starts_at"],
+                        ends_at=left["ends_at"],
+                        reason="schedule rules match the same hourly window for the same agent",
+                        sources=[
+                            _rule_conflict_source(left),
+                            _rule_conflict_source(right),
+                        ],
+                    ),
+                )
+                if len(conflicts) >= limit:
+                    return _conflict_report(world_id, normalized_start, horizon_hours, conflicts)
+
+        for entry in entries:
+            entry_start = entry.starts_at
+            entry_end = entry.ends_at or entry.starts_at + timedelta(hours=1)
+            for window in rule_windows:
+                if window["agent_id"] != entry.agent_id or not _ranges_overlap(
+                    entry_start,
+                    entry_end,
+                    window["starts_at"],
+                    window["ends_at"],
+                ):
+                    continue
+                conflicts.append(
+                    CalendarConflictRecord(
+                        conflict_type="schedule_rule_calendar_overlap",
+                        world_id=world_id,
+                        agent_id=entry.agent_id,
+                        starts_at=max(entry_start, window["starts_at"]),
+                        ends_at=min(entry_end, window["ends_at"]),
+                        reason="schedule rule window overlaps an active calendar entry",
+                        sources=[
+                            _entry_conflict_source(entry),
+                            _rule_conflict_source(window),
+                        ],
+                    ),
+                )
+                if len(conflicts) >= limit:
+                    return _conflict_report(world_id, normalized_start, horizon_hours, conflicts)
+
+        return _conflict_report(world_id, normalized_start, horizon_hours, conflicts)
+
+    def _active_entries_in_window(
+        self,
+        world_id: uuid.UUID,
+        start_world_time: datetime,
+        end_world_time: datetime,
+    ) -> list[CalendarEntryRecord]:
+        entries = self._session.scalars(
+            select(AgentCalendarEntry)
+            .where(
+                AgentCalendarEntry.world_id == world_id,
+                AgentCalendarEntry.status == CalendarEntryStatus.ACTIVE.value,
+                AgentCalendarEntry.starts_at <= end_world_time,
+                (AgentCalendarEntry.ends_at.is_(None))
+                | (AgentCalendarEntry.ends_at >= start_world_time),
+            )
+            .order_by(AgentCalendarEntry.agent_id, AgentCalendarEntry.starts_at),
+        ).all()
+        return [_entry_record(entry) for entry in entries]
+
+    def _rule_windows(
+        self,
+        world_id: uuid.UUID,
+        start_world_time: datetime,
+        horizon_hours: int,
+    ) -> list[_RuleWindow]:
+        agent_ids = self._session.scalars(
+            select(Agent.id)
+            .where(Agent.world_id == world_id, Agent.is_enabled.is_(True))
+            .order_by(Agent.agent_key),
+        ).all()
+        rules = self._session.scalars(
+            select(WorldScheduleRule)
+            .where(
+                WorldScheduleRule.world_id == world_id,
+                WorldScheduleRule.is_enabled.is_(True),
+            )
+            .order_by(WorldScheduleRule.rule_key),
+        ).all()
+        windows: list[_RuleWindow] = []
+        for offset in range(horizon_hours + 1):
+            world_time = start_world_time + timedelta(hours=offset)
+            for rule in rules:
+                if not _rule_matches(rule, world_time):
+                    continue
+                for agent_id in agent_ids:
+                    windows.append(
+                        {
+                            "agent_id": agent_id,
+                            "rule_id": rule.id,
+                            "rule_key": rule.rule_key,
+                            "name": rule.name,
+                            "starts_at": world_time,
+                            "ends_at": world_time + timedelta(hours=1),
+                        },
+                    )
+        return windows
+
 
 def _rule_matches(rule: WorldScheduleRule, world_time: datetime) -> bool:
     kind = ScheduleRuleKind(rule.kind)
@@ -220,6 +385,48 @@ def _rule_match_reason(
     if isinstance(hours, Sequence) and not isinstance(hours, str | bytes):
         return f"hour {world_time.hour}"
     return "no match"
+
+
+def _ranges_overlap(
+    left_start: datetime,
+    left_end: datetime,
+    right_start: datetime,
+    right_end: datetime,
+) -> bool:
+    return left_start < right_end and right_start < left_end
+
+
+def _entry_conflict_source(entry: CalendarEntryRecord) -> CalendarConflictSource:
+    return CalendarConflictSource(
+        source_kind="calendar_entry",
+        source_id=entry.id,
+        agent_id=entry.agent_id,
+        label=entry.title,
+    )
+
+
+def _rule_conflict_source(window: _RuleWindow) -> CalendarConflictSource:
+    return CalendarConflictSource(
+        source_kind="schedule_rule",
+        source_id=window["rule_id"],
+        agent_id=window["agent_id"],
+        label=str(window["name"]),
+    )
+
+
+def _conflict_report(
+    world_id: uuid.UUID,
+    start_world_time: datetime,
+    horizon_hours: int,
+    conflicts: list[CalendarConflictRecord],
+) -> CalendarConflictReport:
+    return CalendarConflictReport(
+        world_id=world_id,
+        start_world_time=start_world_time,
+        horizon_hours=horizon_hours,
+        conflict_count=len(conflicts),
+        conflicts=conflicts,
+    )
 
 
 def _entry_record(entry: AgentCalendarEntry) -> CalendarEntryRecord:

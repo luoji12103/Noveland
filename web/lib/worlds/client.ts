@@ -15,6 +15,8 @@ import type {
   AgentUpdateInput,
   CalendarEntry,
   CalendarEntryCreateInput,
+  CalendarConflictFilters,
+  CalendarConflictReport,
   CalendarEntryUpdateInput,
   ConversationAdvanceResult,
   ConversationNarrativeArtifactSet,
@@ -347,6 +349,27 @@ export function cancelAgentCalendarEntry(
 
 export function listScheduleRules(worldId: string): Promise<ScheduleRule[]> {
   return worldRequest<ScheduleRule[]>(`/api/worlds/${worldId}/schedule-rules`, { method: "GET" });
+}
+
+export function getCalendarConflicts(
+  worldId: string,
+  filters: CalendarConflictFilters = {},
+): Promise<CalendarConflictReport> {
+  const search = new URLSearchParams();
+  if (filters.start_world_time) {
+    search.set("start_world_time", filters.start_world_time);
+  }
+  if (filters.horizon_hours !== undefined) {
+    search.set("horizon_hours", String(filters.horizon_hours));
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  const query = search.toString();
+  return worldRequest<CalendarConflictReport>(
+    `/api/worlds/${worldId}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
+    { method: "GET" },
+  );
 }
 
 export function createScheduleRule(

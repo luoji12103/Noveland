@@ -569,6 +569,7 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
         f"/worlds/{world_id}/schedule-rules/preview",
         json={"kind": "weekday"},
     )
+    member_conflicts = client.get(f"/worlds/{world_id}/calendar/conflicts")
 
     _authenticate(client, owner_token)
     preview_rule = client.post(
@@ -602,6 +603,22 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
             "metadata": {"source": "api-test"},
         },
     )
+    create_overlapping_entry = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/calendar",
+        json={
+            "title": "Overlap scene",
+            "starts_at": "2030-01-01T08:30:00Z",
+            "ends_at": "2030-01-01T09:30:00Z",
+        },
+    )
+    conflicts = client.get(
+        f"/worlds/{world_id}/calendar/conflicts",
+        params={
+            "start_world_time": "2030-01-01T07:00:00Z",
+            "horizon_hours": 4,
+            "limit": 10,
+        },
+    )
     list_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
     update_entry = client.patch(
         f"/worlds/{world_id}/agents/{agent_id}/calendar/{create_entry.json()['id']}",
@@ -614,6 +631,7 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert member_rules.status_code == 200
     assert member_create_rule.status_code == 403
     assert member_preview.status_code == 403
+    assert member_conflicts.status_code == 403
     assert preview_rule.status_code == 200
     assert preview_rule.json()["kind"] == "timetable"
     assert preview_rule.json()["match_count"] == 1
@@ -625,6 +643,10 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert update_rule.json()["name"] == "Weekday Updated"
     assert update_rule.json()["is_enabled"] is False
     assert create_entry.status_code == 201
+    assert create_overlapping_entry.status_code == 201
+    assert conflicts.status_code == 200
+    assert conflicts.json()["conflict_count"] >= 1
+    assert conflicts.json()["conflicts"][0]["conflict_type"] == "calendar_entry_overlap"
     assert create_entry.json()["status"] == "active"
     assert list_entries.status_code == 200
     assert list_entries.json()[0]["title"] == "Morning scene"

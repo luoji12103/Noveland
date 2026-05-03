@@ -330,6 +330,34 @@ export type WorldEventAuditFilters = {
   limit?: number;
 };
 
+export type CalendarConflictSource = {
+  source_kind: "calendar_entry" | "schedule_rule";
+  source_id: string;
+  agent_id: string | null;
+  label: string;
+};
+
+export type CalendarConflict = {
+  conflict_type:
+    | "calendar_entry_overlap"
+    | "schedule_rule_overlap"
+    | "schedule_rule_calendar_overlap";
+  world_id: string;
+  agent_id: string | null;
+  starts_at: string;
+  ends_at: string;
+  reason: string;
+  sources: CalendarConflictSource[];
+};
+
+export type CalendarConflictReport = {
+  world_id: string;
+  start_world_time: string;
+  horizon_hours: number;
+  conflict_count: number;
+  conflicts: CalendarConflict[];
+};
+
 export type CalendarEntry = {
   id: string;
   world_id: string;
@@ -925,6 +953,12 @@ export type ScheduleRuleUpdateInput = {
 export type ScheduleRulePreviewInput = {
   kind: ScheduleRuleKind;
   config?: Record<string, unknown>;
+  start_world_time?: string | null;
+  horizon_hours?: number;
+  limit?: number;
+};
+
+export type CalendarConflictFilters = {
   start_world_time?: string | null;
   horizon_hours?: number;
   limit?: number;
