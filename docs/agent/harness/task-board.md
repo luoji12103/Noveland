@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Plugin/Preset Evolution Ops
+- None
 
 ## Blocked
 - None
@@ -52,6 +52,7 @@
 - Calendar/Agent Diagnostics Ops
 - Conversation/Narrative Quality Ops
 - Narrative Reader + Composition Ops
+- Plugin/Preset Evolution Ops
 
 ## Upcoming Mainline
-- None selected until Plugin/Preset Evolution Ops closeout.
+- None selected; choose the next feature bundle from `roadmap.md`.

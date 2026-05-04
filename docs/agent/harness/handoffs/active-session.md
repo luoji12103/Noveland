@@ -1,24 +1,36 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T20:00:00Z
+- Date: 2026-05-04T21:25:00Z
 - Branch: feat/plugin-preset-evolution-ops
-- Objective: Implement Plugin/Preset Evolution Ops across roadmap phases 28-32.
-- Starting state:
-  - `feat/narrative-reader-composition-ops` was fast-forward merged into local `main`.
-  - Local `main` is ahead of `origin/main`; no push is planned unless explicitly requested.
-  - The dirty whitespace in `backend/packages/memory/src/noveland/memory/models.py` was cleaned before merge and produced no lasting diff, so no empty hygiene commit was created.
-  - New branch `feat/plugin-preset-evolution-ops` was created from local `main`.
-- Planned changes:
-  - Add preset update preview for agents materialized from older preset versions.
-  - Persist explicit plugin binding metadata without adding a parallel plugin layer.
-  - Add built-in plugin contract harness coverage.
-  - Expose plugin config schema metadata to Web and render schema-driven controls with JSON fallback.
-  - Surface plugin runtime/config diagnostics without exposing secret values.
-- Planned checks:
-  - Backend targeted tests for preset preview, plugin binding persistence, plugin contract harness, plugin diagnostics, and schema metadata if migrations are added.
-  - Web targeted tests for preset admin/agent version preview, plugin schema controls, diagnostics display, client routes, and mock backend coverage.
-  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean status.
-- Current risks:
-  - Keep plugin work on existing registry/binding surfaces; do not introduce a second plugin system.
-  - Preset preview must not silently mutate existing agents.
-  - `web/next-env.d.ts` can churn after build/e2e; restore it before committing or merging.
+- Objective: Close Plugin/Preset Evolution Ops and merge back to local `main` after checks pass.
+- Completed changes:
+  - Added platform-admin preset update preview for agents materialized from older preset versions.
+  - Added `/plugins/bindings` as a derived validation surface over existing provider, world, persona, and conversation writer plugin bindings.
+  - Added built-in plugin contract harness coverage.
+  - Added schema-driven provider plugin config controls with raw JSON fallback.
+  - Added `plugin` runtime diagnostic component, migration `20260504_0022`, provider plugin validation diagnostics, and admin display of recent plugin diagnostics.
+- Functional commits:
+  - `181ead6 docs(agent): start plugin preset evolution ops`
+  - `2ccc4ce feat(presets): preview preset updates`
+  - `0d94e36 feat(plugins): persist runtime bindings`
+  - `c6895eb test(plugins): add contract harness`
+  - `b2716a3 feat(plugins): expose config schema forms`
+  - `f22be26 feat(plugins): surface runtime diagnostics`
+- Checks already run:
+  - `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py`
+  - `cd backend && uv run pytest tests/test_api_worlds.py::test_agent_preset_update_preview_reports_stale_and_current_agents -q`
+  - `cd backend && uv run ruff check services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
+  - `cd backend && uv run pytest tests/test_api_runtime.py::test_platform_admin_lists_plugin_bindings_with_validation_status tests/test_api_runtime.py::test_non_platform_admin_cannot_access_runtime_surface -q`
+  - `cd backend && uv run pytest tests/test_plugin_contract_harness.py -q`
+  - `cd backend && uv run pytest tests/test_api_runtime.py::test_plugin_config_failures_emit_redacted_plugin_diagnostics tests/test_api_runtime.py::test_platform_admin_lists_plugin_bindings_with_validation_status -q`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test -- features/admin/preset-admin.test.tsx lib/worlds/client.test.ts`
+  - `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
+- Final checks still to run:
+  - Backend ruff, mypy, pytest.
+  - Web lint, typecheck, test, build, check:next-env, e2e.
+  - `docker compose -f infra/compose.yaml config`, `git diff --check`, and clean branch status.
+- Remaining risks:
+  - `web/next-env.d.ts` may churn after build/e2e; restore it before final merge if needed.
+  - Persistent databases need migration `20260504_0022` before writing plugin diagnostics.
+  - No push is planned unless explicitly requested.

@@ -257,6 +257,7 @@ GET /agent-presets
 POST /agent-presets
 PATCH /agent-presets/{preset_id}
 DELETE /agent-presets/{preset_id}
+GET /agent-presets/{preset_id}/update-preview
 GET /worlds/{world_id}/composition-export
 POST /world-compositions/validate
 POST /world-compositions/import
@@ -382,6 +383,8 @@ GET /runtime/control
 PATCH /runtime/control
 GET /runtime/status
 GET /runtime/diagnostics
+GET /plugins/catalog
+GET /plugins/bindings
 GET /provider-profiles
 GET /provider-profiles/health
 POST /provider-profiles
@@ -390,7 +393,7 @@ POST /provider-profiles/{profile_id}/test-call
 DELETE /provider-profiles/{profile_id}
 ```
 
-Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material.
+Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material. Plugin binding and config diagnostics expose plugin identifiers, categories, and binding context only; they do not expose plugin config values or secrets.
 
 The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 

@@ -28,12 +28,14 @@ Fast orientation for a new coding session.
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
 - `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
 - `web/app/api/plugins/catalog/` — same-origin plugin catalog proxy route handler
+- `web/app/api/plugins/bindings/` — same-origin plugin binding validation proxy route handler
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
 - `web/app/api/worlds/[worldId]/stream/` — same-origin world SSE proxy route
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
   - `web/features/admin/` — platform-level preset, provider, runtime, and memory backend management pages
+  - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
@@ -55,7 +57,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, memory backend profile, and memory write job operator router
+  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, plugin binding validation, memory backend profile, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, and filtered narrative artifact router
@@ -130,7 +132,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, and agent preset versioning
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, and plugin diagnostic component support
 
 ## Update rule
 

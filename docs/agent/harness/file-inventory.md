@@ -35,6 +35,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/runtime/`
 - `web/app/api/runtime/stream/`
 - `web/app/api/plugins/catalog/`
+- `web/app/api/plugins/bindings/`
 - `web/app/api/provider-profiles/`
 - `web/app/api/provider-profiles/[profileId]/test-call/`
 - `web/app/api/worlds/[worldId]/stream/`
@@ -44,6 +45,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
 - `web/features/admin/preset-admin.tsx`
+- `web/features/plugins/`
+- `web/features/plugins/plugin-config-fields.tsx`
 - `web/features/agents/`
 - `web/features/agents/agent-list.test.tsx`
 - `web/features/auth/`
@@ -100,6 +103,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
 - `backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`
 - `backend/migrations/versions/20260504_0021_agent_preset_versioning.py`
+- `backend/migrations/versions/20260504_0022_plugin_diagnostic_component.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`

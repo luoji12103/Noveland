@@ -417,3 +417,14 @@
 - Tests added/updated: narrative API and Web tests for search/timeline; realtime API and reader/workspace tests for publication metadata; composition validation API/client/component/mock-backend tests; preset versioning API/schema/UI tests.
 - Docs updated: README endpoint list, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Push of `main` remains blocked by missing GitHub HTTPS credentials in this environment. Apply migration `20260504_0021` before using preset version provenance on persistent databases.
+
+## Plugin/preset evolution ops entry
+
+- Date: 2026-05-04
+- Branch: feat/plugin-preset-evolution-ops
+- Scope: roadmap phases 28-32 preset update strategy, plugin binding persistence, plugin contract harness, plugin config UI schema, and plugin runtime diagnostics
+- Summary: Added platform-admin preset update preview, derived plugin binding validation across existing persisted binding fields, built-in plugin contract harness coverage, schema-driven provider plugin config controls with JSON fallback, and plugin runtime diagnostics backed by a new diagnostic component.
+- Files changed: `/backend/packages/observability/**`, `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/migrations/versions/20260504_0022_plugin_diagnostic_component.py`, `/backend/tests/**`, `/web/app/api/{agent-presets,plugins}/**`, `/web/features/{admin,plugins}/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: preset update preview API/UI/client tests; plugin binding API permission/validation tests; built-in plugin contract harness; provider plugin diagnostic API tests; provider admin schema/diagnostic rendering tests; mock backend routes for preset preview and plugin bindings.
+- Docs updated: README endpoint list, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Plugin bindings continue to use existing persisted fields rather than a new plugin layer. Persistent databases need migration `20260504_0022` before writing plugin diagnostics.
