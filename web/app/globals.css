@@ -157,6 +157,26 @@ a {
   margin-top: 12px;
 }
 
+.schema-fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.schema-fieldset legend {
+  padding: 0 4px;
+  font-weight: 800;
+}
+
+.schema-fieldset p,
+.schema-fieldset span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .checkbox-label {
   display: flex;
   min-height: 42px;

@@ -25,6 +25,9 @@ describe("ProviderAdmin", () => {
     expect(screen.getByText("`missing-ref` is not present in NOVELAND_PROVIDER_API_KEYS_JSON.")).toBeInTheDocument();
     expect(screen.getByText("Recent errors")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getAllByText("Plugin config")).toHaveLength(2);
+    expect(screen.getAllByText("Raw JSON fallback")).toHaveLength(2);
+    expect(screen.getAllByText("Headers")).toHaveLength(2);
     expect(screen.getByText("Plugin bindings")).toBeInTheDocument();
     expect(screen.getByText("2 bindings inspected - 1 issues")).toBeInTheDocument();
     expect(screen.getByText("missing_plugin - missing.world_rules is not registered.")).toBeInTheDocument();
@@ -72,7 +75,25 @@ const providerData: ProviderAdminData = {
       recent_error_count: 2,
     },
   ],
-  modelProviderPlugins: [],
+  modelProviderPlugins: [
+    {
+      identifier: "builtin.openai_compatible",
+      category: "model_provider",
+      version: "0.1.0",
+      config_schema: {
+        type: "object",
+        properties: {
+          headers: {
+            title: "Headers",
+            type: "string",
+            description: "Optional JSON object of extra headers.",
+          },
+        },
+      },
+      capabilities: ["chat.completions"],
+      built_in: true,
+    },
+  ],
   pluginBindings: [
     {
       owner_kind: "provider_profile",

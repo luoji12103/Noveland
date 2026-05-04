@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { PluginConfigFields } from "@/features/plugins/plugin-config-fields";
 import {
   createProviderProfile,
   disableProviderProfile,
@@ -130,7 +131,13 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
           <input className="text-input" name="timeout_seconds" placeholder="20" />
           <input className="text-input" name="retry_attempts" placeholder="1" />
           <input className="text-input" name="rate_limit_per_minute" placeholder="Rate limit" />
-          <textarea className="text-input" name="plugin_config" placeholder="{}" rows={3} />
+          <PluginConfigFields
+            plugins={modelProviderPlugins}
+            selectedIdentifier={modelProviderPlugins[0]?.identifier ?? ""}
+            config={{}}
+            textareaId="provider-create-plugin-config"
+            textareaName="plugin_config"
+          />
           <textarea className="text-input" name="capabilities" placeholder="{}" rows={3} />
           <button className="primary-button" type="submit" disabled={isBusy}>
             Create provider profile
@@ -209,11 +216,12 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
                       name="rate_limit_per_minute"
                       defaultValue={profile.rate_limit_per_minute ?? ""}
                     />
-                    <textarea
-                      className="text-input"
-                      name="plugin_config"
-                      rows={3}
-                      defaultValue={JSON.stringify(profile.plugin_config, null, 2)}
+                    <PluginConfigFields
+                      plugins={modelProviderPlugins}
+                      selectedIdentifier={profile.plugin_identifier}
+                      config={profile.plugin_config}
+                      textareaId={`provider-${profile.id}-plugin-config`}
+                      textareaName="plugin_config"
                     />
                     <textarea
                       className="text-input"
