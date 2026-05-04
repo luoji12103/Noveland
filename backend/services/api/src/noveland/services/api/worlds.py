@@ -925,7 +925,7 @@ def import_world_composition(
         )
         if preset is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Unknown agent preset: {preset_reference.preset_key}",
             )
         preset_map[preset.preset_key] = preset
@@ -978,7 +978,7 @@ def import_world_composition(
         )
         if exported_agent.provider_profile_key is not None and explicit_provider_profile_id is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Unknown provider profile: {exported_agent.provider_profile_key}",
             )
         home_scene_id = (
@@ -988,7 +988,7 @@ def import_world_composition(
         )
         if exported_agent.home_scene_key is not None and home_scene_id is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Unknown scene key: {exported_agent.home_scene_key}",
             )
         effective_config = dict(preset.advanced_config if preset is not None else {})
@@ -1742,7 +1742,7 @@ def upsert_membership(
     require_csrf(request)
     if user_id != membership_upsert.user_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="user_id mismatch",
         )
     user = _user_or_404(db_session, user_id)
@@ -1873,7 +1873,7 @@ def update_agent_calendar_entry(
         )
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
 
@@ -2022,7 +2022,7 @@ def upsert_agent_persona(
     validation = _validate_persona_policy(persona_update)
     if not validation.valid:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=[issue.model_dump() for issue in validation.issues],
         )
     return _agent_persona_response(
@@ -2336,7 +2336,7 @@ def create_agent(
     )
     if effective_kind is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="kind is required when no preset is supplied",
         )
     preset_provider_profile_id = (
@@ -2350,7 +2350,7 @@ def create_agent(
         and preset_provider_profile_id is None
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Unknown provider profile: {preset.default_provider_profile_key}",
         )
     explicit_provider_profile_id = agent_create.provider_profile_id
@@ -2684,14 +2684,14 @@ def _validate_named_plugin_binding(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=missing_detail) from exc
     if definition.manifest.category is not category:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=invalid_detail,
         )
     try:
         registry.validate_config(identifier, raw_config)
     except PluginConfigValidationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=invalid_detail,
         ) from exc
 
@@ -3209,6 +3209,6 @@ def _optional_query_time(value: datetime | None, field_name: str) -> datetime | 
         return _timezone_aware(value, field_name)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc

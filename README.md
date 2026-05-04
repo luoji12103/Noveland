@@ -218,6 +218,7 @@ NOVELAND_MEMORY_BACKEND_SECRETS_JSON={}
    npm run test
    npm run test:e2e
    npm run build
+   npm run check:next-env
    ```
 8. 停止本地依赖：
    ```sh

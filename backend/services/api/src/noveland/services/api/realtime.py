@@ -363,7 +363,7 @@ def _handle_live_command(
                 input_text = payload.get("input_text")
                 if not isinstance(input_text, str) or input_text.strip() == "":
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                         detail="input_text is required",
                     )
                 turn = conversation_service.seed_session(
@@ -454,7 +454,7 @@ def _handle_live_command(
                 )
             else:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="Unsupported live conversation command",
                 )
         except (ConversationStateError, ConversationValidationError) as exc:

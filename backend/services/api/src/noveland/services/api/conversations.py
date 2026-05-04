@@ -866,7 +866,7 @@ def _conflict(detail: str) -> HTTPException:
 
 
 def _http_error_for_conversation_error(detail: str) -> HTTPException:
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     if (
         "already exists" in detail
         or "cannot" in detail
@@ -898,7 +898,7 @@ def _validate_writer_config_binding(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if definition.manifest.category is not PluginCategory.NARRATIVE_WRITER:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Writer binding must use a narrative_writer plugin",
         )
     try:
@@ -908,6 +908,6 @@ def _validate_writer_config_binding(
         )
     except PluginConfigValidationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc

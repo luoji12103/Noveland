@@ -35,4 +35,5 @@
   - `cd backend && uv run pytest tests/test_api_conversations.py tests/test_conversation_services.py`
   - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_narrative_writer.py tests/test_schema_metadata.py`
   - `cd web && npm run test -- features/conversations/conversation-detail.test.tsx features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx lib/worlds/client.test.ts`
+  - `cd web && npm run check:next-env` after `npm run build`
   - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, `git diff --check`, and `git status --short --branch`.
