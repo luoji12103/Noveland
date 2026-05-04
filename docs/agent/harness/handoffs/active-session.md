@@ -1,48 +1,56 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T23:55:00Z
+- Date: 2026-05-05T00:45:00Z
 - Branch: feat/access-diagnostics-scale-roadmap-plan
 - Objective: Implement roadmap phases 38-47 as an Access/Diagnostics/Scale Readiness Ops bundle, then merge back to local `main` if checks pass.
-- Status: Started; implementation in progress.
+- Status: Implementation complete; final gate pending.
 
-## Selected Roadmap Phases
+## Completed
 
-- 38. World Access Review
-- 39. Diagnostic Retention Policy
-- 40. Metrics Export Baseline
-- 41. Deployment Profile v1
-- 42. Runtime Process Supervision
-- 43. Performance Budget v1
-- 44. Memory Evaluation v2
-- 45. Memory Backfill Execution
-- 46. Distributed Queue Readiness
-- 47. Sandbox Options Design
+- Added world-admin `GET /worlds/{world_id}/access-review`.
+- Added membership upsert/delete audit diagnostics under the API diagnostic component.
+- Added platform-admin diagnostic retention dry-run and bounded prune endpoints.
+- Added platform-admin `/runtime/supervision` and `/metrics` for local operational checks.
+- Added memory eval recommendations for sampled retrieval logs.
+- Added bounded `POST /memory-backfill/execute` using existing `MemoryService` and dry-run dedupe rules.
+- Added `GET /memory-queue/readiness` for DB-backed queue migration readiness.
+- Added deployment, runtime supervision, diagnostic retention, memory queue readiness, performance budget, and sandbox options docs.
+- Fixed stale active handoff text from the previous Storage/Backup/Auth Runtime Ops bundle.
 
-## Implementation Plan
+## Commits
 
-- Add world-admin access review and audit diagnostics around membership changes.
-- Add platform-admin diagnostic retention dry-run/prune endpoints and retention docs.
-- Add a Prometheus text metrics endpoint for local operational scraping.
-- Add runtime supervision status that separates API/runtime control/heartbeat/database health.
-- Add memory eval recommendations and a guarded memory backfill execution endpoint.
-- Add queue-readiness reporting for current DB-backed memory jobs.
-- Add operator docs for deployment profile, runtime supervision, performance budget, queue readiness, and sandbox options.
+- `932868e docs(agent): start access diagnostics scale ops`
+- `8249680 feat(ops): add access review and diagnostic retention`
+- `0077475 feat(ops): expose metrics and runtime supervision`
+- `e996db1 feat(memory): add eval guidance and backfill execution`
+- Closeout docs commit pending.
 
-## Discovered Bug Cleanup
+## Checks Run So Far
 
-- Previous active handoff still described Storage/Backup/Auth Runtime Ops as active/ready; this branch refreshes it at start and will close it out at the end.
-- `web/next-env.d.ts` may churn after build/e2e; restore it before final merge if needed.
+- `cd backend && uv run ruff check packages/observability/src/noveland/observability services/api/src/noveland/services/api/runtime.py services/api/src/noveland/services/api/worlds.py tests/test_api_runtime.py tests/test_api_worlds.py`
+- `cd backend && uv run pytest tests/test_api_runtime.py tests/test_api_worlds.py -q`
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
+- `cd backend && uv run pytest tests/test_api_runtime.py -q`
+- `cd backend && uv run ruff check packages/memory/src/noveland/memory services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py tests/test_memory_backend.py`
+- `cd backend && uv run pytest tests/test_api_runtime.py tests/test_memory_backend.py -q`
 
-## Planned Checks
+## Remaining Checks
 
-- Backend targeted: `cd backend && uv run pytest tests/test_api_runtime.py tests/test_api_worlds.py tests/test_memory_backend.py`
-- Backend full: `cd backend && uv run ruff check . && uv run mypy . && uv run pytest`
-- Web targeted as needed for changed admin/world surfaces.
-- Web full: `cd web && npm run lint && npm run typecheck && npm run test && npm run build && npm run check:next-env && npm run test:e2e`
-- Infra/status: `docker compose -f infra/compose.yaml config`, `git diff --check`, `git status --short --branch`
+- `cd backend && uv run ruff check .`
+- `cd backend && uv run mypy .`
+- `cd backend && uv run pytest`
+- `cd web && npm run lint`
+- `cd web && npm run typecheck`
+- `cd web && npm run test`
+- `cd web && npm run build`
+- `cd web && npm run check:next-env`
+- `cd web && npm run test:e2e`
+- `docker compose -f infra/compose.yaml config`
+- `git diff --check`
+- `git status --short --branch`
 
 ## Risks
 
-- Backfill execution must remain idempotent and bounded; no external queue is introduced.
-- Metrics and diagnostics must not expose secrets, prompts beyond existing diagnostic redaction, or private narrative content.
-- Sandbox work is design-only in this bundle.
+- Backfill execution is bounded and idempotent but can still enqueue real jobs; use dry-run first.
+- Metrics are a local platform-admin text surface and should remain secret-free.
+- Sandbox work is design-only; no untrusted code execution is enabled.

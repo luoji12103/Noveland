@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Access/Diagnostics/Scale Readiness Ops
+- None
 
 ## Blocked
 - None
@@ -54,6 +54,7 @@
 - Narrative Reader + Composition Ops
 - Plugin/Preset Evolution Ops
 - Storage/Backup/Auth Runtime Ops
+- Access/Diagnostics/Scale Readiness Ops
 
 ## Upcoming Mainline
-- None selected until Access/Diagnostics/Scale Readiness Ops closeout.
+- None selected.

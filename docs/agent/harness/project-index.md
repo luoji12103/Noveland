@@ -10,6 +10,12 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
+- `docs/agent/operations/deployment-profile.md` — supported local/single-host deployment shape and startup checks.
+- `docs/agent/operations/runtime-supervision.md` — operator interpretation for runtime process liveness, heartbeat, and metrics.
+- `docs/agent/operations/diagnostic-retention.md` — diagnostic retention dry-run/prune policy.
+- `docs/agent/operations/memory-queue-readiness.md` — DB-backed memory queue readiness and backfill execution rules.
+- `docs/agent/operations/performance-budget.md` — local performance budgets and regression signals.
+- `docs/agent/operations/sandbox-options.md` — design-only sandbox option comparison and selection criteria.
 
 ## Current entrypoints
 
@@ -58,7 +64,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, diagnostics, provider profile, plugin binding validation, memory backend profile, and memory write job operator router
+  - `noveland.services.api.runtime` — platform-admin runtime control, supervision, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, and filtered narrative artifact router
@@ -106,11 +112,11 @@ Fast orientation for a new coding session.
   - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
 - `backend/packages/memory/`
-  - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, and backend contracts
+  - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, backfill, queue-readiness, and backend contracts
   - `noveland.memory.errors` — typed long-term memory validation and execution errors
   - `noveland.memory.models` — memory backend profiles, write jobs/logs, retrieval logs, agent profile snapshots, and local fallback memory ORM models
-  - `noveland.memory.service` — `MemoryService` facade for profile CRUD, context retrieval, async write processing, write job listing/retry/status, forget, health, logs, and eval flows
-  - `noveland.memory.evals` — smoke-eval helpers for backend contract coverage
+  - `noveland.memory.service` — `MemoryService` facade for profile CRUD, context retrieval, async write processing, write job listing/retry/status, backfill dry-run/execution, queue readiness, forget, health, logs, and eval flows
+  - `noveland.memory.evals` — smoke-eval helpers and operator recommendations for backend contract coverage
   - `noveland.memory.backends/` — abstract backend protocol plus fake and Mem0 OSS adapters
   - `noveland.memory.local_pgvector` — local pgvector fallback backend and deterministic local search implementation
   - `noveland.memory.vector_type` — shared embedding dimension and SQLAlchemy vector type adapter
@@ -125,9 +131,9 @@ Fast orientation for a new coding session.
   - `noveland.storage.local` — local filesystem object storage rooted by `NOVELAND_OBJECT_STORAGE_ROOT`
   - `noveland.storage.backup` — local backup verification command for database, migration head, object root, and snapshot payload readability checks
 - `backend/packages/observability/`
-  - `noveland.observability.contracts` — diagnostic severity/component contracts and record DTOs, including conversation diagnostics
+  - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model
-  - `noveland.observability.services` — runtime diagnostic record/list service and detail redaction
+  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, and detail redaction
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

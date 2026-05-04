@@ -91,6 +91,15 @@ Runtime recovery reference: `docs/agent/operations/runtime-recovery.md`.
 
 Snapshot object-storage and backup/restore reference: `docs/agent/operations/backup-restore.md`.
 
+Deployment and supervision references:
+
+- `docs/agent/operations/deployment-profile.md`
+- `docs/agent/operations/runtime-supervision.md`
+- `docs/agent/operations/diagnostic-retention.md`
+- `docs/agent/operations/memory-queue-readiness.md`
+- `docs/agent/operations/performance-budget.md`
+- `docs/agent/operations/sandbox-options.md`
+
 Run a local backup readiness check from `backend/`:
 
 ```sh
@@ -284,6 +293,8 @@ GET /memory-backend-profiles/{profile_id}/jobs
 POST /memory-backend-profiles/{profile_id}/eval-smoke
 POST /memory-write-jobs/{job_id}/retry
 GET /memory-backfill/dry-run
+POST /memory-backfill/execute
+GET /memory-queue/readiness
 GET /worlds/{world_id}/agents/{agent_id}/memory
 POST /worlds/{world_id}/agents/{agent_id}/memory/search
 GET /worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot
@@ -393,7 +404,11 @@ The platform-admin runtime surface is available under:
 GET /runtime/control
 PATCH /runtime/control
 GET /runtime/status
+GET /runtime/supervision
 GET /runtime/diagnostics
+GET /runtime/diagnostics/retention
+POST /runtime/diagnostics/prune
+GET /metrics
 GET /plugins/catalog
 GET /plugins/bindings
 GET /provider-profiles
@@ -417,6 +432,8 @@ The protected Web workspace also exposes runtime controls, recent runtime/world 
 The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, advances running auto-dialogue conversations one turn per loop, appends agent/runtime/conversation events, optionally writes memory items, and optionally creates narrative artifacts.
 
 Runtime-created event paths use the shared actor ref `system:runtime`; human user refs continue to come from authenticated sessions and world membership actions.
+
+Platform-admin ops surfaces include `/runtime/supervision`, `/metrics`, diagnostic retention dry-run/prune, memory queue readiness, and bounded memory backfill execution. These are local/operator tools and do not introduce an external queue or runtime sandbox.
 
 ## Development Rules
 

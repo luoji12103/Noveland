@@ -181,7 +181,13 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/`
 - `docs/agent/operations/`
 - `docs/agent/operations/backup-restore.md`
+- `docs/agent/operations/deployment-profile.md`
+- `docs/agent/operations/diagnostic-retention.md`
+- `docs/agent/operations/memory-queue-readiness.md`
+- `docs/agent/operations/performance-budget.md`
+- `docs/agent/operations/runtime-supervision.md`
 - `docs/agent/operations/runtime-recovery.md`
+- `docs/agent/operations/sandbox-options.md`
 - `docs/agent/harness/roadmap.md`
 
 ## Update rule

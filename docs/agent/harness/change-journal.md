@@ -33,6 +33,17 @@
 - Docs updated: README, backup/restore playbook, migrations README, project index, file inventory, task board, active handoff
 - Follow-up notes: backup/restore remains local operator-driven; Web restore actions, remote object storage providers, and production secret/session policy enforcement remain later roadmap work.
 
+## Access diagnostics scale readiness ops entry
+
+- Date: 2026-05-04
+- Branch: feat/access-diagnostics-scale-roadmap-plan
+- Scope: access review, diagnostic retention, metrics, runtime supervision, deployment/performance ops, memory eval/backfill, queue readiness, sandbox design
+- Summary: Added world access review and membership audit diagnostics, diagnostic retention dry-run/prune endpoints, platform-admin metrics and runtime supervision surfaces, memory eval recommendations, bounded memory backfill execution, DB queue readiness reporting, and ops docs for deployment, supervision, performance, diagnostics, queue readiness, and sandbox options.
+- Files changed: `/backend/packages/observability/**`, `/backend/packages/memory/**`, `/backend/services/api/src/noveland/services/api/{runtime,worlds}.py`, `/backend/tests/**`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: runtime API tests for metrics/supervision/diagnostic retention/memory backfill/queue readiness; world API tests for access review and membership audit diagnostics; memory service tests for backfill idempotency and queue readiness.
+- Docs updated: README, operations docs, project index, file inventory, task board, active handoff
+- Follow-up notes: sandbox remains design-only; metrics are local text output; external queue adoption remains out of scope until a later queue migration phase.
+
 ## Runnable skeleton entry
 
 - Date: 2026-04-15
