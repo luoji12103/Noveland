@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Conversation/Narrative Quality Ops
 
 ## Blocked
 - None
@@ -52,4 +52,4 @@
 - Calendar/Agent Diagnostics Ops
 
 ## Upcoming Mainline
-- None selected; next candidate should be chosen from `roadmap.md` after review.
+- None selected until Conversation/Narrative Quality Ops closeout.

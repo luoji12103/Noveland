@@ -1,44 +1,38 @@
 # Active Session Handoff
 
-- Date: 2026-05-03T08:35:00Z
-- Branch: feat/calendar-agent-diagnostics-ops
-- Objective: Close out the Calendar/Agent Diagnostics Ops roadmap bundle across phases 13-17.
+- Date: 2026-05-04T00:00:00Z
+- Branch: feat/conversation-narrative-quality-ops
+- Objective: Implement the Conversation/Narrative Quality Ops roadmap bundle across phases 18-22.
 - Starting state:
-  - `feat/event-replay-clock-ops` was fast-forward merged into local `main`.
-  - New work started from local `main` on `feat/calendar-agent-diagnostics-ops`.
-  - No push has been performed.
-- Completed work:
-  - Added world-admin calendar conflict detection at `GET /worlds/{world_id}/calendar/conflicts`.
-  - Added world-admin agent run inspector at `GET /worlds/{world_id}/agents/{agent_id}/runs/{run_id}`.
-  - Added persona policy validation at `POST /worlds/{world_id}/agents/{agent_id}/persona/validate` and enforced the same validation before persona saves.
-  - Added observation traceability columns with Alembic migration `20260503_0019_observation_traceability.py`.
-  - Added conversation diagnostics summary at `GET /worlds/{world_id}/conversations/{conversation_id}/diagnostics/summary`.
-  - Updated Web clients, world overview, agent builder/dashboard, and conversation detail surfaces.
-- Commits created on this branch:
-  - `docs(agent): start calendar agent diagnostics ops`
-  - `feat(calendar): detect calendar and schedule conflicts`
-  - `feat(agents): add agent run inspector`
-  - `feat(agents): validate persona policy controls`
-  - `feat(observations): add observation traceability fields`
-  - `feat(conversations): surface conversation diagnostics`
-- Tests run:
-  - `cd backend && uv run pytest tests/test_calendar_services.py tests/test_api_worlds.py -q` returned `23 passed`.
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_runtime_daemon.py -q` returned `20 passed`.
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_agent_observations.py -q` returned `19 passed`.
-  - `cd backend && uv run pytest tests/test_agent_observations.py tests/test_runtime_daemon.py tests/test_schema_metadata.py -q` returned `11 passed`.
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_agent_observations.py tests/test_runtime_daemon.py tests/test_schema_metadata.py -q` returned `29 passed`.
-  - `cd backend && uv run pytest tests/test_api_conversations.py tests/test_conversation_services.py -q` returned `8 passed`.
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_calendar_services.py tests/test_agent_observations.py tests/test_api_conversations.py tests/test_conversation_services.py tests/test_schema_metadata.py` returned `40 passed`.
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts` returned `16 passed`.
-  - `cd web && npm run test -- features/agents/agent-list.test.tsx features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts` returned `22 passed`.
-  - `cd web && npm run test -- features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts` returned `20 passed`.
-  - `cd web && npm run test -- features/worlds/world-overview.test.tsx features/dashboard/world-management-dashboard.test.tsx features/agents/agent-list.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts` returned `27 passed`.
-- Remaining checks:
-  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, and `git diff --check`.
+  - `feat/calendar-agent-diagnostics-ops` was fast-forward merged into local `main`.
+  - New work started from local `main` on `feat/conversation-narrative-quality-ops`.
+  - Local `main` is ahead of `origin/main`; no push has been performed.
+  - Previous Calendar/Agent Diagnostics Ops final gate passed:
+    - `cd backend && uv run ruff check .`
+    - `cd backend && uv run mypy .`
+    - `cd backend && uv run pytest`
+    - `cd web && npm run lint`
+    - `cd web && npm run typecheck`
+    - `cd web && npm run test`
+    - `cd web && npm run build`
+    - `cd web && npm run test:e2e`
+    - `docker compose -f infra/compose.yaml config`
+    - `git diff --check`
+- Planned work:
+  - Close repo-discovered quality warnings: deprecated FastAPI 422 constants and `next-env.d.ts` build churn handling.
+  - Add hybrid conversation speaker policy: deterministic execution plus preview scoring.
+  - Strengthen conversation guardrails with clearer policies, diagnostics, and terminal reasons.
+  - Expose conversation memory controls and retrieval/write behavior in API and Web surfaces.
+  - Add narrative writer prompt controls and a dry-run prompt preview.
+  - Add narrative publishing workflow backed by a separate publication table.
 - Current risks:
-  - Calendar conflict detection must remain read-only and follow current hourly v1 schedule semantics.
-  - Agent run and conversation diagnostic surfaces must redact secret-like values.
-  - Observation traceability includes a schema migration; update model metadata, migration history, and schema tests together.
-  - Keep event/snapshot semantics, world access checks, and `MemoryService` boundaries unchanged unless directly required.
-- Recommended next mainline:
-  - None selected yet; choose the next roadmap bundle after final quality gate and merge readiness review.
+  - Keep `round_robin` conversation speaker selection as the default behavior.
+  - Keep conversation memory behavior routed through `MemoryService`; do not import memory backend adapters into conversation/runtime flows.
+  - Narrative publishing requires a migration; update schema metadata and tests together.
+  - Reader surfaces must only expose published narrative content to non-editors.
+  - Generated `web/next-env.d.ts` churn must not be committed accidentally.
+- Planned checks:
+  - `cd backend && uv run pytest tests/test_api_conversations.py tests/test_conversation_services.py`
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_narrative_writer.py tests/test_schema_metadata.py`
+  - `cd web && npm run test -- features/conversations/conversation-detail.test.tsx features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx lib/worlds/client.test.ts`
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, `git diff --check`, and `git status --short --branch`.
