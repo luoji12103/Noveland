@@ -22,6 +22,7 @@ import {
   skipWorldClock,
   updateWorld,
   upsertMembership,
+  validateWorldComposition,
 } from "@/lib/worlds/client";
 import { subscribeToEventStream } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
@@ -33,6 +34,7 @@ import type {
   CalendarConflictReport,
   WorldEventAuditEntry,
   WorldClock,
+  WorldCompositionValidation,
   WorldRole,
 } from "@/lib/worlds/types";
 import {
@@ -58,6 +60,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
+  const [compositionValidation, setCompositionValidation] =
+    useState<WorldCompositionValidation | null>(null);
   const world = data.selectedWorld;
 
   useEffect(() => {
@@ -245,6 +249,30 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         window.location.assign(`/worlds/${importedWorld.id}`);
       },
       "Composition imported.",
+      false,
+    );
+  }
+
+  async function handleValidateComposition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setCompositionValidation(
+          await validateWorldComposition({
+            slug: formString(form, "slug"),
+            name: formString(form, "name"),
+            owner_user_id: formString(form, "owner_user_id"),
+            description: optionalFormString(form, "description"),
+            rules_config:
+              optionalFormString(form, "rules_config") === null
+                ? undefined
+                : jsonObject(formString(form, "rules_config")),
+            composition: JSON.parse(formString(form, "composition")),
+          }),
+        );
+      },
+      "Composition validation completed.",
       false,
     );
   }
@@ -885,6 +913,53 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           value={exportedComposition}
           placeholder="Exported composition JSON appears here."
         />
+        {data.isPlatformAdmin ? (
+          <form className="management-form" onSubmit={handleValidateComposition}>
+            <input className="text-input" name="slug" placeholder="imported-world-slug" />
+            <input className="text-input" name="name" placeholder="Imported world name" />
+            <input
+              className="text-input"
+              name="owner_user_id"
+              defaultValue={selectedWorld.owner_user_id}
+              placeholder="Owner user id"
+            />
+            <input className="text-input" name="description" placeholder="Override description" />
+            <textarea
+              className="text-input"
+              name="rules_config"
+              rows={3}
+              defaultValue={JSON.stringify(selectedWorld.rules_config, null, 2)}
+            />
+            <textarea
+              className="text-input"
+              name="composition"
+              rows={10}
+              value={compositionDraft}
+              onChange={(event) => setCompositionDraft(event.target.value)}
+              placeholder="Paste exported composition JSON"
+            />
+            <button className="secondary-button" type="submit" disabled={isBusy}>
+              Validate composition
+            </button>
+          </form>
+        ) : null}
+        {compositionValidation !== null ? (
+          <section aria-labelledby="composition-validation-title">
+            <h3 id="composition-validation-title">Composition validation</h3>
+            <p>
+              {compositionValidation.valid ? "Ready to import" : "Import blocked"} -{" "}
+              {compositionValidation.blocking_issue_count} blocking,{" "}
+              {compositionValidation.warning_issue_count} warning
+            </p>
+            <ResourceList
+              rows={compositionValidation.issues.map((issue) => ({
+                id: `${issue.code}:${issue.field}:${issue.message}`,
+                title: `${issue.severity} - ${issue.code}`,
+                detail: `${issue.field}: ${issue.message}`,
+              }))}
+            />
+          </section>
+        ) : null}
         {data.isPlatformAdmin ? (
           <form className="management-form" onSubmit={handleImportComposition}>
             <input className="text-input" name="slug" placeholder="imported-world-slug" />

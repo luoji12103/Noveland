@@ -85,6 +85,7 @@ import type {
   WorldUpdateInput,
   WorldCompositionExport,
   WorldCompositionImportInput,
+  WorldCompositionValidation,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -127,6 +128,16 @@ export function importWorldComposition(
   input: WorldCompositionImportInput,
 ): Promise<World> {
   return apiRequest<World>("/api/world-compositions/import", {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function validateWorldComposition(
+  input: WorldCompositionImportInput,
+): Promise<WorldCompositionValidation> {
+  return apiRequest<WorldCompositionValidation>("/api/world-compositions/validate", {
     method: "POST",
     body: input,
     csrf: true,

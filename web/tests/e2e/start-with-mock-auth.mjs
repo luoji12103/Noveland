@@ -666,6 +666,11 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/world-compositions/validate") {
+    await handleWorldCompositionValidate(request, response);
+    return;
+  }
+
   if (url.pathname.startsWith("/provider-profiles/")) {
     const providerSegments = url.pathname.split("/");
     await handleProviderProfileItem(request, response, providerSegments[2], providerSegments[3]);
@@ -1597,6 +1602,53 @@ async function handleWorldCompositionImport(request, response) {
   }
 
   sendJson(response, 201, world);
+}
+
+async function handleWorldCompositionValidate(request, response) {
+  const currentSubject = subjectForRequest(request);
+  if (currentSubject === null) {
+    sendJson(response, 401, { detail: "Invalid or missing session" });
+    return;
+  }
+  if (!isPlatformAdmin(currentSubject)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method !== "POST") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+
+  const body = await readJson(request);
+  const issues = [];
+  if (worlds.some((world) => world.slug === body.slug)) {
+    issues.push({
+      severity: "blocking",
+      code: "slug_collision",
+      field: "slug",
+      message: "World slug already exists.",
+    });
+  }
+  for (const presetReference of body.composition?.preset_references ?? []) {
+    if (!agentPresets.some((preset) => preset.preset_key === presetReference.preset_key)) {
+      issues.push({
+        severity: "blocking",
+        code: "missing_preset",
+        field: "composition.preset_references",
+        message: `Unknown agent preset: ${presetReference.preset_key}.`,
+      });
+    }
+  }
+  sendJson(response, 200, {
+    valid: issues.length === 0,
+    blocking_issue_count: issues.length,
+    warning_issue_count: 0,
+    issues,
+  });
 }
 
 async function handleProviderProfileItem(request, response, profileId, action) {

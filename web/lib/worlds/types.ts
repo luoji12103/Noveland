@@ -88,6 +88,11 @@ export type WorldCompositionWorld = {
   name: string;
   description: string | null;
   rules_config: Record<string, unknown>;
+  memory_backend_profile_key?: string | null;
+  memory_plugin_identifier?: string | null;
+  memory_plugin_config?: Record<string, unknown>;
+  world_rules_plugin_identifier?: string | null;
+  world_rules_plugin_config?: Record<string, unknown>;
   is_active: boolean;
 };
 
@@ -131,6 +136,20 @@ export type WorldCompositionExport = {
   agents: WorldCompositionAgent[];
   schedule_rules: WorldCompositionScheduleRule[];
   preset_references: WorldCompositionPresetReference[];
+};
+
+export type WorldCompositionValidationIssue = {
+  severity: "blocking" | "warning";
+  code: string;
+  field: string;
+  message: string;
+};
+
+export type WorldCompositionValidation = {
+  valid: boolean;
+  blocking_issue_count: number;
+  warning_issue_count: number;
+  issues: WorldCompositionValidationIssue[];
 };
 
 export type ConversationScopeType = "scene" | "world";

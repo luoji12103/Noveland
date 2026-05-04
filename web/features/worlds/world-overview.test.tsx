@@ -18,11 +18,17 @@ vi.mock("@/lib/worlds/client", async () => {
     getCalendarConflicts: vi.fn(),
     listWorldEvents: vi.fn(),
     previewScheduleRule: vi.fn(),
+    validateWorldComposition: vi.fn(),
   };
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
-import { getCalendarConflicts, listWorldEvents, previewScheduleRule } from "@/lib/worlds/client";
+import {
+  getCalendarConflicts,
+  listWorldEvents,
+  previewScheduleRule,
+  validateWorldComposition,
+} from "@/lib/worlds/client";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type { WorldEventAuditEntry } from "@/lib/worlds/types";
 
@@ -81,6 +87,19 @@ describe("WorldOverview", () => {
         },
       ],
     });
+    vi.mocked(validateWorldComposition).mockResolvedValue({
+      valid: false,
+      blocking_issue_count: 1,
+      warning_issue_count: 0,
+      issues: [
+        {
+          severity: "blocking",
+          code: "missing_preset",
+          field: "composition.agents[0].source_preset_key",
+          message: "Unknown agent preset: absent.",
+        },
+      ],
+    });
 
     render(<WorldOverview data={workspaceData} />);
 
@@ -130,8 +149,50 @@ describe("WorldOverview", () => {
       horizon_hours: 168,
       limit: 50,
     });
+
+    fireEvent.change(screen.getAllByPlaceholderText("imported-world-slug")[0], {
+      target: { value: "composition-import" },
+    });
+    fireEvent.change(screen.getAllByPlaceholderText("Imported world name")[0], {
+      target: { value: "Composition Import" },
+    });
+    fireEvent.change(screen.getAllByPlaceholderText("Paste exported composition JSON")[0], {
+      target: { value: JSON.stringify(compositionExport) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Validate composition" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Composition validation" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("blocking - missing_preset")).toBeInTheDocument();
+    expect(validateWorldComposition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: "composition-import",
+        name: "Composition Import",
+        composition: compositionExport,
+      }),
+    );
   });
 });
+
+const compositionExport = {
+  world: {
+    slug: "first-world",
+    name: "First World",
+    description: null,
+    rules_config: {},
+    memory_backend_profile_key: null,
+    memory_plugin_identifier: "builtin.mem0_oss_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
+    is_active: true,
+  },
+  scenes: [],
+  agents: [],
+  schedule_rules: [],
+  preset_references: [],
+};
 
 function eventRow(id: string, sequence: number, eventName: string): WorldEventAuditEntry {
   return {

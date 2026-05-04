@@ -57,6 +57,7 @@ from noveland.memory import (
 from noveland.memory import (
     MemorySearchRequest as MemoryLookupRequest,
 )
+from noveland.memory.models import MemoryBackendProfile
 from noveland.narrative import (
     NarrativeArtifactKind,
     NarrativeArtifactNotFoundError,
@@ -459,6 +460,11 @@ class WorldCompositionWorldResponse(BaseModel):
     name: str
     description: str | None
     rules_config: dict[str, Any]
+    memory_backend_profile_key: str | None = None
+    memory_plugin_identifier: str | None = None
+    memory_plugin_config: dict[str, Any] = Field(default_factory=dict)
+    world_rules_plugin_identifier: str | None = None
+    world_rules_plugin_config: dict[str, Any] = Field(default_factory=dict)
     is_active: bool
 
 
@@ -496,12 +502,26 @@ class WorldCompositionPresetReferenceResponse(BaseModel):
     is_active: bool
 
 
+class WorldCompositionValidationIssue(BaseModel):
+    severity: Literal["blocking", "warning"]
+    code: str
+    field: str
+    message: str
+
+
 class WorldCompositionExportResponse(BaseModel):
     world: WorldCompositionWorldResponse
     scenes: list[WorldCompositionSceneResponse]
     agents: list[WorldCompositionAgentResponse]
     schedule_rules: list[WorldCompositionScheduleRuleResponse]
     preset_references: list[WorldCompositionPresetReferenceResponse]
+
+
+class WorldCompositionValidationResponse(BaseModel):
+    valid: bool
+    blocking_issue_count: int
+    warning_issue_count: int
+    issues: list[WorldCompositionValidationIssue]
 
 
 class WorldCompositionImportRequest(_RequestModel):
@@ -511,6 +531,10 @@ class WorldCompositionImportRequest(_RequestModel):
     description: str | None = None
     rules_config: dict[str, Any] | None = None
     composition: WorldCompositionExportResponse
+
+
+class WorldCompositionValidationRequest(WorldCompositionImportRequest):
+    pass
 
 
 class CalendarEntryResponse(BaseModel):
@@ -899,6 +923,18 @@ def deactivate_agent_preset(
 
 
 @root_router.post(
+    "/world-compositions/validate",
+    response_model=WorldCompositionValidationResponse,
+)
+def validate_world_composition_import(
+    validation_request: WorldCompositionValidationRequest,
+    _subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldCompositionValidationResponse:
+    return _validate_world_composition_import(db_session, validation_request)
+
+
+@root_router.post(
     "/world-compositions/import",
     response_model=WorldResponse,
     status_code=status.HTTP_201_CREATED,
@@ -910,10 +946,30 @@ def import_world_composition(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldResponse:
     require_csrf(request)
-    _ensure_slug_available(db_session, import_request.slug)
+    validation = _validate_world_composition_import(db_session, import_request)
+    if not validation.valid:
+        blocking_issues = [
+            issue.model_dump()
+            for issue in validation.issues
+            if issue.severity == "blocking"
+        ]
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=blocking_issues,
+        )
     owner = db_session.get(User, import_request.owner_user_id)
     if owner is None or not owner.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                WorldCompositionValidationIssue(
+                    severity="blocking",
+                    code="unknown_owner",
+                    field="owner_user_id",
+                    message="Owner user does not exist or is inactive.",
+                ).model_dump()
+            ],
+        )
 
     world = World(
         id=uuid.uuid4(),
@@ -930,6 +986,19 @@ def import_world_composition(
             if import_request.rules_config is not None
             else import_request.composition.world.rules_config
         ),
+        memory_backend_profile_id=_memory_backend_profile_id_from_profile_key(
+            db_session,
+            import_request.composition.world.memory_backend_profile_key,
+        ),
+        memory_plugin_identifier=(
+            import_request.composition.world.memory_plugin_identifier or BUILTIN_MEM0_OSS_MEMORY
+        ),
+        memory_plugin_config=import_request.composition.world.memory_plugin_config,
+        world_rules_plugin_identifier=(
+            import_request.composition.world.world_rules_plugin_identifier
+            or BUILTIN_DEFAULT_WORLD_RULES
+        ),
+        world_rules_plugin_config=import_request.composition.world.world_rules_plugin_config,
         is_active=import_request.composition.world.is_active,
     )
     db_session.add(world)
@@ -1001,21 +1070,11 @@ def import_world_composition(
             db_session,
             exported_agent.provider_profile_key,
         )
-        if exported_agent.provider_profile_key is not None and explicit_provider_profile_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=f"Unknown provider profile: {exported_agent.provider_profile_key}",
-            )
         home_scene_id = (
             None
             if exported_agent.home_scene_key is None
             else scene_key_to_id.get(exported_agent.home_scene_key)
         )
-        if exported_agent.home_scene_key is not None and home_scene_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=f"Unknown scene key: {exported_agent.home_scene_key}",
-            )
         effective_config = dict(preset.advanced_config if preset is not None else {})
         effective_config.update(exported_agent.config)
         provider_profile_id = explicit_provider_profile_id or preset_provider_profile_id
@@ -1164,6 +1223,14 @@ def export_world_composition(
             name=world.name,
             description=world.description,
             rules_config=world.rules_config,
+            memory_backend_profile_key=_memory_backend_profile_key(
+                db_session,
+                world.memory_backend_profile_id,
+            ),
+            memory_plugin_identifier=world.memory_plugin_identifier,
+            memory_plugin_config=world.memory_plugin_config,
+            world_rules_plugin_identifier=world.world_rules_plugin_identifier,
+            world_rules_plugin_config=world.world_rules_plugin_config,
             is_active=world.is_active,
         ),
         scenes=[
@@ -2679,6 +2746,234 @@ def _provider_profile_id_from_profile_key(
         select(ProviderProfile).where(ProviderProfile.profile_key == profile_key),
     ).one_or_none()
     return None if profile is None else profile.id
+
+
+def _memory_backend_profile_id_from_profile_key(
+    db_session: Session,
+    profile_key: str | None,
+) -> uuid.UUID | None:
+    if profile_key is None or profile_key == "":
+        return None
+    return db_session.scalars(
+        select(MemoryBackendProfile.id).where(MemoryBackendProfile.profile_key == profile_key),
+    ).one_or_none()
+
+
+def _memory_backend_profile_key(
+    db_session: Session,
+    profile_id: uuid.UUID | None,
+) -> str | None:
+    if profile_id is None:
+        return None
+    profile = MemoryBackendProfileService(db_session).get_profile(profile_id)
+    return None if profile is None else profile.profile_key
+
+
+def _validate_world_composition_import(
+    db_session: Session,
+    import_request: WorldCompositionImportRequest,
+) -> WorldCompositionValidationResponse:
+    issues: list[WorldCompositionValidationIssue] = []
+
+    def issue(
+        severity: Literal["blocking", "warning"],
+        code: str,
+        field: str,
+        message: str,
+    ) -> None:
+        issues.append(
+            WorldCompositionValidationIssue(
+                severity=severity,
+                code=code,
+                field=field,
+                message=message,
+            )
+        )
+
+    if (
+        db_session.scalars(select(World.id).where(World.slug == import_request.slug)).first()
+        is not None
+    ):
+        issue("blocking", "slug_collision", "slug", "World slug already exists.")
+    owner = db_session.get(User, import_request.owner_user_id)
+    if owner is None or not owner.is_active:
+        issue(
+            "blocking",
+            "unknown_owner",
+            "owner_user_id",
+            "Owner user does not exist or is inactive.",
+        )
+
+    world = import_request.composition.world
+    if world.memory_backend_profile_key is not None and (
+        _memory_backend_profile_id_from_profile_key(db_session, world.memory_backend_profile_key)
+        is None
+    ):
+        issue(
+            "blocking",
+            "unknown_memory_backend_profile",
+            "composition.world.memory_backend_profile_key",
+            f"Unknown memory backend profile: {world.memory_backend_profile_key}.",
+        )
+    if world.memory_plugin_identifier is not None:
+        _append_plugin_validation_issue(
+            issues,
+            category=PluginCategory.MEMORY_BACKEND,
+            identifier=world.memory_plugin_identifier,
+            raw_config=world.memory_plugin_config,
+            field="composition.world.memory_plugin_identifier",
+            code_prefix="memory_plugin",
+        )
+    if world.world_rules_plugin_identifier is not None:
+        _append_plugin_validation_issue(
+            issues,
+            category=PluginCategory.WORLD_RULES,
+            identifier=world.world_rules_plugin_identifier,
+            raw_config=world.world_rules_plugin_config,
+            field="composition.world.world_rules_plugin_identifier",
+            code_prefix="world_rules_plugin",
+        )
+
+    scene_keys: set[str] = set()
+    for index, scene in enumerate(import_request.composition.scenes):
+        field = f"composition.scenes[{index}].scene_key"
+        if scene.scene_key in scene_keys:
+            issue(
+                "blocking",
+                "duplicate_scene_key",
+                field,
+                f"Duplicate scene key: {scene.scene_key}.",
+            )
+        scene_keys.add(scene.scene_key)
+
+    rule_keys: set[str] = set()
+    for index, rule in enumerate(import_request.composition.schedule_rules):
+        field = f"composition.schedule_rules[{index}].rule_key"
+        if rule.rule_key in rule_keys:
+            issue(
+                "blocking",
+                "duplicate_schedule_rule_key",
+                field,
+                f"Duplicate schedule rule key: {rule.rule_key}.",
+            )
+        rule_keys.add(rule.rule_key)
+
+    preset_service = AgentPresetService(db_session)
+    preset_map: dict[str, AgentPresetRecord] = {}
+    for index, preset_reference in enumerate(import_request.composition.preset_references):
+        field = f"composition.preset_references[{index}].preset_key"
+        preset = preset_service.get_by_key(preset_reference.preset_key, include_inactive=True)
+        if preset is None:
+            issue(
+                "blocking",
+                "missing_preset",
+                field,
+                f"Unknown agent preset: {preset_reference.preset_key}.",
+            )
+            continue
+        preset_map[preset.preset_key] = preset
+        if not preset.is_active:
+            issue(
+                "warning",
+                "inactive_preset",
+                field,
+                f"Agent preset is inactive: {preset_reference.preset_key}.",
+            )
+        if preset_reference.default_provider_profile_key is not None and (
+            _provider_profile_id_from_profile_key(
+                db_session,
+                preset_reference.default_provider_profile_key,
+            )
+            is None
+        ):
+            issue(
+                "blocking",
+                "unknown_provider_profile",
+                f"composition.preset_references[{index}].default_provider_profile_key",
+                f"Unknown provider profile: {preset_reference.default_provider_profile_key}.",
+            )
+
+    agent_keys: set[str] = set()
+    for index, exported_agent in enumerate(import_request.composition.agents):
+        if exported_agent.agent_key in agent_keys:
+            issue(
+                "blocking",
+                "duplicate_agent_key",
+                f"composition.agents[{index}].agent_key",
+                f"Duplicate agent key: {exported_agent.agent_key}.",
+            )
+        agent_keys.add(exported_agent.agent_key)
+        if (
+            exported_agent.home_scene_key is not None
+            and exported_agent.home_scene_key not in scene_keys
+        ):
+            issue(
+                "blocking",
+                "unknown_scene_key",
+                f"composition.agents[{index}].home_scene_key",
+                f"Unknown scene key: {exported_agent.home_scene_key}.",
+            )
+        if (
+            exported_agent.source_preset_key is not None
+            and exported_agent.source_preset_key not in preset_map
+        ):
+            issue(
+                "blocking",
+                "missing_preset",
+                f"composition.agents[{index}].source_preset_key",
+                f"Unknown agent preset: {exported_agent.source_preset_key}.",
+            )
+        if exported_agent.provider_profile_key is not None and (
+            _provider_profile_id_from_profile_key(db_session, exported_agent.provider_profile_key)
+            is None
+        ):
+            issue(
+                "blocking",
+                "unknown_provider_profile",
+                f"composition.agents[{index}].provider_profile_key",
+                f"Unknown provider profile: {exported_agent.provider_profile_key}.",
+            )
+
+    blocking_issue_count = sum(1 for item in issues if item.severity == "blocking")
+    warning_issue_count = len(issues) - blocking_issue_count
+    return WorldCompositionValidationResponse(
+        valid=blocking_issue_count == 0,
+        blocking_issue_count=blocking_issue_count,
+        warning_issue_count=warning_issue_count,
+        issues=issues,
+    )
+
+
+def _append_plugin_validation_issue(
+    issues: list[WorldCompositionValidationIssue],
+    *,
+    category: PluginCategory,
+    identifier: str,
+    raw_config: dict[str, Any],
+    field: str,
+    code_prefix: str,
+) -> None:
+    try:
+        _validate_named_plugin_binding(
+            category=category,
+            identifier=identifier,
+            raw_config=raw_config,
+            missing_detail="Plugin is not registered",
+            invalid_detail="Plugin config is invalid",
+        )
+    except HTTPException as exc:
+        issues.append(
+            WorldCompositionValidationIssue(
+                severity="blocking",
+                code=(
+                    f"{code_prefix}_missing"
+                    if exc.status_code == status.HTTP_404_NOT_FOUND
+                    else f"{code_prefix}_invalid"
+                ),
+                field=field,
+                message=str(exc.detail),
+            )
+        )
 
 
 def _provider_profile_key_map(

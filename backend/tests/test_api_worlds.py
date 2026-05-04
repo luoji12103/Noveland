@@ -506,8 +506,26 @@ def test_world_composition_export_and_import_round_trip() -> None:
             "composition": export_response.json(),
         },
     )
+    forbidden_validate = client.post(
+        "/world-compositions/validate",
+        json={
+            "slug": "forbidden-import",
+            "name": "Forbidden Import",
+            "owner_user_id": str(import_owner_id),
+            "composition": export_response.json(),
+        },
+    )
 
     _authenticate(client, platform_token)
+    validation_response = client.post(
+        "/world-compositions/validate",
+        json={
+            "slug": "composition-imported",
+            "name": "Composition Imported",
+            "owner_user_id": str(import_owner_id),
+            "composition": export_response.json(),
+        },
+    )
     import_response = client.post(
         "/world-compositions/import",
         json={
@@ -532,9 +550,21 @@ def test_world_composition_export_and_import_round_trip() -> None:
 
     assert export_response.status_code == 200
     assert "memberships" not in export_response.json()
+    assert (
+        export_response.json()["world"]["memory_plugin_identifier"]
+        == "builtin.local_pgvector_memory"
+    )
+    assert (
+        export_response.json()["world"]["world_rules_plugin_identifier"]
+        == "builtin.default_world_rules"
+    )
     assert export_response.json()["agents"][0]["source_preset_key"] == "story-preset"
     assert export_response.json()["agents"][0]["provider_profile_key"] == "composition-provider"
     assert forbidden_import.status_code == 403
+    assert forbidden_validate.status_code == 403
+    assert validation_response.status_code == 200
+    assert validation_response.json()["valid"] is True
+    assert validation_response.json()["issues"] == []
     assert import_response.status_code == 201
     assert import_response.json()["slug"] == "composition-imported"
     assert imported_scenes.status_code == 200
@@ -548,6 +578,100 @@ def test_world_composition_export_and_import_round_trip() -> None:
     assert imported_persona.json()["persona_text"] == "Preset persona"
     assert imported_calendar.status_code == 200
     assert imported_calendar.json()[0]["title"] == "Preset briefing"
+
+
+def test_world_composition_validation_reports_import_blockers() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    _seed_world(engine, platform_user_id, "existing-slug")
+    payload = {
+        "slug": "existing-slug",
+        "name": "Invalid Import",
+        "owner_user_id": str(platform_user_id),
+        "composition": {
+            "world": {
+                "slug": "source",
+                "name": "Source",
+                "description": None,
+                "rules_config": {},
+                "memory_backend_profile_key": "missing-memory",
+                "memory_plugin_identifier": "missing.memory_plugin",
+                "memory_plugin_config": {},
+                "world_rules_plugin_identifier": "missing.world_rules_plugin",
+                "world_rules_plugin_config": {},
+                "is_active": True,
+            },
+            "scenes": [
+                {
+                    "scene_key": "hall",
+                    "name": "Hall",
+                    "description": None,
+                    "is_active": True,
+                }
+            ],
+            "agents": [
+                {
+                    "agent_key": "guide",
+                    "display_name": "Guide",
+                    "kind": "role_agent",
+                    "home_scene_key": "missing-scene",
+                    "source_preset_key": "missing-preset",
+                    "provider_profile_key": "missing-provider",
+                    "config": {},
+                    "is_enabled": True,
+                }
+            ],
+            "schedule_rules": [
+                {
+                    "rule_key": "weekday",
+                    "name": "Weekday",
+                    "kind": "weekday",
+                    "config": {},
+                    "is_enabled": True,
+                },
+                {
+                    "rule_key": "weekday",
+                    "name": "Duplicate Weekday",
+                    "kind": "weekday",
+                    "config": {},
+                    "is_enabled": True,
+                },
+            ],
+            "preset_references": [
+                {
+                    "preset_key": "missing-preset",
+                    "name": "Missing Preset",
+                    "default_kind": "role_agent",
+                    "default_provider_profile_key": "missing-provider",
+                    "is_active": True,
+                }
+            ],
+        },
+    }
+
+    _authenticate(client, platform_token)
+    validation = client.post(
+        "/world-compositions/validate",
+        json=payload,
+    )
+    import_response = client.post("/world-compositions/import", json=payload)
+
+    codes = {issue["code"] for issue in validation.json()["issues"]}
+    assert validation.status_code == 200
+    assert validation.json()["valid"] is False
+    assert "slug_collision" in codes
+    assert "unknown_memory_backend_profile" in codes
+    assert "memory_plugin_missing" in codes
+    assert "world_rules_plugin_missing" in codes
+    assert "missing_preset" in codes
+    assert "unknown_provider_profile" in codes
+    assert "unknown_scene_key" in codes
+    assert "duplicate_schedule_rule_key" in codes
+    assert import_response.status_code == 422
 
 
 def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
