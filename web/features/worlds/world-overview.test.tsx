@@ -308,6 +308,7 @@ const workspaceData: WorldWorkspaceData = {
     latest_snapshot_id: null,
     covers_event_sequence: null,
     schema_version: null,
+    payload_location: null,
     event_gap: 0,
     issues: [],
   },

@@ -796,6 +796,7 @@ class WorldSnapshotResponse(BaseModel):
     status: str
     payload: dict[str, Any] | None
     payload_uri: str | None
+    payload_location: str | None
     metadata: dict[str, Any]
     created_by_event_id: uuid.UUID
     created_at: datetime
@@ -1513,7 +1514,7 @@ def replay_state(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldReplayState:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session).replay_state(context.world_id)
+    return WorldReplayService(db_session, load_settings()).replay_state(context.world_id)
 
 
 @router.get("/{world_id}/snapshots/latest", response_model=WorldSnapshotResponse | None)
@@ -1522,7 +1523,7 @@ def latest_snapshot(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldSnapshotResponse | None:
     _world_or_404(db_session, context.world_id)
-    snapshot = WorldReplayService(db_session).latest_snapshot(context.world_id)
+    snapshot = WorldReplayService(db_session, load_settings()).latest_snapshot(context.world_id)
     if snapshot is None:
         return None
     return _snapshot_response(snapshot)
@@ -1537,7 +1538,7 @@ def snapshot_integrity(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldSnapshotIntegrityReport:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session).snapshot_integrity(context.world_id)
+    return WorldReplayService(db_session, load_settings()).snapshot_integrity(context.world_id)
 
 
 @router.get("/{world_id}/events", response_model=list[WorldEventResponse])
@@ -1724,7 +1725,7 @@ def create_snapshot(
 ) -> WorldSnapshotResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
-    snapshot = WorldReplayService(db_session).create_snapshot(
+    snapshot = WorldReplayService(db_session, load_settings()).create_snapshot(
         context.world_id,
         actor_ref=_actor_ref(context.subject),
     )
@@ -3537,10 +3538,19 @@ def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
         status=snapshot.status.value,
         payload=snapshot.payload,
         payload_uri=snapshot.payload_uri,
+        payload_location=_snapshot_payload_location(snapshot),
         metadata=snapshot.metadata,
         created_by_event_id=snapshot.created_by_event_id,
         created_at=snapshot.created_at,
     )
+
+
+def _snapshot_payload_location(snapshot: WorldSnapshotRecord) -> str | None:
+    if snapshot.payload_uri is not None:
+        return "object"
+    if snapshot.payload is not None:
+        return "inline"
+    return None
 
 
 def _world_or_404(db_session: Session, world_id: uuid.UUID) -> World:

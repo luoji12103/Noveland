@@ -401,6 +401,7 @@ export type WorldSnapshot = {
   status: string;
   payload: Record<string, unknown> | null;
   payload_uri: string | null;
+  payload_location: "inline" | "object" | null;
   metadata: Record<string, unknown>;
   created_by_event_id: string;
   created_at: string;
@@ -413,6 +414,7 @@ export type WorldSnapshotIntegrity = {
   latest_snapshot_id: string | null;
   covers_event_sequence: number | null;
   schema_version: string | null;
+  payload_location: "inline" | "object" | null;
   event_gap: number | null;
   issues: string[];
 };

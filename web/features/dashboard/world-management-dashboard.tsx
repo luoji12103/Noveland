@@ -1492,7 +1492,8 @@ function ReplayPanel({
       ) : (
         <p className="status-detail">
           Latest snapshot covers sequence {latestSnapshot.covers_event_sequence} as{" "}
-          {latestSnapshot.schema_version} ({latestSnapshot.status})
+          {latestSnapshot.schema_version} ({latestSnapshot.status}); payload{" "}
+          {latestSnapshot.payload_location ?? "unknown"}
         </p>
       )}
       <div className="button-row">

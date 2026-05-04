@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import cast
 
 from noveland.auth.models import User
+from noveland.core.settings import AppSettings
 from noveland.events import (
     CLOCK_ADVANCED_EVENT_NAME,
     WORLD_STATE_SCHEMA_VERSION,
@@ -14,6 +15,7 @@ from noveland.events import (
     WorldSnapshotCreate,
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.memory.models import MemoryBackendProfile
 from noveland.worlds.models import World
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
@@ -21,13 +23,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 
-def test_replay_state_starts_empty_without_snapshot_or_events() -> None:
+def test_replay_state_starts_empty_without_snapshot_or_events(tmp_path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "empty-replay")
 
     with Session(engine) as session:
-        state = WorldReplayService(session).replay_state(world_id)
+        state = WorldReplayService(session, _settings(tmp_path)).replay_state(world_id)
 
     assert state.schema_version == WORLD_STATE_SCHEMA_VERSION
     assert state.source_sequence == 0
@@ -36,7 +38,7 @@ def test_replay_state_starts_empty_without_snapshot_or_events() -> None:
     assert state.unhandled_event_count == 0
 
 
-def test_replay_applies_latest_snapshot_and_incremental_events() -> None:
+def test_replay_applies_latest_snapshot_and_incremental_events(tmp_path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "snapshot-replay")
@@ -85,7 +87,7 @@ def test_replay_applies_latest_snapshot_and_incremental_events() -> None:
         session.commit()
 
     with Session(engine) as session:
-        state = WorldReplayService(session).replay_state(world_id)
+        state = WorldReplayService(session, _settings(tmp_path)).replay_state(world_id)
 
     assert state.source_sequence == 4
     assert state.clock is not None
@@ -95,7 +97,7 @@ def test_replay_applies_latest_snapshot_and_incremental_events() -> None:
     assert state.unhandled_event_count == 1
 
 
-def test_replay_service_creates_inline_snapshot_from_current_state() -> None:
+def test_replay_service_creates_object_snapshot_from_current_state(tmp_path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "create-snapshot")
@@ -107,31 +109,43 @@ def test_replay_service_creates_inline_snapshot_from_current_state() -> None:
         session.commit()
 
     with Session(engine) as session:
-        snapshot = WorldReplayService(session).create_snapshot(world_id, "user:test")
+        snapshot = WorldReplayService(session, _settings(tmp_path)).create_snapshot(
+            world_id,
+            "user:test",
+        )
         session.commit()
 
     assert snapshot.schema_version == WORLD_STATE_SCHEMA_VERSION
     assert snapshot.covers_event_sequence == 1
-    assert snapshot.payload is not None
-    assert snapshot.payload["source_sequence"] == 1
-    assert snapshot.payload["applied_event_count"] == 1
+    assert snapshot.payload is None
+    assert snapshot.payload_uri == f"object://worlds/{world_id}/snapshots/1.json"
+    assert snapshot.metadata["storage"] == "local_object"
+
+    with Session(engine) as session:
+        state = WorldReplayService(session, _settings(tmp_path)).replay_state(world_id)
+
+    assert state.source_sequence == 2
+    assert state.applied_event_count == 1
 
 
-def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot() -> None:
+def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot(tmp_path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "integrity-healthy")
 
     with Session(engine) as session:
-        no_snapshot = WorldReplayService(session).snapshot_integrity(world_id)
+        no_snapshot = WorldReplayService(session, _settings(tmp_path)).snapshot_integrity(world_id)
         WorldEventStore(session).append_event(
             _clock_event(world_id, revision=1, sequence_time="2030-01-01T00:00:00+00:00"),
         )
-        snapshot = WorldReplayService(session).create_snapshot(world_id, "user:test")
+        snapshot = WorldReplayService(session, _settings(tmp_path)).create_snapshot(
+            world_id,
+            "user:test",
+        )
         session.commit()
 
     with Session(engine) as session:
-        healthy = WorldReplayService(session).snapshot_integrity(world_id)
+        healthy = WorldReplayService(session, _settings(tmp_path)).snapshot_integrity(world_id)
 
     assert no_snapshot.status == "warning"
     assert no_snapshot.latest_snapshot_id is None
@@ -140,11 +154,12 @@ def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot() -> None:
     assert healthy.latest_snapshot_id == snapshot.id
     assert healthy.latest_event_sequence == 2
     assert healthy.covers_event_sequence == 1
+    assert healthy.payload_location == "object"
     assert healthy.event_gap == 0
     assert healthy.issues == []
 
 
-def test_snapshot_integrity_reports_stale_snapshot() -> None:
+def test_snapshot_integrity_reports_stale_snapshot(tmp_path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "integrity-stale")
@@ -154,14 +169,14 @@ def test_snapshot_integrity_reports_stale_snapshot() -> None:
         event_store.append_event(
             _clock_event(world_id, revision=1, sequence_time="2030-01-01T00:00:00+00:00"),
         )
-        WorldReplayService(session).create_snapshot(world_id, "user:test")
+        WorldReplayService(session, _settings(tmp_path)).create_snapshot(world_id, "user:test")
         event_store.append_event(
             _clock_event(world_id, revision=2, sequence_time="2030-01-01T00:01:00+00:00"),
         )
         session.commit()
 
     with Session(engine) as session:
-        report = WorldReplayService(session).snapshot_integrity(world_id)
+        report = WorldReplayService(session, _settings(tmp_path)).snapshot_integrity(world_id)
 
     assert report.status == "warning"
     assert report.latest_event_sequence == 3
@@ -308,12 +323,17 @@ def _engine() -> Engine:
     )
     for table in (
         cast(Table, User.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
     ):
         table.create(engine)
     return engine
+
+
+def _settings(tmp_path) -> AppSettings:
+    return AppSettings(object_storage_root=tmp_path / "objects")
 
 
 def _seed_user(engine: Engine) -> uuid.UUID:

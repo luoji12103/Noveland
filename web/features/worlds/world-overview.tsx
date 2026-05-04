@@ -693,6 +693,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               <p className="metric-label">Snapshot integrity</p>
               <p className="metric-value">{data.snapshotIntegrity?.status ?? "unknown"}</p>
               <p>Gap {data.snapshotIntegrity?.event_gap ?? "n/a"}</p>
+              <p>Payload {data.snapshotIntegrity?.payload_location ?? "n/a"}</p>
               <p>Latest event {data.snapshotIntegrity?.latest_event_sequence ?? "n/a"}</p>
             </div>
           </div>
@@ -711,6 +712,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                     <p>
                       {data.latestSnapshot.schema_version} - {data.latestSnapshot.created_at}
                     </p>
+                    <p>Payload {data.latestSnapshot.payload_location ?? "unknown"}</p>
                   </>
                 )}
               </div>

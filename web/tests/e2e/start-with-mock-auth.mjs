@@ -2458,9 +2458,10 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
       covers_event_sequence: replay.source_sequence,
       schema_version: "world_state.v1",
       status: "valid",
-      payload: replay,
-      payload_uri: null,
-      metadata: { source: "mock" },
+      payload: null,
+      payload_uri: `object://worlds/${worldId}/snapshots/${replay.source_sequence}.json`,
+      payload_location: "object",
+      metadata: { source: "mock", storage: "local_object" },
       created_by_event_id: randomUUID(),
       created_at: new Date().toISOString(),
     };
@@ -3079,6 +3080,7 @@ function snapshotIntegrityForWorld(worldId) {
       latest_snapshot_id: null,
       covers_event_sequence: null,
       schema_version: null,
+      payload_location: null,
       event_gap: null,
       issues: ["No valid snapshot exists."],
     };
@@ -3098,6 +3100,7 @@ function snapshotIntegrityForWorld(worldId) {
     latest_snapshot_id: latestSnapshot.id,
     covers_event_sequence: latestSnapshot.covers_event_sequence,
     schema_version: latestSnapshot.schema_version,
+    payload_location: latestSnapshot.payload_location ?? null,
     event_gap: eventGap,
     issues: eventGap > 0 ? ["Snapshot is stale relative to the latest event."] : [],
   };

@@ -489,6 +489,7 @@ const readOnlyData: WorldDashboardData = {
     status: "valid",
     payload: {},
     payload_uri: null,
+    payload_location: "inline",
     metadata: {},
     created_by_event_id: "event-2",
     created_at: "2026-04-17T00:02:00.000Z",

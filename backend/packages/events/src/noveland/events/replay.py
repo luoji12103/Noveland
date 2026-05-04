@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from noveland.core.settings import AppSettings, load_settings
 from noveland.events.contracts import (
     SNAPSHOT_EVENT_NAME,
     WorldEventRecord,
@@ -12,6 +13,7 @@ from noveland.events.contracts import (
     WorldSnapshotRecord,
 )
 from noveland.events.event_store import WorldEventStore
+from noveland.storage import LocalObjectStorage, ObjectStorageError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.orm import Session
 
@@ -61,17 +63,20 @@ class WorldSnapshotIntegrityReport(BaseModel):
     latest_snapshot_id: uuid.UUID | None = None
     covers_event_sequence: int | None = Field(default=None, ge=0)
     schema_version: str | None = None
+    payload_location: str | None = None
     event_gap: int | None = Field(default=None, ge=0)
     issues: list[str] = Field(default_factory=list)
 
 
 class WorldReplayService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, settings: AppSettings | None = None) -> None:
         self._event_store = WorldEventStore(session)
+        self._settings = settings or load_settings()
+        self._object_storage = LocalObjectStorage(self._settings.object_storage_root)
 
     def replay_state(self, world_id: uuid.UUID) -> WorldReplayState:
         latest_snapshot = self._event_store.latest_snapshot(world_id)
-        state = _state_from_snapshot(world_id, latest_snapshot)
+        state = self._state_from_snapshot(world_id, latest_snapshot)
         events = self._event_store.list_events_after(world_id, state.source_sequence)
 
         source_sequence = state.source_sequence
@@ -104,13 +109,22 @@ class WorldReplayService:
         correlation_id: uuid.UUID | None = None,
     ) -> WorldSnapshotRecord:
         state = self.replay_state(world_id)
+        object_record = self._object_storage.write_json(
+            _snapshot_object_key(world_id, state.source_sequence),
+            state.snapshot_payload(),
+        )
         return self._event_store.record_snapshot(
             WorldSnapshotCreate(
                 world_id=world_id,
                 covers_event_sequence=state.source_sequence,
                 schema_version=WORLD_STATE_SCHEMA_VERSION,
-                payload=state.snapshot_payload(),
-                metadata={"source": "replay"},
+                payload=None,
+                payload_uri=object_record.uri,
+                metadata={
+                    "source": "replay",
+                    "storage": "local_object",
+                    "payload_size_bytes": object_record.size_bytes,
+                },
                 actor_ref=actor_ref,
                 correlation_id=correlation_id,
             ),
@@ -136,9 +150,10 @@ class WorldReplayService:
                 f"Snapshot schema version `{latest_snapshot.schema_version}` "
                 f"does not match `{WORLD_STATE_SCHEMA_VERSION}`.",
             )
-        if latest_snapshot.payload is None:
+        payload = self._snapshot_payload(latest_snapshot)
+        if payload is None:
             issues.append("Snapshot payload is missing.")
-        elif not _snapshot_payload_is_valid(world_id, latest_snapshot):
+        elif not _snapshot_payload_is_valid(world_id, latest_snapshot, payload):
             issues.append("Snapshot payload is not a valid replay payload.")
         if latest_snapshot.covers_event_sequence > latest_event_sequence:
             issues.append("Snapshot covers a future event sequence.")
@@ -162,52 +177,79 @@ class WorldReplayService:
             latest_snapshot_id=latest_snapshot.id,
             covers_event_sequence=latest_snapshot.covers_event_sequence,
             schema_version=latest_snapshot.schema_version,
+            payload_location=_payload_location(latest_snapshot),
             event_gap=event_gap,
             issues=issues,
         )
 
+    def _snapshot_payload(self, snapshot: WorldSnapshotRecord) -> dict[str, Any] | None:
+        if snapshot.payload is not None:
+            return snapshot.payload
+        if snapshot.payload_uri is None:
+            return None
+        try:
+            return self._object_storage.read_json(snapshot.payload_uri)
+        except ObjectStorageError:
+            return None
 
-def _state_from_snapshot(
-    world_id: uuid.UUID,
-    snapshot: WorldSnapshotRecord | None,
-) -> WorldReplayState:
-    if (
-        snapshot is None
-        or snapshot.schema_version != WORLD_STATE_SCHEMA_VERSION
-        or snapshot.payload is None
-    ):
+    def _state_from_snapshot(
+        self,
+        world_id: uuid.UUID,
+        snapshot: WorldSnapshotRecord | None,
+    ) -> WorldReplayState:
+        if snapshot is None or snapshot.schema_version != WORLD_STATE_SCHEMA_VERSION:
+            return WorldReplayState(
+                world_id=world_id,
+                source_sequence=0,
+                applied_event_count=0,
+                unhandled_event_count=0,
+            )
+
+        payload = self._snapshot_payload(snapshot)
+        if payload is None:
+            return WorldReplayState(
+                world_id=world_id,
+                source_sequence=0,
+                applied_event_count=0,
+                unhandled_event_count=0,
+            )
+        clock_payload = payload.get("clock")
+        clock = (
+            ClockReplayState.model_validate(clock_payload)
+            if isinstance(clock_payload, dict)
+            else None
+        )
         return WorldReplayState(
             world_id=world_id,
-            source_sequence=0,
-            applied_event_count=0,
-            unhandled_event_count=0,
+            source_sequence=snapshot.covers_event_sequence,
+            clock=clock,
+            applied_event_count=_nonnegative_int(payload.get("applied_event_count")),
+            unhandled_event_count=_nonnegative_int(payload.get("unhandled_event_count")),
         )
 
-    payload = snapshot.payload
-    clock_payload = payload.get("clock")
-    clock = (
-        ClockReplayState.model_validate(clock_payload)
-        if isinstance(clock_payload, dict)
-        else None
-    )
-    return WorldReplayState(
-        world_id=world_id,
-        source_sequence=snapshot.covers_event_sequence,
-        clock=clock,
-        applied_event_count=_nonnegative_int(payload.get("applied_event_count")),
-        unhandled_event_count=_nonnegative_int(payload.get("unhandled_event_count")),
-    )
 
-
-def _snapshot_payload_is_valid(world_id: uuid.UUID, snapshot: WorldSnapshotRecord) -> bool:
-    if snapshot.payload is None:
-        return False
+def _snapshot_payload_is_valid(
+    world_id: uuid.UUID,
+    snapshot: WorldSnapshotRecord,
+    payload: dict[str, Any],
+) -> bool:
     try:
-        payload = {**snapshot.payload, "world_id": world_id}
-        state = WorldReplayState.model_validate(payload)
+        state = WorldReplayState.model_validate({**payload, "world_id": world_id})
     except ValidationError:
         return False
     return state.source_sequence == snapshot.covers_event_sequence
+
+
+def _snapshot_object_key(world_id: uuid.UUID, source_sequence: int) -> str:
+    return f"worlds/{world_id}/snapshots/{source_sequence}.json"
+
+
+def _payload_location(snapshot: WorldSnapshotRecord) -> str | None:
+    if snapshot.payload_uri is not None:
+        return "object"
+    if snapshot.payload is not None:
+        return "inline"
+    return None
 
 
 def _replay_relevant_event_gap(

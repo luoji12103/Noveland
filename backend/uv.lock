@@ -681,6 +681,7 @@ version = "0.1.0"
 source = { editable = "packages/events" }
 dependencies = [
     { name = "noveland-core" },
+    { name = "noveland-storage" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
@@ -688,6 +689,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-storage", editable = "packages/storage" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
