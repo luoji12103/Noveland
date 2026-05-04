@@ -870,6 +870,16 @@ requires-dist = [
 name = "noveland-storage"
 version = "0.1.0"
 source = { editable = "packages/storage" }
+dependencies = [
+    { name = "noveland-core" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
 
 [[package]]
 name = "noveland-worlds"
