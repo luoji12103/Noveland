@@ -484,6 +484,67 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert agents.json()[0]["source_preset_version"] == 1
 
 
+def test_agent_preset_update_preview_reports_stale_and_current_agents() -> None:
+    client, engine = _client_with_database()
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "preset-preview-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    preset_id = _seed_agent_preset(
+        engine,
+        preset_key="preview-preset",
+        default_provider_profile_key=None,
+    )
+    _seed_agent(
+        engine,
+        world_id,
+        "current-agent",
+        source_preset_id=preset_id,
+        source_preset_version=1,
+    )
+    stale_agent_id = _seed_agent(
+        engine,
+        world_id,
+        "stale-agent",
+        source_preset_id=preset_id,
+        source_preset_version=1,
+    )
+    _seed_agent(
+        engine,
+        world_id,
+        "unversioned-agent",
+        source_preset_id=preset_id,
+        source_preset_version=None,
+    )
+
+    _authenticate(client, platform_token)
+    updated_preset = client.patch(
+        f"/agent-presets/{preset_id}",
+        json={"advanced_config": {"style": "updated", "temperature": 0.2}},
+    )
+    preview = client.get(f"/agent-presets/{preset_id}/update-preview")
+
+    _authenticate(client, owner_token)
+    forbidden = client.get(f"/agent-presets/{preset_id}/update-preview")
+
+    preview_by_agent = {item["agent_key"]: item for item in preview.json()["agents"]}
+    assert updated_preset.status_code == 200
+    assert updated_preset.json()["version"] == 2
+    assert preview.status_code == 200
+    assert preview.json()["stale_agent_count"] == 2
+    assert preview.json()["current_agent_count"] == 0
+    assert preview.json()["unversioned_agent_count"] == 1
+    assert preview_by_agent["stale-agent"]["agent_id"] == str(stale_agent_id)
+    assert preview_by_agent["stale-agent"]["status"] == "stale"
+    assert "config.style" in preview_by_agent["stale-agent"]["changed_fields"]
+    assert preview_by_agent["unversioned-agent"]["status"] == "unversioned"
+    assert forbidden.status_code == 403
+
+
 def test_world_composition_export_and_import_round_trip() -> None:
     client, engine = _client_with_database()
     _platform_user_id, platform_token = _seed_user(
@@ -1482,6 +1543,7 @@ def _seed_agent(
     *,
     scene_id: uuid.UUID | None = None,
     source_preset_id: uuid.UUID | None = None,
+    source_preset_version: int | None = None,
     provider_profile_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     agent_id = uuid.uuid4()
@@ -1492,6 +1554,7 @@ def _seed_agent(
                 world_id=world_id,
                 home_scene_id=scene_id,
                 source_preset_id=source_preset_id,
+                source_preset_version=source_preset_version,
                 agent_key=agent_key,
                 display_name=agent_key,
                 kind="role_agent",

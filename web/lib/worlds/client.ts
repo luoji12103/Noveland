@@ -7,6 +7,7 @@ import type {
   AgentObservationCreateInput,
   AgentPreset,
   AgentPresetCreateInput,
+  AgentPresetUpdatePreview,
   AgentPresetUpdateInput,
   AgentPersona,
   AgentPersonaUpdateInput,
@@ -167,6 +168,15 @@ export function updateAgentPreset(
     body: input,
     csrf: true,
   });
+}
+
+export function getAgentPresetUpdatePreview(
+  presetId: string,
+): Promise<AgentPresetUpdatePreview> {
+  return apiRequest<AgentPresetUpdatePreview>(
+    `/api/agent-presets/${presetId}/update-preview`,
+    { method: "GET" },
+  );
 }
 
 export function deactivateAgentPreset(presetId: string): Promise<void> {

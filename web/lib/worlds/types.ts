@@ -85,6 +85,26 @@ export type AgentPreset = {
   updated_at: string;
 };
 
+export type AgentPresetUpdatePreviewAgent = {
+  agent_id: string;
+  world_id: string;
+  agent_key: string;
+  display_name: string;
+  source_preset_version: number | null;
+  status: "current" | "stale" | "unversioned";
+  changed_fields: string[];
+};
+
+export type AgentPresetUpdatePreview = {
+  preset_id: string;
+  preset_key: string;
+  current_version: number;
+  stale_agent_count: number;
+  current_agent_count: number;
+  unversioned_agent_count: number;
+  agents: AgentPresetUpdatePreviewAgent[];
+};
+
 export type WorldCompositionWorld = {
   slug: string;
   name: string;

@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   createAgentPreset,
   deactivateAgentPreset,
+  getAgentPresetUpdatePreview,
   updateAgentPreset,
 } from "@/lib/worlds/client";
-import type { AgentPreset } from "@/lib/worlds/types";
+import type { AgentPreset, AgentPresetUpdatePreview } from "@/lib/worlds/types";
 import { formString, jsonObject, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type PresetAdminProps = {
@@ -20,6 +21,7 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
   const router = useRouter();
   const [notice, setNotice] = useState(loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [preview, setPreview] = useState<AgentPresetUpdatePreview | null>(null);
 
   async function runAction(action: () => Promise<unknown>, success: string) {
     setIsBusy(true);
@@ -81,6 +83,12 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
         }),
       "Preset saved.",
     );
+  }
+
+  async function handlePreviewPreset(presetId: string) {
+    await runAction(async () => {
+      setPreview(await getAgentPresetUpdatePreview(presetId));
+    }, "Preset update preview loaded.");
   }
 
   return (
@@ -184,6 +192,14 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
                       Active
                     </label>
                     <div className="button-row">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handlePreviewPreset(preset.id)}
+                      >
+                        Preview updates
+                      </button>
                       <button className="primary-button" type="submit" disabled={isBusy}>
                         Save preset
                       </button>
@@ -199,12 +215,51 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
                       </button>
                     </div>
                   </form>
+                  {preview?.preset_id === preset.id ? <PresetUpdatePreview preview={preview} /> : null}
                 </div>
               </article>
             ))
           )}
         </div>
       </section>
+    </section>
+  );
+}
+
+function PresetUpdatePreview({ preview }: { preview: AgentPresetUpdatePreview }) {
+  return (
+    <section aria-labelledby={`preset-preview-${preview.preset_id}`}>
+      <h4 id={`preset-preview-${preview.preset_id}`}>Preset update preview</h4>
+      <p>
+        version {preview.current_version} - {preview.stale_agent_count} stale,{" "}
+        {preview.current_agent_count} current, {preview.unversioned_agent_count} unversioned
+      </p>
+      <div className="resource-list">
+        {preview.agents.length === 0 ? (
+          <article className="resource-row">
+            <div>
+              <h3>No materialized agents</h3>
+              <p>This preset has not been used to create agents yet.</p>
+            </div>
+          </article>
+        ) : (
+          preview.agents.map((agent) => (
+            <article className="resource-row" key={agent.agent_id}>
+              <div>
+                <h3>{agent.display_name}</h3>
+                <p>
+                  {agent.agent_key} - {agent.status} - source version{" "}
+                  {agent.source_preset_version ?? "none"}
+                </p>
+                <p>
+                  Changed fields:{" "}
+                  {agent.changed_fields.length === 0 ? "none" : agent.changed_fields.join(", ")}
+                </p>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
     </section>
   );
 }

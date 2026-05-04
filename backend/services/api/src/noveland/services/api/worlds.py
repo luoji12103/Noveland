@@ -457,6 +457,26 @@ class AgentPresetResponse(BaseModel):
     updated_at: datetime
 
 
+class AgentPresetUpdatePreviewAgent(BaseModel):
+    agent_id: uuid.UUID
+    world_id: uuid.UUID
+    agent_key: str
+    display_name: str
+    source_preset_version: int | None
+    status: Literal["current", "stale", "unversioned"]
+    changed_fields: list[str]
+
+
+class AgentPresetUpdatePreviewResponse(BaseModel):
+    preset_id: uuid.UUID
+    preset_key: str
+    current_version: int
+    stale_agent_count: int
+    current_agent_count: int
+    unversioned_agent_count: int
+    agents: list[AgentPresetUpdatePreviewAgent]
+
+
 class WorldCompositionWorldResponse(BaseModel):
     slug: str
     name: str
@@ -912,6 +932,26 @@ def update_agent_preset(
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _agent_preset_response(updated)
+
+
+@root_router.get(
+    "/agent-presets/{preset_id}/update-preview",
+    response_model=AgentPresetUpdatePreviewResponse,
+)
+def preview_agent_preset_update(
+    preset_id: uuid.UUID,
+    _subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentPresetUpdatePreviewResponse:
+    preset = AgentPresetService(db_session).get(preset_id, include_inactive=True)
+    if preset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    agents = db_session.scalars(
+        select(Agent)
+        .where(Agent.source_preset_id == preset_id)
+        .order_by(Agent.agent_key),
+    ).all()
+    return _agent_preset_update_preview_response(preset, agents)
 
 
 @root_router.delete("/agent-presets/{preset_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -2703,6 +2743,58 @@ def _agent_preset_response(record: AgentPresetRecord) -> AgentPresetResponse:
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
+
+
+def _agent_preset_update_preview_response(
+    preset: AgentPresetRecord,
+    agents: list[Agent],
+) -> AgentPresetUpdatePreviewResponse:
+    agent_rows = [_agent_preset_preview_agent(preset, agent) for agent in agents]
+    return AgentPresetUpdatePreviewResponse(
+        preset_id=preset.id,
+        preset_key=preset.preset_key,
+        current_version=preset.version,
+        stale_agent_count=sum(1 for row in agent_rows if row.status == "stale"),
+        current_agent_count=sum(1 for row in agent_rows if row.status == "current"),
+        unversioned_agent_count=sum(1 for row in agent_rows if row.status == "unversioned"),
+        agents=agent_rows,
+    )
+
+
+def _agent_preset_preview_agent(
+    preset: AgentPresetRecord,
+    agent: Agent,
+) -> AgentPresetUpdatePreviewAgent:
+    if agent.source_preset_version is None:
+        preview_status: Literal["current", "stale", "unversioned"] = "unversioned"
+    elif agent.source_preset_version < preset.version:
+        preview_status = "stale"
+    else:
+        preview_status = "current"
+    return AgentPresetUpdatePreviewAgent(
+        agent_id=agent.id,
+        world_id=agent.world_id,
+        agent_key=agent.agent_key,
+        display_name=agent.display_name,
+        source_preset_version=agent.source_preset_version,
+        status=preview_status,
+        changed_fields=_agent_preset_preview_changed_fields(preset, agent),
+    )
+
+
+def _agent_preset_preview_changed_fields(
+    preset: AgentPresetRecord,
+    agent: Agent,
+) -> list[str]:
+    fields: list[str] = []
+    if agent.kind != preset.default_kind:
+        fields.append("kind")
+    if _provider_profile_id_from_config(agent.config) is not None:
+        fields.append("provider_profile")
+    for key, value in preset.advanced_config.items():
+        if agent.config.get(key) != value:
+            fields.append(f"config.{key}")
+    return fields
 
 
 def _agent_preset_upsert(request: AgentPresetCreateRequest) -> AgentPresetUpsert:

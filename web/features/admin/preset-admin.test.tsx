@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/worlds/client", () => ({
   createAgentPreset: vi.fn(),
+  getAgentPresetUpdatePreview: vi.fn(),
   updateAgentPreset: vi.fn(),
   deactivateAgentPreset: vi.fn(),
 }));
@@ -17,6 +18,7 @@ import { PresetAdmin } from "@/features/admin/preset-admin";
 import {
   createAgentPreset,
   deactivateAgentPreset,
+  getAgentPresetUpdatePreview,
   updateAgentPreset,
 } from "@/lib/worlds/client";
 import type { AgentPreset } from "@/lib/worlds/types";
@@ -75,6 +77,38 @@ describe("PresetAdmin", () => {
     await waitFor(() => {
       expect(deactivateAgentPreset).toHaveBeenCalledWith("preset-1");
     });
+  });
+
+  it("loads preset update previews", async () => {
+    vi.mocked(getAgentPresetUpdatePreview).mockResolvedValue({
+      preset_id: "preset-1",
+      preset_key: "storyteller",
+      current_version: 2,
+      stale_agent_count: 1,
+      current_agent_count: 0,
+      unversioned_agent_count: 1,
+      agents: [
+        {
+          agent_id: "agent-1",
+          world_id: "world-1",
+          agent_key: "guide",
+          display_name: "Guide",
+          source_preset_version: 1,
+          status: "stale",
+          changed_fields: ["config.style"],
+        },
+      ],
+    });
+
+    render(<PresetAdmin presets={presets} loadError={null} />);
+    fireEvent.click(screen.getByRole("button", { name: "Preview updates" }));
+
+    await waitFor(() => {
+      expect(getAgentPresetUpdatePreview).toHaveBeenCalledWith("preset-1");
+    });
+    expect(screen.getByRole("heading", { name: "Preset update preview" })).toBeVisible();
+    expect(screen.getByText(/1 stale/)).toBeVisible();
+    expect(screen.getByText("Changed fields: config.style")).toBeVisible();
   });
 });
 

@@ -30,6 +30,7 @@ import {
   getRuntimeStatus,
   getLatestSnapshot,
   getAgentPersona,
+  getAgentPresetUpdatePreview,
   getReplayState,
   getSnapshotIntegrity,
   listWorldEvents,
@@ -136,6 +137,7 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "preset-1" }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ preset_id: "preset-1", agents: [] }))
       .mockResolvedValueOnce(jsonResponse({ world: { slug: "first-world" } }))
       .mockResolvedValueOnce(jsonResponse({ id: "world-2" }, 201))
       .mockResolvedValueOnce(jsonResponse({ valid: true, issues: [] }));
@@ -149,6 +151,7 @@ describe("world client", () => {
     });
     await updateAgentPreset("preset-1", { name: "Updated preset" });
     await deactivateAgentPreset("preset-1");
+    await getAgentPresetUpdatePreview("preset-1");
     await exportWorldComposition("world-1");
     await importWorldComposition({
       slug: "imported-world",
@@ -191,9 +194,10 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/agent-presets");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/agent-presets/preset-1");
     expect(fetchMock.mock.calls[3][0]).toBe("/api/agent-presets/preset-1");
-    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/composition-export");
-    expect(fetchMock.mock.calls[5][0]).toBe("/api/world-compositions/import");
-    expect(fetchMock.mock.calls[6][0]).toBe("/api/world-compositions/validate");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/agent-presets/preset-1/update-preview");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/worlds/world-1/composition-export");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/world-compositions/import");
+    expect(fetchMock.mock.calls[7][0]).toBe("/api/world-compositions/validate");
   });
 
   it("sends clock control requests", async () => {

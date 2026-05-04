@@ -658,7 +658,7 @@ const mockServer = createServer(async (request, response) => {
 
   if (url.pathname.startsWith("/agent-presets/")) {
     const presetSegments = url.pathname.split("/");
-    await handleAgentPresetItem(request, response, presetSegments[2]);
+    await handleAgentPresetItem(request, response, presetSegments[2], presetSegments[3]);
     return;
   }
 
@@ -1450,7 +1450,7 @@ async function handleAgentPresets(request, response) {
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleAgentPresetItem(request, response, presetId) {
+async function handleAgentPresetItem(request, response, presetId, action) {
   if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -1458,6 +1458,33 @@ async function handleAgentPresetItem(request, response, presetId) {
   const preset = agentPresets.find((item) => item.id === presetId);
   if (preset === undefined) {
     sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "GET" && action === "update-preview") {
+    const materializedAgents = agents.filter((agent) => agent.source_preset_id === presetId);
+    const previewAgents = materializedAgents.map((agent) => ({
+      agent_id: agent.id,
+      world_id: agent.world_id,
+      agent_key: agent.agent_key,
+      display_name: agent.display_name,
+      source_preset_version: agent.source_preset_version ?? null,
+      status:
+        agent.source_preset_version == null
+          ? "unversioned"
+          : agent.source_preset_version < preset.version
+            ? "stale"
+            : "current",
+      changed_fields: [],
+    }));
+    sendJson(response, 200, {
+      preset_id: preset.id,
+      preset_key: preset.preset_key,
+      current_version: preset.version,
+      stale_agent_count: previewAgents.filter((agent) => agent.status === "stale").length,
+      current_agent_count: previewAgents.filter((agent) => agent.status === "current").length,
+      unversioned_agent_count: previewAgents.filter((agent) => agent.status === "unversioned").length,
+      agents: previewAgents,
+    });
     return;
   }
   if (!hasValidCsrf(request)) {
