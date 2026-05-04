@@ -600,6 +600,9 @@ export function listFilteredNarrativeArtifacts(
   if (options.publication_status) {
     search.set("publication_status", options.publication_status);
   }
+  if (options.order_by) {
+    search.set("order_by", options.order_by);
+  }
   if (options.limit !== undefined) {
     search.set("limit", String(options.limit));
   }

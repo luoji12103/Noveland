@@ -2280,6 +2280,7 @@ def list_narrative_artifacts(
         Query(),
     ] = None,
     publication_status: Annotated[Literal["draft", "published"] | None, Query()] = None,
+    order_by: Annotated[Literal["created_at", "published_at"], Query()] = "created_at",
     limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ) -> list[NarrativeArtifactResponse]:
     can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
@@ -2292,6 +2293,7 @@ def list_narrative_artifacts(
             search_text=q,
             source_kind=source_kind,
             publication_status=publication_status if can_manage else None,
+            order_by=order_by,
             limit=limit,
             published_only=not can_manage,
         )

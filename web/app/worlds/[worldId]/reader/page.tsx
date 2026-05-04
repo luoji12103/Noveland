@@ -14,6 +14,7 @@ type NarrativeReaderPageProps = {
     source_conversation_id?: string;
     q?: string;
     source_kind?: "world" | "agent" | "agent_run" | "conversation";
+    order_by?: "created_at" | "published_at";
   }>;
 };
 
@@ -33,6 +34,7 @@ export default async function NarrativeReaderPage({
     source_conversation_id: filters.source_conversation_id ?? null,
     q: filters.q ?? null,
     source_kind: filters.source_kind ?? null,
+    order_by: filters.order_by ?? "published_at",
     limit: 100,
   });
 

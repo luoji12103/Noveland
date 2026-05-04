@@ -125,6 +125,7 @@ export type NarrativeReaderListData = {
   selectedConversationId: string;
   selectedSearch: string;
   selectedSourceKind: string;
+  selectedOrderBy: string;
   loadError: string | null;
 };
 
@@ -618,6 +619,7 @@ export async function getNarrativeReaderListData(
         filters.source_conversation_id ?? "",
         filters.q ?? "",
         filters.source_kind ?? "",
+        filters.order_by ?? "published_at",
       );
     }
 
@@ -638,6 +640,7 @@ export async function getNarrativeReaderListData(
       selectedConversationId: filters.source_conversation_id ?? "",
       selectedSearch: filters.q ?? "",
       selectedSourceKind: filters.source_kind ?? "",
+      selectedOrderBy: filters.order_by ?? "published_at",
       loadError: null,
     };
   } catch (error) {
@@ -651,6 +654,7 @@ export async function getNarrativeReaderListData(
       filters.source_conversation_id ?? "",
       filters.q ?? "",
       filters.source_kind ?? "",
+      filters.order_by ?? "published_at",
     );
   }
 }
@@ -857,6 +861,7 @@ function emptyNarrativeReaderListData(
   selectedConversationId: string,
   selectedSearch: string,
   selectedSourceKind: string,
+  selectedOrderBy: string,
 ): NarrativeReaderListData {
   return {
     worlds,
@@ -867,6 +872,7 @@ function emptyNarrativeReaderListData(
     selectedConversationId,
     selectedSearch,
     selectedSourceKind,
+    selectedOrderBy,
     loadError,
   };
 }
@@ -983,6 +989,9 @@ function narrativeArtifactQuery(filters: NarrativeArtifactFilters): string {
   }
   if (filters.publication_status) {
     search.set("publication_status", filters.publication_status);
+  }
+  if (filters.order_by) {
+    search.set("order_by", filters.order_by);
   }
   if (filters.limit !== undefined) {
     search.set("limit", String(filters.limit));

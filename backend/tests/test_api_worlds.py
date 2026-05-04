@@ -1113,6 +1113,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
             "source_conversation_id": str(conversation_id),
             "q": "summary body",
             "source_kind": "conversation",
+            "order_by": "published_at",
             "limit": 1,
         },
     )

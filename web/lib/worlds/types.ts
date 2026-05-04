@@ -1213,6 +1213,7 @@ export type NarrativeArtifactFilters = {
   q?: string | null;
   source_kind?: "world" | "agent" | "agent_run" | "conversation" | null;
   publication_status?: "draft" | "published" | null;
+  order_by?: "created_at" | "published_at";
   limit?: number;
 };
 

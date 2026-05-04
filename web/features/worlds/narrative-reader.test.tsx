@@ -18,12 +18,14 @@ describe("narrative reader", () => {
     expect(screen.getByDisplayValue("summary")).toBeVisible();
     expect(screen.getByDisplayValue("conversation_summary")).toBeVisible();
     expect(screen.getByDisplayValue("Conversation")).toBeVisible();
+    expect(screen.getByDisplayValue("Publication timeline")).toBeVisible();
     expect(screen.getByRole("link", { name: "Manual Chain summary" })).toHaveAttribute(
       "href",
       "/worlds/world-1/reader/artifact-1",
     );
     expect(screen.getByText("Conversation: Manual Chain")).toBeVisible();
     expect(screen.getAllByText("Published Apr 21, 2026, 12:03 AM")[0]).toBeVisible();
+    expect(screen.getByText("Timeline: published Apr 21, 2026, 12:03 AM")).toBeVisible();
   });
 
   it("renders artifact detail with source conversation link", () => {
@@ -165,6 +167,7 @@ const listData: NarrativeReaderListData = {
   selectedConversationId: "conversation-1",
   selectedSearch: "summary",
   selectedSourceKind: "conversation",
+  selectedOrderBy: "published_at",
   loadError: null,
 };
 

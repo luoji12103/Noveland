@@ -87,6 +87,7 @@ class NarrativeArtifactService:
         search_text: str | None = None,
         source_kind: str | None = None,
         publication_status: str | None = None,
+        order_by: str = "created_at",
         limit: int | None = None,
         published_only: bool = False,
     ) -> list[NarrativeArtifactWithPublication]:
@@ -97,7 +98,6 @@ class NarrativeArtifactService:
                 NarrativePublication.artifact_id == NarrativeArtifact.id,
             )
             .where(NarrativeArtifact.world_id == world_id)
-            .order_by(NarrativeArtifact.created_at.desc())
         )
         if artifact_kind is not None:
             statement = statement.where(NarrativeArtifact.artifact_kind == artifact_kind.value)
@@ -146,6 +146,13 @@ class NarrativeArtifactService:
                     NarrativePublication.reader_visible.is_(False),
                 ),
             )
+        if order_by == "published_at":
+            statement = statement.order_by(
+                NarrativePublication.published_at.desc().nullslast(),
+                NarrativeArtifact.created_at.desc(),
+            )
+        else:
+            statement = statement.order_by(NarrativeArtifact.created_at.desc())
         if limit is not None:
             statement = statement.limit(max(1, min(limit, 200)))
         return [

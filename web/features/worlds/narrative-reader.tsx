@@ -53,6 +53,10 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
             <option value="agent_run">Agent run</option>
             <option value="conversation">Conversation</option>
           </select>
+          <select className="text-input" name="order_by" defaultValue={data.selectedOrderBy}>
+            <option value="published_at">Publication timeline</option>
+            <option value="created_at">Draft creation</option>
+          </select>
           <select
             className="text-input"
             name="source_conversation_id"
@@ -109,6 +113,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
                           : formatDateTime(artifact.publication.published_at)}
                       </p>
                     ) : null}
+                    <p>Timeline: {timelineLabel(artifact)}</p>
                     <p>
                       {sourceConversation === null
                         ? "World-level artifact"
@@ -123,6 +128,13 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
       </section>
     </section>
   );
+}
+
+function timelineLabel(artifact: NarrativeReaderListData["narrativeArtifacts"][number]): string {
+  if (artifact.publication?.published_at) {
+    return `published ${formatDateTime(artifact.publication.published_at)}`;
+  }
+  return `drafted ${formatDateTime(artifact.created_at)}`;
 }
 
 export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailProps) {
