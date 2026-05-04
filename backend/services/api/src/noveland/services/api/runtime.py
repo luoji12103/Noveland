@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import PlainTextResponse
@@ -489,7 +489,7 @@ def get_runtime_supervision(
     return RuntimeSupervisionResponse(
         api_status="ok",
         database_status="ok",
-        desired_state=view.desired_state,
+        desired_state=cast(Literal["running", "stopped"], view.desired_state),
         runtime_health=runtime_health,
         runtime_process_expected=view.desired_state == "running",
         runtime_process_observed=not heartbeat_stale,
