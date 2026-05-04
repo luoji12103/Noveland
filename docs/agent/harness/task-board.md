@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Narrative Reader + Composition Ops
 
 ## Blocked
 - None
@@ -53,4 +53,4 @@
 - Conversation/Narrative Quality Ops
 
 ## Upcoming Mainline
-- None selected; choose the next bundle from `docs/agent/harness/roadmap.md`.
+- None selected until Narrative Reader + Composition Ops closeout.

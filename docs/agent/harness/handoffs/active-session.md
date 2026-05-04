@@ -1,56 +1,29 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T18:00:00Z
-- Branch: feat/conversation-narrative-quality-ops
-- Objective: Completed the Conversation/Narrative Quality Ops roadmap bundle across phases 18-22.
+- Date: 2026-05-04T18:30:00Z
+- Branch: feat/narrative-reader-composition-ops
+- Objective: Implement the Narrative Reader + Composition Ops roadmap bundle across phases 23-27.
 - Starting state:
-  - `feat/calendar-agent-diagnostics-ops` was fast-forward merged into local `main`.
-  - `feat/conversation-narrative-quality-ops` was created from local `main`.
-  - No push has been performed.
-- Completed commits:
-  - `3afe9e3 docs(agent): start conversation narrative quality ops`
-  - `58a57c4 fix(quality): close discovered gate warnings`
-  - `b5910a1 feat(conversations): add hybrid speaker policy`
-  - `042e0cc feat(conversations): expose memory controls`
-  - `9c69bf6 feat(narrative): add writer prompt controls`
-  - `76a6021 feat(narrative): add publishing workflow`
-  - closeout docs commit pending at handoff update time
-- Completed work:
-  - Replaced deprecated FastAPI 422 constants with current status constants.
-  - Added `web` `check:next-env` guard for `next build` churn.
-  - Added deterministic conversation speaker policy preview and policy controls.
-  - Added conversation guardrail settings and runtime enforcement for participant and turn budget constraints.
-  - Added conversation memory controls and operator-facing memory summary.
-  - Added narrative writer controls and dry-run prompt preview.
-  - Added `narrative_publications` migration/table plus publish/unpublish API and Web workflow.
-  - Kept non-editor reader surfaces restricted to published, reader-visible narrative artifacts.
-- Key files changed:
-  - `backend/packages/conversations/src/noveland/conversations/{contracts,services}.py`
-  - `backend/packages/narrative/src/noveland/narrative/{contracts,models,services}.py`
-  - `backend/services/api/src/noveland/services/api/{conversations,worlds}.py`
-  - `backend/migrations/versions/20260504_0020_narrative_publications.py`
-  - `web/features/conversations/conversation-detail.tsx`
-  - `web/features/worlds/{narrative-workspace,narrative-reader}.tsx`
-  - `web/lib/worlds/{client,server,types}.ts`
-  - `web/tests/e2e/start-with-mock-auth.mjs`
-  - `README.md`
-  - `docs/agent/harness/{task-board,change-journal,file-inventory,handoffs/active-session}.md`
-- Checks run so far:
-  - `cd backend && uv run ruff check packages/narrative/src/noveland/narrative services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_schema_metadata.py`
-  - `cd backend && uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members tests/test_api_worlds.py::test_narrative_publication_workflow_filters_reader_visibility tests/test_schema_metadata.py -q`
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_narrative_writer.py tests/test_schema_metadata.py -q`
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test -- features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts`
-- Remaining checks before merge:
-  - Full backend ruff, mypy, and pytest.
-  - Full web lint, typecheck, test, build, `check:next-env`, and e2e.
-  - `docker compose -f infra/compose.yaml config`
-  - `git diff --check`
-  - `git status --short --branch`
+  - `feat/conversation-narrative-quality-ops` was fast-forward merged into local `main`.
+  - Push of `main` to `origin` was attempted but failed because the environment has no GitHub HTTPS credentials:
+    - `fatal: could not read Username for 'https://github.com': No such device or address`
+  - Local `main` is ahead of `origin/main` by 32 commits.
+  - New branch `feat/narrative-reader-composition-ops` was created from local `main`.
+- Current objective:
+  - Add narrative reader search.
+  - Add narrative timeline view.
+  - Make narrative reader/workspace surfaces consume publication-aware realtime updates.
+  - Add world composition import dry-run validation.
+  - Add preset versioning while preserving materialized agent provenance.
+- Bug and hygiene items folded into this branch:
+  - Active handoff previously contained stale closeout/final-gate text.
+  - `web/next-env.d.ts` can churn after build/e2e and must remain restored before commits.
+  - Reader/mock data must keep publication metadata aligned so non-editor members cannot see draft artifacts.
+- Planned checks:
+  - Backend targeted tests for narrative search/timeline ACLs, realtime payloads, composition validation, preset versioning, and schema metadata.
+  - Web targeted tests for reader search/timeline, narrative workspace realtime updates, client mappings, preset admin version display, and mock backend route support.
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean status.
 - Current risks:
-  - Apply migration `20260504_0020` before using narrative publishing on persistent databases.
-  - Publishing v1 updates a single publication record per artifact; it does not yet version or copy draft content.
-  - Reader visibility intentionally depends on publication status, so seed/mock data must include publication records for reader-visible artifacts.
-- Next candidate mainline:
-  - None selected; choose from `docs/agent/harness/roadmap.md` after this branch is merged.
+  - Do not bypass existing world access checks or publication visibility rules.
+  - Reuse existing realtime transport; do not introduce a parallel stream.
+  - Branch cannot be pushed until GitHub credentials are available.
