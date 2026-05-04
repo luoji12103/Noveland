@@ -21,6 +21,7 @@ def seed_admin(
     display_name: str,
 ) -> uuid.UUID:
     normalized_email = _normalize_email(email)
+    _validate_password(password)
     user = session.scalars(select(User).where(User.email == normalized_email)).one_or_none()
     if user is None:
         user = User(
@@ -96,3 +97,8 @@ def _normalize_email(email: str) -> str:
     if "@" not in normalized:
         raise ValueError("email must be an email address")
     return normalized
+
+
+def _validate_password(password: str) -> None:
+    if len(password) < 8:
+        raise ValueError("password must be at least 8 characters")

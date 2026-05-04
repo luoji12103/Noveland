@@ -5,11 +5,13 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 from noveland.auth.contracts import AuthRole, AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User, UserCredential
 from noveland.auth.services import hash_session_token
+from noveland.core.settings import load_settings
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -83,11 +85,39 @@ def test_login_sets_session_cookie_and_me_returns_subject() -> None:
     assert client.cookies.get(CSRF_COOKIE_NAME)
     assert "HttpOnly" in _cookie_header(response, SESSION_COOKIE_NAME)
     assert "HttpOnly" not in _cookie_header(response, CSRF_COOKIE_NAME)
+    assert "Max-Age=604800" in _cookie_header(response, SESSION_COOKIE_NAME)
 
     me_response = client.get("/auth/me")
 
     assert me_response.status_code == 200
     assert me_response.json() == body
+
+
+def test_auth_cookie_policy_uses_configured_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NOVELAND_AUTH_SESSION_TTL_SECONDS", "900")
+    monkeypatch.setenv("NOVELAND_AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("NOVELAND_AUTH_COOKIE_SAMESITE", "strict")
+    load_settings.cache_clear()
+    try:
+        client, engine = _client_with_database()
+        _seed_user(engine, email="admin@example.test", password="correct-password")
+
+        response = client.post(
+            "/auth/login",
+            json={"email": "admin@example.test", "password": "correct-password"},
+        )
+
+        session_cookie = _cookie_header(response, SESSION_COOKIE_NAME)
+        csrf_cookie = _cookie_header(response, CSRF_COOKIE_NAME)
+        assert response.status_code == 200
+        assert "Max-Age=900" in session_cookie
+        assert "Secure" in session_cookie
+        assert "SameSite=strict" in session_cookie
+        assert "Max-Age=900" in csrf_cookie
+        assert "Secure" in csrf_cookie
+        assert "SameSite=strict" in csrf_cookie
+    finally:
+        load_settings.cache_clear()
 
 
 def test_me_rejects_missing_invalid_and_expired_sessions() -> None:

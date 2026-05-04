@@ -13,8 +13,10 @@ from noveland.auth import (
 )
 from noveland.auth.models import User
 from noveland.auth.services import PasswordCredentialService
+from noveland.core.settings import AppSettings, load_settings
 from noveland.services.api.csrf import (
     SESSION_COOKIE_NAME,
+    CookiePolicy,
     clear_auth_cookies,
     create_csrf_token,
     require_csrf,
@@ -25,8 +27,6 @@ from noveland.services.api.dependencies import get_current_subject, get_db_sessi
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-SESSION_TTL = timedelta(days=7)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -57,8 +57,9 @@ class SubjectResponse(BaseModel):
 
 @router.get("/csrf", response_model=CsrfResponse)
 def csrf(response: Response) -> CsrfResponse:
+    settings = load_settings()
     csrf_token = create_csrf_token()
-    set_csrf_cookie(response, csrf_token)
+    set_csrf_cookie(response, csrf_token, policy=_cookie_policy(settings))
     return CsrfResponse(csrf_token=csrf_token)
 
 
@@ -69,6 +70,7 @@ def login(
     response: Response,
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> SubjectResponse:
+    settings = load_settings()
     user = _user_by_email(db_session, login_request.email)
     if user is None or not user.is_active:
         raise _invalid_credentials_http_error()
@@ -84,15 +86,16 @@ def login(
     created_session = AuthSessionService(db_session).create_session(
         AuthSessionCreate(
             user_id=user.id,
-            expires_at=datetime.now(UTC) + SESSION_TTL,
+            expires_at=datetime.now(UTC) + _session_ttl(settings),
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client is not None else None,
         ),
     )
     subject = AuthSessionService(db_session).authenticate_session(created_session.token)
     csrf_token = create_csrf_token()
-    set_session_cookie(response, created_session.token)
-    set_csrf_cookie(response, csrf_token)
+    cookie_policy = _cookie_policy(settings)
+    set_session_cookie(response, created_session.token, policy=cookie_policy)
+    set_csrf_cookie(response, csrf_token, policy=cookie_policy)
     return _subject_response(user, subject)
 
 
@@ -117,6 +120,7 @@ def logout(
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> None:
+    settings = load_settings()
     del subject
     require_csrf(request)
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -126,7 +130,7 @@ def logout(
             detail="Invalid or missing session",
         )
     AuthSessionService(db_session).revoke_session(token)
-    clear_auth_cookies(response)
+    clear_auth_cookies(response, policy=_cookie_policy(settings))
 
 
 def _user_by_email(db_session: Session, email: str) -> User | None:
@@ -147,3 +151,15 @@ def _invalid_credentials_http_error() -> HTTPException:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid email or password",
     )
+
+
+def _cookie_policy(settings: AppSettings) -> CookiePolicy:
+    return CookiePolicy(
+        max_age_seconds=settings.auth_session_ttl_seconds,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+    )
+
+
+def _session_ttl(settings: AppSettings) -> timedelta:
+    return timedelta(seconds=settings.auth_session_ttl_seconds)

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,20 @@ class AppSettings(BaseSettings):
     object_storage_root: Path = Field(
         default=Path(".local/object-storage"),
         validation_alias="NOVELAND_OBJECT_STORAGE_ROOT",
+    )
+    auth_session_ttl_seconds: int = Field(
+        default=604800,
+        ge=300,
+        le=2592000,
+        validation_alias="NOVELAND_AUTH_SESSION_TTL_SECONDS",
+    )
+    auth_cookie_secure: bool = Field(
+        default=False,
+        validation_alias="NOVELAND_AUTH_COOKIE_SECURE",
+    )
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = Field(
+        default="lax",
+        validation_alias="NOVELAND_AUTH_COOKIE_SAMESITE",
     )
     memory_backend_secrets_json: dict[str, str] = Field(
         default_factory=dict,

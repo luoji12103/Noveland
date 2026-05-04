@@ -101,6 +101,17 @@ def test_seed_admin_cli_updates_platform_admin_against_postgres(
     assert login_response.json()["display_name"] == "CLI Admin Two"
 
 
+def test_seed_admin_rejects_short_password(engine: Engine) -> None:
+    with Session(engine) as session:
+        with pytest.raises(ValueError, match="password must be at least 8 characters"):
+            seed_admin(
+                session,
+                email=f"short-{uuid.uuid4()}@example.test",
+                password="short",
+                display_name="Short Password",
+            )
+
+
 def _client_for_engine(engine: Engine) -> TestClient:
     app = create_app()
 
