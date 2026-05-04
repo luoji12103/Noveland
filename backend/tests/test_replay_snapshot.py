@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 
 from noveland.auth.models import User
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 
-def test_replay_state_starts_empty_without_snapshot_or_events(tmp_path) -> None:
+def test_replay_state_starts_empty_without_snapshot_or_events(tmp_path: Path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "empty-replay")
@@ -38,7 +39,7 @@ def test_replay_state_starts_empty_without_snapshot_or_events(tmp_path) -> None:
     assert state.unhandled_event_count == 0
 
 
-def test_replay_applies_latest_snapshot_and_incremental_events(tmp_path) -> None:
+def test_replay_applies_latest_snapshot_and_incremental_events(tmp_path: Path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "snapshot-replay")
@@ -97,7 +98,7 @@ def test_replay_applies_latest_snapshot_and_incremental_events(tmp_path) -> None
     assert state.unhandled_event_count == 1
 
 
-def test_replay_service_creates_object_snapshot_from_current_state(tmp_path) -> None:
+def test_replay_service_creates_object_snapshot_from_current_state(tmp_path: Path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "create-snapshot")
@@ -128,7 +129,7 @@ def test_replay_service_creates_object_snapshot_from_current_state(tmp_path) -> 
     assert state.applied_event_count == 1
 
 
-def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot(tmp_path) -> None:
+def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot(tmp_path: Path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "integrity-healthy")
@@ -159,7 +160,7 @@ def test_snapshot_integrity_reports_no_snapshot_and_healthy_snapshot(tmp_path) -
     assert healthy.issues == []
 
 
-def test_snapshot_integrity_reports_stale_snapshot(tmp_path) -> None:
+def test_snapshot_integrity_reports_stale_snapshot(tmp_path: Path) -> None:
     engine = _engine()
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "integrity-stale")
@@ -332,7 +333,7 @@ def _engine() -> Engine:
     return engine
 
 
-def _settings(tmp_path) -> AppSettings:
+def _settings(tmp_path: Path) -> AppSettings:
     return AppSettings(object_storage_root=tmp_path / "objects")
 
 
