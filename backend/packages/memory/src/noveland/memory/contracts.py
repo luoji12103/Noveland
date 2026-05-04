@@ -304,6 +304,15 @@ class MemoryBackfillDryRunResult(_FrozenContract):
     world_summaries: list[MemoryBackfillWorldSummary] = Field(default_factory=list)
 
 
+class MemoryBackfillExecutionResult(_FrozenContract):
+    enqueued_count: int = Field(ge=0)
+    skipped_existing_count: int = Field(ge=0)
+    skipped_no_profile_count: int = Field(ge=0)
+    skipped_disabled_profile_count: int = Field(ge=0)
+    batch_limit: int = Field(ge=1)
+    dry_run_before: MemoryBackfillDryRunResult
+
+
 class MemoryRetrievalLogRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
@@ -348,7 +357,23 @@ class MemoryEvalResult(_FrozenContract):
     hit_case_count: int = Field(ge=0)
     average_latency_ms: int | None = Field(default=None, ge=0)
     average_context_items: float = Field(ge=0)
+    recommendations: list[str] = Field(default_factory=list)
     cases: list[MemoryEvalCaseResult] = Field(default_factory=list)
+
+
+class MemoryQueueReadinessReport(_FrozenContract):
+    status: str
+    pending_count: int = Field(ge=0)
+    processing_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    retryable_failed_count: int = Field(ge=0)
+    terminal_failed_count: int = Field(ge=0)
+    stalled_processing_count: int = Field(ge=0)
+    due_count: int = Field(ge=0)
+    max_attempts: int = Field(ge=1)
+    stalled_after_seconds: int = Field(ge=1)
+    external_queue_ready: bool
+    issues: list[str] = Field(default_factory=list)
 
 
 class MemoryBackend(Protocol):

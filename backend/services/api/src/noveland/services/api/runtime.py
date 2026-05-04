@@ -31,9 +31,11 @@ from noveland.memory import (
     MemoryBackendProfileService,
     MemoryBackendProfileUpdate,
     MemoryBackfillDryRunResult,
+    MemoryBackfillExecutionResult,
     MemoryBackfillSourceSummary,
     MemoryBackfillWorldSummary,
     MemoryEvalResult,
+    MemoryQueueReadinessReport,
     MemoryRetrievalLogRecord,
     MemoryService,
     MemoryWriteJobRecord,
@@ -332,6 +334,15 @@ class MemoryBackfillDryRunResponse(BaseModel):
     world_summaries: list[MemoryBackfillWorldSummaryResponse]
 
 
+class MemoryBackfillExecutionResponse(BaseModel):
+    enqueued_count: int
+    skipped_existing_count: int
+    skipped_no_profile_count: int
+    skipped_disabled_profile_count: int
+    batch_limit: int
+    dry_run_before: MemoryBackfillDryRunResponse
+
+
 class MemoryEvalCaseResponse(BaseModel):
     label: str
     query_text: str
@@ -347,7 +358,23 @@ class MemoryEvalResponse(BaseModel):
     hit_case_count: int
     average_latency_ms: int | None
     average_context_items: float
+    recommendations: list[str]
     cases: list[MemoryEvalCaseResponse]
+
+
+class MemoryQueueReadinessResponse(BaseModel):
+    status: str
+    pending_count: int
+    processing_count: int
+    failed_count: int
+    retryable_failed_count: int
+    terminal_failed_count: int
+    stalled_processing_count: int
+    due_count: int
+    max_attempts: int
+    stalled_after_seconds: int
+    external_queue_ready: bool
+    issues: list[str]
 
 
 class PluginCatalogResponse(BaseModel):
@@ -909,6 +936,43 @@ def dry_run_memory_backfill(
     return _memory_backfill_dry_run_response(result)
 
 
+@router.post("/memory-backfill/execute", response_model=MemoryBackfillExecutionResponse)
+def execute_memory_backfill(
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> MemoryBackfillExecutionResponse:
+    del subject
+    require_csrf(request)
+    service = MemoryService(db_session, load_settings())
+    result = service.execute_backfill(limit=limit)
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.INFO,
+            component=DiagnosticComponent.RUNTIME,
+            event_type="memory.backfill_executed",
+            message="Memory backfill execution enqueued jobs.",
+            details={
+                "enqueued_count": result.enqueued_count,
+                "batch_limit": result.batch_limit,
+                "candidate_count": result.dry_run_before.candidate_count,
+            },
+        ),
+    )
+    return _memory_backfill_execution_response(result)
+
+
+@router.get("/memory-queue/readiness", response_model=MemoryQueueReadinessResponse)
+def get_memory_queue_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryQueueReadinessResponse:
+    del subject
+    result = MemoryService(db_session, load_settings()).queue_readiness_report()
+    return _memory_queue_readiness_response(result)
+
+
 @router.post(
     "/memory-backend-profiles/{profile_id}/eval-smoke",
     response_model=MemoryEvalResponse,
@@ -1174,6 +1238,19 @@ def _memory_backfill_dry_run_response(
     )
 
 
+def _memory_backfill_execution_response(
+    result: MemoryBackfillExecutionResult,
+) -> MemoryBackfillExecutionResponse:
+    return MemoryBackfillExecutionResponse(
+        enqueued_count=result.enqueued_count,
+        skipped_existing_count=result.skipped_existing_count,
+        skipped_no_profile_count=result.skipped_no_profile_count,
+        skipped_disabled_profile_count=result.skipped_disabled_profile_count,
+        batch_limit=result.batch_limit,
+        dry_run_before=_memory_backfill_dry_run_response(result.dry_run_before),
+    )
+
+
 def _memory_backfill_source_summary_response(
     summary: MemoryBackfillSourceSummary,
 ) -> MemoryBackfillSourceSummaryResponse:
@@ -1205,8 +1282,15 @@ def _memory_eval_response(result: MemoryEvalResult) -> MemoryEvalResponse:
         hit_case_count=result.hit_case_count,
         average_latency_ms=result.average_latency_ms,
         average_context_items=result.average_context_items,
+        recommendations=result.recommendations,
         cases=[MemoryEvalCaseResponse(**case.model_dump()) for case in result.cases],
     )
+
+
+def _memory_queue_readiness_response(
+    result: MemoryQueueReadinessReport,
+) -> MemoryQueueReadinessResponse:
+    return MemoryQueueReadinessResponse(**result.model_dump())
 
 
 def _provider_test_call_response(result: ProviderInvocationResult) -> ProviderTestCallResponse:

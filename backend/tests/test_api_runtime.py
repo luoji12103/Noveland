@@ -159,6 +159,8 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     retry_job = client.post(f"/memory-write-jobs/{failed_job_id}/retry")
     status_after_retry = client.get("/runtime/status")
     dry_run = client.get("/memory-backfill/dry-run?limit=20")
+    execute_backfill = client.post("/memory-backfill/execute?limit=20")
+    queue_readiness = client.get("/memory-queue/readiness")
     eval_smoke = client.post(f"/memory-backend-profiles/{profile_id}/eval-smoke")
     update_profile = client.patch(
         f"/memory-backend-profiles/{profile_id}",
@@ -193,9 +195,18 @@ def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> Non
     assert {
         summary["source_kind"]: summary for summary in dry_run.json()["source_summaries"]
     }["agent_run"]["candidate_count"] == 1
+    assert execute_backfill.status_code == 200
+    assert execute_backfill.json()["enqueued_count"] == 1
+    assert execute_backfill.json()["dry_run_before"]["candidate_count"] == 1
+    assert queue_readiness.status_code == 200
+    assert queue_readiness.json()["external_queue_ready"] is True
+    assert queue_readiness.json()["issues"] == []
     assert eval_smoke.status_code == 200
     assert eval_smoke.json()["case_count"] == 1
     assert eval_smoke.json()["hit_case_count"] == 1
+    assert eval_smoke.json()["recommendations"] == [
+        "Memory eval is healthy for the sampled retrieval logs.",
+    ]
     assert update_profile.status_code == 200
     assert update_profile.json()["is_enabled"] is False
 
@@ -217,6 +228,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     memory_jobs = client.get(f"/memory-backend-profiles/{uuid.uuid4()}/jobs")
     retry_memory_job = client.post(f"/memory-write-jobs/{uuid.uuid4()}/retry")
     memory_backfill = client.get("/memory-backfill/dry-run")
+    memory_backfill_execute = client.post("/memory-backfill/execute")
+    memory_queue_readiness = client.get("/memory-queue/readiness")
 
     assert control.status_code == 403
     assert diagnostics.status_code == 403
@@ -230,6 +243,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     assert memory_jobs.status_code == 403
     assert retry_memory_job.status_code == 403
     assert memory_backfill.status_code == 403
+    assert memory_backfill_execute.status_code == 403
+    assert memory_queue_readiness.status_code == 403
 
 
 def test_platform_admin_dry_runs_and_prunes_diagnostic_retention() -> None:

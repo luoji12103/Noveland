@@ -58,5 +58,38 @@ def run_memory_eval_cases(
         hit_case_count=hit_case_count,
         average_latency_ms=average_latency_ms,
         average_context_items=average_context_items,
+        recommendations=_recommendations(
+            case_count=len(results),
+            hit_case_count=hit_case_count,
+            average_context_items=average_context_items,
+            average_latency_ms=average_latency_ms,
+        ),
         cases=results,
     )
+
+
+def _recommendations(
+    *,
+    case_count: int,
+    hit_case_count: int,
+    average_context_items: float,
+    average_latency_ms: int | None,
+) -> list[str]:
+    recommendations: list[str] = []
+    if case_count == 0:
+        recommendations.append("No retrieval logs were available; run memory retrieval first.")
+        return recommendations
+    hit_rate = hit_case_count / case_count
+    if hit_rate < 0.5:
+        recommendations.append(
+            "Retrieval hit rate is low; review profile config and source attribution.",
+        )
+    if average_context_items == 0:
+        recommendations.append("No context items were returned; verify the backend index has data.")
+    if average_latency_ms is not None and average_latency_ms > 1000:
+        recommendations.append(
+            "Average retrieval latency is high; inspect backend health and limits.",
+        )
+    if not recommendations:
+        recommendations.append("Memory eval is healthy for the sampled retrieval logs.")
+    return recommendations

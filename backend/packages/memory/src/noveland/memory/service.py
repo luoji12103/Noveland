@@ -20,6 +20,7 @@ from noveland.memory.contracts import (
     MemoryBackendProfileRecord,
     MemoryBackendProfileUpdate,
     MemoryBackfillDryRunResult,
+    MemoryBackfillExecutionResult,
     MemoryBackfillSourceSummary,
     MemoryBackfillWorldSummary,
     MemoryContext,
@@ -30,7 +31,9 @@ from noveland.memory.contracts import (
     MemoryEvalResult,
     MemoryEvent,
     MemoryItemRecord,
+    MemoryMessage,
     MemoryProfileSnapshotRecord,
+    MemoryQueueReadinessReport,
     MemoryRetrievalLogRecord,
     MemorySearchRequest,
     MemorySearchResult,
@@ -73,6 +76,29 @@ MEMORY_BACKFILL_EVENT_NAMES = frozenset(
         "memory.item_created",
     },
 )
+
+
+class _BackfillCandidate:
+    def __init__(
+        self,
+        *,
+        source_kind: MemoryWriteSourceKind,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        source_id: uuid.UUID,
+        dedupe_key: str,
+        content: str,
+        metadata: dict[str, Any],
+        conversation_id: uuid.UUID | None = None,
+    ) -> None:
+        self.source_kind = source_kind
+        self.world_id = world_id
+        self.agent_id = agent_id
+        self.source_id = source_id
+        self.dedupe_key = dedupe_key
+        self.content = content
+        self.metadata = metadata
+        self.conversation_id = conversation_id
 
 
 class _MemoryBackendPlugin(Protocol):
@@ -696,6 +722,93 @@ class MemoryService:
             ],
         )
 
+    def execute_backfill(self, limit: int = 100) -> MemoryBackfillExecutionResult:
+        safe_limit = max(1, min(limit, 500))
+        dry_run_before = self.dry_run_backfill(limit=safe_limit)
+        counters = _empty_backfill_stats()
+        enqueued_count = 0
+        for candidate in self._backfill_candidates(safe_limit):
+            if enqueued_count >= safe_limit:
+                break
+            if self._dedupe_exists(candidate.dedupe_key):
+                counters["skipped_existing_count"] += 1
+                continue
+            world = self._session.get(World, candidate.world_id)
+            if world is None:
+                counters["skipped_no_profile_count"] += 1
+                continue
+            skip_reason = self._backfill_skip_reason(world)
+            if skip_reason is not None:
+                counters[skip_reason] += 1
+                continue
+            if candidate.source_kind == MemoryWriteSourceKind.WORLD_EVENT:
+                self.record_events(
+                    [
+                        MemoryEvent(
+                            world_id=candidate.world_id,
+                            agent_id=candidate.agent_id,
+                            event_id=candidate.source_id,
+                            content=candidate.content,
+                            metadata=candidate.metadata,
+                            dedupe_key=candidate.dedupe_key,
+                        ),
+                    ],
+                )
+            else:
+                self.record_turn(
+                    MemoryTurn(
+                        world_id=candidate.world_id,
+                        agent_id=candidate.agent_id,
+                        conversation_id=candidate.conversation_id,
+                        turn_id=candidate.source_id
+                        if candidate.source_kind == MemoryWriteSourceKind.CONVERSATION_TURN
+                        else None,
+                        run_id=candidate.source_id
+                        if candidate.source_kind == MemoryWriteSourceKind.AGENT_RUN
+                        else None,
+                        trigger_source="memory_backfill",
+                        messages=[MemoryMessage(role="assistant", content=candidate.content)],
+                        metadata=candidate.metadata,
+                        dedupe_key=candidate.dedupe_key,
+                    ),
+                )
+            enqueued_count += 1
+        return MemoryBackfillExecutionResult(
+            enqueued_count=enqueued_count,
+            skipped_existing_count=counters["skipped_existing_count"],
+            skipped_no_profile_count=counters["skipped_no_profile_count"],
+            skipped_disabled_profile_count=counters["skipped_disabled_profile_count"],
+            batch_limit=safe_limit,
+            dry_run_before=dry_run_before,
+        )
+
+    def queue_readiness_report(self) -> MemoryQueueReadinessReport:
+        summary = self.write_job_status_summary()
+        issues: list[str] = []
+        if summary.terminal_failed_count > 0:
+            issues.append("Terminal failed memory jobs require operator review before migration.")
+        if summary.stalled_processing_count > 0:
+            issues.append("Stalled processing jobs should be resolved before external workers.")
+        if summary.retryable_failed_count > 0:
+            issues.append("Retryable failures exist; retry or inspect backend health first.")
+        if summary.pending_count + summary.processing_count > 1000:
+            issues.append("Large queue backlog should be drained before changing worker topology.")
+        readiness_status = "ready" if not issues else "blocked"
+        return MemoryQueueReadinessReport(
+            status=readiness_status,
+            pending_count=summary.pending_count,
+            processing_count=summary.processing_count,
+            failed_count=summary.failed_count,
+            retryable_failed_count=summary.retryable_failed_count,
+            terminal_failed_count=summary.terminal_failed_count,
+            stalled_processing_count=summary.stalled_processing_count,
+            due_count=summary.due_count,
+            max_attempts=self._settings.memory_job_max_attempts,
+            stalled_after_seconds=self._settings.memory_job_stalled_after_seconds,
+            external_queue_ready=readiness_status == "ready",
+            issues=issues,
+        )
+
     def list_retrieval_logs(
         self,
         *,
@@ -845,6 +958,91 @@ class MemoryService:
 
     def _eval_search(self, request: MemorySearchRequest) -> MemorySearchResult:
         return self._backend_for_scope(request.world_id).search(request)
+
+    def _backfill_candidates(self, limit: int) -> list[_BackfillCandidate]:
+        safe_limit = max(1, min(limit, 500))
+        candidates: list[_BackfillCandidate] = []
+        for run in self._session.scalars(
+            select(AgentRuntimeRun)
+            .where(
+                AgentRuntimeRun.status == "succeeded",
+                AgentRuntimeRun.response_text.is_not(None),
+            )
+            .order_by(AgentRuntimeRun.started_at.desc())
+            .limit(safe_limit),
+        ).all():
+            if run.response_text is None:
+                continue
+            candidates.append(
+                _BackfillCandidate(
+                    source_kind=MemoryWriteSourceKind.AGENT_RUN,
+                    world_id=run.world_id,
+                    agent_id=run.agent_id,
+                    source_id=run.id,
+                    dedupe_key=f"agent-run:{run.id}",
+                    content=run.response_text,
+                    metadata={
+                        "source_kind": "agent_run",
+                        "run_id": str(run.id),
+                        "trigger_source": run.trigger_source,
+                    },
+                ),
+            )
+        for turn in self._session.scalars(
+            select(ConversationTurn)
+            .where(
+                ConversationTurn.status == "succeeded",
+                ConversationTurn.output_text.is_not(None),
+                ConversationTurn.speaker_agent_id.is_not(None),
+            )
+            .order_by(ConversationTurn.created_at.desc())
+            .limit(safe_limit),
+        ).all():
+            session_model = self._session.get(ConversationSession, turn.session_id)
+            if session_model is None or turn.speaker_agent_id is None or turn.output_text is None:
+                continue
+            candidates.append(
+                _BackfillCandidate(
+                    source_kind=MemoryWriteSourceKind.CONVERSATION_TURN,
+                    world_id=session_model.world_id,
+                    agent_id=turn.speaker_agent_id,
+                    source_id=turn.id,
+                    conversation_id=session_model.id,
+                    dedupe_key=f"conversation-turn:{turn.id}",
+                    content=turn.output_text,
+                    metadata={
+                        "source_kind": "conversation_turn",
+                        "conversation_id": str(session_model.id),
+                        "turn_index": turn.turn_index,
+                    },
+                ),
+            )
+        for event in self._session.scalars(
+            select(WorldEventModel)
+            .where(WorldEventModel.event_name.in_(MEMORY_BACKFILL_EVENT_NAMES))
+            .order_by(WorldEventModel.wall_time.desc())
+            .limit(safe_limit),
+        ).all():
+            agent_id = _event_agent_id(event)
+            content = _event_content(event)
+            if agent_id is None or content is None:
+                continue
+            candidates.append(
+                _BackfillCandidate(
+                    source_kind=MemoryWriteSourceKind.WORLD_EVENT,
+                    world_id=event.world_id,
+                    agent_id=agent_id,
+                    source_id=event.id,
+                    dedupe_key=f"world-event:{event.id}",
+                    content=content,
+                    metadata={
+                        "source_kind": "world_event",
+                        "event_name": event.event_name,
+                        "event_id": str(event.id),
+                    },
+                ),
+            )
+        return candidates[:safe_limit]
 
     def _dedupe_exists(self, dedupe_key: str) -> bool:
         return (
@@ -1054,6 +1252,24 @@ def _retrieval_log_record(model: MemoryRetrievalLog) -> MemoryRetrievalLogRecord
         context_item_count=model.context_item_count,
         occurred_at=_aware_datetime(model.occurred_at),
     )
+
+
+def _event_agent_id(event: WorldEventModel) -> uuid.UUID | None:
+    raw_agent_id = event.payload.get("agent_id")
+    if not isinstance(raw_agent_id, str):
+        return None
+    try:
+        return uuid.UUID(raw_agent_id)
+    except ValueError:
+        return None
+
+
+def _event_content(event: WorldEventModel) -> str | None:
+    for key in ("content", "response_text", "text", "summary"):
+        value = event.payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
 
 
 def _snapshot_contract(record: MemoryProfileSnapshotRecord) -> AgentProfileSnapshot:

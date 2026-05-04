@@ -636,6 +636,54 @@ def test_memory_backfill_dry_run_reports_candidates_and_skips_without_enqueuing(
     assert job_count == 1
 
 
+def test_memory_backfill_execution_enqueues_candidates_idempotently() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    now = datetime.now(UTC)
+
+    with Session(engine) as session:
+        profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="execute-backfill",
+                name="Execute backfill",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        world = session.get(World, world_id)
+        assert world is not None
+        world.memory_backend_profile_id = profile.id
+        run = AgentRuntimeRun(
+            world_id=world_id,
+            agent_id=agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Remember this",
+            response_text="Backfill agent memory",
+            diagnostics={},
+            started_at=now,
+            finished_at=now,
+        )
+        session.add(run)
+        session.flush()
+        expected_dedupe_key = f"agent-run:{run.id}"
+
+        first = MemoryService(session, AppSettings()).execute_backfill(limit=10)
+        second = MemoryService(session, AppSettings()).execute_backfill(limit=10)
+        job_dedupe_keys = [job.dedupe_key for job in session.query(MemoryWriteJob).all()]
+        readiness = MemoryService(session, AppSettings()).queue_readiness_report()
+        session.commit()
+
+    assert first.enqueued_count == 1
+    assert first.dry_run_before.candidate_count == 1
+    assert second.enqueued_count == 0
+    assert second.dry_run_before.skipped_existing_count == 1
+    assert job_dedupe_keys == [expected_dedupe_key]
+    assert readiness.external_queue_ready is True
+    assert readiness.issues == []
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
