@@ -1,5 +1,7 @@
 from noveland.observability.contracts import (
     DiagnosticComponent,
+    DiagnosticRetentionDryRun,
+    DiagnosticRetentionPruneResult,
     DiagnosticSeverity,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
@@ -11,6 +13,8 @@ PACKAGE_NAME = "observability"
 
 __all__ = [
     "DiagnosticComponent",
+    "DiagnosticRetentionDryRun",
+    "DiagnosticRetentionPruneResult",
     "DiagnosticSeverity",
     "PACKAGE_NAME",
     "RuntimeDiagnosticCreate",

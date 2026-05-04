@@ -295,7 +295,7 @@ def test_membership_management_and_final_admin_guard() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
     user_id, _user_token = _seed_user(engine, "user@example.test")
-    second_admin_id, _second_token = _seed_user(engine, "second@example.test")
+    second_admin_id, second_token = _seed_user(engine, "second@example.test")
     world_id = _seed_world(engine, owner_id, "membership-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _authenticate(client, owner_token)
@@ -325,6 +325,9 @@ def test_membership_management_and_final_admin_guard() -> None:
         json={"user_id": str(second_admin_id), "role": "world_admin"},
     )
     delete_original_admin = client.delete(f"/worlds/{world_id}/memberships/{owner_id}")
+    _authenticate(client, second_token)
+    access_review = client.get(f"/worlds/{world_id}/access-review")
+    diagnostics = client.get(f"/worlds/{world_id}/diagnostics")
 
     assert invalid_role.status_code == 422
     assert create_member.status_code == 200
@@ -348,6 +351,14 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert delete_final_admin.status_code == 409
     assert add_second_admin.status_code == 200
     assert delete_original_admin.status_code == 204
+    assert access_review.status_code == 200
+    assert access_review.json()["member_count"] == 1
+    assert access_review.json()["world_admin_count"] == 1
+    assert access_review.json()["final_admin_risk"] is True
+    assert access_review.json()["members"][0]["user_id"] == str(second_admin_id)
+    assert {
+        item["event_type"] for item in diagnostics.json()
+    } >= {"world.membership_upserted", "world.membership_deleted"}
 
 
 def test_platform_admin_manages_agent_presets_and_world_admin_lists_active_presets() -> None:

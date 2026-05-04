@@ -63,3 +63,21 @@ class RuntimeDiagnosticRecord(_FrozenContract):
     run_id: uuid.UUID | None
     provider_profile_id: uuid.UUID | None
     created_at: datetime
+
+
+class DiagnosticRetentionDryRun(_FrozenContract):
+    retention_days: int = Field(ge=1)
+    cutoff: datetime
+    pruneable_count: int = Field(ge=0)
+    retained_count: int = Field(ge=0)
+
+    @field_validator("cutoff", mode="after")
+    @classmethod
+    def normalize_cutoff(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("cutoff must be timezone-aware")
+        return value.astimezone(UTC)
+
+
+class DiagnosticRetentionPruneResult(DiagnosticRetentionDryRun):
+    pruned_count: int = Field(ge=0)

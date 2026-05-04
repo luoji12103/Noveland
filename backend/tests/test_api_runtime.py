@@ -197,6 +197,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
 
     control = client.get("/runtime/control")
     diagnostics = client.get("/runtime/diagnostics")
+    retention = client.get("/runtime/diagnostics/retention")
+    prune = client.post("/runtime/diagnostics/prune")
     profiles = client.get("/provider-profiles")
     provider_health = client.get("/provider-profiles/health")
     plugin_bindings = client.get("/plugins/bindings")
@@ -206,12 +208,56 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
 
     assert control.status_code == 403
     assert diagnostics.status_code == 403
+    assert retention.status_code == 403
+    assert prune.status_code == 403
     assert profiles.status_code == 403
     assert provider_health.status_code == 403
     assert plugin_bindings.status_code == 403
     assert memory_jobs.status_code == 403
     assert retry_memory_job.status_code == 403
     assert memory_backfill.status_code == 403
+
+
+def test_platform_admin_dry_runs_and_prunes_diagnostic_retention() -> None:
+    client, engine = _client_with_database()
+    _user_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    _authenticate(client, token)
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        RuntimeDiagnosticsService(session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.INFO,
+                component=DiagnosticComponent.RUNTIME,
+                event_type="runtime.old",
+                message="Old runtime diagnostic",
+                details={},
+                occurred_at=now - timedelta(days=60),
+            ),
+        )
+        RuntimeDiagnosticsService(session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.INFO,
+                component=DiagnosticComponent.RUNTIME,
+                event_type="runtime.recent",
+                message="Recent runtime diagnostic",
+                details={},
+                occurred_at=now,
+            ),
+        )
+        session.commit()
+
+    dry_run = client.get("/runtime/diagnostics/retention?retention_days=30")
+    prune = client.post("/runtime/diagnostics/prune?retention_days=30&limit=10")
+    diagnostics = client.get("/runtime/diagnostics?limit=10")
+
+    assert dry_run.status_code == 200
+    assert dry_run.json()["pruneable_count"] == 1
+    assert dry_run.json()["retained_count"] == 1
+    assert dry_run.json()["pruned_count"] is None
+    assert prune.status_code == 200
+    assert prune.json()["pruned_count"] == 1
+    assert prune.json()["pruneable_count"] == 0
+    assert [item["event_type"] for item in diagnostics.json()] == ["runtime.recent"]
 
 
 def test_provider_health_reports_secret_ref_statuses(monkeypatch: pytest.MonkeyPatch) -> None:

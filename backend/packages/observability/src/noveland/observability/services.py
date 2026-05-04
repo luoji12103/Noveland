@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import builtins
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from noveland.observability.contracts import (
     DiagnosticComponent,
+    DiagnosticRetentionDryRun,
+    DiagnosticRetentionPruneResult,
     DiagnosticSeverity,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 REDACTED_VALUE = "[redacted]"
@@ -81,11 +83,70 @@ class RuntimeDiagnosticsService:
             statement = statement.where(RuntimeDiagnosticEvent.component == component.value)
         return self._records(_limited(statement, limit))
 
+    def dry_run_retention(self, *, retention_days: int) -> DiagnosticRetentionDryRun:
+        safe_retention_days = max(1, retention_days)
+        cutoff = datetime.now(UTC) - timedelta(days=safe_retention_days)
+        pruneable_count = self._count_before(cutoff)
+        retained_count = self._count_since(cutoff)
+        return DiagnosticRetentionDryRun(
+            retention_days=safe_retention_days,
+            cutoff=cutoff,
+            pruneable_count=pruneable_count,
+            retained_count=retained_count,
+        )
+
+    def prune_retention(
+        self,
+        *,
+        retention_days: int,
+        limit: int = 1000,
+    ) -> DiagnosticRetentionPruneResult:
+        dry_run = self.dry_run_retention(retention_days=retention_days)
+        safe_limit = max(1, min(limit, 10_000))
+        models = self._session.scalars(
+            select(RuntimeDiagnosticEvent)
+            .where(RuntimeDiagnosticEvent.occurred_at < dry_run.cutoff)
+            .order_by(RuntimeDiagnosticEvent.occurred_at.asc())
+            .limit(safe_limit),
+        ).all()
+        for model in models:
+            self._session.delete(model)
+        self._session.flush()
+        retained_count = self._count_since(dry_run.cutoff)
+        remaining_pruneable_count = self._count_before(dry_run.cutoff)
+        return DiagnosticRetentionPruneResult(
+            retention_days=dry_run.retention_days,
+            cutoff=dry_run.cutoff,
+            pruneable_count=remaining_pruneable_count,
+            retained_count=retained_count,
+            pruned_count=len(models),
+        )
+
     def _records(
         self,
         statement: Select[tuple[RuntimeDiagnosticEvent]],
     ) -> builtins.list[RuntimeDiagnosticRecord]:
         return [_record(model) for model in self._session.scalars(statement).all()]
+
+    def _count_before(self, cutoff: datetime) -> int:
+        return int(
+            self._session.scalar(
+                select(func.count(RuntimeDiagnosticEvent.id)).where(
+                    RuntimeDiagnosticEvent.occurred_at < cutoff,
+                ),
+            )
+            or 0
+        )
+
+    def _count_since(self, cutoff: datetime) -> int:
+        return int(
+            self._session.scalar(
+                select(func.count(RuntimeDiagnosticEvent.id)).where(
+                    RuntimeDiagnosticEvent.occurred_at >= cutoff,
+                ),
+            )
+            or 0
+        )
 
 
 def redact_diagnostic_details(details: dict[str, Any]) -> dict[str, Any]:

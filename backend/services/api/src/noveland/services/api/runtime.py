@@ -44,6 +44,8 @@ from noveland.memory.errors import MemoryValidationError
 from noveland.memory.models import MemoryBackendProfile
 from noveland.observability import (
     DiagnosticComponent,
+    DiagnosticRetentionDryRun,
+    DiagnosticRetentionPruneResult,
     DiagnosticSeverity,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
@@ -381,6 +383,14 @@ class RuntimeDiagnosticResponse(BaseModel):
     created_at: datetime
 
 
+class DiagnosticRetentionResponse(BaseModel):
+    retention_days: int
+    cutoff: datetime
+    pruneable_count: int
+    retained_count: int
+    pruned_count: int | None = None
+
+
 @router.get("/runtime/control", response_model=RuntimeControlResponse)
 def get_runtime_control(
     subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
@@ -440,6 +450,42 @@ def list_runtime_diagnostics(
             limit=limit,
         )
     ]
+
+
+@router.get(
+    "/runtime/diagnostics/retention",
+    response_model=DiagnosticRetentionResponse,
+)
+def dry_run_runtime_diagnostic_retention(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    retention_days: Annotated[int, Query(ge=1, le=3650)] = 30,
+) -> DiagnosticRetentionResponse:
+    del subject
+    result = RuntimeDiagnosticsService(db_session).dry_run_retention(
+        retention_days=retention_days,
+    )
+    return _diagnostic_retention_response(result)
+
+
+@router.post(
+    "/runtime/diagnostics/prune",
+    response_model=DiagnosticRetentionResponse,
+)
+def prune_runtime_diagnostics(
+    request: Request,
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    retention_days: Annotated[int, Query(ge=1, le=3650)] = 30,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
+) -> DiagnosticRetentionResponse:
+    del subject
+    require_csrf(request)
+    result = RuntimeDiagnosticsService(db_session).prune_retention(
+        retention_days=retention_days,
+        limit=limit,
+    )
+    return _diagnostic_retention_response(result)
 
 
 @router.get("/plugins/catalog", response_model=list[PluginCatalogResponse])
@@ -1324,3 +1370,18 @@ def _aware_datetime(value: datetime) -> datetime:
 
 def _diagnostic_response(record: RuntimeDiagnosticRecord) -> RuntimeDiagnosticResponse:
     return RuntimeDiagnosticResponse(**record.model_dump())
+
+
+def _diagnostic_retention_response(
+    result: DiagnosticRetentionDryRun | DiagnosticRetentionPruneResult,
+) -> DiagnosticRetentionResponse:
+    pruned_count = (
+        result.pruned_count if isinstance(result, DiagnosticRetentionPruneResult) else None
+    )
+    return DiagnosticRetentionResponse(
+        retention_days=result.retention_days,
+        cutoff=result.cutoff,
+        pruneable_count=result.pruneable_count,
+        retained_count=result.retained_count,
+        pruned_count=pruned_count,
+    )

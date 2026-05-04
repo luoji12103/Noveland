@@ -71,6 +71,7 @@ from noveland.narrative import (
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
+    RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
     redact_diagnostic_details,
@@ -371,6 +372,26 @@ class MembershipResponse(BaseModel):
     user_id: uuid.UUID
     role: WorldRole
     user: UserSummaryResponse
+
+
+class WorldAccessReviewMemberResponse(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    display_name: str
+    is_active: bool
+    role: WorldRole
+    membership_created_at: datetime
+    membership_updated_at: datetime
+
+
+class WorldAccessReviewResponse(BaseModel):
+    world_id: uuid.UUID
+    owner_user_id: uuid.UUID
+    member_count: int
+    world_admin_count: int
+    inactive_member_count: int
+    final_admin_risk: bool
+    members: list[WorldAccessReviewMemberResponse]
 
 
 class AgentResponse(BaseModel):
@@ -1836,6 +1857,43 @@ def list_memberships(
     return [_membership_response(membership, user) for membership, user in rows]
 
 
+@router.get("/{world_id}/access-review", response_model=WorldAccessReviewResponse)
+def get_world_access_review(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldAccessReviewResponse:
+    world = _world_or_404(db_session, context.world_id)
+    rows = db_session.execute(
+        select(WorldMembership, User)
+        .join(User, User.id == WorldMembership.user_id)
+        .where(WorldMembership.world_id == context.world_id)
+        .order_by(WorldMembership.role, User.email),
+    ).all()
+    members = [
+        WorldAccessReviewMemberResponse(
+            user_id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            is_active=user.is_active,
+            role=cast(WorldRole, membership.role),
+            membership_created_at=membership.created_at,
+            membership_updated_at=membership.updated_at,
+        )
+        for membership, user in rows
+    ]
+    world_admin_count = sum(1 for member in members if member.role == AuthRole.WORLD_ADMIN.value)
+    inactive_member_count = sum(1 for member in members if not member.is_active)
+    return WorldAccessReviewResponse(
+        world_id=world.id,
+        owner_user_id=world.owner_user_id,
+        member_count=len(members),
+        world_admin_count=world_admin_count,
+        inactive_member_count=inactive_member_count,
+        final_admin_risk=world_admin_count <= 1,
+        members=members,
+    )
+
+
 @router.get("/{world_id}/member-candidates", response_model=list[MemberCandidateResponse])
 def list_member_candidates(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
@@ -1897,6 +1955,14 @@ def upsert_membership(
         raise _conflict("Cannot remove the final world admin")
     membership = _upsert_membership(db_session, context.world_id, user_id, membership_upsert.role)
     db_session.flush()
+    _record_access_diagnostic(
+        db_session,
+        context=context,
+        event_type="world.membership_upserted",
+        message="World membership was created or updated.",
+        target_user_id=user_id,
+        role=membership_upsert.role,
+    )
     return _membership_response(membership, user)
 
 
@@ -1919,7 +1985,16 @@ def delete_membership(
         <= 1
     ):
         raise _conflict("Cannot remove the final world admin")
+    deleted_role = membership.role
     db_session.delete(membership)
+    _record_access_diagnostic(
+        db_session,
+        context=context,
+        event_type="world.membership_deleted",
+        message="World membership was deleted.",
+        target_user_id=user_id,
+        role=cast(WorldRole, deleted_role),
+    )
     response.status_code = status.HTTP_204_NO_CONTENT
 
 
@@ -3662,6 +3737,32 @@ def _world_admin_count(db_session: Session, world_id: uuid.UUID) -> int:
             ),
         )
         or 0
+    )
+
+
+def _record_access_diagnostic(
+    db_session: Session,
+    *,
+    context: WorldAccessContext,
+    event_type: str,
+    message: str,
+    target_user_id: uuid.UUID,
+    role: WorldRole,
+) -> None:
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.INFO,
+            component=DiagnosticComponent.API,
+            event_type=event_type,
+            message=message,
+            details={
+                "world_id": str(context.world_id),
+                "actor_user_id": str(context.subject.user_id),
+                "target_user_id": str(target_user_id),
+                "role": role,
+            },
+            world_id=context.world_id,
+        ),
     )
 
 
