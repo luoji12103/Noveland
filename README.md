@@ -258,6 +258,7 @@ POST /agent-presets
 PATCH /agent-presets/{preset_id}
 DELETE /agent-presets/{preset_id}
 GET /worlds/{world_id}/composition-export
+POST /world-compositions/validate
 POST /world-compositions/import
 ```
 

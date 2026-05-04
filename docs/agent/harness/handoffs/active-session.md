@@ -1,29 +1,34 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T18:30:00Z
+- Date: 2026-05-04T19:30:00Z
 - Branch: feat/narrative-reader-composition-ops
-- Objective: Implement the Narrative Reader + Composition Ops roadmap bundle across phases 23-27.
+- Objective: Close out the Narrative Reader + Composition Ops roadmap bundle across phases 23-27.
 - Starting state:
   - `feat/conversation-narrative-quality-ops` was fast-forward merged into local `main`.
   - Push of `main` to `origin` was attempted but failed because the environment has no GitHub HTTPS credentials:
     - `fatal: could not read Username for 'https://github.com': No such device or address`
-  - Local `main` is ahead of `origin/main` by 32 commits.
-  - New branch `feat/narrative-reader-composition-ops` was created from local `main`.
-- Current objective:
-  - Add narrative reader search.
-  - Add narrative timeline view.
-  - Make narrative reader/workspace surfaces consume publication-aware realtime updates.
-  - Add world composition import dry-run validation.
-  - Add preset versioning while preserving materialized agent provenance.
-- Bug and hygiene items folded into this branch:
-  - Active handoff previously contained stale closeout/final-gate text.
-  - `web/next-env.d.ts` can churn after build/e2e and must remain restored before commits.
-  - Reader/mock data must keep publication metadata aligned so non-editor members cannot see draft artifacts.
-- Planned checks:
-  - Backend targeted tests for narrative search/timeline ACLs, realtime payloads, composition validation, preset versioning, and schema metadata.
-  - Web targeted tests for reader search/timeline, narrative workspace realtime updates, client mappings, preset admin version display, and mock backend route support.
-  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean status.
+  - `feat/narrative-reader-composition-ops` was created from local `main`.
+- Completed changes:
+  - Narrative reader list now supports search, source-kind filters, and publication/draft timeline ordering.
+  - World stream narrative payloads include publication metadata; reader and workspace surfaces merge publication-aware realtime updates through the existing stream transport.
+  - Platform admins can dry-run validate world composition imports via `POST /world-compositions/validate`.
+  - Composition export includes world plugin/memory metadata and preset/source version metadata while preserving backward-compatible optional fields.
+  - Agent presets now carry explicit `version`; materialized agents store `source_preset_version`; preset updates increment version only for material changes.
+  - Added migration `20260504_0021_agent_preset_versioning.py`.
+- Functional commits on this branch:
+  - `205a4ed docs(agent): start narrative reader composition ops`
+  - `f903ff7 fix(docs): refresh handoff and build churn notes`
+  - `7d55653 feat(narrative): add reader search`
+  - `9a67696 feat(narrative): add timeline view`
+  - `ab6c886 feat(narrative): stream narrative updates`
+  - `baef19c feat(worlds): validate composition imports`
+  - `10307bf feat(presets): add preset versioning`
+- Checks run so far:
+  - `cd backend && uv run ruff check ... && uv run pytest ...` for narrative search/timeline, realtime payloads, composition validation, preset versioning, and schema metadata targets.
+  - `cd web && npm run typecheck && npm run test -- ...` for narrative reader/workspace, world overview, preset admin, agent list, dashboard, conversation detail, and world client targets.
+- Remaining checks:
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and status review.
 - Current risks:
-  - Do not bypass existing world access checks or publication visibility rules.
-  - Reuse existing realtime transport; do not introduce a parallel stream.
-  - Branch cannot be pushed until GitHub credentials are available.
+  - Branch and local `main` are not pushed; `main` push is blocked until GitHub credentials are available.
+  - Apply migration `20260504_0021` before relying on preset version provenance in persistent databases.
+  - `web/next-env.d.ts` can churn after build/e2e; restore it before committing or merging.

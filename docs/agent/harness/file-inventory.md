@@ -99,6 +99,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/agents/src/noveland/agents/services.py`
 - `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
 - `backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`
+- `backend/migrations/versions/20260504_0021_agent_preset_versioning.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`

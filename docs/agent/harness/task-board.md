@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Narrative Reader + Composition Ops
+- None
 
 ## Blocked
 - None
@@ -51,6 +51,7 @@
 - Event/Replay/Clock Ops
 - Calendar/Agent Diagnostics Ops
 - Conversation/Narrative Quality Ops
+- Narrative Reader + Composition Ops
 
 ## Upcoming Mainline
-- None selected until Narrative Reader + Composition Ops closeout.
+- None selected; choose the next candidate from `docs/agent/harness/roadmap.md`.

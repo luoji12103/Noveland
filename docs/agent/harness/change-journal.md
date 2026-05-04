@@ -406,3 +406,14 @@
 - Tests added/updated: conversation service/API tests for speaker policy, guardrails, memory controls, and prompt preview; narrative writer and publication API tests; schema metadata coverage for `narrative_publications`; Web component/client tests for conversation controls, prompt preview, narrative workspace publication controls, and reader visibility.
 - Docs updated: README endpoint list, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Narrative publishing uses a separate `narrative_publications` table. Reader surfaces expose only published, reader-visible artifacts to non-editors; draft artifacts remain admin-visible. Apply migration `20260504_0020` before using the publishing workflow on persistent databases.
+
+## Narrative reader/composition ops entry
+
+- Date: 2026-05-04
+- Branch: feat/narrative-reader-composition-ops
+- Scope: roadmap phases 23-27 narrative reader search/timeline/realtime, world composition validation, and preset versioning
+- Summary: Added publication-aware narrative reader search and timeline controls, realtime narrative artifact updates through the existing world stream, platform-admin composition import dry-run validation, richer composition export metadata, and explicit preset version provenance for materialized agents.
+- Files changed: `/backend/packages/agents/**`, `/backend/services/api/src/noveland/services/api/{realtime,worlds}.py`, `/backend/migrations/versions/20260504_0021_agent_preset_versioning.py`, `/backend/tests/**`, `/web/app/api/world-compositions/validate/**`, `/web/features/{admin,agents,conversations,dashboard,worlds}/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: narrative API and Web tests for search/timeline; realtime API and reader/workspace tests for publication metadata; composition validation API/client/component/mock-backend tests; preset versioning API/schema/UI tests.
+- Docs updated: README endpoint list, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Push of `main` remains blocked by missing GitHub HTTPS credentials in this environment. Apply migration `20260504_0021` before using preset version provenance on persistent databases.

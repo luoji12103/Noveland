@@ -24,7 +24,7 @@ Fast orientation for a new coding session.
 - `web/app/api/memory-write-jobs/` — same-origin memory write job retry proxy route handlers
 - `web/app/api/agent-presets/` — same-origin preset admin proxy route handlers
 - `web/app/api/worlds/` — same-origin world management proxy route handlers
-- `web/app/api/world-compositions/` — same-origin world composition import proxy route handlers
+- `web/app/api/world-compositions/` — same-origin world composition validation/import proxy route handlers
 - `web/app/api/runtime/` — same-origin runtime control proxy route handlers
 - `web/app/api/runtime/stream/` — same-origin platform runtime SSE proxy route
 - `web/app/api/plugins/catalog/` — same-origin plugin catalog proxy route handler
@@ -130,7 +130,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, and explicit plugin runtime bindings
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, and agent preset versioning
 
 ## Update rule
 
