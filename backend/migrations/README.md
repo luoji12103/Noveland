@@ -6,4 +6,11 @@ Alembic is the canonical schema migration entrypoint for the backend.
 uv run alembic upgrade head
 ```
 
-The initial migration defines only the core persistence baseline. The second migration adds world clock state and transition audit tables. The third migration adds the append-only world event log and snapshot metadata baseline. The fourth migration adds local password credentials, opaque auth sessions, and platform role assignments. The fifth migration adds agent calendar entries and world schedule rules. The sixth migration adds local pgvector-backed agent memory. The seventh migration adds provider profiles, runtime control state, agent run records, and narrative artifacts. The eighth migration adds runtime diagnostics. The ninth migration adds provider reliability and test-call health fields. The tenth migration adds agent persona and filtered observation records.
+Migration versions are intentionally linear. Each version module must expose both `upgrade()` and `downgrade()`, and `tests/test_alembic_config.py` verifies the current single head.
+
+Current sequence:
+
+- `20260415_0001` through `20260417_0010`: core schema, clock/events/snapshots, auth sessions, calendar, memory, runtime, diagnostics, provider reliability, and persona/observations.
+- `20260419_0011` through `20260422_0015`: conversation workspace, conversation policies, narrative writer, composition presets, and plugin runtime wiring.
+- `20260423_0016` through `20260423_0018`: Mem0 OSS memory foundation, memory context integration, and memory profile forget/eval ops.
+- `20260503_0019` through `20260504_0022`: observation traceability, narrative publications, agent preset versioning, and plugin diagnostic component support.
