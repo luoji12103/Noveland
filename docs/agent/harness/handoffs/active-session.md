@@ -1,36 +1,24 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T21:25:00Z
-- Branch: feat/plugin-preset-evolution-ops
-- Objective: Close Plugin/Preset Evolution Ops and merge back to local `main` after checks pass.
-- Completed changes:
-  - Added platform-admin preset update preview for agents materialized from older preset versions.
-  - Added `/plugins/bindings` as a derived validation surface over existing provider, world, persona, and conversation writer plugin bindings.
-  - Added built-in plugin contract harness coverage.
-  - Added schema-driven provider plugin config controls with raw JSON fallback.
-  - Added `plugin` runtime diagnostic component, migration `20260504_0022`, provider plugin validation diagnostics, and admin display of recent plugin diagnostics.
-- Functional commits:
-  - `181ead6 docs(agent): start plugin preset evolution ops`
-  - `2ccc4ce feat(presets): preview preset updates`
-  - `0d94e36 feat(plugins): persist runtime bindings`
-  - `c6895eb test(plugins): add contract harness`
-  - `b2716a3 feat(plugins): expose config schema forms`
-  - `f22be26 feat(plugins): surface runtime diagnostics`
-- Checks already run:
-  - `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py`
-  - `cd backend && uv run pytest tests/test_api_worlds.py::test_agent_preset_update_preview_reports_stale_and_current_agents -q`
-  - `cd backend && uv run ruff check services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
-  - `cd backend && uv run pytest tests/test_api_runtime.py::test_platform_admin_lists_plugin_bindings_with_validation_status tests/test_api_runtime.py::test_non_platform_admin_cannot_access_runtime_surface -q`
-  - `cd backend && uv run pytest tests/test_plugin_contract_harness.py -q`
-  - `cd backend && uv run pytest tests/test_api_runtime.py::test_plugin_config_failures_emit_redacted_plugin_diagnostics tests/test_api_runtime.py::test_platform_admin_lists_plugin_bindings_with_validation_status -q`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test -- features/admin/preset-admin.test.tsx lib/worlds/client.test.ts`
-  - `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts`
-- Final checks still to run:
-  - Backend ruff, mypy, pytest.
-  - Web lint, typecheck, test, build, check:next-env, e2e.
-  - `docker compose -f infra/compose.yaml config`, `git diff --check`, and clean branch status.
-- Remaining risks:
-  - `web/next-env.d.ts` may churn after build/e2e; restore it before final merge if needed.
-  - Persistent databases need migration `20260504_0022` before writing plugin diagnostics.
+- Date: 2026-05-04T22:00:00Z
+- Branch: feat/storage-backup-auth-runtime-ops
+- Objective: Implement Storage/Backup/Auth Runtime Ops across roadmap phases 33-37, then merge back to local `main` if checks pass.
+- Starting state:
+  - Local `main` is clean and aligned with `origin/main`.
+  - `feat/plugin-preset-evolution-ops` is already merged into `main`.
+  - New branch `feat/storage-backup-auth-runtime-ops` was created from `main`.
+- Planned changes:
+  - Add local filesystem object storage and store new world snapshot payloads by URI while preserving inline snapshot fallback.
+  - Add backup/restore operator workflow and a dry-run verification command.
+  - Add migration safety tests for Alembic head/order/downgrade/model metadata.
+  - Move auth session TTL and cookie policy into settings with local-compatible defaults.
+  - Centralize runtime actor identity and document human/runtime actor refs.
+- Planned checks:
+  - Backend targeted tests for snapshot URI storage/replay/integrity, backup verification, migration safety, auth settings, and runtime actor refs.
+  - Web targeted tests for snapshot storage metadata and auth compatibility.
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean status.
+- Current risks:
+  - Existing inline snapshots must remain readable.
+  - Snapshot payload object URIs must not expose unsafe filesystem paths.
+  - `web/next-env.d.ts` can churn after build/e2e; restore it before final merge if needed.
   - No push is planned unless explicitly requested.

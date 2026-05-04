@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Storage/Backup/Auth Runtime Ops
 
 ## Blocked
 - None
@@ -55,4 +55,4 @@
 - Plugin/Preset Evolution Ops
 
 ## Upcoming Mainline
-- None selected; choose the next feature bundle from `roadmap.md`.
+- None selected until Storage/Backup/Auth Runtime Ops closeout.
