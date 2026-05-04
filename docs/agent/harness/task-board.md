@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Conversation/Narrative Quality Ops
+- None
 
 ## Blocked
 - None
@@ -50,6 +50,7 @@
 - Runtime Recovery Playbook
 - Event/Replay/Clock Ops
 - Calendar/Agent Diagnostics Ops
+- Conversation/Narrative Quality Ops
 
 ## Upcoming Mainline
-- None selected until Conversation/Narrative Quality Ops closeout.
+- None selected; choose the next bundle from `docs/agent/harness/roadmap.md`.

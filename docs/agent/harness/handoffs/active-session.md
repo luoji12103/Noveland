@@ -1,39 +1,56 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T00:00:00Z
+- Date: 2026-05-04T18:00:00Z
 - Branch: feat/conversation-narrative-quality-ops
-- Objective: Implement the Conversation/Narrative Quality Ops roadmap bundle across phases 18-22.
+- Objective: Completed the Conversation/Narrative Quality Ops roadmap bundle across phases 18-22.
 - Starting state:
   - `feat/calendar-agent-diagnostics-ops` was fast-forward merged into local `main`.
-  - New work started from local `main` on `feat/conversation-narrative-quality-ops`.
-  - Local `main` is ahead of `origin/main`; no push has been performed.
-  - Previous Calendar/Agent Diagnostics Ops final gate passed:
-    - `cd backend && uv run ruff check .`
-    - `cd backend && uv run mypy .`
-    - `cd backend && uv run pytest`
-    - `cd web && npm run lint`
-    - `cd web && npm run typecheck`
-    - `cd web && npm run test`
-    - `cd web && npm run build`
-    - `cd web && npm run test:e2e`
-    - `docker compose -f infra/compose.yaml config`
-    - `git diff --check`
-- Planned work:
-  - Close repo-discovered quality warnings: deprecated FastAPI 422 constants and `next-env.d.ts` build churn handling.
-  - Add hybrid conversation speaker policy: deterministic execution plus preview scoring.
-  - Strengthen conversation guardrails with clearer policies, diagnostics, and terminal reasons.
-  - Expose conversation memory controls and retrieval/write behavior in API and Web surfaces.
-  - Add narrative writer prompt controls and a dry-run prompt preview.
-  - Add narrative publishing workflow backed by a separate publication table.
+  - `feat/conversation-narrative-quality-ops` was created from local `main`.
+  - No push has been performed.
+- Completed commits:
+  - `3afe9e3 docs(agent): start conversation narrative quality ops`
+  - `58a57c4 fix(quality): close discovered gate warnings`
+  - `b5910a1 feat(conversations): add hybrid speaker policy`
+  - `042e0cc feat(conversations): expose memory controls`
+  - `9c69bf6 feat(narrative): add writer prompt controls`
+  - `76a6021 feat(narrative): add publishing workflow`
+  - closeout docs commit pending at handoff update time
+- Completed work:
+  - Replaced deprecated FastAPI 422 constants with current status constants.
+  - Added `web` `check:next-env` guard for `next build` churn.
+  - Added deterministic conversation speaker policy preview and policy controls.
+  - Added conversation guardrail settings and runtime enforcement for participant and turn budget constraints.
+  - Added conversation memory controls and operator-facing memory summary.
+  - Added narrative writer controls and dry-run prompt preview.
+  - Added `narrative_publications` migration/table plus publish/unpublish API and Web workflow.
+  - Kept non-editor reader surfaces restricted to published, reader-visible narrative artifacts.
+- Key files changed:
+  - `backend/packages/conversations/src/noveland/conversations/{contracts,services}.py`
+  - `backend/packages/narrative/src/noveland/narrative/{contracts,models,services}.py`
+  - `backend/services/api/src/noveland/services/api/{conversations,worlds}.py`
+  - `backend/migrations/versions/20260504_0020_narrative_publications.py`
+  - `web/features/conversations/conversation-detail.tsx`
+  - `web/features/worlds/{narrative-workspace,narrative-reader}.tsx`
+  - `web/lib/worlds/{client,server,types}.ts`
+  - `web/tests/e2e/start-with-mock-auth.mjs`
+  - `README.md`
+  - `docs/agent/harness/{task-board,change-journal,file-inventory,handoffs/active-session}.md`
+- Checks run so far:
+  - `cd backend && uv run ruff check packages/narrative/src/noveland/narrative services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_schema_metadata.py`
+  - `cd backend && uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members tests/test_api_worlds.py::test_narrative_publication_workflow_filters_reader_visibility tests/test_schema_metadata.py -q`
+  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_narrative_writer.py tests/test_schema_metadata.py -q`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test -- features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx features/conversations/conversation-detail.test.tsx lib/worlds/client.test.ts`
+- Remaining checks before merge:
+  - Full backend ruff, mypy, and pytest.
+  - Full web lint, typecheck, test, build, `check:next-env`, and e2e.
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
+  - `git status --short --branch`
 - Current risks:
-  - Keep `round_robin` conversation speaker selection as the default behavior.
-  - Keep conversation memory behavior routed through `MemoryService`; do not import memory backend adapters into conversation/runtime flows.
-  - Narrative publishing requires a migration; update schema metadata and tests together.
-  - Reader surfaces must only expose published narrative content to non-editors.
-  - Generated `web/next-env.d.ts` churn must not be committed accidentally.
-- Planned checks:
-  - `cd backend && uv run pytest tests/test_api_conversations.py tests/test_conversation_services.py`
-  - `cd backend && uv run pytest tests/test_api_worlds.py tests/test_narrative_writer.py tests/test_schema_metadata.py`
-  - `cd web && npm run test -- features/conversations/conversation-detail.test.tsx features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx lib/worlds/client.test.ts`
-  - `cd web && npm run check:next-env` after `npm run build`
-  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web test:e2e, compose config, `git diff --check`, and `git status --short --branch`.
+  - Apply migration `20260504_0020` before using narrative publishing on persistent databases.
+  - Publishing v1 updates a single publication record per artifact; it does not yet version or copy draft content.
+  - Reader visibility intentionally depends on publication status, so seed/mock data must include publication records for reader-visible artifacts.
+- Next candidate mainline:
+  - None selected; choose from `docs/agent/harness/roadmap.md` after this branch is merged.

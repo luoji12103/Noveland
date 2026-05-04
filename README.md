@@ -338,6 +338,8 @@ DELETE /worlds/{world_id}/schedule-rules/{rule_id}
 GET /worlds/{world_id}/narrative-artifacts
 GET /worlds/{world_id}/narrative-artifacts/{artifact_id}
 POST /worlds/{world_id}/narrative-artifacts
+POST /worlds/{world_id}/narrative-artifacts/{artifact_id}/publish
+POST /worlds/{world_id}/narrative-artifacts/{artifact_id}/unpublish
 GET /worlds/{world_id}/clock
 GET /worlds/{world_id}/clock/transitions
 POST /worlds/{world_id}/clock/pause
@@ -364,10 +366,11 @@ POST /worlds/{world_id}/conversations/{conversation_id}/start
 POST /worlds/{world_id}/conversations/{conversation_id}/pause
 POST /worlds/{world_id}/conversations/{conversation_id}/resume
 GET /worlds/{world_id}/conversations/{conversation_id}/narrative
+POST /worlds/{world_id}/conversations/{conversation_id}/narrative/preview
 POST /worlds/{world_id}/conversations/{conversation_id}/narrative/generate
 ```
 
-Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows.
+Mutating world endpoints require the same `noveland_csrf` cookie and `X-CSRF-Token` header used by auth logout. DELETE routes are soft-disable operations; they do not hard-delete world, scene, or agent rows. Narrative reader routes only expose artifacts with a published, reader-visible publication record to non-editor world members; world admins can still manage draft artifacts in `/worlds/{worldId}/narrative`.
 
 The platform-admin runtime surface is available under:
 

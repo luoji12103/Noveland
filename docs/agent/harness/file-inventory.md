@@ -163,6 +163,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260423_0017_memory_context_integration.py`
 - `backend/migrations/versions/20260423_0018_memory_profiles_forget_evals.py`
 - `backend/migrations/versions/20260503_0019_observation_traceability.py`
+- `backend/migrations/versions/20260504_0020_narrative_publications.py`
 - `backend/tests/`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`
