@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal, cast
@@ -2747,7 +2748,7 @@ def _agent_preset_response(record: AgentPresetRecord) -> AgentPresetResponse:
 
 def _agent_preset_update_preview_response(
     preset: AgentPresetRecord,
-    agents: list[Agent],
+    agents: Sequence[Agent],
 ) -> AgentPresetUpdatePreviewResponse:
     agent_rows = [_agent_preset_preview_agent(preset, agent) for agent in agents]
     return AgentPresetUpdatePreviewResponse(

@@ -1,7 +1,8 @@
 from collections.abc import Mapping
 from typing import Any
 
-from noveland.plugins import PluginCategory, get_builtin_plugin_registry
+from noveland.plugins import PluginCategory
+from noveland.plugins.builtins import get_builtin_plugin_registry
 
 EXPECTED_CATEGORY_CAPABILITIES: Mapping[PluginCategory, set[str]] = {
     PluginCategory.MODEL_PROVIDER: {"chat.completions", "messages"},
