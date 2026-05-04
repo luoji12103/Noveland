@@ -59,6 +59,11 @@ const conversations = [
       max_consecutive_failed_turns: 1,
       loop_guard_window: 4,
       repeat_output_threshold: 2,
+      speaker_policy: "round_robin" as const,
+      manual_next_agent_id: null,
+      participant_repeat_cooldown: 0,
+      min_enabled_participants: 1,
+      max_turn_budget: null,
     },
     writer_config: {
       provider_profile_id: null,

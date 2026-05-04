@@ -27,6 +27,7 @@ import type {
   ConversationParticipantInput,
   ConversationSeedInput,
   ConversationSession,
+  ConversationSpeakerPreview,
   ConversationTurn,
   ConversationUpdateInput,
   MemberCandidate,
@@ -711,6 +712,16 @@ export function listConversationTurns(
 ): Promise<ConversationTurn[]> {
   return worldRequest<ConversationTurn[]>(
     `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
+    { method: "GET" },
+  );
+}
+
+export function getConversationSpeakerPreview(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationSpeakerPreview> {
+  return worldRequest<ConversationSpeakerPreview>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/speaker-preview`,
     { method: "GET" },
   );
 }

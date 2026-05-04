@@ -2,10 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/worlds/client", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
-  return {
-    ...actual,
-    updateConversation: vi.fn(),
+	  const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
+	  return {
+	    ...actual,
+	    getConversationSpeakerPreview: vi.fn(),
+	    updateConversation: vi.fn(),
     stopConversation: vi.fn(),
     replaceConversationParticipants: vi.fn(),
     seedConversation: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("next/navigation", () => ({
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
 import {
   generateConversationNarrativeArtifacts,
+  getConversationSpeakerPreview,
   stopConversation,
   updateConversation,
 } from "@/lib/worlds/client";
@@ -55,6 +57,13 @@ describe("ConversationDetail", () => {
 
   it("renders policy and diagnostics for admins and updates policy", async () => {
     vi.mocked(updateConversation).mockResolvedValue(adminData.conversation!);
+    vi.mocked(getConversationSpeakerPreview).mockResolvedValue({
+      session_id: "conversation-1",
+      policy_mode: "round_robin",
+      selected_agent_id: "agent-1",
+      selected_reason: "round-robin turn order",
+      candidates: [],
+    });
 
     render(
       <ConversationDetail
@@ -85,10 +94,22 @@ describe("ConversationDetail", () => {
           max_consecutive_failed_turns: 2,
           loop_guard_window: 4,
           repeat_output_threshold: 4,
+          speaker_policy: "round_robin",
+          manual_next_agent_id: null,
+          participant_repeat_cooldown: 0,
+          min_enabled_participants: 1,
+          max_turn_budget: null,
         },
       });
     });
     expect(refresh).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview speaker" }));
+
+    await waitFor(() => {
+      expect(getConversationSpeakerPreview).toHaveBeenCalledWith("world-1", "conversation-1");
+    });
+    expect(screen.getByText("Next speaker preview")).toBeInTheDocument();
   });
 
   it("updates writer config and generates conversation narrative", async () => {
@@ -236,6 +257,11 @@ const adminData: ConversationDetailData = {
       max_consecutive_failed_turns: 2,
       loop_guard_window: 4,
       repeat_output_threshold: 3,
+      speaker_policy: "round_robin",
+      manual_next_agent_id: null,
+      participant_repeat_cooldown: 0,
+      min_enabled_participants: 1,
+      max_turn_budget: null,
     },
     writer_config: {
       provider_profile_id: "profile-1",

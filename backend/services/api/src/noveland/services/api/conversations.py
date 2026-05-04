@@ -21,6 +21,8 @@ from noveland.conversations import (
     ConversationSessionRecord,
     ConversationSessionStatus,
     ConversationSessionUpdate,
+    ConversationSpeakerPolicyMode,
+    ConversationSpeakerPreview,
     ConversationTurnRecord,
     ConversationWriterConfig,
 )
@@ -67,6 +69,13 @@ class ConversationPolicyRequest(_RequestModel):
     max_consecutive_failed_turns: int = Field(ge=1, le=20)
     loop_guard_window: int = Field(ge=2, le=20)
     repeat_output_threshold: int = Field(ge=2, le=20)
+    speaker_policy: Literal["round_robin", "least_recent", "priority_order", "manual_next"] = (
+        "round_robin"
+    )
+    manual_next_agent_id: uuid.UUID | None = None
+    participant_repeat_cooldown: int = Field(default=0, ge=0, le=20)
+    min_enabled_participants: int = Field(default=1, ge=1, le=20)
+    max_turn_budget: int | None = Field(default=None, ge=1, le=200)
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> ConversationPolicyRequest:
@@ -151,6 +160,29 @@ class ConversationPolicyResponse(BaseModel):
     max_consecutive_failed_turns: int
     loop_guard_window: int
     repeat_output_threshold: int
+    speaker_policy: str
+    manual_next_agent_id: uuid.UUID | None
+    participant_repeat_cooldown: int
+    min_enabled_participants: int
+    max_turn_budget: int | None
+
+
+class ConversationSpeakerCandidateResponse(BaseModel):
+    agent_id: uuid.UUID
+    display_name: str
+    turn_order: int
+    is_enabled: bool
+    score: float
+    reasons: list[str]
+    last_spoke_turn_index: int | None
+
+
+class ConversationSpeakerPreviewResponse(BaseModel):
+    session_id: uuid.UUID
+    policy_mode: str
+    selected_agent_id: uuid.UUID | None
+    selected_reason: str
+    candidates: list[ConversationSpeakerCandidateResponse]
 
 
 class ConversationWriterConfigResponse(BaseModel):
@@ -427,6 +459,25 @@ def list_turns(
 
 
 @router.get(
+    "/{conversation_id}/speaker-preview",
+    response_model=ConversationSpeakerPreviewResponse,
+)
+def preview_conversation_speaker(
+    conversation_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ConversationSpeakerPreviewResponse:
+    try:
+        preview = ConversationService(db_session).preview_next_speaker(
+            context.world_id,
+            conversation_id,
+        )
+    except LookupError as exc:
+        raise _not_found() from exc
+    return _speaker_preview_response(preview)
+
+
+@router.get(
     "/{conversation_id}/diagnostics",
     response_model=list[ConversationDiagnosticResponse],
 )
@@ -679,6 +730,11 @@ def _policy_contract(policy: ConversationPolicyRequest) -> ConversationPolicyCon
         max_consecutive_failed_turns=policy.max_consecutive_failed_turns,
         loop_guard_window=policy.loop_guard_window,
         repeat_output_threshold=policy.repeat_output_threshold,
+        speaker_policy=ConversationSpeakerPolicyMode(policy.speaker_policy),
+        manual_next_agent_id=policy.manual_next_agent_id,
+        participant_repeat_cooldown=policy.participant_repeat_cooldown,
+        min_enabled_participants=policy.min_enabled_participants,
+        max_turn_budget=policy.max_turn_budget,
     )
 
 
@@ -725,6 +781,11 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
             loop_guard_window=session.policy.loop_guard_window,
             repeat_output_threshold=session.policy.repeat_output_threshold,
+            speaker_policy=session.policy.speaker_policy.value,
+            manual_next_agent_id=session.policy.manual_next_agent_id,
+            participant_repeat_cooldown=session.policy.participant_repeat_cooldown,
+            min_enabled_participants=session.policy.min_enabled_participants,
+            max_turn_budget=session.policy.max_turn_budget,
         ),
         writer_config=ConversationWriterConfigResponse(
             provider_profile_id=session.writer_config.provider_profile_id,
@@ -757,6 +818,29 @@ def _participant_response(
         is_enabled=participant.is_enabled,
         created_at=participant.created_at.isoformat(),
         updated_at=participant.updated_at.isoformat(),
+    )
+
+
+def _speaker_preview_response(
+    preview: ConversationSpeakerPreview,
+) -> ConversationSpeakerPreviewResponse:
+    return ConversationSpeakerPreviewResponse(
+        session_id=preview.session_id,
+        policy_mode=preview.policy_mode.value,
+        selected_agent_id=preview.selected_agent_id,
+        selected_reason=preview.selected_reason,
+        candidates=[
+            ConversationSpeakerCandidateResponse(
+                agent_id=candidate.agent_id,
+                display_name=candidate.display_name,
+                turn_order=candidate.turn_order,
+                is_enabled=candidate.is_enabled,
+                score=candidate.score,
+                reasons=candidate.reasons,
+                last_spoke_turn_index=candidate.last_spoke_turn_index,
+            )
+            for candidate in preview.candidates
+        ],
     )
 
 

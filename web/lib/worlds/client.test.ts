@@ -12,6 +12,7 @@ import {
   createSnapshot,
   generateConversationNarrativeArtifacts,
   getConversationDiagnosticsSummary,
+  getConversationSpeakerPreview,
   getCalendarConflicts,
   getAgentRunDetail,
   getNarrativeArtifact,
@@ -384,28 +385,33 @@ describe("world client", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ run_id: "run-1" }]))
       .mockResolvedValueOnce(jsonResponse({ run_id: "run-2" }, 201))
-      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
-      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-2" }]))
-      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-3" }]))
-      .mockResolvedValueOnce(jsonResponse({ id: "artifact-4" }, 201));
+	      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
+	      .mockResolvedValueOnce(jsonResponse({ selected_agent_id: "agent-1" }))
+	      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-2" }]))
+	      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-3" }]))
+	      .mockResolvedValueOnce(jsonResponse({ id: "artifact-4" }, 201));
     vi.stubGlobal("fetch", fetchMock);
 
     await listAgentRuns("world-1", "agent-1");
-    await runAgent("world-1", "agent-1", { prompt: "hello" });
-    await listNarrativeArtifacts("world-1");
-    await listConversationNarrativeArtifacts("world-1", "conversation-1");
-    await generateConversationNarrativeArtifacts("world-1", "conversation-1", "summary_only");
-    await createNarrativeArtifact("world-1", { title: "Artifact", content: "Body" });
+	    await runAgent("world-1", "agent-1", { prompt: "hello" });
+	    await listNarrativeArtifacts("world-1");
+	    await getConversationSpeakerPreview("world-1", "conversation-1");
+	    await listConversationNarrativeArtifacts("world-1", "conversation-1");
+	    await generateConversationNarrativeArtifacts("world-1", "conversation-1", "summary_only");
+	    await createNarrativeArtifact("world-1", { title: "Artifact", content: "Body" });
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/runs");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/run");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/worlds/world-1/narrative-artifacts");
-    expect(fetchMock.mock.calls[3][0]).toBe("/api/worlds/world-1/conversations/conversation-1/narrative");
-    expect(fetchMock.mock.calls[4][0]).toBe(
-      "/api/worlds/world-1/conversations/conversation-1/narrative/generate",
-    );
-    expect(fetchMock.mock.calls[5][0]).toBe("/api/worlds/world-1/narrative-artifacts");
-  });
+	    expect(fetchMock.mock.calls[3][0]).toBe(
+	      "/api/worlds/world-1/conversations/conversation-1/speaker-preview",
+	    );
+	    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/conversations/conversation-1/narrative");
+	    expect(fetchMock.mock.calls[5][0]).toBe(
+	      "/api/worlds/world-1/conversations/conversation-1/narrative/generate",
+	    );
+	    expect(fetchMock.mock.calls[6][0]).toBe("/api/worlds/world-1/narrative-artifacts");
+	  });
 
   it("maps calendar conflict requests", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ conflict_count: 0 }));

@@ -161,11 +161,40 @@ export type ConversationTerminalReason =
   | "operator_stopped"
   | "speaker_error";
 
+export type ConversationSpeakerPolicy =
+  | "round_robin"
+  | "least_recent"
+  | "priority_order"
+  | "manual_next";
+
 export type ConversationPolicy = {
   error_policy: ConversationErrorPolicy;
   max_consecutive_failed_turns: number;
   loop_guard_window: number;
   repeat_output_threshold: number;
+  speaker_policy: ConversationSpeakerPolicy;
+  manual_next_agent_id: string | null;
+  participant_repeat_cooldown: number;
+  min_enabled_participants: number;
+  max_turn_budget: number | null;
+};
+
+export type ConversationSpeakerCandidate = {
+  agent_id: string;
+  display_name: string;
+  turn_order: number;
+  is_enabled: boolean;
+  score: number;
+  reasons: string[];
+  last_spoke_turn_index: number | null;
+};
+
+export type ConversationSpeakerPreview = {
+  session_id: string;
+  policy_mode: ConversationSpeakerPolicy;
+  selected_agent_id: string | null;
+  selected_reason: string;
+  candidates: ConversationSpeakerCandidate[];
 };
 
 export type ConversationWriterConfig = {

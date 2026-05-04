@@ -93,10 +93,16 @@ def test_conversation_api_enforces_access_and_manual_advance(
         json={"input_text": "Operator seed"},
     )
     advance_response = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
+    speaker_preview = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/speaker-preview",
+    )
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/conversations")
     member_turns = client.get(f"/worlds/{world_id}/conversations/{conversation_id}/turns")
+    member_speaker_preview = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/speaker-preview",
+    )
     member_diagnostics = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics",
     )
@@ -110,8 +116,12 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert seed_response.status_code == 200
     assert advance_response.status_code == 200
     assert advance_response.json()["turn"]["speaker_agent_id"] == str(first_agent_id)
+    assert speaker_preview.status_code == 200
+    assert speaker_preview.json()["policy_mode"] == "round_robin"
+    assert speaker_preview.json()["selected_agent_id"] == str(second_agent_id)
     assert member_list.status_code == 200
     assert member_turns.status_code == 200
+    assert member_speaker_preview.status_code == 403
     assert member_diagnostics.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
     assert member_advance.status_code == 403

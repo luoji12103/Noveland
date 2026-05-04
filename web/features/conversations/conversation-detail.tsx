@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   advanceConversation,
   generateConversationNarrativeArtifacts,
+  getConversationSpeakerPreview,
   pauseConversation,
   replaceConversationParticipants,
   resumeConversation,
@@ -30,6 +31,7 @@ import type {
   ConversationNarrativeArtifactSet,
   ConversationPolicy,
   ConversationSession,
+  ConversationSpeakerPreview,
   ConversationTurn,
   ConversationWriterConfig,
   NarrativeArtifact,
@@ -57,6 +59,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const [turns, setTurns] = useState(data.turns);
   const [diagnostics, setDiagnostics] = useState(data.diagnostics);
   const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
+  const [speakerPreview, setSpeakerPreview] = useState<ConversationSpeakerPreview | null>(null);
   const [liveReady, setLiveReady] = useState(false);
   const conversation = conversationState;
   const socketRef = useRef<WebSocket | null>(null);
@@ -242,6 +245,12 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
     );
   }
 
+  async function handleSpeakerPreview() {
+    await runAction(async () => {
+      setSpeakerPreview(await getConversationSpeakerPreview(worldId, conversationId));
+    }, "Speaker preview refreshed.");
+  }
+
   async function handleWriterConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -409,8 +418,66 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 name="repeat_output_threshold"
                 defaultValue={String(conversation.policy.repeat_output_threshold)}
               />
+              <select
+                aria-label="Conversation speaker policy"
+                className="text-input"
+                name="speaker_policy"
+                defaultValue={conversation.policy.speaker_policy}
+              >
+                <option value="round_robin">round_robin</option>
+                <option value="least_recent">least_recent</option>
+                <option value="priority_order">priority_order</option>
+                <option value="manual_next">manual_next</option>
+              </select>
+              <select
+                aria-label="Manual next speaker"
+                className="text-input"
+                name="manual_next_agent_id"
+                defaultValue={conversation.policy.manual_next_agent_id ?? ""}
+              >
+                <option value="">No manual speaker</option>
+                {participants.map((participant) => {
+                  const agent = data.agents.find((item) => item.id === participant.agent_id);
+                  return (
+                    <option key={participant.agent_id} value={participant.agent_id}>
+                      {agent?.display_name ?? participant.agent_id}
+                    </option>
+                  );
+                })}
+              </select>
+              <input
+                aria-label="Conversation repeat cooldown"
+                className="text-input"
+                name="participant_repeat_cooldown"
+                defaultValue={String(conversation.policy.participant_repeat_cooldown)}
+              />
+              <input
+                aria-label="Conversation minimum enabled participants"
+                className="text-input"
+                name="min_enabled_participants"
+                defaultValue={String(conversation.policy.min_enabled_participants)}
+              />
+              <input
+                aria-label="Conversation max turn budget"
+                className="text-input"
+                name="max_turn_budget"
+                defaultValue={
+                  conversation.policy.max_turn_budget === null
+                    ? ""
+                    : String(conversation.policy.max_turn_budget)
+                }
+                placeholder="Uses session max turns"
+              />
               <button className="primary-button" type="submit" disabled={isBusy}>
                 Save policy
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={handleSpeakerPreview}
+              >
+                Preview speaker
               </button>
             </form>
           ) : (
@@ -420,6 +487,17 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               {conversation.policy.repeat_output_threshold} in {conversation.policy.loop_guard_window}
             </p>
           )}
+          {speakerPreview !== null ? (
+            <div className="resource-row">
+              <div>
+                <h3>Next speaker preview</h3>
+                <p>
+                  {speakerPreview.policy_mode} - {speakerPreview.selected_reason}
+                </p>
+                <p>Selected: {speakerPreview.selected_agent_id ?? "none"}</p>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="management-panel" aria-labelledby="participants-title">
@@ -715,11 +793,17 @@ function mergeDiagnostics(
 }
 
 function policyFromForm(form: FormData): ConversationPolicy {
+  const maxTurnBudget = optionalFormString(form, "max_turn_budget");
   return {
     error_policy: formString(form, "error_policy") as ConversationPolicy["error_policy"],
     max_consecutive_failed_turns: Number(formString(form, "max_consecutive_failed_turns")),
     loop_guard_window: Number(formString(form, "loop_guard_window")),
     repeat_output_threshold: Number(formString(form, "repeat_output_threshold")),
+    speaker_policy: formString(form, "speaker_policy") as ConversationPolicy["speaker_policy"],
+    manual_next_agent_id: optionalFormString(form, "manual_next_agent_id"),
+    participant_repeat_cooldown: Number(formString(form, "participant_repeat_cooldown")),
+    min_enabled_participants: Number(formString(form, "min_enabled_participants")),
+    max_turn_budget: maxTurnBudget === null ? null : Number(maxTurnBudget),
   };
 }
 

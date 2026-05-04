@@ -19,7 +19,10 @@ from noveland.conversations.contracts import (
     ConversationSessionRecord,
     ConversationSessionStatus,
     ConversationSessionUpdate,
+    ConversationSpeakerCandidate,
     ConversationSpeakerKind,
+    ConversationSpeakerPolicyMode,
+    ConversationSpeakerPreview,
     ConversationTerminalReason,
     ConversationTurnRecord,
     ConversationTurnStatus,
@@ -260,6 +263,16 @@ class ConversationService:
         ]
         return matches[: max(1, min(limit, 100))]
 
+    def preview_next_speaker(
+        self,
+        world_id: uuid.UUID,
+        session_id: uuid.UUID,
+    ) -> ConversationSpeakerPreview:
+        session_model = self._session_model(world_id, session_id)
+        policy = _policy_config(session_model.policy_config)
+        participants = self._available_participants(session_model)
+        return self._speaker_preview(session_model, participants, policy)
+
     def seed_session(
         self,
         world_id: uuid.UUID,
@@ -387,6 +400,7 @@ class ConversationService:
             else:
                 raise ConversationStateError("Auto dialogue session must be paused or running")
 
+        policy = _policy_config(session_model.policy_config)
         participants = self._available_participants(session_model)
         if not participants:
             self._mark_session_failed(
@@ -400,13 +414,33 @@ class ConversationService:
             raise ConversationStateError("Conversation session has no enabled participants")
 
         agent_turn_count = self._agent_turn_count(session_model.id)
-        if agent_turn_count >= session_model.max_turns:
+        max_turn_budget = policy.max_turn_budget or session_model.max_turns
+        if agent_turn_count >= max_turn_budget:
             self._mark_session_completed(session_model)
             self._session.flush()
             raise ConversationStateError("Conversation session has reached max turns")
 
-        participant_index = session_model.next_turn_index % len(participants)
-        participant = participants[participant_index]
+        if len(participants) < policy.min_enabled_participants:
+            self._mark_session_failed(
+                session_model,
+                terminal_reason=ConversationTerminalReason.NO_ENABLED_PARTICIPANTS,
+                turn_index=None,
+                speaker_agent_id=None,
+                error_text="Conversation session does not meet minimum enabled participants",
+            )
+            self._session.flush()
+            raise ConversationStateError(
+                "Conversation session does not meet minimum enabled participants",
+            )
+
+        preview = self._speaker_preview(session_model, participants, policy)
+        if preview.selected_agent_id is None:
+            raise ConversationStateError("Conversation session has no selectable speaker")
+        participant_by_agent_id = {
+            participant.agent_id: participant for participant in participants
+        }
+        participant = participant_by_agent_id[preview.selected_agent_id]
+        participant_index = participants.index(participant)
         turn_index = self._next_turn_index(session_model.id)
         emit_started_event = (
             session_model.mode == ConversationMode.MANUAL_CHAIN.value
@@ -648,6 +682,98 @@ class ConversationService:
             ),
         ]
         return "\n".join(lines)
+
+    def _speaker_preview(
+        self,
+        session_model: ConversationSession,
+        participants: list[ConversationParticipant],
+        policy: ConversationPolicyConfig,
+    ) -> ConversationSpeakerPreview:
+        turns = self._turn_records(session_model.id)
+        agents_by_id = self._agents_for_world(
+            session_model.world_id,
+            [participant.agent_id for participant in participants],
+        )
+        last_spoke_by_agent: dict[uuid.UUID, int] = {}
+        for turn in turns:
+            if turn.speaker_agent_id is not None:
+                last_spoke_by_agent[turn.speaker_agent_id] = turn.turn_index
+
+        recent_speaker_ids = [
+            turn.speaker_agent_id
+            for turn in reversed(turns)
+            if turn.speaker_agent_id is not None
+        ][: policy.participant_repeat_cooldown]
+        cooldown_agent_ids = set(recent_speaker_ids)
+
+        candidates: list[ConversationSpeakerCandidate] = []
+        for index, participant in enumerate(participants):
+            agent = agents_by_id.get(participant.agent_id)
+            score = 0.0
+            reasons: list[str] = []
+            if (
+                participant.agent_id in cooldown_agent_ids
+                and len(participants) > len(cooldown_agent_ids)
+            ):
+                score -= 100.0
+                reasons.append("inside repeat cooldown")
+
+            if policy.speaker_policy == ConversationSpeakerPolicyMode.ROUND_ROBIN:
+                target_index = session_model.next_turn_index % len(participants)
+                score += 100.0 if index == target_index else 0.0
+                reasons.append("round-robin turn order")
+            elif policy.speaker_policy == ConversationSpeakerPolicyMode.LEAST_RECENT:
+                last_spoke = last_spoke_by_agent.get(participant.agent_id)
+                score += 10_000.0 if last_spoke is None else float(-last_spoke)
+                reasons.append("least recent speaker")
+            elif policy.speaker_policy == ConversationSpeakerPolicyMode.PRIORITY_ORDER:
+                score += float(10_000 - participant.turn_order)
+                reasons.append("priority turn order")
+            elif policy.speaker_policy == ConversationSpeakerPolicyMode.MANUAL_NEXT:
+                if participant.agent_id == policy.manual_next_agent_id:
+                    score += 10_000.0
+                    reasons.append("manual next speaker")
+                else:
+                    reasons.append("not selected by manual next policy")
+
+            candidates.append(
+                ConversationSpeakerCandidate(
+                    agent_id=participant.agent_id,
+                    display_name=(
+                        agent.display_name if agent is not None else str(participant.agent_id)
+                    ),
+                    turn_order=participant.turn_order,
+                    is_enabled=participant.is_enabled,
+                    score=score,
+                    reasons=reasons,
+                    last_spoke_turn_index=last_spoke_by_agent.get(participant.agent_id),
+                ),
+            )
+
+        sorted_candidates = sorted(
+            candidates,
+            key=lambda candidate: (-candidate.score, candidate.turn_order, candidate.display_name),
+        )
+        selected = sorted_candidates[0] if sorted_candidates else None
+        if (
+            policy.speaker_policy == ConversationSpeakerPolicyMode.MANUAL_NEXT
+            and policy.manual_next_agent_id is not None
+            and selected is not None
+            and selected.agent_id != policy.manual_next_agent_id
+        ):
+            selected = None
+        selected_reason = (
+            "no selectable speaker"
+            if selected is None
+            else ", ".join(selected.reasons) or policy.speaker_policy.value
+        )
+        return ConversationSpeakerPreview(
+            session_id=session_model.id,
+            policy_mode=policy.speaker_policy,
+            selected_agent_id=None if selected is None else selected.agent_id,
+            selected_reason=selected_reason,
+            candidates=sorted_candidates,
+        )
 
     def _participant_records(
         self,
@@ -974,7 +1100,15 @@ def _turn_record(model: ConversationTurn) -> ConversationTurnRecord:
 
 
 def _policy_config(value: dict[str, object]) -> ConversationPolicyConfig:
-    return ConversationPolicyConfig.model_validate(value)
+    normalized = {
+        "speaker_policy": ConversationSpeakerPolicyMode.ROUND_ROBIN.value,
+        "manual_next_agent_id": None,
+        "participant_repeat_cooldown": 0,
+        "min_enabled_participants": 1,
+        "max_turn_budget": None,
+        **value,
+    }
+    return ConversationPolicyConfig.model_validate(normalized)
 
 
 def _writer_config(value: dict[str, object]) -> ConversationWriterConfig:

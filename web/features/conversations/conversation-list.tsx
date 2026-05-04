@@ -214,6 +214,11 @@ function policyFromForm(form: FormData): ConversationPolicy {
     max_consecutive_failed_turns: Number(formString(form, "max_consecutive_failed_turns")),
     loop_guard_window: Number(formString(form, "loop_guard_window")),
     repeat_output_threshold: Number(formString(form, "repeat_output_threshold")),
+    speaker_policy: "round_robin",
+    manual_next_agent_id: null,
+    participant_repeat_cooldown: 0,
+    min_enabled_participants: 1,
+    max_turn_budget: null,
   };
 }
 

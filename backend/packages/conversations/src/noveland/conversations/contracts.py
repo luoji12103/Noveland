@@ -47,6 +47,13 @@ class ConversationErrorPolicy(StrEnum):
     RETRY_ONCE_THEN_SKIP = "retry_once_then_skip"
 
 
+class ConversationSpeakerPolicyMode(StrEnum):
+    ROUND_ROBIN = "round_robin"
+    LEAST_RECENT = "least_recent"
+    PRIORITY_ORDER = "priority_order"
+    MANUAL_NEXT = "manual_next"
+
+
 class ConversationTerminalReason(StrEnum):
     MAX_TURNS_REACHED = "max_turns_reached"
     LOOP_GUARD_REPEATED_OUTPUT = "loop_guard_repeated_output"
@@ -65,6 +72,11 @@ class ConversationPolicyConfig(_FrozenContract):
     max_consecutive_failed_turns: int = Field(ge=1, le=20)
     loop_guard_window: int = Field(ge=2, le=20)
     repeat_output_threshold: int = Field(ge=2, le=20)
+    speaker_policy: ConversationSpeakerPolicyMode = ConversationSpeakerPolicyMode.ROUND_ROBIN
+    manual_next_agent_id: uuid.UUID | None = None
+    participant_repeat_cooldown: int = Field(default=0, ge=0, le=20)
+    min_enabled_participants: int = Field(default=1, ge=1, le=20)
+    max_turn_budget: int | None = Field(default=None, ge=1, le=200)
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> ConversationPolicyConfig:
@@ -180,6 +192,24 @@ class ConversationTurnRecord(_FrozenContract):
     error_text: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ConversationSpeakerCandidate(_FrozenContract):
+    agent_id: uuid.UUID
+    display_name: str
+    turn_order: int
+    is_enabled: bool
+    score: float
+    reasons: list[str]
+    last_spoke_turn_index: int | None = None
+
+
+class ConversationSpeakerPreview(_FrozenContract):
+    session_id: uuid.UUID
+    policy_mode: ConversationSpeakerPolicyMode
+    selected_agent_id: uuid.UUID | None
+    selected_reason: str
+    candidates: list[ConversationSpeakerCandidate]
 
 
 class PreparedConversationTurn(_FrozenContract):

@@ -18,6 +18,7 @@ from noveland.conversations import (
     ConversationService,
     ConversationSessionCreate,
     ConversationSessionStatus,
+    ConversationSpeakerPolicyMode,
     ConversationTerminalReason,
     ConversationWriterConfig,
 )
@@ -148,6 +149,99 @@ def test_prepare_next_turn_skips_disabled_participant_and_marks_failed_without_a
 
         service.replace_participants(world_id, created.id, [])
         with pytest.raises(ConversationStateError, match="no enabled participants"):
+            service.prepare_next_turn(world_id, created.id)
+        refreshed = service.get_session(world_id, created.id)
+
+    assert refreshed.status == ConversationSessionStatus.FAILED
+    assert refreshed.terminal_reason == ConversationTerminalReason.NO_ENABLED_PARTICIPANTS
+
+
+def test_speaker_policy_preview_and_least_recent_selection() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    first_agent_id = _seed_agent(engine, world_id, "first")
+    second_agent_id = _seed_agent(engine, world_id, "second")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                session_key="least-recent-world",
+                title="Least recent world",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=4,
+                policy=ConversationPolicyConfig(
+                    error_policy=ConversationErrorPolicy.FAIL_SESSION,
+                    max_consecutive_failed_turns=2,
+                    loop_guard_window=4,
+                    repeat_output_threshold=3,
+                    speaker_policy=ConversationSpeakerPolicyMode.LEAST_RECENT,
+                ),
+                writer_config=_default_writer_config(),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [
+                ConversationParticipantDefinition(agent_id=first_agent_id, turn_order=0),
+                ConversationParticipantDefinition(agent_id=second_agent_id, turn_order=1),
+            ],
+        )
+
+        initial_preview = service.preview_next_speaker(world_id, created.id)
+        assert initial_preview.policy_mode == ConversationSpeakerPolicyMode.LEAST_RECENT
+        assert initial_preview.selected_agent_id == first_agent_id
+        first_prepared = service.prepare_next_turn(world_id, created.id)
+        service.finalize_turn(
+            first_prepared,
+            response_text="First speaks",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+
+        next_preview = service.preview_next_speaker(world_id, created.id)
+        next_prepared = service.prepare_next_turn(world_id, created.id)
+
+    assert next_preview.selected_agent_id == second_agent_id
+    assert next_prepared.speaker_agent_id == second_agent_id
+
+
+def test_min_enabled_participants_guardrail_marks_failed() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    agent_id = _seed_agent(engine, world_id, "solo")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                session_key="guardrail-world",
+                title="Guardrail world",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=4,
+                policy=ConversationPolicyConfig(
+                    error_policy=ConversationErrorPolicy.FAIL_SESSION,
+                    max_consecutive_failed_turns=2,
+                    loop_guard_window=4,
+                    repeat_output_threshold=3,
+                    min_enabled_participants=2,
+                ),
+                writer_config=_default_writer_config(),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [ConversationParticipantDefinition(agent_id=agent_id, turn_order=0)],
+        )
+
+        with pytest.raises(ConversationStateError, match="minimum enabled participants"):
             service.prepare_next_turn(world_id, created.id)
         refreshed = service.get_session(world_id, created.id)
 
