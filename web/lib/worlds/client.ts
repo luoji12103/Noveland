@@ -23,6 +23,7 @@ import type {
   ConversationNarrativeArtifactSet,
   ConversationCreateInput,
   ConversationDiagnosticsSummary,
+  ConversationMemorySummary,
   ConversationParticipant,
   ConversationParticipantInput,
   ConversationSeedInput,
@@ -722,6 +723,16 @@ export function getConversationSpeakerPreview(
 ): Promise<ConversationSpeakerPreview> {
   return worldRequest<ConversationSpeakerPreview>(
     `/api/worlds/${worldId}/conversations/${conversationId}/speaker-preview`,
+    { method: "GET" },
+  );
+}
+
+export function getConversationMemorySummary(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationMemorySummary> {
+  return worldRequest<ConversationMemorySummary>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/memory/summary`,
     { method: "GET" },
   );
 }

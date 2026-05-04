@@ -106,6 +106,9 @@ def test_conversation_api_enforces_access_and_manual_advance(
     member_diagnostics = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/diagnostics",
     )
+    memory_summary = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/memory/summary",
+    )
     member_advance = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
 
     _authenticate(client, stranger_token)
@@ -123,9 +126,86 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert member_turns.status_code == 200
     assert member_speaker_preview.status_code == 403
     assert member_diagnostics.status_code == 403
+    assert memory_summary.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
     assert member_advance.status_code == 403
     assert stranger_list.status_code == 404
+
+
+def test_conversation_memory_summary_reports_config_and_runtime_diagnostics() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "memory-world")
+    agent_id = _seed_agent(engine, world_id, "speaker")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, owner_token)
+
+    create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "memory-session",
+            "title": "Memory session",
+            "scope_type": "world",
+            "mode": "manual_chain",
+            "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
+            "memory_config": {
+                "write_turn_memory": False,
+                "retrieve_memory": True,
+                "max_context_items": 3,
+                "query_window": 6,
+                "include_recent_turns": False,
+                "include_agent_observations": True,
+                "memory_query_strategy": "objective",
+            },
+        },
+    )
+    conversation_id = uuid.UUID(create_response.json()["id"])
+    run_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            ConversationTurn(
+                id=uuid.uuid4(),
+                session_id=conversation_id,
+                turn_index=0,
+                speaker_kind="agent",
+                speaker_agent_id=agent_id,
+                input_text="Prompt",
+                output_text="Output",
+                status="succeeded",
+                run_id=run_id,
+            ),
+        )
+        session.add(
+            RuntimeDiagnosticEvent(
+                id=uuid.uuid4(),
+                severity="info",
+                component="agent",
+                event_type="agent.run_succeeded",
+                message="Agent runtime run succeeded.",
+                details={
+                    "conversation_id": str(conversation_id),
+                    "memory_backend": "local_pgvector",
+                    "memory_hit_count": 2,
+                    "memory_retrieval_enabled": True,
+                },
+                world_id=world_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                occurred_at=datetime.now(UTC),
+            ),
+        )
+        session.commit()
+
+    response = client.get(f"/worlds/{world_id}/conversations/{conversation_id}/memory/summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["write_turn_memory"] is False
+    assert body["retrieve_memory"] is True
+    assert body["memory_query_strategy"] == "objective"
+    assert body["latest_backend"] == "local_pgvector"
+    assert body["latest_hit_count"] == 2
 
 
 def test_conversation_api_validates_scene_scope_auto_lifecycle_and_agent_provider_profile() -> None:

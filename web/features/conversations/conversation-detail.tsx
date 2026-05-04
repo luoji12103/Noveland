@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   advanceConversation,
   generateConversationNarrativeArtifacts,
+  getConversationMemorySummary,
   getConversationSpeakerPreview,
   pauseConversation,
   replaceConversationParticipants,
@@ -28,6 +29,7 @@ import type {
 import type { ConversationDetailData } from "@/lib/worlds/server";
 import type {
   ConversationMemoryConfig,
+  ConversationMemorySummary,
   ConversationNarrativeArtifactSet,
   ConversationPolicy,
   ConversationSession,
@@ -60,6 +62,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const [diagnostics, setDiagnostics] = useState(data.diagnostics);
   const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
   const [speakerPreview, setSpeakerPreview] = useState<ConversationSpeakerPreview | null>(null);
+  const [memorySummary, setMemorySummary] = useState<ConversationMemorySummary | null>(null);
   const [liveReady, setLiveReady] = useState(false);
   const conversation = conversationState;
   const socketRef = useRef<WebSocket | null>(null);
@@ -273,6 +276,12 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
         }),
       "Memory config updated.",
     );
+  }
+
+  async function handleMemorySummary() {
+    await runAction(async () => {
+      setMemorySummary(await getConversationMemorySummary(worldId, conversationId));
+    }, "Memory summary refreshed.");
   }
 
   async function handleGenerateNarrative(artifactSet: ConversationNarrativeArtifactSet) {
@@ -591,8 +600,44 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 name="query_window"
                 defaultValue={String(conversation.memory_config.query_window)}
               />
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.memory_config.include_recent_turns}
+                  name="include_recent_turns"
+                  type="checkbox"
+                  value="true"
+                />
+                Include recent turns
+              </label>
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.memory_config.include_agent_observations}
+                  name="include_agent_observations"
+                  type="checkbox"
+                  value="true"
+                />
+                Include observations
+              </label>
+              <select
+                aria-label="Conversation memory query strategy"
+                className="text-input"
+                name="memory_query_strategy"
+                defaultValue={conversation.memory_config.memory_query_strategy}
+              >
+                <option value="prompt">prompt</option>
+                <option value="objective">objective</option>
+                <option value="transcript">transcript</option>
+              </select>
               <button className="primary-button" type="submit" disabled={isBusy}>
                 Save memory config
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={handleMemorySummary}
+              >
+                Refresh memory summary
               </button>
             </form>
           ) : (
@@ -603,6 +648,21 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
               {conversation.memory_config.query_window}
             </p>
           )}
+          {memorySummary !== null ? (
+            <div className="resource-row">
+              <div>
+                <h3>Memory summary</h3>
+                <p>
+                  backend={memorySummary.latest_backend ?? "none"} / hits=
+                  {memorySummary.latest_hit_count} / query={memorySummary.memory_query_strategy}
+                </p>
+                <p>
+                  retrieve={String(memorySummary.latest_retrieval_enabled)} / write=
+                  {String(memorySummary.latest_write_enabled)}
+                </p>
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <section className="management-panel" aria-labelledby="writer-config-title">
@@ -824,6 +884,12 @@ function memoryConfigFromForm(form: FormData): ConversationMemoryConfig {
     retrieve_memory: form.get("retrieve_memory") === "true",
     max_context_items: Number(formString(form, "max_context_items")),
     query_window: Number(formString(form, "query_window")),
+    include_recent_turns: form.get("include_recent_turns") === "true",
+    include_agent_observations: form.get("include_agent_observations") === "true",
+    memory_query_strategy: formString(
+      form,
+      "memory_query_strategy",
+    ) as ConversationMemoryConfig["memory_query_strategy"],
   };
 }
 

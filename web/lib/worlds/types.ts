@@ -211,6 +211,17 @@ export type ConversationMemoryConfig = {
   retrieve_memory: boolean;
   max_context_items: number;
   query_window: number;
+  include_recent_turns: boolean;
+  include_agent_observations: boolean;
+  memory_query_strategy: "prompt" | "objective" | "transcript";
+};
+
+export type ConversationMemorySummary = ConversationMemoryConfig & {
+  latest_backend: string | null;
+  latest_hit_count: number;
+  latest_retrieval_enabled: boolean;
+  latest_write_enabled: boolean;
+  recent_memory_diagnostics: RuntimeDiagnostic[];
 };
 
 export type ConversationSession = {

@@ -637,18 +637,19 @@ class ConversationService:
 
         transcript_lines = []
         memory_config = _memory_config(session_model.memory_config)
-        transcript_window = min(memory_config.query_window, TRANSCRIPT_WINDOW)
-        for turn in turns[-transcript_window:]:
-            speaker = "operator"
-            if turn.speaker_agent_id is not None:
-                agent = agents_by_id.get(turn.speaker_agent_id)
-                speaker = (
-                    agent.display_name
-                    if agent is not None
-                    else f"agent:{turn.speaker_agent_id}"
-                )
-            content = turn.output_text or turn.error_text or turn.input_text
-            transcript_lines.append(f"{speaker}: {content}")
+        if memory_config.include_recent_turns:
+            transcript_window = min(memory_config.query_window, TRANSCRIPT_WINDOW)
+            for turn in turns[-transcript_window:]:
+                speaker = "operator"
+                if turn.speaker_agent_id is not None:
+                    agent = agents_by_id.get(turn.speaker_agent_id)
+                    speaker = (
+                        agent.display_name
+                        if agent is not None
+                        else f"agent:{turn.speaker_agent_id}"
+                    )
+                content = turn.output_text or turn.error_text or turn.input_text
+                transcript_lines.append(f"{speaker}: {content}")
 
         speaker_agent = agents_by_id.get(speaker_agent_id)
         speaker_name = "Unknown agent" if speaker_agent is None else speaker_agent.display_name
@@ -1116,7 +1117,13 @@ def _writer_config(value: dict[str, object]) -> ConversationWriterConfig:
 
 
 def _memory_config(value: dict[str, object]) -> ConversationMemoryConfig:
-    return ConversationMemoryConfig.model_validate(value)
+    normalized = {
+        "include_recent_turns": True,
+        "include_agent_observations": True,
+        "memory_query_strategy": "prompt",
+        **value,
+    }
+    return ConversationMemoryConfig.model_validate(normalized)
 
 
 def _normalize_loop_text(value: str) -> str:

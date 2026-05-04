@@ -2,11 +2,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/worlds/client", async () => {
-	  const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
-	  return {
-	    ...actual,
-	    getConversationSpeakerPreview: vi.fn(),
-	    updateConversation: vi.fn(),
+  const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
+  return {
+    ...actual,
+    getConversationMemorySummary: vi.fn(),
+    getConversationSpeakerPreview: vi.fn(),
+    updateConversation: vi.fn(),
     stopConversation: vi.fn(),
     replaceConversationParticipants: vi.fn(),
     seedConversation: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("next/navigation", () => ({
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
 import {
   generateConversationNarrativeArtifacts,
+  getConversationMemorySummary,
   getConversationSpeakerPreview,
   stopConversation,
   updateConversation,
@@ -63,6 +65,14 @@ describe("ConversationDetail", () => {
       selected_agent_id: "agent-1",
       selected_reason: "round-robin turn order",
       candidates: [],
+    });
+    vi.mocked(getConversationMemorySummary).mockResolvedValue({
+      ...adminData.conversation!.memory_config,
+      latest_backend: "local_pgvector",
+      latest_hit_count: 2,
+      latest_retrieval_enabled: true,
+      latest_write_enabled: true,
+      recent_memory_diagnostics: [],
     });
 
     render(
@@ -110,6 +120,13 @@ describe("ConversationDetail", () => {
       expect(getConversationSpeakerPreview).toHaveBeenCalledWith("world-1", "conversation-1");
     });
     expect(screen.getByText("Next speaker preview")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh memory summary" }));
+
+    await waitFor(() => {
+      expect(getConversationMemorySummary).toHaveBeenCalledWith("world-1", "conversation-1");
+    });
+    expect(screen.getByText("Memory summary")).toBeInTheDocument();
   });
 
   it("updates writer config and generates conversation narrative", async () => {
@@ -276,6 +293,9 @@ const adminData: ConversationDetailData = {
       retrieve_memory: true,
       max_context_items: 5,
       query_window: 4,
+      include_recent_turns: true,
+      include_agent_observations: true,
+      memory_query_strategy: "prompt",
     },
     terminal_reason: null,
     created_at: "2026-04-21T00:00:00.000Z",

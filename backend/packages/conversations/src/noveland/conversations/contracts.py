@@ -103,6 +103,9 @@ class ConversationMemoryConfig(_FrozenContract):
     retrieve_memory: bool = True
     max_context_items: int = Field(default=5, ge=1, le=20)
     query_window: int = Field(default=8, ge=1, le=50)
+    include_recent_turns: bool = True
+    include_agent_observations: bool = True
+    memory_query_strategy: str = Field(default="prompt", pattern="^(prompt|objective|transcript)$")
 
 
 class ConversationSessionCreate(_FrozenContract):

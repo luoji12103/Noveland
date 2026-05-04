@@ -35,7 +35,12 @@ from noveland.narrative import (
     NarrativeArtifactRecord,
     NarrativeGenerationMode,
 )
-from noveland.observability import RuntimeDiagnosticRecord
+from noveland.observability import (
+    DiagnosticComponent,
+    DiagnosticSeverity,
+    RuntimeDiagnosticRecord,
+)
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
@@ -50,6 +55,7 @@ from noveland.services.api.dependencies import (
 from noveland.services.runtime import ConversationRuntimeOrchestrator
 from noveland.worlds.models import Scene, World
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/worlds/{world_id}/conversations", tags=["conversations"])
@@ -146,6 +152,9 @@ class ConversationMemoryConfigRequest(_RequestModel):
     retrieve_memory: bool = True
     max_context_items: int = Field(default=5, ge=1, le=20)
     query_window: int = Field(default=8, ge=1, le=50)
+    include_recent_turns: bool = True
+    include_agent_observations: bool = True
+    memory_query_strategy: Literal["prompt", "objective", "transcript"] = "prompt"
 
 
 class ConversationNarrativeGenerateRequest(_RequestModel):
@@ -199,6 +208,24 @@ class ConversationMemoryConfigResponse(BaseModel):
     retrieve_memory: bool
     max_context_items: int
     query_window: int
+    include_recent_turns: bool
+    include_agent_observations: bool
+    memory_query_strategy: str
+
+
+class ConversationMemorySummaryResponse(BaseModel):
+    retrieve_memory: bool
+    write_turn_memory: bool
+    max_context_items: int
+    query_window: int
+    include_recent_turns: bool
+    include_agent_observations: bool
+    memory_query_strategy: str
+    latest_backend: str | None
+    latest_hit_count: int
+    latest_retrieval_enabled: bool
+    latest_write_enabled: bool
+    recent_memory_diagnostics: list[ConversationDiagnosticResponse]
 
 
 class ConversationSessionResponse(BaseModel):
@@ -544,6 +571,69 @@ def get_conversation_diagnostics_summary(
 
 
 @router.get(
+    "/{conversation_id}/memory/summary",
+    response_model=ConversationMemorySummaryResponse,
+)
+def get_conversation_memory_summary(
+    conversation_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ConversationMemorySummaryResponse:
+    service = ConversationService(db_session)
+    try:
+        session = service.get_session(context.world_id, conversation_id)
+        turns = service.list_turns(context.world_id, conversation_id)
+        diagnostics = service.list_diagnostics(context.world_id, conversation_id, limit=20)
+    except LookupError as exc:
+        raise _not_found() from exc
+    run_ids = {turn.run_id for turn in turns if turn.run_id is not None}
+    runtime_records = (
+        [
+            _runtime_diagnostic_record(record)
+            for record in db_session.scalars(
+                select(RuntimeDiagnosticEvent)
+                .where(
+                    RuntimeDiagnosticEvent.world_id == context.world_id,
+                    RuntimeDiagnosticEvent.run_id.in_(run_ids),
+                )
+                .order_by(RuntimeDiagnosticEvent.occurred_at.desc())
+                .limit(50),
+            ).all()
+        ]
+        if run_ids
+        else []
+    )
+    run_diagnostics = [
+        record
+        for record in [*runtime_records, *diagnostics]
+        if record.run_id in run_ids
+        and (
+            "memory" in record.event_type
+            or "memory_backend" in record.details
+            or "memory_hit_count" in record.details
+        )
+    ]
+    latest = run_diagnostics[0] if run_diagnostics else None
+    latest_details = latest.details if latest is not None else {}
+    return ConversationMemorySummaryResponse(
+        retrieve_memory=session.memory_config.retrieve_memory,
+        write_turn_memory=session.memory_config.write_turn_memory,
+        max_context_items=session.memory_config.max_context_items,
+        query_window=session.memory_config.query_window,
+        include_recent_turns=session.memory_config.include_recent_turns,
+        include_agent_observations=session.memory_config.include_agent_observations,
+        memory_query_strategy=session.memory_config.memory_query_strategy,
+        latest_backend=_string_or_none(latest_details.get("memory_backend")),
+        latest_hit_count=_int_or_zero(latest_details.get("memory_hit_count")),
+        latest_retrieval_enabled=bool(latest_details.get("memory_retrieval_enabled", False)),
+        latest_write_enabled=session.memory_config.write_turn_memory,
+        recent_memory_diagnostics=[
+            _diagnostic_response(record) for record in run_diagnostics[:5]
+        ],
+    )
+
+
+@router.get(
     "/{conversation_id}/narrative",
     response_model=list[ConversationNarrativeArtifactResponse],
 )
@@ -759,6 +849,9 @@ def _memory_config_contract(
         retrieve_memory=memory_config.retrieve_memory,
         max_context_items=memory_config.max_context_items,
         query_window=memory_config.query_window,
+        include_recent_turns=memory_config.include_recent_turns,
+        include_agent_observations=memory_config.include_agent_observations,
+        memory_query_strategy=memory_config.memory_query_strategy,
     )
 
 
@@ -800,6 +893,9 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             retrieve_memory=session.memory_config.retrieve_memory,
             max_context_items=session.memory_config.max_context_items,
             query_window=session.memory_config.query_window,
+            include_recent_turns=session.memory_config.include_recent_turns,
+            include_agent_observations=session.memory_config.include_agent_observations,
+            memory_query_strategy=session.memory_config.memory_query_strategy,
         ),
         terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
@@ -878,6 +974,23 @@ def _diagnostic_response(record: RuntimeDiagnosticRecord) -> ConversationDiagnos
     )
 
 
+def _runtime_diagnostic_record(model: RuntimeDiagnosticEvent) -> RuntimeDiagnosticRecord:
+    return RuntimeDiagnosticRecord(
+        id=model.id,
+        severity=DiagnosticSeverity(model.severity),
+        component=DiagnosticComponent(model.component),
+        event_type=model.event_type,
+        message=model.message,
+        details=model.details,
+        occurred_at=model.occurred_at,
+        world_id=model.world_id,
+        agent_id=model.agent_id,
+        run_id=model.run_id,
+        provider_profile_id=model.provider_profile_id,
+        created_at=model.created_at,
+    )
+
+
 def _conversation_operator_message(
     session: ConversationSessionRecord,
     last_turn: ConversationTurnRecord | None,
@@ -896,6 +1009,22 @@ def _conversation_operator_message(
     if diagnostics:
         return diagnostics[0].message
     return "No blocking conversation diagnostics are currently recorded."
+
+
+def _string_or_none(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
+def _int_or_zero(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return 0
 
 
 def _narrative_artifact_response(

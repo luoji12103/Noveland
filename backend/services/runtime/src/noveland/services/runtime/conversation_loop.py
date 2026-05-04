@@ -56,6 +56,7 @@ class ConversationRuntimeOrchestrator:
             prompt_text=prepared.prompt_text,
             trigger_source=trigger_source,
             memory_config=prepared.session.memory_config,
+            objective=prepared.session.objective,
         )
         if run.status != "succeeded" and policy.error_policy in {
             ConversationErrorPolicy.RETRY_ONCE_THEN_FAIL,
@@ -63,11 +64,12 @@ class ConversationRuntimeOrchestrator:
         }:
             retry_run = self._run_agent_turn(
                 world_id=world_id,
-                agent_id=prepared.speaker_agent_id,
-                prompt_text=prepared.prompt_text,
-                trigger_source=f"{trigger_source}:retry",
-                memory_config=prepared.session.memory_config,
-            )
+                    agent_id=prepared.speaker_agent_id,
+                    prompt_text=prepared.prompt_text,
+                    trigger_source=f"{trigger_source}:retry",
+                    memory_config=prepared.session.memory_config,
+                    objective=prepared.session.objective,
+                )
             retry_diagnostics = dict(retry_run.diagnostics)
             retry_diagnostics["attempt_count"] = 2
             retry_diagnostics["initial_error"] = _error_text(run.diagnostics)
@@ -97,7 +99,13 @@ class ConversationRuntimeOrchestrator:
         prompt_text: str,
         trigger_source: str,
         memory_config: ConversationMemoryConfig,
+        objective: str,
     ) -> AgentRunExecution:
+        memory_query_text = prompt_text
+        if memory_config.memory_query_strategy == "objective":
+            memory_query_text = objective or prompt_text
+        elif memory_config.memory_query_strategy == "transcript":
+            memory_query_text = prompt_text[-2_000:]
         return self._agent_orchestrator.run_agent(
             world_id=world_id,
             agent_id=agent_id,
@@ -105,7 +113,7 @@ class ConversationRuntimeOrchestrator:
             trigger_source=trigger_source,
             create_memory=memory_config.write_turn_memory,
             retrieve_memory=memory_config.retrieve_memory,
-            memory_query_text=prompt_text,
+            memory_query_text=memory_query_text,
             max_context_items=memory_config.max_context_items,
             create_narrative_artifact=False,
         )

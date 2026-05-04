@@ -240,5 +240,8 @@ function memoryConfigFromForm(form: FormData): ConversationMemoryConfig {
     retrieve_memory: form.get("memory_retrieve_memory") === "true",
     max_context_items: Number(formString(form, "memory_max_context_items") || "5"),
     query_window: Number(formString(form, "memory_query_window") || "6"),
+    include_recent_turns: true,
+    include_agent_observations: true,
+    memory_query_strategy: "prompt",
   };
 }
