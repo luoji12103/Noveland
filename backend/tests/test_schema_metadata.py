@@ -78,6 +78,11 @@ def test_core_schema_tables_are_registered() -> None:
     } <= table_names()
 
 
+def test_agent_preset_version_columns_are_registered() -> None:
+    assert "source_preset_version" in column_names("agents")
+    assert "version" in column_names("agent_presets")
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(

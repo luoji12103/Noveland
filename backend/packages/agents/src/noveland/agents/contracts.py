@@ -122,6 +122,7 @@ class AgentPresetRecord(_FrozenContract):
     behavior_policy: dict[str, Any]
     calendar_blueprint: list[AgentPresetCalendarEntry]
     advanced_config: dict[str, Any]
+    version: int
     is_active: bool
     created_at: datetime
     updated_at: datetime

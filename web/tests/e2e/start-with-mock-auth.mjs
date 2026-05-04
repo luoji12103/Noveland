@@ -60,6 +60,7 @@ const agents = [
     world_id: worldOneId,
     home_scene_id: sceneHomeId,
     source_preset_id: null,
+    source_preset_version: null,
     agent_key: "guide",
     display_name: "Guide",
     kind: "role_agent",
@@ -1012,6 +1013,7 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       world_id: worldId,
       home_scene_id: body.home_scene_id ?? null,
       source_preset_id: preset?.id ?? null,
+      source_preset_version: preset?.version ?? null,
       agent_key: body.agent_key,
       display_name: body.display_name,
       kind: body.kind ?? preset?.default_kind ?? "role_agent",
@@ -1100,6 +1102,7 @@ function handleWorldCompositionExport(request, response, currentSubject, worldId
           agent.source_preset_id == null
             ? null
             : agentPresets.find((preset) => preset.id === agent.source_preset_id)?.preset_key ?? null,
+        source_preset_version: agent.source_preset_version ?? null,
         provider_profile_key:
           agent.provider_profile_id == null
             ? null
@@ -1131,6 +1134,7 @@ function handleWorldCompositionExport(request, response, currentSubject, worldId
                     name: preset.name,
                     default_kind: preset.default_kind,
                     default_provider_profile_key: preset.default_provider_profile_key,
+                    version: preset.version,
                     is_active: preset.is_active,
                   },
             ];
@@ -1434,6 +1438,7 @@ async function handleAgentPresets(request, response) {
       behavior_policy: body.behavior_policy ?? {},
       calendar_blueprint: body.calendar_blueprint ?? [],
       advanced_config: body.advanced_config ?? {},
+      version: 1,
       is_active: body.is_active ?? true,
       created_at: now,
       updated_at: now,
@@ -1460,7 +1465,20 @@ async function handleAgentPresetItem(request, response, presetId) {
     return;
   }
   if (request.method === "PATCH") {
-    Object.assign(preset, await readJson(request), {
+    const body = await readJson(request);
+    const materialChange = [
+      "preset_key",
+      "name",
+      "description",
+      "default_kind",
+      "default_provider_profile_key",
+      "persona_text",
+      "behavior_policy",
+      "calendar_blueprint",
+      "advanced_config",
+    ].some((key) => Object.hasOwn(body, key));
+    Object.assign(preset, body, {
+      version: materialChange ? preset.version + 1 : preset.version,
       updated_at: new Date().toISOString(),
     });
     sendJson(response, 200, preset);
@@ -1590,6 +1608,7 @@ async function handleWorldCompositionImport(request, response) {
           ? null
           : (sceneKeyToId.get(exportedAgent.home_scene_key) ?? null),
       source_preset_id: preset?.id ?? null,
+      source_preset_version: preset?.version ?? null,
       agent_key: exportedAgent.agent_key,
       display_name: exportedAgent.display_name,
       kind: exportedAgent.kind ?? preset?.default_kind ?? "role_agent",

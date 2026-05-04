@@ -377,6 +377,7 @@ class AgentResponse(BaseModel):
     world_id: uuid.UUID
     home_scene_id: uuid.UUID | None
     source_preset_id: uuid.UUID | None
+    source_preset_version: int | None
     agent_key: str
     display_name: str
     kind: AgentKind
@@ -450,6 +451,7 @@ class AgentPresetResponse(BaseModel):
     behavior_policy: dict[str, Any]
     calendar_blueprint: list[AgentPresetCalendarEntryResponse]
     advanced_config: dict[str, Any]
+    version: int
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -481,6 +483,7 @@ class WorldCompositionAgentResponse(BaseModel):
     kind: AgentKind
     home_scene_key: str | None
     source_preset_key: str | None
+    source_preset_version: int | None = None
     provider_profile_key: str | None
     config: dict[str, Any]
     is_enabled: bool
@@ -499,6 +502,7 @@ class WorldCompositionPresetReferenceResponse(BaseModel):
     name: str
     default_kind: AgentKind
     default_provider_profile_key: str | None
+    version: int = 1
     is_active: bool
 
 
@@ -1083,6 +1087,7 @@ def import_world_composition(
             world_id=world.id,
             home_scene_id=home_scene_id,
             source_preset_id=None if preset is None else preset.id,
+            source_preset_version=None if preset is None else preset.version,
             agent_key=exported_agent.agent_key,
             display_name=exported_agent.display_name,
             kind=exported_agent.kind,
@@ -1210,6 +1215,7 @@ def export_world_composition(
                 None if agent.home_scene_id is None else scene_map.get(agent.home_scene_id)
             ),
             source_preset_key=_source_preset_key(preset_map, agent.source_preset_id),
+            source_preset_version=agent.source_preset_version,
             provider_profile_key=_provider_profile_key_from_config(profile_map, agent.config),
             config=agent.config,
             is_enabled=agent.is_enabled,
@@ -1259,6 +1265,7 @@ def export_world_composition(
                 name=preset.name,
                 default_kind=cast(AgentKind, preset.default_kind),
                 default_provider_profile_key=preset.default_provider_profile_key,
+                version=preset.version,
                 is_active=preset.is_active,
             )
             for preset in preset_models
@@ -2530,6 +2537,7 @@ def create_agent(
         world_id=context.world_id,
         home_scene_id=agent_create.home_scene_id,
         source_preset_id=None if preset is None else preset.id,
+        source_preset_version=None if preset is None else preset.version,
         agent_key=agent_create.agent_key,
         display_name=agent_create.display_name,
         kind=effective_kind,
@@ -2658,6 +2666,7 @@ def _agent_response(agent: Agent) -> AgentResponse:
         world_id=agent.world_id,
         home_scene_id=agent.home_scene_id,
         source_preset_id=agent.source_preset_id,
+        source_preset_version=agent.source_preset_version,
         agent_key=agent.agent_key,
         display_name=agent.display_name,
         kind=cast(AgentKind, agent.kind),
@@ -2689,6 +2698,7 @@ def _agent_preset_response(record: AgentPresetRecord) -> AgentPresetResponse:
             for entry in record.calendar_blueprint
         ],
         advanced_config=record.advanced_config,
+        version=record.version,
         is_active=record.is_active,
         created_at=record.created_at,
         updated_at=record.updated_at,

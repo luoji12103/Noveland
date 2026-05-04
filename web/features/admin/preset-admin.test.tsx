@@ -90,6 +90,7 @@ const presets: AgentPreset[] = [
     behavior_policy: { tone: "clean" },
     calendar_blueprint: [],
     advanced_config: {},
+    version: 1,
     is_active: true,
     created_at: "2026-04-22T00:00:00.000Z",
     updated_at: "2026-04-22T00:00:00.000Z",

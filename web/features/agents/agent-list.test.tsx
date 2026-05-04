@@ -31,6 +31,7 @@ describe("AgentList", () => {
       agent_key: "scribe",
       display_name: "Scribe",
       source_preset_id: "preset-1",
+      source_preset_version: 1,
     });
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -76,7 +77,8 @@ describe("AgentList", () => {
     );
 
     expect(screen.getByText("Read-only agent catalog access.")).toBeInTheDocument();
-    expect(screen.getByText("Source preset: Storyteller (storyteller)")).toBeInTheDocument();
+    expect(screen.getByText("Source preset: Storyteller (storyteller v1)")).toBeInTheDocument();
+    expect(screen.getByText("Source preset version: 1")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Disable agent" })).not.toBeInTheDocument();
   });
@@ -129,6 +131,7 @@ const workspaceData: AgentWorkspaceData = {
       world_id: "world-1",
       home_scene_id: "scene-1",
       source_preset_id: "preset-1",
+      source_preset_version: 1,
       agent_key: "guide",
       display_name: "Guide",
       kind: "role_agent",
@@ -170,6 +173,7 @@ const workspaceData: AgentWorkspaceData = {
       behavior_policy: {},
       calendar_blueprint: [],
       advanced_config: {},
+      version: 1,
       is_active: true,
       created_at: "2026-04-22T00:00:00.000Z",
       updated_at: "2026-04-22T00:00:00.000Z",

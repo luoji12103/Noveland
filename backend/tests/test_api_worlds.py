@@ -394,10 +394,12 @@ def test_platform_admin_manages_agent_presets_and_world_admin_lists_active_prese
     active_list_for_world_admin = client.get("/agent-presets")
 
     assert create_preset.status_code == 201
+    assert create_preset.json()["version"] == 1
     assert active_list_for_admin.status_code == 200
     assert active_list_for_admin.json()[0]["preset_key"] == "storyteller"
     assert deactivate_preset.status_code == 200
     assert deactivate_preset.json()["is_active"] is False
+    assert deactivate_preset.json()["version"] == 2
     assert inactive_list_for_admin.status_code == 200
     assert inactive_list_for_admin.json()[0]["name"] == "Storyteller Disabled"
     assert active_list_for_world_admin.status_code == 200
@@ -455,6 +457,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert create_agent.status_code == 201
     assert create_agent.json()["kind"] == "narrative_agent"
     assert create_agent.json()["source_preset_id"] == preset_id
+    assert create_agent.json()["source_preset_version"] == 1
     assert create_agent.json()["provider_profile_id"] == str(
         _provider_profile_id_by_key(engine, "preset-provider"),
     )
@@ -465,6 +468,20 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert persona.json()["persona_text"] == "Always narrates in scene."
     assert calendar.status_code == 200
     assert [entry["title"] for entry in calendar.json()] == ["Narrative pulse"]
+
+    _authenticate(client, platform_token)
+    updated_preset = client.patch(
+        f"/agent-presets/{preset_id}",
+        json={"persona_text": "Updated persona.", "name": "Narrator v2"},
+    )
+
+    _authenticate(client, owner_token)
+    agents = client.get(f"/worlds/{world_id}/agents")
+
+    assert updated_preset.status_code == 200
+    assert updated_preset.json()["version"] == 2
+    assert agents.status_code == 200
+    assert agents.json()[0]["source_preset_version"] == 1
 
 
 def test_world_composition_export_and_import_round_trip() -> None:
@@ -559,7 +576,9 @@ def test_world_composition_export_and_import_round_trip() -> None:
         == "builtin.default_world_rules"
     )
     assert export_response.json()["agents"][0]["source_preset_key"] == "story-preset"
+    assert export_response.json()["agents"][0]["source_preset_version"] is None
     assert export_response.json()["agents"][0]["provider_profile_key"] == "composition-provider"
+    assert export_response.json()["preset_references"][0]["version"] == 1
     assert forbidden_import.status_code == 403
     assert forbidden_validate.status_code == 403
     assert validation_response.status_code == 200
@@ -571,6 +590,7 @@ def test_world_composition_export_and_import_round_trip() -> None:
     assert imported_scenes.json()[0]["scene_key"] == "hall"
     assert imported_agents.status_code == 200
     assert imported_agents.json()[0]["source_preset_id"] == str(preset_id)
+    assert imported_agents.json()[0]["source_preset_version"] == 1
     assert imported_agents.json()[0]["provider_profile_id"] == str(profile_id)
     assert imported_rules.status_code == 200
     assert imported_rules.json()[0]["rule_key"] == "weekday"

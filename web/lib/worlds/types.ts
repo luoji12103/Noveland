@@ -50,6 +50,7 @@ export type Agent = {
   world_id: string;
   home_scene_id: string | null;
   source_preset_id: string | null;
+  source_preset_version: number | null;
   agent_key: string;
   display_name: string;
   kind: AgentKind;
@@ -78,6 +79,7 @@ export type AgentPreset = {
   behavior_policy: Record<string, unknown>;
   calendar_blueprint: AgentPresetCalendarEntry[];
   advanced_config: Record<string, unknown>;
+  version: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -109,6 +111,7 @@ export type WorldCompositionAgent = {
   kind: AgentKind;
   home_scene_key: string | null;
   source_preset_key: string | null;
+  source_preset_version?: number | null;
   provider_profile_key: string | null;
   config: Record<string, unknown>;
   is_enabled: boolean;
@@ -127,6 +130,7 @@ export type WorldCompositionPresetReference = {
   name: string;
   default_kind: AgentKind;
   default_provider_profile_key: string | null;
+  version?: number;
   is_active: boolean;
 };
 

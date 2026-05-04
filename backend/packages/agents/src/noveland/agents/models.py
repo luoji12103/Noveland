@@ -48,6 +48,7 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("agent_presets.id", ondelete="SET NULL"),
         nullable=True,
     )
+    source_preset_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     agent_key: Mapped[str] = mapped_column(String(80), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -96,6 +97,12 @@ class AgentPreset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
         default=dict,
+    )
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("1"),
+        default=1,
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean,

@@ -232,6 +232,7 @@ class AgentPresetService:
         ).one_or_none()
         if model is None:
             return None
+        should_increment_version = _preset_has_material_change(model, preset)
         model.preset_key = preset.preset_key
         model.name = preset.name
         model.description = preset.description
@@ -242,6 +243,8 @@ class AgentPresetService:
         model.calendar_blueprint_json = _calendar_blueprint_json(preset.calendar_blueprint)
         model.advanced_config = preset.advanced_config
         model.is_active = preset.is_active
+        if should_increment_version:
+            model.version += 1
         self._session.flush()
         return _preset_record(model)
 
@@ -390,9 +393,24 @@ def _preset_record(model: AgentPreset) -> AgentPresetRecord:
             for entry in model.calendar_blueprint_json
         ],
         advanced_config=model.advanced_config,
+        version=model.version,
         is_active=model.is_active,
         created_at=model.created_at,
         updated_at=model.updated_at,
+    )
+
+
+def _preset_has_material_change(model: AgentPreset, preset: AgentPresetUpsert) -> bool:
+    return (
+        model.preset_key != preset.preset_key
+        or model.name != preset.name
+        or model.description != preset.description
+        or model.default_kind != preset.default_kind
+        or model.default_provider_profile_key != preset.default_provider_profile_key
+        or model.persona_text != preset.persona_text
+        or model.behavior_policy != preset.behavior_policy
+        or model.calendar_blueprint_json != _calendar_blueprint_json(preset.calendar_blueprint)
+        or model.advanced_config != preset.advanced_config
     )
 
 

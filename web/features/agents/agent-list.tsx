@@ -166,6 +166,7 @@ export function AgentList({ worldId, data }: AgentListProps) {
                   <p>
                     Source preset: {formatPresetLabel(presetMap.get(agent.source_preset_id ?? "") ?? null)}
                   </p>
+                  <p>Source preset version: {agent.source_preset_version ?? "none"}</p>
                 </div>
                 <div className="button-row">
                   <Link className="secondary-button" href={`/worlds/${worldId}/agents/${agent.id}`}>
@@ -199,7 +200,7 @@ function PresetPreview({ preset }: { preset: AgentPreset }) {
         <div>
           <h3>Preset preview</h3>
           <p>
-            {preset.preset_key} - {preset.default_kind}
+            {preset.preset_key} - {preset.default_kind} - version {preset.version}
           </p>
           <p>Provider key: {preset.default_provider_profile_key ?? "none"}</p>
           <p>Calendar blueprint entries: {preset.calendar_blueprint.length}</p>
@@ -214,5 +215,5 @@ function formatPresetLabel(preset: AgentPreset | null): string {
   if (preset === null) {
     return "none";
   }
-  return `${preset.name} (${preset.preset_key})`;
+  return `${preset.name} (${preset.preset_key} v${preset.version})`;
 }

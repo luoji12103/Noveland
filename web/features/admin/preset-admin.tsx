@@ -132,7 +132,8 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
                 <div>
                   <h3>{preset.name}</h3>
                   <p>
-                    {preset.preset_key} - {preset.default_kind} - {preset.is_active ? "Active" : "Inactive"}
+                    {preset.preset_key} - {preset.default_kind} - version {preset.version} -{" "}
+                    {preset.is_active ? "Active" : "Inactive"}
                   </p>
                   <p>
                     Provider key: {preset.default_provider_profile_key ?? "none"} | Calendar entries: {preset.calendar_blueprint.length}
