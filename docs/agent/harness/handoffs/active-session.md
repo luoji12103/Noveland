@@ -3,7 +3,7 @@
 - Date: 2026-05-04T23:30:00Z
 - Branch: feat/storage-backup-auth-runtime-ops
 - Objective: Close Storage/Backup/Auth Runtime Ops and merge back to local `main` after final checks if no conflicts appear.
-- Status: Implementation complete; final gate pending.
+- Status: Implementation complete; final gate passed; ready to fast-forward merge into local `main`.
 
 ## Completed
 
@@ -23,7 +23,9 @@
 - `0d92af9 test(migrations): add migration safety gate`
 - `1af2860 feat(auth): harden session and cookie settings`
 - `49f9463 feat(runtime): centralize runtime actor identity`
-- Closeout docs commit pending.
+- `d549b11 docs(agent): close storage backup auth runtime ops`
+- `404dd11 fix(tests): type storage ops regression tests`
+- Final handoff status update pending.
 
 ## Checks Run So Far
 
@@ -40,10 +42,21 @@
 - `cd backend && uv run pytest tests/test_runtime_daemon.py -q`
 - `cd backend && uv run mypy services/runtime/src/noveland/services/runtime packages/conversations/src/noveland/conversations/services.py tests/test_runtime_daemon.py`
 
-## Remaining Checks
+## Final Checks
 
-- Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean branch status.
-- Restore `web/next-env.d.ts` if build/e2e changes it before final merge.
+- `cd backend && uv run ruff check .`
+- `cd backend && uv run mypy .`
+- `cd backend && uv run pytest`
+- `cd web && npm run lint`
+- `cd web && npm run typecheck`
+- `cd web && npm run test`
+- `cd web && npm run build`
+- `cd web && npm run check:next-env`
+- `cd web && npm run test:e2e`
+- `docker compose -f infra/compose.yaml config`
+- `git diff --check`
+- `cd web && npm run check:next-env` after restoring generated `web/next-env.d.ts` churn
+- `git status --short --branch`
 
 ## Risks
 
