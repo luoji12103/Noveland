@@ -23,6 +23,7 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactFilters,
+  PluginBinding,
   PluginCatalogEntry,
   ProviderHealth,
   ProviderProfile,
@@ -154,6 +155,7 @@ export type ProviderAdminData = {
   profiles: ProviderProfile[];
   providerHealth: ProviderHealth[];
   modelProviderPlugins: PluginCatalogEntry[];
+  pluginBindings: PluginBinding[];
   loadError: string | null;
 };
 
@@ -694,12 +696,13 @@ export async function getNarrativeReaderDetailData(
 export async function getProviderAdminData(): Promise<ProviderAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [profiles, providerHealth, modelProviderPlugins] = await Promise.all([
+    const [profiles, providerHealth, modelProviderPlugins, pluginBindings] = await Promise.all([
       apiFetch<ProviderProfile[]>("/provider-profiles", cookies),
       apiFetch<ProviderHealth[]>("/provider-profiles/health", cookies),
       listPluginCatalogForServer("model_provider", cookies),
+      apiFetch<PluginBinding[]>("/plugins/bindings", cookies),
     ]);
-    return { profiles, providerHealth, modelProviderPlugins, loadError: null };
+    return { profiles, providerHealth, modelProviderPlugins, pluginBindings, loadError: null };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -708,6 +711,7 @@ export async function getProviderAdminData(): Promise<ProviderAdminData> {
       profiles: [],
       providerHealth: [],
       modelProviderPlugins: [],
+      pluginBindings: [],
       loadError: "Unable to load provider profiles.",
     };
   }

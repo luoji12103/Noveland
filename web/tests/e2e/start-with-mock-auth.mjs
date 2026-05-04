@@ -631,6 +631,11 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/plugins/bindings") {
+    handlePluginBindings(request, url, response);
+    return;
+  }
+
   if (url.pathname === "/provider-profiles") {
     await handleProviderProfiles(request, response);
     return;
@@ -1217,6 +1222,65 @@ function handlePluginCatalog(url, response) {
     category === null
       ? pluginCatalog
       : pluginCatalog.filter((plugin) => plugin.category === category),
+  );
+}
+
+function handlePluginBindings(request, url, response) {
+  if (subjectForRequest(request)?.roles.includes("platform_admin") !== true) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const bindings = [
+    ...providerProfiles.map((profile) => ({
+      owner_kind: "provider_profile",
+      owner_id: profile.id,
+      owner_key: profile.profile_key,
+      world_id: null,
+      agent_id: null,
+      conversation_id: null,
+      provider_profile_id: profile.id,
+      plugin_identifier: profile.plugin_identifier,
+      category: "model_provider",
+      config_present: Object.keys(profile.plugin_config ?? {}).length > 0,
+      validation_status: "ok",
+      issue_message: null,
+    })),
+    ...worlds.flatMap((world) => [
+      {
+        owner_kind: "world_memory",
+        owner_id: world.id,
+        owner_key: world.slug,
+        world_id: world.id,
+        agent_id: null,
+        conversation_id: null,
+        provider_profile_id: null,
+        plugin_identifier: world.memory_plugin_identifier,
+        category: "memory_backend",
+        config_present: Object.keys(world.memory_plugin_config ?? {}).length > 0,
+        validation_status: "ok",
+        issue_message: null,
+      },
+      {
+        owner_kind: "world_rules",
+        owner_id: world.id,
+        owner_key: world.slug,
+        world_id: world.id,
+        agent_id: null,
+        conversation_id: null,
+        provider_profile_id: null,
+        plugin_identifier: world.world_rules_plugin_identifier,
+        category: "world_rules",
+        config_present: Object.keys(world.world_rules_plugin_config ?? {}).length > 0,
+        validation_status: "ok",
+        issue_message: null,
+      },
+    ]),
+  ];
+  const category = url.searchParams.get("category");
+  sendJson(
+    response,
+    200,
+    category === null ? bindings : bindings.filter((binding) => binding.category === category),
   );
 }
 

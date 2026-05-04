@@ -18,7 +18,9 @@ from noveland.adapters import (
     ProviderType,
 )
 from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import AgentPersona
 from noveland.auth import AuthenticatedSubject
+from noveland.conversations.models import ConversationSession
 from noveland.core.settings import load_settings
 from noveland.memory import (
     MemoryBackendHealth,
@@ -62,6 +64,7 @@ from noveland.services.api.dependencies import (
     get_platform_admin_subject,
 )
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
+from noveland.worlds.models import World
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -342,6 +345,27 @@ class PluginCatalogResponse(BaseModel):
     built_in: bool
 
 
+class PluginBindingResponse(BaseModel):
+    owner_kind: Literal[
+        "provider_profile",
+        "world_memory",
+        "world_rules",
+        "agent_persona",
+        "conversation_writer",
+    ]
+    owner_id: uuid.UUID
+    owner_key: str
+    world_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    conversation_id: uuid.UUID | None
+    provider_profile_id: uuid.UUID | None
+    plugin_identifier: str
+    category: PluginCategory
+    config_present: bool
+    validation_status: Literal["ok", "missing_plugin", "category_mismatch", "invalid_config"]
+    issue_message: str | None
+
+
 class RuntimeDiagnosticResponse(BaseModel):
     id: uuid.UUID
     severity: DiagnosticSeverity
@@ -426,6 +450,102 @@ def list_plugin_catalog(
     registry = get_builtin_plugin_registry()
     definitions = registry.all() if category is None else registry.list_by_category(category)
     return [_plugin_catalog_response(definition.manifest) for definition in definitions]
+
+
+@router.get("/plugins/bindings", response_model=list[PluginBindingResponse])
+def list_plugin_bindings(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    category: PluginCategory | None = None,
+) -> list[PluginBindingResponse]:
+    del subject
+    bindings: list[PluginBindingResponse] = []
+    for profile in db_session.scalars(
+        select(ProviderProfile).order_by(ProviderProfile.profile_key),
+    ):
+        bindings.append(
+            _plugin_binding_response(
+                owner_kind="provider_profile",
+                owner_id=profile.id,
+                owner_key=profile.profile_key,
+                world_id=None,
+                agent_id=None,
+                conversation_id=None,
+                provider_profile_id=profile.id,
+                plugin_identifier=profile.plugin_identifier,
+                category=PluginCategory.MODEL_PROVIDER,
+                raw_config=profile.plugin_config,
+            )
+        )
+    for world in db_session.scalars(select(World).order_by(World.slug)):
+        bindings.extend(
+            [
+                _plugin_binding_response(
+                    owner_kind="world_memory",
+                    owner_id=world.id,
+                    owner_key=world.slug,
+                    world_id=world.id,
+                    agent_id=None,
+                    conversation_id=None,
+                    provider_profile_id=None,
+                    plugin_identifier=world.memory_plugin_identifier,
+                    category=PluginCategory.MEMORY_BACKEND,
+                    raw_config=world.memory_plugin_config,
+                ),
+                _plugin_binding_response(
+                    owner_kind="world_rules",
+                    owner_id=world.id,
+                    owner_key=world.slug,
+                    world_id=world.id,
+                    agent_id=None,
+                    conversation_id=None,
+                    provider_profile_id=None,
+                    plugin_identifier=world.world_rules_plugin_identifier,
+                    category=PluginCategory.WORLD_RULES,
+                    raw_config=world.world_rules_plugin_config,
+                ),
+            ]
+        )
+    for persona in db_session.scalars(select(AgentPersona).order_by(AgentPersona.created_at)):
+        bindings.append(
+            _plugin_binding_response(
+                owner_kind="agent_persona",
+                owner_id=persona.id,
+                owner_key=str(persona.agent_id),
+                world_id=persona.world_id,
+                agent_id=persona.agent_id,
+                conversation_id=None,
+                provider_profile_id=None,
+                plugin_identifier=persona.policy_plugin_identifier,
+                category=PluginCategory.PERSONA_POLICY,
+                raw_config=persona.policy_plugin_config,
+            )
+        )
+    for session in db_session.scalars(
+        select(ConversationSession).order_by(ConversationSession.updated_at.desc()),
+    ):
+        writer_config = session.writer_config
+        plugin_identifier = str(
+            writer_config.get("writer_plugin_identifier", "builtin.default_narrative_writer"),
+        )
+        raw_config = writer_config.get("writer_plugin_config", {})
+        bindings.append(
+            _plugin_binding_response(
+                owner_kind="conversation_writer",
+                owner_id=session.id,
+                owner_key=session.session_key,
+                world_id=session.world_id,
+                agent_id=None,
+                conversation_id=session.id,
+                provider_profile_id=None,
+                plugin_identifier=plugin_identifier,
+                category=PluginCategory.NARRATIVE_WRITER,
+                raw_config=raw_config if isinstance(raw_config, dict) else {},
+            )
+        )
+    if category is not None:
+        bindings = [binding for binding in bindings if binding.category == category]
+    return bindings
 
 
 @router.get("/provider-profiles", response_model=list[ProviderProfileResponse])
@@ -964,6 +1084,72 @@ def _plugin_catalog_response(manifest: PluginManifest) -> PluginCatalogResponse:
         capabilities=manifest.capabilities,
         built_in=manifest.identifier.startswith("builtin."),
     )
+
+
+def _plugin_binding_response(
+    *,
+    owner_kind: Literal[
+        "provider_profile",
+        "world_memory",
+        "world_rules",
+        "agent_persona",
+        "conversation_writer",
+    ],
+    owner_id: uuid.UUID,
+    owner_key: str,
+    world_id: uuid.UUID | None,
+    agent_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
+    provider_profile_id: uuid.UUID | None,
+    plugin_identifier: str,
+    category: PluginCategory,
+    raw_config: dict[str, Any],
+) -> PluginBindingResponse:
+    validation_status, issue_message = _plugin_binding_validation_status(
+        identifier=plugin_identifier,
+        category=category,
+        raw_config=raw_config,
+    )
+    return PluginBindingResponse(
+        owner_kind=owner_kind,
+        owner_id=owner_id,
+        owner_key=owner_key,
+        world_id=world_id,
+        agent_id=agent_id,
+        conversation_id=conversation_id,
+        provider_profile_id=provider_profile_id,
+        plugin_identifier=plugin_identifier,
+        category=category,
+        config_present=bool(raw_config),
+        validation_status=validation_status,
+        issue_message=issue_message,
+    )
+
+
+def _plugin_binding_validation_status(
+    *,
+    identifier: str,
+    category: PluginCategory,
+    raw_config: dict[str, Any],
+) -> tuple[Literal["ok", "missing_plugin", "category_mismatch", "invalid_config"], str | None]:
+    registry = get_builtin_plugin_registry()
+    try:
+        definition = registry.get(identifier)
+    except PluginNotFoundError:
+        return "missing_plugin", f"{identifier} is not registered."
+    if definition.manifest.category is not category:
+        return (
+            "category_mismatch",
+            (
+                f"{identifier} is registered as {definition.manifest.category.value}, "
+                f"not {category.value}."
+            ),
+        )
+    try:
+        registry.validate_config(identifier, raw_config)
+    except PluginConfigValidationError:
+        return "invalid_config", f"{identifier} config is invalid."
+    return "ok", None
 
 
 def _runtime_control_response(view: Any) -> RuntimeControlResponse:

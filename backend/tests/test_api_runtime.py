@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentRuntimeRun
+from noveland.agents.models import Agent, AgentPersona, AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -199,6 +199,7 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     diagnostics = client.get("/runtime/diagnostics")
     profiles = client.get("/provider-profiles")
     provider_health = client.get("/provider-profiles/health")
+    plugin_bindings = client.get("/plugins/bindings")
     memory_jobs = client.get(f"/memory-backend-profiles/{uuid.uuid4()}/jobs")
     retry_memory_job = client.post(f"/memory-write-jobs/{uuid.uuid4()}/retry")
     memory_backfill = client.get("/memory-backfill/dry-run")
@@ -207,6 +208,7 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     assert diagnostics.status_code == 403
     assert profiles.status_code == 403
     assert provider_health.status_code == 403
+    assert plugin_bindings.status_code == 403
     assert memory_jobs.status_code == 403
     assert retry_memory_job.status_code == 403
     assert memory_backfill.status_code == 403
@@ -263,6 +265,52 @@ def test_provider_health_reports_secret_ref_statuses(monkeypatch: pytest.MonkeyP
         load_settings.cache_clear()
 
 
+def test_platform_admin_lists_plugin_bindings_with_validation_status() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    world_id = _seed_world(engine, owner_id, "plugin-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _seed_persona_and_conversation_bindings(engine, world_id, agent_id)
+    _authenticate(client, token)
+    create_profile = client.post(
+        "/provider-profiles",
+        json={
+            "profile_key": "openai-local",
+            "name": "OpenAI Local",
+            "provider_type": "openai_compatible",
+            "plugin_identifier": "builtin.openai_compatible",
+            "plugin_config": {"headers": {"X-Test": "1"}},
+            "base_url": "https://api.example.test/v1",
+            "model_name": "gpt-test",
+            "capabilities": {},
+            "api_key_ref": "openai-local",
+        },
+    )
+
+    bindings = client.get("/plugins/bindings")
+    model_provider_bindings = client.get("/plugins/bindings?category=model_provider")
+
+    assert create_profile.status_code == 201
+    assert bindings.status_code == 200
+    records = {
+        (record["owner_kind"], record["plugin_identifier"]): record
+        for record in bindings.json()
+    }
+    assert records[("provider_profile", "builtin.openai_compatible")]["validation_status"] == "ok"
+    assert records[("provider_profile", "builtin.openai_compatible")]["config_present"] is True
+    assert "X-Test" not in bindings.text
+    assert records[("world_memory", "builtin.local_pgvector_memory")]["validation_status"] == "ok"
+    assert records[("world_rules", "missing.world_rules")]["validation_status"] == "missing_plugin"
+    assert records[("agent_persona", "builtin.openai_compatible")]["validation_status"] == (
+        "category_mismatch"
+    )
+    assert records[("conversation_writer", "builtin.default_narrative_writer")][
+        "validation_status"
+    ] == "ok"
+    assert model_provider_bindings.status_code == 200
+    assert {record["category"] for record in model_provider_bindings.json()} == {"model_provider"}
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -296,6 +344,7 @@ def _create_tables(engine: Engine) -> None:
         ProviderProfile.__table__,
         MemoryBackendProfile.__table__,
         Agent.__table__,
+        AgentPersona.__table__,
         WorldScheduleRule.__table__,
         ConversationSession.__table__,
         ConversationTurn.__table__,
@@ -393,6 +442,49 @@ def _seed_agent(engine: Engine, world_id: uuid.UUID, agent_key: str) -> uuid.UUI
         )
         session.commit()
     return agent_id
+
+
+def _seed_persona_and_conversation_bindings(
+    engine: Engine,
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        world = session.get(World, world_id)
+        assert world is not None
+        world.world_rules_plugin_identifier = "missing.world_rules"
+        session.add(
+            AgentPersona(
+                world_id=world_id,
+                agent_id=agent_id,
+                persona_text="Guide persona",
+                behavior_policy={},
+                policy_plugin_identifier="builtin.openai_compatible",
+                policy_plugin_config={},
+                is_enabled=True,
+            )
+        )
+        session.add(
+            ConversationSession(
+                world_id=world_id,
+                session_key="plugin-conversation",
+                title="Plugin Conversation",
+                scope_type="world",
+                mode="manual_chain",
+                status="draft",
+                objective="",
+                opening_prompt="",
+                max_turns=4,
+                next_turn_index=0,
+                policy_config={},
+                writer_config={
+                    "writer_plugin_identifier": "builtin.default_narrative_writer",
+                    "writer_plugin_config": {},
+                },
+                memory_config={},
+            )
+        )
+        session.commit()
 
 
 def _attach_world_memory_profile(

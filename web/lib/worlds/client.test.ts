@@ -33,6 +33,7 @@ import {
   getAgentPresetUpdatePreview,
   getReplayState,
   getSnapshotIntegrity,
+  listPluginBindings,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
   listClockTransitions,
@@ -50,6 +51,7 @@ import {
   listAgentPresets,
   listProviderProfiles,
   listProviderHealth,
+  listPluginCatalog,
   runAgent,
   refreshAgentObservations,
   retryMemoryWriteJob,
@@ -368,6 +370,8 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse([{ event_type: "agent.run_succeeded" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1", health: "ok" }]))
+      .mockResolvedValueOnce(jsonResponse([{ identifier: "builtin.openai_compatible" }]))
+      .mockResolvedValueOnce(jsonResponse([{ owner_kind: "provider_profile" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "profile-1" }))
       .mockResolvedValueOnce(jsonResponse({ status: "success", latency_ms: 10 }))
@@ -381,6 +385,8 @@ describe("world client", () => {
     await listWorldDiagnostics("world-1");
     await listProviderProfiles();
     await listProviderHealth();
+    await listPluginCatalog("model_provider");
+    await listPluginBindings("model_provider");
     await createProviderProfile({
       profile_key: "openai-local",
       name: "OpenAI Local",
@@ -402,10 +408,12 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/diagnostics");
     expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles");
     expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles/health");
-    expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/profile-1");
-    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[7][0]).toBe("/api/plugins/catalog?category=model_provider");
+    expect(fetchMock.mock.calls[8][0]).toBe("/api/plugins/bindings?category=model_provider");
+    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles");
     expect(fetchMock.mock.calls[10][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[11][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[12][0]).toBe("/api/provider-profiles/profile-1");
   });
 
   it("maps runs and narrative requests", async () => {

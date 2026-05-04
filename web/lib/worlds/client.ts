@@ -54,6 +54,7 @@ import type {
   NarrativePublication,
   NarrativePublicationInput,
   PersonaPolicyValidation,
+  PluginBinding,
   PluginCatalogEntry,
   PluginCategory,
   Scene,
@@ -551,6 +552,11 @@ export function listPluginCatalog(
 ): Promise<PluginCatalogEntry[]> {
   const query = category === undefined ? "" : `?category=${encodeURIComponent(category)}`;
   return apiRequest<PluginCatalogEntry[]>(`/api/plugins/catalog${query}`, { method: "GET" });
+}
+
+export function listPluginBindings(category?: PluginCategory): Promise<PluginBinding[]> {
+  const query = category === undefined ? "" : `?category=${encodeURIComponent(category)}`;
+  return apiRequest<PluginBinding[]>(`/api/plugins/bindings${query}`, { method: "GET" });
 }
 
 export function listAgentObservations(

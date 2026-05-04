@@ -10,7 +10,7 @@ import {
   updateProviderProfile,
 } from "@/lib/worlds/client";
 import type { ProviderAdminData } from "@/lib/worlds/server";
-import type { PluginCatalogEntry, ProviderProfile } from "@/lib/worlds/types";
+import type { PluginBinding, PluginCatalogEntry, ProviderProfile } from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
@@ -260,6 +260,8 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
           )}
         </div>
       </section>
+
+      <PluginBindingIssues bindings={data.pluginBindings} />
     </section>
   );
 }
@@ -293,6 +295,45 @@ function ProviderHealthSummary({
         <p className="metric-value">{health.recent_error_count}</p>
       </div>
     </div>
+  );
+}
+
+function PluginBindingIssues({ bindings }: { bindings: PluginBinding[] }) {
+  const issueBindings = bindings.filter((binding) => binding.validation_status !== "ok");
+  return (
+    <section className="management-panel" aria-labelledby="plugin-bindings-title">
+      <h2 className="section-title" id="plugin-bindings-title">
+        Plugin bindings
+      </h2>
+      <p>
+        {bindings.length} bindings inspected - {issueBindings.length} issues
+      </p>
+      <div className="resource-list">
+        {issueBindings.length === 0 ? (
+          <article className="resource-row">
+            <div>
+              <h3>No plugin binding issues</h3>
+              <p>Persisted plugin refs match the registry and expected categories.</p>
+            </div>
+          </article>
+        ) : (
+          issueBindings.map((binding) => (
+            <article className="resource-row" key={`${binding.owner_kind}-${binding.owner_id}`}>
+              <div>
+                <h3>{binding.owner_key}</h3>
+                <p>
+                  {binding.owner_kind} - {binding.category} - {binding.plugin_identifier}
+                </p>
+                <p>
+                  {binding.validation_status}
+                  {binding.issue_message === null ? "" : ` - ${binding.issue_message}`}
+                </p>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 

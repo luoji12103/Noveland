@@ -885,6 +885,26 @@ export type PluginCatalogEntry = {
   built_in: boolean;
 };
 
+export type PluginBinding = {
+  owner_kind:
+    | "provider_profile"
+    | "world_memory"
+    | "world_rules"
+    | "agent_persona"
+    | "conversation_writer";
+  owner_id: string;
+  owner_key: string;
+  world_id: string | null;
+  agent_id: string | null;
+  conversation_id: string | null;
+  provider_profile_id: string | null;
+  plugin_identifier: string;
+  category: PluginCategory;
+  config_present: boolean;
+  validation_status: "ok" | "missing_plugin" | "category_mismatch" | "invalid_config";
+  issue_message: string | null;
+};
+
 export type AgentObservation = {
   id: string;
   world_id: string;
