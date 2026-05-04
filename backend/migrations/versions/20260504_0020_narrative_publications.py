@@ -56,7 +56,11 @@ def upgrade() -> None:
         sa.CheckConstraint("status IN ('published', 'unpublished')", name="status"),
         sa.ForeignKeyConstraint(["artifact_id"], ["narrative_artifacts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["published_by_user_id"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["source_draft_id"], ["narrative_artifacts.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["source_draft_id"],
+            ["narrative_artifacts.id"],
+            ondelete="SET NULL",
+        ),
         sa.ForeignKeyConstraint(["world_id"], ["worlds.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("artifact_id", name="uq_narrative_publications_artifact_id"),
