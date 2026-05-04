@@ -220,6 +220,8 @@ NOVELAND_MEMORY_BACKEND_SECRETS_JSON={}
    npm run build
    npm run check:next-env
    ```
+   如果 `npm run build` 或 `npm run test:e2e` 改写了 `web/next-env.d.ts`，
+   先恢复该生成文件再提交，随后重新运行 `npm run check:next-env`。
 8. 停止本地依赖：
    ```sh
    docker compose -f infra/compose.yaml down
