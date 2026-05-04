@@ -150,13 +150,13 @@ describe("WorldOverview", () => {
       limit: 50,
     });
 
-    fireEvent.change(screen.getAllByPlaceholderText("imported-world-slug")[0], {
+    fireEvent.change(screen.getByPlaceholderText("validate-world-slug"), {
       target: { value: "composition-import" },
     });
-    fireEvent.change(screen.getAllByPlaceholderText("Imported world name")[0], {
+    fireEvent.change(screen.getByPlaceholderText("Validate world name"), {
       target: { value: "Composition Import" },
     });
-    fireEvent.change(screen.getAllByPlaceholderText("Paste exported composition JSON")[0], {
+    fireEvent.change(screen.getByPlaceholderText("Paste composition JSON to validate"), {
       target: { value: JSON.stringify(compositionExport) },
     });
     fireEvent.click(screen.getByRole("button", { name: "Validate composition" }));

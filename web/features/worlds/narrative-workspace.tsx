@@ -28,18 +28,14 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
   const [busyArtifactId, setBusyArtifactId] = useState<string | null>(null);
-  const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
-
-  useEffect(() => {
-    setNarrativeArtifacts(data.narrativeArtifacts);
-  }, [data.narrativeArtifacts]);
+  const [streamedArtifacts, setStreamedArtifacts] = useState<NarrativeArtifact[]>([]);
 
   useEffect(() => {
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
       `/api/worlds/${worldId}/stream`,
       (envelope) => {
         if (envelope.payload.narrative_artifacts.length > 0) {
-          setNarrativeArtifacts((current) =>
+          setStreamedArtifacts((current) =>
             mergeArtifacts(current, envelope.payload.narrative_artifacts),
           );
         }
@@ -103,6 +99,7 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
     }
   }
 
+  const narrativeArtifacts = mergeArtifacts(data.narrativeArtifacts, streamedArtifacts);
   const publishedArtifacts = narrativeArtifacts.filter(
     (artifact) =>
       artifact.publication?.status === "published" && artifact.publication.reader_visible,

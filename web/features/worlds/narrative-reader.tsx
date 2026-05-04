@@ -21,11 +21,9 @@ type NarrativeReaderDetailProps = {
 };
 
 export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps) {
-  const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
-
-  useEffect(() => {
-    setNarrativeArtifacts(data.narrativeArtifacts);
-  }, [data.narrativeArtifacts]);
+  const [streamedArtifacts, setStreamedArtifacts] = useState<
+    NarrativeReaderListData["narrativeArtifacts"]
+  >([]);
 
   useEffect(() => {
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
@@ -37,7 +35,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
             artifact.publication.reader_visible,
         );
         if (publishedArtifacts.length > 0) {
-          setNarrativeArtifacts((current) => mergeTimelineArtifacts(current, publishedArtifacts));
+          setStreamedArtifacts((current) => mergeTimelineArtifacts(current, publishedArtifacts));
         }
       },
     );
@@ -52,6 +50,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
   }
 
   const conversationsById = new Map(data.conversations.map((conversation) => [conversation.id, conversation]));
+  const narrativeArtifacts = mergeTimelineArtifacts(data.narrativeArtifacts, streamedArtifacts);
 
   return (
     <section className="management-section">

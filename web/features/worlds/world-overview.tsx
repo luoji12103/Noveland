@@ -915,8 +915,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         />
         {data.isPlatformAdmin ? (
           <form className="management-form" onSubmit={handleValidateComposition}>
-            <input className="text-input" name="slug" placeholder="imported-world-slug" />
-            <input className="text-input" name="name" placeholder="Imported world name" />
+            <input className="text-input" name="slug" placeholder="validate-world-slug" />
+            <input className="text-input" name="name" placeholder="Validate world name" />
             <input
               className="text-input"
               name="owner_user_id"
@@ -936,7 +936,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               rows={10}
               value={compositionDraft}
               onChange={(event) => setCompositionDraft(event.target.value)}
-              placeholder="Paste exported composition JSON"
+              placeholder="Paste composition JSON to validate"
             />
             <button className="secondary-button" type="submit" disabled={isBusy}>
               Validate composition
