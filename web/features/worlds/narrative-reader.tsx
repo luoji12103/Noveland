@@ -35,10 +35,23 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
           Reader filters
         </h2>
         <form className="inline-form" method="get">
+          <input
+            className="text-input"
+            name="q"
+            placeholder="Search title or content"
+            defaultValue={data.selectedSearch}
+          />
           <select className="text-input" name="artifact_kind" defaultValue={data.selectedArtifactKind}>
             <option value="">All readable artifacts</option>
             <option value="conversation_summary">conversation_summary</option>
             <option value="chapter_draft">chapter_draft</option>
+          </select>
+          <select className="text-input" name="source_kind" defaultValue={data.selectedSourceKind}>
+            <option value="">All sources</option>
+            <option value="world">World level</option>
+            <option value="agent">Agent note</option>
+            <option value="agent_run">Agent run</option>
+            <option value="conversation">Conversation</option>
           </select>
           <select
             className="text-input"
@@ -70,7 +83,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
             <article className="resource-row">
               <div>
                 <h3>No readable artifacts</h3>
-                <p>Try a different filter or generate narrative from a conversation.</p>
+                <p>Try a different search or filter, or generate narrative from a conversation.</p>
               </div>
             </article>
           ) : (

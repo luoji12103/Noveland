@@ -22,6 +22,7 @@ import type {
   MemoryProfileSnapshot,
   Membership,
   NarrativeArtifact,
+  NarrativeArtifactFilters,
   PluginCatalogEntry,
   ProviderHealth,
   ProviderProfile,
@@ -122,6 +123,8 @@ export type NarrativeReaderListData = {
   narrativeArtifacts: NarrativeArtifact[];
   selectedArtifactKind: string;
   selectedConversationId: string;
+  selectedSearch: string;
+  selectedSourceKind: string;
   loadError: string | null;
 };
 
@@ -601,11 +604,7 @@ export async function getNarrativeWorkspaceData(
 
 export async function getNarrativeReaderListData(
   worldId: string,
-  filters: {
-    artifactKind?: string | null;
-    sourceConversationId?: string | null;
-    limit?: number;
-  } = {},
+  filters: NarrativeArtifactFilters = {},
 ): Promise<NarrativeReaderListData> {
   const cookies = await cookieHeader();
   try {
@@ -615,8 +614,10 @@ export async function getNarrativeReaderListData(
       return emptyNarrativeReaderListData(
         worlds,
         "Unable to load narrative reader.",
-        filters.artifactKind ?? "",
-        filters.sourceConversationId ?? "",
+        filters.artifact_kind ?? "",
+        filters.source_conversation_id ?? "",
+        filters.q ?? "",
+        filters.source_kind ?? "",
       );
     }
 
@@ -633,8 +634,10 @@ export async function getNarrativeReaderListData(
       selectedWorld,
       conversations,
       narrativeArtifacts,
-      selectedArtifactKind: filters.artifactKind ?? "",
-      selectedConversationId: filters.sourceConversationId ?? "",
+      selectedArtifactKind: filters.artifact_kind ?? "",
+      selectedConversationId: filters.source_conversation_id ?? "",
+      selectedSearch: filters.q ?? "",
+      selectedSourceKind: filters.source_kind ?? "",
       loadError: null,
     };
   } catch (error) {
@@ -644,8 +647,10 @@ export async function getNarrativeReaderListData(
     return emptyNarrativeReaderListData(
       [],
       "Unable to load narrative reader.",
-      filters.artifactKind ?? "",
-      filters.sourceConversationId ?? "",
+      filters.artifact_kind ?? "",
+      filters.source_conversation_id ?? "",
+      filters.q ?? "",
+      filters.source_kind ?? "",
     );
   }
 }
@@ -850,6 +855,8 @@ function emptyNarrativeReaderListData(
   loadError: string,
   selectedArtifactKind: string,
   selectedConversationId: string,
+  selectedSearch: string,
+  selectedSourceKind: string,
 ): NarrativeReaderListData {
   return {
     worlds,
@@ -858,6 +865,8 @@ function emptyNarrativeReaderListData(
     narrativeArtifacts: [],
     selectedArtifactKind,
     selectedConversationId,
+    selectedSearch,
+    selectedSourceKind,
     loadError,
   };
 }
@@ -958,17 +967,22 @@ function emptyDashboardData(
   };
 }
 
-function narrativeArtifactQuery(filters: {
-  artifactKind?: string | null;
-  sourceConversationId?: string | null;
-  limit?: number;
-}): string {
+function narrativeArtifactQuery(filters: NarrativeArtifactFilters): string {
   const search = new URLSearchParams();
-  if (filters.artifactKind) {
-    search.set("artifact_kind", filters.artifactKind);
+  if (filters.artifact_kind) {
+    search.set("artifact_kind", filters.artifact_kind);
   }
-  if (filters.sourceConversationId) {
-    search.set("source_conversation_id", filters.sourceConversationId);
+  if (filters.source_conversation_id) {
+    search.set("source_conversation_id", filters.source_conversation_id);
+  }
+  if (filters.q) {
+    search.set("q", filters.q);
+  }
+  if (filters.source_kind) {
+    search.set("source_kind", filters.source_kind);
+  }
+  if (filters.publication_status) {
+    search.set("publication_status", filters.publication_status);
   }
   if (filters.limit !== undefined) {
     search.set("limit", String(filters.limit));

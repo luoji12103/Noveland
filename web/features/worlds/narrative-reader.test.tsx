@@ -15,7 +15,9 @@ describe("narrative reader", () => {
     render(<NarrativeReaderList worldId="world-1" data={listData} />);
 
     expect(screen.getByRole("heading", { name: "Reader filters" })).toBeVisible();
+    expect(screen.getByDisplayValue("summary")).toBeVisible();
     expect(screen.getByDisplayValue("conversation_summary")).toBeVisible();
+    expect(screen.getByDisplayValue("Conversation")).toBeVisible();
     expect(screen.getByRole("link", { name: "Manual Chain summary" })).toHaveAttribute(
       "href",
       "/worlds/world-1/reader/artifact-1",
@@ -161,6 +163,8 @@ const listData: NarrativeReaderListData = {
   narrativeArtifacts: artifacts,
   selectedArtifactKind: "conversation_summary",
   selectedConversationId: "conversation-1",
+  selectedSearch: "summary",
+  selectedSourceKind: "conversation",
   loadError: null,
 };
 

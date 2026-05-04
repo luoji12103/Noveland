@@ -49,6 +49,7 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
+  NarrativeArtifactFilters,
   NarrativePublication,
   NarrativePublicationInput,
   PersonaPolicyValidation,
@@ -581,11 +582,7 @@ export function listNarrativeArtifacts(worldId: string): Promise<NarrativeArtifa
 
 export function listFilteredNarrativeArtifacts(
   worldId: string,
-  options: {
-    artifact_kind?: string | null;
-    source_conversation_id?: string | null;
-    limit?: number;
-  } = {},
+  options: NarrativeArtifactFilters = {},
 ): Promise<NarrativeArtifact[]> {
   const search = new URLSearchParams();
   if (options.artifact_kind) {
@@ -593,6 +590,15 @@ export function listFilteredNarrativeArtifacts(
   }
   if (options.source_conversation_id) {
     search.set("source_conversation_id", options.source_conversation_id);
+  }
+  if (options.q) {
+    search.set("q", options.q);
+  }
+  if (options.source_kind) {
+    search.set("source_kind", options.source_kind);
+  }
+  if (options.publication_status) {
+    search.set("publication_status", options.publication_status);
   }
   if (options.limit !== undefined) {
     search.set("limit", String(options.limit));

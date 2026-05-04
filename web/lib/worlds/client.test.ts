@@ -486,12 +486,15 @@ describe("world client", () => {
     await listFilteredNarrativeArtifacts("world-1", {
       artifact_kind: "chapter_draft",
       source_conversation_id: "conversation-1",
+      q: "summary",
+      source_kind: "conversation",
+      publication_status: "published",
       limit: 10,
     });
     await getNarrativeArtifact("world-1", "artifact-1");
 
     expect(fetchMock.mock.calls[0][0]).toBe(
-      "/api/worlds/world-1/narrative-artifacts?artifact_kind=chapter_draft&source_conversation_id=conversation-1&limit=10",
+      "/api/worlds/world-1/narrative-artifacts?artifact_kind=chapter_draft&source_conversation_id=conversation-1&q=summary&source_kind=conversation&publication_status=published&limit=10",
     );
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/narrative-artifacts/artifact-1");
   });

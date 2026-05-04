@@ -1111,15 +1111,21 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         params={
             "artifact_kind": "conversation_summary",
             "source_conversation_id": str(conversation_id),
+            "q": "summary body",
+            "source_kind": "conversation",
             "limit": 1,
         },
+    )
+    hidden_draft_search = client.get(
+        f"/worlds/{world_id}/narrative-artifacts",
+        params={"q": "chapter", "source_kind": "conversation"},
     )
     detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
 
     _authenticate(client, owner_token)
     owner_list = client.get(
         f"/worlds/{world_id}/narrative-artifacts",
-        params={"source_conversation_id": str(conversation_id)},
+        params={"source_conversation_id": str(conversation_id), "publication_status": "draft"},
     )
 
     _authenticate(client, stranger_token)
@@ -1129,17 +1135,17 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert len(filtered.json()) == 1
     assert filtered.json()[0]["artifact_kind"] == "conversation_summary"
     assert filtered.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert hidden_draft_search.status_code == 200
+    assert hidden_draft_search.json() == []
     assert detail.status_code == 200
     assert detail.json()["id"] == str(summary_id)
     assert detail.json()["source_conversation_id"] == str(conversation_id)
     assert owner_list.status_code == 200
     assert [item["artifact_kind"] for item in owner_list.json()] == [
         "chapter_draft",
-        "conversation_summary",
     ]
     assert owner_list.json()[0]["id"] == str(draft_chapter_id)
     assert owner_list.json()[0]["publication"] is None
-    assert owner_list.json()[1]["publication"]["status"] == "published"
     assert hidden.status_code == 404
 
 

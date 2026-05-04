@@ -35,7 +35,7 @@ from noveland.plugins.errors import (
     PluginFactoryError,
     PluginNotFoundError,
 )
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 
@@ -84,6 +84,9 @@ class NarrativeArtifactService:
         *,
         artifact_kind: NarrativeArtifactKind | None = None,
         source_conversation_id: uuid.UUID | None = None,
+        search_text: str | None = None,
+        source_kind: str | None = None,
+        publication_status: str | None = None,
         limit: int | None = None,
         published_only: bool = False,
     ) -> list[NarrativeArtifactWithPublication]:
@@ -102,10 +105,46 @@ class NarrativeArtifactService:
             statement = statement.where(
                 NarrativeArtifact.source_conversation_id == source_conversation_id,
             )
+        if source_kind == "conversation":
+            statement = statement.where(NarrativeArtifact.source_conversation_id.is_not(None))
+        elif source_kind == "agent_run":
+            statement = statement.where(NarrativeArtifact.source_run_id.is_not(None))
+        elif source_kind == "agent":
+            statement = statement.where(
+                NarrativeArtifact.agent_id.is_not(None),
+                NarrativeArtifact.source_run_id.is_(None),
+            )
+        elif source_kind == "world":
+            statement = statement.where(
+                NarrativeArtifact.agent_id.is_(None),
+                NarrativeArtifact.source_run_id.is_(None),
+                NarrativeArtifact.source_conversation_id.is_(None),
+            )
+        if search_text:
+            like_pattern = f"%{search_text.lower()}%"
+            statement = statement.where(
+                or_(
+                    NarrativeArtifact.title.ilike(like_pattern),
+                    NarrativeArtifact.content.ilike(like_pattern),
+                ),
+            )
         if published_only:
             statement = statement.where(
                 NarrativePublication.status == NarrativePublicationStatus.PUBLISHED.value,
                 NarrativePublication.reader_visible.is_(True),
+            )
+        elif publication_status == "published":
+            statement = statement.where(
+                NarrativePublication.status == NarrativePublicationStatus.PUBLISHED.value,
+                NarrativePublication.reader_visible.is_(True),
+            )
+        elif publication_status == "draft":
+            statement = statement.where(
+                or_(
+                    NarrativePublication.id.is_(None),
+                    NarrativePublication.status != NarrativePublicationStatus.PUBLISHED.value,
+                    NarrativePublication.reader_visible.is_(False),
+                ),
             )
         if limit is not None:
             statement = statement.limit(max(1, min(limit, 200)))

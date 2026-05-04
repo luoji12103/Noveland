@@ -2274,6 +2274,12 @@ def list_narrative_artifacts(
         Query(),
     ] = None,
     source_conversation_id: uuid.UUID | None = None,
+    q: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    source_kind: Annotated[
+        Literal["world", "agent", "agent_run", "conversation"] | None,
+        Query(),
+    ] = None,
+    publication_status: Annotated[Literal["draft", "published"] | None, Query()] = None,
     limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ) -> list[NarrativeArtifactResponse]:
     can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
@@ -2283,6 +2289,9 @@ def list_narrative_artifacts(
             context.world_id,
             artifact_kind=None if artifact_kind is None else NarrativeArtifactKind(artifact_kind),
             source_conversation_id=source_conversation_id,
+            search_text=q,
+            source_kind=source_kind,
+            publication_status=publication_status if can_manage else None,
             limit=limit,
             published_only=not can_manage,
         )

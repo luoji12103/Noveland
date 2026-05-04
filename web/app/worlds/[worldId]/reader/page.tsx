@@ -12,6 +12,8 @@ type NarrativeReaderPageProps = {
   searchParams: Promise<{
     artifact_kind?: string;
     source_conversation_id?: string;
+    q?: string;
+    source_kind?: "world" | "agent" | "agent_run" | "conversation";
   }>;
 };
 
@@ -27,8 +29,10 @@ export default async function NarrativeReaderPage({
   const { worldId } = await params;
   const filters = await searchParams;
   const data = await getNarrativeReaderListData(worldId, {
-    artifactKind: filters.artifact_kind ?? null,
-    sourceConversationId: filters.source_conversation_id ?? null,
+    artifact_kind: filters.artifact_kind ?? null,
+    source_conversation_id: filters.source_conversation_id ?? null,
+    q: filters.q ?? null,
+    source_kind: filters.source_kind ?? null,
     limit: 100,
   });
 

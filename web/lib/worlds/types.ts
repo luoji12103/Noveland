@@ -1207,6 +1207,15 @@ export type NarrativePublicationInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type NarrativeArtifactFilters = {
+  artifact_kind?: string | null;
+  source_conversation_id?: string | null;
+  q?: string | null;
+  source_kind?: "world" | "agent" | "agent_run" | "conversation" | null;
+  publication_status?: "draft" | "published" | null;
+  limit?: number;
+};
+
 export type ConversationNarrativeArtifactSet =
   | "summary_and_chapter"
   | "summary_only"
