@@ -9,6 +9,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/roadmap.md` — long-term project roadmap and candidate mainline bundles; not the active task board.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
+- `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
 
 ## Current entrypoints
 
@@ -66,6 +67,7 @@ Fast orientation for a new coding session.
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
   - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including conversation memory configuration and optional completed-session narrative auto-generation
   - `noveland.services.runtime.daemon` — database-backed runtime control state, daemon loop orchestration, and due memory job processing status
+  - `noveland.services.runtime.identity` — shared runtime actor ref used by runtime-created events and service paths
 - `backend/pyproject.toml` — backend uv workspace manifest
 
 ### Backend packages
@@ -97,7 +99,7 @@ Fast orientation for a new coding session.
   - `noveland.events.models` — world event log and snapshot metadata ORM models
   - `noveland.events.event_store` — minimal world event append/list/snapshot helper
   - `noveland.events.publisher` — world event envelope and NATS/in-memory publisher interfaces
-  - `noveland.events.replay` — replay state reconstruction, inline snapshot creation, and snapshot integrity reporting service
+  - `noveland.events.replay` — replay state reconstruction, object-storage-backed snapshot creation with inline fallback, and snapshot integrity reporting service
 - `backend/packages/auth/`
   - `noveland.auth` — auth/session contracts, services, and typed errors
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models
@@ -120,6 +122,8 @@ Fast orientation for a new coding session.
   - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, test-call support, services, and model-provider adapters
   - `noveland.adapters.models` — provider profile ORM model and provider health fields
 - `backend/packages/storage/`
+  - `noveland.storage.local` — local filesystem object storage rooted by `NOVELAND_OBJECT_STORAGE_ROOT`
+  - `noveland.storage.backup` — local backup verification command for database, migration head, object root, and snapshot payload readability checks
 - `backend/packages/observability/`
   - `noveland.observability.contracts` — diagnostic severity/component contracts and record DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model

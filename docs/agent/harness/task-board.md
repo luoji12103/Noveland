@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Storage/Backup/Auth Runtime Ops
+- None
 
 ## Blocked
 - None
@@ -53,6 +53,7 @@
 - Conversation/Narrative Quality Ops
 - Narrative Reader + Composition Ops
 - Plugin/Preset Evolution Ops
+- Storage/Backup/Auth Runtime Ops
 
 ## Upcoming Mainline
-- None selected until Storage/Backup/Auth Runtime Ops closeout.
+- None selected.

@@ -89,6 +89,14 @@ uv run noveland-runtime --daemon
 
 Runtime recovery reference: `docs/agent/operations/runtime-recovery.md`.
 
+Snapshot object-storage and backup/restore reference: `docs/agent/operations/backup-restore.md`.
+
+Run a local backup readiness check from `backend/`:
+
+```sh
+uv run noveland-backup-verify
+```
+
 Run frontend checks from `web/`:
 
 ```sh
@@ -296,6 +304,9 @@ POST /auth/logout
 
 Auth uses an HttpOnly opaque session cookie named `noveland_session`, a readable CSRF cookie named `noveland_csrf`, and `X-CSRF-Token` for mutating authenticated requests. The web app reaches FastAPI through same-origin Next route handlers under `/api/auth/*`; `NOVELAND_API_BASE_URL` points those handlers at the backend API.
 
+Local auth defaults are a 7-day session TTL, non-secure cookies, and `SameSite=lax`.
+Override them with `NOVELAND_AUTH_SESSION_TTL_SECONDS`, `NOVELAND_AUTH_COOKIE_SECURE`, and `NOVELAND_AUTH_COOKIE_SAMESITE` for production-like environments.
+
 The initial world management API is available under:
 
 ```http
@@ -397,11 +408,15 @@ Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_AP
 
 The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 
+New snapshots store replay payload JSON in local object storage under `NOVELAND_OBJECT_STORAGE_ROOT` and keep only a safe `object://...` URI in the database. Older inline snapshot payloads remain readable.
+
 The Web workspace is split into `/worlds`, `/worlds/{worldId}`, `/worlds/{worldId}/agents`, `/worlds/{worldId}/agents/{agentId}`, `/worlds/{worldId}/conversations`, `/worlds/{worldId}/conversations/{conversationId}`, `/worlds/{worldId}/narrative`, `/worlds/{worldId}/reader`, `/worlds/{worldId}/reader/{artifactId}`, `/admin/providers`, and `/admin/runtime`.
 
 The protected Web workspace also exposes runtime controls, recent runtime/world diagnostics, provider profiles, agent personas, filtered observations, manual agent runs, conversation transcript controls, per-session writer configuration, and narrative artifacts through same-origin `/api/runtime/*`, `/api/provider-profiles/*`, and `/api/worlds/*` proxy routes.
 
 The runtime host now supports both finite and daemon modes. `noveland-runtime --once` advances active running clocks, appends `world.clock_advanced` events, and broadcasts event envelopes to NATS on `noveland.world.{world_id}.events`. `noveland-runtime --daemon` obeys the database-backed runtime control state, resolves due calendar entries and schedule rules, runs enabled agents through provider profiles, advances running auto-dialogue conversations one turn per loop, appends agent/runtime/conversation events, optionally writes memory items, and optionally creates narrative artifacts.
+
+Runtime-created event paths use the shared actor ref `system:runtime`; human user refs continue to come from authenticated sessions and world membership actions.
 
 ## Development Rules
 

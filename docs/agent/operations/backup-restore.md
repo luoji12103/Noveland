@@ -57,4 +57,5 @@ This playbook covers the supported local/single-host backup workflow for the dat
 
 - New world snapshots store replay payloads in local object storage and keep a safe `object://...` URI in the database.
 - Older inline snapshots remain readable and do not require an object storage payload.
+- Human actions should be attributable to user/session refs in API paths. Runtime-created events use `system:runtime`; this is an operational actor ref, not a login-capable user.
 - This playbook intentionally does not expose destructive restore actions through the Web UI.

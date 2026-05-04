@@ -82,6 +82,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/runtime/src/noveland/services/runtime/clock_tick.py`
 - `backend/services/runtime/src/noveland/services/runtime/conversation_loop.py`
 - `backend/services/runtime/src/noveland/services/runtime/daemon.py`
+- `backend/services/runtime/src/noveland/services/runtime/identity.py`
 - `backend/packages/core/`
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
@@ -146,6 +147,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/adapters/src/noveland/adapters/model_provider.py`
 - `backend/packages/adapters/src/noveland/adapters/models.py`
 - `backend/packages/storage/`
+- `backend/packages/storage/src/noveland/storage/local.py`
+- `backend/packages/storage/src/noveland/storage/backup.py`
 - `backend/packages/observability/`
 - `backend/packages/observability/src/noveland/observability/contracts.py`
 - `backend/packages/observability/src/noveland/observability/models.py`
@@ -177,6 +180,7 @@ Track key structural files and prevent unregistered sprawl.
 - `infra/compose.yaml`
 - `docs/agent/`
 - `docs/agent/operations/`
+- `docs/agent/operations/backup-restore.md`
 - `docs/agent/operations/runtime-recovery.md`
 - `docs/agent/harness/roadmap.md`
 

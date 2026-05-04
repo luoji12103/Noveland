@@ -22,6 +22,17 @@
 - Docs updated: initial package
 - Follow-up notes: scaffold repository next
 
+## Storage backup auth runtime ops entry
+
+- Date: 2026-05-04
+- Branch: feat/storage-backup-auth-runtime-ops
+- Scope: snapshot object storage, backup/restore ops, migration safety, auth hardening, runtime identity
+- Summary: Added local object storage for new world snapshot replay payloads with inline fallback, backup verification tooling and playbook, Alembic safety checks, configurable auth session/cookie policy, seed-admin password validation, and centralized runtime actor identity for runtime-created events.
+- Files changed: `/backend/packages/storage/**`, `/backend/packages/events/src/noveland/events/replay.py`, `/backend/services/api/src/noveland/services/api/{auth,csrf,worlds}.py`, `/backend/services/runtime/src/noveland/services/runtime/**`, `/backend/packages/core/src/noveland/core/settings.py`, `/backend/packages/auth/src/noveland/auth/seed_admin.py`, `/backend/packages/conversations/src/noveland/conversations/services.py`, `/backend/tests/**`, `/web/features/**`, `/web/lib/worlds/**`, `/.env.example`, `/README.md`, `/docs/agent/**`
+- Tests added/updated: replay snapshot URI/integrity tests, migration safety tests, auth cookie policy tests, runtime daemon actor-ref tests, and Web snapshot metadata tests.
+- Docs updated: README, backup/restore playbook, migrations README, project index, file inventory, task board, active handoff
+- Follow-up notes: backup/restore remains local operator-driven; Web restore actions, remote object storage providers, and production secret/session policy enforcement remain later roadmap work.
+
 ## Runnable skeleton entry
 
 - Date: 2026-04-15
