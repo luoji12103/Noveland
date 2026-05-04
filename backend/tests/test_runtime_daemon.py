@@ -125,6 +125,7 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
         "memory.item_created",
         "narrative.artifact_created",
     ]
+    assert {event.actor_ref for event in events} == {"system:runtime"}
     assert {event.event_type for event in diagnostics} >= {
         "runtime.iteration_started",
         "runtime.iteration_finished",
@@ -183,6 +184,9 @@ def test_runtime_daemon_advances_running_auto_conversation(
         turns = session.scalars(
             select(ConversationTurn).order_by(ConversationTurn.turn_index.asc()),
         ).all()
+        events = session.scalars(
+            select(WorldEventModel).order_by(WorldEventModel.sequence),
+        ).all()
 
     assert result.executed_runs == 1
     assert result.processed_memory_jobs == 1
@@ -190,6 +194,7 @@ def test_runtime_daemon_advances_running_auto_conversation(
     assert len(turns) == 1
     assert turns[0].speaker_kind == "agent"
     assert turns[0].output_text is not None
+    assert {event.actor_ref for event in events} == {"system:runtime"}
 
 
 def _create_tables(engine: Engine) -> None:

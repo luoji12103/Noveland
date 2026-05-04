@@ -46,12 +46,12 @@ from noveland.plugins.errors import (
     PluginFactoryError,
     PluginNotFoundError,
 )
+from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.models import World
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-RUNTIME_ACTOR_REF = "system:runtime"
 CALENDAR_ENTRY_DUE_EVENT_NAME = "calendar.entry_due"
 AGENT_RUN_STARTED_EVENT_NAME = "agent.run_started"
 AGENT_RUN_COMPLETED_EVENT_NAME = "agent.run_completed"

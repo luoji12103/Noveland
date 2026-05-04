@@ -19,13 +19,13 @@ from noveland.observability import (
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticsService,
 )
+from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from noveland.worlds.clock import WorldClockStatus
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.models import World, WorldClockStateModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-RUNTIME_ACTOR_REF = "system:runtime"
 CLOCK_ADVANCED_EVENT_NAME = "world.clock_advanced"
 
 

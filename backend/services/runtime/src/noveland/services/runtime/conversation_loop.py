@@ -15,6 +15,7 @@ from noveland.conversations.errors import ConversationStateError
 from noveland.core.settings import AppSettings
 from noveland.narrative import ConversationNarrativeWriterService
 from noveland.services.runtime.agent_loop import AgentRunExecution, AgentRuntimeOrchestrator
+from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from sqlalchemy.orm import Session
 
 
@@ -33,7 +34,7 @@ class ConversationRuntimeOrchestrator:
         self._session = session
         self._profile_service = profile_service
         self._settings = settings
-        self._conversation_service = ConversationService(session)
+        self._conversation_service = ConversationService(session, actor_ref=RUNTIME_ACTOR_REF)
         self._agent_orchestrator = AgentRuntimeOrchestrator(session, profile_service, settings)
 
     def advance_session(

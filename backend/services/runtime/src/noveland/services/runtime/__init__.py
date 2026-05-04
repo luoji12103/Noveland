@@ -5,7 +5,6 @@ from noveland.services.runtime.agent_loop import (
     CALENDAR_ENTRY_DUE_EVENT_NAME,
     MEMORY_ITEM_CREATED_EVENT_NAME,
     NARRATIVE_ARTIFACT_CREATED_EVENT_NAME,
-    RUNTIME_ACTOR_REF,
     AgentRunExecution,
     AgentRuntimeOrchestrator,
     DueRunBatchResult,
@@ -29,6 +28,7 @@ from noveland.services.runtime.daemon import (
     get_runtime_control_view,
     set_runtime_desired_state,
 )
+from noveland.services.runtime.identity import RUNTIME_ACTOR_REF, runtime_actor_ref
 from noveland.services.runtime.main import main, run_daemon, run_once
 
 __all__ = [
@@ -58,4 +58,5 @@ __all__ = [
     "run_daemon",
     "run_once",
     "set_runtime_desired_state",
+    "runtime_actor_ref",
 ]

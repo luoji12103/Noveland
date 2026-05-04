@@ -62,9 +62,10 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 class ConversationService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, actor_ref: str = SYSTEM_ACTOR_REF) -> None:
         self._session = session
         self._diagnostics = RuntimeDiagnosticsService(session)
+        self._actor_ref = actor_ref
 
     def list_sessions(self, world_id: uuid.UUID) -> list[ConversationSessionRecord]:
         return [
@@ -1038,7 +1039,7 @@ class ConversationService:
                 event_name=event_name,
                 payload=payload,
                 wall_time=datetime.now(UTC),
-                actor_ref=SYSTEM_ACTOR_REF,
+                actor_ref=self._actor_ref,
             ),
         )
 
