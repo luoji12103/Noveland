@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import PlainTextResponse
 from noveland.adapters import (
     ProviderConfigurationError,
     ProviderHealthStatus,
@@ -106,6 +107,17 @@ class RuntimeStatusResponse(RuntimeControlResponse):
     runtime_batch_limit: int
     memory_write_jobs: MemoryWriteJobStatusSummaryResponse
     runtime_health: RuntimeHealthResponse
+
+
+class RuntimeSupervisionResponse(BaseModel):
+    api_status: Literal["ok"]
+    database_status: Literal["ok", "error"]
+    desired_state: Literal["running", "stopped"]
+    runtime_health: RuntimeHealthResponse
+    runtime_process_expected: bool
+    runtime_process_observed: bool
+    heartbeat_stale: bool
+    last_error: str | None
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -431,6 +443,54 @@ def get_runtime_status(
         runtime_health=runtime_health,
         **_runtime_control_response(view).model_dump(),
     )
+
+
+@router.get("/runtime/supervision", response_model=RuntimeSupervisionResponse)
+def get_runtime_supervision(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RuntimeSupervisionResponse:
+    del subject
+    settings = load_settings()
+    view = get_runtime_control_view(db_session)
+    memory_summary = MemoryService(db_session, settings).write_job_status_summary()
+    runtime_health = _runtime_health_response(db_session, view, memory_summary, settings)
+    heartbeat_stale = (
+        runtime_health.heartbeat_age_seconds is None
+        or runtime_health.heartbeat_age_seconds > settings.runtime_loop_interval_seconds * 3
+    )
+    return RuntimeSupervisionResponse(
+        api_status="ok",
+        database_status="ok",
+        desired_state=view.desired_state,
+        runtime_health=runtime_health,
+        runtime_process_expected=view.desired_state == "running",
+        runtime_process_observed=not heartbeat_stale,
+        heartbeat_stale=heartbeat_stale,
+        last_error=view.last_error,
+    )
+
+
+@router.get("/metrics", response_class=PlainTextResponse)
+def get_runtime_metrics(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlainTextResponse:
+    del subject
+    settings = load_settings()
+    view = get_runtime_control_view(db_session)
+    memory_summary = MemoryService(db_session, settings).write_job_status_summary()
+    runtime_health = _runtime_health_response(db_session, view, memory_summary, settings)
+    provider_health = ProviderProfileService(db_session, settings).health_records(
+        _provider_diagnostic_counts(db_session),
+    )
+    lines = _metrics_lines(
+        view=view,
+        memory_summary=memory_summary,
+        runtime_health=runtime_health,
+        provider_health=provider_health,
+    )
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
 @router.get("/runtime/diagnostics", response_model=list[RuntimeDiagnosticResponse])
@@ -1320,6 +1380,66 @@ def _runtime_health_response(
         recent_error_count=recent_error_count,
         heartbeat_age_seconds=heartbeat_age_seconds,
     )
+
+
+def _metrics_lines(
+    *,
+    view: Any,
+    memory_summary: MemoryWriteJobStatusSummary,
+    runtime_health: RuntimeHealthResponse,
+    provider_health: list[ProviderProfileHealthRecord],
+) -> list[str]:
+    status_values = ("healthy", "stopped", "degraded", "failed")
+    lines = [
+        "# HELP noveland_runtime_desired_state Runtime desired state as 1 for running.",
+        "# TYPE noveland_runtime_desired_state gauge",
+        f"noveland_runtime_desired_state {_bool_metric(view.desired_state == 'running')}",
+        "# HELP noveland_runtime_health Runtime health by state.",
+        "# TYPE noveland_runtime_health gauge",
+        *[
+            (
+                f'noveland_runtime_health{{status="{status_value}"}} '
+                f"{_bool_metric(runtime_health.status == status_value)}"
+            )
+            for status_value in status_values
+        ],
+        "# HELP noveland_runtime_recent_errors Recent runtime error diagnostics.",
+        "# TYPE noveland_runtime_recent_errors gauge",
+        f"noveland_runtime_recent_errors {runtime_health.recent_error_count}",
+        "# HELP noveland_memory_write_jobs Memory write jobs by status.",
+        "# TYPE noveland_memory_write_jobs gauge",
+        f'noveland_memory_write_jobs{{status="pending"}} {memory_summary.pending_count}',
+        f'noveland_memory_write_jobs{{status="processing"}} {memory_summary.processing_count}',
+        f'noveland_memory_write_jobs{{status="succeeded"}} {memory_summary.succeeded_count}',
+        f'noveland_memory_write_jobs{{status="failed"}} {memory_summary.failed_count}',
+        (
+            'noveland_memory_write_jobs{status="retryable_failed"} '
+            f"{memory_summary.retryable_failed_count}"
+        ),
+        (
+            'noveland_memory_write_jobs{status="terminal_failed"} '
+            f"{memory_summary.terminal_failed_count}"
+        ),
+        (
+            'noveland_memory_write_jobs{status="stalled_processing"} '
+            f"{memory_summary.stalled_processing_count}"
+        ),
+        "# HELP noveland_provider_profiles Provider profiles by derived health.",
+        "# TYPE noveland_provider_profiles gauge",
+    ]
+    provider_counts: dict[str, int] = {}
+    for record in provider_health:
+        provider_counts[record.health.value] = provider_counts.get(record.health.value, 0) + 1
+    for health_value in ("ok", "untested", "configuration_error", "degraded", "disabled"):
+        lines.append(
+            f'noveland_provider_profiles{{health="{health_value}"}} '
+            f"{provider_counts.get(health_value, 0)}",
+        )
+    return lines
+
+
+def _bool_metric(value: bool) -> int:
+    return 1 if value else 0
 
 
 def _runtime_diagnostic_counts(db_session: Session) -> tuple[int, int]:

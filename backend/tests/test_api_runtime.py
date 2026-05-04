@@ -49,8 +49,10 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
 
     control = client.get("/runtime/control")
     status = client.get("/runtime/status")
+    supervision = client.get("/runtime/supervision")
     _seed_runtime_diagnostic(engine)
     diagnostics = client.get("/runtime/diagnostics")
+    metrics = client.get("/metrics")
     start_runtime = client.patch("/runtime/control", json={"desired_state": "running"})
     create_profile = client.post(
         "/provider-profiles",
@@ -89,6 +91,14 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert status.json()["memory_write_jobs"]["failed_count"] == 0
     assert status.json()["runtime_health"]["status"] == "stopped"
     assert status.json()["runtime_health"]["recent_error_count"] == 0
+    assert supervision.status_code == 200
+    assert supervision.json()["api_status"] == "ok"
+    assert supervision.json()["database_status"] == "ok"
+    assert supervision.json()["runtime_process_expected"] is False
+    assert metrics.status_code == 200
+    assert "noveland_runtime_desired_state" in metrics.text
+    assert 'noveland_memory_write_jobs{status="failed"}' in metrics.text
+    assert "secret" not in metrics.text
     assert diagnostics.status_code == 200
     assert diagnostics.json()[0]["event_type"] == "runtime.test"
     assert diagnostics.json()[0]["details"]["token"] == "[redacted]"
@@ -199,6 +209,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     diagnostics = client.get("/runtime/diagnostics")
     retention = client.get("/runtime/diagnostics/retention")
     prune = client.post("/runtime/diagnostics/prune")
+    supervision = client.get("/runtime/supervision")
+    metrics = client.get("/metrics")
     profiles = client.get("/provider-profiles")
     provider_health = client.get("/provider-profiles/health")
     plugin_bindings = client.get("/plugins/bindings")
@@ -210,6 +222,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     assert diagnostics.status_code == 403
     assert retention.status_code == 403
     assert prune.status_code == 403
+    assert supervision.status_code == 403
+    assert metrics.status_code == 403
     assert profiles.status_code == 403
     assert provider_health.status_code == 403
     assert plugin_bindings.status_code == 403
