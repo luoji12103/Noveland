@@ -269,7 +269,7 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
         </div>
       </section>
 
-      <PluginBindingIssues bindings={data.pluginBindings} />
+      <PluginBindingIssues bindings={data.pluginBindings} diagnostics={data.pluginDiagnostics} />
     </section>
   );
 }
@@ -306,7 +306,13 @@ function ProviderHealthSummary({
   );
 }
 
-function PluginBindingIssues({ bindings }: { bindings: PluginBinding[] }) {
+function PluginBindingIssues({
+  bindings,
+  diagnostics,
+}: {
+  bindings: PluginBinding[];
+  diagnostics: ProviderAdminData["pluginDiagnostics"];
+}) {
   const issueBindings = bindings.filter((binding) => binding.validation_status !== "ok");
   return (
     <section className="management-panel" aria-labelledby="plugin-bindings-title">
@@ -316,6 +322,7 @@ function PluginBindingIssues({ bindings }: { bindings: PluginBinding[] }) {
       <p>
         {bindings.length} bindings inspected - {issueBindings.length} issues
       </p>
+      <p>{diagnostics.length} recent plugin diagnostics</p>
       <div className="resource-list">
         {issueBindings.length === 0 ? (
           <article className="resource-row">
@@ -341,6 +348,20 @@ function PluginBindingIssues({ bindings }: { bindings: PluginBinding[] }) {
           ))
         )}
       </div>
+      {diagnostics.length > 0 ? (
+        <div className="resource-list">
+          {diagnostics.map((diagnostic) => (
+            <article className="resource-row" key={diagnostic.id}>
+              <div>
+                <h3>{diagnostic.event_type}</h3>
+                <p>
+                  {diagnostic.severity} - {diagnostic.message}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

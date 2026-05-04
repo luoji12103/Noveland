@@ -688,7 +688,8 @@ export type DiagnosticComponent =
   | "agent"
   | "conversation"
   | "event_publisher"
-  | "api";
+  | "api"
+  | "plugin";
 
 export type RuntimeDiagnostic = {
   id: string;

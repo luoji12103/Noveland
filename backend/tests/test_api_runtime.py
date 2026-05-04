@@ -311,6 +311,43 @@ def test_platform_admin_lists_plugin_bindings_with_validation_status() -> None:
     assert {record["category"] for record in model_provider_bindings.json()} == {"model_provider"}
 
 
+def test_plugin_config_failures_emit_redacted_plugin_diagnostics() -> None:
+    client, engine = _client_with_database()
+    _user_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    _authenticate(client, token)
+
+    response = client.post(
+        "/provider-profiles",
+        json={
+            "profile_key": "bad-plugin",
+            "name": "Bad Plugin",
+            "provider_type": "openai_compatible",
+            "plugin_identifier": "builtin.openai_compatible",
+            "plugin_config": {
+                "headers": {"Authorization": "secret-token"},
+                "unexpected": "not allowed",
+            },
+            "base_url": "https://api.example.test/v1",
+            "model_name": "gpt-test",
+            "capabilities": {},
+            "api_key_ref": "openai-local",
+        },
+    )
+    diagnostics = client.get("/runtime/diagnostics?component=plugin")
+
+    assert response.status_code == 422
+    assert diagnostics.status_code == 200
+    assert diagnostics.json()[0]["component"] == "plugin"
+    assert diagnostics.json()[0]["event_type"] == "plugin.binding_invalid_config"
+    assert diagnostics.json()[0]["details"] == {
+        "plugin_identifier": "builtin.openai_compatible",
+        "category": "model_provider",
+        "owner_kind": "provider_profile",
+        "owner_key": "bad-plugin",
+    }
+    assert "secret-token" not in diagnostics.text
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

@@ -21,6 +21,7 @@ class DiagnosticComponent(StrEnum):
     CONVERSATION = "conversation"
     EVENT_PUBLISHER = "event_publisher"
     API = "api"
+    PLUGIN = "plugin"
 
 
 class _FrozenContract(BaseModel):

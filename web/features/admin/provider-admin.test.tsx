@@ -30,6 +30,8 @@ describe("ProviderAdmin", () => {
     expect(screen.getAllByText("Headers")).toHaveLength(2);
     expect(screen.getByText("Plugin bindings")).toBeInTheDocument();
     expect(screen.getByText("2 bindings inspected - 1 issues")).toBeInTheDocument();
+    expect(screen.getByText("1 recent plugin diagnostics")).toBeInTheDocument();
+    expect(screen.getByText("plugin.binding_invalid_config")).toBeInTheDocument();
     expect(screen.getByText("missing_plugin - missing.world_rules is not registered.")).toBeInTheDocument();
   });
 });
@@ -122,6 +124,27 @@ const providerData: ProviderAdminData = {
       config_present: false,
       validation_status: "missing_plugin",
       issue_message: "missing.world_rules is not registered.",
+    },
+  ],
+  pluginDiagnostics: [
+    {
+      id: "diagnostic-1",
+      severity: "error",
+      component: "plugin",
+      event_type: "plugin.binding_invalid_config",
+      message: "Provider plugin binding config failed validation.",
+      details: {
+        plugin_identifier: "builtin.openai_compatible",
+        category: "model_provider",
+        owner_kind: "provider_profile",
+        owner_key: "openai-local",
+      },
+      occurred_at: "2026-05-04T00:00:00Z",
+      world_id: null,
+      agent_id: null,
+      run_id: null,
+      provider_profile_id: null,
+      created_at: "2026-05-04T00:00:00Z",
     },
   ],
   loadError: null,

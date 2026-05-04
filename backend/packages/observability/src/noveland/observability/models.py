@@ -24,7 +24,8 @@ class RuntimeDiagnosticEvent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "'agent', "
             "'conversation', "
             "'event_publisher', "
-            "'api'"
+            "'api', "
+            "'plugin'"
             ")",
             name="component",
         ),

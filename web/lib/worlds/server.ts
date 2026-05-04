@@ -156,6 +156,7 @@ export type ProviderAdminData = {
   providerHealth: ProviderHealth[];
   modelProviderPlugins: PluginCatalogEntry[];
   pluginBindings: PluginBinding[];
+  pluginDiagnostics: RuntimeDiagnostic[];
   loadError: string | null;
 };
 
@@ -696,13 +697,27 @@ export async function getNarrativeReaderDetailData(
 export async function getProviderAdminData(): Promise<ProviderAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [profiles, providerHealth, modelProviderPlugins, pluginBindings] = await Promise.all([
+    const [
+      profiles,
+      providerHealth,
+      modelProviderPlugins,
+      pluginBindings,
+      pluginDiagnostics,
+    ] = await Promise.all([
       apiFetch<ProviderProfile[]>("/provider-profiles", cookies),
       apiFetch<ProviderHealth[]>("/provider-profiles/health", cookies),
       listPluginCatalogForServer("model_provider", cookies),
       apiFetch<PluginBinding[]>("/plugins/bindings", cookies),
+      apiFetch<RuntimeDiagnostic[]>("/runtime/diagnostics?component=plugin&limit=5", cookies),
     ]);
-    return { profiles, providerHealth, modelProviderPlugins, pluginBindings, loadError: null };
+    return {
+      profiles,
+      providerHealth,
+      modelProviderPlugins,
+      pluginBindings,
+      pluginDiagnostics,
+      loadError: null,
+    };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -712,6 +727,7 @@ export async function getProviderAdminData(): Promise<ProviderAdminData> {
       providerHealth: [],
       modelProviderPlugins: [],
       pluginBindings: [],
+      pluginDiagnostics: [],
       loadError: "Unable to load provider profiles.",
     };
   }

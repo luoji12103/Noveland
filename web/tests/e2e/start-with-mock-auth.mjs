@@ -1211,7 +1211,15 @@ function handleRuntimeDiagnostics(request, response) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
   }
-  sendJson(response, 200, runtimeDiagnostics);
+  const url = new URL(request.url, "http://mock.local");
+  const component = url.searchParams.get("component");
+  sendJson(
+    response,
+    200,
+    component === null
+      ? runtimeDiagnostics
+      : runtimeDiagnostics.filter((diagnostic) => diagnostic.component === component),
+  );
 }
 
 function handlePluginCatalog(url, response) {

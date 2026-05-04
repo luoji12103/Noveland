@@ -853,8 +853,26 @@ def create_provider_profile(
             ),
         )
     except PluginNotFoundError as exc:
+        _record_plugin_binding_diagnostic(
+            db_session,
+            event_type="plugin.binding_missing",
+            message="Provider plugin binding references an unregistered plugin.",
+            plugin_identifier=profile_create.plugin_identifier,
+            category=PluginCategory.MODEL_PROVIDER,
+            owner_kind="provider_profile",
+            owner_key=profile_create.profile_key,
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PluginConfigValidationError as exc:
+        _record_plugin_binding_diagnostic(
+            db_session,
+            event_type="plugin.binding_invalid_config",
+            message="Provider plugin binding config failed validation.",
+            plugin_identifier=profile_create.plugin_identifier,
+            category=PluginCategory.MODEL_PROVIDER,
+            owner_kind="provider_profile",
+            owner_key=profile_create.profile_key,
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
@@ -896,8 +914,28 @@ def update_provider_profile(
             ),
         )
     except PluginNotFoundError as exc:
+        _record_plugin_binding_diagnostic(
+            db_session,
+            event_type="plugin.binding_missing",
+            message="Provider plugin binding references an unregistered plugin.",
+            plugin_identifier=profile_update.plugin_identifier or model.plugin_identifier,
+            category=PluginCategory.MODEL_PROVIDER,
+            owner_kind="provider_profile",
+            owner_key=model.profile_key,
+            provider_profile_id=model.id,
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PluginConfigValidationError as exc:
+        _record_plugin_binding_diagnostic(
+            db_session,
+            event_type="plugin.binding_invalid_config",
+            message="Provider plugin binding config failed validation.",
+            plugin_identifier=profile_update.plugin_identifier or model.plugin_identifier,
+            category=PluginCategory.MODEL_PROVIDER,
+            owner_kind="provider_profile",
+            owner_key=model.profile_key,
+            provider_profile_id=model.id,
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
@@ -1150,6 +1188,39 @@ def _plugin_binding_validation_status(
     except PluginConfigValidationError:
         return "invalid_config", f"{identifier} config is invalid."
     return "ok", None
+
+
+def _record_plugin_binding_diagnostic(
+    db_session: Session,
+    *,
+    event_type: str,
+    message: str,
+    plugin_identifier: str | None,
+    category: PluginCategory,
+    owner_kind: str,
+    owner_key: str,
+    world_id: uuid.UUID | None = None,
+    agent_id: uuid.UUID | None = None,
+    provider_profile_id: uuid.UUID | None = None,
+) -> None:
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.ERROR,
+            component=DiagnosticComponent.PLUGIN,
+            event_type=event_type,
+            message=message,
+            details={
+                "plugin_identifier": plugin_identifier,
+                "category": category.value,
+                "owner_kind": owner_kind,
+                "owner_key": owner_key,
+            },
+            world_id=world_id,
+            agent_id=agent_id,
+            provider_profile_id=provider_profile_id,
+        ),
+    )
+    db_session.commit()
 
 
 def _runtime_control_response(view: Any) -> RuntimeControlResponse:
