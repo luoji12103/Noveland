@@ -49,6 +49,8 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
+  NarrativePublication,
+  NarrativePublicationInput,
   PersonaPolicyValidation,
   PluginCatalogEntry,
   PluginCategory,
@@ -622,6 +624,36 @@ export function createNarrativeArtifact(
     body: input,
     csrf: true,
   });
+}
+
+export function publishNarrativeArtifact(
+  worldId: string,
+  artifactId: string,
+  input: NarrativePublicationInput = {},
+): Promise<NarrativePublication> {
+  return worldRequest<NarrativePublication>(
+    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/publish`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function unpublishNarrativeArtifact(
+  worldId: string,
+  artifactId: string,
+  input: NarrativePublicationInput = {},
+): Promise<NarrativePublication> {
+  return worldRequest<NarrativePublication>(
+    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/unpublish`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function createAgent(worldId: string, input: AgentCreateInput): Promise<Agent> {

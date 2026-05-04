@@ -32,7 +32,7 @@ from noveland.memory.models import (
     MemoryWriteJob,
     MemoryWriteLog,
 )
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -1088,7 +1088,8 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         artifact_kind="conversation_summary",
         source_conversation_id=conversation_id,
     )
-    _seed_narrative_artifact(
+    _publish_narrative_artifact(engine, world_id, summary_id, owner_id)
+    draft_chapter_id = _seed_narrative_artifact(
         engine,
         world_id,
         "Chapter draft",
@@ -1136,7 +1137,73 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         "chapter_draft",
         "conversation_summary",
     ]
+    assert owner_list.json()[0]["id"] == str(draft_chapter_id)
+    assert owner_list.json()[0]["publication"] is None
+    assert owner_list.json()[1]["publication"]["status"] == "published"
     assert hidden.status_code == 404
+
+
+def test_narrative_publication_workflow_filters_reader_visibility() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "publication-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    draft_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Draft chapter",
+        "Draft body",
+        artifact_kind="chapter_draft",
+    )
+
+    _authenticate(client, member_token)
+    member_before_publish = client.get(f"/worlds/{world_id}/narrative-artifacts")
+    member_draft_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{draft_id}")
+    member_publish = client.post(f"/worlds/{world_id}/narrative-artifacts/{draft_id}/publish")
+
+    _authenticate(client, owner_token)
+    publish = client.post(
+        f"/worlds/{world_id}/narrative-artifacts/{draft_id}/publish",
+        json={"reader_visible": True, "metadata": {"channel": "reader"}},
+    )
+
+    _authenticate(client, member_token)
+    member_after_publish = client.get(f"/worlds/{world_id}/narrative-artifacts")
+    member_published_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{draft_id}")
+
+    _authenticate(client, owner_token)
+    unpublish = client.post(
+        f"/worlds/{world_id}/narrative-artifacts/{draft_id}/unpublish",
+        json={"metadata": {"reason": "revision"}},
+    )
+
+    _authenticate(client, member_token)
+    member_after_unpublish = client.get(f"/worlds/{world_id}/narrative-artifacts")
+    member_unpublished_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{draft_id}")
+
+    assert member_before_publish.status_code == 200
+    assert member_before_publish.json() == []
+    assert member_draft_detail.status_code == 404
+    assert member_publish.status_code == 403
+    assert publish.status_code == 200
+    assert publish.json()["status"] == "published"
+    assert publish.json()["reader_visible"] is True
+    assert publish.json()["metadata"] == {"channel": "reader"}
+    assert publish.json()["published_by_user_id"] == str(owner_id)
+    assert member_after_publish.status_code == 200
+    assert member_after_publish.json()[0]["id"] == str(draft_id)
+    assert member_after_publish.json()[0]["publication"]["status"] == "published"
+    assert member_published_detail.status_code == 200
+    assert member_published_detail.json()["content"] == "Draft body"
+    assert unpublish.status_code == 200
+    assert unpublish.json()["status"] == "unpublished"
+    assert unpublish.json()["reader_visible"] is False
+    assert unpublish.json()["metadata"] == {"channel": "reader", "reason": "revision"}
+    assert member_after_unpublish.status_code == 200
+    assert member_after_unpublish.json() == []
+    assert member_unpublished_detail.status_code == 404
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -1190,6 +1257,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, NarrativePublication.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
         table.create(engine)
@@ -1454,6 +1522,33 @@ def _seed_narrative_artifact(
         )
         session.commit()
     return artifact_id
+
+
+def _publish_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    published_by_user_id: uuid.UUID,
+) -> uuid.UUID:
+    publication_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            NarrativePublication(
+                id=publication_id,
+                world_id=world_id,
+                artifact_id=artifact_id,
+                source_draft_id=artifact_id,
+                status="published",
+                reader_visible=True,
+                published_metadata={},
+                published_at=now,
+                unpublished_at=None,
+                published_by_user_id=published_by_user_id,
+            ),
+        )
+        session.commit()
+    return publication_id
 
 
 def _membership_role(engine: Engine, world_id: uuid.UUID, user_id: uuid.UUID) -> str | None:

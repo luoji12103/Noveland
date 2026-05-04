@@ -21,6 +21,7 @@ describe("narrative reader", () => {
       "/worlds/world-1/reader/artifact-1",
     );
     expect(screen.getByText("Conversation: Manual Chain")).toBeVisible();
+    expect(screen.getAllByText("Published Apr 21, 2026, 12:03 AM")[0]).toBeVisible();
   });
 
   it("renders artifact detail with source conversation link", () => {
@@ -36,6 +37,7 @@ describe("narrative reader", () => {
       "/worlds/world-1/conversations/conversation-1",
     );
     expect(screen.getByText("Summary body")).toBeVisible();
+    expect(screen.getByText("Published Apr 21, 2026, 12:03 AM")).toBeVisible();
     expect(screen.getByText(/generation_mode/)).toBeVisible();
   });
 });
@@ -107,6 +109,20 @@ const artifacts = [
       scope_type: "world",
     },
     created_at: "2026-04-21T00:03:00.000Z",
+    publication: {
+      id: "publication-1",
+      world_id: "world-1",
+      artifact_id: "artifact-1",
+      source_draft_id: "artifact-1",
+      status: "published" as const,
+      reader_visible: true,
+      metadata: { channel: "reader" },
+      published_at: "2026-04-21T00:03:00.000Z",
+      unpublished_at: null,
+      published_by_user_id: "user-1",
+      created_at: "2026-04-21T00:03:00.000Z",
+      updated_at: "2026-04-21T00:03:00.000Z",
+    },
   },
 ];
 

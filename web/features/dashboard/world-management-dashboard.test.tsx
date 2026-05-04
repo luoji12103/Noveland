@@ -289,6 +289,7 @@ const adminData: WorldDashboardData = {
       artifact_kind: "agent_note",
       metadata: {},
       created_at: "2026-04-17T00:03:02.000Z",
+      publication: null,
     },
   ],
   providerProfiles: [
@@ -551,6 +552,7 @@ const readOnlyData: WorldDashboardData = {
       artifact_kind: "agent_note",
       metadata: {},
       created_at: "2026-04-17T00:03:02.000Z",
+      publication: null,
     },
   ],
   providerProfiles: [],

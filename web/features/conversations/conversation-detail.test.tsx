@@ -399,6 +399,7 @@ const adminData: ConversationDetailData = {
       artifact_kind: "conversation_summary",
       metadata: { generation_mode: "manual" },
       created_at: "2026-04-21T00:00:03.000Z",
+      publication: null,
     },
   ],
   narrativeWriterPlugins: [

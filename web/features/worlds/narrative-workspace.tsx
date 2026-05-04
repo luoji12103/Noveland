@@ -3,8 +3,13 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { createNarrativeArtifact } from "@/lib/worlds/client";
+import {
+  createNarrativeArtifact,
+  publishNarrativeArtifact,
+  unpublishNarrativeArtifact,
+} from "@/lib/worlds/client";
 import type { NarrativeWorkspaceData } from "@/lib/worlds/server";
+import type { NarrativeArtifact } from "@/lib/worlds/types";
 import {
   formString,
   messageForError,
@@ -20,6 +25,7 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
   const router = useRouter();
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
+  const [busyArtifactId, setBusyArtifactId] = useState<string | null>(null);
 
   async function handleCreateArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +49,50 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
       setIsBusy(false);
     }
   }
+
+  async function handlePublishArtifact(artifactId: string) {
+    setBusyArtifactId(artifactId);
+    setNotice(null);
+    try {
+      await publishNarrativeArtifact(worldId, artifactId, {
+        reader_visible: true,
+        metadata: { channel: "reader" },
+      });
+      setNotice("Narrative artifact published.");
+      router.refresh();
+    } catch (error) {
+      setNotice(messageForError(error));
+    } finally {
+      setBusyArtifactId(null);
+    }
+  }
+
+  async function handleUnpublishArtifact(artifactId: string) {
+    setBusyArtifactId(artifactId);
+    setNotice(null);
+    try {
+      await unpublishNarrativeArtifact(worldId, artifactId, {
+        metadata: { reason: "operator_unpublished" },
+      });
+      setNotice("Narrative artifact unpublished.");
+      router.refresh();
+    } catch (error) {
+      setNotice(messageForError(error));
+    } finally {
+      setBusyArtifactId(null);
+    }
+  }
+
+  const publishedArtifacts = data.narrativeArtifacts.filter(
+    (artifact) =>
+      artifact.publication?.status === "published" && artifact.publication.reader_visible,
+  );
+  const draftArtifacts = data.narrativeArtifacts.filter(
+    (artifact) =>
+      artifact.publication === null ||
+      artifact.publication.status !== "published" ||
+      !artifact.publication.reader_visible,
+  );
 
   return (
     <section className="management-section">
@@ -82,34 +132,126 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
 
       <section className="management-panel" aria-labelledby="artifacts-title">
         <h2 className="section-title" id="artifacts-title">
-          Narrative artifacts
+          Draft artifacts
         </h2>
-        <div className="resource-list">
-          {data.narrativeArtifacts.length === 0 ? (
-            <article className="resource-row">
-              <div>
-                <h3>No artifacts yet</h3>
-                <p>Run agents or create a world summary to begin.</p>
-              </div>
-            </article>
-          ) : (
-            data.narrativeArtifacts.map((artifact) => {
-              const agent = data.agents.find((item) => item.id === artifact.agent_id);
-              return (
-                <article className="resource-row" key={artifact.id}>
-                  <div>
-                    <h3>{artifact.title}</h3>
-                    <p>
-                      {artifact.artifact_kind} - {agent?.display_name ?? "world"}
-                    </p>
-                    <p>{artifact.content}</p>
-                  </div>
-                </article>
-              );
-            })
-          )}
-        </div>
+        <ArtifactList
+          artifacts={draftArtifacts}
+          agents={data.agents}
+          emptyTitle="No drafts"
+          emptyBody="Run agents or create a world summary to begin."
+          busyArtifactId={busyArtifactId}
+          canManage={data.canManageSelectedWorld}
+          onPublish={handlePublishArtifact}
+          onUnpublish={handleUnpublishArtifact}
+        />
+      </section>
+
+      <section className="management-panel" aria-labelledby="published-artifacts-title">
+        <h2 className="section-title" id="published-artifacts-title">
+          Published artifacts
+        </h2>
+        <ArtifactList
+          artifacts={publishedArtifacts}
+          agents={data.agents}
+          emptyTitle="No published artifacts"
+          emptyBody="Publish a draft to make it visible in the reader."
+          busyArtifactId={busyArtifactId}
+          canManage={data.canManageSelectedWorld}
+          onPublish={handlePublishArtifact}
+          onUnpublish={handleUnpublishArtifact}
+        />
       </section>
     </section>
   );
+}
+
+function ArtifactList({
+  artifacts,
+  agents,
+  emptyTitle,
+  emptyBody,
+  busyArtifactId,
+  canManage,
+  onPublish,
+  onUnpublish,
+}: {
+  artifacts: NarrativeArtifact[];
+  agents: NarrativeWorkspaceData["agents"];
+  emptyTitle: string;
+  emptyBody: string;
+  busyArtifactId: string | null;
+  canManage: boolean;
+  onPublish: (artifactId: string) => void;
+  onUnpublish: (artifactId: string) => void;
+}) {
+  return (
+    <div className="resource-list">
+      {artifacts.length === 0 ? (
+        <article className="resource-row">
+          <div>
+            <h3>{emptyTitle}</h3>
+            <p>{emptyBody}</p>
+          </div>
+        </article>
+      ) : (
+        artifacts.map((artifact) => {
+          const agent = agents.find((item) => item.id === artifact.agent_id);
+          const isPublished =
+            artifact.publication?.status === "published" &&
+            artifact.publication.reader_visible;
+          return (
+            <article className="resource-row" key={artifact.id}>
+              <div>
+                <h3>{artifact.title}</h3>
+                <p>
+                  {artifact.artifact_kind} - {agent?.display_name ?? "world"} -{" "}
+                  {isPublished ? "published" : "draft"}
+                </p>
+                <p>{artifact.content}</p>
+                {artifact.publication !== null ? (
+                  <p>
+                    Publication: {artifact.publication.status}
+                    {artifact.publication.published_at === null
+                      ? ""
+                      : ` at ${formatDateTime(artifact.publication.published_at)}`}
+                  </p>
+                ) : null}
+              </div>
+              {canManage ? (
+                <div className="button-row">
+                  {isPublished ? (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={busyArtifactId === artifact.id}
+                      onClick={() => onUnpublish(artifact.id)}
+                    >
+                      Unpublish
+                    </button>
+                  ) : (
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={busyArtifactId === artifact.id}
+                      onClick={() => onPublish(artifact.id)}
+                    >
+                      Publish
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </article>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }

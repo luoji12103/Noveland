@@ -15,6 +15,11 @@ class NarrativeArtifactKind(StrEnum):
     CHAPTER_DRAFT = "chapter_draft"
 
 
+class NarrativePublicationStatus(StrEnum):
+    PUBLISHED = "published"
+    UNPUBLISHED = "unpublished"
+
+
 class NarrativeGenerationMode(StrEnum):
     MANUAL = "manual"
     AUTO_ON_COMPLETE = "auto_on_complete"
@@ -59,6 +64,35 @@ class NarrativeArtifactRecord(_FrozenContract):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("created_at must be timezone-aware")
         return value.astimezone(UTC)
+
+
+class NarrativePublicationRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    artifact_id: uuid.UUID
+    source_draft_id: uuid.UUID | None = None
+    status: NarrativePublicationStatus
+    reader_visible: bool
+    metadata: dict[str, Any]
+    published_at: datetime | None = None
+    unpublished_at: datetime | None = None
+    published_by_user_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("published_at", "unpublished_at", "created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetimes(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("publication datetimes must be timezone-aware")
+        return value.astimezone(UTC)
+
+
+class NarrativeArtifactWithPublication(_FrozenContract):
+    artifact: NarrativeArtifactRecord
+    publication: NarrativePublicationRecord | None = None
 
 
 class ConversationNarrativeGenerate(_FrozenContract):

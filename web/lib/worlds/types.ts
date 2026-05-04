@@ -876,6 +876,22 @@ export type NarrativeArtifact = {
   artifact_kind: NarrativeArtifactKind;
   metadata: Record<string, unknown>;
   created_at: string;
+  publication: NarrativePublication | null;
+};
+
+export type NarrativePublication = {
+  id: string;
+  world_id: string;
+  artifact_id: string;
+  source_draft_id: string | null;
+  status: "published" | "unpublished";
+  reader_visible: boolean;
+  metadata: Record<string, unknown>;
+  published_at: string | null;
+  unpublished_at: string | null;
+  published_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type WorldDashboardData = {
@@ -1184,6 +1200,11 @@ export type NarrativeArtifactCreateInput = {
   content: string;
   artifact_kind?: NarrativeArtifactKind;
   agent_id?: string | null;
+};
+
+export type NarrativePublicationInput = {
+  reader_visible?: boolean;
+  metadata?: Record<string, unknown>;
 };
 
 export type ConversationNarrativeArtifactSet =

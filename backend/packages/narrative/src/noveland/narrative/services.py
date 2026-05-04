@@ -22,9 +22,12 @@ from noveland.narrative.contracts import (
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
+    NarrativeArtifactWithPublication,
     NarrativeGenerationMode,
+    NarrativePublicationRecord,
+    NarrativePublicationStatus,
 )
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.plugins.builtins import NarrativeWriterPlugin, get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.errors import (
@@ -75,6 +78,45 @@ class NarrativeArtifactService:
             statement = statement.limit(max(1, min(limit, 200)))
         return [_record(model) for model in self._session.scalars(statement).all()]
 
+    def list_artifacts_with_publications(
+        self,
+        world_id: uuid.UUID,
+        *,
+        artifact_kind: NarrativeArtifactKind | None = None,
+        source_conversation_id: uuid.UUID | None = None,
+        limit: int | None = None,
+        published_only: bool = False,
+    ) -> list[NarrativeArtifactWithPublication]:
+        statement = (
+            select(NarrativeArtifact, NarrativePublication)
+            .outerjoin(
+                NarrativePublication,
+                NarrativePublication.artifact_id == NarrativeArtifact.id,
+            )
+            .where(NarrativeArtifact.world_id == world_id)
+            .order_by(NarrativeArtifact.created_at.desc())
+        )
+        if artifact_kind is not None:
+            statement = statement.where(NarrativeArtifact.artifact_kind == artifact_kind.value)
+        if source_conversation_id is not None:
+            statement = statement.where(
+                NarrativeArtifact.source_conversation_id == source_conversation_id,
+            )
+        if published_only:
+            statement = statement.where(
+                NarrativePublication.status == NarrativePublicationStatus.PUBLISHED.value,
+                NarrativePublication.reader_visible.is_(True),
+            )
+        if limit is not None:
+            statement = statement.limit(max(1, min(limit, 200)))
+        return [
+            NarrativeArtifactWithPublication(
+                artifact=_record(artifact),
+                publication=None if publication is None else _publication_record(publication),
+            )
+            for artifact, publication in self._session.execute(statement).all()
+        ]
+
     def get_artifact(
         self,
         world_id: uuid.UUID,
@@ -84,6 +126,28 @@ class NarrativeArtifactService:
         if model is None or model.world_id != world_id:
             return None
         return _record(model)
+
+    def get_artifact_with_publication(
+        self,
+        world_id: uuid.UUID,
+        artifact_id: uuid.UUID,
+        *,
+        published_only: bool = False,
+    ) -> NarrativeArtifactWithPublication | None:
+        model = self._session.get(NarrativeArtifact, artifact_id)
+        if model is None or model.world_id != world_id:
+            return None
+        publication = self._publication_for_artifact(world_id, artifact_id)
+        if published_only and (
+            publication is None
+            or publication.status != NarrativePublicationStatus.PUBLISHED.value
+            or not publication.reader_visible
+        ):
+            return None
+        return NarrativeArtifactWithPublication(
+            artifact=_record(model),
+            publication=None if publication is None else _publication_record(publication),
+        )
 
     def get_conversation_artifact(
         self,
@@ -119,6 +183,89 @@ class NarrativeArtifactService:
         self._session.add(model)
         self._session.flush()
         return _record(model)
+
+    def publish_artifact(
+        self,
+        world_id: uuid.UUID,
+        artifact_id: uuid.UUID,
+        *,
+        actor_user_id: uuid.UUID | None,
+        reader_visible: bool = True,
+        metadata: dict[str, object] | None = None,
+    ) -> NarrativePublicationRecord:
+        artifact = self._session.get(NarrativeArtifact, artifact_id)
+        if artifact is None or artifact.world_id != world_id:
+            raise NarrativeArtifactNotFoundError
+
+        now = datetime.now(UTC)
+        publication = self._publication_for_artifact(world_id, artifact_id)
+        if publication is None:
+            publication = NarrativePublication(
+                world_id=world_id,
+                artifact_id=artifact_id,
+                source_draft_id=artifact_id,
+                status=NarrativePublicationStatus.PUBLISHED.value,
+                reader_visible=reader_visible,
+                published_metadata=metadata or {},
+                published_at=now,
+                unpublished_at=None,
+                published_by_user_id=actor_user_id,
+            )
+            self._session.add(publication)
+        else:
+            publication.status = NarrativePublicationStatus.PUBLISHED.value
+            publication.reader_visible = reader_visible
+            publication.published_metadata = metadata or publication.published_metadata or {}
+            publication.published_at = now
+            publication.unpublished_at = None
+            publication.published_by_user_id = actor_user_id
+        self._session.flush()
+        return _publication_record(publication)
+
+    def unpublish_artifact(
+        self,
+        world_id: uuid.UUID,
+        artifact_id: uuid.UUID,
+        *,
+        metadata: dict[str, object] | None = None,
+    ) -> NarrativePublicationRecord:
+        artifact = self._session.get(NarrativeArtifact, artifact_id)
+        if artifact is None or artifact.world_id != world_id:
+            raise NarrativeArtifactNotFoundError
+        publication = self._publication_for_artifact(world_id, artifact_id)
+        if publication is None:
+            raise NarrativePublicationNotFoundError
+
+        publication.status = NarrativePublicationStatus.UNPUBLISHED.value
+        publication.reader_visible = False
+        publication.unpublished_at = datetime.now(UTC)
+        if metadata:
+            publication.published_metadata = {
+                **(publication.published_metadata or {}),
+                **metadata,
+            }
+        self._session.flush()
+        return _publication_record(publication)
+
+    def _publication_for_artifact(
+        self,
+        world_id: uuid.UUID,
+        artifact_id: uuid.UUID,
+    ) -> NarrativePublication | None:
+        return self._session.scalars(
+            select(NarrativePublication).where(
+                NarrativePublication.world_id == world_id,
+                NarrativePublication.artifact_id == artifact_id,
+            ),
+        ).one_or_none()
+
+
+class NarrativeArtifactNotFoundError(Exception):
+    pass
+
+
+class NarrativePublicationNotFoundError(Exception):
+    pass
 
 
 class ConversationNarrativeWriterService:
@@ -526,6 +673,23 @@ def _record(model: NarrativeArtifact) -> NarrativeArtifactRecord:
         artifact_kind=NarrativeArtifactKind(model.artifact_kind),
         metadata=model.artifact_metadata,
         created_at=_utc(model.created_at),
+    )
+
+
+def _publication_record(model: NarrativePublication) -> NarrativePublicationRecord:
+    return NarrativePublicationRecord(
+        id=model.id,
+        world_id=model.world_id,
+        artifact_id=model.artifact_id,
+        source_draft_id=model.source_draft_id,
+        status=NarrativePublicationStatus(model.status),
+        reader_visible=model.reader_visible,
+        metadata=model.published_metadata,
+        published_at=None if model.published_at is None else _utc(model.published_at),
+        unpublished_at=None if model.unpublished_at is None else _utc(model.unpublished_at),
+        published_by_user_id=model.published_by_user_id,
+        created_at=_utc(model.created_at),
+        updated_at=_utc(model.updated_at),
     )
 
 

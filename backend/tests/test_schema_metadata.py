@@ -64,6 +64,7 @@ def test_core_schema_tables_are_registered() -> None:
         "runtime_control_states",
         "runtime_diagnostic_events",
         "narrative_artifacts",
+        "narrative_publications",
         "scenes",
         "user_credentials",
         "users",
@@ -157,6 +158,10 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_runtime_control_states_control_key" in constraint_names(
         "runtime_control_states",
+        UniqueConstraint,
+    )
+    assert "uq_narrative_publications_artifact_id" in constraint_names(
+        "narrative_publications",
         UniqueConstraint,
     )
 
@@ -316,6 +321,10 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
         "narrative_artifacts",
         CheckConstraint,
     )
+    assert "ck_narrative_publications_status" in constraint_names(
+        "narrative_publications",
+        CheckConstraint,
+    )
     assert "ck_runtime_diagnostic_events_severity" in constraint_names(
         "runtime_diagnostic_events",
         CheckConstraint,
@@ -392,6 +401,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "agents.id",
         "worlds.id",
     }
+    assert foreign_key_targets("narrative_publications") == {
+        "narrative_artifacts.id",
+        "users.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("runtime_diagnostic_events") == {
         "agent_runtime_runs.id",
         "agents.id",
@@ -461,6 +475,13 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_narrative_artifacts_world_conversation_created_at" in index_names(
         "narrative_artifacts",
     )
+    assert "ix_narrative_publications_world_status_visible" in index_names(
+        "narrative_publications",
+    )
+    assert "ix_narrative_publications_world_published_at" in index_names(
+        "narrative_publications",
+    )
+    assert "ix_narrative_publications_source_draft" in index_names("narrative_publications")
     assert "ix_runtime_diagnostic_events_occurred_at" in index_names(
         "runtime_diagnostic_events",
     )
@@ -487,3 +508,16 @@ def test_world_schema_includes_memory_backend_profile_column() -> None:
 
 def test_narrative_schema_includes_conversation_source_column() -> None:
     assert {"source_conversation_id"} <= column_names("narrative_artifacts")
+
+
+def test_narrative_publication_schema_includes_workflow_columns() -> None:
+    assert {
+        "artifact_id",
+        "source_draft_id",
+        "status",
+        "reader_visible",
+        "metadata",
+        "published_at",
+        "unpublished_at",
+        "published_by_user_id",
+    } <= column_names("narrative_publications")

@@ -5,18 +5,24 @@ from noveland.narrative.contracts import (
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
+    NarrativeArtifactWithPublication,
     NarrativeGenerationMode,
+    NarrativePublicationRecord,
+    NarrativePublicationStatus,
 )
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative.services import (
     ConversationNarrativeWriterService,
+    NarrativeArtifactNotFoundError,
     NarrativeArtifactService,
+    NarrativePublicationNotFoundError,
 )
 
 PACKAGE_NAME = "narrative"
 
 __all__ = [
     "NarrativeArtifact",
+    "NarrativePublication",
     "ConversationNarrativeArtifactSet",
     "ConversationNarrativeGenerate",
     "ConversationNarrativePromptPreview",
@@ -25,6 +31,11 @@ __all__ = [
     "NarrativeArtifactCreate",
     "NarrativeArtifactKind",
     "NarrativeArtifactRecord",
+    "NarrativeArtifactWithPublication",
+    "NarrativePublicationRecord",
+    "NarrativePublicationStatus",
+    "NarrativeArtifactNotFoundError",
     "NarrativeArtifactService",
+    "NarrativePublicationNotFoundError",
     "PACKAGE_NAME",
 ]

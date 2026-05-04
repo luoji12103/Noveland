@@ -59,8 +59,12 @@ from noveland.memory import (
 )
 from noveland.narrative import (
     NarrativeArtifactKind,
+    NarrativeArtifactNotFoundError,
     NarrativeArtifactRecord,
     NarrativeArtifactService,
+    NarrativeArtifactWithPublication,
+    NarrativePublicationNotFoundError,
+    NarrativePublicationRecord,
 )
 from noveland.observability import (
     DiagnosticComponent,
@@ -300,6 +304,11 @@ class NarrativeArtifactCreateRequest(_RequestModel):
     content: str = Field(min_length=1)
     artifact_kind: Literal["agent_note", "world_summary"] = "world_summary"
     agent_id: uuid.UUID | None = None
+
+
+class NarrativePublicationRequest(_RequestModel):
+    reader_visible: bool = True
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ClockTransitionRequest(_RequestModel):
@@ -685,6 +694,22 @@ class NarrativeArtifactResponse(BaseModel):
     artifact_kind: str
     metadata: dict[str, Any]
     created_at: datetime
+    publication: NarrativePublicationResponse | None = None
+
+
+class NarrativePublicationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    artifact_id: uuid.UUID
+    source_draft_id: uuid.UUID | None
+    status: str
+    reader_visible: bool
+    metadata: dict[str, Any]
+    published_at: datetime | None
+    unpublished_at: datetime | None
+    published_by_user_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class WorldClockResponse(BaseModel):
@@ -2251,13 +2276,15 @@ def list_narrative_artifacts(
     source_conversation_id: uuid.UUID | None = None,
     limit: Annotated[int | None, Query(ge=1, le=100)] = None,
 ) -> list[NarrativeArtifactResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
         _narrative_artifact_response(artifact)
-        for artifact in NarrativeArtifactService(db_session).list_artifacts(
+        for artifact in NarrativeArtifactService(db_session).list_artifacts_with_publications(
             context.world_id,
             artifact_kind=None if artifact_kind is None else NarrativeArtifactKind(artifact_kind),
             source_conversation_id=source_conversation_id,
             limit=limit,
+            published_only=not can_manage,
         )
     ]
 
@@ -2271,7 +2298,12 @@ def get_narrative_artifact(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> NarrativeArtifactResponse:
-    artifact = NarrativeArtifactService(db_session).get_artifact(context.world_id, artifact_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    artifact = NarrativeArtifactService(db_session).get_artifact_with_publication(
+        context.world_id,
+        artifact_id,
+        published_only=not can_manage,
+    )
     if artifact is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2307,6 +2339,65 @@ def create_narrative_artifact(
         artifact_kind=NarrativeArtifactKind(artifact_create.artifact_kind),
     )
     return _narrative_artifact_response(artifact)
+
+
+@router.post(
+    "/{world_id}/narrative-artifacts/{artifact_id}/publish",
+    response_model=NarrativePublicationResponse,
+)
+def publish_narrative_artifact(
+    artifact_id: uuid.UUID,
+    publication_request: NarrativePublicationRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativePublicationResponse:
+    require_csrf(request)
+    try:
+        publication = NarrativeArtifactService(db_session).publish_artifact(
+            context.world_id,
+            artifact_id,
+            actor_user_id=context.subject.user_id,
+            reader_visible=publication_request.reader_visible,
+            metadata=publication_request.metadata,
+        )
+    except NarrativeArtifactNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Narrative artifact not found",
+        ) from exc
+    return _narrative_publication_response(publication)
+
+
+@router.post(
+    "/{world_id}/narrative-artifacts/{artifact_id}/unpublish",
+    response_model=NarrativePublicationResponse,
+)
+def unpublish_narrative_artifact(
+    artifact_id: uuid.UUID,
+    publication_request: NarrativePublicationRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativePublicationResponse:
+    require_csrf(request)
+    try:
+        publication = NarrativeArtifactService(db_session).unpublish_artifact(
+            context.world_id,
+            artifact_id,
+            metadata=publication_request.metadata,
+        )
+    except NarrativeArtifactNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Narrative artifact not found",
+        ) from exc
+    except NarrativePublicationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Narrative publication not found",
+        ) from exc
+    return _narrative_publication_response(publication)
 
 
 @router.post(
@@ -2932,19 +3023,45 @@ def _agent_observation_response(observation: AgentObservationRecord) -> AgentObs
 
 
 def _narrative_artifact_response(
-    artifact: NarrativeArtifactRecord,
+    artifact: NarrativeArtifactRecord | NarrativeArtifactWithPublication,
 ) -> NarrativeArtifactResponse:
+    if isinstance(artifact, NarrativeArtifactWithPublication):
+        publication = artifact.publication
+        artifact_record = artifact.artifact
+    else:
+        publication = None
+        artifact_record = artifact
     return NarrativeArtifactResponse(
-        id=artifact.id,
-        world_id=artifact.world_id,
-        agent_id=artifact.agent_id,
-        source_run_id=artifact.source_run_id,
-        source_conversation_id=artifact.source_conversation_id,
-        title=artifact.title,
-        content=artifact.content,
-        artifact_kind=artifact.artifact_kind.value,
-        metadata=artifact.metadata,
-        created_at=artifact.created_at,
+        id=artifact_record.id,
+        world_id=artifact_record.world_id,
+        agent_id=artifact_record.agent_id,
+        source_run_id=artifact_record.source_run_id,
+        source_conversation_id=artifact_record.source_conversation_id,
+        title=artifact_record.title,
+        content=artifact_record.content,
+        artifact_kind=artifact_record.artifact_kind.value,
+        metadata=artifact_record.metadata,
+        created_at=artifact_record.created_at,
+        publication=None if publication is None else _narrative_publication_response(publication),
+    )
+
+
+def _narrative_publication_response(
+    publication: NarrativePublicationRecord,
+) -> NarrativePublicationResponse:
+    return NarrativePublicationResponse(
+        id=publication.id,
+        world_id=publication.world_id,
+        artifact_id=publication.artifact_id,
+        source_draft_id=publication.source_draft_id,
+        status=publication.status.value,
+        reader_visible=publication.reader_visible,
+        metadata=publication.metadata,
+        published_at=publication.published_at,
+        unpublished_at=publication.unpublished_at,
+        published_by_user_id=publication.published_by_user_id,
+        created_at=publication.created_at,
+        updated_at=publication.updated_at,
     )
 
 

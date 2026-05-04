@@ -328,6 +328,7 @@ const narrativeArtifacts = [
     artifact_kind: "agent_note",
     metadata: {},
     created_at: "2026-04-17T00:03:02.000Z",
+    publication: null,
   },
   {
     id: "73000000-0000-4000-8000-000000000002",
@@ -340,6 +341,20 @@ const narrativeArtifacts = [
     artifact_kind: "conversation_summary",
     metadata: { generation_mode: "manual", scope_type: "world" },
     created_at: "2026-04-17T00:03:03.000Z",
+    publication: {
+      id: "73500000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      artifact_id: "73000000-0000-4000-8000-000000000002",
+      source_draft_id: "73000000-0000-4000-8000-000000000002",
+      status: "published",
+      reader_visible: true,
+      metadata: { channel: "reader" },
+      published_at: "2026-04-17T00:03:03.000Z",
+      unpublished_at: null,
+      published_by_user_id: adminUserId,
+      created_at: "2026-04-17T00:03:03.000Z",
+      updated_at: "2026-04-17T00:03:03.000Z",
+    },
   },
   {
     id: "73000000-0000-4000-8000-000000000003",
@@ -352,6 +367,7 @@ const narrativeArtifacts = [
     artifact_kind: "chapter_draft",
     metadata: { generation_mode: "manual", scope_type: "world" },
     created_at: "2026-04-17T00:03:04.000Z",
+    publication: null,
   },
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
@@ -1943,11 +1959,13 @@ async function handleAgentRun(request, response, currentSubject, worldId, agentI
         world_id: worldId,
         agent_id: agentId,
         source_run_id: run.run_id,
+        source_conversation_id: null,
         title: "Runtime note",
         content: run.response_text,
         artifact_kind: "agent_note",
         metadata: {},
         created_at: new Date().toISOString(),
+        publication: null,
       });
     }
     sendJson(response, 201, run);
@@ -2345,7 +2363,10 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     const artifact = narrativeArtifacts.find(
       (item) => item.id === artifactId && item.world_id === worldId,
     );
-    if (artifact === undefined) {
+    if (
+      artifact === undefined
+      || (!canManageWorld(currentSubject, worldId) && !isReaderVisibleArtifact(artifact))
+    ) {
       sendJson(response, 404, { detail: "Narrative artifact not found" });
       return;
     }
@@ -2359,6 +2380,9 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     let items = narrativeArtifacts
       .filter((artifact) => artifact.world_id === worldId)
       .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    if (!canManageWorld(currentSubject, worldId)) {
+      items = items.filter(isReaderVisibleArtifact);
+    }
     if (artifactKind !== null && artifactKind !== "") {
       items = items.filter((artifact) => artifact.artifact_kind === artifactKind);
     }
@@ -2379,6 +2403,53 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
     return;
   }
+  if (artifactId !== undefined && segmentsForArtifactAction(url).includes("publish")) {
+    const artifact = narrativeArtifacts.find(
+      (item) => item.id === artifactId && item.world_id === worldId,
+    );
+    if (artifact === undefined) {
+      sendJson(response, 404, { detail: "Narrative artifact not found" });
+      return;
+    }
+    const body = await readJson(request);
+    const now = new Date().toISOString();
+    artifact.publication = {
+      id: artifact.publication?.id ?? randomUUID(),
+      world_id: worldId,
+      artifact_id: artifact.id,
+      source_draft_id: artifact.id,
+      status: "published",
+      reader_visible: body.reader_visible ?? true,
+      metadata: body.metadata ?? artifact.publication?.metadata ?? {},
+      published_at: now,
+      unpublished_at: null,
+      published_by_user_id: currentSubject.user_id,
+      created_at: artifact.publication?.created_at ?? now,
+      updated_at: now,
+    };
+    sendJson(response, 200, artifact.publication);
+    return;
+  }
+  if (artifactId !== undefined && segmentsForArtifactAction(url).includes("unpublish")) {
+    const artifact = narrativeArtifacts.find(
+      (item) => item.id === artifactId && item.world_id === worldId,
+    );
+    if (artifact === undefined || artifact.publication === null) {
+      sendJson(response, 404, { detail: "Narrative publication not found" });
+      return;
+    }
+    const body = await readJson(request);
+    artifact.publication = {
+      ...artifact.publication,
+      status: "unpublished",
+      reader_visible: false,
+      metadata: { ...artifact.publication.metadata, ...(body.metadata ?? {}) },
+      unpublished_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    sendJson(response, 200, artifact.publication);
+    return;
+  }
   if (request.method === "POST") {
     const body = await readJson(request);
     const artifact = {
@@ -2392,6 +2463,7 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       artifact_kind: body.artifact_kind ?? "world_summary",
       metadata: {},
       created_at: new Date().toISOString(),
+      publication: null,
     };
     narrativeArtifacts.unshift(artifact);
     sendJson(response, 201, artifact);
@@ -2705,6 +2777,7 @@ function pushNarrativeArtifact(fields) {
   const artifact = {
     id: randomUUID(),
     created_at: new Date().toISOString(),
+    publication: null,
     ...fields,
   };
   narrativeArtifacts.unshift(artifact);
@@ -2946,6 +3019,14 @@ function canManageWorld(currentSubject, worldId) {
     isPlatformAdmin(currentSubject)
     || membershipFor(worldId, currentSubject.user_id)?.role === "world_admin"
   );
+}
+
+function isReaderVisibleArtifact(artifact) {
+  return artifact.publication?.status === "published" && artifact.publication.reader_visible;
+}
+
+function segmentsForArtifactAction(url) {
+  return url.pathname.split("/").filter(Boolean);
 }
 
 function isPlatformAdmin(currentSubject) {

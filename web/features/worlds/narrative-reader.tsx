@@ -88,6 +88,14 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
                     <p>
                       {artifact.artifact_kind} - {formatDateTime(artifact.created_at)}
                     </p>
+                    {artifact.publication !== null ? (
+                      <p>
+                        Published{" "}
+                        {artifact.publication.published_at === null
+                          ? "for readers"
+                          : formatDateTime(artifact.publication.published_at)}
+                      </p>
+                    ) : null}
                     <p>
                       {sourceConversation === null
                         ? "World-level artifact"
@@ -145,6 +153,14 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
         <p>
           {data.artifact.artifact_kind} - {formatDateTime(data.artifact.created_at)}
         </p>
+        {data.artifact.publication !== null ? (
+          <p>
+            Published{" "}
+            {data.artifact.publication.published_at === null
+              ? "for readers"
+              : formatDateTime(data.artifact.publication.published_at)}
+          </p>
+        ) : null}
         <p>
           {sourceConversation === null
             ? "World-level artifact"
