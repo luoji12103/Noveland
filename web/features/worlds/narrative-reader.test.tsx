@@ -1,5 +1,19 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { subscribeToEventStream as subscribeToEventStreamFn } from "@/lib/realtime";
+import type { WorldStreamPayload } from "@/lib/worlds/types";
+
+const { subscribeToEventStream } = vi.hoisted(() => ({
+  subscribeToEventStream: vi.fn<typeof subscribeToEventStreamFn>(() => () => {}),
+}));
+
+vi.mock("@/lib/realtime", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/realtime")>("@/lib/realtime");
+  return {
+    ...actual,
+    subscribeToEventStream,
+  };
+});
 
 import {
   NarrativeReaderDetail,
@@ -43,6 +57,41 @@ describe("narrative reader", () => {
     expect(screen.getByText("Summary body")).toBeVisible();
     expect(screen.getByText("Published Apr 21, 2026, 12:03 AM")).toBeVisible();
     expect(screen.getByText(/generation_mode/)).toBeVisible();
+  });
+
+  it("merges published stream updates into the reader list", () => {
+    subscribeToEventStream.mockImplementation(
+      ((_, handler) => {
+        handler({
+          cursor: "cursor-streamed",
+          event_type: "world.delta",
+          occurred_at: "2026-04-21T00:04:00.000Z",
+          world_id: "world-1",
+          conversation_id: null,
+          payload: {
+            diagnostics: [],
+            agent_runs: [],
+            narrative_artifacts: [
+              {
+                ...artifacts[0],
+                id: "artifact-streamed",
+                title: "Streamed published summary",
+                publication: {
+                  ...artifacts[0].publication,
+                  artifact_id: "artifact-streamed",
+                },
+              },
+            ],
+            conversations: [],
+          },
+        });
+        return () => {};
+      }) satisfies typeof subscribeToEventStreamFn<WorldStreamPayload>,
+    );
+
+    render(<NarrativeReaderList worldId="world-1" data={listData} />);
+
+    expect(screen.getByRole("link", { name: "Streamed published summary" })).toBeVisible();
   });
 });
 

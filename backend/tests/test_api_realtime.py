@@ -8,6 +8,7 @@ from typing import cast
 import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -19,6 +20,7 @@ from noveland.conversations.models import (
 )
 from noveland.core.models import RuntimeControlState
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob, MemoryWriteLog
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -30,7 +32,12 @@ from noveland.services.api import realtime as realtime_api
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
-from noveland.worlds.models import World, WorldClockStateModel, WorldMembership
+from noveland.worlds.models import (
+    World,
+    WorldClockStateModel,
+    WorldClockTransitionModel,
+    WorldMembership,
+)
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -96,6 +103,23 @@ def test_conversation_stream_replays_new_turns_and_diagnostics(
     assert next_delta["payload"]["diagnostics"][0]["details"]["conversation_id"] == str(
         conversation_id
     )
+
+
+def test_world_stream_replays_narrative_artifacts_with_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _client, engine = _client_with_database(monkeypatch)
+    owner_id, _token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    artifact_id = _seed_narrative_artifact(engine, world_id, owner_id)
+
+    delta = realtime_api.collect_world_stream_delta(world_id, None)
+
+    assert delta is not None
+    artifact = delta["payload"]["narrative_artifacts"][0]
+    assert artifact["id"] == str(artifact_id)
+    assert artifact["publication"]["status"] == "published"
+    assert artifact["publication"]["reader_visible"] is True
 
 
 def test_conversation_live_websocket_enforces_origin_and_admin_controls(
@@ -192,13 +216,17 @@ def _create_tables(engine: Engine) -> None:
         World.__table__,
         WorldMembership.__table__,
         WorldClockStateModel.__table__,
+        WorldClockTransitionModel.__table__,
         ProviderProfile.__table__,
+        AgentRuntimeRun.__table__,
         MemoryBackendProfile.__table__,
         ConversationSession.__table__,
         ConversationParticipant.__table__,
         ConversationTurn.__table__,
         MemoryWriteJob.__table__,
         MemoryWriteLog.__table__,
+        NarrativeArtifact.__table__,
+        NarrativePublication.__table__,
         RuntimeControlState.__table__,
         RuntimeDiagnosticEvent.__table__,
     ):
@@ -363,6 +391,50 @@ def _seed_conversation_diagnostic(
             )
         )
         session.commit()
+
+
+def _seed_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    owner_id: uuid.UUID,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                agent_id=None,
+                source_run_id=None,
+                source_conversation_id=None,
+                title="Published realtime artifact",
+                content="Reader-visible body",
+                artifact_kind="world_summary",
+                artifact_metadata={},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.flush()
+        session.add(
+            NarrativePublication(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                artifact_id=artifact_id,
+                source_draft_id=artifact_id,
+                status="published",
+                reader_visible=True,
+                published_metadata={"channel": "reader"},
+                published_at=now,
+                unpublished_at=None,
+                published_by_user_id=owner_id,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    return artifact_id
 
 
 def _authenticate(client: TestClient, token: str) -> None:

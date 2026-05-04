@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -8,6 +8,8 @@ import {
   publishNarrativeArtifact,
   unpublishNarrativeArtifact,
 } from "@/lib/worlds/client";
+import { mergeById, subscribeToEventStream } from "@/lib/realtime";
+import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { NarrativeWorkspaceData } from "@/lib/worlds/server";
 import type { NarrativeArtifact } from "@/lib/worlds/types";
 import {
@@ -26,6 +28,24 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
   const [notice, setNotice] = useState(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
   const [busyArtifactId, setBusyArtifactId] = useState<string | null>(null);
+  const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
+
+  useEffect(() => {
+    setNarrativeArtifacts(data.narrativeArtifacts);
+  }, [data.narrativeArtifacts]);
+
+  useEffect(() => {
+    return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
+      `/api/worlds/${worldId}/stream`,
+      (envelope) => {
+        if (envelope.payload.narrative_artifacts.length > 0) {
+          setNarrativeArtifacts((current) =>
+            mergeArtifacts(current, envelope.payload.narrative_artifacts),
+          );
+        }
+      },
+    );
+  }, [worldId]);
 
   async function handleCreateArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,11 +103,11 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
     }
   }
 
-  const publishedArtifacts = data.narrativeArtifacts.filter(
+  const publishedArtifacts = narrativeArtifacts.filter(
     (artifact) =>
       artifact.publication?.status === "published" && artifact.publication.reader_visible,
   );
-  const draftArtifacts = data.narrativeArtifacts.filter(
+  const draftArtifacts = narrativeArtifacts.filter(
     (artifact) =>
       artifact.publication === null ||
       artifact.publication.status !== "published" ||
@@ -254,4 +274,10 @@ function formatDateTime(value: string): string {
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function mergeArtifacts(current: NarrativeArtifact[], incoming: NarrativeArtifact[]): NarrativeArtifact[] {
+  return mergeById(current, incoming).sort((left, right) =>
+    right.created_at.localeCompare(left.created_at),
+  );
 }

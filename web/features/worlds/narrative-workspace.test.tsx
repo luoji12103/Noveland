@@ -1,5 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { subscribeToEventStream as subscribeToEventStreamFn } from "@/lib/realtime";
+import type { WorldStreamPayload } from "@/lib/worlds/types";
+
+const { subscribeToEventStream } = vi.hoisted(() => ({
+  subscribeToEventStream: vi.fn<typeof subscribeToEventStreamFn>(() => () => {}),
+}));
 
 vi.mock("@/lib/worlds/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
@@ -16,6 +22,14 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
 }));
+
+vi.mock("@/lib/realtime", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/realtime")>("@/lib/realtime");
+  return {
+    ...actual,
+    subscribeToEventStream,
+  };
+});
 
 import { NarrativeWorkspace } from "@/features/worlds/narrative-workspace";
 import {
@@ -59,6 +73,37 @@ describe("NarrativeWorkspace", () => {
         metadata: { reason: "operator_unpublished" },
       });
     });
+  });
+
+  it("merges narrative stream updates", async () => {
+    subscribeToEventStream.mockImplementation(
+      ((_, handler) => {
+        handler({
+          cursor: "cursor-streamed",
+          event_type: "world.delta",
+          occurred_at: "2026-04-21T00:04:00.000Z",
+          world_id: "world-1",
+          conversation_id: null,
+          payload: {
+            diagnostics: [],
+            agent_runs: [],
+            narrative_artifacts: [
+              {
+                ...workspaceData.narrativeArtifacts[0],
+                id: "artifact-streamed",
+                title: "Streamed draft",
+              },
+            ],
+            conversations: [],
+          },
+        });
+        return () => {};
+      }) satisfies typeof subscribeToEventStreamFn<WorldStreamPayload>,
+    );
+
+    render(<NarrativeWorkspace worldId="world-1" data={workspaceData} />);
+
+    expect(screen.getByText(/Streamed draft/)).toBeVisible();
   });
 });
 

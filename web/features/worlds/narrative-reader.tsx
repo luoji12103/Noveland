@@ -1,5 +1,10 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { mergeById, subscribeToEventStream } from "@/lib/realtime";
+import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type {
   NarrativeReaderDetailData,
   NarrativeReaderListData,
@@ -16,6 +21,28 @@ type NarrativeReaderDetailProps = {
 };
 
 export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps) {
+  const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
+
+  useEffect(() => {
+    setNarrativeArtifacts(data.narrativeArtifacts);
+  }, [data.narrativeArtifacts]);
+
+  useEffect(() => {
+    return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
+      `/api/worlds/${worldId}/stream`,
+      (envelope) => {
+        const publishedArtifacts = envelope.payload.narrative_artifacts.filter(
+          (artifact) =>
+            artifact.publication?.status === "published" &&
+            artifact.publication.reader_visible,
+        );
+        if (publishedArtifacts.length > 0) {
+          setNarrativeArtifacts((current) => mergeTimelineArtifacts(current, publishedArtifacts));
+        }
+      },
+    );
+  }, [worldId]);
+
   if (data.selectedWorld === null) {
     return (
       <section className="management-section">
@@ -83,7 +110,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
           Narrative reader
         </h2>
         <div className="resource-list">
-          {data.narrativeArtifacts.length === 0 ? (
+          {narrativeArtifacts.length === 0 ? (
             <article className="resource-row">
               <div>
                 <h3>No readable artifacts</h3>
@@ -91,7 +118,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
               </div>
             </article>
           ) : (
-            data.narrativeArtifacts.map((artifact) => {
+            narrativeArtifacts.map((artifact) => {
               const sourceConversation =
                 artifact.source_conversation_id === null
                   ? null
@@ -135,6 +162,19 @@ function timelineLabel(artifact: NarrativeReaderListData["narrativeArtifacts"][n
     return `published ${formatDateTime(artifact.publication.published_at)}`;
   }
   return `drafted ${formatDateTime(artifact.created_at)}`;
+}
+
+function mergeTimelineArtifacts(
+  current: NarrativeReaderListData["narrativeArtifacts"],
+  incoming: NarrativeReaderListData["narrativeArtifacts"],
+): NarrativeReaderListData["narrativeArtifacts"] {
+  return mergeById(current, incoming).sort((left, right) =>
+    timelineDate(right).localeCompare(timelineDate(left)),
+  );
+}
+
+function timelineDate(artifact: NarrativeReaderListData["narrativeArtifacts"][number]): string {
+  return artifact.publication?.published_at ?? artifact.created_at;
 }
 
 export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailProps) {

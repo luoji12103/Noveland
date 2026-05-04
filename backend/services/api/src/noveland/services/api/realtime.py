@@ -21,7 +21,7 @@ from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import load_settings
 from noveland.memory import MemoryService
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import DiagnosticComponent, DiagnosticSeverity
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.authorization import (
@@ -244,7 +244,9 @@ def collect_world_stream_delta(world_id: uuid.UUID, cursor: str | None) -> dict[
         payload: dict[str, Any] = {
             "diagnostics": [_diagnostic_payload(record) for record in diagnostics],
             "agent_runs": [_agent_run_payload(model) for model in agent_runs],
-            "narrative_artifacts": [_narrative_artifact_payload(model) for model in artifacts],
+            "narrative_artifacts": [
+                _narrative_artifact_with_publication_payload(row) for row in artifacts
+            ],
             "conversations": [_conversation_session_payload(model) for model in conversations],
         }
         if clock_changed:
@@ -267,8 +269,8 @@ def collect_world_stream_delta(world_id: uuid.UUID, cursor: str | None) -> dict[
                 ),
                 "narrative_artifact": _last_cursor_key(
                     artifacts,
-                    lambda item: item.created_at,
-                    lambda item: item.id,
+                    lambda item: item[0].created_at,
+                    lambda item: item[0].id,
                     parsed.get("narrative_artifact"),
                 ),
                 "conversation_session": _last_cursor_key(
@@ -697,16 +699,23 @@ def _world_narrative_artifacts_since(
     session: Any,
     world_id: uuid.UUID,
     cursor: dict[str, str] | None,
-) -> list[NarrativeArtifact]:
-    statement = select(NarrativeArtifact).where(NarrativeArtifact.world_id == world_id)
+) -> list[tuple[NarrativeArtifact, NarrativePublication | None]]:
+    statement = (
+        select(NarrativeArtifact, NarrativePublication)
+        .outerjoin(
+            NarrativePublication,
+            NarrativePublication.artifact_id == NarrativeArtifact.id,
+        )
+        .where(NarrativeArtifact.world_id == world_id)
+    )
     if cursor is None or cursor.get("at") is None or cursor.get("id") is None:
         return list(
-            session.scalars(statement.order_by(NarrativeArtifact.created_at.desc()).limit(10)).all()
+            session.execute(statement.order_by(NarrativeArtifact.created_at.desc()).limit(10)).all()
         )[::-1]
     created_at = _parse_datetime(cursor["at"])
     identifier = uuid.UUID(cursor["id"])
     return list(
-        session.scalars(
+        session.execute(
             statement.where(
                 or_(
                     NarrativeArtifact.created_at > created_at,
@@ -996,7 +1005,41 @@ def _narrative_artifact_payload(model: NarrativeArtifact) -> dict[str, Any]:
             "artifact_kind": model.artifact_kind,
             "metadata": model.artifact_metadata,
             "created_at": model.created_at,
+            "publication": None,
         },
+        ),
+    )
+
+
+def _narrative_artifact_with_publication_payload(
+    row: tuple[NarrativeArtifact, NarrativePublication | None],
+) -> dict[str, Any]:
+    artifact, publication = row
+    payload = _narrative_artifact_payload(artifact)
+    payload["publication"] = (
+        None if publication is None else _narrative_publication_payload(publication)
+    )
+    return payload
+
+
+def _narrative_publication_payload(model: NarrativePublication) -> dict[str, Any]:
+    return cast(
+        dict[str, Any],
+        jsonable_encoder(
+            {
+                "id": model.id,
+                "world_id": model.world_id,
+                "artifact_id": model.artifact_id,
+                "source_draft_id": model.source_draft_id,
+                "status": model.status,
+                "reader_visible": model.reader_visible,
+                "metadata": model.published_metadata,
+                "published_at": model.published_at,
+                "unpublished_at": model.unpublished_at,
+                "published_by_user_id": model.published_by_user_id,
+                "created_at": model.created_at,
+                "updated_at": model.updated_at,
+            },
         ),
     )
 
