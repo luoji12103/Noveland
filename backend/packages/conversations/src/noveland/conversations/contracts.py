@@ -96,6 +96,10 @@ class ConversationWriterConfig(_FrozenContract):
     auto_generate_on_complete: bool = False
     generate_summary: bool = True
     generate_chapter: bool = True
+    style_guide: str = Field(default="", max_length=4_000)
+    target_length: str = Field(default="standard", pattern="^(brief|standard|expanded)$")
+    source_constraints: str = Field(default="", max_length=4_000)
+    include_prompt_preview: bool = True
 
 
 class ConversationMemoryConfig(_FrozenContract):

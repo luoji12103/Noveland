@@ -75,9 +75,8 @@ def test_writer_generates_summary_then_chapter() -> None:
         "conversation_summary",
         "chapter_draft",
     ]
-    assert profile_service.prompts[0].startswith(
-        "Write a concise but complete conversation summary.",
-    )
+    assert profile_service.prompts[0].startswith("Writer controls:")
+    assert "Write a concise but complete conversation summary." in profile_service.prompts[0]
     assert "Conversation summary output" in profile_service.prompts[1]
     assert artifacts[0].metadata["generation_mode"] == "manual"
     assert artifacts[0].metadata["source_turn_count"] == 2

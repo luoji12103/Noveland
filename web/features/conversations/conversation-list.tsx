@@ -231,6 +231,10 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
     auto_generate_on_complete: form.get("writer_auto_generate_on_complete") === "true",
     generate_summary: form.get("writer_generate_summary") === "true",
     generate_chapter: form.get("writer_generate_chapter") === "true",
+    style_guide: "",
+    target_length: "standard",
+    source_constraints: "",
+    include_prompt_preview: true,
   };
 }
 

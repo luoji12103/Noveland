@@ -1113,7 +1113,14 @@ def _policy_config(value: dict[str, object]) -> ConversationPolicyConfig:
 
 
 def _writer_config(value: dict[str, object]) -> ConversationWriterConfig:
-    return ConversationWriterConfig.model_validate(value)
+    normalized = {
+        "style_guide": "",
+        "target_length": "standard",
+        "source_constraints": "",
+        "include_prompt_preview": True,
+        **value,
+    }
+    return ConversationWriterConfig.model_validate(normalized)
 
 
 def _memory_config(value: dict[str, object]) -> ConversationMemoryConfig:

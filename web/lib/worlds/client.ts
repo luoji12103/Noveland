@@ -21,6 +21,7 @@ import type {
   CalendarEntryUpdateInput,
   ConversationAdvanceResult,
   ConversationNarrativeArtifactSet,
+  ConversationNarrativePromptPreview,
   ConversationCreateInput,
   ConversationDiagnosticsSummary,
   ConversationMemorySummary,
@@ -765,6 +766,25 @@ export function generateConversationNarrativeArtifacts(
 ): Promise<NarrativeArtifact[]> {
   return worldRequest<NarrativeArtifact[]>(
     `/api/worlds/${worldId}/conversations/${conversationId}/narrative/generate`,
+    {
+      method: "POST",
+      body: {
+        artifact_set,
+        ...(provider_profile_id ? { provider_profile_id } : {}),
+      },
+      csrf: true,
+    },
+  );
+}
+
+export function previewConversationNarrativePrompt(
+  worldId: string,
+  conversationId: string,
+  artifact_set: ConversationNarrativeArtifactSet,
+  provider_profile_id?: string | null,
+): Promise<ConversationNarrativePromptPreview> {
+  return worldRequest<ConversationNarrativePromptPreview>(
+    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/preview`,
     {
       method: "POST",
       body: {

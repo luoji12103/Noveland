@@ -407,6 +407,10 @@ def test_conversation_narrative_generation_and_listing(
     list_response = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
     )
+    preview_response = client.post(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative/preview",
+        json={"artifact_set": "summary_only"},
+    )
     regenerate_response = client.post(
         f"/worlds/{world_id}/conversations/{conversation_id}/narrative/generate",
         json={"artifact_set": "summary_and_chapter"},
@@ -421,14 +425,18 @@ def test_conversation_narrative_generation_and_listing(
     assert advance_response.status_code == 200
     assert advance_response.json()["session"]["status"] == "completed"
     assert list_response.status_code == 200
+    assert preview_response.status_code == 200
+    assert preview_response.json()["prompt_text"].startswith("Writer controls:")
+    assert preview_response.json()["source_turn_count"] == 2
     assert regenerate_response.status_code == 200
     assert [artifact["artifact_kind"] for artifact in list_response.json()] == [
         "chapter_draft",
         "conversation_summary",
     ]
     assert len(prompts) == 3
-    assert prompts[1].startswith("Write a concise but complete conversation summary.")
-    assert prompts[2].startswith("Write a chapter draft based on this Noveland conversation.")
+    assert prompts[1].startswith("Writer controls:")
+    assert "Write a concise but complete conversation summary." in prompts[1]
+    assert "Write a chapter draft based on this Noveland conversation." in prompts[2]
     assert len(artifacts) == 2
     assert {artifact.artifact_kind for artifact in artifacts} == {
         "conversation_summary",

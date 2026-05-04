@@ -1,6 +1,7 @@
 from noveland.narrative.contracts import (
     ConversationNarrativeArtifactSet,
     ConversationNarrativeGenerate,
+    ConversationNarrativePromptPreview,
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
@@ -18,6 +19,7 @@ __all__ = [
     "NarrativeArtifact",
     "ConversationNarrativeArtifactSet",
     "ConversationNarrativeGenerate",
+    "ConversationNarrativePromptPreview",
     "ConversationNarrativeWriterService",
     "NarrativeGenerationMode",
     "NarrativeArtifactCreate",

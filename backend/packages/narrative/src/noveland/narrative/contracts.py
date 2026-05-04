@@ -69,3 +69,16 @@ class ConversationNarrativeGenerate(_FrozenContract):
     )
     provider_profile_id: uuid.UUID | None = None
     generation_mode: NarrativeGenerationMode = NarrativeGenerationMode.MANUAL
+
+
+class ConversationNarrativePromptPreview(_FrozenContract):
+    world_id: uuid.UUID
+    conversation_id: uuid.UUID
+    artifact_set: ConversationNarrativeArtifactSet
+    provider_profile_id: uuid.UUID
+    provider_profile_key: str
+    writer_plugin_identifier: str
+    prompt_text: str
+    source_turn_count: int
+    existing_artifact_count: int
+    warnings: list[str]

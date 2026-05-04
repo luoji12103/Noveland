@@ -204,6 +204,23 @@ export type ConversationWriterConfig = {
   auto_generate_on_complete: boolean;
   generate_summary: boolean;
   generate_chapter: boolean;
+  style_guide: string;
+  target_length: "brief" | "standard" | "expanded";
+  source_constraints: string;
+  include_prompt_preview: boolean;
+};
+
+export type ConversationNarrativePromptPreview = {
+  world_id: string;
+  conversation_id: string;
+  artifact_set: ConversationNarrativeArtifactSet;
+  provider_profile_id: string;
+  provider_profile_key: string;
+  writer_plugin_identifier: string;
+  prompt_text: string;
+  source_turn_count: number;
+  existing_artifact_count: number;
+  warnings: string[];
 };
 
 export type ConversationMemoryConfig = {

@@ -18,6 +18,7 @@ from noveland.conversations.contracts import (
 from noveland.narrative.contracts import (
     ConversationNarrativeArtifactSet,
     ConversationNarrativeGenerate,
+    ConversationNarrativePromptPreview,
     NarrativeArtifactCreate,
     NarrativeArtifactKind,
     NarrativeArtifactRecord,
@@ -194,11 +195,14 @@ class ConversationNarrativeWriterService:
             if summary_artifact is None:
                 summary_text = self._profile_service.invoke_profile(
                     provider,
-                    writer_plugin.build_summary_prompt(
+                    _apply_writer_controls(
+                        writer_plugin.build_summary_prompt(
+                            session=session,
+                            participants=participants,
+                            turns=turns,
+                            agents_by_id=agents_by_id,
+                        ),
                         session=session,
-                        participants=participants,
-                        turns=turns,
-                        agents_by_id=agents_by_id,
                     ),
                 ).text.strip()
                 summary_artifact = self._artifact_service.create_artifact(
@@ -220,11 +224,14 @@ class ConversationNarrativeWriterService:
         elif needs_chapter and summary_text is None:
             summary_text = self._profile_service.invoke_profile(
                 provider,
-                writer_plugin.build_summary_prompt(
+                _apply_writer_controls(
+                    writer_plugin.build_summary_prompt(
+                        session=session,
+                        participants=participants,
+                        turns=turns,
+                        agents_by_id=agents_by_id,
+                    ),
                     session=session,
-                    participants=participants,
-                    turns=turns,
-                    agents_by_id=agents_by_id,
                 ),
             ).text.strip()
 
@@ -242,12 +249,15 @@ class ConversationNarrativeWriterService:
                         title=f"{session.title} chapter draft",
                         content=self._profile_service.invoke_profile(
                             provider,
-                            writer_plugin.build_chapter_prompt(
+                            _apply_writer_controls(
+                                writer_plugin.build_chapter_prompt(
+                                    session=session,
+                                    participants=participants,
+                                    turns=turns,
+                                    agents_by_id=agents_by_id,
+                                    summary_text=summary_text or "No summary available.",
+                                ),
                                 session=session,
-                                participants=participants,
-                                turns=turns,
-                                agents_by_id=agents_by_id,
-                                summary_text=summary_text or "No summary available.",
                             ),
                         ).text.strip(),
                         artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
@@ -262,6 +272,39 @@ class ConversationNarrativeWriterService:
             artifacts.append(chapter_artifact)
 
         return artifacts
+
+    def preview_for_conversation(
+        self,
+        generate: ConversationNarrativeGenerate,
+    ) -> ConversationNarrativePromptPreview:
+        bundle = self._conversation_prompt_bundle(generate)
+        prompt = bundle["summary_prompt"] if bundle["needs_summary"] else bundle["chapter_prompt"]
+        assert isinstance(prompt, str)
+        provider = cast(ProviderProfileRecord, bundle["provider"])
+        session = cast(ConversationSessionRecord, bundle["session"])
+        turns = cast(list[ConversationTurnRecord], bundle["turns"])
+        existing_count = 0
+        if bundle["summary_artifact"] is not None:
+            existing_count += 1
+        if bundle["chapter_artifact"] is not None:
+            existing_count += 1
+        warnings = []
+        if not turns:
+            warnings.append("conversation has no turns")
+        if session.writer_config.source_constraints:
+            warnings.append("source constraints are applied")
+        return ConversationNarrativePromptPreview(
+            world_id=generate.world_id,
+            conversation_id=generate.conversation_id,
+            artifact_set=generate.artifact_set,
+            provider_profile_id=provider.id,
+            provider_profile_key=provider.profile_key,
+            writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
+            prompt_text=prompt,
+            source_turn_count=len(turns),
+            existing_artifact_count=existing_count,
+            warnings=warnings,
+        )
 
     def auto_generate_for_completed_conversation(
         self,
@@ -328,6 +371,90 @@ class ConversationNarrativeWriterService:
         except PluginFactoryError as exc:
             raise ProviderConfigurationError(str(exc)) from exc
 
+    def _conversation_prompt_bundle(
+        self,
+        generate: ConversationNarrativeGenerate,
+    ) -> dict[str, object]:
+        session = self._conversation_service.get_session(
+            generate.world_id,
+            generate.conversation_id,
+        )
+        participants = self._conversation_service.list_participants(
+            generate.world_id,
+            generate.conversation_id,
+        )
+        turns = self._conversation_service.list_turns(generate.world_id, generate.conversation_id)
+        agents_by_id = self._agents_by_id(
+            generate.world_id,
+            [participant.agent_id for participant in participants]
+            + [
+                turn.speaker_agent_id
+                for turn in turns
+                if turn.speaker_agent_id is not None
+            ],
+        )
+        provider = self._resolve_provider(
+            generate.provider_profile_id or session.writer_config.provider_profile_id,
+        )
+        writer_plugin = self._resolve_writer_plugin(
+            session.writer_config.writer_plugin_identifier,
+            session.writer_config.writer_plugin_config,
+        )
+        summary_artifact = self._artifact_service.get_conversation_artifact(
+            generate.world_id,
+            generate.conversation_id,
+            NarrativeArtifactKind.CONVERSATION_SUMMARY,
+        )
+        chapter_artifact = self._artifact_service.get_conversation_artifact(
+            generate.world_id,
+            generate.conversation_id,
+            NarrativeArtifactKind.CHAPTER_DRAFT,
+        )
+        needs_summary = generate.artifact_set in {
+            ConversationNarrativeArtifactSet.SUMMARY_AND_CHAPTER,
+            ConversationNarrativeArtifactSet.SUMMARY_ONLY,
+        }
+        needs_chapter = generate.artifact_set in {
+            ConversationNarrativeArtifactSet.SUMMARY_AND_CHAPTER,
+            ConversationNarrativeArtifactSet.CHAPTER_ONLY,
+        }
+        summary_prompt = _apply_writer_controls(
+            writer_plugin.build_summary_prompt(
+                session=session,
+                participants=participants,
+                turns=turns,
+                agents_by_id=agents_by_id,
+            ),
+            session=session,
+        )
+        chapter_prompt = _apply_writer_controls(
+            writer_plugin.build_chapter_prompt(
+                session=session,
+                participants=participants,
+                turns=turns,
+                agents_by_id=agents_by_id,
+                summary_text=(
+                    summary_artifact.content
+                    if summary_artifact is not None
+                    else "No summary available."
+                ),
+            ),
+            session=session,
+        )
+        return {
+            "session": session,
+            "participants": participants,
+            "turns": turns,
+            "agents_by_id": agents_by_id,
+            "provider": provider,
+            "summary_artifact": summary_artifact,
+            "chapter_artifact": chapter_artifact,
+            "needs_summary": needs_summary,
+            "needs_chapter": needs_chapter,
+            "summary_prompt": summary_prompt,
+            "chapter_prompt": chapter_prompt,
+        }
+
     def _agents_by_id(
         self,
         world_id: uuid.UUID,
@@ -369,7 +496,22 @@ def _metadata(
         "source_turn_end_index": None if not turns else turns[-1].turn_index,
         "scope_type": session.scope_type.value,
         "provider_profile_id": str(provider.id),
+        "writer_target_length": session.writer_config.target_length,
+        "writer_has_style_guide": bool(session.writer_config.style_guide),
+        "writer_has_source_constraints": bool(session.writer_config.source_constraints),
     }
+
+
+def _apply_writer_controls(prompt: str, *, session: ConversationSessionRecord) -> str:
+    control_lines = [
+        "Writer controls:",
+        f"- Target length: {session.writer_config.target_length}",
+    ]
+    if session.writer_config.style_guide:
+        control_lines.append(f"- Style guide: {session.writer_config.style_guide}")
+    if session.writer_config.source_constraints:
+        control_lines.append(f"- Source constraints: {session.writer_config.source_constraints}")
+    return "\n".join([*control_lines, "", prompt])
 
 
 def _record(model: NarrativeArtifact) -> NarrativeArtifactRecord:

@@ -31,6 +31,7 @@ from noveland.core.settings import load_settings
 from noveland.narrative import (
     ConversationNarrativeArtifactSet,
     ConversationNarrativeGenerate,
+    ConversationNarrativePromptPreview,
     ConversationNarrativeWriterService,
     NarrativeArtifactRecord,
     NarrativeGenerationMode,
@@ -145,6 +146,10 @@ class ConversationWriterConfigRequest(_RequestModel):
     auto_generate_on_complete: bool = False
     generate_summary: bool = True
     generate_chapter: bool = True
+    style_guide: str = Field(default="", max_length=4_000)
+    target_length: Literal["brief", "standard", "expanded"] = "standard"
+    source_constraints: str = Field(default="", max_length=4_000)
+    include_prompt_preview: bool = True
 
 
 class ConversationMemoryConfigRequest(_RequestModel):
@@ -201,6 +206,23 @@ class ConversationWriterConfigResponse(BaseModel):
     auto_generate_on_complete: bool
     generate_summary: bool
     generate_chapter: bool
+    style_guide: str
+    target_length: str
+    source_constraints: str
+    include_prompt_preview: bool
+
+
+class ConversationNarrativePromptPreviewResponse(BaseModel):
+    world_id: uuid.UUID
+    conversation_id: uuid.UUID
+    artifact_set: str
+    provider_profile_id: uuid.UUID
+    provider_profile_key: str
+    writer_plugin_identifier: str
+    prompt_text: str
+    source_turn_count: int
+    existing_artifact_count: int
+    warnings: list[str]
 
 
 class ConversationMemoryConfigResponse(BaseModel):
@@ -684,6 +706,38 @@ def generate_conversation_narrative_artifacts(
     return [_narrative_artifact_response(artifact) for artifact in artifacts]
 
 
+@router.post(
+    "/{conversation_id}/narrative/preview",
+    response_model=ConversationNarrativePromptPreviewResponse,
+)
+def preview_conversation_narrative_prompt(
+    conversation_id: uuid.UUID,
+    generate_request: ConversationNarrativeGenerateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ConversationNarrativePromptPreviewResponse:
+    require_csrf(request)
+    try:
+        preview = ConversationNarrativeWriterService(
+            db_session,
+            ProviderProfileService(db_session, load_settings()),
+        ).preview_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=context.world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet(generate_request.artifact_set),
+                provider_profile_id=generate_request.provider_profile_id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+    except LookupError as exc:
+        raise _not_found() from exc
+    except (ConversationValidationError, ConversationStateError, ValueError) as exc:
+        raise _http_error_for_conversation_error(str(exc)) from exc
+    return _narrative_prompt_preview_response(preview)
+
+
 @router.post("/{conversation_id}/seed", response_model=ConversationTurnResponse)
 def seed_conversation(
     conversation_id: uuid.UUID,
@@ -838,6 +892,10 @@ def _writer_config_contract(
         auto_generate_on_complete=writer_config.auto_generate_on_complete,
         generate_summary=writer_config.generate_summary,
         generate_chapter=writer_config.generate_chapter,
+        style_guide=writer_config.style_guide,
+        target_length=writer_config.target_length,
+        source_constraints=writer_config.source_constraints,
+        include_prompt_preview=writer_config.include_prompt_preview,
     )
 
 
@@ -887,6 +945,10 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
             generate_summary=session.writer_config.generate_summary,
             generate_chapter=session.writer_config.generate_chapter,
+            style_guide=session.writer_config.style_guide,
+            target_length=session.writer_config.target_length,
+            source_constraints=session.writer_config.source_constraints,
+            include_prompt_preview=session.writer_config.include_prompt_preview,
         ),
         memory_config=ConversationMemoryConfigResponse(
             write_turn_memory=session.memory_config.write_turn_memory,
@@ -1041,6 +1103,23 @@ def _narrative_artifact_response(
         artifact_kind=artifact.artifact_kind.value,
         metadata=artifact.metadata,
         created_at=artifact.created_at.isoformat(),
+    )
+
+
+def _narrative_prompt_preview_response(
+    preview: ConversationNarrativePromptPreview,
+) -> ConversationNarrativePromptPreviewResponse:
+    return ConversationNarrativePromptPreviewResponse(
+        world_id=preview.world_id,
+        conversation_id=preview.conversation_id,
+        artifact_set=preview.artifact_set.value,
+        provider_profile_id=preview.provider_profile_id,
+        provider_profile_key=preview.provider_profile_key,
+        writer_plugin_identifier=preview.writer_plugin_identifier,
+        prompt_text=preview.prompt_text,
+        source_turn_count=preview.source_turn_count,
+        existing_artifact_count=preview.existing_artifact_count,
+        warnings=preview.warnings,
     )
 
 

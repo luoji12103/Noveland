@@ -9,6 +9,7 @@ import {
   getConversationMemorySummary,
   getConversationSpeakerPreview,
   pauseConversation,
+  previewConversationNarrativePrompt,
   replaceConversationParticipants,
   resumeConversation,
   seedConversation,
@@ -31,6 +32,7 @@ import type {
   ConversationMemoryConfig,
   ConversationMemorySummary,
   ConversationNarrativeArtifactSet,
+  ConversationNarrativePromptPreview,
   ConversationPolicy,
   ConversationSession,
   ConversationSpeakerPreview,
@@ -63,6 +65,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const [narrativeArtifacts, setNarrativeArtifacts] = useState(data.narrativeArtifacts);
   const [speakerPreview, setSpeakerPreview] = useState<ConversationSpeakerPreview | null>(null);
   const [memorySummary, setMemorySummary] = useState<ConversationMemorySummary | null>(null);
+  const [promptPreview, setPromptPreview] = useState<ConversationNarrativePromptPreview | null>(null);
   const [liveReady, setLiveReady] = useState(false);
   const conversation = conversationState;
   const socketRef = useRef<WebSocket | null>(null);
@@ -297,6 +300,19 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
       },
       "Conversation narrative generated.",
     );
+  }
+
+  async function handlePromptPreview(artifactSet: ConversationNarrativeArtifactSet) {
+    await runAction(async () => {
+      setPromptPreview(
+        await previewConversationNarrativePrompt(
+          worldId,
+          conversationId,
+          artifactSet,
+          conversation?.writer_config.provider_profile_id ?? null,
+        ),
+      );
+    }, "Narrative prompt preview refreshed.");
   }
 
   const canManage = data.canManageSelectedWorld;
@@ -725,6 +741,39 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 />
                 Generate chapter
               </label>
+              <select
+                aria-label="Writer target length"
+                className="text-input"
+                name="target_length"
+                defaultValue={conversation.writer_config.target_length}
+              >
+                <option value="brief">brief</option>
+                <option value="standard">standard</option>
+                <option value="expanded">expanded</option>
+              </select>
+              <textarea
+                aria-label="Writer style guide"
+                className="text-input"
+                name="style_guide"
+                rows={3}
+                defaultValue={conversation.writer_config.style_guide}
+              />
+              <textarea
+                aria-label="Writer source constraints"
+                className="text-input"
+                name="source_constraints"
+                rows={3}
+                defaultValue={conversation.writer_config.source_constraints}
+              />
+              <label className="checkbox-label">
+                <input
+                  defaultChecked={conversation.writer_config.include_prompt_preview}
+                  name="include_prompt_preview"
+                  type="checkbox"
+                  value="true"
+                />
+                Include prompt preview
+              </label>
               <button className="primary-button" type="submit" disabled={isBusy}>
                 Save writer config
               </button>
@@ -757,6 +806,14 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 className="secondary-button"
                 type="button"
                 disabled={isBusy}
+                onClick={() => handlePromptPreview("summary_and_chapter")}
+              >
+                Preview narrative prompt
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
                 onClick={() => handleGenerateNarrative("summary_only")}
               >
                 Generate summary
@@ -770,6 +827,18 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 Generate chapter
               </button>
             </div>
+          ) : null}
+          {promptPreview !== null ? (
+            <article className="resource-row">
+              <div>
+                <h3>Narrative prompt preview</h3>
+                <p>
+                  {promptPreview.writer_plugin_identifier} / {promptPreview.provider_profile_key} /
+                  turns={promptPreview.source_turn_count}
+                </p>
+                <pre>{promptPreview.prompt_text}</pre>
+              </div>
+            </article>
           ) : null}
           <NarrativeArtifactList artifacts={narrativeArtifacts} />
         </section>
@@ -875,6 +944,13 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
     auto_generate_on_complete: form.get("auto_generate_on_complete") === "true",
     generate_summary: form.get("generate_summary") === "true",
     generate_chapter: form.get("generate_chapter") === "true",
+    style_guide: formString(form, "style_guide"),
+    target_length: formString(
+      form,
+      "target_length",
+    ) as ConversationWriterConfig["target_length"],
+    source_constraints: formString(form, "source_constraints"),
+    include_prompt_preview: form.get("include_prompt_preview") === "true",
   };
 }
 

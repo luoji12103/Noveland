@@ -7,6 +7,7 @@ vi.mock("@/lib/worlds/client", async () => {
     ...actual,
     getConversationMemorySummary: vi.fn(),
     getConversationSpeakerPreview: vi.fn(),
+    previewConversationNarrativePrompt: vi.fn(),
     updateConversation: vi.fn(),
     stopConversation: vi.fn(),
     replaceConversationParticipants: vi.fn(),
@@ -46,6 +47,7 @@ import {
   generateConversationNarrativeArtifacts,
   getConversationMemorySummary,
   getConversationSpeakerPreview,
+  previewConversationNarrativePrompt,
   stopConversation,
   updateConversation,
 } from "@/lib/worlds/client";
@@ -134,6 +136,18 @@ describe("ConversationDetail", () => {
     vi.mocked(generateConversationNarrativeArtifacts).mockResolvedValue(
       adminData.narrativeArtifacts,
     );
+    vi.mocked(previewConversationNarrativePrompt).mockResolvedValue({
+      world_id: "world-1",
+      conversation_id: "conversation-1",
+      artifact_set: "summary_and_chapter",
+      provider_profile_id: "profile-1",
+      provider_profile_key: "runtime-profile",
+      writer_plugin_identifier: "builtin.default_narrative_writer",
+      prompt_text: "Writer controls:\n\nPrompt body",
+      source_turn_count: 2,
+      existing_artifact_count: 0,
+      warnings: [],
+    });
 
     render(
       <ConversationDetail
@@ -155,9 +169,24 @@ describe("ConversationDetail", () => {
           auto_generate_on_complete: false,
           generate_summary: true,
           generate_chapter: true,
+          style_guide: "",
+          target_length: "standard",
+          source_constraints: "",
+          include_prompt_preview: true,
         },
       });
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview narrative prompt" }));
+    await waitFor(() => {
+      expect(previewConversationNarrativePrompt).toHaveBeenCalledWith(
+        "world-1",
+        "conversation-1",
+        "summary_and_chapter",
+        "profile-1",
+      );
+    });
+    expect(screen.getByText("Narrative prompt preview")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Generate summary + chapter" }));
 
@@ -287,6 +316,10 @@ const adminData: ConversationDetailData = {
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
+      style_guide: "",
+      target_length: "standard",
+      source_constraints: "",
+      include_prompt_preview: true,
     },
     memory_config: {
       write_turn_memory: true,

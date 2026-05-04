@@ -72,6 +72,10 @@ const conversations = [
       auto_generate_on_complete: true,
       generate_summary: true,
       generate_chapter: true,
+      style_guide: "",
+      target_length: "standard" as const,
+      source_constraints: "",
+      include_prompt_preview: true,
     },
     memory_config: {
       write_turn_memory: true,
