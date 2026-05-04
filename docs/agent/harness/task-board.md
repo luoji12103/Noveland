@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Access/Diagnostics/Scale Readiness Ops
 
 ## Blocked
 - None
@@ -56,4 +56,4 @@
 - Storage/Backup/Auth Runtime Ops
 
 ## Upcoming Mainline
-- None selected.
+- None selected until Access/Diagnostics/Scale Readiness Ops closeout.
