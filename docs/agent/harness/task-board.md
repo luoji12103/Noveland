@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Plugin/Preset Evolution Ops
 
 ## Blocked
 - None
@@ -54,4 +54,4 @@
 - Narrative Reader + Composition Ops
 
 ## Upcoming Mainline
-- None selected; choose the next candidate from `docs/agent/harness/roadmap.md`.
+- None selected until Plugin/Preset Evolution Ops closeout.

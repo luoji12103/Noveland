@@ -1,34 +1,24 @@
 # Active Session Handoff
 
-- Date: 2026-05-04T19:30:00Z
-- Branch: feat/narrative-reader-composition-ops
-- Objective: Close out the Narrative Reader + Composition Ops roadmap bundle across phases 23-27.
+- Date: 2026-05-04T20:00:00Z
+- Branch: feat/plugin-preset-evolution-ops
+- Objective: Implement Plugin/Preset Evolution Ops across roadmap phases 28-32.
 - Starting state:
-  - `feat/conversation-narrative-quality-ops` was fast-forward merged into local `main`.
-  - Push of `main` to `origin` was attempted but failed because the environment has no GitHub HTTPS credentials:
-    - `fatal: could not read Username for 'https://github.com': No such device or address`
-  - `feat/narrative-reader-composition-ops` was created from local `main`.
-- Completed changes:
-  - Narrative reader list now supports search, source-kind filters, and publication/draft timeline ordering.
-  - World stream narrative payloads include publication metadata; reader and workspace surfaces merge publication-aware realtime updates through the existing stream transport.
-  - Platform admins can dry-run validate world composition imports via `POST /world-compositions/validate`.
-  - Composition export includes world plugin/memory metadata and preset/source version metadata while preserving backward-compatible optional fields.
-  - Agent presets now carry explicit `version`; materialized agents store `source_preset_version`; preset updates increment version only for material changes.
-  - Added migration `20260504_0021_agent_preset_versioning.py`.
-- Functional commits on this branch:
-  - `205a4ed docs(agent): start narrative reader composition ops`
-  - `f903ff7 fix(docs): refresh handoff and build churn notes`
-  - `7d55653 feat(narrative): add reader search`
-  - `9a67696 feat(narrative): add timeline view`
-  - `ab6c886 feat(narrative): stream narrative updates`
-  - `baef19c feat(worlds): validate composition imports`
-  - `10307bf feat(presets): add preset versioning`
-- Checks run so far:
-  - `cd backend && uv run ruff check ... && uv run pytest ...` for narrative search/timeline, realtime payloads, composition validation, preset versioning, and schema metadata targets.
-  - `cd web && npm run typecheck && npm run test -- ...` for narrative reader/workspace, world overview, preset admin, agent list, dashboard, conversation detail, and world client targets.
-- Remaining checks:
-  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and status review.
+  - `feat/narrative-reader-composition-ops` was fast-forward merged into local `main`.
+  - Local `main` is ahead of `origin/main`; no push is planned unless explicitly requested.
+  - The dirty whitespace in `backend/packages/memory/src/noveland/memory/models.py` was cleaned before merge and produced no lasting diff, so no empty hygiene commit was created.
+  - New branch `feat/plugin-preset-evolution-ops` was created from local `main`.
+- Planned changes:
+  - Add preset update preview for agents materialized from older preset versions.
+  - Persist explicit plugin binding metadata without adding a parallel plugin layer.
+  - Add built-in plugin contract harness coverage.
+  - Expose plugin config schema metadata to Web and render schema-driven controls with JSON fallback.
+  - Surface plugin runtime/config diagnostics without exposing secret values.
+- Planned checks:
+  - Backend targeted tests for preset preview, plugin binding persistence, plugin contract harness, plugin diagnostics, and schema metadata if migrations are added.
+  - Web targeted tests for preset admin/agent version preview, plugin schema controls, diagnostics display, client routes, and mock backend coverage.
+  - Final gate: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web test, web build, web check:next-env, web e2e, compose config, `git diff --check`, and clean status.
 - Current risks:
-  - Branch and local `main` are not pushed; `main` push is blocked until GitHub credentials are available.
-  - Apply migration `20260504_0021` before relying on preset version provenance in persistent databases.
+  - Keep plugin work on existing registry/binding surfaces; do not introduce a second plugin system.
+  - Preset preview must not silently mutate existing agents.
   - `web/next-env.d.ts` can churn after build/e2e; restore it before committing or merging.
