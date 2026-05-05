@@ -4,6 +4,7 @@ import {
   cancelAgentCalendarEntry,
   createAgentCalendarEntry,
   createAgentObservation,
+  createAgentRelationship,
   createMemoryBackendProfile,
   createNarrativeArtifact,
   publishNarrativeArtifact,
@@ -35,6 +36,7 @@ import {
   getAgentPresetUpdatePreview,
   getReplayState,
   getSnapshotIntegrity,
+  getWorldBible,
   listPluginBindings,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
@@ -48,6 +50,7 @@ import {
   previewScheduleRule,
   resumeWorldClock,
   listAgentMemory,
+  listAgentRelationships,
   listNarrativeArtifacts,
   listConversationNarrativeArtifacts,
   listAgentPresets,
@@ -67,6 +70,7 @@ import {
   validateWorldComposition,
   updateMemoryBackendProfile,
   updateAgent,
+  updateAgentRelationship,
   updateAgentPreset,
   updateProviderProfile,
   unpublishNarrativeArtifact,
@@ -74,6 +78,7 @@ import {
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
+  upsertWorldBible,
 } from "@/lib/worlds/client";
 
 describe("world client", () => {
@@ -202,6 +207,45 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[5][0]).toBe("/api/worlds/world-1/composition-export");
     expect(fetchMock.mock.calls[6][0]).toBe("/api/world-compositions/import");
     expect(fetchMock.mock.calls[7][0]).toBe("/api/world-compositions/validate");
+  });
+
+  it("maps world bible and relationship requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ continuity_status: "post_canon" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "relationship-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "relationship-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "relationship-1", trust: 55 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getWorldBible("world-1");
+    await upsertWorldBible("world-1", {
+      source_material: "After story",
+      continuity_config: { status: "post_canon" },
+    });
+    await listAgentRelationships("world-1", "agent-1");
+    await createAgentRelationship("world-1", "agent-1", {
+      source_agent_id: "agent-1",
+      target_agent_id: "agent-2",
+      relationship_type: "friendship",
+      trust: 40,
+    });
+    await updateAgentRelationship("world-1", "agent-1", "relationship-1", { trust: 55 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/bible");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/bible");
+    expect(fetchMock.mock.calls[1][1].method).toBe("PUT");
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/relationships",
+    );
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/relationships",
+    );
+    expect(fetchMock.mock.calls[4][0]).toBe(
+      "/api/worlds/world-1/agents/agent-1/relationships/relationship-1",
+    );
   });
 
   it("sends clock control requests", async () => {

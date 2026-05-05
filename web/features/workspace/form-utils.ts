@@ -45,6 +45,20 @@ export function jsonObject(rawValue: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+export function jsonObjectArray(rawValue: string): Record<string, unknown>[] {
+  if (rawValue.trim() === "") {
+    return [];
+  }
+  const parsed = JSON.parse(rawValue) as unknown;
+  if (
+    !Array.isArray(parsed)
+    || parsed.some((item) => item === null || typeof item !== "object" || Array.isArray(item))
+  ) {
+    throw new Error("Value must be a JSON array of objects.");
+  }
+  return parsed as Record<string, unknown>[];
+}
+
 export function jsonNumberArray(rawValue: string): number[] {
   const parsed = JSON.parse(rawValue) as unknown;
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "number")) {

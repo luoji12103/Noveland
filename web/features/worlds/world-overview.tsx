@@ -21,6 +21,7 @@ import {
   resumeWorldClock,
   skipWorldClock,
   updateWorld,
+  upsertWorldBible,
   upsertMembership,
   validateWorldComposition,
 } from "@/lib/worlds/client";
@@ -40,6 +41,7 @@ import type {
 import {
   formString,
   jsonObject,
+  jsonObjectArray,
   messageForError,
   optionalFormString,
 } from "@/features/workspace/form-utils";
@@ -147,6 +149,24 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         formElement.reset();
       },
       "Scene created.",
+    );
+  }
+
+  async function handleSaveWorldBible(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      () =>
+        upsertWorldBible(selectedWorld.id, {
+          source_material: formString(form, "source_material"),
+          canon_timeline: jsonObjectArray(formString(form, "canon_timeline")),
+          setting_rules: jsonObject(formString(form, "setting_rules")),
+          forbidden_changes: jsonObjectArray(formString(form, "forbidden_changes")),
+          sequel_boundaries: jsonObject(formString(form, "sequel_boundaries")),
+          continuity_config: jsonObject(formString(form, "continuity_config")),
+          metadata: jsonObject(formString(form, "metadata")),
+        }),
+      "World bible saved.",
     );
   }
 
@@ -399,6 +419,95 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             <p>Memory plugin: {world.memory_plugin_identifier}</p>
             <p>World rules plugin: {world.world_rules_plugin_identifier}</p>
           </>
+        )}
+      </section>
+
+      <section className="management-panel" aria-labelledby="world-bible-title">
+        <h2 className="section-title" id="world-bible-title">
+          World bible and continuity
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Continuity</p>
+            <p className="metric-value">{data.worldBible?.continuity_status ?? "unset"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Timeline notes</p>
+            <p className="metric-value">{data.worldBible?.canon_timeline.length ?? 0}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Forbidden changes</p>
+            <p className="metric-value">{data.worldBible?.forbidden_changes.length ?? 0}</p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <form className="management-form" onSubmit={handleSaveWorldBible}>
+            <textarea
+              className="text-input"
+              name="source_material"
+              rows={5}
+              defaultValue={data.worldBible?.source_material ?? ""}
+              placeholder="Source work context and post-ending setup"
+            />
+            <textarea
+              className="text-input"
+              name="canon_timeline"
+              rows={4}
+              defaultValue={JSON.stringify(data.worldBible?.canon_timeline ?? [], null, 2)}
+              placeholder="[]"
+            />
+            <textarea
+              className="text-input"
+              name="setting_rules"
+              rows={4}
+              defaultValue={JSON.stringify(data.worldBible?.setting_rules ?? {}, null, 2)}
+              placeholder="{}"
+            />
+            <textarea
+              className="text-input"
+              name="forbidden_changes"
+              rows={4}
+              defaultValue={JSON.stringify(data.worldBible?.forbidden_changes ?? [], null, 2)}
+              placeholder="[]"
+            />
+            <textarea
+              className="text-input"
+              name="sequel_boundaries"
+              rows={4}
+              defaultValue={JSON.stringify(data.worldBible?.sequel_boundaries ?? {}, null, 2)}
+              placeholder="{}"
+            />
+            <textarea
+              className="text-input"
+              name="continuity_config"
+              rows={4}
+              defaultValue={JSON.stringify(
+                data.worldBible?.continuity_config ?? { status: "post_canon" },
+                null,
+                2,
+              )}
+              placeholder='{"status":"post_canon"}'
+            />
+            <textarea
+              className="text-input"
+              name="metadata"
+              rows={3}
+              defaultValue={JSON.stringify(data.worldBible?.metadata ?? {}, null, 2)}
+              placeholder="{}"
+            />
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Save world bible
+            </button>
+          </form>
+        ) : (
+          <div className="resource-list">
+            <article className="resource-row">
+              <div>
+                <h3>Source material</h3>
+                <p>{data.worldBible?.source_material || "No world bible recorded."}</p>
+              </div>
+            </article>
+          </div>
         )}
       </section>
 

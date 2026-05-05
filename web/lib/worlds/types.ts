@@ -24,6 +24,41 @@ export type Scene = {
 
 export type WorldRole = "world_admin" | "human_user";
 
+export type ContinuityStatus = "canon" | "post_canon" | "alternate" | "original_expansion";
+
+export type NarrativeRole =
+  | "protagonist"
+  | "main_character"
+  | "side_character"
+  | "supporting_cast"
+  | "ordinary_member"
+  | "organization_member"
+  | "original_character"
+  | "narrative_agent";
+
+export type CharacterImportance = "lead" | "major" | "minor" | "background";
+
+export type CharacterCategory =
+  | "player"
+  | "main_character"
+  | "side_character"
+  | "ordinary_member"
+  | "organization_member"
+  | "original_character"
+  | "narrative_agent";
+
+export type RelationshipType =
+  | "affection"
+  | "friendship"
+  | "rivalry"
+  | "family"
+  | "alliance"
+  | "hostility"
+  | "obligation"
+  | "debt"
+  | "secret"
+  | "custom";
+
 export type UserSummary = {
   id: string;
   email: string;
@@ -55,8 +90,50 @@ export type Agent = {
   display_name: string;
   kind: AgentKind;
   provider_profile_id: string | null;
+  narrative_role?: NarrativeRole | null;
+  importance?: CharacterImportance | null;
+  canon_status?: ContinuityStatus | null;
+  character_category?: CharacterCategory | null;
+  character_profile?: Record<string, unknown>;
   config: Record<string, unknown>;
   is_enabled: boolean;
+};
+
+export type WorldBible = {
+  id: string;
+  world_id: string;
+  source_material: string;
+  canon_timeline: Record<string, unknown>[];
+  setting_rules: Record<string, unknown>;
+  forbidden_changes: Record<string, unknown>[];
+  sequel_boundaries: Record<string, unknown>;
+  continuity_config: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  continuity_status: ContinuityStatus | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentRelationship = {
+  id: string;
+  world_id: string;
+  source_agent_id: string;
+  source_agent_key: string;
+  source_display_name: string;
+  target_agent_id: string;
+  target_agent_key: string;
+  target_display_name: string;
+  relationship_type: RelationshipType;
+  affection: number;
+  trust: number;
+  hostility: number;
+  intimacy: number;
+  obligation: number;
+  rivalry: number;
+  debt: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AgentPresetCalendarEntry = {
@@ -133,6 +210,11 @@ export type WorldCompositionAgent = {
   source_preset_key: string | null;
   source_preset_version?: number | null;
   provider_profile_key: string | null;
+  narrative_role?: NarrativeRole | null;
+  importance?: CharacterImportance | null;
+  canon_status?: ContinuityStatus | null;
+  character_category?: CharacterCategory | null;
+  character_profile?: Record<string, unknown>;
   config: Record<string, unknown>;
   is_enabled: boolean;
 };
@@ -428,6 +510,8 @@ export type WorldEventAuditEntry = {
   wall_time: string;
   world_time: string | null;
   actor_ref: string;
+  continuity_metadata?: Record<string, unknown>;
+  continuity_status?: ContinuityStatus | null;
   causation_event_id: string | null;
   correlation_id: string | null;
   created_at: string;
@@ -971,6 +1055,8 @@ export type NarrativeArtifact = {
   content: string;
   artifact_kind: NarrativeArtifactKind;
   metadata: Record<string, unknown>;
+  continuity_metadata?: Record<string, unknown>;
+  continuity_status?: ContinuityStatus | null;
   created_at: string;
   publication: NarrativePublication | null;
 };
@@ -1060,6 +1146,11 @@ export type AgentCreateInput = {
   home_scene_id?: string | null;
   preset_id?: string | null;
   provider_profile_id?: string | null;
+  narrative_role?: NarrativeRole | null;
+  importance?: CharacterImportance | null;
+  canon_status?: ContinuityStatus | null;
+  character_category?: CharacterCategory | null;
+  character_profile?: Record<string, unknown>;
   config?: Record<string, unknown>;
 };
 
@@ -1068,9 +1159,52 @@ export type AgentUpdateInput = {
   kind?: AgentKind;
   home_scene_id?: string | null;
   provider_profile_id?: string | null;
+  narrative_role?: NarrativeRole | null;
+  importance?: CharacterImportance | null;
+  canon_status?: ContinuityStatus | null;
+  character_category?: CharacterCategory | null;
+  character_profile?: Record<string, unknown>;
   config?: Record<string, unknown>;
   is_enabled?: boolean;
 };
+
+export type WorldBibleInput = {
+  source_material?: string;
+  canon_timeline?: Record<string, unknown>[];
+  setting_rules?: Record<string, unknown>;
+  forbidden_changes?: Record<string, unknown>[];
+  sequel_boundaries?: Record<string, unknown>;
+  continuity_config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type AgentRelationshipCreateInput = {
+  source_agent_id: string;
+  target_agent_id: string;
+  relationship_type: RelationshipType;
+  affection?: number;
+  trust?: number;
+  hostility?: number;
+  intimacy?: number;
+  obligation?: number;
+  rivalry?: number;
+  debt?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type AgentRelationshipUpdateInput = Partial<
+  Pick<
+    AgentRelationship,
+    | "affection"
+    | "trust"
+    | "hostility"
+    | "intimacy"
+    | "obligation"
+    | "rivalry"
+    | "debt"
+    | "metadata"
+  >
+>;
 
 export type AgentPresetCreateInput = {
   preset_key: string;
@@ -1296,6 +1430,7 @@ export type NarrativeArtifactCreateInput = {
   content: string;
   artifact_kind?: NarrativeArtifactKind;
   agent_id?: string | null;
+  continuity_metadata?: Record<string, unknown>;
 };
 
 export type NarrativePublicationInput = {

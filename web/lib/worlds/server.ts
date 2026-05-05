@@ -6,6 +6,7 @@ import type {
   AgentObservation,
   AgentPreset,
   AgentPersona,
+  AgentRelationship,
   AgentRun,
   CalendarConflictReport,
   CalendarEntry,
@@ -35,6 +36,7 @@ import type {
   Scene,
   ScheduleRule,
   World,
+  WorldBible,
   WorldClock,
   WorldClockTransition,
   WorldDashboardData,
@@ -50,6 +52,7 @@ export type WorldWorkspaceData = {
   scenes: Scene[];
   agents: Agent[];
   memberships: Membership[];
+  worldBible: WorldBible | null;
   memoryBackendProfiles: MemoryBackendProfile[];
   memoryPlugins: PluginCatalogEntry[];
   worldRulesPlugins: PluginCatalogEntry[];
@@ -82,6 +85,7 @@ export type AgentWorkspaceData = {
 
 export type AgentDetailData = AgentWorkspaceData & {
   selectedAgent: Agent | null;
+  relationships: AgentRelationship[];
   calendarEntries: CalendarEntry[];
   memoryItems: MemoryItem[];
   memoryProfileSnapshot: MemoryProfileSnapshot | null;
@@ -326,6 +330,7 @@ export async function getWorldWorkspaceData(
       scenes,
       agents,
       memberships,
+      worldBible,
       clock,
       clockTransitions,
       replayState,
@@ -339,6 +344,7 @@ export async function getWorldWorkspaceData(
       apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<WorldBible | null>(`/worlds/${worldId}/bible`, cookies),
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
       apiFetchOptional<WorldClockTransition[]>(
         `/worlds/${worldId}/clock/transitions?limit=5`,
@@ -358,6 +364,7 @@ export async function getWorldWorkspaceData(
       scenes,
       agents,
       memberships: memberships ?? [],
+      worldBible,
       memoryBackendProfiles,
       memoryPlugins,
       worldRulesPlugins,
@@ -447,6 +454,7 @@ export async function getAgentDetailData(
     return {
       ...data,
       selectedAgent: null,
+      relationships: [],
       calendarEntries: [],
       memoryItems: [],
       memoryProfileSnapshot: null,
@@ -456,8 +464,17 @@ export async function getAgentDetailData(
     };
   }
   const cookies = await cookieHeader();
-  const [calendarEntries, memoryItems, memoryProfileSnapshot, agentRuns, agentPersona, agentObservations] =
+  const [
+    relationships,
+    calendarEntries,
+    memoryItems,
+    memoryProfileSnapshot,
+    agentRuns,
+    agentPersona,
+    agentObservations,
+  ] =
     await Promise.all([
+      apiFetch<AgentRelationship[]>(`/worlds/${worldId}/agents/${agentId}/relationships`, cookies),
       apiFetch<CalendarEntry[]>(`/worlds/${worldId}/agents/${agentId}/calendar`, cookies),
       apiFetchOptional<MemoryItem[]>(`/worlds/${worldId}/agents/${agentId}/memory`, cookies),
       data.canManageSelectedWorld
@@ -479,6 +496,7 @@ export async function getAgentDetailData(
   return {
     ...data,
     selectedAgent,
+    relationships,
     calendarEntries,
     memoryItems: memoryItems ?? [],
     memoryProfileSnapshot,
@@ -879,6 +897,7 @@ function emptyWorldWorkspaceData(
     scenes: [],
     agents: [],
     memberships: [],
+    worldBible: null,
     memoryBackendProfiles: [],
     memoryPlugins: [],
     worldRulesPlugins: [],

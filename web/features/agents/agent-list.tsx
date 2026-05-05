@@ -6,8 +6,19 @@ import { useRouter } from "next/navigation";
 
 import { createAgent, deactivateAgent } from "@/lib/worlds/client";
 import type { AgentWorkspaceData } from "@/lib/worlds/server";
-import type { AgentPreset } from "@/lib/worlds/types";
-import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
+import type {
+  AgentPreset,
+  CharacterCategory,
+  CharacterImportance,
+  ContinuityStatus,
+  NarrativeRole,
+} from "@/lib/worlds/types";
+import {
+  formString,
+  jsonObject,
+  messageForError,
+  optionalFormString,
+} from "@/features/workspace/form-utils";
 
 type AgentListProps = {
   worldId: string;
@@ -55,6 +66,11 @@ export function AgentList({ worldId, data }: AgentListProps) {
           home_scene_id: optionalFormString(form, "home_scene_id"),
           preset_id: optionalFormString(form, "preset_id"),
           provider_profile_id: optionalFormString(form, "provider_profile_id"),
+          narrative_role: optionalFormString(form, "narrative_role") as NarrativeRole | null,
+          importance: optionalFormString(form, "importance") as CharacterImportance | null,
+          canon_status: optionalFormString(form, "canon_status") as ContinuityStatus | null,
+          character_category: optionalFormString(form, "character_category") as CharacterCategory | null,
+          character_profile: jsonObject(formString(form, "character_profile")),
         });
         formElement.reset();
         setSelectedPresetId("");
@@ -128,6 +144,48 @@ export function AgentList({ worldId, data }: AgentListProps) {
                   </option>
                 ))}
               </select>
+              <select className="text-input" name="narrative_role" defaultValue="">
+                <option value="">Narrative role unset</option>
+                <option value="protagonist">protagonist</option>
+                <option value="main_character">main_character</option>
+                <option value="side_character">side_character</option>
+                <option value="supporting_cast">supporting_cast</option>
+                <option value="ordinary_member">ordinary_member</option>
+                <option value="organization_member">organization_member</option>
+                <option value="original_character">original_character</option>
+                <option value="narrative_agent">narrative_agent</option>
+              </select>
+              <select className="text-input" name="importance" defaultValue="">
+                <option value="">Importance unset</option>
+                <option value="lead">lead</option>
+                <option value="major">major</option>
+                <option value="minor">minor</option>
+                <option value="background">background</option>
+              </select>
+              <select className="text-input" name="canon_status" defaultValue="">
+                <option value="">Canon status unset</option>
+                <option value="canon">canon</option>
+                <option value="post_canon">post_canon</option>
+                <option value="alternate">alternate</option>
+                <option value="original_expansion">original_expansion</option>
+              </select>
+              <select className="text-input" name="character_category" defaultValue="">
+                <option value="">Character category unset</option>
+                <option value="player">player</option>
+                <option value="main_character">main_character</option>
+                <option value="side_character">side_character</option>
+                <option value="ordinary_member">ordinary_member</option>
+                <option value="organization_member">organization_member</option>
+                <option value="original_character">original_character</option>
+                <option value="narrative_agent">narrative_agent</option>
+              </select>
+              <textarea
+                className="text-input"
+                name="character_profile"
+                rows={4}
+                defaultValue="{}"
+                placeholder="Character profile JSON"
+              />
               <button className="primary-button" type="submit" disabled={isBusy}>
                 Create agent
               </button>
@@ -159,6 +217,10 @@ export function AgentList({ worldId, data }: AgentListProps) {
                   <p>
                     {agent.agent_key} - {agent.kind} -{" "}
                     {agent.is_enabled ? "Enabled" : "Disabled"}
+                  </p>
+                  <p>
+                    {agent.narrative_role ?? "role unset"} - {agent.importance ?? "importance unset"} -{" "}
+                    {agent.canon_status ?? "continuity unset"}
                   </p>
                   <p>
                     Default provider: {agent.provider_profile_id ?? "first enabled provider"}

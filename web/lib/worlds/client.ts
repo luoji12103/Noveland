@@ -11,6 +11,9 @@ import type {
   AgentPresetUpdateInput,
   AgentPersona,
   AgentPersonaUpdateInput,
+  AgentRelationship,
+  AgentRelationshipCreateInput,
+  AgentRelationshipUpdateInput,
   AgentRun,
   AgentRunCreateInput,
   AgentRunDetail,
@@ -77,6 +80,8 @@ import type {
   ScheduleRulePreviewInput,
   ScheduleRuleUpdateInput,
   World,
+  WorldBible,
+  WorldBibleInput,
   WorldCreateInput,
   WorldClock,
   WorldClockTransition,
@@ -125,6 +130,21 @@ export function deactivateWorld(worldId: string): Promise<void> {
 export function exportWorldComposition(worldId: string): Promise<WorldCompositionExport> {
   return worldRequest<WorldCompositionExport>(`/api/worlds/${worldId}/composition-export`, {
     method: "GET",
+  });
+}
+
+export function getWorldBible(worldId: string): Promise<WorldBible | null> {
+  return worldRequest<WorldBible | null>(`/api/worlds/${worldId}/bible`, { method: "GET" });
+}
+
+export function upsertWorldBible(
+  worldId: string,
+  input: WorldBibleInput,
+): Promise<WorldBible> {
+  return worldRequest<WorldBible>(`/api/worlds/${worldId}/bible`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
   });
 }
 
@@ -333,6 +353,47 @@ export function deactivateScene(worldId: string, sceneId: string): Promise<void>
 
 export function listAgents(worldId: string): Promise<Agent[]> {
   return worldRequest<Agent[]>(`/api/worlds/${worldId}/agents`, { method: "GET" });
+}
+
+export function listAgentRelationships(
+  worldId: string,
+  agentId: string,
+): Promise<AgentRelationship[]> {
+  return worldRequest<AgentRelationship[]>(
+    `/api/worlds/${worldId}/agents/${agentId}/relationships`,
+    { method: "GET" },
+  );
+}
+
+export function createAgentRelationship(
+  worldId: string,
+  agentId: string,
+  input: AgentRelationshipCreateInput,
+): Promise<AgentRelationship> {
+  return worldRequest<AgentRelationship>(
+    `/api/worlds/${worldId}/agents/${agentId}/relationships`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function updateAgentRelationship(
+  worldId: string,
+  agentId: string,
+  relationshipId: string,
+  input: AgentRelationshipUpdateInput,
+): Promise<AgentRelationship> {
+  return worldRequest<AgentRelationship>(
+    `/api/worlds/${worldId}/agents/${agentId}/relationships/${relationshipId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function listAgentCalendar(worldId: string, agentId: string): Promise<CalendarEntry[]> {

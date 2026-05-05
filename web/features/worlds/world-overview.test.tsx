@@ -244,6 +244,7 @@ const workspaceData: WorldWorkspaceData = {
   scenes: [],
   agents: [],
   memberships: [],
+  worldBible: null,
   memoryBackendProfiles: [],
   memoryPlugins: [
     {

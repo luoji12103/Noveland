@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  createAgentRelationship,
   createAgentCalendarEntry,
   createAgentObservation,
   forgetAgentMemory,
@@ -14,11 +15,21 @@ import {
   runAgent,
   searchAgentMemory,
   updateAgent,
+  updateAgentRelationship,
   updateAgentPersona,
   validateAgentPersona,
 } from "@/lib/worlds/client";
 import type { AgentDetailData } from "@/lib/worlds/server";
-import type { AgentPreset, AgentRunDetail } from "@/lib/worlds/types";
+import type {
+  AgentRelationship,
+  AgentPreset,
+  AgentRunDetail,
+  CharacterCategory,
+  CharacterImportance,
+  ContinuityStatus,
+  NarrativeRole,
+  RelationshipType,
+} from "@/lib/worlds/types";
 import {
   formString,
   jsonObject,
@@ -38,6 +49,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [memoryItems, setMemoryItems] = useState(data.memoryItems);
   const [memoryProfileSnapshot, setMemoryProfileSnapshot] = useState(data.memoryProfileSnapshot);
+  const [relationships, setRelationships] = useState(data.relationships);
   const [selectedRunDetail, setSelectedRunDetail] = useState<AgentRunDetail | null>(null);
   const agent = data.selectedAgent;
   const sourcePreset = useMemo(
@@ -56,6 +68,10 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
   useEffect(() => {
     setMemoryProfileSnapshot(data.memoryProfileSnapshot);
   }, [data.memoryProfileSnapshot]);
+
+  useEffect(() => {
+    setRelationships(data.relationships);
+  }, [data.relationships]);
 
   useEffect(() => {
     setSelectedRunDetail(null);
@@ -99,10 +115,67 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           kind: formString(form, "kind") as "role_agent" | "narrative_agent",
           home_scene_id: optionalFormString(form, "home_scene_id"),
           provider_profile_id: optionalFormString(form, "provider_profile_id"),
+          narrative_role: optionalFormString(form, "narrative_role") as NarrativeRole | null,
+          importance: optionalFormString(form, "importance") as CharacterImportance | null,
+          canon_status: optionalFormString(form, "canon_status") as ContinuityStatus | null,
+          character_category: optionalFormString(form, "character_category") as CharacterCategory | null,
+          character_profile: jsonObject(formString(form, "character_profile")),
           is_enabled: form.get("is_enabled") === "on",
           config: jsonObject(formString(form, "config")),
         }),
       "Agent saved.",
+    );
+  }
+
+  async function handleCreateRelationship(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        const edge = await createAgentRelationship(worldId, agentId, {
+          source_agent_id: agentId,
+          target_agent_id: formString(form, "target_agent_id"),
+          relationship_type: formString(form, "relationship_type") as RelationshipType,
+          affection: numberValue(form, "affection", 0),
+          trust: numberValue(form, "trust", 0),
+          hostility: numberValue(form, "hostility", 0),
+          intimacy: numberValue(form, "intimacy", 0),
+          obligation: numberValue(form, "obligation", 0),
+          rivalry: numberValue(form, "rivalry", 0),
+          debt: numberValue(form, "debt", 0),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        setRelationships((current) => [...current, edge]);
+        formElement.reset();
+      },
+      "Relationship created.",
+    );
+  }
+
+  async function handleUpdateRelationship(
+    relationshipId: string,
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        const edge = await updateAgentRelationship(worldId, agentId, relationshipId, {
+          affection: numberValue(form, "affection", 0),
+          trust: numberValue(form, "trust", 0),
+          hostility: numberValue(form, "hostility", 0),
+          intimacy: numberValue(form, "intimacy", 0),
+          obligation: numberValue(form, "obligation", 0),
+          rivalry: numberValue(form, "rivalry", 0),
+          debt: numberValue(form, "debt", 0),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        setRelationships((current) =>
+          current.map((item) => (item.id === relationshipId ? edge : item)),
+        );
+      },
+      "Relationship updated.",
     );
   }
 
@@ -256,6 +329,45 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
               <option value="role_agent">role_agent</option>
               <option value="narrative_agent">narrative_agent</option>
             </select>
+            <select className="text-input" name="narrative_role" defaultValue={agent.narrative_role ?? ""}>
+              <option value="">Narrative role unset</option>
+              <option value="protagonist">protagonist</option>
+              <option value="main_character">main_character</option>
+              <option value="side_character">side_character</option>
+              <option value="supporting_cast">supporting_cast</option>
+              <option value="ordinary_member">ordinary_member</option>
+              <option value="organization_member">organization_member</option>
+              <option value="original_character">original_character</option>
+              <option value="narrative_agent">narrative_agent</option>
+            </select>
+            <select className="text-input" name="importance" defaultValue={agent.importance ?? ""}>
+              <option value="">Importance unset</option>
+              <option value="lead">lead</option>
+              <option value="major">major</option>
+              <option value="minor">minor</option>
+              <option value="background">background</option>
+            </select>
+            <select className="text-input" name="canon_status" defaultValue={agent.canon_status ?? ""}>
+              <option value="">Canon status unset</option>
+              <option value="canon">canon</option>
+              <option value="post_canon">post_canon</option>
+              <option value="alternate">alternate</option>
+              <option value="original_expansion">original_expansion</option>
+            </select>
+            <select
+              className="text-input"
+              name="character_category"
+              defaultValue={agent.character_category ?? ""}
+            >
+              <option value="">Character category unset</option>
+              <option value="player">player</option>
+              <option value="main_character">main_character</option>
+              <option value="side_character">side_character</option>
+              <option value="ordinary_member">ordinary_member</option>
+              <option value="organization_member">organization_member</option>
+              <option value="original_character">original_character</option>
+              <option value="narrative_agent">narrative_agent</option>
+            </select>
             <select className="text-input" name="home_scene_id" defaultValue={agent.home_scene_id ?? ""}>
               <option value="">No home scene</option>
               {data.scenes.map((scene) => (
@@ -282,6 +394,12 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             </label>
             <textarea
               className="text-input"
+              name="character_profile"
+              rows={5}
+              defaultValue={JSON.stringify(agent.character_profile ?? {}, null, 2)}
+            />
+            <textarea
+              className="text-input"
               name="config"
               rows={4}
               defaultValue={JSON.stringify(agent.config, null, 2)}
@@ -292,6 +410,108 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           </form>
         ) : (
           <p>Read-only agent configuration access.</p>
+        )}
+      </section>
+
+      <section className="management-panel" aria-labelledby="character-profile-title">
+        <h2 className="section-title" id="character-profile-title">
+          Character profile sheet
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Role</p>
+            <p className="metric-value">{agent.narrative_role ?? "unset"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Importance</p>
+            <p className="metric-value">{agent.importance ?? "unset"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Continuity</p>
+            <p className="metric-value">{agent.canon_status ?? "unset"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Category</p>
+            <p className="metric-value">{agent.character_category ?? "unset"}</p>
+          </div>
+        </div>
+        <pre>{JSON.stringify(agent.character_profile ?? {}, null, 2)}</pre>
+      </section>
+
+      <section className="management-panel" aria-labelledby="relationships-title">
+        <h2 className="section-title" id="relationships-title">
+          Relationship graph
+        </h2>
+        {data.canManageSelectedWorld ? (
+          <form className="management-form" onSubmit={handleCreateRelationship}>
+            <select className="text-input" name="target_agent_id" defaultValue="">
+              <option value="">Target agent</option>
+              {data.agents
+                .filter((candidate) => candidate.id !== agentId)
+                .map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.display_name}
+                  </option>
+                ))}
+            </select>
+            <select className="text-input" name="relationship_type" defaultValue="friendship">
+              <option value="affection">affection</option>
+              <option value="friendship">friendship</option>
+              <option value="rivalry">rivalry</option>
+              <option value="family">family</option>
+              <option value="alliance">alliance</option>
+              <option value="hostility">hostility</option>
+              <option value="obligation">obligation</option>
+              <option value="debt">debt</option>
+              <option value="secret">secret</option>
+              <option value="custom">custom</option>
+            </select>
+            <RelationshipScoreInputs />
+            <textarea className="text-input" name="metadata" rows={3} placeholder="{}" />
+            <button className="primary-button" type="submit" disabled={isBusy}>
+              Create relationship
+            </button>
+          </form>
+        ) : null}
+        {relationships.length === 0 ? (
+          <ResourceList rows={[]} />
+        ) : (
+          <div className="resource-list">
+            {relationships.map((edge) => (
+              <article className="resource-row" key={edge.id}>
+                <div>
+                  <h3>
+                    {edge.target_display_name} - {edge.relationship_type}
+                  </h3>
+                  <p>
+                    affection {edge.affection} / trust {edge.trust} / hostility {edge.hostility} /
+                    intimacy {edge.intimacy}
+                  </p>
+                  <p>
+                    obligation {edge.obligation} / rivalry {edge.rivalry} / debt {edge.debt}
+                  </p>
+                  <pre>{JSON.stringify(edge.metadata, null, 2)}</pre>
+                </div>
+                {data.canManageSelectedWorld ? (
+                  <form
+                    className="inline-form"
+                    onSubmit={(event) => void handleUpdateRelationship(edge.id, event)}
+                  >
+                    <RelationshipScoreInputs edge={edge} />
+                    <textarea
+                      className="text-input"
+                      name="metadata"
+                      rows={2}
+                      defaultValue={JSON.stringify(edge.metadata, null, 2)}
+                    />
+                    <button className="secondary-button" type="submit" disabled={isBusy}>
+                      Update edge
+                    </button>
+                  </form>
+                ) : null}
+              </article>
+            ))}
+          </div>
         )}
       </section>
 
@@ -581,6 +801,25 @@ function optionalNumber(form: FormData, key: string): number | null {
   }
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function numberValue(form: FormData, key: string, fallback: number): number {
+  const value = optionalNumber(form, key);
+  return value ?? fallback;
+}
+
+function RelationshipScoreInputs({ edge }: { edge?: AgentRelationship }) {
+  return (
+    <>
+      <input className="text-input" name="affection" defaultValue={edge?.affection ?? 0} placeholder="Affection" />
+      <input className="text-input" name="trust" defaultValue={edge?.trust ?? 0} placeholder="Trust" />
+      <input className="text-input" name="hostility" defaultValue={edge?.hostility ?? 0} placeholder="Hostility" />
+      <input className="text-input" name="intimacy" defaultValue={edge?.intimacy ?? 0} placeholder="Intimacy" />
+      <input className="text-input" name="obligation" defaultValue={edge?.obligation ?? 0} placeholder="Obligation" />
+      <input className="text-input" name="rivalry" defaultValue={edge?.rivalry ?? 0} placeholder="Rivalry" />
+      <input className="text-input" name="debt" defaultValue={edge?.debt ?? 0} placeholder="Debt" />
+    </>
+  );
 }
 
 function presetOverrideSummary(

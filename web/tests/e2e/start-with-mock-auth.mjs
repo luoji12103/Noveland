@@ -44,6 +44,25 @@ const worlds = [
     is_active: true,
   },
 ];
+const worldBibles = new Map([
+  [
+    worldOneId,
+    {
+      id: "10500000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      source_material: "Original ending and sequel boundary notes.",
+      canon_timeline: ["Original story has concluded."],
+      setting_rules: ["Keep continuity stable."],
+      forbidden_changes: ["Do not erase canon relationships."],
+      sequel_boundaries: ["Post-canon expansion only."],
+      continuity_config: { status: "post_canon" },
+      metadata: {},
+      continuity_status: "post_canon",
+      created_at: "2026-04-17T00:00:00.000Z",
+      updated_at: "2026-04-17T00:00:00.000Z",
+    },
+  ],
+]);
 const scenes = [
   {
     id: sceneHomeId,
@@ -65,8 +84,43 @@ const agents = [
     display_name: "Guide",
     kind: "role_agent",
     provider_profile_id: providerOpenAiId,
+    narrative_role: "supporting",
+    importance: "secondary",
+    canon_status: "post_canon",
+    character_category: "supporting_cast",
+    character_profile: {
+      speech_style_notes: ["Careful and direct."],
+      current_goals: ["Help operators move the world forward."],
+      secrets: [],
+      daily_preferences: ["Morning check-ins."],
+      emotional_baseline: "calm",
+      story_function: "Guide operators through the sequel world.",
+    },
     config: { provider_profile_id: providerOpenAiId },
     is_enabled: true,
+  },
+];
+const agentRelationships = [
+  {
+    id: "30500000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    source_agent_id: agentGuideId,
+    source_agent_key: "guide",
+    source_display_name: "Guide",
+    target_agent_id: agentGuideId,
+    target_agent_key: "guide",
+    target_display_name: "Guide",
+    relationship_type: "friendship",
+    affection: 50,
+    trust: 50,
+    hostility: 0,
+    intimacy: 10,
+    obligation: 0,
+    rivalry: 0,
+    debt: 0,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
 const agentPresets = [];
@@ -828,6 +882,10 @@ async function handleWorldResource(request, response, url) {
     handleMemberCandidates(request, response, currentSubject, worldId, url);
     return;
   }
+  if (resource === "bible") {
+    await handleWorldBible(request, response, currentSubject, worldId);
+    return;
+  }
   if (resource === "schedule-rules") {
     await handleScheduleRules(request, response, currentSubject, worldId, segments[3]);
     return;
@@ -889,6 +947,43 @@ async function handleWorldItem(request, response, currentSubject, world) {
     world.is_active = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleWorldBible(request, response, currentSubject, worldId) {
+  if (request.method === "GET") {
+    sendJson(response, 200, worldBibles.get(worldId) ?? null);
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PUT") {
+    const body = await readJson(request);
+    const existing = worldBibles.get(worldId);
+    const bible = {
+      id: existing?.id ?? randomUUID(),
+      world_id: worldId,
+      source_material: body.source_material ?? "",
+      canon_timeline: body.canon_timeline ?? [],
+      setting_rules: body.setting_rules ?? [],
+      forbidden_changes: body.forbidden_changes ?? [],
+      sequel_boundaries: body.sequel_boundaries ?? [],
+      continuity_config: body.continuity_config ?? {},
+      metadata: body.metadata ?? {},
+      continuity_status: body.continuity_config?.status ?? null,
+      created_at: existing?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    worldBibles.set(worldId, bible);
+    sendJson(response, 200, bible);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -977,6 +1072,17 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       handleAgentRuns(request, response, currentSubject, worldId, agentId);
       return;
     }
+    if (segments[4] === "relationships") {
+      await handleAgentRelationships(
+        request,
+        response,
+        currentSubject,
+        worldId,
+        agentId,
+        segments[5],
+      );
+      return;
+    }
     if (segments[4] === "run") {
       await handleAgentRun(request, response, currentSubject, worldId, agentId);
       return;
@@ -1023,6 +1129,11 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
       display_name: body.display_name,
       kind: body.kind ?? preset?.default_kind ?? "role_agent",
       provider_profile_id: providerProfileId,
+      narrative_role: body.narrative_role ?? null,
+      importance: body.importance ?? null,
+      canon_status: body.canon_status ?? null,
+      character_category: body.character_category ?? null,
+      character_profile: body.character_profile ?? {},
       config: {
         ...(preset?.advanced_config ?? {}),
         ...(body.config ?? {}),
@@ -1062,6 +1173,86 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
     agent.is_enabled = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAgentRelationships(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  agentId,
+  relationshipId,
+) {
+  const agent = agents.find((item) => item.id === agentId && item.world_id === worldId);
+  if (agent === undefined) {
+    sendJson(response, 404, { detail: "Agent not found" });
+    return;
+  }
+  if (request.method === "GET" && relationshipId === undefined) {
+    sendJson(
+      response,
+      200,
+      agentRelationships.filter(
+        (relationship) =>
+          relationship.world_id === worldId && relationship.source_agent_id === agentId,
+      ),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && relationshipId === undefined) {
+    const body = await readJson(request);
+    const targetAgent = agents.find(
+      (item) => item.id === body.target_agent_id && item.world_id === worldId,
+    );
+    if (targetAgent === undefined || body.source_agent_id !== agentId) {
+      sendJson(response, 422, { detail: "Invalid relationship edge" });
+      return;
+    }
+    const relationship = relationshipResponse({
+      id: randomUUID(),
+      world_id: worldId,
+      source_agent_id: agentId,
+      target_agent_id: targetAgent.id,
+      relationship_type: body.relationship_type,
+      affection: body.affection ?? 0,
+      trust: body.trust ?? 0,
+      hostility: body.hostility ?? 0,
+      intimacy: body.intimacy ?? 0,
+      obligation: body.obligation ?? 0,
+      rivalry: body.rivalry ?? 0,
+      debt: body.debt ?? 0,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    agentRelationships.push(relationship);
+    sendJson(response, 201, relationship);
+    return;
+  }
+  const relationship = agentRelationships.find(
+    (item) =>
+      item.id === relationshipId
+      && item.world_id === worldId
+      && item.source_agent_id === agentId,
+  );
+  if (relationship === undefined) {
+    sendJson(response, 404, { detail: "Relationship not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(relationship, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, relationshipResponse(relationship));
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -3212,6 +3403,18 @@ function membershipFor(worldId, userId) {
 
 function observationsFor(worldId, agentId) {
   return agentObservations.filter((item) => item.world_id === worldId && item.agent_id === agentId);
+}
+
+function relationshipResponse(edge) {
+  const sourceAgent = agents.find((agent) => agent.id === edge.source_agent_id);
+  const targetAgent = agents.find((agent) => agent.id === edge.target_agent_id);
+  return {
+    ...edge,
+    source_agent_key: sourceAgent?.agent_key ?? null,
+    source_display_name: sourceAgent?.display_name ?? null,
+    target_agent_key: targetAgent?.agent_key ?? null,
+    target_display_name: targetAgent?.display_name ?? null,
+  };
 }
 
 function hasValidCsrf(request) {

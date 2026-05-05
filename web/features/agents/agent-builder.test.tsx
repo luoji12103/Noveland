@@ -1,0 +1,243 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/worlds/client", () => ({
+  createAgentCalendarEntry: vi.fn(),
+  createAgentObservation: vi.fn(),
+  createAgentRelationship: vi.fn(),
+  forgetAgentMemory: vi.fn(),
+  getAgentRunDetail: vi.fn(),
+  listAgentMemory: vi.fn(),
+  refreshAgentMemoryProfileSnapshot: vi.fn(),
+  refreshAgentObservations: vi.fn(),
+  runAgent: vi.fn(),
+  searchAgentMemory: vi.fn(),
+  updateAgent: vi.fn(),
+  updateAgentPersona: vi.fn(),
+  updateAgentRelationship: vi.fn(),
+  validateAgentPersona: vi.fn(),
+}));
+
+const refresh = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+}));
+
+import { AgentBuilder } from "@/features/agents/agent-builder";
+import {
+  createAgentRelationship,
+  updateAgent,
+  updateAgentRelationship,
+} from "@/lib/worlds/client";
+import type { AgentDetailData } from "@/lib/worlds/server";
+
+describe("AgentBuilder", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    refresh.mockReset();
+  });
+
+  it("renders character profile and submits relationship updates", async () => {
+    vi.mocked(updateAgent).mockResolvedValue(agentData.selectedAgent!);
+    vi.mocked(createAgentRelationship).mockResolvedValue({
+      ...agentData.relationships[0],
+      id: "relationship-2",
+      target_agent_id: "agent-3",
+      target_agent_key: "rival",
+      target_display_name: "Rival",
+      trust: 20,
+    });
+    vi.mocked(updateAgentRelationship).mockResolvedValue({
+      ...agentData.relationships[0],
+      trust: 55,
+      metadata: { reason: "kept promise" },
+    });
+
+    render(<AgentBuilder worldId="world-1" agentId="agent-1" data={agentData} />);
+
+    expect(screen.getByRole("heading", { name: "Character profile sheet" })).toBeInTheDocument();
+    expect(document.body.textContent).toContain("route heroine");
+    expect(screen.getByText("Target - friendship")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue("lead"), { target: { value: "major" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+
+    await waitFor(() => {
+      expect(updateAgent).toHaveBeenCalledWith(
+        "world-1",
+        "agent-1",
+        expect.objectContaining({
+          importance: "major",
+          character_profile: expect.objectContaining({ story_function: "route heroine" }),
+        }),
+      );
+    });
+
+    fireEvent.change(screen.getByDisplayValue("Target agent"), { target: { value: "agent-3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create relationship" }));
+
+    await waitFor(() => {
+      expect(createAgentRelationship).toHaveBeenCalledWith(
+        "world-1",
+        "agent-1",
+        expect.objectContaining({ target_agent_id: "agent-3", relationship_type: "friendship" }),
+      );
+    });
+
+    const trustInputs = screen.getAllByPlaceholderText("Trust");
+    fireEvent.change(trustInputs[1], { target: { value: "55" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Update edge" })[0]);
+
+    await waitFor(() => {
+      expect(updateAgentRelationship).toHaveBeenCalledWith(
+        "world-1",
+        "agent-1",
+        "relationship-1",
+        expect.objectContaining({ trust: 55 }),
+      );
+    });
+  });
+});
+
+const agentData: AgentDetailData = {
+  worlds: [
+    {
+      id: "world-1",
+      owner_user_id: "user-1",
+      slug: "first-world",
+      name: "First World",
+      description: null,
+      rules_config: {},
+      memory_backend_profile_id: null,
+      memory_plugin_identifier: "builtin.local_pgvector_memory",
+      memory_plugin_config: {},
+      world_rules_plugin_identifier: "builtin.default_world_rules",
+      world_rules_plugin_config: {},
+      is_active: true,
+    },
+  ],
+  selectedWorld: {
+    id: "world-1",
+    owner_user_id: "user-1",
+    slug: "first-world",
+    name: "First World",
+    description: null,
+    rules_config: {},
+    memory_backend_profile_id: null,
+    memory_plugin_identifier: "builtin.local_pgvector_memory",
+    memory_plugin_config: {},
+    world_rules_plugin_identifier: "builtin.default_world_rules",
+    world_rules_plugin_config: {},
+    is_active: true,
+  },
+  scenes: [
+    {
+      id: "scene-1",
+      world_id: "world-1",
+      scene_key: "club-room",
+      name: "Club Room",
+      description: null,
+      is_active: true,
+    },
+  ],
+  agents: [
+    {
+      id: "agent-1",
+      world_id: "world-1",
+      home_scene_id: "scene-1",
+      source_preset_id: null,
+      source_preset_version: null,
+      agent_key: "heroine",
+      display_name: "Heroine",
+      kind: "role_agent",
+      provider_profile_id: null,
+      narrative_role: "main_character",
+      importance: "lead",
+      canon_status: "post_canon",
+      character_category: "main_character",
+      character_profile: { story_function: "route heroine", goals: ["reopen the club"] },
+      config: {},
+      is_enabled: true,
+    },
+    {
+      id: "agent-2",
+      world_id: "world-1",
+      home_scene_id: null,
+      source_preset_id: null,
+      source_preset_version: null,
+      agent_key: "target",
+      display_name: "Target",
+      kind: "role_agent",
+      provider_profile_id: null,
+      config: {},
+      is_enabled: true,
+    },
+    {
+      id: "agent-3",
+      world_id: "world-1",
+      home_scene_id: null,
+      source_preset_id: null,
+      source_preset_version: null,
+      agent_key: "rival",
+      display_name: "Rival",
+      kind: "role_agent",
+      provider_profile_id: null,
+      config: {},
+      is_enabled: true,
+    },
+  ],
+  providerProfiles: [],
+  agentPresets: [],
+  personaPolicyPlugins: [],
+  canManageSelectedWorld: true,
+  isPlatformAdmin: true,
+  loadError: null,
+  selectedAgent: {
+    id: "agent-1",
+    world_id: "world-1",
+    home_scene_id: "scene-1",
+    source_preset_id: null,
+    source_preset_version: null,
+    agent_key: "heroine",
+    display_name: "Heroine",
+    kind: "role_agent",
+    provider_profile_id: null,
+    narrative_role: "main_character",
+    importance: "lead",
+    canon_status: "post_canon",
+    character_category: "main_character",
+    character_profile: { story_function: "route heroine", goals: ["reopen the club"] },
+    config: {},
+    is_enabled: true,
+  },
+  relationships: [
+    {
+      id: "relationship-1",
+      world_id: "world-1",
+      source_agent_id: "agent-1",
+      source_agent_key: "heroine",
+      source_display_name: "Heroine",
+      target_agent_id: "agent-2",
+      target_agent_key: "target",
+      target_display_name: "Target",
+      relationship_type: "friendship",
+      affection: 42,
+      trust: 35,
+      hostility: 0,
+      intimacy: 20,
+      obligation: 10,
+      rivalry: 0,
+      debt: 0,
+      metadata: { reason: "shared promise" },
+      created_at: "2026-05-05T00:00:00.000Z",
+      updated_at: "2026-05-05T00:00:00.000Z",
+    },
+  ],
+  calendarEntries: [],
+  memoryItems: [],
+  memoryProfileSnapshot: null,
+  agentRuns: [],
+  agentPersona: null,
+  agentObservations: [],
+};
