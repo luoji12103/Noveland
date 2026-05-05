@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Tool Policy / Scale / v2 Readiness
+- None
 
 ## Blocked
 - None
@@ -55,6 +55,7 @@
 - Plugin/Preset Evolution Ops
 - Storage/Backup/Auth Runtime Ops
 - Access/Diagnostics/Scale Readiness Ops
+- Tool Policy / Scale / v2 Readiness
 
 ## Upcoming Mainline
-- None selected; current 50-phase roadmap is expected to close with Tool Policy / Scale / v2 Readiness.
+- None selected; the current 50-phase roadmap is complete.

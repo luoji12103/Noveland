@@ -450,3 +450,14 @@
 - Tests added/updated: preset update preview API/UI/client tests; plugin binding API permission/validation tests; built-in plugin contract harness; provider plugin diagnostic API tests; provider admin schema/diagnostic rendering tests; mock backend routes for preset preview and plugin bindings.
 - Docs updated: README endpoint list, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Plugin bindings continue to use existing persisted fields rather than a new plugin layer. Persistent databases need migration `20260504_0022` before writing plugin diagnostics.
+
+## Tool policy / scale / v2 readiness entry
+
+- Date: 2026-05-05
+- Branch: feat/tool-policy-scale-v2-readiness
+- Scope: roadmap phases 48-50 external tool policy, scale readiness, and v2 expansion review
+- Summary: Added policy-only external tool reporting, a derived platform-admin scale-readiness report, runtime admin visibility for both reports, and an evidence-based v2 readiness review that closes the current 50-phase roadmap without selecting a binding v2 direction.
+- Files changed: `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/tests/test_api_runtime.py`, `/web/app/api/runtime/{tool-policy,scale-readiness}/**`, `/web/features/admin/runtime-admin.tsx`, `/web/lib/worlds/**`, `/README.md`, `/docs/agent/operations/{external-tool-policy,scale-readiness}.md`, `/docs/agent/harness/**`
+- Tests added/updated: runtime API tests for tool policy permissions and scale readiness sections/blockers; runtime admin component and world client tests for policy/readiness rendering and routes.
+- Docs updated: README, project index, file inventory, task board, change journal, active handoff, and v2 readiness review.
+- Follow-up notes: External tool execution remains disabled. Scale readiness is a derived operator report, not a load test. The 50-phase roadmap is complete; next work should start from the v2 readiness review and real operator feedback.

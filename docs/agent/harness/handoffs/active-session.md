@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-05T02:05:00Z
+- Date: 2026-05-05T02:45:00Z
 - Branch: feat/tool-policy-scale-v2-readiness
 - Objective: Implement roadmap phases 48-50 as a policy-only External Tool Policy, Scale Readiness report, and v2 evidence review; then merge back to local `main` if checks pass.
-- Status: Started.
+- Status: Implementation complete; final gate pending.
 
 ## Completed
 
@@ -11,15 +11,29 @@
 - Created `feat/tool-policy-scale-v2-readiness`.
 - Selected policy-only external tool scope; no subprocess, network, sandbox, or real tool execution will be added.
 - Identified stale previous handoff text as this bundle's hygiene cleanup.
+- Added platform-admin `GET /runtime/tool-policy` and same-origin Web proxy.
+- Added platform-admin `GET /runtime/scale-readiness` and runtime admin scale-readiness panel.
+- Added tool policy and scale readiness operator docs.
+- Added evidence-based `docs/agent/harness/v2-readiness-review.md`.
+- Updated task board, README, project index, and file inventory for roadmap closeout.
 
 ## Commits
 
-- Startup docs commit pending.
+- `66b1673 docs(agent): start tool policy scale readiness`
+- `9efcb19 feat(ops): add tool policy and scale readiness`
+- `0676925 docs(agent): add v2 readiness review`
+- Closeout docs commit pending.
 
 ## Checks Run
 
 - `git status --short --branch`
 - `git fetch --prune origin && git rev-list --left-right --count origin/main...main`
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/runtime.py tests/test_api_runtime.py`
+- `cd backend && uv run pytest tests/test_api_runtime.py -q`
+- `cd backend && uv run mypy services/api/src/noveland/services/api/runtime.py`
+- `cd web && npm run test -- features/admin/runtime-admin.test.tsx lib/worlds/client.test.ts`
+- `cd web && npm run typecheck`
+- `git diff --check`
 
 ## Risks
 
