@@ -30,9 +30,15 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "event_name ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'",
             name="event_name_format",
         ).ddl_if(dialect="postgresql"),
+        CheckConstraint(
+            "importance IN ('system', 'daily', 'relationship', 'organization', "
+            "'route', 'main_plot')",
+            name="importance",
+        ),
         Index("ix_world_events_world_sequence", "world_id", "sequence"),
         Index("ix_world_events_world_event_name", "world_id", "event_name"),
         Index("ix_world_events_world_wall_time", "world_id", "wall_time"),
+        Index("ix_world_events_world_importance", "world_id", "importance"),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
@@ -41,6 +47,12 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     event_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    importance: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'system'"),
+        default="system",
+    )
     payload: Mapped[dict[str, Any]] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,

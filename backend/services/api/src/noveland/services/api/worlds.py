@@ -42,6 +42,9 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationTurn
 from noveland.core.settings import load_settings
 from noveland.events import (
+    WorldEventAppend,
+    WorldEventImportance,
+    WorldEventStore,
     WorldReplayService,
     WorldReplayState,
     WorldSnapshotIntegrityReport,
@@ -99,14 +102,22 @@ from noveland.services.api.dependencies import (
     get_world_member_context,
 )
 from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
+from noveland.worlds import LivingWorldAutonomyService
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.models import (
+    AgentPresenceState,
+    DailyLifeEventCandidate,
+    FactionProgressTrack,
+    OffscreenEventQueueItem,
+    OrganizationMembership,
     Scene,
+    SceneLocationEdge,
     World,
     WorldBible,
     WorldClockTransitionModel,
     WorldMembership,
+    WorldOrganization,
 )
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
@@ -150,6 +161,15 @@ RelationshipType = Literal[
     "secret",
     "custom",
 ]
+OrganizationType = Literal[
+    "school", "club", "family", "company", "faction", "secret_group", "other"
+]
+OrganizationVisibility = Literal["public", "hidden"]
+FactionTrackType = Literal["goal", "conflict", "resource", "reputation", "risk"]
+PresenceVisibilityStatus = Literal["visible", "offscreen", "hidden", "unavailable"]
+EventImportance = Literal["system", "daily", "relationship", "organization", "route", "main_plot"]
+OffscreenEventStatus = Literal["pending", "resolved", "cancelled", "failed"]
+DailyLifeCandidateStatus = Literal["candidate", "queued", "dismissed"]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -195,12 +215,114 @@ class SceneCreateRequest(_RequestModel):
     scene_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
     name: str = Field(min_length=1, max_length=160)
     description: str | None = None
+    region_key: str | None = Field(default=None, max_length=80)
+    location_tags: list[str] = Field(default_factory=list, max_length=20)
+    opening_rules: dict[str, Any] = Field(default_factory=dict)
 
 
 class SceneUpdateRequest(_RequestModel):
     name: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = None
+    region_key: str | None = Field(default=None, max_length=80)
+    location_tags: list[str] | None = None
+    opening_rules: dict[str, Any] | None = None
     is_active: bool | None = None
+
+
+class SceneLocationEdgeCreateRequest(_RequestModel):
+    source_scene_id: uuid.UUID
+    target_scene_id: uuid.UUID
+    travel_label: str | None = Field(default=None, max_length=120)
+    traversal_rules: dict[str, Any] = Field(default_factory=dict)
+
+
+class SceneLocationEdgeUpdateRequest(_RequestModel):
+    travel_label: str | None = Field(default=None, max_length=120)
+    traversal_rules: dict[str, Any] | None = None
+
+
+class OrganizationCreateRequest(_RequestModel):
+    organization_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    organization_type: OrganizationType
+    description: str | None = None
+    public_summary: str | None = None
+    hidden_summary: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class OrganizationUpdateRequest(_RequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    organization_type: OrganizationType | None = None
+    description: str | None = None
+    public_summary: str | None = None
+    hidden_summary: str | None = None
+    metadata: dict[str, Any] | None = None
+    is_active: bool | None = None
+
+
+class OrganizationMembershipCreateRequest(_RequestModel):
+    agent_id: uuid.UUID
+    role_title: str | None = Field(default=None, max_length=120)
+    visibility: OrganizationVisibility = "public"
+    loyalty: int = Field(default=50, ge=0, le=100)
+    influence: int = Field(default=50, ge=0, le=100)
+    responsibilities: list[str] = Field(default_factory=list, max_length=20)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class OrganizationMembershipUpdateRequest(_RequestModel):
+    role_title: str | None = Field(default=None, max_length=120)
+    visibility: OrganizationVisibility | None = None
+    loyalty: int | None = Field(default=None, ge=0, le=100)
+    influence: int | None = Field(default=None, ge=0, le=100)
+    responsibilities: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class FactionProgressTrackCreateRequest(_RequestModel):
+    track_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    track_type: FactionTrackType
+    progress: int = Field(default=0, ge=0, le=100)
+    pressure: int = Field(default=0, ge=0, le=100)
+    summary: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class FactionProgressTrackUpdateRequest(_RequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    track_type: FactionTrackType | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+    pressure: int | None = Field(default=None, ge=0, le=100)
+    summary: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class AgentPresenceUpdateRequest(_RequestModel):
+    current_scene_id: uuid.UUID | None = None
+    visibility_status: PresenceVisibilityStatus = "visible"
+    encounter_eligible: bool = True
+    scheduled_movement: dict[str, Any] = Field(default_factory=dict)
+
+
+class DailyLifeGenerateRequest(_RequestModel):
+    horizon_hours: int = Field(default=24, ge=1, le=168)
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class OffscreenQueueCreateRequest(_RequestModel):
+    candidate_id: uuid.UUID | None = None
+    event_name: str = Field(default="living_world.offscreen_event", min_length=3, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    due_at: datetime
+    importance: Literal["daily", "relationship", "organization", "route", "main_plot"] = "daily"
+
+    @field_validator("due_at", mode="after")
+    @classmethod
+    def due_at_must_be_timezone_aware(cls, value: datetime) -> datetime:
+        return _timezone_aware(value, "due_at")
 
 
 class WorldBibleUpsertRequest(_RequestModel):
@@ -450,7 +572,141 @@ class SceneResponse(BaseModel):
     scene_key: str
     name: str
     description: str | None
+    region_key: str | None
+    location_tags: list[str]
+    opening_rules: dict[str, Any]
     is_active: bool
+
+
+class SceneLocationEdgeResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    source_scene_id: uuid.UUID
+    target_scene_id: uuid.UUID
+    source_scene_key: str
+    target_scene_key: str
+    travel_label: str | None
+    traversal_rules: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrganizationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    organization_key: str
+    name: str
+    organization_type: OrganizationType
+    description: str | None
+    public_summary: str | None
+    hidden_summary: str | None
+    metadata: dict[str, Any]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrganizationMembershipResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    organization_id: uuid.UUID
+    organization_key: str
+    organization_name: str
+    agent_id: uuid.UUID
+    agent_key: str
+    agent_display_name: str
+    role_title: str | None
+    visibility: OrganizationVisibility
+    loyalty: int
+    influence: int
+    responsibilities: list[str]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class FactionProgressTrackResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    organization_id: uuid.UUID
+    organization_key: str
+    organization_name: str
+    track_key: str
+    name: str
+    track_type: FactionTrackType
+    progress: int
+    pressure: int
+    summary: str | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentPresenceResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_key: str
+    agent_display_name: str
+    current_scene_id: uuid.UUID | None
+    current_scene_key: str | None
+    current_scene_name: str | None
+    visibility_status: PresenceVisibilityStatus
+    encounter_eligible: bool
+    scheduled_movement: dict[str, Any]
+    last_event_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DailyLifeEventCandidateResponse(BaseModel):
+    id: uuid.UUID | None
+    world_id: uuid.UUID
+    agent_id: uuid.UUID | None
+    agent_display_name: str | None
+    scene_id: uuid.UUID | None
+    scene_name: str | None
+    title: str
+    summary: str
+    importance: Literal["daily", "relationship", "organization"]
+    starts_at: datetime
+    source_kind: str
+    source_ref: str | None
+    status: DailyLifeCandidateStatus
+    metadata: dict[str, Any]
+    created_at: datetime | None
+    updated_at: datetime | None
+
+
+class DailyLifePreviewResponse(BaseModel):
+    world_id: uuid.UUID
+    start_world_time: datetime
+    horizon_hours: int
+    candidate_count: int
+    candidates: list[DailyLifeEventCandidateResponse]
+
+
+class OffscreenEventQueueResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    source_candidate_id: uuid.UUID | None
+    event_name: str
+    title: str
+    payload: dict[str, Any]
+    due_at: datetime
+    importance: Literal["daily", "relationship", "organization", "route", "main_plot"]
+    status: OffscreenEventStatus
+    resolved_event_id: uuid.UUID | None
+    last_error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OffscreenResolutionResponse(BaseModel):
+    processed_count: int
+    resolved_count: int
+    failed_count: int
+    event_ids: list[uuid.UUID]
 
 
 class UserSummaryResponse(BaseModel):
@@ -975,6 +1231,7 @@ class WorldEventResponse(BaseModel):
     world_id: uuid.UUID
     sequence: int
     event_name: str
+    importance: EventImportance
     payload: dict[str, Any]
     wall_time: datetime
     world_time: datetime | None
@@ -1119,9 +1376,7 @@ def preview_agent_preset_update(
     if preset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     agents = db_session.scalars(
-        select(Agent)
-        .where(Agent.source_preset_id == preset_id)
-        .order_by(Agent.agent_key),
+        select(Agent).where(Agent.source_preset_id == preset_id).order_by(Agent.agent_key),
     ).all()
     return _agent_preset_update_preview_response(preset, agents)
 
@@ -1165,9 +1420,7 @@ def import_world_composition(
     validation = _validate_world_composition_import(db_session, import_request)
     if not validation.valid:
         blocking_issues = [
-            issue.model_dump()
-            for issue in validation.issues
-            if issue.severity == "blocking"
+            issue.model_dump() for issue in validation.issues if issue.severity == "blocking"
         ]
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -1767,6 +2020,7 @@ def list_world_events(
     actor_ref: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
     sequence_after: Annotated[int | None, Query(ge=0)] = None,
     sequence_before: Annotated[int | None, Query(ge=1)] = None,
+    importance: Annotated[EventImportance | None, Query()] = None,
     wall_time_from: datetime | None = None,
     wall_time_to: datetime | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -1779,6 +2033,8 @@ def list_world_events(
         statement = statement.where(WorldEventModel.event_name == event_name)
     if actor_ref is not None:
         statement = statement.where(WorldEventModel.actor_ref == actor_ref)
+    if importance is not None:
+        statement = statement.where(WorldEventModel.importance == importance)
     if sequence_after is not None:
         statement = statement.where(WorldEventModel.sequence > sequence_after)
     if sequence_before is not None:
@@ -1821,9 +2077,14 @@ def list_calendar_conflicts(
     _world_or_404(db_session, context.world_id)
     if start_world_time is not None:
         start_world_time = _timezone_aware(start_world_time, "start_world_time")
-    start_time = start_world_time or WorldClockService(db_session).view(
-        context.world_id,
-    ).effective_world_time
+    start_time = (
+        start_world_time
+        or WorldClockService(db_session)
+        .view(
+            context.world_id,
+        )
+        .effective_world_time
+    )
     return _calendar_conflict_report_response(
         CalendarService(db_session).detect_conflicts(
             world_id=context.world_id,
@@ -1832,6 +2093,163 @@ def list_calendar_conflicts(
             limit=limit,
         ),
     )
+
+
+@router.get("/{world_id}/daily-life/preview", response_model=DailyLifePreviewResponse)
+def preview_daily_life(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    start_world_time: Annotated[datetime | None, Query()] = None,
+    horizon_hours: Annotated[int, Query(ge=1, le=168)] = 24,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> DailyLifePreviewResponse:
+    _world_or_404(db_session, context.world_id)
+    if start_world_time is not None:
+        start_world_time = _timezone_aware(start_world_time, "start_world_time")
+    preview = LivingWorldAutonomyService(db_session).preview_daily_life(
+        world_id=context.world_id,
+        start_world_time=start_world_time,
+        horizon_hours=horizon_hours,
+        limit=limit,
+    )
+    return DailyLifePreviewResponse(
+        world_id=preview.world_id,
+        start_world_time=preview.start_world_time,
+        horizon_hours=preview.horizon_hours,
+        candidate_count=preview.candidate_count,
+        candidates=[
+            _daily_life_candidate_response(db_session, item) for item in preview.candidates
+        ],
+    )
+
+
+@router.post(
+    "/{world_id}/daily-life/generate",
+    response_model=list[DailyLifeEventCandidateResponse],
+)
+def generate_daily_life_candidates(
+    generate_request: DailyLifeGenerateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[DailyLifeEventCandidateResponse]:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    candidates = LivingWorldAutonomyService(db_session).generate_daily_life_candidates(
+        world_id=context.world_id,
+        horizon_hours=generate_request.horizon_hours,
+        limit=generate_request.limit,
+    )
+    return [_daily_life_candidate_response(db_session, item) for item in candidates]
+
+
+@router.get(
+    "/{world_id}/daily-life/candidates",
+    response_model=list[DailyLifeEventCandidateResponse],
+)
+def list_daily_life_candidates(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    status_filter: Annotated[DailyLifeCandidateStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[DailyLifeEventCandidateResponse]:
+    _world_or_404(db_session, context.world_id)
+    statement = select(DailyLifeEventCandidate).where(
+        DailyLifeEventCandidate.world_id == context.world_id,
+    )
+    if status_filter is not None:
+        statement = statement.where(DailyLifeEventCandidate.status == status_filter)
+    candidates = db_session.scalars(
+        statement.order_by(DailyLifeEventCandidate.starts_at.desc()).limit(limit),
+    ).all()
+    return [_daily_life_candidate_response(db_session, item) for item in candidates]
+
+
+@router.post(
+    "/{world_id}/offscreen-events",
+    response_model=OffscreenEventQueueResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_offscreen_event(
+    queue_create: OffscreenQueueCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OffscreenEventQueueResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    if queue_create.candidate_id is not None:
+        candidate = db_session.get(DailyLifeEventCandidate, queue_create.candidate_id)
+        if candidate is None or candidate.world_id != context.world_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        item = LivingWorldAutonomyService(db_session).queue_candidate(
+            candidate_id=queue_create.candidate_id,
+            event_name=queue_create.event_name,
+        )
+        return _offscreen_queue_response(item)
+    item = OffscreenEventQueueItem(
+        world_id=context.world_id,
+        event_name=queue_create.event_name,
+        title=queue_create.title,
+        payload_json=queue_create.payload,
+        due_at=queue_create.due_at,
+        importance=queue_create.importance,
+        status="pending",
+    )
+    db_session.add(item)
+    db_session.flush()
+    return _offscreen_queue_response(item)
+
+
+@router.get("/{world_id}/offscreen-events", response_model=list[OffscreenEventQueueResponse])
+def list_offscreen_events(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    status_filter: Annotated[OffscreenEventStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[OffscreenEventQueueResponse]:
+    _world_or_404(db_session, context.world_id)
+    statement = select(OffscreenEventQueueItem).where(
+        OffscreenEventQueueItem.world_id == context.world_id,
+    )
+    if status_filter is not None:
+        statement = statement.where(OffscreenEventQueueItem.status == status_filter)
+    items = db_session.scalars(
+        statement.order_by(OffscreenEventQueueItem.due_at.desc()).limit(limit),
+    ).all()
+    return [_offscreen_queue_response(item) for item in items]
+
+
+@router.post("/{world_id}/offscreen-events/resolve", response_model=OffscreenResolutionResponse)
+def resolve_offscreen_events(
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> OffscreenResolutionResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    result = LivingWorldAutonomyService(db_session).resolve_due_offscreen_events(
+        world_id=context.world_id,
+        wall_time=datetime.now(UTC),
+        limit=limit,
+        actor_ref=_actor_ref(context.subject),
+    )
+    RuntimeDiagnosticsService(db_session).record(
+        RuntimeDiagnosticCreate(
+            severity=DiagnosticSeverity.INFO,
+            component=DiagnosticComponent.RUNTIME,
+            event_type="gm.offscreen_events_resolved",
+            message="GM world engine resolved due offscreen events.",
+            details={
+                "processed_count": result.processed_count,
+                "resolved_count": result.resolved_count,
+                "failed_count": result.failed_count,
+            },
+            world_id=context.world_id,
+        ),
+    )
+    return _offscreen_resolution_response(result)
 
 
 @router.post(
@@ -2000,6 +2418,9 @@ def create_scene(
         scene_key=scene_create.scene_key,
         name=scene_create.name,
         description=scene_create.description,
+        region_key=scene_create.region_key,
+        location_tags=scene_create.location_tags,
+        opening_rules=scene_create.opening_rules,
         is_active=True,
     )
     db_session.add(scene)
@@ -2021,6 +2442,12 @@ def update_scene(
         scene.name = scene_update.name or scene.name
     if "description" in scene_update.model_fields_set:
         scene.description = scene_update.description
+    if "region_key" in scene_update.model_fields_set:
+        scene.region_key = scene_update.region_key
+    if "location_tags" in scene_update.model_fields_set:
+        scene.location_tags = scene_update.location_tags or []
+    if "opening_rules" in scene_update.model_fields_set:
+        scene.opening_rules = scene_update.opening_rules or {}
     if "is_active" in scene_update.model_fields_set:
         scene.is_active = bool(scene_update.is_active)
     db_session.flush()
@@ -2038,6 +2465,366 @@ def deactivate_scene(
     scene = _scene_or_404(db_session, context.world_id, scene_id)
     scene.is_active = False
     db_session.flush()
+
+
+@router.get("/{world_id}/location-edges", response_model=list[SceneLocationEdgeResponse])
+def list_location_edges(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[SceneLocationEdgeResponse]:
+    _world_or_404(db_session, context.world_id)
+    edges = db_session.scalars(
+        select(SceneLocationEdge)
+        .where(SceneLocationEdge.world_id == context.world_id)
+        .order_by(SceneLocationEdge.created_at),
+    ).all()
+    return [_location_edge_response(db_session, edge) for edge in edges]
+
+
+@router.post(
+    "/{world_id}/location-edges",
+    response_model=SceneLocationEdgeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_location_edge(
+    edge_create: SceneLocationEdgeCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SceneLocationEdgeResponse:
+    require_csrf(request)
+    _scene_or_404(db_session, context.world_id, edge_create.source_scene_id)
+    _scene_or_404(db_session, context.world_id, edge_create.target_scene_id)
+    if edge_create.source_scene_id == edge_create.target_scene_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="location edge endpoints must connect two distinct scenes",
+        )
+    existing = db_session.scalars(
+        select(SceneLocationEdge).where(
+            SceneLocationEdge.source_scene_id == edge_create.source_scene_id,
+            SceneLocationEdge.target_scene_id == edge_create.target_scene_id,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Location edge already exists")
+    edge = SceneLocationEdge(
+        world_id=context.world_id,
+        source_scene_id=edge_create.source_scene_id,
+        target_scene_id=edge_create.target_scene_id,
+        travel_label=edge_create.travel_label,
+        traversal_rules=edge_create.traversal_rules,
+    )
+    db_session.add(edge)
+    db_session.flush()
+    return _location_edge_response(db_session, edge)
+
+
+@router.patch(
+    "/{world_id}/location-edges/{edge_id}",
+    response_model=SceneLocationEdgeResponse,
+)
+def update_location_edge(
+    edge_id: uuid.UUID,
+    edge_update: SceneLocationEdgeUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SceneLocationEdgeResponse:
+    require_csrf(request)
+    edge = _location_edge_or_404(db_session, context.world_id, edge_id)
+    if "travel_label" in edge_update.model_fields_set:
+        edge.travel_label = edge_update.travel_label
+    if "traversal_rules" in edge_update.model_fields_set:
+        edge.traversal_rules = edge_update.traversal_rules or {}
+    db_session.flush()
+    return _location_edge_response(db_session, edge)
+
+
+@router.get("/{world_id}/organizations", response_model=list[OrganizationResponse])
+def list_organizations(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[OrganizationResponse]:
+    organizations = db_session.scalars(
+        select(WorldOrganization)
+        .where(WorldOrganization.world_id == context.world_id)
+        .order_by(WorldOrganization.organization_key),
+    ).all()
+    return [_organization_response(organization) for organization in organizations]
+
+
+@router.post(
+    "/{world_id}/organizations",
+    response_model=OrganizationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_organization(
+    organization_create: OrganizationCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationResponse:
+    require_csrf(request)
+    existing = db_session.scalars(
+        select(WorldOrganization).where(
+            WorldOrganization.world_id == context.world_id,
+            WorldOrganization.organization_key == organization_create.organization_key,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Organization key already exists")
+    organization = WorldOrganization(
+        world_id=context.world_id,
+        organization_key=organization_create.organization_key,
+        name=organization_create.name,
+        organization_type=organization_create.organization_type,
+        description=organization_create.description,
+        public_summary=organization_create.public_summary,
+        hidden_summary=organization_create.hidden_summary,
+        metadata_json=organization_create.metadata,
+        is_active=True,
+    )
+    db_session.add(organization)
+    db_session.flush()
+    return _organization_response(organization)
+
+
+@router.patch("/{world_id}/organizations/{organization_id}", response_model=OrganizationResponse)
+def update_organization(
+    organization_id: uuid.UUID,
+    organization_update: OrganizationUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationResponse:
+    require_csrf(request)
+    organization = _organization_or_404(db_session, context.world_id, organization_id)
+    for field_name in (
+        "name",
+        "organization_type",
+        "description",
+        "public_summary",
+        "hidden_summary",
+    ):
+        if field_name in organization_update.model_fields_set:
+            next_value = getattr(organization_update, field_name)
+            if next_value is not None or field_name in (
+                "description",
+                "public_summary",
+                "hidden_summary",
+            ):
+                setattr(organization, field_name, next_value)
+    if "metadata" in organization_update.model_fields_set:
+        organization.metadata_json = organization_update.metadata or {}
+    if "is_active" in organization_update.model_fields_set:
+        organization.is_active = bool(organization_update.is_active)
+    db_session.flush()
+    return _organization_response(organization)
+
+
+@router.get(
+    "/{world_id}/organizations/{organization_id}/memberships",
+    response_model=list[OrganizationMembershipResponse],
+)
+def list_organization_memberships(
+    organization_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[OrganizationMembershipResponse]:
+    _organization_or_404(db_session, context.world_id, organization_id)
+    memberships = db_session.scalars(
+        select(OrganizationMembership)
+        .where(
+            OrganizationMembership.world_id == context.world_id,
+            OrganizationMembership.organization_id == organization_id,
+        )
+        .order_by(OrganizationMembership.created_at),
+    ).all()
+    return [_organization_membership_response(db_session, membership) for membership in memberships]
+
+
+@router.post(
+    "/{world_id}/organizations/{organization_id}/memberships",
+    response_model=OrganizationMembershipResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_organization_membership(
+    organization_id: uuid.UUID,
+    membership_create: OrganizationMembershipCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationMembershipResponse:
+    require_csrf(request)
+    _organization_or_404(db_session, context.world_id, organization_id)
+    _agent_or_404(db_session, context.world_id, membership_create.agent_id)
+    existing = db_session.scalars(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.agent_id == membership_create.agent_id,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Organization membership already exists")
+    membership = OrganizationMembership(
+        world_id=context.world_id,
+        organization_id=organization_id,
+        agent_id=membership_create.agent_id,
+        role_title=membership_create.role_title,
+        visibility=membership_create.visibility,
+        loyalty=membership_create.loyalty,
+        influence=membership_create.influence,
+        responsibilities=membership_create.responsibilities,
+        metadata_json=membership_create.metadata,
+    )
+    db_session.add(membership)
+    db_session.flush()
+    return _organization_membership_response(db_session, membership)
+
+
+@router.patch(
+    "/{world_id}/organizations/{organization_id}/memberships/{membership_id}",
+    response_model=OrganizationMembershipResponse,
+)
+def update_organization_membership(
+    organization_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    membership_update: OrganizationMembershipUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationMembershipResponse:
+    require_csrf(request)
+    _organization_or_404(db_session, context.world_id, organization_id)
+    membership = _organization_membership_or_404(
+        db_session,
+        context.world_id,
+        organization_id,
+        membership_id,
+    )
+    for field_name in ("role_title", "visibility", "loyalty", "influence"):
+        if field_name in membership_update.model_fields_set:
+            setattr(membership, field_name, getattr(membership_update, field_name))
+    if "responsibilities" in membership_update.model_fields_set:
+        membership.responsibilities = membership_update.responsibilities or []
+    if "metadata" in membership_update.model_fields_set:
+        membership.metadata_json = membership_update.metadata or {}
+    db_session.flush()
+    return _organization_membership_response(db_session, membership)
+
+
+@router.get(
+    "/{world_id}/organizations/{organization_id}/faction-tracks",
+    response_model=list[FactionProgressTrackResponse],
+)
+def list_faction_tracks(
+    organization_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[FactionProgressTrackResponse]:
+    _organization_or_404(db_session, context.world_id, organization_id)
+    tracks = db_session.scalars(
+        select(FactionProgressTrack)
+        .where(
+            FactionProgressTrack.world_id == context.world_id,
+            FactionProgressTrack.organization_id == organization_id,
+        )
+        .order_by(FactionProgressTrack.track_key),
+    ).all()
+    return [_faction_track_response(db_session, track) for track in tracks]
+
+
+@router.post(
+    "/{world_id}/organizations/{organization_id}/faction-tracks",
+    response_model=FactionProgressTrackResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_faction_track(
+    organization_id: uuid.UUID,
+    track_create: FactionProgressTrackCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> FactionProgressTrackResponse:
+    require_csrf(request)
+    _organization_or_404(db_session, context.world_id, organization_id)
+    existing = db_session.scalars(
+        select(FactionProgressTrack).where(
+            FactionProgressTrack.organization_id == organization_id,
+            FactionProgressTrack.track_key == track_create.track_key,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Faction progress track already exists")
+    track = FactionProgressTrack(
+        world_id=context.world_id,
+        organization_id=organization_id,
+        track_key=track_create.track_key,
+        name=track_create.name,
+        track_type=track_create.track_type,
+        progress=track_create.progress,
+        pressure=track_create.pressure,
+        summary=track_create.summary,
+        metadata_json=track_create.metadata,
+    )
+    db_session.add(track)
+    db_session.flush()
+    return _faction_track_response(db_session, track)
+
+
+@router.patch(
+    "/{world_id}/organizations/{organization_id}/faction-tracks/{track_id}",
+    response_model=FactionProgressTrackResponse,
+)
+def update_faction_track(
+    organization_id: uuid.UUID,
+    track_id: uuid.UUID,
+    track_update: FactionProgressTrackUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> FactionProgressTrackResponse:
+    require_csrf(request)
+    _organization_or_404(db_session, context.world_id, organization_id)
+    track = _faction_track_or_404(db_session, context.world_id, organization_id, track_id)
+    previous_progress = track.progress
+    for field_name in ("name", "track_type", "progress", "pressure", "summary"):
+        if field_name in track_update.model_fields_set:
+            next_value = getattr(track_update, field_name)
+            if next_value is not None or field_name == "summary":
+                setattr(track, field_name, next_value)
+    if "metadata" in track_update.model_fields_set:
+        track.metadata_json = track_update.metadata or {}
+    if track.progress != previous_progress:
+        event = WorldEventStore(db_session).append_event(
+            WorldEventAppend(
+                world_id=context.world_id,
+                event_name="organization.faction_progress_updated",
+                importance=WorldEventImportance.ORGANIZATION,
+                payload={
+                    "organization_id": str(organization_id),
+                    "track_id": str(track.id),
+                    "track_key": track.track_key,
+                    "previous_progress": previous_progress,
+                    "progress": track.progress,
+                },
+                wall_time=datetime.now(UTC),
+                actor_ref=_actor_ref(context.subject),
+            ),
+        )
+        RuntimeDiagnosticsService(db_session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.INFO,
+                component=DiagnosticComponent.API,
+                event_type="organization.faction_progress_updated",
+                message="Faction progress track was updated.",
+                details={"event_id": str(event.id), "track_id": str(track.id)},
+                world_id=context.world_id,
+            ),
+        )
+    db_session.flush()
+    return _faction_track_response(db_session, track)
 
 
 @router.get("/{world_id}/memberships", response_model=list[MembershipResponse])
@@ -2227,6 +3014,57 @@ def list_agent_relationships(
     return [_agent_relationship_response(db_session, edge) for edge in edges]
 
 
+@router.get(
+    "/{world_id}/agents/{agent_id}/presence",
+    response_model=AgentPresenceResponse | None,
+)
+def get_agent_presence(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentPresenceResponse | None:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    presence = db_session.scalars(
+        select(AgentPresenceState).where(
+            AgentPresenceState.world_id == context.world_id,
+            AgentPresenceState.agent_id == agent_id,
+        ),
+    ).one_or_none()
+    return None if presence is None else _presence_response(db_session, presence)
+
+
+@router.put(
+    "/{world_id}/agents/{agent_id}/presence",
+    response_model=AgentPresenceResponse,
+)
+def upsert_agent_presence(
+    agent_id: uuid.UUID,
+    presence_update: AgentPresenceUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentPresenceResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    if presence_update.current_scene_id is not None:
+        _scene_or_404(db_session, context.world_id, presence_update.current_scene_id)
+    presence = db_session.scalars(
+        select(AgentPresenceState).where(
+            AgentPresenceState.world_id == context.world_id,
+            AgentPresenceState.agent_id == agent_id,
+        ),
+    ).one_or_none()
+    if presence is None:
+        presence = AgentPresenceState(world_id=context.world_id, agent_id=agent_id)
+        db_session.add(presence)
+    presence.current_scene_id = presence_update.current_scene_id
+    presence.visibility_status = presence_update.visibility_status
+    presence.encounter_eligible = presence_update.encounter_eligible
+    presence.scheduled_movement = presence_update.scheduled_movement
+    db_session.flush()
+    return _presence_response(db_session, presence)
+
+
 @router.post(
     "/{world_id}/agents/{agent_id}/relationships",
     response_model=AgentRelationshipResponse,
@@ -2278,6 +3116,24 @@ def create_agent_relationship(
     )
     db_session.add(edge)
     db_session.flush()
+    relationship_event = WorldEventStore(db_session).append_event(
+        WorldEventAppend(
+            world_id=context.world_id,
+            event_name="relationship.edge_created",
+            importance=WorldEventImportance.RELATIONSHIP,
+            payload={
+                "relationship_id": str(edge.id),
+                "source_agent_id": str(edge.source_agent_id),
+                "target_agent_id": str(edge.target_agent_id),
+                "relationship_type": edge.relationship_type,
+            },
+            wall_time=datetime.now(UTC),
+            actor_ref=_actor_ref(context.subject),
+        ),
+    )
+    _record_relationship_memory(
+        db_session, context.world_id, edge, relationship_event.id, "created"
+    )
     return _agent_relationship_response(db_session, edge)
 
 
@@ -2312,6 +3168,24 @@ def update_agent_relationship(
     if "metadata" in relationship_update.model_fields_set:
         edge.metadata_json = relationship_update.metadata or {}
     db_session.flush()
+    relationship_event = WorldEventStore(db_session).append_event(
+        WorldEventAppend(
+            world_id=context.world_id,
+            event_name="relationship.edge_updated",
+            importance=WorldEventImportance.RELATIONSHIP,
+            payload={
+                "relationship_id": str(edge.id),
+                "source_agent_id": str(edge.source_agent_id),
+                "target_agent_id": str(edge.target_agent_id),
+                "relationship_type": edge.relationship_type,
+            },
+            wall_time=datetime.now(UTC),
+            actor_ref=_actor_ref(context.subject),
+        ),
+    )
+    _record_relationship_memory(
+        db_session, context.world_id, edge, relationship_event.id, "updated"
+    )
     return _agent_relationship_response(db_session, edge)
 
 
@@ -2855,10 +3729,13 @@ def create_narrative_artifact(
                 "continuity": artifact_create.continuity_metadata,
             }
             db_session.flush()
-            artifact = NarrativeArtifactService(db_session).get_artifact(
-                context.world_id,
-                artifact.id,
-            ) or artifact
+            artifact = (
+                NarrativeArtifactService(db_session).get_artifact(
+                    context.world_id,
+                    artifact.id,
+                )
+                or artifact
+            )
     return _narrative_artifact_response(artifact)
 
 
@@ -3088,7 +3965,177 @@ def _scene_response(scene: Scene) -> SceneResponse:
         scene_key=scene.scene_key,
         name=scene.name,
         description=scene.description,
+        region_key=scene.region_key,
+        location_tags=scene.location_tags,
+        opening_rules=scene.opening_rules,
         is_active=scene.is_active,
+    )
+
+
+def _location_edge_response(
+    db_session: Session,
+    edge: SceneLocationEdge,
+) -> SceneLocationEdgeResponse:
+    source_scene = _scene_or_404(db_session, edge.world_id, edge.source_scene_id)
+    target_scene = _scene_or_404(db_session, edge.world_id, edge.target_scene_id)
+    return SceneLocationEdgeResponse(
+        id=edge.id,
+        world_id=edge.world_id,
+        source_scene_id=edge.source_scene_id,
+        target_scene_id=edge.target_scene_id,
+        source_scene_key=source_scene.scene_key,
+        target_scene_key=target_scene.scene_key,
+        travel_label=edge.travel_label,
+        traversal_rules=edge.traversal_rules,
+        created_at=edge.created_at,
+        updated_at=edge.updated_at,
+    )
+
+
+def _organization_response(organization: WorldOrganization) -> OrganizationResponse:
+    return OrganizationResponse(
+        id=organization.id,
+        world_id=organization.world_id,
+        organization_key=organization.organization_key,
+        name=organization.name,
+        organization_type=cast(OrganizationType, organization.organization_type),
+        description=organization.description,
+        public_summary=organization.public_summary,
+        hidden_summary=organization.hidden_summary,
+        metadata=organization.metadata_json,
+        is_active=organization.is_active,
+        created_at=organization.created_at,
+        updated_at=organization.updated_at,
+    )
+
+
+def _organization_membership_response(
+    db_session: Session,
+    membership: OrganizationMembership,
+) -> OrganizationMembershipResponse:
+    organization = _organization_or_404(db_session, membership.world_id, membership.organization_id)
+    agent = _agent_or_404(db_session, membership.world_id, membership.agent_id)
+    return OrganizationMembershipResponse(
+        id=membership.id,
+        world_id=membership.world_id,
+        organization_id=membership.organization_id,
+        organization_key=organization.organization_key,
+        organization_name=organization.name,
+        agent_id=membership.agent_id,
+        agent_key=agent.agent_key,
+        agent_display_name=agent.display_name,
+        role_title=membership.role_title,
+        visibility=cast(OrganizationVisibility, membership.visibility),
+        loyalty=membership.loyalty,
+        influence=membership.influence,
+        responsibilities=membership.responsibilities,
+        metadata=membership.metadata_json,
+        created_at=membership.created_at,
+        updated_at=membership.updated_at,
+    )
+
+
+def _faction_track_response(
+    db_session: Session,
+    track: FactionProgressTrack,
+) -> FactionProgressTrackResponse:
+    organization = _organization_or_404(db_session, track.world_id, track.organization_id)
+    return FactionProgressTrackResponse(
+        id=track.id,
+        world_id=track.world_id,
+        organization_id=track.organization_id,
+        organization_key=organization.organization_key,
+        organization_name=organization.name,
+        track_key=track.track_key,
+        name=track.name,
+        track_type=cast(FactionTrackType, track.track_type),
+        progress=track.progress,
+        pressure=track.pressure,
+        summary=track.summary,
+        metadata=track.metadata_json,
+        created_at=track.created_at,
+        updated_at=track.updated_at,
+    )
+
+
+def _presence_response(db_session: Session, presence: AgentPresenceState) -> AgentPresenceResponse:
+    agent = _agent_or_404(db_session, presence.world_id, presence.agent_id)
+    scene = (
+        None
+        if presence.current_scene_id is None
+        else _scene_or_404(db_session, presence.world_id, presence.current_scene_id)
+    )
+    return AgentPresenceResponse(
+        id=presence.id,
+        world_id=presence.world_id,
+        agent_id=presence.agent_id,
+        agent_key=agent.agent_key,
+        agent_display_name=agent.display_name,
+        current_scene_id=presence.current_scene_id,
+        current_scene_key=None if scene is None else scene.scene_key,
+        current_scene_name=None if scene is None else scene.name,
+        visibility_status=cast(PresenceVisibilityStatus, presence.visibility_status),
+        encounter_eligible=presence.encounter_eligible,
+        scheduled_movement=presence.scheduled_movement,
+        last_event_id=presence.last_event_id,
+        created_at=presence.created_at,
+        updated_at=presence.updated_at,
+    )
+
+
+def _daily_life_candidate_response(
+    db_session: Session,
+    candidate: DailyLifeEventCandidate,
+) -> DailyLifeEventCandidateResponse:
+    agent = None if candidate.agent_id is None else db_session.get(Agent, candidate.agent_id)
+    scene = None if candidate.scene_id is None else db_session.get(Scene, candidate.scene_id)
+    return DailyLifeEventCandidateResponse(
+        id=candidate.id,
+        world_id=candidate.world_id,
+        agent_id=candidate.agent_id,
+        agent_display_name=None if agent is None else agent.display_name,
+        scene_id=candidate.scene_id,
+        scene_name=None if scene is None else scene.name,
+        title=candidate.title,
+        summary=candidate.summary,
+        importance=cast(Literal["daily", "relationship", "organization"], candidate.importance),
+        starts_at=candidate.starts_at,
+        source_kind=candidate.source_kind,
+        source_ref=candidate.source_ref,
+        status=cast(DailyLifeCandidateStatus, candidate.status),
+        metadata=candidate.metadata_json,
+        created_at=candidate.created_at,
+        updated_at=candidate.updated_at,
+    )
+
+
+def _offscreen_queue_response(item: OffscreenEventQueueItem) -> OffscreenEventQueueResponse:
+    return OffscreenEventQueueResponse(
+        id=item.id,
+        world_id=item.world_id,
+        source_candidate_id=item.source_candidate_id,
+        event_name=item.event_name,
+        title=item.title,
+        payload=item.payload_json,
+        due_at=item.due_at,
+        importance=cast(
+            Literal["daily", "relationship", "organization", "route", "main_plot"],
+            item.importance,
+        ),
+        status=cast(OffscreenEventStatus, item.status),
+        resolved_event_id=item.resolved_event_id,
+        last_error=item.last_error,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+def _offscreen_resolution_response(result: Any) -> OffscreenResolutionResponse:
+    return OffscreenResolutionResponse(
+        processed_count=result.processed_count,
+        resolved_count=result.resolved_count,
+        failed_count=result.failed_count,
+        event_ids=result.event_ids,
     )
 
 
@@ -3814,10 +4861,7 @@ def _calendar_conflict_report_response(
         start_world_time=report.start_world_time,
         horizon_hours=report.horizon_hours,
         conflict_count=report.conflict_count,
-        conflicts=[
-            _calendar_conflict_response(conflict)
-            for conflict in report.conflicts
-        ],
+        conflicts=[_calendar_conflict_response(conflict) for conflict in report.conflicts],
     )
 
 
@@ -3981,6 +5025,7 @@ def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
         world_id=event.world_id,
         sequence=event.sequence,
         event_name=event.event_name,
+        importance=cast(EventImportance, event.importance),
         payload=event.payload,
         wall_time=event.wall_time,
         world_time=event.world_time,
@@ -4048,6 +5093,62 @@ def _relationship_or_404(
     if edge is None or edge.world_id != world_id or edge.source_agent_id != source_agent_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relationship not found")
     return edge
+
+
+def _location_edge_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    edge_id: uuid.UUID,
+) -> SceneLocationEdge:
+    edge = db_session.get(SceneLocationEdge, edge_id)
+    if edge is None or edge.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location edge not found")
+    return edge
+
+
+def _organization_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    organization_id: uuid.UUID,
+) -> WorldOrganization:
+    organization = db_session.get(WorldOrganization, organization_id)
+    if organization is None or organization.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+    return organization
+
+
+def _organization_membership_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    membership_id: uuid.UUID,
+) -> OrganizationMembership:
+    membership = db_session.get(OrganizationMembership, membership_id)
+    if (
+        membership is None
+        or membership.world_id != world_id
+        or membership.organization_id != organization_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization membership not found",
+        )
+    return membership
+
+
+def _faction_track_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    track_id: uuid.UUID,
+) -> FactionProgressTrack:
+    track = db_session.get(FactionProgressTrack, track_id)
+    if track is None or track.world_id != world_id or track.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Faction progress track not found",
+        )
+    return track
 
 
 def _calendar_entry_or_404(
@@ -4232,6 +5333,48 @@ def _clock_conflict(error: WorldClockError) -> HTTPException:
 
 def _actor_ref(subject: AuthenticatedSubject) -> str:
     return f"user:{subject.user_id}"
+
+
+def _relationship_memory_summary(db_session: Session, edge: AgentRelationshipEdge) -> str:
+    source_agent = _agent_or_404(db_session, edge.world_id, edge.source_agent_id)
+    target_agent = _agent_or_404(db_session, edge.world_id, edge.target_agent_id)
+    return (
+        f"{source_agent.display_name} and {target_agent.display_name} have a "
+        f"{edge.relationship_type} relationship: affection {edge.affection}, trust {edge.trust}, "
+        f"hostility {edge.hostility}, intimacy {edge.intimacy}, obligation {edge.obligation}, "
+        f"rivalry {edge.rivalry}, debt {edge.debt}."
+    )
+
+
+def _record_relationship_memory(
+    db_session: Session,
+    world_id: uuid.UUID,
+    edge: AgentRelationshipEdge,
+    event_id: uuid.UUID,
+    action: str,
+) -> None:
+    try:
+        MemoryService(db_session, load_settings()).record_relationship_change(
+            world_id=world_id,
+            source_agent_id=edge.source_agent_id,
+            target_agent_id=edge.target_agent_id,
+            relationship_id=edge.id,
+            relationship_type=edge.relationship_type,
+            summary=_relationship_memory_summary(db_session, edge),
+            metadata={"source_event_id": str(event_id), "action": action},
+            dedupe_suffix=f"{action}:{event_id}",
+        )
+    except Exception as exc:
+        RuntimeDiagnosticsService(db_session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.WARNING,
+                component=DiagnosticComponent.API,
+                event_type="relationship.memory_write_skipped",
+                message="Relationship memory write was skipped.",
+                details={"error": str(exc), "relationship_id": str(edge.id), "action": action},
+                world_id=world_id,
+            ),
+        )
 
 
 def _continuity_metadata(metadata: dict[str, Any]) -> dict[str, Any]:

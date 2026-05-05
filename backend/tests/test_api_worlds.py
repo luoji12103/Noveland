@@ -23,7 +23,12 @@ from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationSession, ConversationTurn
-from noveland.events import CLOCK_ADVANCED_EVENT_NAME, WorldEventAppend, WorldEventStore
+from noveland.events import (
+    CLOCK_ADVANCED_EVENT_NAME,
+    WorldEventAppend,
+    WorldEventImportance,
+    WorldEventStore,
+)
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import (
     AgentMemoryItem,
@@ -45,12 +50,19 @@ from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
+    AgentPresenceState,
+    DailyLifeEventCandidate,
+    FactionProgressTrack,
+    OffscreenEventQueueItem,
+    OrganizationMembership,
     Scene,
+    SceneLocationEdge,
     World,
     WorldBible,
     WorldClockStateModel,
     WorldClockTransitionModel,
     WorldMembership,
+    WorldOrganization,
 )
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -503,6 +515,15 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
         json={"trust": 55, "metadata": {"reason": "kept promise"}},
     )
     listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
+    with Session(engine) as session:
+        relationship_events = session.scalars(
+            select(WorldEventModel)
+            .where(WorldEventModel.world_id == world_id)
+            .order_by(WorldEventModel.sequence),
+        ).all()
+        relationship_memory_jobs = session.scalars(
+            select(MemoryWriteJob).order_by(MemoryWriteJob.created_at),
+        ).all()
 
     assert member_empty.status_code == 200
     assert member_empty.json() == []
@@ -520,6 +541,394 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     assert updated.json()["metadata"] == {"reason": "kept promise"}
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == created.json()["id"]
+    assert [event.event_name for event in relationship_events] == [
+        "relationship.edge_created",
+        "relationship.edge_updated",
+    ]
+    assert {event.importance for event in relationship_events} == {"relationship"}
+    assert len(relationship_memory_jobs) == 4
+    assert {
+        job.payload_json["metadata"]["relationship_type"] for job in relationship_memory_jobs
+    } == {"friendship"}
+
+
+def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    other_owner_id, _other_token = _seed_user(engine, "other@example.test")
+    world_id = _seed_world(engine, owner_id, "location-world")
+    other_world_id = _seed_world(engine, other_owner_id, "other-location-world")
+    other_scene_id = _seed_scene(engine, other_world_id, "outside")
+    agent_id = _seed_agent(engine, world_id, "wanderer")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, owner_token)
+    classroom = client.post(
+        f"/worlds/{world_id}/scenes",
+        json={
+            "scene_key": "classroom",
+            "name": "Classroom",
+            "region_key": "school",
+            "location_tags": ["school", "indoors"],
+            "opening_rules": {"weekday": "07:00-18:00"},
+        },
+    )
+    courtyard = client.post(
+        f"/worlds/{world_id}/scenes",
+        json={
+            "scene_key": "courtyard",
+            "name": "Courtyard",
+            "region_key": "school",
+        },
+    )
+    classroom_id = classroom.json()["id"]
+    courtyard_id = courtyard.json()["id"]
+
+    _authenticate(client, member_token)
+    member_edges = client.get(f"/worlds/{world_id}/location-edges")
+    member_create_edge = client.post(
+        f"/worlds/{world_id}/location-edges",
+        json={"source_scene_id": classroom_id, "target_scene_id": courtyard_id},
+    )
+    member_empty_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
+    member_update_presence = client.put(
+        f"/worlds/{world_id}/agents/{agent_id}/presence",
+        json={"current_scene_id": classroom_id},
+    )
+
+    _authenticate(client, owner_token)
+    self_edge = client.post(
+        f"/worlds/{world_id}/location-edges",
+        json={"source_scene_id": classroom_id, "target_scene_id": classroom_id},
+    )
+    cross_world_edge = client.post(
+        f"/worlds/{world_id}/location-edges",
+        json={"source_scene_id": classroom_id, "target_scene_id": str(other_scene_id)},
+    )
+    created_edge = client.post(
+        f"/worlds/{world_id}/location-edges",
+        json={
+            "source_scene_id": classroom_id,
+            "target_scene_id": courtyard_id,
+            "travel_label": "walkway",
+            "traversal_rules": {"requires": "school_access"},
+        },
+    )
+    duplicate_edge = client.post(
+        f"/worlds/{world_id}/location-edges",
+        json={"source_scene_id": classroom_id, "target_scene_id": courtyard_id},
+    )
+    updated_edge = client.patch(
+        f"/worlds/{world_id}/location-edges/{created_edge.json()['id']}",
+        json={"travel_label": "covered walkway"},
+    )
+    upsert_presence = client.put(
+        f"/worlds/{world_id}/agents/{agent_id}/presence",
+        json={
+            "current_scene_id": classroom_id,
+            "visibility_status": "offscreen",
+            "encounter_eligible": False,
+            "scheduled_movement": {"next_scene_id": courtyard_id},
+        },
+    )
+    invalid_presence_scene = client.put(
+        f"/worlds/{world_id}/agents/{agent_id}/presence",
+        json={"current_scene_id": str(other_scene_id)},
+    )
+    scenes = client.get(f"/worlds/{world_id}/scenes")
+
+    _authenticate(client, member_token)
+    member_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
+
+    assert classroom.status_code == 201
+    assert classroom.json()["region_key"] == "school"
+    assert classroom.json()["location_tags"] == ["school", "indoors"]
+    assert classroom.json()["opening_rules"] == {"weekday": "07:00-18:00"}
+    assert member_edges.status_code == 200
+    assert member_edges.json() == []
+    assert member_create_edge.status_code == 403
+    assert member_empty_presence.status_code == 200
+    assert member_empty_presence.json() is None
+    assert member_update_presence.status_code == 403
+    assert self_edge.status_code == 422
+    assert cross_world_edge.status_code == 404
+    assert created_edge.status_code == 201
+    assert created_edge.json()["source_scene_key"] == "classroom"
+    assert created_edge.json()["target_scene_key"] == "courtyard"
+    assert duplicate_edge.status_code == 409
+    assert updated_edge.status_code == 200
+    assert updated_edge.json()["travel_label"] == "covered walkway"
+    assert upsert_presence.status_code == 200
+    assert upsert_presence.json()["current_scene_key"] == "classroom"
+    assert upsert_presence.json()["visibility_status"] == "offscreen"
+    assert upsert_presence.json()["encounter_eligible"] is False
+    assert invalid_presence_scene.status_code == 404
+    assert [scene["scene_key"] for scene in scenes.json()] == ["classroom", "courtyard"]
+    assert member_presence.status_code == 200
+    assert member_presence.json()["scheduled_movement"] == {"next_scene_id": courtyard_id}
+
+
+def test_organization_memberships_and_faction_tracks_append_events() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    other_owner_id, _other_token = _seed_user(engine, "other@example.test")
+    world_id = _seed_world(engine, owner_id, "organization-world")
+    other_world_id = _seed_world(engine, other_owner_id, "other-organization-world")
+    agent_id = _seed_agent(engine, world_id, "club-president")
+    other_agent_id = _seed_agent(engine, other_world_id, "outsider")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    member_list = client.get(f"/worlds/{world_id}/organizations")
+    member_create = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+        },
+    )
+
+    _authenticate(client, owner_token)
+    created_org = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+            "public_summary": "Runs school events.",
+            "hidden_summary": "Tracks the old club room incident.",
+            "metadata": {"founded": "post-canon"},
+        },
+    )
+    organization_id = created_org.json()["id"]
+    duplicate_org = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Duplicate",
+            "organization_type": "club",
+        },
+    )
+    updated_org = client.patch(
+        f"/worlds/{world_id}/organizations/{organization_id}",
+        json={"organization_type": "faction", "is_active": False},
+    )
+    cross_world_membership = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+        json={"agent_id": str(other_agent_id), "role_title": "Observer"},
+    )
+    created_membership = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+        json={
+            "agent_id": str(agent_id),
+            "role_title": "President",
+            "visibility": "public",
+            "loyalty": 80,
+            "influence": 70,
+            "responsibilities": ["agenda"],
+            "metadata": {"route": "student-council"},
+        },
+    )
+    duplicate_membership = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+        json={"agent_id": str(agent_id)},
+    )
+    updated_membership = client.patch(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships/"
+        f"{created_membership.json()['id']}",
+        json={"loyalty": 85, "visibility": "hidden"},
+    )
+    list_memberships = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+    )
+    created_track = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+        json={
+            "track_key": "festival-plan",
+            "name": "Festival Plan",
+            "track_type": "goal",
+            "progress": 10,
+            "pressure": 20,
+        },
+    )
+    duplicate_track = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+        json={
+            "track_key": "festival-plan",
+            "name": "Festival Plan",
+            "track_type": "goal",
+        },
+    )
+    updated_track = client.patch(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks/"
+        f"{created_track.json()['id']}",
+        json={"progress": 35, "summary": "Venue confirmed."},
+    )
+    list_tracks = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+    )
+    organization_events = client.get(
+        f"/worlds/{world_id}/events",
+        params={"importance": "organization"},
+    )
+
+    assert member_list.status_code == 200
+    assert member_list.json() == []
+    assert member_create.status_code == 403
+    assert created_org.status_code == 201
+    assert created_org.json()["organization_key"] == "student-council"
+    assert created_org.json()["metadata"] == {"founded": "post-canon"}
+    assert duplicate_org.status_code == 409
+    assert updated_org.status_code == 200
+    assert updated_org.json()["organization_type"] == "faction"
+    assert updated_org.json()["is_active"] is False
+    assert cross_world_membership.status_code == 404
+    assert created_membership.status_code == 201
+    assert created_membership.json()["agent_key"] == "club-president"
+    assert created_membership.json()["loyalty"] == 80
+    assert duplicate_membership.status_code == 409
+    assert updated_membership.status_code == 200
+    assert updated_membership.json()["visibility"] == "hidden"
+    assert updated_membership.json()["loyalty"] == 85
+    assert [item["agent_key"] for item in list_memberships.json()] == ["club-president"]
+    assert created_track.status_code == 201
+    assert created_track.json()["progress"] == 10
+    assert duplicate_track.status_code == 409
+    assert updated_track.status_code == 200
+    assert updated_track.json()["progress"] == 35
+    assert list_tracks.status_code == 200
+    assert list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert organization_events.status_code == 200
+    assert organization_events.json()[0]["event_name"] == "organization.faction_progress_updated"
+    assert organization_events.json()[0]["payload"]["previous_progress"] == 10
+
+
+def test_daily_life_and_offscreen_event_queue_are_world_scoped() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    other_owner_id, _other_token = _seed_user(engine, "other@example.test")
+    world_id = _seed_world(engine, owner_id, "daily-world")
+    other_world_id = _seed_world(engine, other_owner_id, "other-daily-world")
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    agent_id = _seed_agent(engine, world_id, "club-member", scene_id=scene_id)
+    other_agent_id = _seed_agent(engine, other_world_id, "other-member")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_schedule_rule(engine, world_id)
+    with Session(engine) as session:
+        other_candidate = DailyLifeEventCandidate(
+            world_id=other_world_id,
+            agent_id=other_agent_id,
+            title="Other beat",
+            summary="Other world beat.",
+            importance="daily",
+            starts_at=datetime(2000, 1, 1, tzinfo=UTC),
+            source_kind="test",
+            status="candidate",
+        )
+        other_queue_item = OffscreenEventQueueItem(
+            world_id=other_world_id,
+            event_name="living_world.other_event",
+            title="Other due event",
+            payload_json={"summary": "Should remain pending."},
+            due_at=datetime(2000, 1, 1, tzinfo=UTC),
+            importance="daily",
+            status="pending",
+        )
+        session.add_all([other_candidate, other_queue_item])
+        session.commit()
+        other_candidate_id = other_candidate.id
+        other_queue_item_id = other_queue_item.id
+
+    _authenticate(client, member_token)
+    member_preview = client.get(f"/worlds/{world_id}/daily-life/preview")
+    member_queue = client.get(f"/worlds/{world_id}/offscreen-events")
+
+    _authenticate(client, owner_token)
+    preview = client.get(
+        f"/worlds/{world_id}/daily-life/preview",
+        params={
+            "start_world_time": "2030-01-01T08:00:00Z",
+            "horizon_hours": 12,
+            "limit": 5,
+        },
+    )
+    generated = client.post(
+        f"/worlds/{world_id}/daily-life/generate",
+        json={"horizon_hours": 12, "limit": 5},
+    )
+    candidate_id = generated.json()[0]["id"]
+    cross_world_candidate = client.post(
+        f"/worlds/{world_id}/offscreen-events",
+        json={
+            "candidate_id": str(other_candidate_id),
+            "title": "Blocked",
+            "due_at": "2000-01-01T00:00:00Z",
+        },
+    )
+    queued = client.post(
+        f"/worlds/{world_id}/offscreen-events",
+        json={
+            "candidate_id": candidate_id,
+            "event_name": "living_world.daily_life",
+            "title": "Ignored by candidate queue",
+            "due_at": "2000-01-01T00:00:00Z",
+        },
+    )
+    candidates_after_queue = client.get(
+        f"/worlds/{world_id}/daily-life/candidates",
+        params={"status": "queued"},
+    )
+    pending = client.get(f"/worlds/{world_id}/offscreen-events", params={"status": "pending"})
+    resolved = client.post(f"/worlds/{world_id}/offscreen-events/resolve", params={"limit": 5})
+    resolved_queue = client.get(
+        f"/worlds/{world_id}/offscreen-events",
+        params={"status": "resolved"},
+    )
+    daily_events = client.get(f"/worlds/{world_id}/events", params={"importance": "daily"})
+    presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
+    with Session(engine) as session:
+        other_queue_status = session.scalars(
+            select(OffscreenEventQueueItem.status).where(
+                OffscreenEventQueueItem.id == other_queue_item_id,
+            ),
+        ).one()
+
+    assert member_preview.status_code == 403
+    assert member_queue.status_code == 403
+    assert preview.status_code == 200
+    assert preview.json()["candidate_count"] == 1
+    assert preview.json()["candidates"][0]["agent_display_name"] == "club-member"
+    assert preview.json()["candidates"][0]["scene_name"] == "club-room"
+    assert preview.json()["candidates"][0]["metadata"]["schedule_rule_count"] == 1
+    assert generated.status_code == 200
+    assert generated.json()[0]["status"] == "candidate"
+    assert generated.json()[0]["importance"] == "daily"
+    assert cross_world_candidate.status_code == 404
+    assert queued.status_code == 201
+    assert queued.json()["source_candidate_id"] == candidate_id
+    assert queued.json()["status"] == "pending"
+    assert candidates_after_queue.status_code == 200
+    assert candidates_after_queue.json()[0]["id"] == candidate_id
+    assert pending.status_code == 200
+    assert pending.json()[0]["id"] == queued.json()["id"]
+    assert resolved.status_code == 200
+    assert resolved.json()["processed_count"] == 1
+    assert resolved.json()["resolved_count"] == 1
+    assert resolved_queue.status_code == 200
+    assert resolved_queue.json()[0]["resolved_event_id"] == resolved.json()["event_ids"][0]
+    assert daily_events.status_code == 200
+    assert daily_events.json()[0]["event_name"] == "living_world.daily_life"
+    assert presence.status_code == 200
+    assert presence.json()["current_scene_id"] == str(scene_id)
+    assert presence.json()["last_event_id"] == resolved.json()["event_ids"][0]
+    assert other_queue_status == "pending"
 
 
 def test_membership_management_and_final_admin_guard() -> None:
@@ -1337,6 +1746,7 @@ def test_world_event_audit_requires_admin_and_filters_events() -> None:
         actor_ref="conversation:seed",
         minute=2,
         payload={"turn": 1},
+        importance=WorldEventImportance.RELATIONSHIP,
     )
     _seed_world_event(
         engine,
@@ -1368,6 +1778,10 @@ def test_world_event_audit_requires_admin_and_filters_events() -> None:
             "wall_time_to": "2026-04-17T12:03:00Z",
         },
     )
+    by_importance = client.get(
+        f"/worlds/{world_id}/events",
+        params={"importance": "relationship"},
+    )
     limited = client.get(f"/worlds/{world_id}/events", params={"limit": 1})
     limit_too_high = client.get(f"/worlds/{world_id}/events", params={"limit": 101})
 
@@ -1389,6 +1803,10 @@ def test_world_event_audit_requires_admin_and_filters_events() -> None:
     ]
     assert by_wall_time.status_code == 200
     assert [event["sequence"] for event in by_wall_time.json()] == [3, 2]
+    assert by_importance.status_code == 200
+    assert [event["event_name"] for event in by_importance.json()] == [
+        "conversation.turn_completed",
+    ]
     assert limited.status_code == 200
     assert [event["sequence"] for event in limited.json()] == [3]
     assert limit_too_high.status_code == 422
@@ -1696,12 +2114,19 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AgentPreset.__table__),
         cast(Table, Agent.__table__),
         cast(Table, WorldBible.__table__),
+        cast(Table, WorldOrganization.__table__),
+        cast(Table, OrganizationMembership.__table__),
+        cast(Table, FactionProgressTrack.__table__),
+        cast(Table, SceneLocationEdge.__table__),
         cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, AgentPresenceState.__table__),
+        cast(Table, DailyLifeEventCandidate.__table__),
+        cast(Table, OffscreenEventQueueItem.__table__),
         cast(Table, WorldSnapshotModel.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
@@ -2071,6 +2496,7 @@ def _seed_world_event(
     actor_ref: str,
     minute: int,
     payload: dict[str, object],
+    importance: WorldEventImportance = WorldEventImportance.SYSTEM,
     correlation_id: uuid.UUID | None = None,
 ) -> None:
     with Session(engine) as session:
@@ -2078,6 +2504,7 @@ def _seed_world_event(
             WorldEventAppend(
                 world_id=world_id,
                 event_name=event_name,
+                importance=importance,
                 payload=payload,
                 wall_time=datetime(2026, 4, 17, 12, minute, tzinfo=UTC),
                 world_time=datetime(2030, 1, 1, 0, minute, tzinfo=UTC),

@@ -17,6 +17,15 @@ class WorldSnapshotStatus(StrEnum):
     INVALID = "invalid"
 
 
+class WorldEventImportance(StrEnum):
+    SYSTEM = "system"
+    DAILY = "daily"
+    RELATIONSHIP = "relationship"
+    ORGANIZATION = "organization"
+    ROUTE = "route"
+    MAIN_PLOT = "main_plot"
+
+
 class _FrozenContract(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -25,6 +34,7 @@ class WorldEventAppend(_FrozenContract):
     world_id: uuid.UUID
     event_name: str = Field(min_length=3, max_length=120, pattern=EVENT_NAME_PATTERN)
     payload: dict[str, Any] = Field(default_factory=dict)
+    importance: WorldEventImportance = WorldEventImportance.SYSTEM
     wall_time: datetime
     world_time: datetime | None = None
     actor_ref: str = Field(min_length=1, max_length=120)

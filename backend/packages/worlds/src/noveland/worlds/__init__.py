@@ -1,3 +1,8 @@
+from noveland.worlds.autonomous import (
+    DailyLifePreviewResult,
+    LivingWorldAutonomyService,
+    OffscreenResolutionResult,
+)
 from noveland.worlds.clock import (
     ClockTransition,
     WorldClockError,
@@ -19,6 +24,9 @@ PACKAGE_NAME = "worlds"
 __all__ = [
     "PACKAGE_NAME",
     "ClockTransition",
+    "DailyLifePreviewResult",
+    "LivingWorldAutonomyService",
+    "OffscreenResolutionResult",
     "WorldClockError",
     "WorldClockState",
     "WorldClockStateError",

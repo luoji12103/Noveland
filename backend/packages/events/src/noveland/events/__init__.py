@@ -1,6 +1,7 @@
 from noveland.events.contracts import (
     SNAPSHOT_EVENT_NAME,
     WorldEventAppend,
+    WorldEventImportance,
     WorldEventRecord,
     WorldSnapshotCreate,
     WorldSnapshotRecord,
@@ -51,6 +52,7 @@ __all__ = [
     "SnapshotIntegrityStatus",
     "WorldEventEnvelope",
     "WorldEventAppend",
+    "WorldEventImportance",
     "WorldEventPublisher",
     "WorldEventRecord",
     "WorldEventStore",

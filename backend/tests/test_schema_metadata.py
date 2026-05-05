@@ -48,6 +48,7 @@ def test_core_schema_tables_are_registered() -> None:
         "agent_observations",
         "agent_personas",
         "agent_runtime_runs",
+        "agent_presence_states",
         "agent_calendar_entries",
         "agent_memory_items",
         "agent_profile_snapshots",
@@ -55,10 +56,14 @@ def test_core_schema_tables_are_registered() -> None:
         "conversation_participants",
         "conversation_sessions",
         "conversation_turns",
+        "daily_life_event_candidates",
+        "faction_progress_tracks",
         "memory_backend_profiles",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
+        "offscreen_event_queue",
+        "organization_memberships",
         "platform_settings",
         "platform_role_assignments",
         "provider_profiles",
@@ -67,6 +72,7 @@ def test_core_schema_tables_are_registered() -> None:
         "narrative_artifacts",
         "narrative_publications",
         "scenes",
+        "scene_location_edges",
         "user_credentials",
         "users",
         "world_events",
@@ -74,6 +80,7 @@ def test_core_schema_tables_are_registered() -> None:
         "world_clock_transitions",
         "world_bibles",
         "world_memberships",
+        "world_organizations",
         "world_schedule_rules",
         "world_snapshots",
         "worlds",
@@ -118,6 +125,36 @@ def test_living_world_character_foundation_columns_are_registered() -> None:
     } <= column_names("agent_relationship_edges")
 
 
+def test_living_world_autonomous_system_columns_are_registered() -> None:
+    assert {"importance"} <= column_names("world_events")
+    assert {"region_key", "location_tags", "opening_rules"} <= column_names("scenes")
+    assert {
+        "organization_key",
+        "organization_type",
+        "public_summary",
+        "hidden_summary",
+        "metadata",
+    } <= column_names("world_organizations")
+    assert {"role_title", "visibility", "loyalty", "influence", "responsibilities"} <= column_names(
+        "organization_memberships",
+    )
+    assert {"track_key", "track_type", "progress", "pressure", "summary"} <= column_names(
+        "faction_progress_tracks",
+    )
+    assert {"source_scene_id", "target_scene_id", "traversal_rules"} <= column_names(
+        "scene_location_edges",
+    )
+    assert {"visibility_status", "encounter_eligible", "scheduled_movement"} <= column_names(
+        "agent_presence_states",
+    )
+    assert {"title", "summary", "importance", "starts_at", "status"} <= column_names(
+        "daily_life_event_candidates",
+    )
+    assert {"event_name", "payload", "due_at", "importance", "status"} <= column_names(
+        "offscreen_event_queue",
+    )
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(
@@ -146,6 +183,26 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_agent_relationship_edges_source_target_type" in constraint_names(
         "agent_relationship_edges",
+        UniqueConstraint,
+    )
+    assert "uq_world_organizations_world_key" in constraint_names(
+        "world_organizations",
+        UniqueConstraint,
+    )
+    assert "uq_organization_memberships_organization_agent" in constraint_names(
+        "organization_memberships",
+        UniqueConstraint,
+    )
+    assert "uq_faction_progress_tracks_organization_key" in constraint_names(
+        "faction_progress_tracks",
+        UniqueConstraint,
+    )
+    assert "uq_scene_location_edges_pair" in constraint_names(
+        "scene_location_edges",
+        UniqueConstraint,
+    )
+    assert "uq_agent_presence_states_world_agent" in constraint_names(
+        "agent_presence_states",
         UniqueConstraint,
     )
     assert "uq_agent_personas_agent_id" in constraint_names(
@@ -272,6 +329,38 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
     )
     assert "ck_world_events_event_name_format" in constraint_names(
         "world_events",
+        CheckConstraint,
+    )
+    assert "ck_world_events_importance" in constraint_names(
+        "world_events",
+        CheckConstraint,
+    )
+    assert "ck_world_organizations_organization_type" in constraint_names(
+        "world_organizations",
+        CheckConstraint,
+    )
+    assert "ck_organization_memberships_visibility" in constraint_names(
+        "organization_memberships",
+        CheckConstraint,
+    )
+    assert "ck_faction_progress_tracks_track_type" in constraint_names(
+        "faction_progress_tracks",
+        CheckConstraint,
+    )
+    assert "ck_scene_location_edges_distinct_scenes" in constraint_names(
+        "scene_location_edges",
+        CheckConstraint,
+    )
+    assert "ck_agent_presence_states_visibility_status" in constraint_names(
+        "agent_presence_states",
+        CheckConstraint,
+    )
+    assert "ck_daily_life_event_candidates_status" in constraint_names(
+        "daily_life_event_candidates",
+        CheckConstraint,
+    )
+    assert "ck_offscreen_event_queue_status" in constraint_names(
+        "offscreen_event_queue",
         CheckConstraint,
     )
     assert "ck_world_snapshots_status" in constraint_names(
@@ -416,6 +505,36 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("world_clock_states") == {"worlds.id"}
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
     assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("world_organizations") == {"worlds.id"}
+    assert foreign_key_targets("organization_memberships") == {
+        "agents.id",
+        "world_organizations.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("faction_progress_tracks") == {
+        "world_organizations.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("scene_location_edges") == {
+        "scenes.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("agent_presence_states") == {
+        "agents.id",
+        "scenes.id",
+        "world_events.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("daily_life_event_candidates") == {
+        "agents.id",
+        "scenes.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("offscreen_event_queue") == {
+        "daily_life_event_candidates.id",
+        "world_events.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
     assert foreign_key_targets("conversation_sessions") == {"scenes.id", "worlds.id"}
     assert foreign_key_targets("conversation_participants") == {
@@ -510,6 +629,30 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_events_world_sequence" in index_names("world_events")
     assert "ix_world_events_world_event_name" in index_names("world_events")
     assert "ix_world_events_world_wall_time" in index_names("world_events")
+    assert "ix_world_events_world_importance" in index_names("world_events")
+    assert "ix_scenes_world_region" in index_names("scenes")
+    assert "ix_world_organizations_world_id" in index_names("world_organizations")
+    assert "ix_world_organizations_world_type" in index_names("world_organizations")
+    assert "ix_organization_memberships_world_agent" in index_names("organization_memberships")
+    assert "ix_organization_memberships_world_organization" in index_names(
+        "organization_memberships",
+    )
+    assert "ix_faction_progress_tracks_world_organization" in index_names(
+        "faction_progress_tracks",
+    )
+    assert "ix_faction_progress_tracks_world_type" in index_names("faction_progress_tracks")
+    assert "ix_scene_location_edges_world_source" in index_names("scene_location_edges")
+    assert "ix_scene_location_edges_world_target" in index_names("scene_location_edges")
+    assert "ix_agent_presence_states_world_agent" in index_names("agent_presence_states")
+    assert "ix_agent_presence_states_world_scene" in index_names("agent_presence_states")
+    assert "ix_daily_life_event_candidates_world_status" in index_names(
+        "daily_life_event_candidates",
+    )
+    assert "ix_daily_life_event_candidates_world_time" in index_names(
+        "daily_life_event_candidates",
+    )
+    assert "ix_offscreen_event_queue_world_status_due" in index_names("offscreen_event_queue")
+    assert "ix_offscreen_event_queue_world_importance" in index_names("offscreen_event_queue")
     assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")

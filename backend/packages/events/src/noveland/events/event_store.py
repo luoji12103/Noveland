@@ -9,6 +9,7 @@ from noveland.core.database import Base, import_model_modules
 from noveland.events.contracts import (
     SNAPSHOT_EVENT_NAME,
     WorldEventAppend,
+    WorldEventImportance,
     WorldEventRecord,
     WorldSnapshotCreate,
     WorldSnapshotRecord,
@@ -44,6 +45,7 @@ class WorldEventStore:
                 world_id=event_input.world_id,
                 sequence=sequence,
                 event_name=event_input.event_name,
+                importance=event_input.importance.value,
                 payload=event_input.payload,
                 wall_time=event_input.wall_time,
                 world_time=event_input.world_time,
@@ -192,6 +194,7 @@ def _event_record_from_model(event_model: WorldEventModel) -> WorldEventRecord:
         world_id=event_model.world_id,
         sequence=event_model.sequence,
         event_name=event_model.event_name,
+        importance=WorldEventImportance(event_model.importance),
         payload=event_model.payload,
         wall_time=_utc(event_model.wall_time),
         world_time=None if event_model.world_time is None else _utc(event_model.world_time),
