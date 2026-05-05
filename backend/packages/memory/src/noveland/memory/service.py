@@ -260,6 +260,50 @@ class MemoryService:
             jobs.append(job)
         return jobs
 
+    def record_relationship_change(
+        self,
+        *,
+        world_id: uuid.UUID,
+        source_agent_id: uuid.UUID,
+        target_agent_id: uuid.UUID,
+        relationship_id: uuid.UUID,
+        relationship_type: str,
+        summary: str,
+        metadata: dict[str, Any] | None = None,
+        dedupe_suffix: str = "latest",
+    ) -> list[MemoryWriteJob]:
+        relationship_metadata = {
+            **(metadata or {}),
+            "source": "relationship_graph",
+            "relationship_id": str(relationship_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": relationship_type,
+        }
+        return self.record_events(
+            [
+                MemoryEvent(
+                    world_id=world_id,
+                    agent_id=source_agent_id,
+                    event_id=relationship_id,
+                    content=summary,
+                    metadata=relationship_metadata,
+                    dedupe_key=f"relationship:{relationship_id}:{source_agent_id}:{dedupe_suffix}",
+                ),
+                MemoryEvent(
+                    world_id=world_id,
+                    agent_id=target_agent_id,
+                    event_id=relationship_id,
+                    content=summary,
+                    metadata={
+                        **relationship_metadata,
+                        "target_agent_id": str(source_agent_id),
+                        "perspective": "target",
+                    },
+                    dedupe_key=f"relationship:{relationship_id}:{target_agent_id}:{dedupe_suffix}",
+                ),
+            ],
+        )
+
     def process_due_jobs(self, limit: int) -> int:
         processed = 0
         for job in self._due_jobs(limit):
