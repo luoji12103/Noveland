@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Living World Character Foundation
 
 ## Blocked
 - None
@@ -58,4 +58,4 @@
 - Tool Policy / Scale / v2 Readiness
 
 ## Upcoming Mainline
-- None selected; V2 candidate bundles are documented in `roadmap-v2-living-world.md`.
+- None selected until Living World Character Foundation closeout.
