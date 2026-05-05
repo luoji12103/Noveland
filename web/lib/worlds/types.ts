@@ -19,6 +19,9 @@ export type Scene = {
   scene_key: string;
   name: string;
   description: string | null;
+  region_key: string | null;
+  location_tags: string[];
+  opening_rules: Record<string, unknown>;
   is_active: boolean;
 };
 
@@ -58,6 +61,164 @@ export type RelationshipType =
   | "debt"
   | "secret"
   | "custom";
+
+export type EventImportance =
+  | "system"
+  | "daily"
+  | "relationship"
+  | "organization"
+  | "route"
+  | "main_plot";
+
+export type SceneLocationEdge = {
+  id: string;
+  world_id: string;
+  source_scene_id: string;
+  target_scene_id: string;
+  source_scene_key: string;
+  target_scene_key: string;
+  travel_label: string | null;
+  traversal_rules: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrganizationType =
+  | "school"
+  | "club"
+  | "family"
+  | "company"
+  | "faction"
+  | "secret_group"
+  | "other";
+
+export type OrganizationVisibility = "public" | "hidden";
+
+export type WorldOrganization = {
+  id: string;
+  world_id: string;
+  organization_key: string;
+  name: string;
+  organization_type: OrganizationType;
+  description: string | null;
+  public_summary: string | null;
+  hidden_summary: string | null;
+  metadata: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrganizationMembership = {
+  id: string;
+  world_id: string;
+  organization_id: string;
+  organization_key: string;
+  organization_name: string;
+  agent_id: string;
+  agent_key: string;
+  agent_display_name: string;
+  role_title: string | null;
+  visibility: OrganizationVisibility;
+  loyalty: number;
+  influence: number;
+  responsibilities: string[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FactionTrackType = "goal" | "conflict" | "resource" | "reputation" | "risk";
+
+export type FactionProgressTrack = {
+  id: string;
+  world_id: string;
+  organization_id: string;
+  organization_key: string;
+  organization_name: string;
+  track_key: string;
+  name: string;
+  track_type: FactionTrackType;
+  progress: number;
+  pressure: number;
+  summary: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PresenceVisibilityStatus = "visible" | "offscreen" | "hidden" | "unavailable";
+
+export type AgentPresence = {
+  id: string;
+  world_id: string;
+  agent_id: string;
+  agent_key: string;
+  agent_display_name: string;
+  current_scene_id: string | null;
+  current_scene_key: string | null;
+  current_scene_name: string | null;
+  visibility_status: PresenceVisibilityStatus;
+  encounter_eligible: boolean;
+  scheduled_movement: Record<string, unknown>;
+  last_event_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyLifeCandidateStatus = "candidate" | "queued" | "dismissed";
+
+export type DailyLifeEventCandidate = {
+  id: string | null;
+  world_id: string;
+  agent_id: string | null;
+  agent_display_name: string | null;
+  scene_id: string | null;
+  scene_name: string | null;
+  title: string;
+  summary: string;
+  importance: "daily" | "relationship" | "organization";
+  starts_at: string;
+  source_kind: string;
+  source_ref: string | null;
+  status: DailyLifeCandidateStatus;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type DailyLifePreview = {
+  world_id: string;
+  start_world_time: string;
+  horizon_hours: number;
+  candidate_count: number;
+  candidates: DailyLifeEventCandidate[];
+};
+
+export type OffscreenEventStatus = "pending" | "resolved" | "cancelled" | "failed";
+
+export type OffscreenEventQueueItem = {
+  id: string;
+  world_id: string;
+  source_candidate_id: string | null;
+  event_name: string;
+  title: string;
+  payload: Record<string, unknown>;
+  due_at: string;
+  importance: Exclude<EventImportance, "system">;
+  status: OffscreenEventStatus;
+  resolved_event_id: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OffscreenResolution = {
+  processed_count: number;
+  resolved_count: number;
+  failed_count: number;
+  event_ids: string[];
+};
 
 export type UserSummary = {
   id: string;
@@ -506,6 +667,7 @@ export type WorldEventAuditEntry = {
   world_id: string;
   sequence: number;
   event_name: string;
+  importance: EventImportance;
   payload: Record<string, unknown>;
   wall_time: string;
   world_time: string | null;
@@ -520,6 +682,7 @@ export type WorldEventAuditEntry = {
 export type WorldEventAuditFilters = {
   event_name?: string | null;
   actor_ref?: string | null;
+  importance?: EventImportance | null;
   sequence_after?: number | null;
   sequence_before?: number | null;
   wall_time_from?: string | null;
@@ -1080,7 +1243,15 @@ export type WorldDashboardData = {
   worlds: World[];
   selectedWorldId: string | null;
   scenes: Scene[];
+  locationEdges: SceneLocationEdge[];
   agents: Agent[];
+  organizations: WorldOrganization[];
+  organizationMemberships: OrganizationMembership[];
+  factionTracks: FactionProgressTrack[];
+  agentPresenceStates: AgentPresence[];
+  dailyLifePreview: DailyLifePreview | null;
+  dailyLifeCandidates: DailyLifeEventCandidate[];
+  offscreenEvents: OffscreenEventQueueItem[];
   memberships: Membership[];
   clock: WorldClock | null;
   replayState: WorldReplayState | null;
@@ -1131,12 +1302,124 @@ export type SceneCreateInput = {
   scene_key: string;
   name: string;
   description?: string | null;
+  region_key?: string | null;
+  location_tags?: string[];
+  opening_rules?: Record<string, unknown>;
 };
 
 export type SceneUpdateInput = {
   name?: string;
   description?: string | null;
+  region_key?: string | null;
+  location_tags?: string[];
+  opening_rules?: Record<string, unknown>;
   is_active?: boolean;
+};
+
+export type SceneLocationEdgeCreateInput = {
+  source_scene_id: string;
+  target_scene_id: string;
+  travel_label?: string | null;
+  traversal_rules?: Record<string, unknown>;
+};
+
+export type SceneLocationEdgeUpdateInput = {
+  travel_label?: string | null;
+  traversal_rules?: Record<string, unknown>;
+};
+
+export type OrganizationCreateInput = {
+  organization_key: string;
+  name: string;
+  organization_type: OrganizationType;
+  description?: string | null;
+  public_summary?: string | null;
+  hidden_summary?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type OrganizationUpdateInput = Partial<
+  Pick<
+    WorldOrganization,
+    | "name"
+    | "organization_type"
+    | "description"
+    | "public_summary"
+    | "hidden_summary"
+    | "metadata"
+    | "is_active"
+  >
+>;
+
+export type OrganizationMembershipCreateInput = {
+  agent_id: string;
+  role_title?: string | null;
+  visibility?: OrganizationVisibility;
+  loyalty?: number;
+  influence?: number;
+  responsibilities?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type OrganizationMembershipUpdateInput = Partial<
+  Pick<
+    OrganizationMembership,
+    "role_title" | "visibility" | "loyalty" | "influence" | "responsibilities" | "metadata"
+  >
+>;
+
+export type FactionProgressTrackCreateInput = {
+  track_key: string;
+  name: string;
+  track_type: FactionTrackType;
+  progress?: number;
+  pressure?: number;
+  summary?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type FactionProgressTrackUpdateInput = Partial<
+  Pick<
+    FactionProgressTrack,
+    "name" | "track_type" | "progress" | "pressure" | "summary" | "metadata"
+  >
+>;
+
+export type AgentPresenceInput = {
+  current_scene_id?: string | null;
+  visibility_status?: PresenceVisibilityStatus;
+  encounter_eligible?: boolean;
+  scheduled_movement?: Record<string, unknown>;
+};
+
+export type DailyLifePreviewFilters = {
+  start_world_time?: string | null;
+  horizon_hours?: number;
+  limit?: number;
+};
+
+export type DailyLifeGenerateInput = {
+  horizon_hours?: number;
+  limit?: number;
+};
+
+export type DailyLifeCandidateFilters = {
+  status?: DailyLifeCandidateStatus | null;
+  limit?: number;
+};
+
+export type OffscreenEventCreateInput = {
+  candidate_id?: string | null;
+  event_name?: string;
+  title: string;
+  payload?: Record<string, unknown>;
+  due_at: string;
+  importance?: Exclude<EventImportance, "system">;
+};
+
+export type OffscreenEventFilters = {
+  status?: OffscreenEventStatus | null;
+  limit?: number;
 };
 
 export type AgentCreateInput = {

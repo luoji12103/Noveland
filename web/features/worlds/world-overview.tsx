@@ -6,20 +6,30 @@ import { useRouter } from "next/navigation";
 
 import {
   advanceWorldClock,
+  createFactionTrack,
+  createLocationEdge,
+  createOffscreenEvent,
+  createOrganization,
+  createOrganizationMembership,
   createScene,
   createScheduleRule,
   createSnapshot,
   deactivateScene,
   deleteMembership,
   exportWorldComposition,
+  generateDailyLifeCandidates,
   importWorldComposition,
   getCalendarConflicts,
+  getDailyLifePreview,
   listMemberCandidates,
+  listOffscreenEvents,
   listWorldEvents,
   pauseWorldClock,
   previewScheduleRule,
+  resolveOffscreenEvents,
   resumeWorldClock,
   skipWorldClock,
+  upsertAgentPresence,
   updateWorld,
   upsertWorldBible,
   upsertMembership,
@@ -33,6 +43,9 @@ import type {
   RuntimeDiagnostic,
   ScheduleRulePreview,
   CalendarConflictReport,
+  DailyLifePreview,
+  DailyLifeEventCandidate,
+  OffscreenEventQueueItem,
   WorldEventAuditEntry,
   WorldClock,
   WorldCompositionValidation,
@@ -59,6 +72,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [worldDiagnostics, setWorldDiagnostics] = useState(data.worldDiagnostics);
   const [worldEventAudit, setWorldEventAudit] = useState(data.worldEventAudit);
   const [calendarConflicts, setCalendarConflicts] = useState(data.calendarConflicts);
+  const [dailyLifePreview, setDailyLifePreview] = useState(data.dailyLifePreview);
+  const [dailyLifeCandidates, setDailyLifeCandidates] = useState(data.dailyLifeCandidates);
+  const [offscreenEvents, setOffscreenEvents] = useState(data.offscreenEvents);
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
@@ -71,7 +87,18 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     setWorldDiagnostics(data.worldDiagnostics);
     setWorldEventAudit(data.worldEventAudit);
     setCalendarConflicts(data.calendarConflicts);
-  }, [data.calendarConflicts, data.clock, data.worldDiagnostics, data.worldEventAudit]);
+    setDailyLifePreview(data.dailyLifePreview);
+    setDailyLifeCandidates(data.dailyLifeCandidates);
+    setOffscreenEvents(data.offscreenEvents);
+  }, [
+    data.calendarConflicts,
+    data.clock,
+    data.dailyLifeCandidates,
+    data.dailyLifePreview,
+    data.offscreenEvents,
+    data.worldDiagnostics,
+    data.worldEventAudit,
+  ]);
 
   useEffect(() => {
     if (world === null) {
@@ -145,10 +172,116 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           scene_key: formString(form, "scene_key"),
           name: formString(form, "name"),
           description: optionalFormString(form, "description"),
+          region_key: optionalFormString(form, "region_key"),
+          location_tags: commaList(formString(form, "location_tags")),
+          opening_rules: jsonObject(formString(form, "opening_rules")),
         });
         formElement.reset();
       },
       "Scene created.",
+    );
+  }
+
+  async function handleCreateLocationEdge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createLocationEdge(selectedWorld.id, {
+          source_scene_id: formString(form, "source_scene_id"),
+          target_scene_id: formString(form, "target_scene_id"),
+          travel_label: optionalFormString(form, "travel_label"),
+          traversal_rules: jsonObject(formString(form, "traversal_rules")),
+        });
+        formElement.reset();
+      },
+      "Location edge created.",
+    );
+  }
+
+  async function handleSetPresence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      () =>
+        upsertAgentPresence(selectedWorld.id, formString(form, "agent_id"), {
+          current_scene_id: optionalFormString(form, "current_scene_id"),
+          visibility_status: formString(form, "visibility_status") as
+            | "visible"
+            | "offscreen"
+            | "hidden"
+            | "unavailable",
+          encounter_eligible: form.get("encounter_eligible") === "on",
+          scheduled_movement: jsonObject(formString(form, "scheduled_movement")),
+        }),
+      "Presence saved.",
+    );
+  }
+
+  async function handleCreateOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createOrganization(selectedWorld.id, {
+          organization_key: formString(form, "organization_key"),
+          name: formString(form, "name"),
+          organization_type: formString(form, "organization_type") as "club",
+          public_summary: optionalFormString(form, "public_summary"),
+          hidden_summary: optionalFormString(form, "hidden_summary"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Organization created.",
+    );
+  }
+
+  async function handleCreateOrganizationMembership(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createOrganizationMembership(
+          selectedWorld.id,
+          formString(form, "organization_id"),
+          {
+            agent_id: formString(form, "agent_id"),
+            role_title: optionalFormString(form, "role_title"),
+            visibility: formString(form, "visibility") as "public" | "hidden",
+            loyalty: optionalPositiveInteger(form, "loyalty") ?? 50,
+            influence: optionalPositiveInteger(form, "influence") ?? 50,
+            responsibilities: commaList(formString(form, "responsibilities")),
+            metadata: jsonObject(formString(form, "metadata")),
+          },
+        );
+        formElement.reset();
+      },
+      "Organization membership created.",
+    );
+  }
+
+  async function handleCreateFactionTrack(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createFactionTrack(selectedWorld.id, formString(form, "organization_id"), {
+          track_key: formString(form, "track_key"),
+          name: formString(form, "name"),
+          track_type: formString(form, "track_type") as "goal",
+          progress: optionalPositiveInteger(form, "progress") ?? 0,
+          pressure: optionalPositiveInteger(form, "pressure") ?? 0,
+          summary: optionalFormString(form, "summary"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Faction track created.",
     );
   }
 
@@ -241,6 +374,74 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     );
   }
 
+  async function handlePreviewDailyLife(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setDailyLifePreview(
+          await getDailyLifePreview(selectedWorld.id, {
+            start_world_time: optionalFormString(form, "start_world_time"),
+            horizon_hours: optionalPositiveInteger(form, "horizon_hours") ?? 24,
+            limit: optionalPositiveInteger(form, "limit") ?? 20,
+          }),
+        );
+      },
+      "Daily life preview loaded.",
+      false,
+    );
+  }
+
+  async function handleGenerateDailyLife(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setDailyLifeCandidates(
+          await generateDailyLifeCandidates(selectedWorld.id, {
+            horizon_hours: optionalPositiveInteger(form, "horizon_hours") ?? 24,
+            limit: optionalPositiveInteger(form, "limit") ?? 20,
+          }),
+        );
+      },
+      "Daily life candidates generated.",
+      false,
+    );
+  }
+
+  async function handleQueueOffscreen(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createOffscreenEvent(selectedWorld.id, {
+          candidate_id: optionalFormString(form, "candidate_id"),
+          event_name: optionalFormString(form, "event_name") ?? "living_world.daily_life",
+          title: formString(form, "title"),
+          payload: jsonObject(formString(form, "payload")),
+          due_at: formString(form, "due_at"),
+          importance: (optionalFormString(form, "importance") ?? "daily") as "daily",
+        });
+        setOffscreenEvents(await listOffscreenEvents(selectedWorld.id, { limit: 10 }));
+        formElement.reset();
+      },
+      "Offscreen event queued.",
+      false,
+    );
+  }
+
+  async function handleResolveOffscreen() {
+    await runAction(
+      async () => {
+        await resolveOffscreenEvents(selectedWorld.id, 20);
+        setOffscreenEvents(await listOffscreenEvents(selectedWorld.id, { limit: 10 }));
+      },
+      "Due offscreen events resolved.",
+      false,
+    );
+  }
+
   async function handleExportComposition() {
     await runAction(async () => {
       const composition = await exportWorldComposition(selectedWorld.id);
@@ -306,6 +507,14 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           await listWorldEvents(selectedWorld.id, {
             event_name: optionalFormString(form, "event_name"),
             actor_ref: optionalFormString(form, "actor_ref"),
+            importance: optionalFormString(form, "importance") as
+              | "system"
+              | "daily"
+              | "relationship"
+              | "organization"
+              | "route"
+              | "main_plot"
+              | null,
             sequence_after: optionalPositiveInteger(form, "sequence_after"),
             sequence_before: optionalPositiveInteger(form, "sequence_before"),
             wall_time_from: optionalFormString(form, "wall_time_from"),
@@ -521,6 +730,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               <input className="text-input" name="scene_key" placeholder="scene-key" />
               <input className="text-input" name="name" placeholder="Scene name" />
               <input className="text-input" name="description" placeholder="Description" />
+              <input className="text-input" name="region_key" placeholder="Region key" />
+              <input className="text-input" name="location_tags" placeholder="school,indoors" />
+              <input className="text-input" name="opening_rules" defaultValue="{}" />
               <button className="primary-button" type="submit" disabled={isBusy}>
                 Create scene
               </button>
@@ -535,33 +747,40 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                 </div>
               </article>
             ) : (
-              data.scenes.map((scene) => (
-                <article className="resource-row" key={scene.id}>
-                  <div>
-                    <h3>{scene.name}</h3>
-                    <p>
-                      {scene.scene_key} - {scene.is_active ? "Active" : "Inactive"}
-                    </p>
-                  </div>
-                  {data.canManageSelectedWorld ? (
-                    <div className="button-row">
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() =>
-                          runAction(
-                            () => deactivateScene(selectedWorld.id, scene.id),
-                            "Scene deactivated.",
-                          )
-                        }
-                      >
-                        Deactivate scene
-                      </button>
+              data.scenes.map((scene) => {
+                const locationTags = scene.location_tags ?? [];
+                return (
+                  <article className="resource-row" key={scene.id}>
+                    <div>
+                      <h3>{scene.name}</h3>
+                      <p>
+                        {scene.scene_key} - {scene.is_active ? "Active" : "Inactive"}
+                      </p>
+                      <p>
+                        Region {scene.region_key ?? "unset"} - tags{" "}
+                        {locationTags.length === 0 ? "none" : locationTags.join(", ")}
+                      </p>
                     </div>
-                  ) : null}
-                </article>
-              ))
+                    {data.canManageSelectedWorld ? (
+                      <div className="button-row">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() =>
+                            runAction(
+                              () => deactivateScene(selectedWorld.id, scene.id),
+                              "Scene deactivated.",
+                            )
+                          }
+                        >
+                          Deactivate scene
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })
             )}
           </div>
         </section>
@@ -641,6 +860,293 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           </div>
         </section>
       </div>
+
+      <section className="management-panel" aria-labelledby="living-world-title">
+        <h2 className="section-title" id="living-world-title">
+          Living world autonomy
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Location edges</p>
+            <p className="metric-value">{data.locationEdges.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Organizations</p>
+            <p className="metric-value">{data.organizations.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Presence states</p>
+            <p className="metric-value">{data.agentPresenceStates.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Offscreen queue</p>
+            <p className="metric-value">{offscreenEvents.length}</p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <div className="management-columns">
+            <form className="management-form" onSubmit={handleCreateLocationEdge}>
+              <h3>Location edge</h3>
+              <select className="text-input" name="source_scene_id" defaultValue="">
+                <option value="">Source scene</option>
+                {data.scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>
+                    {scene.name}
+                  </option>
+                ))}
+              </select>
+              <select className="text-input" name="target_scene_id" defaultValue="">
+                <option value="">Target scene</option>
+                {data.scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>
+                    {scene.name}
+                  </option>
+                ))}
+              </select>
+              <input className="text-input" name="travel_label" placeholder="Travel label" />
+              <input className="text-input" name="traversal_rules" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Add edge
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handleSetPresence}>
+              <h3>Character presence</h3>
+              <select className="text-input" name="agent_id" defaultValue="">
+                <option value="">Agent</option>
+                {data.agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.display_name}
+                  </option>
+                ))}
+              </select>
+              <select className="text-input" name="current_scene_id" defaultValue="">
+                <option value="">No current scene</option>
+                {data.scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>
+                    {scene.name}
+                  </option>
+                ))}
+              </select>
+              <select className="text-input" name="visibility_status" defaultValue="visible">
+                <option value="visible">visible</option>
+                <option value="offscreen">offscreen</option>
+                <option value="hidden">hidden</option>
+                <option value="unavailable">unavailable</option>
+              </select>
+              <label className="checkbox-label">
+                <input name="encounter_eligible" type="checkbox" defaultChecked />
+                Encounter eligible
+              </label>
+              <input className="text-input" name="scheduled_movement" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Save presence
+              </button>
+            </form>
+          </div>
+        ) : null}
+        <ResourceList
+          rows={[
+            ...data.locationEdges.map((edge) => ({
+              id: edge.id,
+              title: `${edge.source_scene_key} to ${edge.target_scene_key}`,
+              detail: edge.travel_label ?? "No travel label",
+            })),
+            ...data.agentPresenceStates.map((presence) => ({
+              id: presence.id,
+              title: `${presence.agent_display_name} presence`,
+              detail: `${presence.visibility_status} at ${
+                presence.current_scene_name ?? "unknown"
+              }`,
+            })),
+          ]}
+        />
+      </section>
+
+      <section className="management-panel" aria-labelledby="organizations-title">
+        <h2 className="section-title" id="organizations-title">
+          Organizations and faction tracks
+        </h2>
+        {data.canManageSelectedWorld ? (
+          <div className="management-columns">
+            <form className="management-form" onSubmit={handleCreateOrganization}>
+              <h3>Organization</h3>
+              <input className="text-input" name="organization_key" placeholder="organization-key" />
+              <input className="text-input" name="name" placeholder="Organization name" />
+              <select className="text-input" name="organization_type" defaultValue="club">
+                <option value="school">school</option>
+                <option value="club">club</option>
+                <option value="family">family</option>
+                <option value="company">company</option>
+                <option value="faction">faction</option>
+                <option value="secret_group">secret_group</option>
+                <option value="other">other</option>
+              </select>
+              <input className="text-input" name="public_summary" placeholder="Public summary" />
+              <input className="text-input" name="hidden_summary" placeholder="Hidden summary" />
+              <input className="text-input" name="metadata" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Create organization
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handleCreateOrganizationMembership}>
+              <h3>Organization assignment</h3>
+              <select className="text-input" name="organization_id" defaultValue="">
+                <option value="">Organization</option>
+                {data.organizations.map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
+              </select>
+              <select className="text-input" name="agent_id" defaultValue="">
+                <option value="">Agent</option>
+                {data.agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.display_name}
+                  </option>
+                ))}
+              </select>
+              <input className="text-input" name="role_title" placeholder="Role title" />
+              <select className="text-input" name="visibility" defaultValue="public">
+                <option value="public">public</option>
+                <option value="hidden">hidden</option>
+              </select>
+              <input className="text-input" name="loyalty" placeholder="Loyalty" />
+              <input className="text-input" name="influence" placeholder="Influence" />
+              <input className="text-input" name="responsibilities" placeholder="agenda,liaison" />
+              <input className="text-input" name="metadata" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Add membership
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handleCreateFactionTrack}>
+              <h3>Faction track</h3>
+              <select className="text-input" name="organization_id" defaultValue="">
+                <option value="">Organization</option>
+                {data.organizations.map((organization) => (
+                  <option key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </option>
+                ))}
+              </select>
+              <input className="text-input" name="track_key" placeholder="track-key" />
+              <input className="text-input" name="name" placeholder="Track name" />
+              <select className="text-input" name="track_type" defaultValue="goal">
+                <option value="goal">goal</option>
+                <option value="conflict">conflict</option>
+                <option value="resource">resource</option>
+                <option value="reputation">reputation</option>
+                <option value="risk">risk</option>
+              </select>
+              <input className="text-input" name="progress" placeholder="Progress" />
+              <input className="text-input" name="pressure" placeholder="Pressure" />
+              <input className="text-input" name="summary" placeholder="Summary" />
+              <input className="text-input" name="metadata" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Add track
+              </button>
+            </form>
+          </div>
+        ) : null}
+        <ResourceList
+          rows={[
+            ...data.organizations.map((organization) => ({
+              id: organization.id,
+              title: `${organization.name} (${organization.organization_type})`,
+              detail: organization.public_summary ?? organization.organization_key,
+            })),
+            ...data.organizationMemberships.map((membership) => ({
+              id: membership.id,
+              title: `${membership.agent_display_name} in ${membership.organization_name}`,
+              detail: `${membership.role_title ?? "member"} - loyalty ${
+                membership.loyalty
+              } / influence ${membership.influence}`,
+            })),
+            ...data.factionTracks.map((track) => ({
+              id: track.id,
+              title: `${track.organization_name}: ${track.name}`,
+              detail: `${track.track_type} - progress ${track.progress} / pressure ${
+                track.pressure
+              }`,
+            })),
+          ]}
+        />
+      </section>
+
+      <section className="management-panel" aria-labelledby="daily-life-title">
+        <h2 className="section-title" id="daily-life-title">
+          Daily life and offscreen queue
+        </h2>
+        {data.canManageSelectedWorld ? (
+          <div className="management-columns">
+            <form className="management-form" onSubmit={handlePreviewDailyLife}>
+              <h3>Preview</h3>
+              <input
+                className="text-input"
+                name="start_world_time"
+                placeholder="2030-01-01T08:00:00Z"
+              />
+              <input className="text-input" name="horizon_hours" placeholder="Horizon hours" />
+              <input className="text-input" name="limit" placeholder="Limit" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Preview daily life
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handleGenerateDailyLife}>
+              <h3>Generate</h3>
+              <input className="text-input" name="horizon_hours" placeholder="Horizon hours" />
+              <input className="text-input" name="limit" placeholder="Limit" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Generate candidates
+              </button>
+            </form>
+            <form className="management-form" onSubmit={handleQueueOffscreen}>
+              <h3>Queue event</h3>
+              <select className="text-input" name="candidate_id" defaultValue="">
+                <option value="">Manual queue item</option>
+                {dailyLifeCandidates
+                  .filter((candidate) => candidate.id !== null)
+                  .map((candidate) => (
+                    <option key={candidate.id ?? candidate.title} value={candidate.id ?? ""}>
+                      {candidate.title}
+                    </option>
+                  ))}
+              </select>
+              <input className="text-input" name="event_name" placeholder="living_world.daily_life" />
+              <input className="text-input" name="title" placeholder="Queue title" />
+              <input className="text-input" name="due_at" placeholder="2030-01-01T08:00:00Z" />
+              <select className="text-input" name="importance" defaultValue="daily">
+                <option value="daily">daily</option>
+                <option value="relationship">relationship</option>
+                <option value="organization">organization</option>
+                <option value="route">route</option>
+                <option value="main_plot">main_plot</option>
+              </select>
+              <textarea className="text-input" name="payload" rows={3} defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Queue offscreen event
+              </button>
+            </form>
+          </div>
+        ) : null}
+        <div className="button-row">
+          {data.canManageSelectedWorld ? (
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => void handleResolveOffscreen()}
+            >
+              Resolve due offscreen events
+            </button>
+          ) : null}
+        </div>
+        <DailyLifeView
+          preview={dailyLifePreview}
+          candidates={dailyLifeCandidates}
+          offscreenEvents={offscreenEvents}
+        />
+      </section>
 
       <div className="management-columns">
         <section className="management-panel" aria-labelledby="clock-title">
@@ -963,6 +1469,15 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           <form className="inline-form" onSubmit={handleEventAuditFilter}>
             <input className="text-input" name="event_name" placeholder="event.name" />
             <input className="text-input" name="actor_ref" placeholder="actor:ref" />
+            <select className="text-input" name="importance" defaultValue="">
+              <option value="">Any importance</option>
+              <option value="system">system</option>
+              <option value="daily">daily</option>
+              <option value="relationship">relationship</option>
+              <option value="organization">organization</option>
+              <option value="route">route</option>
+              <option value="main_plot">main_plot</option>
+            </select>
             <input className="text-input" name="sequence_after" placeholder="After sequence" />
             <input className="text-input" name="sequence_before" placeholder="Before sequence" />
             <input className="text-input" name="wall_time_from" placeholder="Wall time from" />
@@ -988,7 +1503,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                       #{event.sequence} {event.event_name}
                     </h3>
                     <p>
-                      {event.actor_ref} - {event.wall_time}
+                      {event.actor_ref} - {event.importance} - {event.wall_time}
                     </p>
                     <p>{formatPayload(event)}</p>
                   </div>
@@ -1146,12 +1661,72 @@ function optionalPositiveInteger(form: FormData, key: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function commaList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+}
+
 function formatPayload(event: WorldEventAuditEntry): string {
   const payload = JSON.stringify(event.payload);
   if (payload.length <= 160) {
     return payload;
   }
   return `${payload.slice(0, 157)}...`;
+}
+
+function DailyLifeView({
+  preview,
+  candidates,
+  offscreenEvents,
+}: {
+  preview: DailyLifePreview | null;
+  candidates: DailyLifeEventCandidate[];
+  offscreenEvents: OffscreenEventQueueItem[];
+}) {
+  return (
+    <div className="management-columns">
+      <section aria-labelledby="daily-preview-title">
+        <h3 id="daily-preview-title">Daily preview</h3>
+        {preview === null ? (
+          <p className="status-detail">No preview loaded.</p>
+        ) : (
+          <ResourceList
+            rows={preview.candidates.map((candidate, index) => ({
+              id: candidate.id ?? `${candidate.title}-${index}`,
+              title: candidate.title,
+              detail: `${candidate.agent_display_name ?? "world"} at ${
+                candidate.scene_name ?? "offscreen"
+              } - ${candidate.importance}`,
+            }))}
+          />
+        )}
+      </section>
+      <section aria-labelledby="daily-candidates-title">
+        <h3 id="daily-candidates-title">Daily candidates</h3>
+        <ResourceList
+          rows={candidates.map((candidate, index) => ({
+            id: candidate.id ?? `${candidate.title}-${index}`,
+            title: candidate.title,
+            detail: `${candidate.status} - ${candidate.starts_at}`,
+          }))}
+        />
+      </section>
+      <section aria-labelledby="offscreen-queue-title">
+        <h3 id="offscreen-queue-title">Offscreen queue</h3>
+        <ResourceList
+          rows={offscreenEvents.map((item) => ({
+            id: item.id,
+            title: item.title,
+            detail: `${item.status} - ${item.importance} - ${item.due_at}${
+              item.last_error === null ? "" : ` - ${item.last_error}`
+            }`,
+          }))}
+        />
+      </section>
+    </div>
+  );
 }
 
 function CalendarConflictsView({ report }: { report: CalendarConflictReport | null }) {

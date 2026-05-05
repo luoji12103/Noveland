@@ -37,6 +37,16 @@ import type {
   ConversationTurn,
   ConversationUpdateInput,
   ExternalToolPolicy,
+  AgentPresence,
+  AgentPresenceInput,
+  DailyLifeCandidateFilters,
+  DailyLifeEventCandidate,
+  DailyLifeGenerateInput,
+  DailyLifePreview,
+  DailyLifePreviewFilters,
+  FactionProgressTrack,
+  FactionProgressTrackCreateInput,
+  FactionProgressTrackUpdateInput,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -57,6 +67,15 @@ import type {
   NarrativeArtifactFilters,
   NarrativePublication,
   NarrativePublicationInput,
+  OffscreenEventCreateInput,
+  OffscreenEventFilters,
+  OffscreenEventQueueItem,
+  OffscreenResolution,
+  OrganizationCreateInput,
+  OrganizationMembership,
+  OrganizationMembershipCreateInput,
+  OrganizationMembershipUpdateInput,
+  OrganizationUpdateInput,
   PersonaPolicyValidation,
   PluginBinding,
   PluginCatalogEntry,
@@ -75,6 +94,9 @@ import type {
   RuntimeStatus,
   ScaleReadiness,
   ScheduleRule,
+  SceneLocationEdge,
+  SceneLocationEdgeCreateInput,
+  SceneLocationEdgeUpdateInput,
   ScheduleRuleCreateInput,
   ScheduleRulePreview,
   ScheduleRulePreviewInput,
@@ -95,6 +117,7 @@ import type {
   WorldCompositionExport,
   WorldCompositionImportInput,
   WorldCompositionValidation,
+  WorldOrganization,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -299,6 +322,9 @@ export function listWorldEvents(
   if (filters.actor_ref) {
     search.set("actor_ref", filters.actor_ref);
   }
+  if (filters.importance) {
+    search.set("importance", filters.importance);
+  }
   if (filters.sequence_after !== undefined && filters.sequence_after !== null) {
     search.set("sequence_after", String(filters.sequence_after));
   }
@@ -351,6 +377,149 @@ export function deactivateScene(worldId: string, sceneId: string): Promise<void>
   });
 }
 
+export function listLocationEdges(worldId: string): Promise<SceneLocationEdge[]> {
+  return worldRequest<SceneLocationEdge[]>(`/api/worlds/${worldId}/location-edges`, {
+    method: "GET",
+  });
+}
+
+export function createLocationEdge(
+  worldId: string,
+  input: SceneLocationEdgeCreateInput,
+): Promise<SceneLocationEdge> {
+  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateLocationEdge(
+  worldId: string,
+  edgeId: string,
+  input: SceneLocationEdgeUpdateInput,
+): Promise<SceneLocationEdge> {
+  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges/${edgeId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listOrganizations(worldId: string): Promise<WorldOrganization[]> {
+  return worldRequest<WorldOrganization[]>(`/api/worlds/${worldId}/organizations`, {
+    method: "GET",
+  });
+}
+
+export function createOrganization(
+  worldId: string,
+  input: OrganizationCreateInput,
+): Promise<WorldOrganization> {
+  return worldRequest<WorldOrganization>(`/api/worlds/${worldId}/organizations`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateOrganization(
+  worldId: string,
+  organizationId: string,
+  input: OrganizationUpdateInput,
+): Promise<WorldOrganization> {
+  return worldRequest<WorldOrganization>(
+    `/api/worlds/${worldId}/organizations/${organizationId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listOrganizationMemberships(
+  worldId: string,
+  organizationId: string,
+): Promise<OrganizationMembership[]> {
+  return worldRequest<OrganizationMembership[]>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    { method: "GET" },
+  );
+}
+
+export function createOrganizationMembership(
+  worldId: string,
+  organizationId: string,
+  input: OrganizationMembershipCreateInput,
+): Promise<OrganizationMembership> {
+  return worldRequest<OrganizationMembership>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function updateOrganizationMembership(
+  worldId: string,
+  organizationId: string,
+  membershipId: string,
+  input: OrganizationMembershipUpdateInput,
+): Promise<OrganizationMembership> {
+  return worldRequest<OrganizationMembership>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/memberships/${membershipId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listFactionTracks(
+  worldId: string,
+  organizationId: string,
+): Promise<FactionProgressTrack[]> {
+  return worldRequest<FactionProgressTrack[]>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks`,
+    { method: "GET" },
+  );
+}
+
+export function createFactionTrack(
+  worldId: string,
+  organizationId: string,
+  input: FactionProgressTrackCreateInput,
+): Promise<FactionProgressTrack> {
+  return worldRequest<FactionProgressTrack>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function updateFactionTrack(
+  worldId: string,
+  organizationId: string,
+  trackId: string,
+  input: FactionProgressTrackUpdateInput,
+): Promise<FactionProgressTrack> {
+  return worldRequest<FactionProgressTrack>(
+    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks/${trackId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
 export function listAgents(worldId: string): Promise<Agent[]> {
   return worldRequest<Agent[]>(`/api/worlds/${worldId}/agents`, { method: "GET" });
 }
@@ -394,6 +563,28 @@ export function updateAgentRelationship(
       csrf: true,
     },
   );
+}
+
+export function getAgentPresence(
+  worldId: string,
+  agentId: string,
+): Promise<AgentPresence | null> {
+  return worldRequest<AgentPresence | null>(
+    `/api/worlds/${worldId}/agents/${agentId}/presence`,
+    { method: "GET" },
+  );
+}
+
+export function upsertAgentPresence(
+  worldId: string,
+  agentId: string,
+  input: AgentPresenceInput,
+): Promise<AgentPresence> {
+  return worldRequest<AgentPresence>(`/api/worlds/${worldId}/agents/${agentId}/presence`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
 }
 
 export function listAgentCalendar(worldId: string, agentId: string): Promise<CalendarEntry[]> {
@@ -463,6 +654,97 @@ export function getCalendarConflicts(
   return worldRequest<CalendarConflictReport>(
     `/api/worlds/${worldId}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
     { method: "GET" },
+  );
+}
+
+export function getDailyLifePreview(
+  worldId: string,
+  filters: DailyLifePreviewFilters = {},
+): Promise<DailyLifePreview> {
+  const search = new URLSearchParams();
+  if (filters.start_world_time) {
+    search.set("start_world_time", filters.start_world_time);
+  }
+  if (filters.horizon_hours !== undefined) {
+    search.set("horizon_hours", String(filters.horizon_hours));
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return worldRequest<DailyLifePreview>(`/api/worlds/${worldId}/daily-life/preview${suffix}`, {
+    method: "GET",
+  });
+}
+
+export function generateDailyLifeCandidates(
+  worldId: string,
+  input: DailyLifeGenerateInput = {},
+): Promise<DailyLifeEventCandidate[]> {
+  return worldRequest<DailyLifeEventCandidate[]>(`/api/worlds/${worldId}/daily-life/generate`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listDailyLifeCandidates(
+  worldId: string,
+  filters: DailyLifeCandidateFilters = {},
+): Promise<DailyLifeEventCandidate[]> {
+  const search = new URLSearchParams();
+  if (filters.status) {
+    search.set("status", filters.status);
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return worldRequest<DailyLifeEventCandidate[]>(
+    `/api/worlds/${worldId}/daily-life/candidates${suffix}`,
+    { method: "GET" },
+  );
+}
+
+export function createOffscreenEvent(
+  worldId: string,
+  input: OffscreenEventCreateInput,
+): Promise<OffscreenEventQueueItem> {
+  return worldRequest<OffscreenEventQueueItem>(`/api/worlds/${worldId}/offscreen-events`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listOffscreenEvents(
+  worldId: string,
+  filters: OffscreenEventFilters = {},
+): Promise<OffscreenEventQueueItem[]> {
+  const search = new URLSearchParams();
+  if (filters.status) {
+    search.set("status", filters.status);
+  }
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  return worldRequest<OffscreenEventQueueItem[]>(
+    `/api/worlds/${worldId}/offscreen-events${suffix}`,
+    { method: "GET" },
+  );
+}
+
+export function resolveOffscreenEvents(
+  worldId: string,
+  limit = 20,
+): Promise<OffscreenResolution> {
+  return worldRequest<OffscreenResolution>(
+    `/api/worlds/${worldId}/offscreen-events/resolve?limit=${encodeURIComponent(String(limit))}`,
+    {
+      method: "POST",
+      csrf: true,
+    },
   );
 }
 

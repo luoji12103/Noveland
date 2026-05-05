@@ -438,6 +438,38 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
         <pre>{JSON.stringify(agent.character_profile ?? {}, null, 2)}</pre>
       </section>
 
+      <section className="management-panel" aria-labelledby="agent-autonomy-title">
+        <h2 className="section-title" id="agent-autonomy-title">
+          Autonomous world state
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Presence</p>
+            <p className="metric-value">{data.presence?.visibility_status ?? "unset"}</p>
+            <p>{data.presence?.current_scene_name ?? "No current location"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Encounter</p>
+            <p className="metric-value">
+              {data.presence?.encounter_eligible === false ? "blocked" : "eligible"}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Organizations</p>
+            <p className="metric-value">{data.organizationMemberships.length}</p>
+          </div>
+        </div>
+        <ResourceList
+          rows={data.organizationMemberships.map((membership) => ({
+            id: membership.id,
+            title: membership.organization_name,
+            detail: `${membership.role_title ?? "member"} - ${membership.visibility} - loyalty ${
+              membership.loyalty
+            } / influence ${membership.influence}`,
+          }))}
+        />
+      </section>
+
       <section className="management-panel" aria-labelledby="relationships-title">
         <h2 className="section-title" id="relationships-title">
           Relationship graph

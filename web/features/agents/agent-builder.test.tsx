@@ -57,7 +57,10 @@ describe("AgentBuilder", () => {
     render(<AgentBuilder worldId="world-1" agentId="agent-1" data={agentData} />);
 
     expect(screen.getByRole("heading", { name: "Character profile sheet" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Autonomous world state" })).toBeInTheDocument();
     expect(document.body.textContent).toContain("route heroine");
+    expect(screen.getAllByText("Club Room").length).toBeGreaterThan(0);
+    expect(screen.getByText("Student Council")).toBeInTheDocument();
     expect(screen.getByText("Target - friendship")).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue("lead"), { target: { value: "major" } });
@@ -138,6 +141,9 @@ const agentData: AgentDetailData = {
       scene_key: "club-room",
       name: "Club Room",
       description: null,
+      region_key: "school",
+      location_tags: ["club"],
+      opening_rules: {},
       is_active: true,
     },
   ],
@@ -211,6 +217,42 @@ const agentData: AgentDetailData = {
     config: {},
     is_enabled: true,
   },
+  presence: {
+    id: "presence-1",
+    world_id: "world-1",
+    agent_id: "agent-1",
+    agent_key: "heroine",
+    agent_display_name: "Heroine",
+    current_scene_id: "scene-1",
+    current_scene_key: "club-room",
+    current_scene_name: "Club Room",
+    visibility_status: "visible",
+    encounter_eligible: true,
+    scheduled_movement: {},
+    last_event_id: null,
+    created_at: "2026-05-05T00:00:00.000Z",
+    updated_at: "2026-05-05T00:00:00.000Z",
+  },
+  organizationMemberships: [
+    {
+      id: "membership-1",
+      world_id: "world-1",
+      organization_id: "org-1",
+      organization_key: "student-council",
+      organization_name: "Student Council",
+      agent_id: "agent-1",
+      agent_key: "heroine",
+      agent_display_name: "Heroine",
+      role_title: "President",
+      visibility: "public",
+      loyalty: 80,
+      influence: 70,
+      responsibilities: ["agenda"],
+      metadata: {},
+      created_at: "2026-05-05T00:00:00.000Z",
+      updated_at: "2026-05-05T00:00:00.000Z",
+    },
+  ],
   relationships: [
     {
       id: "relationship-1",

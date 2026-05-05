@@ -16,8 +16,12 @@ vi.mock("@/lib/worlds/client", async () => {
   return {
     ...actual,
     getCalendarConflicts: vi.fn(),
+    getDailyLifePreview: vi.fn(),
+    generateDailyLifeCandidates: vi.fn(),
+    listOffscreenEvents: vi.fn(),
     listWorldEvents: vi.fn(),
     previewScheduleRule: vi.fn(),
+    resolveOffscreenEvents: vi.fn(),
     validateWorldComposition: vi.fn(),
   };
 });
@@ -25,8 +29,12 @@ vi.mock("@/lib/worlds/client", async () => {
 import { WorldOverview } from "@/features/worlds/world-overview";
 import {
   getCalendarConflicts,
+  getDailyLifePreview,
+  generateDailyLifeCandidates,
+  listOffscreenEvents,
   listWorldEvents,
   previewScheduleRule,
+  resolveOffscreenEvents,
   validateWorldComposition,
 } from "@/lib/worlds/client";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
@@ -87,6 +95,75 @@ describe("WorldOverview", () => {
         },
       ],
     });
+    vi.mocked(getDailyLifePreview).mockResolvedValue({
+      world_id: "world-1",
+      start_world_time: "2030-01-01T08:00:00.000Z",
+      horizon_hours: 12,
+      candidate_count: 1,
+      candidates: [
+        {
+          id: null,
+          world_id: "world-1",
+          agent_id: "agent-1",
+          agent_display_name: "Guide",
+          scene_id: "scene-1",
+          scene_name: "Club room",
+          title: "Guide daily life beat",
+          summary: "Guide spends time at Club room.",
+          importance: "daily",
+          starts_at: "2030-01-01T08:00:00.000Z",
+          source_kind: "daily_life_scheduler",
+          source_ref: "agent-1",
+          status: "candidate",
+          metadata: {},
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    });
+    vi.mocked(generateDailyLifeCandidates).mockResolvedValue([
+      {
+        id: "candidate-1",
+        world_id: "world-1",
+        agent_id: "agent-1",
+        agent_display_name: "Guide",
+        scene_id: "scene-1",
+        scene_name: "Club room",
+        title: "Guide daily life beat",
+        summary: "Guide spends time at Club room.",
+        importance: "daily",
+        starts_at: "2030-01-01T08:00:00.000Z",
+        source_kind: "daily_life_scheduler",
+        source_ref: "agent-1",
+        status: "candidate",
+        metadata: {},
+        created_at: "2026-05-05T12:00:00.000Z",
+        updated_at: "2026-05-05T12:00:00.000Z",
+      },
+    ]);
+    vi.mocked(resolveOffscreenEvents).mockResolvedValue({
+      processed_count: 1,
+      resolved_count: 1,
+      failed_count: 0,
+      event_ids: ["event-3"],
+    });
+    vi.mocked(listOffscreenEvents).mockResolvedValue([
+      {
+        id: "queue-1",
+        world_id: "world-1",
+        source_candidate_id: "candidate-1",
+        event_name: "living_world.daily_life",
+        title: "Guide daily life beat",
+        payload: {},
+        due_at: "2030-01-01T08:00:00.000Z",
+        importance: "daily",
+        status: "resolved",
+        resolved_event_id: "event-3",
+        last_error: null,
+        created_at: "2026-05-05T12:00:00.000Z",
+        updated_at: "2026-05-05T12:00:00.000Z",
+      },
+    ]);
     vi.mocked(validateWorldComposition).mockResolvedValue({
       valid: false,
       blocking_issue_count: 1,
@@ -108,6 +185,12 @@ describe("WorldOverview", () => {
     expect(screen.getByText("Reconstructed clock")).toBeInTheDocument();
     expect(screen.getByText("Snapshot integrity")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Calendar conflicts" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Living world autonomy" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Organizations and faction tracks" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Daily life and offscreen queue" })).toBeInTheDocument();
+    expect(screen.getByText("classroom to courtyard")).toBeInTheDocument();
+    expect(screen.getByText("Student Council (club)")).toBeInTheDocument();
+    expect(screen.getByText("Guide presence")).toBeInTheDocument();
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
@@ -148,6 +231,32 @@ describe("WorldOverview", () => {
       start_world_time: null,
       horizon_hours: 168,
       limit: 50,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview daily life" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Guide daily life beat")).toBeInTheDocument();
+    });
+    expect(getDailyLifePreview).toHaveBeenCalledWith("world-1", {
+      start_world_time: null,
+      horizon_hours: 24,
+      limit: 20,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate candidates" }));
+
+    await waitFor(() => {
+      expect(generateDailyLifeCandidates).toHaveBeenCalledWith("world-1", {
+        horizon_hours: 24,
+        limit: 20,
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve due offscreen events" }));
+
+    await waitFor(() => {
+      expect(resolveOffscreenEvents).toHaveBeenCalledWith("world-1", 20);
     });
 
     fireEvent.change(screen.getByPlaceholderText("validate-world-slug"), {
@@ -200,6 +309,7 @@ function eventRow(id: string, sequence: number, eventName: string): WorldEventAu
     world_id: "world-1",
     sequence,
     event_name: eventName,
+    importance: "system",
     payload: eventName === "agent.run_succeeded" ? { output: "ok" } : { error: "timeout" },
     wall_time: "2026-04-17T12:00:00.000Z",
     world_time: "2030-01-01T00:00:00.000Z",
@@ -241,8 +351,120 @@ const workspaceData: WorldWorkspaceData = {
     world_rules_plugin_config: {},
     is_active: true,
   },
-  scenes: [],
+  scenes: [
+    {
+      id: "scene-1",
+      world_id: "world-1",
+      scene_key: "classroom",
+      name: "Classroom",
+      description: null,
+      region_key: "school",
+      location_tags: ["school"],
+      opening_rules: {},
+      is_active: true,
+    },
+    {
+      id: "scene-2",
+      world_id: "world-1",
+      scene_key: "courtyard",
+      name: "Courtyard",
+      description: null,
+      region_key: "school",
+      location_tags: [],
+      opening_rules: {},
+      is_active: true,
+    },
+  ],
+  locationEdges: [
+    {
+      id: "edge-1",
+      world_id: "world-1",
+      source_scene_id: "scene-1",
+      target_scene_id: "scene-2",
+      source_scene_key: "classroom",
+      target_scene_key: "courtyard",
+      travel_label: "walkway",
+      traversal_rules: {},
+      created_at: "2026-05-05T12:00:00.000Z",
+      updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
   agents: [],
+  organizations: [
+    {
+      id: "org-1",
+      world_id: "world-1",
+      organization_key: "student-council",
+      name: "Student Council",
+      organization_type: "club",
+      description: null,
+      public_summary: "Runs school events.",
+      hidden_summary: null,
+      metadata: {},
+      is_active: true,
+      created_at: "2026-05-05T12:00:00.000Z",
+      updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  organizationMemberships: [
+    {
+      id: "membership-1",
+      world_id: "world-1",
+      organization_id: "org-1",
+      organization_key: "student-council",
+      organization_name: "Student Council",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      role_title: "President",
+      visibility: "public",
+      loyalty: 80,
+      influence: 70,
+      responsibilities: [],
+      metadata: {},
+      created_at: "2026-05-05T12:00:00.000Z",
+      updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  factionTracks: [
+    {
+      id: "track-1",
+      world_id: "world-1",
+      organization_id: "org-1",
+      organization_key: "student-council",
+      organization_name: "Student Council",
+      track_key: "festival-plan",
+      name: "Festival Plan",
+      track_type: "goal",
+      progress: 30,
+      pressure: 20,
+      summary: "Venue search",
+      metadata: {},
+      created_at: "2026-05-05T12:00:00.000Z",
+      updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  agentPresenceStates: [
+    {
+      id: "presence-1",
+      world_id: "world-1",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      current_scene_id: "scene-1",
+      current_scene_key: "classroom",
+      current_scene_name: "Classroom",
+      visibility_status: "visible",
+      encounter_eligible: true,
+      scheduled_movement: {},
+      last_event_id: null,
+      created_at: "2026-05-05T12:00:00.000Z",
+      updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  dailyLifePreview: null,
+  dailyLifeCandidates: [],
+  offscreenEvents: [],
   memberships: [],
   worldBible: null,
   memoryBackendProfiles: [],

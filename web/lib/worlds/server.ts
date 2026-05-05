@@ -4,6 +4,7 @@ import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 import type {
   Agent,
   AgentObservation,
+  AgentPresence,
   AgentPreset,
   AgentPersona,
   AgentRelationship,
@@ -14,7 +15,10 @@ import type {
   ConversationDiagnosticsSummary,
   ConversationSession,
   ConversationTurn,
+  DailyLifeEventCandidate,
+  DailyLifePreview,
   ExternalToolPolicy,
+  FactionProgressTrack,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -25,6 +29,8 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactFilters,
+  OffscreenEventQueueItem,
+  OrganizationMembership,
   PluginBinding,
   PluginCatalogEntry,
   ProviderHealth,
@@ -34,6 +40,7 @@ import type {
   RuntimeStatus,
   ScaleReadiness,
   Scene,
+  SceneLocationEdge,
   ScheduleRule,
   World,
   WorldBible,
@@ -44,13 +51,22 @@ import type {
   WorldReplayState,
   WorldSnapshot,
   WorldSnapshotIntegrity,
+  WorldOrganization,
 } from "@/lib/worlds/types";
 
 export type WorldWorkspaceData = {
   worlds: World[];
   selectedWorld: World | null;
   scenes: Scene[];
+  locationEdges: SceneLocationEdge[];
   agents: Agent[];
+  organizations: WorldOrganization[];
+  organizationMemberships: OrganizationMembership[];
+  factionTracks: FactionProgressTrack[];
+  agentPresenceStates: AgentPresence[];
+  dailyLifePreview: DailyLifePreview | null;
+  dailyLifeCandidates: DailyLifeEventCandidate[];
+  offscreenEvents: OffscreenEventQueueItem[];
   memberships: Membership[];
   worldBible: WorldBible | null;
   memoryBackendProfiles: MemoryBackendProfile[];
@@ -85,6 +101,8 @@ export type AgentWorkspaceData = {
 
 export type AgentDetailData = AgentWorkspaceData & {
   selectedAgent: Agent | null;
+  presence: AgentPresence | null;
+  organizationMemberships: OrganizationMembership[];
   relationships: AgentRelationship[];
   calendarEntries: CalendarEntry[];
   memoryItems: MemoryItem[];
@@ -264,7 +282,15 @@ export async function getWorldDashboardData(
       worlds,
       selectedWorldId: selectedWorld.id,
       scenes,
+      locationEdges: [],
       agents,
+      organizations: [],
+      organizationMemberships: [],
+      factionTracks: [],
+      agentPresenceStates: [],
+      dailyLifePreview: null,
+      dailyLifeCandidates: [],
+      offscreenEvents: [],
       memberships: memberships ?? [],
       clock,
       replayState,
@@ -328,7 +354,9 @@ export async function getWorldWorkspaceData(
     }
     const [
       scenes,
+      locationEdges,
       agents,
+      organizations,
       memberships,
       worldBible,
       clock,
@@ -339,10 +367,15 @@ export async function getWorldWorkspaceData(
       worldEventAudit,
       calendarConflicts,
       scheduleRules,
+      dailyLifePreview,
+      dailyLifeCandidates,
+      offscreenEvents,
       worldDiagnostics,
     ] = await Promise.all([
       apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
+      apiFetch<SceneLocationEdge[]>(`/worlds/${worldId}/location-edges`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetch<WorldOrganization[]>(`/worlds/${worldId}/organizations`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       apiFetch<WorldBible | null>(`/worlds/${worldId}/bible`, cookies),
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
@@ -356,13 +389,59 @@ export async function getWorldWorkspaceData(
       apiFetchOptional<WorldEventAuditEntry[]>(`/worlds/${worldId}/events?limit=10`, cookies),
       apiFetchOptional<CalendarConflictReport>(`/worlds/${worldId}/calendar/conflicts`, cookies),
       apiFetch<ScheduleRule[]>(`/worlds/${worldId}/schedule-rules`, cookies),
+      apiFetchOptional<DailyLifePreview>(`/worlds/${worldId}/daily-life/preview`, cookies),
+      apiFetchOptional<DailyLifeEventCandidate[]>(
+        `/worlds/${worldId}/daily-life/candidates?limit=10`,
+        cookies,
+      ),
+      apiFetchOptional<OffscreenEventQueueItem[]>(
+        `/worlds/${worldId}/offscreen-events?limit=10`,
+        cookies,
+      ),
       apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${worldId}/diagnostics`, cookies),
     ]);
+    const [organizationMembershipGroups, factionTrackGroups, agentPresenceStates] =
+      await Promise.all([
+        Promise.all(
+          organizations.map((organization) =>
+            apiFetch<OrganizationMembership[]>(
+              `/worlds/${worldId}/organizations/${organization.id}/memberships`,
+              cookies,
+            ),
+          ),
+        ),
+        Promise.all(
+          organizations.map((organization) =>
+            apiFetch<FactionProgressTrack[]>(
+              `/worlds/${worldId}/organizations/${organization.id}/faction-tracks`,
+              cookies,
+            ),
+          ),
+        ),
+        Promise.all(
+          agents.map((agent) =>
+            apiFetch<AgentPresence | null>(
+              `/worlds/${worldId}/agents/${agent.id}/presence`,
+              cookies,
+            ),
+          ),
+        ),
+      ]);
     return {
       worlds,
       selectedWorld,
       scenes,
+      locationEdges,
       agents,
+      organizations,
+      organizationMemberships: organizationMembershipGroups.flat(),
+      factionTracks: factionTrackGroups.flat(),
+      agentPresenceStates: agentPresenceStates.filter(
+        (presence): presence is AgentPresence => presence !== null,
+      ),
+      dailyLifePreview,
+      dailyLifeCandidates: dailyLifeCandidates ?? [],
+      offscreenEvents: offscreenEvents ?? [],
       memberships: memberships ?? [],
       worldBible,
       memoryBackendProfiles,
@@ -454,6 +533,8 @@ export async function getAgentDetailData(
     return {
       ...data,
       selectedAgent: null,
+      presence: null,
+      organizationMemberships: [],
       relationships: [],
       calendarEntries: [],
       memoryItems: [],
@@ -465,6 +546,8 @@ export async function getAgentDetailData(
   }
   const cookies = await cookieHeader();
   const [
+    presence,
+    organizations,
     relationships,
     calendarEntries,
     memoryItems,
@@ -474,6 +557,8 @@ export async function getAgentDetailData(
     agentObservations,
   ] =
     await Promise.all([
+      apiFetch<AgentPresence | null>(`/worlds/${worldId}/agents/${agentId}/presence`, cookies),
+      apiFetch<WorldOrganization[]>(`/worlds/${worldId}/organizations`, cookies),
       apiFetch<AgentRelationship[]>(`/worlds/${worldId}/agents/${agentId}/relationships`, cookies),
       apiFetch<CalendarEntry[]>(`/worlds/${worldId}/agents/${agentId}/calendar`, cookies),
       apiFetchOptional<MemoryItem[]>(`/worlds/${worldId}/agents/${agentId}/memory`, cookies),
@@ -493,9 +578,21 @@ export async function getAgentDetailData(
         cookies,
       ),
     ]);
+  const organizationMembershipGroups = await Promise.all(
+    organizations.map((organization) =>
+      apiFetch<OrganizationMembership[]>(
+        `/worlds/${worldId}/organizations/${organization.id}/memberships`,
+        cookies,
+      ),
+    ),
+  );
   return {
     ...data,
     selectedAgent,
+    presence,
+    organizationMemberships: organizationMembershipGroups
+      .flat()
+      .filter((membership) => membership.agent_id === agentId),
     relationships,
     calendarEntries,
     memoryItems: memoryItems ?? [],
@@ -895,7 +992,15 @@ function emptyWorldWorkspaceData(
     worlds,
     selectedWorld: null,
     scenes: [],
+    locationEdges: [],
     agents: [],
+    organizations: [],
+    organizationMemberships: [],
+    factionTracks: [],
+    agentPresenceStates: [],
+    dailyLifePreview: null,
+    dailyLifeCandidates: [],
+    offscreenEvents: [],
     memberships: [],
     worldBible: null,
     memoryBackendProfiles: [],
@@ -1011,7 +1116,15 @@ function emptyDashboardData(
     worlds,
     selectedWorldId,
     scenes: [],
+    locationEdges: [],
     agents: [],
+    organizations: [],
+    organizationMemberships: [],
+    factionTracks: [],
+    agentPresenceStates: [],
+    dailyLifePreview: null,
+    dailyLifeCandidates: [],
+    offscreenEvents: [],
     memberships: [],
     clock: null,
     replayState: null,

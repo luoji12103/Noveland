@@ -70,6 +70,9 @@ const scenes = [
     scene_key: "home",
     name: "Home",
     description: null,
+    region_key: "home-district",
+    location_tags: ["indoors"],
+    opening_rules: {},
     is_active: true,
   },
 ];
@@ -84,8 +87,8 @@ const agents = [
     display_name: "Guide",
     kind: "role_agent",
     provider_profile_id: providerOpenAiId,
-    narrative_role: "supporting",
-    importance: "secondary",
+    narrative_role: "supporting_cast",
+    importance: "major",
     canon_status: "post_canon",
     character_category: "supporting_cast",
     character_profile: {
@@ -119,6 +122,129 @@ const agentRelationships = [
     rivalry: 0,
     debt: 0,
     metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const locationEdges = [
+  {
+    id: "20500000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    source_scene_id: sceneHomeId,
+    target_scene_id: sceneHomeId,
+    source_scene_key: "home",
+    target_scene_key: "home",
+    travel_label: "same building",
+    traversal_rules: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const organizations = [
+  {
+    id: "81000000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    organization_key: "student-council",
+    name: "Student Council",
+    organization_type: "club",
+    description: null,
+    public_summary: "Coordinates daily school activity.",
+    hidden_summary: null,
+    metadata: {},
+    is_active: true,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const organizationMemberships = [
+  {
+    id: "81100000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    organization_id: "81000000-0000-4000-8000-000000000001",
+    organization_key: "student-council",
+    organization_name: "Student Council",
+    agent_id: agentGuideId,
+    agent_key: "guide",
+    agent_display_name: "Guide",
+    role_title: "Advisor",
+    visibility: "public",
+    loyalty: 70,
+    influence: 60,
+    responsibilities: ["briefing"],
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const factionTracks = [
+  {
+    id: "81200000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    organization_id: "81000000-0000-4000-8000-000000000001",
+    organization_key: "student-council",
+    organization_name: "Student Council",
+    track_key: "festival-plan",
+    name: "Festival Plan",
+    track_type: "goal",
+    progress: 30,
+    pressure: 20,
+    summary: "Initial planning is open.",
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const agentPresenceStates = [
+  {
+    id: "81300000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    agent_key: "guide",
+    agent_display_name: "Guide",
+    current_scene_id: sceneHomeId,
+    current_scene_key: "home",
+    current_scene_name: "Home",
+    visibility_status: "visible",
+    encounter_eligible: true,
+    scheduled_movement: {},
+    last_event_id: null,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const dailyLifeCandidates = [
+  {
+    id: "81400000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    agent_display_name: "Guide",
+    scene_id: sceneHomeId,
+    scene_name: "Home",
+    title: "Guide daily life beat",
+    summary: "Guide keeps the world moving from Home.",
+    importance: "daily",
+    starts_at: "2030-01-01T08:00:00.000Z",
+    source_kind: "daily_life_scheduler",
+    source_ref: agentGuideId,
+    status: "candidate",
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const offscreenEvents = [
+  {
+    id: "81500000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    source_candidate_id: "81400000-0000-4000-8000-000000000001",
+    event_name: "living_world.daily_life",
+    title: "Guide daily life beat",
+    payload: { summary: "Guide keeps the world moving from Home." },
+    due_at: "2030-01-01T08:00:00.000Z",
+    importance: "daily",
+    status: "pending",
+    resolved_event_id: null,
+    last_error: null,
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
   },
@@ -459,6 +585,7 @@ const worldEvents = new Map([
         world_id: worldOneId,
         sequence: 1,
         event_name: "world.clock_advanced",
+        importance: "system",
         payload: { revision: 1, status: "running" },
         wall_time: "2026-04-17T00:02:00.000Z",
         world_time: "2030-01-01T00:00:00.000Z",
@@ -870,6 +997,14 @@ async function handleWorldResource(request, response, url) {
     await handleScenes(request, response, currentSubject, worldId, segments[3]);
     return;
   }
+  if (resource === "location-edges") {
+    await handleLocationEdges(request, response, currentSubject, worldId, segments[3]);
+    return;
+  }
+  if (resource === "organizations") {
+    await handleOrganizations(request, response, currentSubject, worldId, segments[3], segments[4], segments[5]);
+    return;
+  }
   if (resource === "agents") {
     await handleAgents(request, response, currentSubject, worldId, segments[3]);
     return;
@@ -908,6 +1043,14 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "events") {
     handleWorldEvents(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "daily-life") {
+    await handleDailyLife(request, response, currentSubject, worldId, segments[3], url);
+    return;
+  }
+  if (resource === "offscreen-events") {
+    await handleOffscreenEvents(request, response, currentSubject, worldId, segments[3], url);
     return;
   }
   if (resource === "diagnostics") {
@@ -1014,6 +1157,9 @@ async function handleScenes(request, response, currentSubject, worldId, sceneId)
       scene_key: body.scene_key,
       name: body.name,
       description: body.description ?? null,
+      region_key: body.region_key ?? null,
+      location_tags: body.location_tags ?? [],
+      opening_rules: body.opening_rules ?? {},
       is_active: true,
     };
     scenes.push(scene);
@@ -1034,6 +1180,224 @@ async function handleScenes(request, response, currentSubject, worldId, sceneId)
     scene.is_active = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleLocationEdges(request, response, currentSubject, worldId, edgeId) {
+  if (request.method === "GET" && edgeId === undefined) {
+    sendJson(response, 200, locationEdges.filter((edge) => edge.world_id === worldId));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && edgeId === undefined) {
+    const body = await readJson(request);
+    const sourceScene = scenes.find((scene) => scene.id === body.source_scene_id);
+    const targetScene = scenes.find((scene) => scene.id === body.target_scene_id);
+    const edge = {
+      id: randomUUID(),
+      world_id: worldId,
+      source_scene_id: body.source_scene_id,
+      target_scene_id: body.target_scene_id,
+      source_scene_key: sourceScene?.scene_key ?? "unknown",
+      target_scene_key: targetScene?.scene_key ?? "unknown",
+      travel_label: body.travel_label ?? null,
+      traversal_rules: body.traversal_rules ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    locationEdges.push(edge);
+    sendJson(response, 201, edge);
+    return;
+  }
+  const edge = locationEdges.find((item) => item.id === edgeId && item.world_id === worldId);
+  if (edge === undefined) {
+    sendJson(response, 404, { detail: "Location edge not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(edge, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, edge);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleOrganizations(request, response, currentSubject, worldId, organizationId, childResource, childId) {
+  if (organizationId !== undefined && childResource === "memberships") {
+    await handleOrganizationMemberships(request, response, currentSubject, worldId, organizationId, childId);
+    return;
+  }
+  if (organizationId !== undefined && childResource === "faction-tracks") {
+    await handleFactionTracks(request, response, currentSubject, worldId, organizationId, childId);
+    return;
+  }
+  if (request.method === "GET" && organizationId === undefined) {
+    sendJson(response, 200, organizations.filter((organization) => organization.world_id === worldId));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && organizationId === undefined) {
+    const body = await readJson(request);
+    const organization = {
+      id: randomUUID(),
+      world_id: worldId,
+      organization_key: body.organization_key,
+      name: body.name,
+      organization_type: body.organization_type,
+      description: body.description ?? null,
+      public_summary: body.public_summary ?? null,
+      hidden_summary: body.hidden_summary ?? null,
+      metadata: body.metadata ?? {},
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    organizations.push(organization);
+    sendJson(response, 201, organization);
+    return;
+  }
+  const organization = organizations.find(
+    (item) => item.id === organizationId && item.world_id === worldId,
+  );
+  if (organization === undefined) {
+    sendJson(response, 404, { detail: "Organization not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(organization, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, organization);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleOrganizationMemberships(request, response, currentSubject, worldId, organizationId, membershipId) {
+  if (request.method === "GET" && membershipId === undefined) {
+    sendJson(
+      response,
+      200,
+      organizationMemberships.filter(
+        (membership) =>
+          membership.world_id === worldId && membership.organization_id === organizationId,
+      ),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && membershipId === undefined) {
+    const body = await readJson(request);
+    const organization = organizations.find((item) => item.id === organizationId);
+    const agent = agents.find((item) => item.id === body.agent_id);
+    const membership = {
+      id: randomUUID(),
+      world_id: worldId,
+      organization_id: organizationId,
+      organization_key: organization?.organization_key ?? "unknown",
+      organization_name: organization?.name ?? "Unknown",
+      agent_id: body.agent_id,
+      agent_key: agent?.agent_key ?? "unknown",
+      agent_display_name: agent?.display_name ?? "Unknown",
+      role_title: body.role_title ?? null,
+      visibility: body.visibility ?? "public",
+      loyalty: body.loyalty ?? 50,
+      influence: body.influence ?? 50,
+      responsibilities: body.responsibilities ?? [],
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    organizationMemberships.push(membership);
+    sendJson(response, 201, membership);
+    return;
+  }
+  const membership = organizationMemberships.find(
+    (item) => item.id === membershipId && item.world_id === worldId,
+  );
+  if (membership === undefined) {
+    sendJson(response, 404, { detail: "Membership not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(membership, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, membership);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleFactionTracks(request, response, currentSubject, worldId, organizationId, trackId) {
+  if (request.method === "GET" && trackId === undefined) {
+    sendJson(
+      response,
+      200,
+      factionTracks.filter(
+        (track) => track.world_id === worldId && track.organization_id === organizationId,
+      ),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && trackId === undefined) {
+    const body = await readJson(request);
+    const organization = organizations.find((item) => item.id === organizationId);
+    const track = {
+      id: randomUUID(),
+      world_id: worldId,
+      organization_id: organizationId,
+      organization_key: organization?.organization_key ?? "unknown",
+      organization_name: organization?.name ?? "Unknown",
+      track_key: body.track_key,
+      name: body.name,
+      track_type: body.track_type,
+      progress: body.progress ?? 0,
+      pressure: body.pressure ?? 0,
+      summary: body.summary ?? null,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    factionTracks.push(track);
+    sendJson(response, 201, track);
+    return;
+  }
+  const track = factionTracks.find((item) => item.id === trackId && item.world_id === worldId);
+  if (track === undefined) {
+    sendJson(response, 404, { detail: "Faction track not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(track, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, track);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -1081,6 +1445,10 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
         agentId,
         segments[5],
       );
+      return;
+    }
+    if (segments[4] === "presence") {
+      await handleAgentPresence(request, response, currentSubject, worldId, agentId);
       return;
     }
     if (segments[4] === "run") {
@@ -1173,6 +1541,57 @@ async function handleAgents(request, response, currentSubject, worldId, agentId)
     agent.is_enabled = false;
     response.writeHead(204);
     response.end();
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAgentPresence(request, response, currentSubject, worldId, agentId) {
+  const agent = agents.find((item) => item.id === agentId && item.world_id === worldId);
+  if (agent === undefined) {
+    sendJson(response, 404, { detail: "Agent not found" });
+    return;
+  }
+  const existing = agentPresenceStates.find(
+    (item) => item.world_id === worldId && item.agent_id === agentId,
+  );
+  if (request.method === "GET") {
+    sendJson(response, 200, existing ?? null);
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PUT") {
+    const body = await readJson(request);
+    const scene = scenes.find((item) => item.id === body.current_scene_id);
+    const presence = existing ?? {
+      id: randomUUID(),
+      world_id: worldId,
+      agent_id: agentId,
+      agent_key: agent.agent_key,
+      agent_display_name: agent.display_name,
+      created_at: new Date().toISOString(),
+    };
+    Object.assign(presence, {
+      current_scene_id: body.current_scene_id ?? null,
+      current_scene_key: scene?.scene_key ?? null,
+      current_scene_name: scene?.name ?? null,
+      visibility_status: body.visibility_status ?? "visible",
+      encounter_eligible: body.encounter_eligible ?? true,
+      scheduled_movement: body.scheduled_movement ?? {},
+      last_event_id: presence.last_event_id ?? null,
+      updated_at: new Date().toISOString(),
+    });
+    if (existing === undefined) {
+      agentPresenceStates.push(presence);
+    }
+    sendJson(response, 200, presence);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -1282,6 +1701,9 @@ function handleWorldCompositionExport(request, response, currentSubject, worldId
         scene_key: scene.scene_key,
         name: scene.name,
         description: scene.description,
+        region_key: scene.region_key ?? null,
+        location_tags: scene.location_tags ?? [],
+        opening_rules: scene.opening_rules ?? {},
         is_active: scene.is_active,
       })),
     agents: agents
@@ -1853,6 +2275,9 @@ async function handleWorldCompositionImport(request, response) {
       scene_key: scene.scene_key,
       name: scene.name,
       description: scene.description ?? null,
+      region_key: scene.region_key ?? null,
+      location_tags: scene.location_tags ?? [],
+      opening_rules: scene.opening_rules ?? {},
       is_active: scene.is_active,
     };
     scenes.push(createdScene);
@@ -2687,6 +3112,7 @@ function handleWorldEvents(request, response, currentSubject, worldId, url) {
   let events = [...(worldEvents.get(worldId) ?? [])];
   const eventName = url.searchParams.get("event_name");
   const actorRef = url.searchParams.get("actor_ref");
+  const importance = url.searchParams.get("importance");
   const sequenceAfter = url.searchParams.get("sequence_after");
   const sequenceBefore = url.searchParams.get("sequence_before");
   const wallTimeFrom = url.searchParams.get("wall_time_from");
@@ -2696,6 +3122,9 @@ function handleWorldEvents(request, response, currentSubject, worldId, url) {
   }
   if (actorRef !== null) {
     events = events.filter((event) => event.actor_ref === actorRef);
+  }
+  if (importance !== null) {
+    events = events.filter((event) => event.importance === importance);
   }
   if (sequenceAfter !== null) {
     events = events.filter((event) => event.sequence > Number(sequenceAfter));
@@ -2714,6 +3143,116 @@ function handleWorldEvents(request, response, currentSubject, worldId, url) {
     200,
     events.sort((left, right) => right.sequence - left.sequence).slice(0, limit),
   );
+}
+
+async function handleDailyLife(request, response, currentSubject, worldId, action, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (action === "preview" && request.method === "GET") {
+    const candidates = dailyLifeCandidates.filter((candidate) => candidate.world_id === worldId);
+    sendJson(response, 200, {
+      world_id: worldId,
+      start_world_time: url.searchParams.get("start_world_time") ?? "2030-01-01T08:00:00.000Z",
+      horizon_hours: Number(url.searchParams.get("horizon_hours") ?? "24"),
+      candidate_count: candidates.length,
+      candidates: candidates.map((candidate) => ({ ...candidate, id: null, created_at: null, updated_at: null })),
+    });
+    return;
+  }
+  if (!hasValidCsrf(request) && action === "generate") {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (action === "generate" && request.method === "POST") {
+    sendJson(response, 200, dailyLifeCandidates.filter((candidate) => candidate.world_id === worldId));
+    return;
+  }
+  if (action === "candidates" && request.method === "GET") {
+    const status = url.searchParams.get("status");
+    const candidates = dailyLifeCandidates.filter(
+      (candidate) =>
+        candidate.world_id === worldId && (status === null || candidate.status === status),
+    );
+    sendJson(response, 200, candidates);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleOffscreenEvents(request, response, currentSubject, worldId, action, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && action === undefined) {
+    const status = url.searchParams.get("status");
+    sendJson(
+      response,
+      200,
+      offscreenEvents.filter(
+        (item) => item.world_id === worldId && (status === null || item.status === status),
+      ),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === undefined) {
+    const body = await readJson(request);
+    const candidate = dailyLifeCandidates.find((item) => item.id === body.candidate_id);
+    const item = {
+      id: randomUUID(),
+      world_id: worldId,
+      source_candidate_id: candidate?.id ?? null,
+      event_name: body.event_name ?? "living_world.offscreen_event",
+      title: candidate?.title ?? body.title,
+      payload: candidate === undefined ? body.payload ?? {} : { summary: candidate.summary },
+      due_at: candidate?.starts_at ?? body.due_at,
+      importance: candidate?.importance ?? body.importance ?? "daily",
+      status: "pending",
+      resolved_event_id: null,
+      last_error: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    offscreenEvents.unshift(item);
+    if (candidate !== undefined) {
+      candidate.status = "queued";
+    }
+    sendJson(response, 201, item);
+    return;
+  }
+  if (request.method === "POST" && action === "resolve") {
+    const dueItems = offscreenEvents.filter(
+      (item) => item.world_id === worldId && item.status === "pending",
+    );
+    const eventIds = [];
+    for (const item of dueItems) {
+      const event = appendWorldEvent(worldId, {
+        event_name: item.event_name,
+        importance: item.importance,
+        payload: item.payload,
+        world_time: item.due_at,
+        actor_ref: "system:runtime",
+      });
+      item.status = "resolved";
+      item.resolved_event_id = event.id;
+      item.updated_at = new Date().toISOString();
+      eventIds.push(event.id);
+    }
+    sendJson(response, 200, {
+      processed_count: dueItems.length,
+      resolved_count: dueItems.length,
+      failed_count: 0,
+      event_ids: eventIds,
+    });
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
 }
 
 async function handleNarrativeArtifacts(request, response, currentSubject, worldId, artifactId, url) {
@@ -3246,6 +3785,7 @@ function appendWorldEvent(worldId, input) {
     world_id: worldId,
     sequence: events.length + 1,
     event_name: input.event_name,
+    importance: input.importance ?? "system",
     payload: input.payload ?? {},
     wall_time: new Date().toISOString(),
     world_time: input.world_time ?? null,

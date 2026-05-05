@@ -5,11 +5,15 @@ import {
   createAgentCalendarEntry,
   createAgentObservation,
   createAgentRelationship,
+  createFactionTrack,
+  createLocationEdge,
   createMemoryBackendProfile,
   createNarrativeArtifact,
-  publishNarrativeArtifact,
-  createProviderProfile,
+  createOffscreenEvent,
+  createOrganization,
+  createOrganizationMembership,
   createAgentPreset,
+  createProviderProfile,
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
@@ -19,7 +23,9 @@ import {
   getExternalToolPolicy,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
+  getDailyLifePreview,
   getAgentRunDetail,
+  getAgentPresence,
   getNarrativeArtifact,
   createWorld,
   deactivateAgentPreset,
@@ -37,6 +43,13 @@ import {
   getReplayState,
   getSnapshotIntegrity,
   getWorldBible,
+  generateDailyLifeCandidates,
+  listDailyLifeCandidates,
+  listFactionTracks,
+  listLocationEdges,
+  listOffscreenEvents,
+  listOrganizationMemberships,
+  listOrganizations,
   listPluginBindings,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
@@ -48,6 +61,8 @@ import {
   listMemoryBackendProfileJobs,
   pauseWorldClock,
   previewScheduleRule,
+  publishNarrativeArtifact,
+  resolveOffscreenEvents,
   resumeWorldClock,
   listAgentMemory,
   listAgentRelationships,
@@ -70,6 +85,10 @@ import {
   validateWorldComposition,
   updateMemoryBackendProfile,
   updateAgent,
+  updateFactionTrack,
+  updateLocationEdge,
+  updateOrganization,
+  updateOrganizationMembership,
   updateAgentRelationship,
   updateAgentPreset,
   updateProviderProfile,
@@ -78,6 +97,7 @@ import {
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
+  upsertAgentPresence,
   upsertWorldBible,
 } from "@/lib/worlds/client";
 
@@ -245,6 +265,102 @@ describe("world client", () => {
     );
     expect(fetchMock.mock.calls[4][0]).toBe(
       "/api/worlds/world-1/agents/agent-1/relationships/relationship-1",
+    );
+  });
+
+  it("maps autonomous living world requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "edge-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "edge-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "edge-1", travel_label: "walkway" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "org-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "org-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "org-1", is_active: false }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "membership-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "membership-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "membership-1", loyalty: 80 }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "track-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "track-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "track-1", progress: 40 }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence-1" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence-1", visibility_status: "offscreen" }))
+      .mockResolvedValueOnce(jsonResponse({ candidate_count: 1, candidates: [] }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "candidate-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: "candidate-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "queue-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "queue-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ processed_count: 1, resolved_count: 1 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listLocationEdges("world-1");
+    await createLocationEdge("world-1", {
+      source_scene_id: "scene-1",
+      target_scene_id: "scene-2",
+      travel_label: "walkway",
+    });
+    await updateLocationEdge("world-1", "edge-1", { travel_label: "covered walkway" });
+    await listOrganizations("world-1");
+    await createOrganization("world-1", {
+      organization_key: "student-council",
+      name: "Student Council",
+      organization_type: "club",
+    });
+    await updateOrganization("world-1", "org-1", { is_active: false });
+    await listOrganizationMemberships("world-1", "org-1");
+    await createOrganizationMembership("world-1", "org-1", {
+      agent_id: "agent-1",
+      role_title: "President",
+    });
+    await updateOrganizationMembership("world-1", "org-1", "membership-1", { loyalty: 80 });
+    await listFactionTracks("world-1", "org-1");
+    await createFactionTrack("world-1", "org-1", {
+      track_key: "festival-plan",
+      name: "Festival Plan",
+      track_type: "goal",
+    });
+    await updateFactionTrack("world-1", "org-1", "track-1", { progress: 40 });
+    await getAgentPresence("world-1", "agent-1");
+    await upsertAgentPresence("world-1", "agent-1", {
+      current_scene_id: "scene-1",
+      visibility_status: "offscreen",
+    });
+    await getDailyLifePreview("world-1", { horizon_hours: 12, limit: 5 });
+    await generateDailyLifeCandidates("world-1", { horizon_hours: 12, limit: 5 });
+    await listDailyLifeCandidates("world-1", { status: "candidate", limit: 5 });
+    await createOffscreenEvent("world-1", {
+      candidate_id: "candidate-1",
+      title: "Daily beat",
+      due_at: "2030-01-01T08:00:00Z",
+    });
+    await listOffscreenEvents("world-1", { status: "pending", limit: 5 });
+    await resolveOffscreenEvents("world-1", 5);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/world-1/location-edges",
+      "/api/worlds/world-1/location-edges",
+      "/api/worlds/world-1/location-edges/edge-1",
+      "/api/worlds/world-1/organizations",
+      "/api/worlds/world-1/organizations",
+      "/api/worlds/world-1/organizations/org-1",
+      "/api/worlds/world-1/organizations/org-1/memberships",
+      "/api/worlds/world-1/organizations/org-1/memberships",
+      "/api/worlds/world-1/organizations/org-1/memberships/membership-1",
+      "/api/worlds/world-1/organizations/org-1/faction-tracks",
+      "/api/worlds/world-1/organizations/org-1/faction-tracks",
+      "/api/worlds/world-1/organizations/org-1/faction-tracks/track-1",
+      "/api/worlds/world-1/agents/agent-1/presence",
+      "/api/worlds/world-1/agents/agent-1/presence",
+      "/api/worlds/world-1/daily-life/preview?horizon_hours=12&limit=5",
+      "/api/worlds/world-1/daily-life/generate",
+      "/api/worlds/world-1/daily-life/candidates?status=candidate&limit=5",
+      "/api/worlds/world-1/offscreen-events",
+      "/api/worlds/world-1/offscreen-events?status=pending&limit=5",
+      "/api/worlds/world-1/offscreen-events/resolve?limit=5",
+    ]);
+    expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBe(
+      "csrf-token",
     );
   });
 
