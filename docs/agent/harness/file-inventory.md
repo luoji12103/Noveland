@@ -194,6 +194,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/operations/runtime-recovery.md`
 - `docs/agent/operations/sandbox-options.md`
 - `docs/agent/harness/roadmap.md`
+- `docs/agent/harness/roadmap-v2-living-world.md`
 
 ## Update rule
 

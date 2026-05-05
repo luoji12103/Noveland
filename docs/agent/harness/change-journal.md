@@ -461,3 +461,14 @@
 - Tests added/updated: runtime API tests for tool policy permissions and scale readiness sections/blockers; runtime admin component and world client tests for policy/readiness rendering and routes.
 - Docs updated: README, project index, file inventory, task board, change journal, active handoff, and v2 readiness review.
 - Follow-up notes: External tool execution remains disabled. Scale readiness is a derived operator report, not a load test. The 50-phase roadmap is complete; next work should start from the v2 readiness review and real operator feedback.
+
+## V2 living world roadmap entry
+
+- Date: 2026-05-05
+- Branch: docs/v2-living-world-roadmap
+- Scope: long-term roadmap planning for the galgame sequel-style living world direction
+- Summary: Added a new 50-phase V2 roadmap focused on world bible, canon continuity, relationships, organizations/factions, GM world engine, offscreen events, player choice consequences, branchable worldlines, route systems, information flow, and living-world beta validation.
+- Files changed: `/docs/agent/harness/roadmap-v2-living-world.md`, `/docs/agent/README.md`, `/docs/agent/harness/{project-index,file-inventory,task-board,change-journal,handoffs/active-session}.md`
+- Tests added/updated: N/A; documentation-only planning update.
+- Docs updated: agent README read order, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Do not treat all 50 V2 phases as active tasks. Select one V2 mainline bundle in `task-board.md` only when implementation starts.

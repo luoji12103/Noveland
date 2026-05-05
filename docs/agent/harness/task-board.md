@@ -58,4 +58,4 @@
 - Tool Policy / Scale / v2 Readiness
 
 ## Upcoming Mainline
-- None selected; the current 50-phase roadmap is complete.
+- None selected; V2 candidate bundles are documented in `roadmap-v2-living-world.md`.
