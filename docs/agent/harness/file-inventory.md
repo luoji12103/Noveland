@@ -33,6 +33,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/worlds/`
 - `web/app/api/world-compositions/`
 - `web/app/api/runtime/`
+- `web/app/api/runtime/tool-policy/`
+- `web/app/api/runtime/scale-readiness/`
 - `web/app/api/runtime/stream/`
 - `web/app/api/plugins/catalog/`
 - `web/app/api/plugins/bindings/`
@@ -184,6 +186,9 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/operations/deployment-profile.md`
 - `docs/agent/operations/diagnostic-retention.md`
 - `docs/agent/operations/memory-queue-readiness.md`
+- `docs/agent/operations/external-tool-policy.md`
+- `docs/agent/operations/scale-readiness.md`
+- `docs/agent/harness/v2-readiness-review.md`
 - `docs/agent/operations/performance-budget.md`
 - `docs/agent/operations/runtime-supervision.md`
 - `docs/agent/operations/runtime-recovery.md`

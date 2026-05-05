@@ -109,6 +109,8 @@ describe("RuntimeAdmin", () => {
       expect(screen.getByText("Iteration finished.")).toBeInTheDocument();
       expect(screen.getByText("0 due / 0 failed")).toBeInTheDocument();
       expect(screen.getByText("healthy")).toBeInTheDocument();
+      expect(screen.getByText("policy_only")).toBeInTheDocument();
+      expect(screen.getByText("database_indexes - ok")).toBeInTheDocument();
     });
   });
 
@@ -151,6 +153,40 @@ const runtimeData: RuntimeAdminData = {
     runtime_health: stoppedRuntimeHealth,
   },
   runtimeDiagnostics: [],
+  externalToolPolicy: {
+    policy_mode: "policy_only",
+    execution_enabled: false,
+    runtime_execution_enabled: false,
+    supported_permission_modes: [
+      "disabled",
+      "allowlist_required",
+      "denylist_block",
+      "manual_approval_required",
+    ],
+    default_permission_mode: "disabled",
+    deny_reasons: ["external_tool_execution_disabled"],
+    audit_fields: ["world_id", "agent_id", "actor_ref"],
+    secret_handling: ["Secret values are not exposed."],
+    data_exposure_rules: ["No external execution is enabled."],
+    operator_message:
+      "External tool policy is defined for audit and future integration only.",
+  },
+  scaleReadiness: {
+    status: "ok",
+    section_count: 1,
+    blocker_count: 0,
+    generated_at: "2026-05-05T00:00:00.000Z",
+    sections: [
+      {
+        area: "database_indexes",
+        status: "ok",
+        summary: "Core operational tables are available for derived scale review.",
+        metrics: { world_count: 0 },
+        blockers: [],
+        recommendations: ["Review query plans before growth testing."],
+      },
+    ],
+  },
   modelProviderPlugins: [],
   loadError: null,
 };

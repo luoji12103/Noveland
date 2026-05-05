@@ -17,7 +17,7 @@ from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import load_settings
-from noveland.events.models import WorldEventModel
+from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import (
     AgentMemoryItem,
     MemoryBackendProfile,
@@ -50,6 +50,7 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     control = client.get("/runtime/control")
     status = client.get("/runtime/status")
     supervision = client.get("/runtime/supervision")
+    tool_policy = client.get("/runtime/tool-policy")
     _seed_runtime_diagnostic(engine)
     diagnostics = client.get("/runtime/diagnostics")
     metrics = client.get("/metrics")
@@ -95,6 +96,12 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert supervision.json()["api_status"] == "ok"
     assert supervision.json()["database_status"] == "ok"
     assert supervision.json()["runtime_process_expected"] is False
+    assert tool_policy.status_code == 200
+    assert tool_policy.json()["policy_mode"] == "policy_only"
+    assert tool_policy.json()["execution_enabled"] is False
+    assert tool_policy.json()["runtime_execution_enabled"] is False
+    assert tool_policy.json()["default_permission_mode"] == "disabled"
+    assert "secret-token" not in tool_policy.text
     assert metrics.status_code == 200
     assert "noveland_runtime_desired_state" in metrics.text
     assert 'noveland_memory_write_jobs{status="failed"}' in metrics.text
@@ -221,6 +228,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     retention = client.get("/runtime/diagnostics/retention")
     prune = client.post("/runtime/diagnostics/prune")
     supervision = client.get("/runtime/supervision")
+    tool_policy = client.get("/runtime/tool-policy")
+    scale_readiness = client.get("/runtime/scale-readiness")
     metrics = client.get("/metrics")
     profiles = client.get("/provider-profiles")
     provider_health = client.get("/provider-profiles/health")
@@ -236,6 +245,8 @@ def test_non_platform_admin_cannot_access_runtime_surface() -> None:
     assert retention.status_code == 403
     assert prune.status_code == 403
     assert supervision.status_code == 403
+    assert tool_policy.status_code == 403
+    assert scale_readiness.status_code == 403
     assert metrics.status_code == 403
     assert profiles.status_code == 403
     assert provider_health.status_code == 403
@@ -287,6 +298,57 @@ def test_platform_admin_dry_runs_and_prunes_diagnostic_retention() -> None:
     assert prune.json()["pruned_count"] == 1
     assert prune.json()["pruneable_count"] == 0
     assert [item["event_type"] for item in diagnostics.json()] == ["runtime.recent"]
+
+
+def test_platform_admin_gets_scale_readiness_report() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    world_id = _seed_world(engine, owner_id, "scale-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _authenticate(client, token)
+    create_profile = client.post(
+        "/memory-backend-profiles",
+        json={
+            "profile_key": "local-memory",
+            "name": "Local memory",
+            "backend_kind": "local_pgvector",
+            "vector_store_config": {},
+            "llm_config": {},
+            "embedder_config": {},
+            "reranker_config": {},
+            "secret_refs": {},
+        },
+    )
+    profile_id = uuid.UUID(create_profile.json()["id"])
+    _attach_world_memory_profile(engine, world_id, profile_id)
+    _seed_memory_backend_logs(engine, profile_id, world_id, agent_id)
+    provider = client.post(
+        "/provider-profiles",
+        json={
+            "profile_key": "openai-local",
+            "name": "OpenAI Local",
+            "provider_type": "openai_compatible",
+            "base_url": "https://api.example.test/v1",
+            "model_name": "gpt-test",
+            "capabilities": {},
+            "api_key_ref": "missing-provider-secret",
+        },
+    )
+
+    report = client.get("/runtime/scale-readiness")
+
+    assert provider.status_code == 201
+    assert report.status_code == 200
+    assert report.json()["status"] == "blocked"
+    assert report.json()["section_count"] == 6
+    sections = {section["area"]: section for section in report.json()["sections"]}
+    assert sections["database_indexes"]["metrics"]["world_count"] == 1
+    assert sections["memory_queue_throughput"]["status"] == "watch"
+    assert sections["memory_queue_throughput"]["metrics"]["failed_count"] == 1
+    assert sections["provider_limits"]["status"] == "blocked"
+    assert sections["provider_limits"]["metrics"]["unhealthy_enabled_profile_count"] == 1
+    assert sections["snapshot_storage"]["metrics"]["snapshot_count"] == 0
+    assert "missing-provider-secret" not in report.text
 
 
 def test_provider_health_reports_secret_ref_statuses(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -461,6 +523,7 @@ def _create_tables(engine: Engine) -> None:
         ConversationSession.__table__,
         ConversationTurn.__table__,
         WorldEventModel.__table__,
+        WorldSnapshotModel.__table__,
         AgentMemoryItem.__table__,
         MemoryWriteJob.__table__,
         MemoryWriteLog.__table__,

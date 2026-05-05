@@ -188,6 +188,84 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         </div>
       </section>
 
+      <section className="management-panel" aria-labelledby="tool-policy-title">
+        <h2 className="section-title" id="tool-policy-title">
+          External tool policy
+        </h2>
+        {data.externalToolPolicy === null ? (
+          <p>External tool policy is unavailable.</p>
+        ) : (
+          <>
+            <div className="dashboard-grid">
+              <div className="metric">
+                <p className="metric-label">Mode</p>
+                <p className="metric-value">{data.externalToolPolicy.policy_mode}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Execution</p>
+                <p className="metric-value">
+                  {data.externalToolPolicy.execution_enabled ? "enabled" : "disabled"}
+                </p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Default permission</p>
+                <p className="metric-value">{data.externalToolPolicy.default_permission_mode}</p>
+              </div>
+            </div>
+            <p className="management-notice">{data.externalToolPolicy.operator_message}</p>
+            <CompactList
+              title="Deny reasons"
+              items={data.externalToolPolicy.deny_reasons}
+            />
+            <CompactList title="Audit fields" items={data.externalToolPolicy.audit_fields} />
+          </>
+        )}
+      </section>
+
+      <section className="management-panel" aria-labelledby="scale-readiness-title">
+        <h2 className="section-title" id="scale-readiness-title">
+          Scale readiness
+        </h2>
+        {data.scaleReadiness === null ? (
+          <p>Scale readiness report is unavailable.</p>
+        ) : (
+          <>
+            <div className="dashboard-grid">
+              <div className="metric">
+                <p className="metric-label">Status</p>
+                <p className="metric-value">{data.scaleReadiness.status}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Sections</p>
+                <p className="metric-value">{data.scaleReadiness.section_count}</p>
+              </div>
+              <div className="metric">
+                <p className="metric-label">Blockers</p>
+                <p className="metric-value">{data.scaleReadiness.blocker_count}</p>
+              </div>
+            </div>
+            <div className="resource-list">
+              {data.scaleReadiness.sections.map((section) => (
+                <article className="resource-row" key={section.area}>
+                  <div>
+                    <h3>
+                      {section.area} - {section.status}
+                    </h3>
+                    <p>{section.summary}</p>
+                    {section.blockers.length > 0 ? (
+                      <p>Blockers: {section.blockers.join("; ")}</p>
+                    ) : null}
+                    {section.recommendations.length > 0 ? (
+                      <p>Next: {section.recommendations[0]}</p>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="management-panel" aria-labelledby="diagnostics-title">
         <h2 className="section-title" id="diagnostics-title">
           Runtime diagnostics
@@ -195,6 +273,22 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         <DiagnosticList diagnostics={runtimeDiagnostics} />
       </section>
     </section>
+  );
+}
+
+function CompactList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <div className="resource-list">
+      <article className="resource-row">
+        <div>
+          <h3>{title}</h3>
+          <p>{items.join(", ")}</p>
+        </div>
+      </article>
+    </div>
   );
 }
 

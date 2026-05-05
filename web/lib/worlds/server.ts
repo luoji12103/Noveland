@@ -13,6 +13,7 @@ import type {
   ConversationDiagnosticsSummary,
   ConversationSession,
   ConversationTurn,
+  ExternalToolPolicy,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -30,6 +31,7 @@ import type {
   RuntimeDiagnostic,
   RuntimeControl,
   RuntimeStatus,
+  ScaleReadiness,
   Scene,
   ScheduleRule,
   World,
@@ -141,6 +143,8 @@ export type NarrativeReaderDetailData = {
 export type RuntimeAdminData = {
   runtimeControl: RuntimeControl | null;
   runtimeStatus: RuntimeStatus | null;
+  externalToolPolicy: ExternalToolPolicy | null;
+  scaleReadiness: ScaleReadiness | null;
   runtimeDiagnostics: RuntimeDiagnostic[];
   modelProviderPlugins: PluginCatalogEntry[];
   loadError: string | null;
@@ -736,13 +740,30 @@ export async function getProviderAdminData(): Promise<ProviderAdminData> {
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
-    const [runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins] = await Promise.all([
+    const [
+      runtimeControl,
+      runtimeStatus,
+      externalToolPolicy,
+      scaleReadiness,
+      runtimeDiagnostics,
+      modelProviderPlugins,
+    ] = await Promise.all([
       apiFetch<RuntimeControl>("/runtime/control", cookies),
       apiFetch<RuntimeStatus>("/runtime/status", cookies),
+      apiFetch<ExternalToolPolicy>("/runtime/tool-policy", cookies),
+      apiFetch<ScaleReadiness>("/runtime/scale-readiness", cookies),
       apiFetch<RuntimeDiagnostic[]>("/runtime/diagnostics", cookies),
       listPluginCatalogForServer("model_provider", cookies),
     ]);
-    return { runtimeControl, runtimeStatus, runtimeDiagnostics, modelProviderPlugins, loadError: null };
+    return {
+      runtimeControl,
+      runtimeStatus,
+      externalToolPolicy,
+      scaleReadiness,
+      runtimeDiagnostics,
+      modelProviderPlugins,
+      loadError: null,
+    };
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -750,6 +771,8 @@ export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
     return {
       runtimeControl: null,
       runtimeStatus: null,
+      externalToolPolicy: null,
+      scaleReadiness: null,
       runtimeDiagnostics: [],
       modelProviderPlugins: [],
       loadError: "Unable to load runtime state.",

@@ -15,6 +15,7 @@ import {
   getConversationDiagnosticsSummary,
   getConversationMemorySummary,
   getConversationSpeakerPreview,
+  getExternalToolPolicy,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
   getAgentRunDetail,
@@ -28,6 +29,7 @@ import {
   exportWorldComposition,
   getRuntimeControl,
   getRuntimeStatus,
+  getScaleReadiness,
   getLatestSnapshot,
   getAgentPersona,
   getAgentPresetUpdatePreview,
@@ -366,6 +368,8 @@ describe("world client", () => {
           runtime_batch_limit: 20,
         }),
       )
+      .mockResolvedValueOnce(jsonResponse({ policy_mode: "policy_only" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", sections: [] }))
       .mockResolvedValueOnce(jsonResponse([{ event_type: "runtime.iteration_failed" }]))
       .mockResolvedValueOnce(jsonResponse([{ event_type: "agent.run_succeeded" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "profile-1" }]))
@@ -381,6 +385,8 @@ describe("world client", () => {
     await getRuntimeControl();
     await updateRuntimeControl({ desired_state: "running" });
     await getRuntimeStatus();
+    await getExternalToolPolicy();
+    await getScaleReadiness();
     await listRuntimeDiagnostics();
     await listWorldDiagnostics("world-1");
     await listProviderProfiles();
@@ -404,16 +410,18 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/runtime/control");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/runtime/control");
     expect(fetchMock.mock.calls[2][0]).toBe("/api/runtime/status");
-    expect(fetchMock.mock.calls[3][0]).toBe("/api/runtime/diagnostics");
-    expect(fetchMock.mock.calls[4][0]).toBe("/api/worlds/world-1/diagnostics");
-    expect(fetchMock.mock.calls[5][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[6][0]).toBe("/api/provider-profiles/health");
-    expect(fetchMock.mock.calls[7][0]).toBe("/api/plugins/catalog?category=model_provider");
-    expect(fetchMock.mock.calls[8][0]).toBe("/api/plugins/bindings?category=model_provider");
-    expect(fetchMock.mock.calls[9][0]).toBe("/api/provider-profiles");
-    expect(fetchMock.mock.calls[10][0]).toBe("/api/provider-profiles/profile-1");
-    expect(fetchMock.mock.calls[11][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[3][0]).toBe("/api/runtime/tool-policy");
+    expect(fetchMock.mock.calls[4][0]).toBe("/api/runtime/scale-readiness");
+    expect(fetchMock.mock.calls[5][0]).toBe("/api/runtime/diagnostics");
+    expect(fetchMock.mock.calls[6][0]).toBe("/api/worlds/world-1/diagnostics");
+    expect(fetchMock.mock.calls[7][0]).toBe("/api/provider-profiles");
+    expect(fetchMock.mock.calls[8][0]).toBe("/api/provider-profiles/health");
+    expect(fetchMock.mock.calls[9][0]).toBe("/api/plugins/catalog?category=model_provider");
+    expect(fetchMock.mock.calls[10][0]).toBe("/api/plugins/bindings?category=model_provider");
+    expect(fetchMock.mock.calls[11][0]).toBe("/api/provider-profiles");
     expect(fetchMock.mock.calls[12][0]).toBe("/api/provider-profiles/profile-1");
+    expect(fetchMock.mock.calls[13][0]).toBe("/api/provider-profiles/profile-1/test-call");
+    expect(fetchMock.mock.calls[14][0]).toBe("/api/provider-profiles/profile-1");
   });
 
   it("maps runs and narrative requests", async () => {

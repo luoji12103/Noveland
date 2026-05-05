@@ -682,6 +682,36 @@ export type RuntimeStatus = RuntimeControl & {
   runtime_health: RuntimeHealth;
 };
 
+export type ExternalToolPolicy = {
+  policy_mode: "policy_only";
+  execution_enabled: boolean;
+  runtime_execution_enabled: boolean;
+  supported_permission_modes: string[];
+  default_permission_mode: string;
+  deny_reasons: string[];
+  audit_fields: string[];
+  secret_handling: string[];
+  data_exposure_rules: string[];
+  operator_message: string;
+};
+
+export type ScaleReadinessSection = {
+  area: string;
+  status: "ok" | "watch" | "blocked";
+  summary: string;
+  metrics: Record<string, number | boolean | string | null>;
+  blockers: string[];
+  recommendations: string[];
+};
+
+export type ScaleReadiness = {
+  status: "ok" | "watch" | "blocked";
+  section_count: number;
+  blocker_count: number;
+  generated_at: string;
+  sections: ScaleReadinessSection[];
+};
+
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
 export type DiagnosticComponent =

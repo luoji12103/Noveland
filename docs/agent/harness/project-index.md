@@ -16,6 +16,9 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/memory-queue-readiness.md` — DB-backed memory queue readiness and backfill execution rules.
 - `docs/agent/operations/performance-budget.md` — local performance budgets and regression signals.
 - `docs/agent/operations/sandbox-options.md` — design-only sandbox option comparison and selection criteria.
+- `docs/agent/operations/external-tool-policy.md` — policy-only external tool allow/deny boundary; no execution path.
+- `docs/agent/operations/scale-readiness.md` — derived scale-readiness report interpretation.
+- `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 
 ## Current entrypoints
 
@@ -64,7 +67,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, supervision, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
+  - `noveland.services.api.runtime` — platform-admin runtime control, supervision, external tool policy, scale readiness, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, and filtered narrative artifact router

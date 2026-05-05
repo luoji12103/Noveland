@@ -99,6 +99,8 @@ Deployment and supervision references:
 - `docs/agent/operations/memory-queue-readiness.md`
 - `docs/agent/operations/performance-budget.md`
 - `docs/agent/operations/sandbox-options.md`
+- `docs/agent/operations/external-tool-policy.md`
+- `docs/agent/operations/scale-readiness.md`
 
 Run a local backup readiness check from `backend/`:
 
@@ -433,7 +435,7 @@ The runtime host now supports both finite and daemon modes. `noveland-runtime --
 
 Runtime-created event paths use the shared actor ref `system:runtime`; human user refs continue to come from authenticated sessions and world membership actions.
 
-Platform-admin ops surfaces include `/runtime/supervision`, `/metrics`, diagnostic retention dry-run/prune, memory queue readiness, and bounded memory backfill execution. These are local/operator tools and do not introduce an external queue or runtime sandbox.
+Platform-admin ops surfaces include `/runtime/supervision`, `/runtime/tool-policy`, `/runtime/scale-readiness`, `/metrics`, diagnostic retention dry-run/prune, memory queue readiness, and bounded memory backfill execution. These are local/operator tools and do not introduce external tool execution, an external queue, or a runtime sandbox.
 
 ## Development Rules
 

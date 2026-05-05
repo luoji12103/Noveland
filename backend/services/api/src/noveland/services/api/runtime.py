@@ -19,10 +19,11 @@ from noveland.adapters import (
     ProviderType,
 )
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import AgentPersona
+from noveland.agents.models import AgentPersona, AgentRuntimeRun
 from noveland.auth import AuthenticatedSubject
 from noveland.conversations.models import ConversationSession
 from noveland.core.settings import load_settings
+from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory import (
     MemoryBackendHealth,
     MemoryBackendKind,
@@ -120,6 +121,36 @@ class RuntimeSupervisionResponse(BaseModel):
     runtime_process_observed: bool
     heartbeat_stale: bool
     last_error: str | None
+
+
+class ExternalToolPolicyResponse(BaseModel):
+    policy_mode: Literal["policy_only"]
+    execution_enabled: bool
+    runtime_execution_enabled: bool
+    supported_permission_modes: list[str]
+    default_permission_mode: str
+    deny_reasons: list[str]
+    audit_fields: list[str]
+    secret_handling: list[str]
+    data_exposure_rules: list[str]
+    operator_message: str
+
+
+class ScaleReadinessSectionResponse(BaseModel):
+    area: str
+    status: Literal["ok", "watch", "blocked"]
+    summary: str
+    metrics: dict[str, int | bool | str | None]
+    blockers: list[str]
+    recommendations: list[str]
+
+
+class ScaleReadinessResponse(BaseModel):
+    status: Literal["ok", "watch", "blocked"]
+    section_count: int
+    blocker_count: int
+    generated_at: datetime
+    sections: list[ScaleReadinessSectionResponse]
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -496,6 +527,68 @@ def get_runtime_supervision(
         heartbeat_stale=heartbeat_stale,
         last_error=view.last_error,
     )
+
+
+@router.get("/runtime/tool-policy", response_model=ExternalToolPolicyResponse)
+def get_external_tool_policy(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+) -> ExternalToolPolicyResponse:
+    del subject
+    return ExternalToolPolicyResponse(
+        policy_mode="policy_only",
+        execution_enabled=False,
+        runtime_execution_enabled=False,
+        supported_permission_modes=[
+            "disabled",
+            "allowlist_required",
+            "denylist_block",
+            "manual_approval_required",
+        ],
+        default_permission_mode="disabled",
+        deny_reasons=[
+            "external_tool_execution_disabled",
+            "tool_not_allowlisted",
+            "missing_world_or_actor_context",
+            "secret_exposure_risk",
+            "network_or_process_sandbox_unavailable",
+        ],
+        audit_fields=[
+            "world_id",
+            "agent_id",
+            "actor_ref",
+            "tool_identifier",
+            "permission_mode",
+            "decision",
+            "deny_reason",
+            "correlation_id",
+        ],
+        secret_handling=[
+            "Secret values must never be persisted in tool policy responses.",
+            "Future tool credentials must be referenced by secret ref only.",
+            "Diagnostics must redact token, key, password, and authorization-like fields.",
+        ],
+        data_exposure_rules=[
+            "Policy inputs must include world and runtime actor context.",
+            (
+                "Future tool outputs must be bounded and attributable before entering memory "
+                "or events."
+            ),
+            "No subprocess, network, or filesystem tool execution is enabled in v1.",
+        ],
+        operator_message=(
+            "External tool policy is defined for audit and future integration only; "
+            "runtime tool execution is disabled."
+        ),
+    )
+
+
+@router.get("/runtime/scale-readiness", response_model=ScaleReadinessResponse)
+def get_scale_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ScaleReadinessResponse:
+    del subject
+    return _scale_readiness_response(db_session)
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
@@ -1464,6 +1557,233 @@ def _runtime_health_response(
         recent_error_count=recent_error_count,
         heartbeat_age_seconds=heartbeat_age_seconds,
     )
+
+
+def _scale_readiness_response(db_session: Session) -> ScaleReadinessResponse:
+    memory_summary = MemoryService(db_session, load_settings()).write_job_status_summary()
+    provider_records = ProviderProfileService(
+        db_session,
+        load_settings(),
+    ).health_records(_provider_diagnostic_counts(db_session))
+
+    sections = [
+        _database_scale_section(db_session),
+        _realtime_scale_section(db_session),
+        _memory_queue_scale_section(memory_summary),
+        _provider_limit_scale_section(db_session, provider_records),
+        _diagnostics_growth_scale_section(db_session),
+        _snapshot_storage_scale_section(db_session),
+    ]
+    blocker_count = sum(len(section.blockers) for section in sections)
+    if blocker_count > 0:
+        status_value: Literal["ok", "watch", "blocked"] = "blocked"
+    elif any(section.status == "watch" for section in sections):
+        status_value = "watch"
+    else:
+        status_value = "ok"
+    return ScaleReadinessResponse(
+        status=status_value,
+        section_count=len(sections),
+        blocker_count=blocker_count,
+        generated_at=datetime.now(UTC),
+        sections=sections,
+    )
+
+
+def _database_scale_section(db_session: Session) -> ScaleReadinessSectionResponse:
+    world_count = _table_count(db_session, World)
+    event_count = _table_count(db_session, WorldEventModel)
+    run_count = _table_count(db_session, AgentRuntimeRun)
+    blockers: list[str] = []
+    recommendations = [
+        "Review query plans before multi-world fanout or high-volume event replay.",
+        "Keep Alembic migration safety checks in the release gate.",
+    ]
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    if event_count > 10000 or run_count > 5000:
+        status_value = "watch"
+        recommendations.append("Add explicit index review for event/run listing hot paths.")
+    return ScaleReadinessSectionResponse(
+        area="database_indexes",
+        status=status_value,
+        summary="Core operational tables are available for derived scale review.",
+        metrics={
+            "world_count": world_count,
+            "event_count": event_count,
+            "agent_runtime_run_count": run_count,
+        },
+        blockers=blockers,
+        recommendations=recommendations,
+    )
+
+
+def _realtime_scale_section(db_session: Session) -> ScaleReadinessSectionResponse:
+    world_count = _table_count(db_session, World)
+    active_world_count = int(
+        db_session.scalar(select(func.count(World.id)).where(World.is_active.is_(True))) or 0,
+    )
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    blockers: list[str] = []
+    recommendations = [
+        "Keep SSE fanout scoped by world/runtime stream before adding many concurrent readers.",
+    ]
+    if active_world_count > 25:
+        status_value = "watch"
+        recommendations.append("Measure NATS/SSE fanout under active-world concurrency.")
+    return ScaleReadinessSectionResponse(
+        area="realtime_fanout",
+        status=status_value,
+        summary="Realtime remains single transport via existing SSE/proxy infrastructure.",
+        metrics={
+            "world_count": world_count,
+            "active_world_count": active_world_count,
+        },
+        blockers=blockers,
+        recommendations=recommendations,
+    )
+
+
+def _memory_queue_scale_section(
+    memory_summary: MemoryWriteJobStatusSummary,
+) -> ScaleReadinessSectionResponse:
+    blockers: list[str] = []
+    recommendations = [
+        "Keep DB-backed queue until retryability, stalled jobs, and throughput stay healthy.",
+    ]
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    if memory_summary.terminal_failed_count > 0 or memory_summary.stalled_processing_count > 0:
+        status_value = "blocked"
+        blockers.append("Memory queue has terminal failed or stalled processing jobs.")
+    elif memory_summary.failed_count > 0 or memory_summary.due_count > 100:
+        status_value = "watch"
+        recommendations.append("Drain failed/due jobs before scale testing.")
+    return ScaleReadinessSectionResponse(
+        area="memory_queue_throughput",
+        status=status_value,
+        summary="Memory writes continue through the database-backed queue.",
+        metrics={
+            "pending_count": memory_summary.pending_count,
+            "processing_count": memory_summary.processing_count,
+            "failed_count": memory_summary.failed_count,
+            "due_count": memory_summary.due_count,
+            "retryable_failed_count": memory_summary.retryable_failed_count,
+            "terminal_failed_count": memory_summary.terminal_failed_count,
+            "stalled_processing_count": memory_summary.stalled_processing_count,
+        },
+        blockers=blockers,
+        recommendations=recommendations,
+    )
+
+
+def _provider_limit_scale_section(
+    db_session: Session,
+    provider_records: list[ProviderProfileHealthRecord],
+) -> ScaleReadinessSectionResponse:
+    missing_rate_limit_count = int(
+        db_session.scalar(
+            select(func.count(ProviderProfile.id)).where(
+                ProviderProfile.is_enabled.is_(True),
+                ProviderProfile.rate_limit_per_minute.is_(None),
+            ),
+        )
+        or 0,
+    )
+    unhealthy_count = sum(
+        1
+        for record in provider_records
+        if record.is_enabled and record.health.value in {"configuration_error", "degraded"}
+    )
+    blockers: list[str] = []
+    recommendations = [
+        "Set per-profile rate limits before concurrent multi-world runtime tests.",
+    ]
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    if unhealthy_count > 0:
+        status_value = "blocked"
+        blockers.append(
+            "Enabled provider profiles include configuration errors or degraded health.",
+        )
+    elif missing_rate_limit_count > 0:
+        status_value = "watch"
+    return ScaleReadinessSectionResponse(
+        area="provider_limits",
+        status=status_value,
+        summary="Provider readiness is derived from profile health and configured rate limits.",
+        metrics={
+            "provider_profile_count": len(provider_records),
+            "enabled_profile_count": sum(1 for record in provider_records if record.is_enabled),
+            "missing_rate_limit_count": missing_rate_limit_count,
+            "unhealthy_enabled_profile_count": unhealthy_count,
+        },
+        blockers=blockers,
+        recommendations=recommendations,
+    )
+
+
+def _diagnostics_growth_scale_section(db_session: Session) -> ScaleReadinessSectionResponse:
+    diagnostic_count = _table_count(db_session, RuntimeDiagnosticEvent)
+    old_count = int(
+        db_session.scalar(
+            select(func.count(RuntimeDiagnosticEvent.id)).where(
+                RuntimeDiagnosticEvent.occurred_at < datetime.now(UTC) - timedelta(days=30),
+            ),
+        )
+        or 0,
+    )
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    recommendations = [
+        "Use diagnostic retention dry-run before pruning incident evidence.",
+    ]
+    if old_count > 0 or diagnostic_count > 10000:
+        status_value = "watch"
+        recommendations.append("Apply the diagnostic retention playbook before growth testing.")
+    return ScaleReadinessSectionResponse(
+        area="diagnostics_growth",
+        status=status_value,
+        summary="Diagnostic retention is available but operator-triggered.",
+        metrics={
+            "diagnostic_count": diagnostic_count,
+            "older_than_30_days_count": old_count,
+        },
+        blockers=[],
+        recommendations=recommendations,
+    )
+
+
+def _snapshot_storage_scale_section(db_session: Session) -> ScaleReadinessSectionResponse:
+    snapshot_count = _table_count(db_session, WorldSnapshotModel)
+    uri_snapshot_count = int(
+        db_session.scalar(
+            select(func.count(WorldSnapshotModel.id)).where(
+                WorldSnapshotModel.payload_uri.is_not(None),
+            ),
+        )
+        or 0,
+    )
+    inline_snapshot_count = snapshot_count - uri_snapshot_count
+    status_value: Literal["ok", "watch", "blocked"] = "ok"
+    recommendations = [
+        "Keep object-storage backup verification in the deployment checklist.",
+    ]
+    if inline_snapshot_count > 0:
+        status_value = "watch"
+        recommendations.append("Legacy inline snapshots remain readable but should be monitored.")
+    return ScaleReadinessSectionResponse(
+        area="snapshot_storage",
+        status=status_value,
+        summary="New snapshots can use object storage while old inline snapshots remain readable.",
+        metrics={
+            "snapshot_count": snapshot_count,
+            "uri_snapshot_count": uri_snapshot_count,
+            "inline_snapshot_count": inline_snapshot_count,
+        },
+        blockers=[],
+        recommendations=recommendations,
+    )
+
+
+def _table_count(db_session: Session, model: Any) -> int:
+    return int(db_session.scalar(select(func.count(model.id))) or 0)
 
 
 def _metrics_lines(

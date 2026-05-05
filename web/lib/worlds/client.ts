@@ -33,6 +33,7 @@ import type {
   ConversationSpeakerPreview,
   ConversationTurn,
   ConversationUpdateInput,
+  ExternalToolPolicy,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -69,6 +70,7 @@ import type {
   RuntimeControl,
   RuntimeControlUpdateInput,
   RuntimeStatus,
+  ScaleReadiness,
   ScheduleRule,
   ScheduleRuleCreateInput,
   ScheduleRulePreview,
@@ -996,6 +998,14 @@ export function updateRuntimeControl(input: RuntimeControlUpdateInput): Promise<
 
 export function getRuntimeStatus(): Promise<RuntimeStatus> {
   return apiRequest<RuntimeStatus>("/api/runtime/status", { method: "GET" });
+}
+
+export function getExternalToolPolicy(): Promise<ExternalToolPolicy> {
+  return apiRequest<ExternalToolPolicy>("/api/runtime/tool-policy", { method: "GET" });
+}
+
+export function getScaleReadiness(): Promise<ScaleReadiness> {
+  return apiRequest<ScaleReadiness>("/api/runtime/scale-readiness", { method: "GET" });
 }
 
 export function listRuntimeDiagnostics(): Promise<RuntimeDiagnostic[]> {
