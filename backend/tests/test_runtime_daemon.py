@@ -32,7 +32,19 @@ from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.runtime.daemon import RuntimeDaemon
 from noveland.worlds.clock_service import WorldClockService
-from noveland.worlds.models import World, WorldClockStateModel, WorldClockTransitionModel
+from noveland.worlds.models import (
+    AgentPresenceState,
+    DailyLifeEventCandidate,
+    FactionProgressTrack,
+    OffscreenEventQueueItem,
+    OrganizationMembership,
+    Scene,
+    SceneLocationEdge,
+    World,
+    WorldClockStateModel,
+    WorldClockTransitionModel,
+    WorldOrganization,
+)
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -202,10 +214,15 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, User.__table__),
         cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
+        cast(Table, Scene.__table__),
         cast(Table, WorldClockStateModel.__table__),
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, WorldOrganization.__table__),
+        cast(Table, OrganizationMembership.__table__),
+        cast(Table, FactionProgressTrack.__table__),
+        cast(Table, SceneLocationEdge.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
@@ -215,6 +232,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationTurn.__table__),
         cast(Table, RuntimeControlState.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, AgentPresenceState.__table__),
+        cast(Table, DailyLifeEventCandidate.__table__),
+        cast(Table, OffscreenEventQueueItem.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),

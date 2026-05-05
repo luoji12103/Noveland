@@ -20,6 +20,8 @@ from noveland.observability import (
 from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.clock_tick import RuntimeClockTicker
 from noveland.services.runtime.conversation_loop import ConversationRuntimeOrchestrator
+from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
+from noveland.worlds import LivingWorldAutonomyService
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -161,6 +163,11 @@ class RuntimeDaemon:
                     .executed_turns
                 )
                 executed_runs += conversation_turns
+                gm_result = LivingWorldAutonomyService(session).gm_iteration(
+                    wall_time=wall_time,
+                    limit=self._settings.runtime_batch_limit,
+                    actor_ref=RUNTIME_ACTOR_REF,
+                )
                 processed_memory_jobs = MemoryService(
                     session,
                     self._settings,
@@ -176,6 +183,9 @@ class RuntimeDaemon:
                             "advanced_worlds": tick_result.advanced_worlds,
                             "executed_runs": executed_runs,
                             "executed_conversation_turns": conversation_turns,
+                            "processed_offscreen_events": gm_result.processed_count,
+                            "resolved_offscreen_events": gm_result.resolved_count,
+                            "failed_offscreen_events": gm_result.failed_count,
                             "processed_memory_jobs": processed_memory_jobs,
                             "published_events": tick_result.published_events,
                         },
