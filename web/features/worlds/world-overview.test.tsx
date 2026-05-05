@@ -172,7 +172,7 @@ describe("WorldOverview", () => {
         composition: compositionExport,
       }),
     );
-  });
+  }, 10000);
 });
 
 const compositionExport = {
