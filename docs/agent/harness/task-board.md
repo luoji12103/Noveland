@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Tool Policy / Scale / v2 Readiness
 
 ## Blocked
 - None
@@ -57,4 +57,4 @@
 - Access/Diagnostics/Scale Readiness Ops
 
 ## Upcoming Mainline
-- None selected.
+- None selected; current 50-phase roadmap is expected to close with Tool Policy / Scale / v2 Readiness.
