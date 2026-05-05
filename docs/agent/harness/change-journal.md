@@ -483,3 +483,14 @@
 - Tests added/updated: world bible API/access tests; continuity metadata API tests; agent metadata compatibility tests; relationship graph same-world/self-edge/update tests; schema metadata/alembic head tests; Web client route tests; agent list/builder/world overview component tests.
 - Docs updated: task board, change journal, active handoff.
 - Follow-up notes: Apply migration `20260505_0023` before using V2 character foundation on persistent databases. Relationship memory integration, organizations/factions, location graph, GM engine, worldlines, and player choices remain future V2 phases.
+
+## Living world autonomous systems entry
+
+- Date: 2026-05-05
+- Branch: feat/living-world-autonomous-systems
+- Scope: V2 living-world roadmap phases 6-15 relationship memory integration, organizations, memberships, faction progress, location graph, character presence, daily life scheduler, offscreen queue, event importance, and deterministic GM world engine v1.
+- Summary: Added relationship-change memory write integration through `MemoryService`; organization, membership, faction track, location edge, presence, daily-life candidate, and offscreen queue persistence/API surfaces; world-event importance metadata and filters; deterministic GM runtime resolution for due offscreen events; and dense Web/admin panels plus Playwright mock routes for the new living-world autonomy surfaces.
+- Files changed: `/backend/migrations/versions/20260505_0024_living_world_autonomous_systems.py`, `/backend/packages/{events,memory,worlds}/src/noveland/**`, `/backend/services/{api,runtime}/src/noveland/services/**`, `/backend/tests/{test_api_worlds,test_memory_backend,test_runtime_daemon,test_schema_metadata,test_alembic_config}.py`, `/backend/migrations/README.md`, `/web/features/{agents,dashboard,worlds}/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/harness/**`
+- Tests added/updated: relationship memory write-job coverage; organization/membership/faction/presence/daily/offscreen/world-event importance API tests; deterministic GM runtime daemon tests; schema metadata/alembic coverage for `20260505_0024`; Web client/component tests; e2e mock backend coverage for new world APIs.
+- Docs updated: migration README, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Apply migration `20260505_0024` before using autonomous living-world data on persistent databases. GM v1 is deterministic and does not call providers, external tools, or direct memory backend SDKs. V2 phases 16-20 remain the next candidate bundle.

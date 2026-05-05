@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Living World Autonomous Systems
+- None
 
 ## Blocked
 - None
@@ -57,6 +57,7 @@
 - Access/Diagnostics/Scale Readiness Ops
 - Tool Policy / Scale / v2 Readiness
 - Living World Character Foundation
+- Living World Autonomous Systems
 
 ## Upcoming Mainline
 - V2 phases 16-20 candidate after this bundle: GM agenda planner, GM event proposal, event resolution rules, player actor model, and player choice records.
