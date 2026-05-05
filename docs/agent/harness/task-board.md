@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Living World Character Foundation
+- None
 
 ## Blocked
 - None
@@ -56,6 +56,7 @@
 - Storage/Backup/Auth Runtime Ops
 - Access/Diagnostics/Scale Readiness Ops
 - Tool Policy / Scale / v2 Readiness
+- Living World Character Foundation
 
 ## Upcoming Mainline
-- None selected until Living World Character Foundation closeout.
+- V2 phases 6-10 candidate: relationship memory integration, organization model, organization membership, faction progress tracks, and location graph.

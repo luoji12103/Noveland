@@ -50,6 +50,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/plugins/`
 - `web/features/plugins/plugin-config-fields.tsx`
 - `web/features/agents/`
+- `web/features/agents/agent-builder.test.tsx`
 - `web/features/agents/agent-list.test.tsx`
 - `web/features/auth/`
 - `web/features/conversations/`
@@ -174,6 +175,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260423_0018_memory_profiles_forget_evals.py`
 - `backend/migrations/versions/20260503_0019_observation_traceability.py`
 - `backend/migrations/versions/20260504_0020_narrative_publications.py`
+- `backend/migrations/versions/20260505_0023_living_world_character_foundation.py`
 - `backend/tests/`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`

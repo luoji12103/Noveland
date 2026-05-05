@@ -472,3 +472,14 @@
 - Tests added/updated: N/A; documentation-only planning update.
 - Docs updated: agent README read order, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Do not treat all 50 V2 phases as active tasks. Select one V2 mainline bundle in `task-board.md` only when implementation starts.
+
+## Living world character foundation entry
+
+- Date: 2026-05-05
+- Branch: feat/living-world-character-foundation
+- Scope: V2 living-world roadmap phases 1-5 story world bible, canon continuity, character roster metadata, character profile sheets, and relationship graph v1.
+- Summary: Added a world-scoped bible with continuity configuration, continuity metadata on event/narrative API responses, structured galgame character roster/profile fields on agents, and a world-scoped directed relationship edge table/API. Web world overview now exposes world bible editing, agent creation/builder flows expose structured character fields, and agent detail shows relationship graph create/update controls.
+- Files changed: `/backend/migrations/versions/20260505_0023_living_world_character_foundation.py`, `/backend/packages/{agents,worlds}/src/noveland/*/models.py`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/{test_api_worlds,test_schema_metadata,test_alembic_config}.py`, `/backend/migrations/README.md`, `/web/features/{agents,worlds,workspace}/**`, `/web/lib/worlds/**`, `/docs/agent/harness/**`
+- Tests added/updated: world bible API/access tests; continuity metadata API tests; agent metadata compatibility tests; relationship graph same-world/self-edge/update tests; schema metadata/alembic head tests; Web client route tests; agent list/builder/world overview component tests.
+- Docs updated: task board, change journal, active handoff.
+- Follow-up notes: Apply migration `20260505_0023` before using V2 character foundation on persistent databases. Relationship memory integration, organizations/factions, location graph, GM engine, worldlines, and player choices remain future V2 phases.
