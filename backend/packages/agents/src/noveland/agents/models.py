@@ -31,9 +31,36 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "kind IN ('role_agent', 'narrative_agent')",
             name="kind",
         ),
+        CheckConstraint(
+            "narrative_role IS NULL OR narrative_role IN ("
+            "'protagonist', 'main_character', 'side_character', "
+            "'supporting_cast', 'ordinary_member', 'organization_member', "
+            "'original_character', 'narrative_agent'"
+            ")",
+            name="narrative_role",
+        ),
+        CheckConstraint(
+            "importance IS NULL OR importance IN ('lead', 'major', 'minor', 'background')",
+            name="importance",
+        ),
+        CheckConstraint(
+            "canon_status IS NULL OR canon_status IN ("
+            "'canon', 'post_canon', 'alternate', 'original_expansion'"
+            ")",
+            name="canon_status",
+        ),
+        CheckConstraint(
+            "character_category IS NULL OR character_category IN ("
+            "'player', 'main_character', 'side_character', 'ordinary_member', "
+            "'organization_member', 'original_character', 'narrative_agent'"
+            ")",
+            name="character_category",
+        ),
         Index("ix_agents_world_id", "world_id"),
         Index("ix_agents_home_scene_id", "home_scene_id"),
         Index("ix_agents_source_preset_id", "source_preset_id"),
+        Index("ix_agents_world_canon_status", "world_id", "canon_status"),
+        Index("ix_agents_world_character_category", "world_id", "character_category"),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
@@ -52,6 +79,15 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     agent_key: Mapped[str] = mapped_column(String(80), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    narrative_role: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    importance: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    canon_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    character_category: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    character_profile: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
     config: Mapped[dict[str, Any]] = mapped_column(
         JSONB().with_variant(JSON(), "sqlite"),
         nullable=False,
@@ -62,6 +98,60 @@ class Agent(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default=text("true"),
         default=True,
+    )
+
+
+class AgentRelationshipEdge(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "agent_relationship_edges"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_agent_id",
+            "target_agent_id",
+            "relationship_type",
+            name="uq_agent_relationship_edges_source_target_type",
+        ),
+        CheckConstraint("source_agent_id <> target_agent_id", name="distinct_agents"),
+        CheckConstraint(
+            "relationship_type IN ('affection', 'friendship', 'rivalry', 'family', "
+            "'alliance', 'hostility', 'obligation', 'debt', 'secret', 'custom')",
+            name="relationship_type",
+        ),
+        CheckConstraint("affection >= -100 AND affection <= 100", name="affection_range"),
+        CheckConstraint("trust >= -100 AND trust <= 100", name="trust_range"),
+        CheckConstraint("hostility >= 0 AND hostility <= 100", name="hostility_range"),
+        CheckConstraint("intimacy >= 0 AND intimacy <= 100", name="intimacy_range"),
+        CheckConstraint("obligation >= 0 AND obligation <= 100", name="obligation_range"),
+        CheckConstraint("rivalry >= 0 AND rivalry <= 100", name="rivalry_range"),
+        CheckConstraint("debt >= 0 AND debt <= 100", name="debt_range"),
+        Index("ix_agent_relationship_edges_world_source", "world_id", "source_agent_id"),
+        Index("ix_agent_relationship_edges_world_target", "world_id", "target_agent_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_agent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    target_agent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    relationship_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    affection: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    trust: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    hostility: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    intimacy: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    obligation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rivalry: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    debt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
     )
 
 

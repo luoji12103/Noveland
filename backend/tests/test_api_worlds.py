@@ -14,6 +14,7 @@ from noveland.agents.models import (
     AgentObservation,
     AgentPersona,
     AgentPreset,
+    AgentRelationshipEdge,
     AgentRuntimeRun,
 )
 from noveland.auth import AuthRole
@@ -46,6 +47,7 @@ from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     Scene,
     World,
+    WorldBible,
     WorldClockStateModel,
     WorldClockTransitionModel,
     WorldMembership,
@@ -289,6 +291,235 @@ def test_world_admin_manages_scenes_agents_and_conflicts() -> None:
     assert deactivate_agent.status_code == 204
     assert _agent_is_enabled(engine, uuid.UUID(agent_response.json()["id"])) is False
     assert list_agents.json()[0]["agent_key"] == "guide"
+
+
+def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "bible-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    empty_read = client.get(f"/worlds/{world_id}/bible")
+    forbidden_write = client.put(
+        f"/worlds/{world_id}/bible",
+        json={"source_material": "blocked"},
+    )
+
+    _authenticate(client, owner_token)
+    invalid_continuity = client.put(
+        f"/worlds/{world_id}/bible",
+        json={"continuity_config": {"status": "fanon"}},
+    )
+    created = client.put(
+        f"/worlds/{world_id}/bible",
+        json={
+            "source_material": "Original ending and sequel notes.",
+            "canon_timeline": [{"label": "Finale", "world_time": "2030-01-01"}],
+            "setting_rules": {"school": "closed on Sunday"},
+            "forbidden_changes": [{"rule": "Do not revive resolved antagonist"}],
+            "sequel_boundaries": {"starts_after": "original finale"},
+            "continuity_config": {"status": "post_canon", "tone": "daily"},
+            "metadata": {"source": "operator"},
+        },
+    )
+    updated = client.put(
+        f"/worlds/{world_id}/bible",
+        json={
+            "source_material": "Updated sequel notes.",
+            "continuity_config": {"continuity_status": "alternate"},
+        },
+    )
+
+    assert empty_read.status_code == 200
+    assert empty_read.json() is None
+    assert forbidden_write.status_code == 403
+    assert invalid_continuity.status_code == 422
+    assert created.status_code == 200
+    assert created.json()["source_material"] == "Original ending and sequel notes."
+    assert created.json()["continuity_status"] == "post_canon"
+    assert created.json()["metadata"] == {"source": "operator"}
+    assert updated.status_code == 200
+    assert updated.json()["source_material"] == "Updated sequel notes."
+    assert updated.json()["continuity_status"] == "alternate"
+
+
+def test_agent_character_metadata_and_continuity_surfaces_are_compatible() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "character-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, token)
+
+    legacy_agent = client.post(
+        f"/worlds/{world_id}/agents",
+        json={"agent_key": "legacy", "display_name": "Legacy", "kind": "role_agent"},
+    )
+    create_agent = client.post(
+        f"/worlds/{world_id}/agents",
+        json={
+            "agent_key": "heroine",
+            "display_name": "Heroine",
+            "kind": "role_agent",
+            "narrative_role": "main_character",
+            "importance": "lead",
+            "canon_status": "post_canon",
+            "character_category": "main_character",
+            "character_profile": {
+                "speech_style_notes": "Soft Kansai inflection",
+                "goals": ["reopen the club room"],
+                "secrets": ["keeps the old letter"],
+                "daily_preferences": {"morning": "library"},
+                "emotional_baseline": "guarded but warm",
+                "story_function": "route heroine",
+            },
+        },
+    )
+    update_agent = client.patch(
+        f"/worlds/{world_id}/agents/{create_agent.json()['id']}",
+        json={
+            "importance": "major",
+            "character_profile": {"goals": ["repair the club sign"]},
+        },
+    )
+    invalid_agent = client.post(
+        f"/worlds/{world_id}/agents",
+        json={
+            "agent_key": "bad-role",
+            "display_name": "Bad Role",
+            "kind": "role_agent",
+            "narrative_role": "mascot",
+        },
+    )
+    with Session(engine) as session:
+        WorldEventStore(session).append_event(
+            WorldEventAppend(
+                world_id=world_id,
+                event_name="story.post_canon_note",
+                payload={
+                    "summary": "The club room lights are on again.",
+                    "continuity": {"status": "post_canon", "source": "bible"},
+                },
+                wall_time=datetime(2026, 5, 5, 12, 0, tzinfo=UTC),
+                world_time=datetime(2030, 1, 2, 18, 0, tzinfo=UTC),
+                actor_ref="user:test",
+            ),
+        )
+        session.commit()
+    events = client.get(f"/worlds/{world_id}/events")
+    artifact = client.post(
+        f"/worlds/{world_id}/narrative-artifacts",
+        json={
+            "title": "After Story Draft",
+            "content": "The heroine returns to the club room.",
+            "artifact_kind": "world_summary",
+            "continuity_metadata": {"status": "post_canon", "source": "writer"},
+        },
+    )
+
+    assert legacy_agent.status_code == 201
+    assert legacy_agent.json()["narrative_role"] is None
+    assert legacy_agent.json()["character_profile"] == {}
+    assert create_agent.status_code == 201
+    assert create_agent.json()["narrative_role"] == "main_character"
+    assert create_agent.json()["canon_status"] == "post_canon"
+    assert create_agent.json()["character_profile"]["story_function"] == "route heroine"
+    assert update_agent.status_code == 200
+    assert update_agent.json()["importance"] == "major"
+    assert update_agent.json()["character_profile"] == {"goals": ["repair the club sign"]}
+    assert invalid_agent.status_code == 422
+    assert events.status_code == 200
+    assert events.json()[0]["continuity_status"] == "post_canon"
+    assert events.json()[0]["continuity_metadata"]["source"] == "bible"
+    assert artifact.status_code == 201
+    assert artifact.json()["continuity_status"] == "post_canon"
+    assert artifact.json()["continuity_metadata"]["source"] == "writer"
+
+
+def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    other_owner_id, _other_token = _seed_user(engine, "other@example.test")
+    world_id = _seed_world(engine, owner_id, "relationship-world")
+    other_world_id = _seed_world(engine, other_owner_id, "other-relationship-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    source_agent_id = _seed_agent(engine, world_id, "source")
+    target_agent_id = _seed_agent(engine, world_id, "target")
+    other_agent_id = _seed_agent(engine, other_world_id, "outside")
+
+    _authenticate(client, member_token)
+    member_empty = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
+    member_create = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "friendship",
+        },
+    )
+
+    _authenticate(client, owner_token)
+    self_edge = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(source_agent_id),
+            "relationship_type": "friendship",
+        },
+    )
+    cross_world = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(other_agent_id),
+            "relationship_type": "friendship",
+        },
+    )
+    created = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "friendship",
+            "affection": 42,
+            "trust": 35,
+            "metadata": {"reason": "shared promise"},
+        },
+    )
+    duplicate = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "friendship",
+        },
+    )
+    updated = client.patch(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships/{created.json()['id']}",
+        json={"trust": 55, "metadata": {"reason": "kept promise"}},
+    )
+    listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
+
+    assert member_empty.status_code == 200
+    assert member_empty.json() == []
+    assert member_create.status_code == 403
+    assert self_edge.status_code == 422
+    assert cross_world.status_code == 404
+    assert created.status_code == 201
+    assert created.json()["source_agent_key"] == "source"
+    assert created.json()["target_agent_key"] == "target"
+    assert created.json()["relationship_type"] == "friendship"
+    assert created.json()["affection"] == 42
+    assert duplicate.status_code == 409
+    assert updated.status_code == 200
+    assert updated.json()["trust"] == 55
+    assert updated.json()["metadata"] == {"reason": "kept promise"}
+    assert listed.status_code == 200
+    assert listed.json()[0]["id"] == created.json()["id"]
 
 
 def test_membership_management_and_final_admin_guard() -> None:
@@ -1464,6 +1695,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, AgentPreset.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, WorldBible.__table__),
+        cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),

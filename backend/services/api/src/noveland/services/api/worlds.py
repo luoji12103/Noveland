@@ -22,7 +22,7 @@ from noveland.agents import (
     AgentPresetService,
     AgentPresetUpsert,
 )
-from noveland.agents.models import Agent, AgentPreset
+from noveland.agents.models import Agent, AgentPreset, AgentRelationshipEdge
 from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.auth.models import User
 from noveland.calendar import (
@@ -68,6 +68,7 @@ from noveland.narrative import (
     NarrativePublicationNotFoundError,
     NarrativePublicationRecord,
 )
+from noveland.narrative.models import NarrativeArtifact
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -100,7 +101,13 @@ from noveland.services.api.dependencies import (
 from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
-from noveland.worlds.models import Scene, World, WorldClockTransitionModel, WorldMembership
+from noveland.worlds.models import (
+    Scene,
+    World,
+    WorldBible,
+    WorldClockTransitionModel,
+    WorldMembership,
+)
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -110,6 +117,39 @@ SLUG_RE = re.compile(SLUG_PATTERN)
 
 WorldRole = Literal["world_admin", "human_user"]
 AgentKind = Literal["role_agent", "narrative_agent"]
+ContinuityStatus = Literal["canon", "post_canon", "alternate", "original_expansion"]
+NarrativeRole = Literal[
+    "protagonist",
+    "main_character",
+    "side_character",
+    "supporting_cast",
+    "ordinary_member",
+    "organization_member",
+    "original_character",
+    "narrative_agent",
+]
+CharacterImportance = Literal["lead", "major", "minor", "background"]
+CharacterCategory = Literal[
+    "player",
+    "main_character",
+    "side_character",
+    "ordinary_member",
+    "organization_member",
+    "original_character",
+    "narrative_agent",
+]
+RelationshipType = Literal[
+    "affection",
+    "friendship",
+    "rivalry",
+    "family",
+    "alliance",
+    "hostility",
+    "obligation",
+    "debt",
+    "secret",
+    "custom",
+]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -163,6 +203,22 @@ class SceneUpdateRequest(_RequestModel):
     is_active: bool | None = None
 
 
+class WorldBibleUpsertRequest(_RequestModel):
+    source_material: str = Field(default="", max_length=80_000)
+    canon_timeline: list[dict[str, Any]] = Field(default_factory=list)
+    setting_rules: dict[str, Any] = Field(default_factory=dict)
+    forbidden_changes: list[dict[str, Any]] = Field(default_factory=list)
+    sequel_boundaries: dict[str, Any] = Field(default_factory=dict)
+    continuity_config: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("continuity_config", mode="after")
+    @classmethod
+    def continuity_config_status_is_known(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _validate_continuity_metadata(value, "continuity_config")
+        return value
+
+
 class MembershipUpsertRequest(_RequestModel):
     user_id: uuid.UUID
     role: WorldRole
@@ -175,6 +231,11 @@ class AgentCreateRequest(_RequestModel):
     home_scene_id: uuid.UUID | None = None
     preset_id: uuid.UUID | None = None
     provider_profile_id: uuid.UUID | None = None
+    narrative_role: NarrativeRole | None = None
+    importance: CharacterImportance | None = None
+    canon_status: ContinuityStatus | None = None
+    character_category: CharacterCategory | None = None
+    character_profile: dict[str, Any] = Field(default_factory=dict)
     config: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -183,8 +244,38 @@ class AgentUpdateRequest(_RequestModel):
     kind: AgentKind | None = None
     home_scene_id: uuid.UUID | None = None
     provider_profile_id: uuid.UUID | None = None
+    narrative_role: NarrativeRole | None = None
+    importance: CharacterImportance | None = None
+    canon_status: ContinuityStatus | None = None
+    character_category: CharacterCategory | None = None
+    character_profile: dict[str, Any] | None = None
     config: dict[str, Any] | None = None
     is_enabled: bool | None = None
+
+
+class AgentRelationshipCreateRequest(_RequestModel):
+    source_agent_id: uuid.UUID
+    target_agent_id: uuid.UUID
+    relationship_type: RelationshipType
+    affection: int = Field(default=0, ge=-100, le=100)
+    trust: int = Field(default=0, ge=-100, le=100)
+    hostility: int = Field(default=0, ge=0, le=100)
+    intimacy: int = Field(default=0, ge=0, le=100)
+    obligation: int = Field(default=0, ge=0, le=100)
+    rivalry: int = Field(default=0, ge=0, le=100)
+    debt: int = Field(default=0, ge=0, le=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentRelationshipUpdateRequest(_RequestModel):
+    affection: int | None = Field(default=None, ge=-100, le=100)
+    trust: int | None = Field(default=None, ge=-100, le=100)
+    hostility: int | None = Field(default=None, ge=0, le=100)
+    intimacy: int | None = Field(default=None, ge=0, le=100)
+    obligation: int | None = Field(default=None, ge=0, le=100)
+    rivalry: int | None = Field(default=None, ge=0, le=100)
+    debt: int | None = Field(default=None, ge=0, le=100)
+    metadata: dict[str, Any] | None = None
 
 
 class CalendarEntryCreateRequest(_RequestModel):
@@ -307,6 +398,13 @@ class NarrativeArtifactCreateRequest(_RequestModel):
     content: str = Field(min_length=1)
     artifact_kind: Literal["agent_note", "world_summary"] = "world_summary"
     agent_id: uuid.UUID | None = None
+    continuity_metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("continuity_metadata", mode="after")
+    @classmethod
+    def continuity_metadata_status_is_known(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _validate_continuity_metadata(value, "continuity_metadata")
+        return value
 
 
 class NarrativePublicationRequest(_RequestModel):
@@ -394,6 +492,21 @@ class WorldAccessReviewResponse(BaseModel):
     members: list[WorldAccessReviewMemberResponse]
 
 
+class WorldBibleResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    source_material: str
+    canon_timeline: list[dict[str, Any]]
+    setting_rules: dict[str, Any]
+    forbidden_changes: list[dict[str, Any]]
+    sequel_boundaries: dict[str, Any]
+    continuity_config: dict[str, Any]
+    metadata: dict[str, Any]
+    continuity_status: ContinuityStatus | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class AgentResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
@@ -404,8 +517,35 @@ class AgentResponse(BaseModel):
     display_name: str
     kind: AgentKind
     provider_profile_id: uuid.UUID | None
+    narrative_role: NarrativeRole | None
+    importance: CharacterImportance | None
+    canon_status: ContinuityStatus | None
+    character_category: CharacterCategory | None
+    character_profile: dict[str, Any]
     config: dict[str, Any]
     is_enabled: bool
+
+
+class AgentRelationshipResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    source_agent_id: uuid.UUID
+    source_agent_key: str
+    source_display_name: str
+    target_agent_id: uuid.UUID
+    target_agent_key: str
+    target_display_name: str
+    relationship_type: RelationshipType
+    affection: int
+    trust: int
+    hostility: int
+    intimacy: int
+    obligation: int
+    rivalry: int
+    debt: int
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
 
 
 class AgentPresetCalendarEntryRequest(_RequestModel):
@@ -527,6 +667,11 @@ class WorldCompositionAgentResponse(BaseModel):
     source_preset_key: str | None
     source_preset_version: int | None = None
     provider_profile_key: str | None
+    narrative_role: NarrativeRole | None = None
+    importance: CharacterImportance | None = None
+    canon_status: ContinuityStatus | None = None
+    character_category: CharacterCategory | None = None
+    character_profile: dict[str, Any] = Field(default_factory=dict)
     config: dict[str, Any]
     is_enabled: bool
 
@@ -763,6 +908,8 @@ class NarrativeArtifactResponse(BaseModel):
     content: str
     artifact_kind: str
     metadata: dict[str, Any]
+    continuity_metadata: dict[str, Any]
+    continuity_status: ContinuityStatus | None
     created_at: datetime
     publication: NarrativePublicationResponse | None = None
 
@@ -832,6 +979,8 @@ class WorldEventResponse(BaseModel):
     wall_time: datetime
     world_time: datetime | None
     actor_ref: str
+    continuity_metadata: dict[str, Any]
+    continuity_status: ContinuityStatus | None
     causation_event_id: uuid.UUID | None
     correlation_id: uuid.UUID | None
     created_at: datetime
@@ -1154,6 +1303,11 @@ def import_world_composition(
             agent_key=exported_agent.agent_key,
             display_name=exported_agent.display_name,
             kind=exported_agent.kind,
+            narrative_role=exported_agent.narrative_role,
+            importance=exported_agent.importance,
+            canon_status=exported_agent.canon_status,
+            character_category=exported_agent.character_category,
+            character_profile=exported_agent.character_profile,
             config=_agent_config_with_provider_profile_id(effective_config, provider_profile_id),
             is_enabled=exported_agent.is_enabled,
         )
@@ -1233,6 +1387,44 @@ def get_world(
     return _world_response(_world_or_404(db_session, context.world_id))
 
 
+@router.get("/{world_id}/bible", response_model=WorldBibleResponse | None)
+def get_world_bible(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldBibleResponse | None:
+    _world_or_404(db_session, context.world_id)
+    bible = db_session.scalars(
+        select(WorldBible).where(WorldBible.world_id == context.world_id),
+    ).one_or_none()
+    return None if bible is None else _world_bible_response(bible)
+
+
+@router.put("/{world_id}/bible", response_model=WorldBibleResponse)
+def upsert_world_bible(
+    bible_upsert: WorldBibleUpsertRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldBibleResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    bible = db_session.scalars(
+        select(WorldBible).where(WorldBible.world_id == context.world_id),
+    ).one_or_none()
+    if bible is None:
+        bible = WorldBible(id=uuid.uuid4(), world_id=context.world_id)
+        db_session.add(bible)
+    bible.source_material = bible_upsert.source_material
+    bible.canon_timeline = bible_upsert.canon_timeline
+    bible.setting_rules = bible_upsert.setting_rules
+    bible.forbidden_changes = bible_upsert.forbidden_changes
+    bible.sequel_boundaries = bible_upsert.sequel_boundaries
+    bible.continuity_config = bible_upsert.continuity_config
+    bible.metadata_json = bible_upsert.metadata
+    db_session.flush()
+    return _world_bible_response(bible)
+
+
 @router.get("/{world_id}/composition-export", response_model=WorldCompositionExportResponse)
 def export_world_composition(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
@@ -1280,6 +1472,11 @@ def export_world_composition(
             source_preset_key=_source_preset_key(preset_map, agent.source_preset_id),
             source_preset_version=agent.source_preset_version,
             provider_profile_key=_provider_profile_key_from_config(profile_map, agent.config),
+            narrative_role=cast(NarrativeRole | None, agent.narrative_role),
+            importance=cast(CharacterImportance | None, agent.importance),
+            canon_status=cast(ContinuityStatus | None, agent.canon_status),
+            character_category=cast(CharacterCategory | None, agent.character_category),
+            character_profile=agent.character_profile,
             config=agent.config,
             is_enabled=agent.is_enabled,
         )
@@ -2010,6 +2207,115 @@ def list_agents(
 
 
 @router.get(
+    "/{world_id}/agents/{agent_id}/relationships",
+    response_model=list[AgentRelationshipResponse],
+)
+def list_agent_relationships(
+    agent_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[AgentRelationshipResponse]:
+    _agent_or_404(db_session, context.world_id, agent_id)
+    edges = db_session.scalars(
+        select(AgentRelationshipEdge)
+        .where(
+            AgentRelationshipEdge.world_id == context.world_id,
+            AgentRelationshipEdge.source_agent_id == agent_id,
+        )
+        .order_by(AgentRelationshipEdge.relationship_type, AgentRelationshipEdge.created_at),
+    ).all()
+    return [_agent_relationship_response(db_session, edge) for edge in edges]
+
+
+@router.post(
+    "/{world_id}/agents/{agent_id}/relationships",
+    response_model=AgentRelationshipResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_agent_relationship(
+    agent_id: uuid.UUID,
+    relationship_create: AgentRelationshipCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentRelationshipResponse:
+    require_csrf(request)
+    if relationship_create.source_agent_id != agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="source_agent_id must match route agent_id",
+        )
+    _agent_or_404(db_session, context.world_id, relationship_create.source_agent_id)
+    _agent_or_404(db_session, context.world_id, relationship_create.target_agent_id)
+    if relationship_create.source_agent_id == relationship_create.target_agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="relationship endpoints must connect two distinct agents",
+        )
+    existing = db_session.scalars(
+        select(AgentRelationshipEdge).where(
+            AgentRelationshipEdge.source_agent_id == relationship_create.source_agent_id,
+            AgentRelationshipEdge.target_agent_id == relationship_create.target_agent_id,
+            AgentRelationshipEdge.relationship_type == relationship_create.relationship_type,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Relationship edge already exists")
+    edge = AgentRelationshipEdge(
+        id=uuid.uuid4(),
+        world_id=context.world_id,
+        source_agent_id=relationship_create.source_agent_id,
+        target_agent_id=relationship_create.target_agent_id,
+        relationship_type=relationship_create.relationship_type,
+        affection=relationship_create.affection,
+        trust=relationship_create.trust,
+        hostility=relationship_create.hostility,
+        intimacy=relationship_create.intimacy,
+        obligation=relationship_create.obligation,
+        rivalry=relationship_create.rivalry,
+        debt=relationship_create.debt,
+        metadata_json=relationship_create.metadata,
+    )
+    db_session.add(edge)
+    db_session.flush()
+    return _agent_relationship_response(db_session, edge)
+
+
+@router.patch(
+    "/{world_id}/agents/{agent_id}/relationships/{relationship_id}",
+    response_model=AgentRelationshipResponse,
+)
+def update_agent_relationship(
+    agent_id: uuid.UUID,
+    relationship_id: uuid.UUID,
+    relationship_update: AgentRelationshipUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AgentRelationshipResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, agent_id)
+    edge = _relationship_or_404(db_session, context.world_id, agent_id, relationship_id)
+    for field_name in (
+        "affection",
+        "trust",
+        "hostility",
+        "intimacy",
+        "obligation",
+        "rivalry",
+        "debt",
+    ):
+        if field_name in relationship_update.model_fields_set:
+            next_value = getattr(relationship_update, field_name)
+            if next_value is not None:
+                setattr(edge, field_name, next_value)
+    if "metadata" in relationship_update.model_fields_set:
+        edge.metadata_json = relationship_update.metadata or {}
+    db_session.flush()
+    return _agent_relationship_response(db_session, edge)
+
+
+@router.get(
     "/{world_id}/agents/{agent_id}/calendar",
     response_model=list[CalendarEntryResponse],
 )
@@ -2529,17 +2835,30 @@ def create_narrative_artifact(
     if artifact_create.agent_id is not None:
         _agent_or_404(db_session, context.world_id, artifact_create.agent_id)
     settings = load_settings()
-    artifact = AgentRuntimeOrchestrator(
+    orchestrator = AgentRuntimeOrchestrator(
         db_session,
         ProviderProfileService(db_session, settings),
         settings,
-    ).create_narrative_artifact(
+    )
+    artifact = orchestrator.create_narrative_artifact(
         world_id=context.world_id,
         agent_id=artifact_create.agent_id,
         title=artifact_create.title,
         content=artifact_create.content,
         artifact_kind=NarrativeArtifactKind(artifact_create.artifact_kind),
     )
+    if artifact_create.continuity_metadata:
+        artifact_model = db_session.get(NarrativeArtifact, artifact.id)
+        if artifact_model is not None:
+            artifact_model.artifact_metadata = {
+                **(artifact_model.artifact_metadata or {}),
+                "continuity": artifact_create.continuity_metadata,
+            }
+            db_session.flush()
+            artifact = NarrativeArtifactService(db_session).get_artifact(
+                context.world_id,
+                artifact.id,
+            ) or artifact
     return _narrative_artifact_response(artifact)
 
 
@@ -2658,6 +2977,11 @@ def create_agent(
         agent_key=agent_create.agent_key,
         display_name=agent_create.display_name,
         kind=effective_kind,
+        narrative_role=agent_create.narrative_role,
+        importance=agent_create.importance,
+        canon_status=agent_create.canon_status,
+        character_category=agent_create.character_category,
+        character_profile=agent_create.character_profile,
         config=_agent_config_with_provider_profile_id(
             _materialize_agent_config(preset, agent_create.config),
             explicit_provider_profile_id or preset_provider_profile_id,
@@ -2702,6 +3026,16 @@ def update_agent(
         if agent_update.home_scene_id is not None:
             _scene_or_404(db_session, context.world_id, agent_update.home_scene_id)
         agent.home_scene_id = agent_update.home_scene_id
+    if "narrative_role" in agent_update.model_fields_set:
+        agent.narrative_role = agent_update.narrative_role
+    if "importance" in agent_update.model_fields_set:
+        agent.importance = agent_update.importance
+    if "canon_status" in agent_update.model_fields_set:
+        agent.canon_status = agent_update.canon_status
+    if "character_category" in agent_update.model_fields_set:
+        agent.character_category = agent_update.character_category
+    if "character_profile" in agent_update.model_fields_set:
+        agent.character_profile = agent_update.character_profile or {}
     if "config" in agent_update.model_fields_set:
         agent.config = agent_update.config or {}
     if "provider_profile_id" in agent_update.model_fields_set:
@@ -2758,6 +3092,23 @@ def _scene_response(scene: Scene) -> SceneResponse:
     )
 
 
+def _world_bible_response(bible: WorldBible) -> WorldBibleResponse:
+    return WorldBibleResponse(
+        id=bible.id,
+        world_id=bible.world_id,
+        source_material=bible.source_material,
+        canon_timeline=bible.canon_timeline,
+        setting_rules=bible.setting_rules,
+        forbidden_changes=bible.forbidden_changes,
+        sequel_boundaries=bible.sequel_boundaries,
+        continuity_config=bible.continuity_config,
+        metadata=bible.metadata_json,
+        continuity_status=_continuity_status_from_metadata(bible.continuity_config),
+        created_at=bible.created_at,
+        updated_at=bible.updated_at,
+    )
+
+
 def _membership_response(membership: WorldMembership, user: User) -> MembershipResponse:
     return MembershipResponse(
         id=membership.id,
@@ -2788,8 +3139,42 @@ def _agent_response(agent: Agent) -> AgentResponse:
         display_name=agent.display_name,
         kind=cast(AgentKind, agent.kind),
         provider_profile_id=_provider_profile_id_from_config(agent.config),
+        narrative_role=cast(NarrativeRole | None, agent.narrative_role),
+        importance=cast(CharacterImportance | None, agent.importance),
+        canon_status=cast(ContinuityStatus | None, agent.canon_status),
+        character_category=cast(CharacterCategory | None, agent.character_category),
+        character_profile=agent.character_profile,
         config=agent.config,
         is_enabled=agent.is_enabled,
+    )
+
+
+def _agent_relationship_response(
+    db_session: Session,
+    edge: AgentRelationshipEdge,
+) -> AgentRelationshipResponse:
+    source_agent = _agent_or_404(db_session, edge.world_id, edge.source_agent_id)
+    target_agent = _agent_or_404(db_session, edge.world_id, edge.target_agent_id)
+    return AgentRelationshipResponse(
+        id=edge.id,
+        world_id=edge.world_id,
+        source_agent_id=edge.source_agent_id,
+        source_agent_key=source_agent.agent_key,
+        source_display_name=source_agent.display_name,
+        target_agent_id=edge.target_agent_id,
+        target_agent_key=target_agent.agent_key,
+        target_display_name=target_agent.display_name,
+        relationship_type=cast(RelationshipType, edge.relationship_type),
+        affection=edge.affection,
+        trust=edge.trust,
+        hostility=edge.hostility,
+        intimacy=edge.intimacy,
+        obligation=edge.obligation,
+        rivalry=edge.rivalry,
+        debt=edge.debt,
+        metadata=edge.metadata_json,
+        created_at=edge.created_at,
+        updated_at=edge.updated_at,
     )
 
 
@@ -3526,6 +3911,8 @@ def _narrative_artifact_response(
         content=artifact_record.content,
         artifact_kind=artifact_record.artifact_kind.value,
         metadata=artifact_record.metadata,
+        continuity_metadata=_continuity_metadata(artifact_record.metadata),
+        continuity_status=_continuity_status_from_metadata(artifact_record.metadata),
         created_at=artifact_record.created_at,
         publication=None if publication is None else _narrative_publication_response(publication),
     )
@@ -3598,6 +3985,8 @@ def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
         wall_time=event.wall_time,
         world_time=event.world_time,
         actor_ref=event.actor_ref,
+        continuity_metadata=_continuity_metadata(event.payload),
+        continuity_status=_continuity_status_from_metadata(event.payload),
         causation_event_id=event.causation_event_id,
         correlation_id=event.correlation_id,
         created_at=event.created_at,
@@ -3647,6 +4036,18 @@ def _agent_or_404(db_session: Session, world_id: uuid.UUID, agent_id: uuid.UUID)
     if agent is None or agent.world_id != world_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
     return agent
+
+
+def _relationship_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    source_agent_id: uuid.UUID,
+    relationship_id: uuid.UUID,
+) -> AgentRelationshipEdge:
+    edge = db_session.get(AgentRelationshipEdge, relationship_id)
+    if edge is None or edge.world_id != world_id or edge.source_agent_id != source_agent_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relationship not found")
+    return edge
 
 
 def _calendar_entry_or_404(
@@ -3831,6 +4232,55 @@ def _clock_conflict(error: WorldClockError) -> HTTPException:
 
 def _actor_ref(subject: AuthenticatedSubject) -> str:
     return f"user:{subject.user_id}"
+
+
+def _continuity_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    raw_nested = metadata.get("continuity")
+    if isinstance(raw_nested, dict):
+        return raw_nested
+    if _continuity_status_from_metadata(metadata) is not None:
+        return {
+            key: value
+            for key, value in metadata.items()
+            if key.startswith("continuity_") or key == "canon_status"
+        }
+    return {}
+
+
+def _continuity_status_from_metadata(metadata: dict[str, Any]) -> ContinuityStatus | None:
+    raw_nested = metadata.get("continuity")
+    raw_status = None
+    if isinstance(raw_nested, dict):
+        raw_status = raw_nested.get("status")
+    if raw_status is None:
+        raw_status = (
+            metadata.get("status")
+            or metadata.get("continuity_status")
+            or metadata.get("canon_status")
+        )
+    if raw_status in {"canon", "post_canon", "alternate", "original_expansion"}:
+        return cast(ContinuityStatus, raw_status)
+    return None
+
+
+def _validate_continuity_metadata(metadata: dict[str, Any], field_name: str) -> None:
+    raw_nested = metadata.get("continuity")
+    raw_status = None
+    if isinstance(raw_nested, dict):
+        raw_status = raw_nested.get("status")
+    if raw_status is None:
+        raw_status = (
+            metadata.get("status")
+            or metadata.get("continuity_status")
+            or metadata.get("canon_status")
+        )
+    if raw_status is None:
+        return
+    if raw_status not in {"canon", "post_canon", "alternate", "original_expansion"}:
+        raise ValueError(
+            f"{field_name} continuity status must be one of "
+            "canon, post_canon, alternate, original_expansion",
+        )
 
 
 def _timezone_aware(value: datetime, field_name: str) -> datetime:

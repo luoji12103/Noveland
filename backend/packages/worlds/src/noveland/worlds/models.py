@@ -79,6 +79,51 @@ class World(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class WorldBible(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "world_bibles"
+    __table_args__ = (
+        UniqueConstraint("world_id", name="uq_world_bibles_world_id"),
+        Index("ix_world_bibles_world_id", "world_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_material: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    canon_timeline: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    setting_rules: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    forbidden_changes: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    sequel_boundaries: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    continuity_config: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
 class WorldMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "world_memberships"
     __table_args__ = (
