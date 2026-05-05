@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Living World Autonomous Systems
 
 ## Blocked
 - None
@@ -59,4 +59,4 @@
 - Living World Character Foundation
 
 ## Upcoming Mainline
-- V2 phases 6-10 candidate: relationship memory integration, organization model, organization membership, faction progress tracks, and location graph.
+- V2 phases 16-20 candidate after this bundle: GM agenda planner, GM event proposal, event resolution rules, player actor model, and player choice records.
