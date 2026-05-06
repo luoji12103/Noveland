@@ -30,6 +30,7 @@ FILTERED_EVENT_NAMES = {
     "agent.run_failed",
     "memory.item_created",
     "narrative.artifact_created",
+    "rumor.delivered",
 }
 
 
@@ -317,6 +318,8 @@ def _observation_from_event(
 
 
 def _payload_matches_agent(payload: dict[str, Any], agent_id: uuid.UUID) -> bool:
+    if payload.get("target_agent_id") == str(agent_id):
+        return True
     return payload.get("agent_id") == str(agent_id)
 
 
@@ -341,6 +344,8 @@ def _event_content(event_name: str, payload: dict[str, Any]) -> str:
         return "A private memory item was created for this agent."
     if event_name == "narrative.artifact_created":
         return "A narrative artifact was created from this agent context."
+    if event_name == "rumor.delivered":
+        return "A rumor or information update reached this agent."
     return f"Observed event {event_name}."
 
 

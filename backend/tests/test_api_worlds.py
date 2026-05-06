@@ -51,17 +51,28 @@ from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSI
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     AgentPresenceState,
+    DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventResolutionRule,
+    EventTriggerCondition,
     FactionProgressTrack,
     GMAgenda,
     GMEventProposal,
+    GroupInteractionContext,
     OffscreenEventQueueItem,
+    OrganizationConflictEvent,
     OrganizationMembership,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlotThread,
+    RelationshipEventSuggestion,
+    RouteAffinity,
+    RumorPropagation,
+    RumorRecord,
     Scene,
+    SceneBeatDraft,
     SceneLocationEdge,
+    StoryHook,
     World,
     WorldBible,
     WorldClockStateModel,
@@ -1155,6 +1166,246 @@ def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
     assert comparison.json()["faction_delta_count"] == 1
     assert comparison.json()["choice_delta_count"] == 1
     assert comparison.json()["divergent_event_count"] >= 1
+
+
+def test_plot_route_rumor_flow_admin_apis_are_worldline_scoped() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "plot-route-rumor-world")
+    other_owner_id, _ = _seed_user(engine, "other-owner@example.test")
+    other_world_id = _seed_world(engine, other_owner_id, "other-plot-world")
+    other_agent_id = _seed_agent(engine, other_world_id, "outside")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    source_agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    target_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, member_token)
+    member_hooks = client.get(f"/worlds/{world_id}/story-hooks")
+
+    _authenticate(client, owner_token)
+    primary = client.get(f"/worlds/{world_id}/worldlines").json()[0]
+    organization = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+        },
+    )
+    organization_id = organization.json()["id"]
+    track = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+        json={
+            "track_key": "festival-pressure",
+            "name": "Festival Pressure",
+            "track_type": "conflict",
+            "progress": 30,
+            "pressure": 40,
+        },
+    )
+    relationship = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "rivalry",
+            "affection": 25,
+            "trust": 20,
+            "hostility": 30,
+            "rivalry": 45,
+        },
+    )
+    hook = client.post(
+        f"/worlds/{world_id}/story-hooks",
+        json={
+            "hook_key": "festival-promise",
+            "title": "Festival promise",
+            "hook_type": "promise",
+            "summary": "Hero promised to help with the late rehearsal.",
+            "owner_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "priority": 80,
+        },
+    )
+    thread = client.post(
+        f"/worlds/{world_id}/plot-threads",
+        json={
+            "thread_key": "festival-route",
+            "title": "Festival route",
+            "thread_type": "personal",
+            "summary": "A shared festival route starts to form.",
+            "participant_agent_ids": [str(source_agent_id), str(target_agent_id)],
+            "organization_ids": [organization_id],
+            "next_beats": ["late rehearsal"],
+            "priority": 70,
+        },
+    )
+    route = client.put(
+        f"/worlds/{world_id}/route-affinities",
+        json={
+            "agent_id": str(target_agent_id),
+            "route_key": "rival-route",
+            "status": "active",
+            "affinity": 35,
+            "stage": 2,
+            "flags": ["festival"],
+        },
+    )
+    trigger = client.post(
+        f"/worlds/{world_id}/event-trigger-conditions",
+        json={
+            "condition_key": "festival-gate",
+            "name": "Festival Gate",
+            "conditions": {
+                "min_open_hooks": 1,
+                "min_route_affinity": 20,
+                "min_relationship_tension": 20,
+                "scene_id": str(scene_id),
+            },
+        },
+    )
+    client.put(
+        f"/worlds/{world_id}/agents/{source_agent_id}/presence",
+        json={"current_scene_id": str(scene_id), "visibility_status": "visible"},
+    )
+    dry_run = client.post(
+        f"/worlds/{world_id}/event-trigger-conditions/{trigger.json()['id']}/dry-run",
+    )
+    cross_world_beat = client.post(
+        f"/worlds/{world_id}/scene-beats",
+        json={
+            "title": "Invalid cross-world beat",
+            "participant_agent_ids": [str(other_agent_id)],
+        },
+    )
+    beat = client.post(
+        f"/worlds/{world_id}/scene-beats",
+        json={
+            "source_kind": "manual",
+            "title": "Late rehearsal",
+            "participant_agent_ids": [str(source_agent_id), str(target_agent_id)],
+            "scene_id": str(scene_id),
+        },
+    )
+    candidate = client.post(
+        f"/worlds/{world_id}/daily-life/generate",
+        json={"limit": 1},
+    )
+    episode = client.post(
+        f"/worlds/{world_id}/daily-episodes",
+        json={
+            "source_candidate_id": candidate.json()[0]["id"],
+            "title": "After-school rehearsal",
+        },
+    )
+    group_context = client.post(
+        f"/worlds/{world_id}/group-interactions",
+        json={
+            "context_key": "festival-meeting",
+            "title": "Festival meeting",
+            "interaction_type": "organization_meeting",
+            "scene_id": str(scene_id),
+            "organization_id": organization_id,
+            "participant_agent_ids": [str(source_agent_id), str(target_agent_id)],
+            "participant_roles": {str(source_agent_id): "helper"},
+        },
+    )
+    suggestions = client.post(f"/worlds/{world_id}/relationship-suggestions/generate")
+    suggestion_update = client.patch(
+        f"/worlds/{world_id}/relationship-suggestions/{suggestions.json()[0]['id']}",
+        json={"status": "accepted", "metadata": {"reviewed": True}},
+    )
+    conflict = client.post(
+        f"/worlds/{world_id}/organization-conflicts",
+        json={
+            "organization_id": organization_id,
+            "faction_track_id": track.json()["id"],
+            "title": "Budget pressure",
+            "summary": "The festival budget tightens before rehearsal.",
+            "pressure_delta": 5,
+            "progress_delta": 3,
+        },
+    )
+    resolved_conflict = client.post(
+        f"/worlds/{world_id}/organization-conflicts/{conflict.json()['id']}/resolve",
+    )
+    rumor = client.post(
+        f"/worlds/{world_id}/rumors",
+        json={
+            "rumor_key": "late-rehearsal",
+            "title": "Late rehearsal rumor",
+            "content": "The rival stayed late with the hero.",
+            "source_agent_id": str(source_agent_id),
+            "visibility": "group",
+            "known_agent_ids": [str(source_agent_id)],
+        },
+    )
+    propagation = client.post(
+        f"/worlds/{world_id}/rumor-propagations",
+        json={
+            "rumor_id": rumor.json()["id"],
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "propagation_reason": "Club members saw them leaving together.",
+        },
+    )
+    delivered = client.post(
+        f"/worlds/{world_id}/rumor-propagations/{propagation.json()['id']}/deliver",
+    )
+    rumors_after_delivery = client.get(f"/worlds/{world_id}/rumors")
+    fork = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={"worldline_key": "festival-alt", "name": "Festival Alt"},
+    )
+    fork_id = fork.json()["id"]
+    fork_hooks = client.get(f"/worlds/{world_id}/story-hooks", params={"worldline_id": fork_id})
+    fork_threads = client.get(f"/worlds/{world_id}/plot-threads", params={"worldline_id": fork_id})
+    fork_routes = client.get(
+        f"/worlds/{world_id}/route-affinities",
+        params={"worldline_id": fork_id},
+    )
+    fork_rumors = client.get(f"/worlds/{world_id}/rumors", params={"worldline_id": fork_id})
+
+    assert member_hooks.status_code == 403
+    assert hook.status_code == 201
+    assert hook.json()["owner_agent_key"] == "hero"
+    assert thread.status_code == 201
+    assert thread.json()["organization_ids"] == [organization_id]
+    assert route.status_code == 200
+    assert route.json()["status"] == "active"
+    assert route.json()["affinity"] == 35
+    assert trigger.status_code == 201
+    assert dry_run.status_code == 200
+    assert dry_run.json()["matched"] is True
+    assert cross_world_beat.status_code == 404
+    assert beat.status_code == 201
+    assert beat.json()["dialogue_beats"][0]["speaker"] == "hero"
+    assert episode.status_code == 201
+    assert episode.json()["scene_beat_draft_id"] is not None
+    assert group_context.status_code == 201
+    assert group_context.json()["organization_name"] == "Student Council"
+    assert suggestions.status_code == 200
+    assert suggestions.json()[0]["relationship_id"] == relationship.json()["id"]
+    assert suggestion_update.json()["status"] == "accepted"
+    assert conflict.status_code == 201
+    assert resolved_conflict.status_code == 200
+    assert resolved_conflict.json()["resolved_event_id"] is not None
+    assert rumor.status_code == 201
+    assert rumor.json()["known_agent_ids"] == [str(source_agent_id)]
+    assert propagation.status_code == 201
+    assert delivered.status_code == 200
+    assert delivered.json()["status"] == "delivered"
+    assert str(target_agent_id) in rumors_after_delivery.json()[0]["known_agent_ids"]
+    assert fork.status_code == 201
+    assert fork_hooks.json()[0]["hook_key"] == hook.json()["hook_key"]
+    assert fork_threads.json()[0]["thread_key"] == thread.json()["thread_key"]
+    assert fork_routes.json()[0]["route_key"] == route.json()["route_key"]
+    assert fork_rumors.json()[0]["rumor_key"] == rumor.json()["rumor_key"]
+    assert fork_rumors.json()[0]["worldline_id"] == fork_id
+    assert primary["id"] != fork_id
 
 
 def test_membership_management_and_final_admin_guard() -> None:
@@ -2361,6 +2612,17 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, EventResolutionRule.__table__),
         cast(Table, PlayerActorProfile.__table__),
         cast(Table, PlayerChoiceRecord.__table__),
+        cast(Table, StoryHook.__table__),
+        cast(Table, PlotThread.__table__),
+        cast(Table, RouteAffinity.__table__),
+        cast(Table, EventTriggerCondition.__table__),
+        cast(Table, SceneBeatDraft.__table__),
+        cast(Table, DailyEpisodeDraft.__table__),
+        cast(Table, GroupInteractionContext.__table__),
+        cast(Table, RelationshipEventSuggestion.__table__),
+        cast(Table, OrganizationConflictEvent.__table__),
+        cast(Table, RumorRecord.__table__),
+        cast(Table, RumorPropagation.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

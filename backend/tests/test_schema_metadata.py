@@ -56,28 +56,39 @@ def test_core_schema_tables_are_registered() -> None:
         "conversation_participants",
         "conversation_sessions",
         "conversation_turns",
+        "daily_episode_drafts",
         "daily_life_event_candidates",
         "event_resolution_rules",
+        "event_trigger_conditions",
         "faction_progress_tracks",
         "gm_agendas",
         "gm_event_proposals",
+        "group_interaction_contexts",
         "memory_backend_profiles",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
         "offscreen_event_queue",
+        "organization_conflict_events",
         "organization_memberships",
         "player_actor_profiles",
         "player_choice_records",
         "platform_settings",
+        "plot_threads",
         "platform_role_assignments",
         "provider_profiles",
+        "relationship_event_suggestions",
         "runtime_control_states",
         "runtime_diagnostic_events",
         "narrative_artifacts",
         "narrative_publications",
+        "route_affinities",
+        "rumor_propagations",
+        "rumor_records",
         "scenes",
+        "scene_beat_drafts",
         "scene_location_edges",
+        "story_hooks",
         "user_credentials",
         "users",
         "world_events",
@@ -210,6 +221,104 @@ def test_living_world_gm_choices_worldline_columns_are_registered() -> None:
     } <= column_names("player_choice_records")
 
 
+def test_living_world_plot_route_rumor_flow_columns_are_registered() -> None:
+    assert {
+        "worldline_id",
+        "hook_key",
+        "hook_type",
+        "summary",
+        "status",
+        "priority",
+        "owner_agent_id",
+        "target_agent_id",
+        "due_at",
+        "resolution",
+    } <= column_names("story_hooks")
+    assert {
+        "worldline_id",
+        "thread_key",
+        "thread_type",
+        "status",
+        "next_beats",
+        "participant_agent_ids",
+        "organization_ids",
+        "related_event_ids",
+    } <= column_names("plot_threads")
+    assert {"worldline_id", "agent_id", "route_key", "affinity", "stage", "flags"} <= column_names(
+        "route_affinities",
+    )
+    assert {"condition_key", "conditions", "status", "priority"} <= column_names(
+        "event_trigger_conditions",
+    )
+    assert {
+        "worldline_id",
+        "source_kind",
+        "setup",
+        "dialogue_beats",
+        "choice_points",
+        "aftermath",
+        "participant_agent_ids",
+        "scene_id",
+        "status",
+    } <= column_names("scene_beat_drafts")
+    assert {
+        "worldline_id",
+        "source_candidate_id",
+        "scene_beat_draft_id",
+        "participant_agent_ids",
+        "status",
+    } <= column_names("daily_episode_drafts")
+    assert {
+        "worldline_id",
+        "context_key",
+        "interaction_type",
+        "scene_id",
+        "organization_id",
+        "participant_agent_ids",
+        "participant_roles",
+        "constraints",
+        "status",
+    } <= column_names("group_interaction_contexts")
+    assert {
+        "worldline_id",
+        "relationship_id",
+        "source_agent_id",
+        "target_agent_id",
+        "suggested_event_name",
+        "score",
+        "status",
+    } <= column_names("relationship_event_suggestions")
+    assert {
+        "worldline_id",
+        "organization_id",
+        "faction_track_id",
+        "pressure_delta",
+        "progress_delta",
+        "resolved_event_id",
+        "status",
+    } <= column_names("organization_conflict_events")
+    assert {
+        "worldline_id",
+        "rumor_key",
+        "content",
+        "source_agent_id",
+        "source_organization_id",
+        "visibility",
+        "known_agent_ids",
+        "status",
+    } <= column_names("rumor_records")
+    assert {
+        "worldline_id",
+        "rumor_id",
+        "source_agent_id",
+        "target_agent_id",
+        "target_organization_id",
+        "propagation_reason",
+        "delivered_event_id",
+        "status",
+    } <= column_names("rumor_propagations")
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(
@@ -288,6 +397,24 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_player_actor_profiles_scope_user" in constraint_names(
         "player_actor_profiles",
+        UniqueConstraint,
+    )
+    assert "uq_story_hooks_scope_key" in constraint_names("story_hooks", UniqueConstraint)
+    assert "uq_plot_threads_scope_key" in constraint_names("plot_threads", UniqueConstraint)
+    assert "uq_route_affinities_scope_agent_key" in constraint_names(
+        "route_affinities",
+        UniqueConstraint,
+    )
+    assert "uq_event_trigger_conditions_world_key" in constraint_names(
+        "event_trigger_conditions",
+        UniqueConstraint,
+    )
+    assert "uq_group_interaction_contexts_scope_key" in constraint_names(
+        "group_interaction_contexts",
+        UniqueConstraint,
+    )
+    assert "uq_rumor_records_scope_key" in constraint_names(
+        "rumor_records",
         UniqueConstraint,
     )
     assert "uq_memory_backend_profiles_profile_key" in constraint_names(
@@ -415,6 +542,52 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
     )
     assert "ck_player_choice_records_choice_kind" in constraint_names(
         "player_choice_records",
+        CheckConstraint,
+    )
+    assert "ck_story_hooks_hook_type" in constraint_names("story_hooks", CheckConstraint)
+    assert "ck_story_hooks_status" in constraint_names("story_hooks", CheckConstraint)
+    assert "ck_plot_threads_thread_type" in constraint_names("plot_threads", CheckConstraint)
+    assert "ck_plot_threads_status" in constraint_names("plot_threads", CheckConstraint)
+    assert "ck_route_affinities_status" in constraint_names(
+        "route_affinities",
+        CheckConstraint,
+    )
+    assert "ck_event_trigger_conditions_status" in constraint_names(
+        "event_trigger_conditions",
+        CheckConstraint,
+    )
+    assert "ck_scene_beat_drafts_source_kind" in constraint_names(
+        "scene_beat_drafts",
+        CheckConstraint,
+    )
+    assert "ck_scene_beat_drafts_status" in constraint_names(
+        "scene_beat_drafts",
+        CheckConstraint,
+    )
+    assert "ck_daily_episode_drafts_status" in constraint_names(
+        "daily_episode_drafts",
+        CheckConstraint,
+    )
+    assert "ck_group_interaction_contexts_interaction_type" in constraint_names(
+        "group_interaction_contexts",
+        CheckConstraint,
+    )
+    assert "ck_group_interaction_contexts_status" in constraint_names(
+        "group_interaction_contexts",
+        CheckConstraint,
+    )
+    assert "ck_relationship_event_suggestions_status" in constraint_names(
+        "relationship_event_suggestions",
+        CheckConstraint,
+    )
+    assert "ck_organization_conflict_events_status" in constraint_names(
+        "organization_conflict_events",
+        CheckConstraint,
+    )
+    assert "ck_rumor_records_visibility" in constraint_names("rumor_records", CheckConstraint)
+    assert "ck_rumor_records_status" in constraint_names("rumor_records", CheckConstraint)
+    assert "ck_rumor_propagations_status" in constraint_names(
+        "rumor_propagations",
         CheckConstraint,
     )
     assert "ck_world_organizations_organization_type" in constraint_names(
@@ -689,6 +862,64 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worldlines.id",
         "worlds.id",
     }
+    assert foreign_key_targets("story_hooks") == {
+        "agents.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("plot_threads") == {"worldlines.id", "worlds.id"}
+    assert foreign_key_targets("route_affinities") == {
+        "agents.id",
+        "player_choice_records.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("event_trigger_conditions") == {"worlds.id"}
+    assert foreign_key_targets("scene_beat_drafts") == {
+        "scenes.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("daily_episode_drafts") == {
+        "daily_life_event_candidates.id",
+        "scene_beat_drafts.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("group_interaction_contexts") == {
+        "scenes.id",
+        "world_organizations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("relationship_event_suggestions") == {
+        "agent_relationship_edges.id",
+        "agents.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("organization_conflict_events") == {
+        "faction_progress_tracks.id",
+        "world_events.id",
+        "world_organizations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("rumor_records") == {
+        "agents.id",
+        "world_organizations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("rumor_propagations") == {
+        "agents.id",
+        "rumor_records.id",
+        "world_events.id",
+        "world_organizations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("agent_profile_snapshots") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("provider_profiles") == set()
     assert foreign_key_targets("runtime_control_states") == set()
@@ -795,6 +1026,42 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_offscreen_event_queue_worldline_status_due" in index_names(
         "offscreen_event_queue",
     )
+    assert "ix_story_hooks_worldline_status" in index_names("story_hooks")
+    assert "ix_story_hooks_worldline_type" in index_names("story_hooks")
+    assert "ix_plot_threads_worldline_status" in index_names("plot_threads")
+    assert "ix_plot_threads_worldline_type" in index_names("plot_threads")
+    assert "ix_route_affinities_worldline_agent" in index_names("route_affinities")
+    assert "ix_route_affinities_worldline_status" in index_names("route_affinities")
+    assert "ix_event_trigger_conditions_world_status" in index_names(
+        "event_trigger_conditions",
+    )
+    assert "ix_scene_beat_drafts_worldline_status" in index_names("scene_beat_drafts")
+    assert "ix_scene_beat_drafts_source" in index_names("scene_beat_drafts")
+    assert "ix_daily_episode_drafts_worldline_status" in index_names(
+        "daily_episode_drafts",
+    )
+    assert "ix_daily_episode_drafts_source_candidate" in index_names(
+        "daily_episode_drafts",
+    )
+    assert "ix_group_interaction_contexts_worldline_status" in index_names(
+        "group_interaction_contexts",
+    )
+    assert "ix_relationship_event_suggestions_worldline_status" in index_names(
+        "relationship_event_suggestions",
+    )
+    assert "ix_relationship_event_suggestions_relationship" in index_names(
+        "relationship_event_suggestions",
+    )
+    assert "ix_organization_conflict_events_worldline_status" in index_names(
+        "organization_conflict_events",
+    )
+    assert "ix_organization_conflict_events_track" in index_names(
+        "organization_conflict_events",
+    )
+    assert "ix_rumor_records_worldline_status" in index_names("rumor_records")
+    assert "ix_rumor_records_worldline_visibility" in index_names("rumor_records")
+    assert "ix_rumor_propagations_rumor_status" in index_names("rumor_propagations")
+    assert "ix_rumor_propagations_worldline_target" in index_names("rumor_propagations")
     assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")

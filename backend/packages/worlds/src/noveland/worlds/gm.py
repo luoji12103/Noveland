@@ -14,9 +14,18 @@ from noveland.worlds.models import (
     FactionProgressTrack,
     GMAgenda,
     GMEventProposal,
+    GroupInteractionContext,
     OffscreenEventQueueItem,
+    OrganizationConflictEvent,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlotThread,
+    RelationshipEventSuggestion,
+    RouteAffinity,
+    RumorPropagation,
+    RumorRecord,
+    SceneBeatDraft,
+    StoryHook,
     Worldline,
 )
 from noveland.worlds.worldlines import ensure_primary_worldline, worldline_or_404
@@ -629,6 +638,7 @@ class LivingWorldGMService:
         self._copy_faction_tracks(world_id=world_id, source=source, target=target)
         self._copy_presence_states(world_id=world_id, source=source, target=target)
         self._copy_pending_autonomous_state(world_id=world_id, source=source, target=target)
+        self._copy_plot_route_rumor_state(world_id=world_id, source=source, target=target)
 
     def _copy_player_actors(
         self,
@@ -683,6 +693,264 @@ class LivingWorldGMService:
                         "forked_from_choice_id": str(choice.id),
                     },
                     consequence_preview=choice.consequence_preview,
+                ),
+            )
+
+    def _copy_plot_route_rumor_state(
+        self,
+        *,
+        world_id: uuid.UUID,
+        source: Worldline,
+        target: Worldline,
+    ) -> None:
+        hook_id_map: dict[uuid.UUID, uuid.UUID] = {}
+        for hook in self._session.scalars(
+            select(StoryHook).where(
+                StoryHook.world_id == world_id,
+                StoryHook.worldline_id == source.id,
+                StoryHook.status == "open",
+            ),
+        ).all():
+            copied = StoryHook(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=target.id,
+                hook_key=hook.hook_key,
+                title=hook.title,
+                hook_type=hook.hook_type,
+                summary=hook.summary,
+                status=hook.status,
+                priority=hook.priority,
+                owner_agent_id=hook.owner_agent_id,
+                target_agent_id=hook.target_agent_id,
+                source_event_id=hook.source_event_id,
+                due_at=hook.due_at,
+                resolution=hook.resolution,
+                metadata_json={**hook.metadata_json, "forked_from_hook_id": str(hook.id)},
+            )
+            hook_id_map[hook.id] = copied.id
+            self._session.add(copied)
+        for thread in self._session.scalars(
+            select(PlotThread).where(
+                PlotThread.world_id == world_id,
+                PlotThread.worldline_id == source.id,
+                PlotThread.status.in_(["active", "dormant"]),
+            ),
+        ).all():
+            self._session.add(
+                PlotThread(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    thread_key=thread.thread_key,
+                    title=thread.title,
+                    thread_type=thread.thread_type,
+                    status=thread.status,
+                    summary=thread.summary,
+                    stakes=thread.stakes,
+                    next_beats=thread.next_beats,
+                    participant_agent_ids=thread.participant_agent_ids,
+                    organization_ids=thread.organization_ids,
+                    related_event_ids=thread.related_event_ids,
+                    priority=thread.priority,
+                    metadata_json={
+                        **thread.metadata_json,
+                        "forked_from_thread_id": str(thread.id),
+                    },
+                ),
+            )
+        for route in self._session.scalars(
+            select(RouteAffinity).where(
+                RouteAffinity.world_id == world_id,
+                RouteAffinity.worldline_id == source.id,
+            ),
+        ).all():
+            self._session.add(
+                RouteAffinity(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    agent_id=route.agent_id,
+                    route_key=route.route_key,
+                    status=route.status,
+                    affinity=route.affinity,
+                    stage=route.stage,
+                    flags=route.flags,
+                    last_choice_id=None,
+                    metadata_json={**route.metadata_json, "forked_from_route_id": str(route.id)},
+                ),
+            )
+        for beat in self._session.scalars(
+            select(SceneBeatDraft).where(
+                SceneBeatDraft.world_id == world_id,
+                SceneBeatDraft.worldline_id == source.id,
+                SceneBeatDraft.status == "draft",
+            ),
+        ).all():
+            self._session.add(
+                SceneBeatDraft(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    source_kind=beat.source_kind,
+                    source_ref=beat.source_ref,
+                    title=beat.title,
+                    setup=beat.setup,
+                    dialogue_beats=beat.dialogue_beats,
+                    choice_points=beat.choice_points,
+                    aftermath=beat.aftermath,
+                    participant_agent_ids=beat.participant_agent_ids,
+                    scene_id=beat.scene_id,
+                    status=beat.status,
+                    metadata_json={**beat.metadata_json, "forked_from_beat_id": str(beat.id)},
+                ),
+            )
+        self._copy_open_group_suggestions_conflicts(world_id=world_id, source=source, target=target)
+        self._copy_active_rumors(world_id=world_id, source=source, target=target)
+
+    def _copy_open_group_suggestions_conflicts(
+        self,
+        *,
+        world_id: uuid.UUID,
+        source: Worldline,
+        target: Worldline,
+    ) -> None:
+        for context in self._session.scalars(
+            select(GroupInteractionContext).where(
+                GroupInteractionContext.world_id == world_id,
+                GroupInteractionContext.worldline_id == source.id,
+                GroupInteractionContext.status.in_(["planned", "active"]),
+            ),
+        ).all():
+            self._session.add(
+                GroupInteractionContext(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    context_key=context.context_key,
+                    title=context.title,
+                    interaction_type=context.interaction_type,
+                    scene_id=context.scene_id,
+                    organization_id=context.organization_id,
+                    participant_agent_ids=context.participant_agent_ids,
+                    participant_roles=context.participant_roles,
+                    constraints=context.constraints,
+                    status=context.status,
+                    metadata_json={
+                        **context.metadata_json,
+                        "forked_from_context_id": str(context.id),
+                    },
+                ),
+            )
+        for suggestion in self._session.scalars(
+            select(RelationshipEventSuggestion).where(
+                RelationshipEventSuggestion.world_id == world_id,
+                RelationshipEventSuggestion.worldline_id == source.id,
+                RelationshipEventSuggestion.status == "suggested",
+            ),
+        ).all():
+            self._session.add(
+                RelationshipEventSuggestion(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    relationship_id=None,
+                    source_agent_id=suggestion.source_agent_id,
+                    target_agent_id=suggestion.target_agent_id,
+                    title=suggestion.title,
+                    reason=suggestion.reason,
+                    suggested_event_name=suggestion.suggested_event_name,
+                    score=suggestion.score,
+                    status=suggestion.status,
+                    metadata_json={
+                        **suggestion.metadata_json,
+                        "forked_from_suggestion_id": str(suggestion.id),
+                    },
+                ),
+            )
+        for conflict in self._session.scalars(
+            select(OrganizationConflictEvent).where(
+                OrganizationConflictEvent.world_id == world_id,
+                OrganizationConflictEvent.worldline_id == source.id,
+                OrganizationConflictEvent.status == "proposed",
+            ),
+        ).all():
+            self._session.add(
+                OrganizationConflictEvent(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    organization_id=conflict.organization_id,
+                    faction_track_id=None,
+                    title=conflict.title,
+                    summary=conflict.summary,
+                    pressure_delta=conflict.pressure_delta,
+                    progress_delta=conflict.progress_delta,
+                    status=conflict.status,
+                    metadata_json={
+                        **conflict.metadata_json,
+                        "forked_from_conflict_id": str(conflict.id),
+                    },
+                ),
+            )
+
+    def _copy_active_rumors(
+        self,
+        *,
+        world_id: uuid.UUID,
+        source: Worldline,
+        target: Worldline,
+    ) -> None:
+        rumor_id_map: dict[uuid.UUID, uuid.UUID] = {}
+        for rumor in self._session.scalars(
+            select(RumorRecord).where(
+                RumorRecord.world_id == world_id,
+                RumorRecord.worldline_id == source.id,
+                RumorRecord.status == "active",
+            ),
+        ).all():
+            copied = RumorRecord(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=target.id,
+                rumor_key=rumor.rumor_key,
+                title=rumor.title,
+                content=rumor.content,
+                source_agent_id=rumor.source_agent_id,
+                source_organization_id=rumor.source_organization_id,
+                visibility=rumor.visibility,
+                known_agent_ids=rumor.known_agent_ids,
+                status=rumor.status,
+                metadata_json={**rumor.metadata_json, "forked_from_rumor_id": str(rumor.id)},
+            )
+            rumor_id_map[rumor.id] = copied.id
+            self._session.add(copied)
+        self._session.flush()
+        for propagation in self._session.scalars(
+            select(RumorPropagation).where(
+                RumorPropagation.world_id == world_id,
+                RumorPropagation.worldline_id == source.id,
+                RumorPropagation.status == "pending",
+            ),
+        ).all():
+            copied_rumor_id = rumor_id_map.get(propagation.rumor_id)
+            if copied_rumor_id is None:
+                continue
+            self._session.add(
+                RumorPropagation(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=target.id,
+                    rumor_id=copied_rumor_id,
+                    source_agent_id=propagation.source_agent_id,
+                    target_agent_id=propagation.target_agent_id,
+                    target_organization_id=propagation.target_organization_id,
+                    propagation_reason=propagation.propagation_reason,
+                    status="pending",
+                    metadata_json={
+                        **propagation.metadata_json,
+                        "forked_from_propagation_id": str(propagation.id),
+                    },
                 ),
             )
 

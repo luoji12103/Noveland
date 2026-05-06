@@ -108,17 +108,28 @@ from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.gm import LivingWorldGMService, ResolutionRuleDryRun, WorldlineComparison
 from noveland.worlds.models import (
     AgentPresenceState,
+    DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventResolutionRule,
+    EventTriggerCondition,
     FactionProgressTrack,
     GMAgenda,
     GMEventProposal,
+    GroupInteractionContext,
     OffscreenEventQueueItem,
+    OrganizationConflictEvent,
     OrganizationMembership,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlotThread,
+    RelationshipEventSuggestion,
+    RouteAffinity,
+    RumorPropagation,
+    RumorRecord,
     Scene,
+    SceneBeatDraft,
     SceneLocationEdge,
+    StoryHook,
     World,
     WorldBible,
     WorldClockTransitionModel,
@@ -126,6 +137,7 @@ from noveland.worlds.models import (
     WorldMembership,
     WorldOrganization,
 )
+from noveland.worlds.plot import LivingWorldPlotService, TriggerDryRun
 from noveland.worlds.worldlines import ensure_primary_worldline
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
@@ -183,6 +195,21 @@ GMAgendaStatus = Literal["active", "paused", "completed", "archived"]
 GMProposalStatus = Literal["proposed", "accepted", "rejected", "resolved"]
 ResolutionRuleStatus = Literal["active", "inactive"]
 PlayerChoiceKind = Literal["dialogue", "travel", "contact", "intervention", "route"]
+StoryHookType = Literal["promise", "foreshadowing", "mystery", "agreement", "flag"]
+StoryHookStatus = Literal["open", "resolved", "cancelled"]
+PlotThreadType = Literal["personal", "organization", "daily", "main", "hidden"]
+PlotThreadStatus = Literal["active", "dormant", "completed", "archived"]
+RouteStatus = Literal["locked", "available", "active", "completed", "blocked"]
+TriggerConditionStatus = Literal["active", "inactive"]
+SceneBeatStatus = Literal["draft", "approved", "published", "archived"]
+DailyEpisodeStatus = Literal["draft", "queued", "published", "archived"]
+GroupInteractionType = Literal["club", "class", "organization_meeting", "conflict", "casual"]
+GroupInteractionStatus = Literal["planned", "active", "completed", "archived"]
+SuggestionStatus = Literal["suggested", "accepted", "dismissed"]
+OrganizationConflictStatus = Literal["proposed", "resolved", "dismissed"]
+RumorStatus = Literal["active", "resolved", "false", "archived"]
+RumorVisibility = Literal["private", "group", "public"]
+RumorPropagationStatus = Literal["pending", "delivered", "blocked"]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -444,6 +471,211 @@ class PlayerChoiceCreateRequest(_RequestModel):
     context: dict[str, Any] = Field(default_factory=dict)
     effects: dict[str, Any] = Field(default_factory=dict)
     apply: bool = True
+
+
+class StoryHookCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    hook_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    hook_type: StoryHookType
+    summary: str = Field(min_length=1, max_length=12_000)
+    priority: int = Field(default=50, ge=0, le=100)
+    owner_agent_id: uuid.UUID | None = None
+    target_agent_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("due_at", mode="after")
+    @classmethod
+    def due_at_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "due_at")
+
+
+class StoryHookUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    summary: str | None = Field(default=None, min_length=1, max_length=12_000)
+    status: StoryHookStatus | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    owner_agent_id: uuid.UUID | None = None
+    target_agent_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+    resolution: str | None = Field(default=None, max_length=12_000)
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("due_at", mode="after")
+    @classmethod
+    def due_at_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "due_at")
+
+
+class PlotThreadCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    thread_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    thread_type: PlotThreadType
+    summary: str = Field(min_length=1, max_length=12_000)
+    stakes: str | None = Field(default=None, max_length=12_000)
+    next_beats: list[str] = Field(default_factory=list, max_length=50)
+    participant_agent_ids: list[str] = Field(default_factory=list, max_length=50)
+    organization_ids: list[str] = Field(default_factory=list, max_length=50)
+    priority: int = Field(default=50, ge=0, le=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlotThreadUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    thread_type: PlotThreadType | None = None
+    status: PlotThreadStatus | None = None
+    summary: str | None = Field(default=None, min_length=1, max_length=12_000)
+    stakes: str | None = Field(default=None, max_length=12_000)
+    next_beats: list[str] | None = None
+    participant_agent_ids: list[str] | None = None
+    organization_ids: list[str] | None = None
+    related_event_ids: list[str] | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    metadata: dict[str, Any] | None = None
+
+
+class RouteAffinityUpsertRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    agent_id: uuid.UUID
+    route_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    status: RouteStatus = "available"
+    affinity: int = Field(default=0, ge=-100, le=100)
+    stage: int = Field(default=0, ge=0)
+    flags: list[str] = Field(default_factory=list, max_length=50)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EventTriggerConditionCreateRequest(_RequestModel):
+    condition_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    priority: int = Field(default=50, ge=0, le=100)
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EventTriggerConditionUpdateRequest(_RequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    status: TriggerConditionStatus | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    conditions: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class SceneBeatDraftCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    source_kind: Literal["event", "proposal", "daily_episode", "manual"] = "manual"
+    source_ref: str | None = Field(default=None, max_length=160)
+    title: str = Field(min_length=1, max_length=160)
+    participant_agent_ids: list[str] = Field(default_factory=list, max_length=50)
+    scene_id: uuid.UUID | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SceneBeatDraftUpdateRequest(_RequestModel):
+    status: SceneBeatStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class DailyEpisodeDraftCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    source_candidate_id: uuid.UUID | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class DailyEpisodeDraftUpdateRequest(_RequestModel):
+    status: DailyEpisodeStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class GroupInteractionCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    context_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    interaction_type: GroupInteractionType
+    scene_id: uuid.UUID | None = None
+    organization_id: uuid.UUID | None = None
+    participant_agent_ids: list[str] = Field(default_factory=list, max_length=50)
+    participant_roles: dict[str, Any] = Field(default_factory=dict)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GroupInteractionUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    interaction_type: GroupInteractionType | None = None
+    scene_id: uuid.UUID | None = None
+    organization_id: uuid.UUID | None = None
+    participant_agent_ids: list[str] | None = None
+    participant_roles: dict[str, Any] | None = None
+    constraints: dict[str, Any] | None = None
+    status: GroupInteractionStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class RelationshipSuggestionUpdateRequest(_RequestModel):
+    status: SuggestionStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class OrganizationConflictCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    organization_id: uuid.UUID
+    faction_track_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=160)
+    summary: str = Field(min_length=1, max_length=12_000)
+    pressure_delta: int = Field(default=0, ge=-100, le=100)
+    progress_delta: int = Field(default=0, ge=-100, le=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class OrganizationConflictUpdateRequest(_RequestModel):
+    status: OrganizationConflictStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class RumorCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    rumor_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=12_000)
+    source_agent_id: uuid.UUID | None = None
+    source_organization_id: uuid.UUID | None = None
+    visibility: RumorVisibility = "private"
+    known_agent_ids: list[str] = Field(default_factory=list, max_length=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RumorUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    content: str | None = Field(default=None, min_length=1, max_length=12_000)
+    visibility: RumorVisibility | None = None
+    known_agent_ids: list[str] | None = None
+    status: RumorStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class RumorPropagationCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    rumor_id: uuid.UUID
+    source_agent_id: uuid.UUID | None = None
+    target_agent_id: uuid.UUID | None = None
+    target_organization_id: uuid.UUID | None = None
+    propagation_reason: str = Field(min_length=1, max_length=12_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RumorPropagationUpdateRequest(_RequestModel):
+    status: RumorPropagationStatus | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class MembershipUpsertRequest(_RequestModel):
@@ -938,6 +1170,226 @@ class PlayerChoiceResponse(BaseModel):
     context: dict[str, Any]
     consequence_preview: dict[str, Any]
     applied_event_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class StoryHookResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    hook_key: str
+    title: str
+    hook_type: StoryHookType
+    summary: str
+    status: StoryHookStatus
+    priority: int
+    owner_agent_id: uuid.UUID | None
+    owner_agent_key: str | None
+    owner_agent_display_name: str | None
+    target_agent_id: uuid.UUID | None
+    target_agent_key: str | None
+    target_agent_display_name: str | None
+    source_event_id: uuid.UUID | None
+    due_at: datetime | None
+    resolution: str | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlotThreadResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    thread_key: str
+    title: str
+    thread_type: PlotThreadType
+    status: PlotThreadStatus
+    summary: str
+    stakes: str | None
+    next_beats: list[str]
+    participant_agent_ids: list[str]
+    organization_ids: list[str]
+    related_event_ids: list[str]
+    priority: int
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RouteAffinityResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_key: str
+    agent_display_name: str
+    route_key: str
+    status: RouteStatus
+    affinity: int
+    stage: int
+    flags: list[str]
+    last_choice_id: uuid.UUID | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class EventTriggerConditionResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    condition_key: str
+    name: str
+    description: str | None
+    status: TriggerConditionStatus
+    priority: int
+    conditions: dict[str, Any]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class TriggerConditionDryRunResponse(BaseModel):
+    condition_id: uuid.UUID
+    condition_key: str
+    matched: bool
+    satisfied: list[str]
+    unsatisfied: list[str]
+
+
+class SceneBeatDraftResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    source_kind: Literal["event", "proposal", "daily_episode", "manual"]
+    source_ref: str | None
+    title: str
+    setup: str
+    dialogue_beats: list[dict[str, Any]]
+    choice_points: list[dict[str, Any]]
+    aftermath: str
+    participant_agent_ids: list[str]
+    scene_id: uuid.UUID | None
+    scene_key: str | None
+    scene_name: str | None
+    status: SceneBeatStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DailyEpisodeDraftResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    source_candidate_id: uuid.UUID | None
+    title: str
+    summary: str
+    scene_beat_draft_id: uuid.UUID | None
+    participant_agent_ids: list[str]
+    status: DailyEpisodeStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class GroupInteractionContextResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    context_key: str
+    title: str
+    interaction_type: GroupInteractionType
+    scene_id: uuid.UUID | None
+    scene_key: str | None
+    scene_name: str | None
+    organization_id: uuid.UUID | None
+    organization_key: str | None
+    organization_name: str | None
+    participant_agent_ids: list[str]
+    participant_roles: dict[str, Any]
+    constraints: dict[str, Any]
+    status: GroupInteractionStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RelationshipEventSuggestionResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    relationship_id: uuid.UUID | None
+    source_agent_id: uuid.UUID | None
+    source_agent_display_name: str | None
+    target_agent_id: uuid.UUID | None
+    target_agent_display_name: str | None
+    title: str
+    reason: str
+    suggested_event_name: str
+    score: int
+    status: SuggestionStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrganizationConflictResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    organization_id: uuid.UUID
+    organization_key: str
+    organization_name: str
+    faction_track_id: uuid.UUID | None
+    faction_track_key: str | None
+    title: str
+    summary: str
+    pressure_delta: int
+    progress_delta: int
+    status: OrganizationConflictStatus
+    resolved_event_id: uuid.UUID | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RumorResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    rumor_key: str
+    title: str
+    content: str
+    source_agent_id: uuid.UUID | None
+    source_agent_display_name: str | None
+    source_organization_id: uuid.UUID | None
+    source_organization_name: str | None
+    visibility: RumorVisibility
+    known_agent_ids: list[str]
+    status: RumorStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RumorPropagationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    rumor_id: uuid.UUID
+    rumor_title: str
+    source_agent_id: uuid.UUID | None
+    source_agent_display_name: str | None
+    target_agent_id: uuid.UUID | None
+    target_agent_display_name: str | None
+    target_organization_id: uuid.UUID | None
+    target_organization_name: str | None
+    propagation_reason: str
+    status: RumorPropagationStatus
+    delivered_event_id: uuid.UUID | None
+    metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
 
@@ -2353,6 +2805,1015 @@ def preview_player_choice_consequences(
         offscreen_events=preview.offscreen_events,
         diagnostics=preview.diagnostics,
     )
+
+
+@router.get("/{world_id}/story-hooks", response_model=list[StoryHookResponse])
+def list_story_hooks(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[StoryHookStatus | None, Query(alias="status")] = None,
+    hook_type: StoryHookType | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[StoryHookResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(StoryHook).where(
+        StoryHook.world_id == context.world_id,
+        StoryHook.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(StoryHook.status == status_filter)
+    if hook_type is not None:
+        statement = statement.where(StoryHook.hook_type == hook_type)
+    hooks = db_session.scalars(
+        statement.order_by(StoryHook.priority.desc(), StoryHook.created_at.desc()).limit(limit),
+    ).all()
+    return [_story_hook_response(db_session, hook) for hook in hooks]
+
+
+@router.post(
+    "/{world_id}/story-hooks",
+    response_model=StoryHookResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_story_hook(
+    hook_create: StoryHookCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> StoryHookResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    if hook_create.owner_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, hook_create.owner_agent_id)
+    if hook_create.target_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, hook_create.target_agent_id)
+    try:
+        hook = LivingWorldPlotService(db_session).create_story_hook(
+            world_id=context.world_id,
+            worldline_id=hook_create.worldline_id,
+            hook_key=hook_create.hook_key,
+            title=hook_create.title,
+            hook_type=hook_create.hook_type,
+            summary=hook_create.summary,
+            priority=hook_create.priority,
+            owner_agent_id=hook_create.owner_agent_id,
+            target_agent_id=hook_create.target_agent_id,
+            due_at=hook_create.due_at,
+            metadata=hook_create.metadata,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _story_hook_response(db_session, hook)
+
+
+@router.patch("/{world_id}/story-hooks/{hook_id}", response_model=StoryHookResponse)
+def update_story_hook(
+    hook_id: uuid.UUID,
+    hook_update: StoryHookUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> StoryHookResponse:
+    require_csrf(request)
+    hook = _story_hook_or_404(db_session, context.world_id, hook_id)
+    for field_name in ("title", "summary", "status", "priority", "due_at", "resolution"):
+        if field_name in hook_update.model_fields_set:
+            next_value = getattr(hook_update, field_name)
+            if next_value is not None or field_name in ("due_at", "resolution"):
+                setattr(hook, field_name, next_value)
+    if "owner_agent_id" in hook_update.model_fields_set:
+        if hook_update.owner_agent_id is not None:
+            _agent_or_404(db_session, context.world_id, hook_update.owner_agent_id)
+        hook.owner_agent_id = hook_update.owner_agent_id
+    if "target_agent_id" in hook_update.model_fields_set:
+        if hook_update.target_agent_id is not None:
+            _agent_or_404(db_session, context.world_id, hook_update.target_agent_id)
+        hook.target_agent_id = hook_update.target_agent_id
+    if "metadata" in hook_update.model_fields_set:
+        hook.metadata_json = hook_update.metadata or {}
+    db_session.flush()
+    return _story_hook_response(db_session, hook)
+
+
+@router.get("/{world_id}/plot-threads", response_model=list[PlotThreadResponse])
+def list_plot_threads(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[PlotThreadStatus | None, Query(alias="status")] = None,
+    thread_type: PlotThreadType | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[PlotThreadResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(PlotThread).where(
+        PlotThread.world_id == context.world_id,
+        PlotThread.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(PlotThread.status == status_filter)
+    if thread_type is not None:
+        statement = statement.where(PlotThread.thread_type == thread_type)
+    threads = db_session.scalars(
+        statement.order_by(PlotThread.priority.desc(), PlotThread.updated_at.desc()).limit(limit),
+    ).all()
+    return [_plot_thread_response(thread) for thread in threads]
+
+
+@router.post(
+    "/{world_id}/plot-threads",
+    response_model=PlotThreadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_plot_thread(
+    thread_create: PlotThreadCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlotThreadResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    _ensure_agent_string_refs(db_session, context.world_id, thread_create.participant_agent_ids)
+    _ensure_organization_string_refs(db_session, context.world_id, thread_create.organization_ids)
+    try:
+        thread = LivingWorldPlotService(db_session).create_plot_thread(
+            world_id=context.world_id,
+            worldline_id=thread_create.worldline_id,
+            thread_key=thread_create.thread_key,
+            title=thread_create.title,
+            thread_type=thread_create.thread_type,
+            summary=thread_create.summary,
+            stakes=thread_create.stakes,
+            next_beats=thread_create.next_beats,
+            participant_agent_ids=thread_create.participant_agent_ids,
+            organization_ids=thread_create.organization_ids,
+            priority=thread_create.priority,
+            metadata=thread_create.metadata,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _plot_thread_response(thread)
+
+
+@router.patch("/{world_id}/plot-threads/{thread_id}", response_model=PlotThreadResponse)
+def update_plot_thread(
+    thread_id: uuid.UUID,
+    thread_update: PlotThreadUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlotThreadResponse:
+    require_csrf(request)
+    thread = _plot_thread_or_404(db_session, context.world_id, thread_id)
+    for field_name in ("title", "thread_type", "status", "summary", "stakes", "priority"):
+        if field_name in thread_update.model_fields_set:
+            next_value = getattr(thread_update, field_name)
+            if next_value is not None or field_name == "stakes":
+                setattr(thread, field_name, next_value)
+    if "next_beats" in thread_update.model_fields_set:
+        thread.next_beats = thread_update.next_beats or []
+    if "participant_agent_ids" in thread_update.model_fields_set:
+        participant_ids = thread_update.participant_agent_ids or []
+        _ensure_agent_string_refs(db_session, context.world_id, participant_ids)
+        thread.participant_agent_ids = participant_ids
+    if "organization_ids" in thread_update.model_fields_set:
+        organization_ids = thread_update.organization_ids or []
+        _ensure_organization_string_refs(db_session, context.world_id, organization_ids)
+        thread.organization_ids = organization_ids
+    if "related_event_ids" in thread_update.model_fields_set:
+        thread.related_event_ids = thread_update.related_event_ids or []
+    if "metadata" in thread_update.model_fields_set:
+        thread.metadata_json = thread_update.metadata or {}
+    db_session.flush()
+    return _plot_thread_response(thread)
+
+
+@router.get("/{world_id}/route-affinities", response_model=list[RouteAffinityResponse])
+def list_route_affinities(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    agent_id: uuid.UUID | None = None,
+    status_filter: Annotated[RouteStatus | None, Query(alias="status")] = None,
+) -> list[RouteAffinityResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RouteAffinity).where(
+        RouteAffinity.world_id == context.world_id,
+        RouteAffinity.worldline_id == resolved_worldline.id,
+    )
+    if agent_id is not None:
+        _agent_or_404(db_session, context.world_id, agent_id)
+        statement = statement.where(RouteAffinity.agent_id == agent_id)
+    if status_filter is not None:
+        statement = statement.where(RouteAffinity.status == status_filter)
+    routes = db_session.scalars(
+        statement.order_by(RouteAffinity.route_key, RouteAffinity.updated_at.desc()),
+    ).all()
+    return [_route_affinity_response(db_session, route) for route in routes]
+
+
+@router.put("/{world_id}/route-affinities", response_model=RouteAffinityResponse)
+def upsert_route_affinity(
+    route_upsert: RouteAffinityUpsertRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RouteAffinityResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    _agent_or_404(db_session, context.world_id, route_upsert.agent_id)
+    route = LivingWorldPlotService(db_session).upsert_route_affinity(
+        world_id=context.world_id,
+        worldline_id=route_upsert.worldline_id,
+        agent_id=route_upsert.agent_id,
+        route_key=route_upsert.route_key,
+        status=route_upsert.status,
+        affinity=route_upsert.affinity,
+        stage=route_upsert.stage,
+        flags=route_upsert.flags,
+        metadata=route_upsert.metadata,
+    )
+    return _route_affinity_response(db_session, route)
+
+
+@router.get(
+    "/{world_id}/event-trigger-conditions",
+    response_model=list[EventTriggerConditionResponse],
+)
+def list_event_trigger_conditions(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    status_filter: Annotated[TriggerConditionStatus | None, Query(alias="status")] = None,
+) -> list[EventTriggerConditionResponse]:
+    _world_or_404(db_session, context.world_id)
+    statement = select(EventTriggerCondition).where(
+        EventTriggerCondition.world_id == context.world_id
+    )
+    if status_filter is not None:
+        statement = statement.where(EventTriggerCondition.status == status_filter)
+    conditions = db_session.scalars(
+        statement.order_by(
+            EventTriggerCondition.priority.desc(), EventTriggerCondition.condition_key
+        ),
+    ).all()
+    return [_trigger_condition_response(condition) for condition in conditions]
+
+
+@router.post(
+    "/{world_id}/event-trigger-conditions",
+    response_model=EventTriggerConditionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_event_trigger_condition(
+    condition_create: EventTriggerConditionCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EventTriggerConditionResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        condition = LivingWorldPlotService(db_session).create_trigger_condition(
+            world_id=context.world_id,
+            condition_key=condition_create.condition_key,
+            name=condition_create.name,
+            description=condition_create.description,
+            priority=condition_create.priority,
+            conditions=condition_create.conditions,
+            metadata=condition_create.metadata,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _trigger_condition_response(condition)
+
+
+@router.patch(
+    "/{world_id}/event-trigger-conditions/{condition_id}",
+    response_model=EventTriggerConditionResponse,
+)
+def update_event_trigger_condition(
+    condition_id: uuid.UUID,
+    condition_update: EventTriggerConditionUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EventTriggerConditionResponse:
+    require_csrf(request)
+    condition = _trigger_condition_or_404(db_session, context.world_id, condition_id)
+    for field_name in ("name", "description", "status", "priority"):
+        if field_name in condition_update.model_fields_set:
+            next_value = getattr(condition_update, field_name)
+            if next_value is not None or field_name == "description":
+                setattr(condition, field_name, next_value)
+    if "conditions" in condition_update.model_fields_set:
+        condition.conditions_json = condition_update.conditions or {}
+    if "metadata" in condition_update.model_fields_set:
+        condition.metadata_json = condition_update.metadata or {}
+    db_session.flush()
+    return _trigger_condition_response(condition)
+
+
+@router.post(
+    "/{world_id}/event-trigger-conditions/{condition_id}/dry-run",
+    response_model=TriggerConditionDryRunResponse,
+)
+def dry_run_event_trigger_condition(
+    condition_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> TriggerConditionDryRunResponse:
+    require_csrf(request)
+    condition = _trigger_condition_or_404(db_session, context.world_id, condition_id)
+    result = LivingWorldPlotService(db_session).dry_run_trigger_condition(
+        world_id=context.world_id,
+        worldline_id=worldline_id,
+        condition=condition,
+    )
+    return _trigger_dry_run_response(result)
+
+
+@router.get("/{world_id}/scene-beats", response_model=list[SceneBeatDraftResponse])
+def list_scene_beats(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[SceneBeatStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[SceneBeatDraftResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(SceneBeatDraft).where(
+        SceneBeatDraft.world_id == context.world_id,
+        SceneBeatDraft.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(SceneBeatDraft.status == status_filter)
+    beats = db_session.scalars(
+        statement.order_by(SceneBeatDraft.updated_at.desc()).limit(limit),
+    ).all()
+    return [_scene_beat_response(db_session, beat) for beat in beats]
+
+
+@router.post(
+    "/{world_id}/scene-beats",
+    response_model=SceneBeatDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_scene_beat(
+    beat_create: SceneBeatDraftCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SceneBeatDraftResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    if beat_create.scene_id is not None:
+        _scene_or_404(db_session, context.world_id, beat_create.scene_id)
+    _ensure_agent_string_refs(db_session, context.world_id, beat_create.participant_agent_ids)
+    beat = LivingWorldPlotService(db_session).compose_scene_beat(
+        world_id=context.world_id,
+        worldline_id=beat_create.worldline_id,
+        source_kind=beat_create.source_kind,
+        source_ref=beat_create.source_ref,
+        title=beat_create.title,
+        participant_agent_ids=beat_create.participant_agent_ids,
+        scene_id=beat_create.scene_id,
+        metadata=beat_create.metadata,
+    )
+    return _scene_beat_response(db_session, beat)
+
+
+@router.patch("/{world_id}/scene-beats/{beat_id}", response_model=SceneBeatDraftResponse)
+def update_scene_beat(
+    beat_id: uuid.UUID,
+    beat_update: SceneBeatDraftUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SceneBeatDraftResponse:
+    require_csrf(request)
+    beat = _scene_beat_or_404(db_session, context.world_id, beat_id)
+    if "status" in beat_update.model_fields_set and beat_update.status is not None:
+        beat.status = beat_update.status
+    if "metadata" in beat_update.model_fields_set:
+        beat.metadata_json = beat_update.metadata or {}
+    db_session.flush()
+    return _scene_beat_response(db_session, beat)
+
+
+@router.get("/{world_id}/daily-episodes", response_model=list[DailyEpisodeDraftResponse])
+def list_daily_episodes(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[DailyEpisodeStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[DailyEpisodeDraftResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(DailyEpisodeDraft).where(
+        DailyEpisodeDraft.world_id == context.world_id,
+        DailyEpisodeDraft.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(DailyEpisodeDraft.status == status_filter)
+    drafts = db_session.scalars(
+        statement.order_by(DailyEpisodeDraft.updated_at.desc()).limit(limit),
+    ).all()
+    return [_daily_episode_response(draft) for draft in drafts]
+
+
+@router.post(
+    "/{world_id}/daily-episodes",
+    response_model=DailyEpisodeDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_daily_episode(
+    episode_create: DailyEpisodeDraftCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> DailyEpisodeDraftResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        episode = LivingWorldPlotService(db_session).generate_daily_episode(
+            world_id=context.world_id,
+            worldline_id=episode_create.worldline_id,
+            source_candidate_id=episode_create.source_candidate_id,
+            title=episode_create.title,
+            metadata=episode_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _daily_episode_response(episode)
+
+
+@router.patch(
+    "/{world_id}/daily-episodes/{episode_id}",
+    response_model=DailyEpisodeDraftResponse,
+)
+def update_daily_episode(
+    episode_id: uuid.UUID,
+    episode_update: DailyEpisodeDraftUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> DailyEpisodeDraftResponse:
+    require_csrf(request)
+    episode = _daily_episode_or_404(db_session, context.world_id, episode_id)
+    if "status" in episode_update.model_fields_set and episode_update.status is not None:
+        episode.status = episode_update.status
+    if "metadata" in episode_update.model_fields_set:
+        episode.metadata_json = episode_update.metadata or {}
+    db_session.flush()
+    return _daily_episode_response(episode)
+
+
+@router.get("/{world_id}/group-interactions", response_model=list[GroupInteractionContextResponse])
+def list_group_interactions(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[GroupInteractionStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[GroupInteractionContextResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(GroupInteractionContext).where(
+        GroupInteractionContext.world_id == context.world_id,
+        GroupInteractionContext.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(GroupInteractionContext.status == status_filter)
+    contexts = db_session.scalars(
+        statement.order_by(GroupInteractionContext.updated_at.desc()).limit(limit),
+    ).all()
+    return [_group_context_response(db_session, group_context) for group_context in contexts]
+
+
+@router.post(
+    "/{world_id}/group-interactions",
+    response_model=GroupInteractionContextResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_group_interaction(
+    group_create: GroupInteractionCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GroupInteractionContextResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        group_create.worldline_id,
+    )
+    if group_create.scene_id is not None:
+        _scene_or_404(db_session, context.world_id, group_create.scene_id)
+    if group_create.organization_id is not None:
+        _organization_or_404(db_session, context.world_id, group_create.organization_id)
+    _ensure_agent_string_refs(db_session, context.world_id, group_create.participant_agent_ids)
+    existing = db_session.scalars(
+        select(GroupInteractionContext).where(
+            GroupInteractionContext.world_id == context.world_id,
+            GroupInteractionContext.worldline_id == resolved_worldline.id,
+            GroupInteractionContext.context_key == group_create.context_key,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Group interaction context key already exists")
+    group_context = GroupInteractionContext(
+        id=uuid.uuid4(),
+        world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
+        context_key=group_create.context_key,
+        title=group_create.title,
+        interaction_type=group_create.interaction_type,
+        scene_id=group_create.scene_id,
+        organization_id=group_create.organization_id,
+        participant_agent_ids=group_create.participant_agent_ids,
+        participant_roles=group_create.participant_roles,
+        constraints=group_create.constraints,
+        status="planned",
+        metadata_json=group_create.metadata,
+    )
+    db_session.add(group_context)
+    db_session.flush()
+    return _group_context_response(db_session, group_context)
+
+
+@router.patch(
+    "/{world_id}/group-interactions/{context_id}",
+    response_model=GroupInteractionContextResponse,
+)
+def update_group_interaction(
+    context_id: uuid.UUID,
+    group_update: GroupInteractionUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GroupInteractionContextResponse:
+    require_csrf(request)
+    group_context = _group_context_or_404(db_session, context.world_id, context_id)
+    for field_name in ("title", "interaction_type", "scene_id", "organization_id", "status"):
+        if field_name in group_update.model_fields_set:
+            next_value = getattr(group_update, field_name)
+            if field_name == "scene_id" and next_value is not None:
+                _scene_or_404(db_session, context.world_id, next_value)
+            if field_name == "organization_id" and next_value is not None:
+                _organization_or_404(db_session, context.world_id, next_value)
+            if next_value is not None or field_name in ("scene_id", "organization_id"):
+                setattr(group_context, field_name, next_value)
+    if "participant_agent_ids" in group_update.model_fields_set:
+        participant_ids = group_update.participant_agent_ids or []
+        _ensure_agent_string_refs(db_session, context.world_id, participant_ids)
+        group_context.participant_agent_ids = participant_ids
+    if "participant_roles" in group_update.model_fields_set:
+        group_context.participant_roles = group_update.participant_roles or {}
+    if "constraints" in group_update.model_fields_set:
+        group_context.constraints = group_update.constraints or {}
+    if "metadata" in group_update.model_fields_set:
+        group_context.metadata_json = group_update.metadata or {}
+    db_session.flush()
+    return _group_context_response(db_session, group_context)
+
+
+@router.get(
+    "/{world_id}/relationship-suggestions",
+    response_model=list[RelationshipEventSuggestionResponse],
+)
+def list_relationship_suggestions(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[SuggestionStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[RelationshipEventSuggestionResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RelationshipEventSuggestion).where(
+        RelationshipEventSuggestion.world_id == context.world_id,
+        RelationshipEventSuggestion.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(RelationshipEventSuggestion.status == status_filter)
+    suggestions = db_session.scalars(
+        statement.order_by(RelationshipEventSuggestion.score.desc()).limit(limit),
+    ).all()
+    return [_relationship_suggestion_response(db_session, item) for item in suggestions]
+
+
+@router.post(
+    "/{world_id}/relationship-suggestions/generate",
+    response_model=list[RelationshipEventSuggestionResponse],
+)
+def generate_relationship_suggestions(
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[RelationshipEventSuggestionResponse]:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    suggestions = LivingWorldPlotService(db_session).generate_relationship_suggestions(
+        world_id=context.world_id,
+        worldline_id=worldline_id,
+        limit=limit,
+    )
+    return [_relationship_suggestion_response(db_session, item) for item in suggestions]
+
+
+@router.patch(
+    "/{world_id}/relationship-suggestions/{suggestion_id}",
+    response_model=RelationshipEventSuggestionResponse,
+)
+def update_relationship_suggestion(
+    suggestion_id: uuid.UUID,
+    suggestion_update: RelationshipSuggestionUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RelationshipEventSuggestionResponse:
+    require_csrf(request)
+    suggestion = _relationship_suggestion_or_404(db_session, context.world_id, suggestion_id)
+    if "status" in suggestion_update.model_fields_set and suggestion_update.status is not None:
+        suggestion.status = suggestion_update.status
+    if "metadata" in suggestion_update.model_fields_set:
+        suggestion.metadata_json = suggestion_update.metadata or {}
+    db_session.flush()
+    return _relationship_suggestion_response(db_session, suggestion)
+
+
+@router.get(
+    "/{world_id}/organization-conflicts",
+    response_model=list[OrganizationConflictResponse],
+)
+def list_organization_conflicts(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[OrganizationConflictStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[OrganizationConflictResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(OrganizationConflictEvent).where(
+        OrganizationConflictEvent.world_id == context.world_id,
+        OrganizationConflictEvent.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(OrganizationConflictEvent.status == status_filter)
+    conflicts = db_session.scalars(
+        statement.order_by(OrganizationConflictEvent.updated_at.desc()).limit(limit),
+    ).all()
+    return [_organization_conflict_response(db_session, item) for item in conflicts]
+
+
+@router.post(
+    "/{world_id}/organization-conflicts",
+    response_model=OrganizationConflictResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_organization_conflict(
+    conflict_create: OrganizationConflictCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationConflictResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        conflict_create.worldline_id,
+    )
+    _organization_or_404(db_session, context.world_id, conflict_create.organization_id)
+    if conflict_create.faction_track_id is not None:
+        track = db_session.get(FactionProgressTrack, conflict_create.faction_track_id)
+        if (
+            track is None
+            or track.world_id != context.world_id
+            or track.worldline_id != resolved_worldline.id
+            or track.organization_id != conflict_create.organization_id
+        ):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+    conflict = OrganizationConflictEvent(
+        id=uuid.uuid4(),
+        world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
+        organization_id=conflict_create.organization_id,
+        faction_track_id=conflict_create.faction_track_id,
+        title=conflict_create.title,
+        summary=conflict_create.summary,
+        pressure_delta=conflict_create.pressure_delta,
+        progress_delta=conflict_create.progress_delta,
+        status="proposed",
+        metadata_json=conflict_create.metadata,
+    )
+    db_session.add(conflict)
+    db_session.flush()
+    return _organization_conflict_response(db_session, conflict)
+
+
+@router.patch(
+    "/{world_id}/organization-conflicts/{conflict_id}",
+    response_model=OrganizationConflictResponse,
+)
+def update_organization_conflict(
+    conflict_id: uuid.UUID,
+    conflict_update: OrganizationConflictUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationConflictResponse:
+    require_csrf(request)
+    conflict = _organization_conflict_or_404(db_session, context.world_id, conflict_id)
+    if "status" in conflict_update.model_fields_set and conflict_update.status is not None:
+        conflict.status = conflict_update.status
+    if "metadata" in conflict_update.model_fields_set:
+        conflict.metadata_json = conflict_update.metadata or {}
+    db_session.flush()
+    return _organization_conflict_response(db_session, conflict)
+
+
+@router.post(
+    "/{world_id}/organization-conflicts/{conflict_id}/resolve",
+    response_model=OrganizationConflictResponse,
+)
+def resolve_organization_conflict(
+    conflict_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> OrganizationConflictResponse:
+    require_csrf(request)
+    try:
+        conflict = LivingWorldPlotService(db_session).resolve_organization_conflict(
+            world_id=context.world_id,
+            conflict_id=conflict_id,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _organization_conflict_response(db_session, conflict)
+
+
+@router.get("/{world_id}/rumors", response_model=list[RumorResponse])
+def list_rumors(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[RumorStatus | None, Query(alias="status")] = None,
+    visibility: RumorVisibility | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[RumorResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RumorRecord).where(
+        RumorRecord.world_id == context.world_id,
+        RumorRecord.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(RumorRecord.status == status_filter)
+    if visibility is not None:
+        statement = statement.where(RumorRecord.visibility == visibility)
+    rumors = db_session.scalars(
+        statement.order_by(RumorRecord.updated_at.desc()).limit(limit),
+    ).all()
+    return [_rumor_response(db_session, rumor) for rumor in rumors]
+
+
+@router.post(
+    "/{world_id}/rumors",
+    response_model=RumorResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_rumor(
+    rumor_create: RumorCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RumorResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        rumor_create.worldline_id,
+    )
+    if rumor_create.source_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, rumor_create.source_agent_id)
+    if rumor_create.source_organization_id is not None:
+        _organization_or_404(db_session, context.world_id, rumor_create.source_organization_id)
+    _ensure_agent_string_refs(db_session, context.world_id, rumor_create.known_agent_ids)
+    existing = db_session.scalars(
+        select(RumorRecord).where(
+            RumorRecord.world_id == context.world_id,
+            RumorRecord.worldline_id == resolved_worldline.id,
+            RumorRecord.rumor_key == rumor_create.rumor_key,
+        ),
+    ).one_or_none()
+    if existing is not None:
+        raise _conflict("Rumor key already exists")
+    rumor = RumorRecord(
+        id=uuid.uuid4(),
+        world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
+        rumor_key=rumor_create.rumor_key,
+        title=rumor_create.title,
+        content=rumor_create.content,
+        source_agent_id=rumor_create.source_agent_id,
+        source_organization_id=rumor_create.source_organization_id,
+        visibility=rumor_create.visibility,
+        known_agent_ids=rumor_create.known_agent_ids,
+        status="active",
+        metadata_json=rumor_create.metadata,
+    )
+    db_session.add(rumor)
+    db_session.flush()
+    return _rumor_response(db_session, rumor)
+
+
+@router.patch("/{world_id}/rumors/{rumor_id}", response_model=RumorResponse)
+def update_rumor(
+    rumor_id: uuid.UUID,
+    rumor_update: RumorUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RumorResponse:
+    require_csrf(request)
+    rumor = _rumor_or_404(db_session, context.world_id, rumor_id)
+    for field_name in ("title", "content", "visibility", "status"):
+        if field_name in rumor_update.model_fields_set:
+            next_value = getattr(rumor_update, field_name)
+            if next_value is not None:
+                setattr(rumor, field_name, next_value)
+    if "known_agent_ids" in rumor_update.model_fields_set:
+        known_agent_ids = rumor_update.known_agent_ids or []
+        _ensure_agent_string_refs(db_session, context.world_id, known_agent_ids)
+        rumor.known_agent_ids = known_agent_ids
+    if "metadata" in rumor_update.model_fields_set:
+        rumor.metadata_json = rumor_update.metadata or {}
+    db_session.flush()
+    return _rumor_response(db_session, rumor)
+
+
+@router.get(
+    "/{world_id}/rumor-propagations",
+    response_model=list[RumorPropagationResponse],
+)
+def list_rumor_propagations(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[RumorPropagationStatus | None, Query(alias="status")] = None,
+    target_agent_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[RumorPropagationResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RumorPropagation).where(
+        RumorPropagation.world_id == context.world_id,
+        RumorPropagation.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(RumorPropagation.status == status_filter)
+    if target_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, target_agent_id)
+        statement = statement.where(RumorPropagation.target_agent_id == target_agent_id)
+    propagations = db_session.scalars(
+        statement.order_by(RumorPropagation.updated_at.desc()).limit(limit),
+    ).all()
+    return [_rumor_propagation_response(db_session, item) for item in propagations]
+
+
+@router.post(
+    "/{world_id}/rumor-propagations",
+    response_model=RumorPropagationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_rumor_propagation(
+    propagation_create: RumorPropagationCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RumorPropagationResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldPlotService(db_session).worldline_or_404(
+        context.world_id,
+        propagation_create.worldline_id,
+    )
+    rumor = _rumor_or_404(db_session, context.world_id, propagation_create.rumor_id)
+    if rumor.worldline_id != resolved_worldline.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rumor not found")
+    if propagation_create.source_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, propagation_create.source_agent_id)
+    if propagation_create.target_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, propagation_create.target_agent_id)
+    if propagation_create.target_organization_id is not None:
+        _organization_or_404(
+            db_session,
+            context.world_id,
+            propagation_create.target_organization_id,
+        )
+    propagation = RumorPropagation(
+        id=uuid.uuid4(),
+        world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
+        rumor_id=rumor.id,
+        source_agent_id=propagation_create.source_agent_id,
+        target_agent_id=propagation_create.target_agent_id,
+        target_organization_id=propagation_create.target_organization_id,
+        propagation_reason=propagation_create.propagation_reason,
+        status="pending",
+        metadata_json=propagation_create.metadata,
+    )
+    db_session.add(propagation)
+    db_session.flush()
+    return _rumor_propagation_response(db_session, propagation)
+
+
+@router.patch(
+    "/{world_id}/rumor-propagations/{propagation_id}",
+    response_model=RumorPropagationResponse,
+)
+def update_rumor_propagation(
+    propagation_id: uuid.UUID,
+    propagation_update: RumorPropagationUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RumorPropagationResponse:
+    require_csrf(request)
+    propagation = _rumor_propagation_or_404(db_session, context.world_id, propagation_id)
+    if "status" in propagation_update.model_fields_set and propagation_update.status is not None:
+        propagation.status = propagation_update.status
+    if "metadata" in propagation_update.model_fields_set:
+        propagation.metadata_json = propagation_update.metadata or {}
+    db_session.flush()
+    return _rumor_propagation_response(db_session, propagation)
+
+
+@router.post(
+    "/{world_id}/rumor-propagations/{propagation_id}/deliver",
+    response_model=RumorPropagationResponse,
+)
+def deliver_rumor_propagation(
+    propagation_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RumorPropagationResponse:
+    require_csrf(request)
+    try:
+        propagation = LivingWorldPlotService(db_session).deliver_rumor(
+            world_id=context.world_id,
+            propagation_id=propagation_id,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _rumor_propagation_response(db_session, propagation)
 
 
 @router.get("/{world_id}/composition-export", response_model=WorldCompositionExportResponse)
@@ -5051,6 +6512,320 @@ def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
     )
 
 
+def _story_hook_response(db_session: Session, hook: StoryHook) -> StoryHookResponse:
+    owner = None if hook.owner_agent_id is None else db_session.get(Agent, hook.owner_agent_id)
+    target = None if hook.target_agent_id is None else db_session.get(Agent, hook.target_agent_id)
+    return StoryHookResponse(
+        id=hook.id,
+        world_id=hook.world_id,
+        worldline_id=hook.worldline_id,
+        hook_key=hook.hook_key,
+        title=hook.title,
+        hook_type=cast(StoryHookType, hook.hook_type),
+        summary=hook.summary,
+        status=cast(StoryHookStatus, hook.status),
+        priority=hook.priority,
+        owner_agent_id=hook.owner_agent_id,
+        owner_agent_key=None if owner is None else owner.agent_key,
+        owner_agent_display_name=None if owner is None else owner.display_name,
+        target_agent_id=hook.target_agent_id,
+        target_agent_key=None if target is None else target.agent_key,
+        target_agent_display_name=None if target is None else target.display_name,
+        source_event_id=hook.source_event_id,
+        due_at=hook.due_at,
+        resolution=hook.resolution,
+        metadata=hook.metadata_json,
+        created_at=hook.created_at,
+        updated_at=hook.updated_at,
+    )
+
+
+def _plot_thread_response(thread: PlotThread) -> PlotThreadResponse:
+    return PlotThreadResponse(
+        id=thread.id,
+        world_id=thread.world_id,
+        worldline_id=thread.worldline_id,
+        thread_key=thread.thread_key,
+        title=thread.title,
+        thread_type=cast(PlotThreadType, thread.thread_type),
+        status=cast(PlotThreadStatus, thread.status),
+        summary=thread.summary,
+        stakes=thread.stakes,
+        next_beats=thread.next_beats,
+        participant_agent_ids=thread.participant_agent_ids,
+        organization_ids=thread.organization_ids,
+        related_event_ids=thread.related_event_ids,
+        priority=thread.priority,
+        metadata=thread.metadata_json,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+    )
+
+
+def _route_affinity_response(db_session: Session, route: RouteAffinity) -> RouteAffinityResponse:
+    agent = _agent_or_404(db_session, route.world_id, route.agent_id)
+    return RouteAffinityResponse(
+        id=route.id,
+        world_id=route.world_id,
+        worldline_id=route.worldline_id,
+        agent_id=route.agent_id,
+        agent_key=agent.agent_key,
+        agent_display_name=agent.display_name,
+        route_key=route.route_key,
+        status=cast(RouteStatus, route.status),
+        affinity=route.affinity,
+        stage=route.stage,
+        flags=route.flags,
+        last_choice_id=route.last_choice_id,
+        metadata=route.metadata_json,
+        created_at=route.created_at,
+        updated_at=route.updated_at,
+    )
+
+
+def _trigger_condition_response(
+    condition: EventTriggerCondition,
+) -> EventTriggerConditionResponse:
+    return EventTriggerConditionResponse(
+        id=condition.id,
+        world_id=condition.world_id,
+        condition_key=condition.condition_key,
+        name=condition.name,
+        description=condition.description,
+        status=cast(TriggerConditionStatus, condition.status),
+        priority=condition.priority,
+        conditions=condition.conditions_json,
+        metadata=condition.metadata_json,
+        created_at=condition.created_at,
+        updated_at=condition.updated_at,
+    )
+
+
+def _trigger_dry_run_response(dry_run: TriggerDryRun) -> TriggerConditionDryRunResponse:
+    return TriggerConditionDryRunResponse(
+        condition_id=dry_run.condition_id,
+        condition_key=dry_run.condition_key,
+        matched=dry_run.matched,
+        satisfied=dry_run.satisfied,
+        unsatisfied=dry_run.unsatisfied,
+    )
+
+
+def _scene_beat_response(db_session: Session, beat: SceneBeatDraft) -> SceneBeatDraftResponse:
+    scene = None if beat.scene_id is None else db_session.get(Scene, beat.scene_id)
+    return SceneBeatDraftResponse(
+        id=beat.id,
+        world_id=beat.world_id,
+        worldline_id=beat.worldline_id,
+        source_kind=cast(Literal["event", "proposal", "daily_episode", "manual"], beat.source_kind),
+        source_ref=beat.source_ref,
+        title=beat.title,
+        setup=beat.setup,
+        dialogue_beats=beat.dialogue_beats,
+        choice_points=beat.choice_points,
+        aftermath=beat.aftermath,
+        participant_agent_ids=beat.participant_agent_ids,
+        scene_id=beat.scene_id,
+        scene_key=None if scene is None else scene.scene_key,
+        scene_name=None if scene is None else scene.name,
+        status=cast(SceneBeatStatus, beat.status),
+        metadata=beat.metadata_json,
+        created_at=beat.created_at,
+        updated_at=beat.updated_at,
+    )
+
+
+def _daily_episode_response(draft: DailyEpisodeDraft) -> DailyEpisodeDraftResponse:
+    return DailyEpisodeDraftResponse(
+        id=draft.id,
+        world_id=draft.world_id,
+        worldline_id=draft.worldline_id,
+        source_candidate_id=draft.source_candidate_id,
+        title=draft.title,
+        summary=draft.summary,
+        scene_beat_draft_id=draft.scene_beat_draft_id,
+        participant_agent_ids=draft.participant_agent_ids,
+        status=cast(DailyEpisodeStatus, draft.status),
+        metadata=draft.metadata_json,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+    )
+
+
+def _group_context_response(
+    db_session: Session,
+    group_context: GroupInteractionContext,
+) -> GroupInteractionContextResponse:
+    scene = (
+        None if group_context.scene_id is None else db_session.get(Scene, group_context.scene_id)
+    )
+    organization = (
+        None
+        if group_context.organization_id is None
+        else db_session.get(WorldOrganization, group_context.organization_id)
+    )
+    return GroupInteractionContextResponse(
+        id=group_context.id,
+        world_id=group_context.world_id,
+        worldline_id=group_context.worldline_id,
+        context_key=group_context.context_key,
+        title=group_context.title,
+        interaction_type=cast(GroupInteractionType, group_context.interaction_type),
+        scene_id=group_context.scene_id,
+        scene_key=None if scene is None else scene.scene_key,
+        scene_name=None if scene is None else scene.name,
+        organization_id=group_context.organization_id,
+        organization_key=None if organization is None else organization.organization_key,
+        organization_name=None if organization is None else organization.name,
+        participant_agent_ids=group_context.participant_agent_ids,
+        participant_roles=group_context.participant_roles,
+        constraints=group_context.constraints,
+        status=cast(GroupInteractionStatus, group_context.status),
+        metadata=group_context.metadata_json,
+        created_at=group_context.created_at,
+        updated_at=group_context.updated_at,
+    )
+
+
+def _relationship_suggestion_response(
+    db_session: Session,
+    suggestion: RelationshipEventSuggestion,
+) -> RelationshipEventSuggestionResponse:
+    source = (
+        None
+        if suggestion.source_agent_id is None
+        else db_session.get(Agent, suggestion.source_agent_id)
+    )
+    target = (
+        None
+        if suggestion.target_agent_id is None
+        else db_session.get(Agent, suggestion.target_agent_id)
+    )
+    return RelationshipEventSuggestionResponse(
+        id=suggestion.id,
+        world_id=suggestion.world_id,
+        worldline_id=suggestion.worldline_id,
+        relationship_id=suggestion.relationship_id,
+        source_agent_id=suggestion.source_agent_id,
+        source_agent_display_name=None if source is None else source.display_name,
+        target_agent_id=suggestion.target_agent_id,
+        target_agent_display_name=None if target is None else target.display_name,
+        title=suggestion.title,
+        reason=suggestion.reason,
+        suggested_event_name=suggestion.suggested_event_name,
+        score=suggestion.score,
+        status=cast(SuggestionStatus, suggestion.status),
+        metadata=suggestion.metadata_json,
+        created_at=suggestion.created_at,
+        updated_at=suggestion.updated_at,
+    )
+
+
+def _organization_conflict_response(
+    db_session: Session,
+    conflict: OrganizationConflictEvent,
+) -> OrganizationConflictResponse:
+    organization = _organization_or_404(db_session, conflict.world_id, conflict.organization_id)
+    track = (
+        None
+        if conflict.faction_track_id is None
+        else db_session.get(FactionProgressTrack, conflict.faction_track_id)
+    )
+    return OrganizationConflictResponse(
+        id=conflict.id,
+        world_id=conflict.world_id,
+        worldline_id=conflict.worldline_id,
+        organization_id=conflict.organization_id,
+        organization_key=organization.organization_key,
+        organization_name=organization.name,
+        faction_track_id=conflict.faction_track_id,
+        faction_track_key=None if track is None else track.track_key,
+        title=conflict.title,
+        summary=conflict.summary,
+        pressure_delta=conflict.pressure_delta,
+        progress_delta=conflict.progress_delta,
+        status=cast(OrganizationConflictStatus, conflict.status),
+        resolved_event_id=conflict.resolved_event_id,
+        metadata=conflict.metadata_json,
+        created_at=conflict.created_at,
+        updated_at=conflict.updated_at,
+    )
+
+
+def _rumor_response(db_session: Session, rumor: RumorRecord) -> RumorResponse:
+    source_agent = (
+        None if rumor.source_agent_id is None else db_session.get(Agent, rumor.source_agent_id)
+    )
+    source_organization = (
+        None
+        if rumor.source_organization_id is None
+        else db_session.get(WorldOrganization, rumor.source_organization_id)
+    )
+    return RumorResponse(
+        id=rumor.id,
+        world_id=rumor.world_id,
+        worldline_id=rumor.worldline_id,
+        rumor_key=rumor.rumor_key,
+        title=rumor.title,
+        content=rumor.content,
+        source_agent_id=rumor.source_agent_id,
+        source_agent_display_name=None if source_agent is None else source_agent.display_name,
+        source_organization_id=rumor.source_organization_id,
+        source_organization_name=(
+            None if source_organization is None else source_organization.name
+        ),
+        visibility=cast(RumorVisibility, rumor.visibility),
+        known_agent_ids=rumor.known_agent_ids,
+        status=cast(RumorStatus, rumor.status),
+        metadata=rumor.metadata_json,
+        created_at=rumor.created_at,
+        updated_at=rumor.updated_at,
+    )
+
+
+def _rumor_propagation_response(
+    db_session: Session,
+    propagation: RumorPropagation,
+) -> RumorPropagationResponse:
+    rumor = _rumor_or_404(db_session, propagation.world_id, propagation.rumor_id)
+    source_agent = (
+        None
+        if propagation.source_agent_id is None
+        else db_session.get(Agent, propagation.source_agent_id)
+    )
+    target_agent = (
+        None
+        if propagation.target_agent_id is None
+        else db_session.get(Agent, propagation.target_agent_id)
+    )
+    target_organization = (
+        None
+        if propagation.target_organization_id is None
+        else db_session.get(WorldOrganization, propagation.target_organization_id)
+    )
+    return RumorPropagationResponse(
+        id=propagation.id,
+        world_id=propagation.world_id,
+        worldline_id=propagation.worldline_id,
+        rumor_id=propagation.rumor_id,
+        rumor_title=rumor.title,
+        source_agent_id=propagation.source_agent_id,
+        source_agent_display_name=None if source_agent is None else source_agent.display_name,
+        target_agent_id=propagation.target_agent_id,
+        target_agent_display_name=None if target_agent is None else target_agent.display_name,
+        target_organization_id=propagation.target_organization_id,
+        target_organization_name=(
+            None if target_organization is None else target_organization.name
+        ),
+        propagation_reason=propagation.propagation_reason,
+        status=cast(RumorPropagationStatus, propagation.status),
+        delivered_event_id=propagation.delivered_event_id,
+        metadata=propagation.metadata_json,
+        created_at=propagation.created_at,
+        updated_at=propagation.updated_at,
+    )
+
+
 def _world_bible_response(bible: WorldBible) -> WorldBibleResponse:
     return WorldBibleResponse(
         id=bible.id,
@@ -6073,6 +7848,164 @@ def _resolution_rule_or_404(
     return rule
 
 
+def _story_hook_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    hook_id: uuid.UUID,
+) -> StoryHook:
+    hook = db_session.get(StoryHook, hook_id)
+    if hook is None or hook.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Story hook not found")
+    return hook
+
+
+def _plot_thread_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    thread_id: uuid.UUID,
+) -> PlotThread:
+    thread = db_session.get(PlotThread, thread_id)
+    if thread is None or thread.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plot thread not found")
+    return thread
+
+
+def _trigger_condition_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    condition_id: uuid.UUID,
+) -> EventTriggerCondition:
+    condition = db_session.get(EventTriggerCondition, condition_id)
+    if condition is None or condition.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trigger condition not found",
+        )
+    return condition
+
+
+def _scene_beat_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    beat_id: uuid.UUID,
+) -> SceneBeatDraft:
+    beat = db_session.get(SceneBeatDraft, beat_id)
+    if beat is None or beat.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene beat not found")
+    return beat
+
+
+def _daily_episode_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    episode_id: uuid.UUID,
+) -> DailyEpisodeDraft:
+    episode = db_session.get(DailyEpisodeDraft, episode_id)
+    if episode is None or episode.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Daily episode not found",
+        )
+    return episode
+
+
+def _group_context_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    context_id: uuid.UUID,
+) -> GroupInteractionContext:
+    group_context = db_session.get(GroupInteractionContext, context_id)
+    if group_context is None or group_context.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Group interaction context not found",
+        )
+    return group_context
+
+
+def _relationship_suggestion_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+) -> RelationshipEventSuggestion:
+    suggestion = db_session.get(RelationshipEventSuggestion, suggestion_id)
+    if suggestion is None or suggestion.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Relationship suggestion not found",
+        )
+    return suggestion
+
+
+def _organization_conflict_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    conflict_id: uuid.UUID,
+) -> OrganizationConflictEvent:
+    conflict = db_session.get(OrganizationConflictEvent, conflict_id)
+    if conflict is None or conflict.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization conflict not found",
+        )
+    return conflict
+
+
+def _rumor_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    rumor_id: uuid.UUID,
+) -> RumorRecord:
+    rumor = db_session.get(RumorRecord, rumor_id)
+    if rumor is None or rumor.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rumor not found")
+    return rumor
+
+
+def _rumor_propagation_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    propagation_id: uuid.UUID,
+) -> RumorPropagation:
+    propagation = db_session.get(RumorPropagation, propagation_id)
+    if propagation is None or propagation.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rumor propagation not found",
+        )
+    return propagation
+
+
+def _ensure_agent_string_refs(
+    db_session: Session,
+    world_id: uuid.UUID,
+    agent_ids: Sequence[str],
+) -> None:
+    for raw_agent_id in agent_ids:
+        agent_id = _uuid_or_none(raw_agent_id)
+        if agent_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Invalid agent id: {raw_agent_id}",
+            )
+        _agent_or_404(db_session, world_id, agent_id)
+
+
+def _ensure_organization_string_refs(
+    db_session: Session,
+    world_id: uuid.UUID,
+    organization_ids: Sequence[str],
+) -> None:
+    for raw_organization_id in organization_ids:
+        organization_id = _uuid_or_none(raw_organization_id)
+        if organization_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Invalid organization id: {raw_organization_id}",
+            )
+        _organization_or_404(db_session, world_id, organization_id)
+
+
 def _faction_track_or_404(
     db_session: Session,
     world_id: uuid.UUID,
@@ -6380,3 +8313,14 @@ def _optional_query_time(value: datetime | None, field_name: str) -> datetime | 
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
+
+
+def _uuid_or_none(value: object) -> uuid.UUID | None:
+    if isinstance(value, uuid.UUID):
+        return value
+    if isinstance(value, str):
+        try:
+            return uuid.UUID(value)
+        except ValueError:
+            return None
+    return None
