@@ -7,21 +7,31 @@ import {
   createAgentCalendarEntry,
   createAgentObservation,
   createAgentRelationship,
+  createDailyEpisode,
   createFactionTrack,
   createGMAgenda,
   createGMProposal,
+  createGroupInteraction,
   createLocationEdge,
   createMemoryBackendProfile,
   createNarrativeArtifact,
   createOffscreenEvent,
   createOrganization,
+  createOrganizationConflict,
   createOrganizationMembership,
   createAgentPreset,
+  createPlotThread,
   createProviderProfile,
   createResolutionRule,
   createScheduleRule,
   createSnapshot,
+  createRumor,
+  createRumorPropagation,
+  createSceneBeat,
+  createStoryHook,
+  createEventTriggerCondition,
   generateConversationNarrativeArtifacts,
+  generateRelationshipSuggestions,
   getConversationDiagnosticsSummary,
   getConversationMemorySummary,
   getConversationSpeakerPreview,
@@ -38,7 +48,9 @@ import {
   disableProviderProfile,
   dryRunMemoryBackfill,
   dryRunResolutionRule,
+  dryRunEventTriggerCondition,
   deactivateScene,
+  deliverRumorPropagation,
   exportWorldComposition,
   forkWorldline,
   getRuntimeControl,
@@ -55,14 +67,25 @@ import {
   listFactionTracks,
   listGMAgendas,
   listGMProposals,
+  listGroupInteractions,
+  listDailyEpisodes,
+  listEventTriggerConditions,
   listLocationEdges,
   listOffscreenEvents,
   listOrganizationMemberships,
+  listOrganizationConflicts,
   listOrganizations,
   listPluginBindings,
   listPlayerActors,
   listPlayerChoices,
+  listPlotThreads,
   listResolutionRules,
+  listRelationshipSuggestions,
+  listRouteAffinities,
+  listRumors,
+  listRumorPropagations,
+  listSceneBeats,
+  listStoryHooks,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
   listClockTransitions,
@@ -90,6 +113,7 @@ import {
   runAgent,
   refreshAgentObservations,
   retryMemoryWriteJob,
+  resolveOrganizationConflict,
   skipWorldClock,
   listMemberCandidates,
   listScheduleRules,
@@ -100,6 +124,7 @@ import {
   validateWorldComposition,
   updateMemoryBackendProfile,
   updateAgent,
+  updateEventTriggerCondition,
   updateFactionTrack,
   updateGMAgenda,
   updateLocationEdge,
@@ -109,12 +134,14 @@ import {
   updateAgentPreset,
   updateProviderProfile,
   updateResolutionRule,
+  updateRelationshipSuggestion,
   unpublishNarrativeArtifact,
   updateAgentPersona,
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
   upsertAgentPresence,
+  upsertRouteAffinity,
   upsertWorldBible,
   listWorldlines,
 } from "@/lib/worlds/client";
@@ -464,6 +491,132 @@ describe("world client", () => {
       "/api/worlds/world-1/player-choices?worldline_id=worldline-1&limit=5",
       "/api/worlds/world-1/player-choices/preview",
       "/api/worlds/world-1/player-choices",
+    ]);
+  });
+
+  it("maps plot, route, and rumor flow requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "hook-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "hook-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "thread-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "thread-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "route-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "route-1", affinity: 45 }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "condition-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "condition-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "condition-2", status: "inactive" }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true, satisfied: [], unsatisfied: [] }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "beat-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "beat-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "episode-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "episode-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "group-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "group-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "suggestion-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: "suggestion-2" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "suggestion-2", status: "accepted" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "conflict-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "conflict-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "conflict-2", status: "resolved" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "rumor-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "rumor-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "propagation-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "propagation-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "propagation-2", status: "delivered" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listStoryHooks("world-1", { worldline_id: "worldline-1" });
+    await createStoryHook("world-1", {
+      hook_key: "festival-promise",
+      title: "Festival promise",
+      hook_type: "promise",
+      summary: "Promise to attend the festival.",
+    });
+    await listPlotThreads("world-1", { worldline_id: "worldline-1" });
+    await createPlotThread("world-1", {
+      thread_key: "festival-route",
+      title: "Festival route",
+      thread_type: "personal",
+      summary: "Guide route pressure.",
+    });
+    await listRouteAffinities("world-1", { agent_id: "agent-1", status: "active" });
+    await upsertRouteAffinity("world-1", {
+      agent_id: "agent-1",
+      route_key: "guide-route",
+      affinity: 45,
+    });
+    await listEventTriggerConditions("world-1");
+    await createEventTriggerCondition("world-1", {
+      condition_key: "festival-flag",
+      name: "Festival flag",
+    });
+    await updateEventTriggerCondition("world-1", "condition-2", { status: "inactive" });
+    await dryRunEventTriggerCondition("world-1", "condition-2", {
+      worldline_id: "worldline-1",
+    });
+    await listSceneBeats("world-1", { worldline_id: "worldline-1" });
+    await createSceneBeat("world-1", { title: "Festival scene" });
+    await listDailyEpisodes("world-1", { worldline_id: "worldline-1" });
+    await createDailyEpisode("world-1", { title: "Festival morning" });
+    await listGroupInteractions("world-1", { worldline_id: "worldline-1" });
+    await createGroupInteraction("world-1", {
+      context_key: "club-meeting",
+      title: "Club meeting",
+      interaction_type: "club",
+    });
+    await listRelationshipSuggestions("world-1", { worldline_id: "worldline-1" });
+    await generateRelationshipSuggestions("world-1", { worldline_id: "worldline-1", limit: 5 });
+    await updateRelationshipSuggestion("world-1", "suggestion-2", { status: "accepted" });
+    await listOrganizationConflicts("world-1", { worldline_id: "worldline-1" });
+    await createOrganizationConflict("world-1", {
+      organization_id: "org-1",
+      title: "Budget pressure",
+      summary: "Festival budget pressure rises.",
+    });
+    await resolveOrganizationConflict("world-1", "conflict-2");
+    await listRumors("world-1", { worldline_id: "worldline-1" });
+    await createRumor("world-1", {
+      rumor_key: "late-rehearsal",
+      title: "Late rehearsal rumor",
+      content: "Someone saw the club room lights after closing.",
+    });
+    await listRumorPropagations("world-1", { worldline_id: "worldline-1" });
+    await createRumorPropagation("world-1", {
+      rumor_id: "rumor-2",
+      propagation_reason: "Shared after class",
+    });
+    await deliverRumorPropagation("world-1", "propagation-2");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/world-1/story-hooks?worldline_id=worldline-1",
+      "/api/worlds/world-1/story-hooks",
+      "/api/worlds/world-1/plot-threads?worldline_id=worldline-1",
+      "/api/worlds/world-1/plot-threads",
+      "/api/worlds/world-1/route-affinities?agent_id=agent-1&status=active",
+      "/api/worlds/world-1/route-affinities",
+      "/api/worlds/world-1/event-trigger-conditions",
+      "/api/worlds/world-1/event-trigger-conditions",
+      "/api/worlds/world-1/event-trigger-conditions/condition-2",
+      "/api/worlds/world-1/event-trigger-conditions/condition-2/dry-run?worldline_id=worldline-1",
+      "/api/worlds/world-1/scene-beats?worldline_id=worldline-1",
+      "/api/worlds/world-1/scene-beats",
+      "/api/worlds/world-1/daily-episodes?worldline_id=worldline-1",
+      "/api/worlds/world-1/daily-episodes",
+      "/api/worlds/world-1/group-interactions?worldline_id=worldline-1",
+      "/api/worlds/world-1/group-interactions",
+      "/api/worlds/world-1/relationship-suggestions?worldline_id=worldline-1",
+      "/api/worlds/world-1/relationship-suggestions/generate?worldline_id=worldline-1&limit=5",
+      "/api/worlds/world-1/relationship-suggestions/suggestion-2",
+      "/api/worlds/world-1/organization-conflicts?worldline_id=worldline-1",
+      "/api/worlds/world-1/organization-conflicts",
+      "/api/worlds/world-1/organization-conflicts/conflict-2/resolve",
+      "/api/worlds/world-1/rumors?worldline_id=worldline-1",
+      "/api/worlds/world-1/rumors",
+      "/api/worlds/world-1/rumor-propagations?worldline_id=worldline-1",
+      "/api/worlds/world-1/rumor-propagations",
+      "/api/worlds/world-1/rumor-propagations/propagation-2/deliver",
     ]);
   });
 

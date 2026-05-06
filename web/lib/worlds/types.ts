@@ -853,6 +853,257 @@ export type PlayerChoice = {
   updated_at: string;
 };
 
+export type StoryHookType = "promise" | "foreshadowing" | "mystery" | "agreement" | "flag";
+export type StoryHookStatus = "open" | "resolved" | "cancelled";
+
+export type StoryHook = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  hook_key: string;
+  title: string;
+  hook_type: StoryHookType;
+  summary: string;
+  status: StoryHookStatus;
+  priority: number;
+  owner_agent_id: string | null;
+  owner_agent_key: string | null;
+  owner_agent_display_name: string | null;
+  target_agent_id: string | null;
+  target_agent_key: string | null;
+  target_agent_display_name: string | null;
+  source_event_id: string | null;
+  due_at: string | null;
+  resolution: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlotThreadType = "personal" | "organization" | "daily" | "main" | "hidden";
+export type PlotThreadStatus = "active" | "dormant" | "completed" | "archived";
+
+export type PlotThread = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  thread_key: string;
+  title: string;
+  thread_type: PlotThreadType;
+  status: PlotThreadStatus;
+  summary: string;
+  stakes: string | null;
+  next_beats: string[];
+  participant_agent_ids: string[];
+  organization_ids: string[];
+  related_event_ids: string[];
+  priority: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RouteStatus = "locked" | "available" | "active" | "completed" | "blocked";
+
+export type RouteAffinity = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  agent_id: string;
+  agent_key: string;
+  agent_display_name: string;
+  route_key: string;
+  status: RouteStatus;
+  affinity: number;
+  stage: number;
+  flags: string[];
+  last_choice_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TriggerConditionStatus = "active" | "inactive";
+
+export type EventTriggerCondition = {
+  id: string;
+  world_id: string;
+  condition_key: string;
+  name: string;
+  description: string | null;
+  status: TriggerConditionStatus;
+  priority: number;
+  conditions: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TriggerConditionDryRun = {
+  condition_id: string;
+  condition_key: string;
+  matched: boolean;
+  satisfied: string[];
+  unsatisfied: string[];
+};
+
+export type SceneBeatStatus = "draft" | "approved" | "published" | "archived";
+
+export type SceneBeatDraft = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  source_kind: "event" | "proposal" | "daily_episode" | "manual";
+  source_ref: string | null;
+  title: string;
+  setup: string;
+  dialogue_beats: Record<string, unknown>[];
+  choice_points: Record<string, unknown>[];
+  aftermath: string;
+  participant_agent_ids: string[];
+  scene_id: string | null;
+  scene_key: string | null;
+  scene_name: string | null;
+  status: SceneBeatStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyEpisodeStatus = "draft" | "queued" | "published" | "archived";
+
+export type DailyEpisodeDraft = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  source_candidate_id: string | null;
+  title: string;
+  summary: string;
+  scene_beat_draft_id: string | null;
+  participant_agent_ids: string[];
+  status: DailyEpisodeStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GroupInteractionType =
+  | "club"
+  | "class"
+  | "organization_meeting"
+  | "conflict"
+  | "casual";
+export type GroupInteractionStatus = "planned" | "active" | "completed" | "archived";
+
+export type GroupInteractionContext = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  context_key: string;
+  title: string;
+  interaction_type: GroupInteractionType;
+  scene_id: string | null;
+  scene_key: string | null;
+  scene_name: string | null;
+  organization_id: string | null;
+  organization_key: string | null;
+  organization_name: string | null;
+  participant_agent_ids: string[];
+  participant_roles: Record<string, unknown>;
+  constraints: Record<string, unknown>;
+  status: GroupInteractionStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SuggestionStatus = "suggested" | "accepted" | "dismissed";
+
+export type RelationshipEventSuggestion = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  relationship_id: string | null;
+  source_agent_id: string | null;
+  source_agent_display_name: string | null;
+  target_agent_id: string | null;
+  target_agent_display_name: string | null;
+  title: string;
+  reason: string;
+  suggested_event_name: string;
+  score: number;
+  status: SuggestionStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrganizationConflictStatus = "proposed" | "resolved" | "dismissed";
+
+export type OrganizationConflict = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  organization_id: string;
+  organization_key: string;
+  organization_name: string;
+  faction_track_id: string | null;
+  faction_track_key: string | null;
+  title: string;
+  summary: string;
+  pressure_delta: number;
+  progress_delta: number;
+  status: OrganizationConflictStatus;
+  resolved_event_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RumorStatus = "active" | "resolved" | "false" | "archived";
+export type RumorVisibility = "private" | "group" | "public";
+
+export type Rumor = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  rumor_key: string;
+  title: string;
+  content: string;
+  source_agent_id: string | null;
+  source_agent_display_name: string | null;
+  source_organization_id: string | null;
+  source_organization_name: string | null;
+  visibility: RumorVisibility;
+  known_agent_ids: string[];
+  status: RumorStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RumorPropagationStatus = "pending" | "delivered" | "blocked";
+
+export type RumorPropagation = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  rumor_id: string;
+  rumor_title: string;
+  source_agent_id: string | null;
+  source_agent_display_name: string | null;
+  target_agent_id: string | null;
+  target_agent_display_name: string | null;
+  target_organization_id: string | null;
+  target_organization_name: string | null;
+  propagation_reason: string;
+  status: RumorPropagationStatus;
+  delivered_event_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ChoiceConsequencePreview = {
   relationship_updates: Record<string, unknown>[];
   faction_updates: Record<string, unknown>[];
@@ -1730,6 +1981,160 @@ export type PlayerChoiceCreateInput = {
   context?: Record<string, unknown>;
   effects?: Record<string, unknown>;
   apply?: boolean;
+};
+
+export type StoryHookCreateInput = {
+  worldline_id?: string | null;
+  hook_key: string;
+  title: string;
+  hook_type: StoryHookType;
+  summary: string;
+  priority?: number;
+  owner_agent_id?: string | null;
+  target_agent_id?: string | null;
+  due_at?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type StoryHookUpdateInput = Partial<
+  Pick<
+    StoryHook,
+    | "title"
+    | "summary"
+    | "status"
+    | "priority"
+    | "owner_agent_id"
+    | "target_agent_id"
+    | "due_at"
+    | "resolution"
+    | "metadata"
+  >
+>;
+
+export type PlotThreadCreateInput = {
+  worldline_id?: string | null;
+  thread_key: string;
+  title: string;
+  thread_type: PlotThreadType;
+  summary: string;
+  stakes?: string | null;
+  next_beats?: string[];
+  participant_agent_ids?: string[];
+  organization_ids?: string[];
+  priority?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type PlotThreadUpdateInput = Partial<
+  Pick<
+    PlotThread,
+    | "title"
+    | "thread_type"
+    | "status"
+    | "summary"
+    | "stakes"
+    | "next_beats"
+    | "participant_agent_ids"
+    | "organization_ids"
+    | "related_event_ids"
+    | "priority"
+    | "metadata"
+  >
+>;
+
+export type RouteAffinityUpsertInput = {
+  worldline_id?: string | null;
+  agent_id: string;
+  route_key: string;
+  status?: RouteStatus;
+  affinity?: number;
+  stage?: number;
+  flags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type EventTriggerConditionCreateInput = {
+  condition_key: string;
+  name: string;
+  description?: string | null;
+  priority?: number;
+  conditions?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type EventTriggerConditionUpdateInput = Partial<
+  Pick<
+    EventTriggerCondition,
+    "name" | "description" | "status" | "priority" | "conditions" | "metadata"
+  >
+>;
+
+export type SceneBeatDraftCreateInput = {
+  worldline_id?: string | null;
+  source_kind?: "event" | "proposal" | "daily_episode" | "manual";
+  source_ref?: string | null;
+  title: string;
+  participant_agent_ids?: string[];
+  scene_id?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type DailyEpisodeDraftCreateInput = {
+  worldline_id?: string | null;
+  source_candidate_id?: string | null;
+  title?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type GroupInteractionCreateInput = {
+  worldline_id?: string | null;
+  context_key: string;
+  title: string;
+  interaction_type: GroupInteractionType;
+  scene_id?: string | null;
+  organization_id?: string | null;
+  participant_agent_ids?: string[];
+  participant_roles?: Record<string, unknown>;
+  constraints?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type RelationshipSuggestionUpdateInput = {
+  status?: SuggestionStatus | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type OrganizationConflictCreateInput = {
+  worldline_id?: string | null;
+  organization_id: string;
+  faction_track_id?: string | null;
+  title: string;
+  summary: string;
+  pressure_delta?: number;
+  progress_delta?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type RumorCreateInput = {
+  worldline_id?: string | null;
+  rumor_key: string;
+  title: string;
+  content: string;
+  source_agent_id?: string | null;
+  source_organization_id?: string | null;
+  visibility?: RumorVisibility;
+  known_agent_ids?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type RumorPropagationCreateInput = {
+  worldline_id?: string | null;
+  rumor_id: string;
+  source_agent_id?: string | null;
+  target_agent_id?: string | null;
+  target_organization_id?: string | null;
+  propagation_reason: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type AgentPresetCreateInput = {

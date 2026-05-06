@@ -40,6 +40,8 @@ import type {
   AgentPresence,
   AgentPresenceInput,
   DailyLifeCandidateFilters,
+  DailyEpisodeDraft,
+  DailyEpisodeDraftCreateInput,
   DailyLifeEventCandidate,
   DailyLifeGenerateInput,
   DailyLifePreview,
@@ -48,6 +50,9 @@ import type {
   EventResolutionRule,
   EventResolutionRuleCreateInput,
   EventResolutionRuleUpdateInput,
+  EventTriggerCondition,
+  EventTriggerConditionCreateInput,
+  EventTriggerConditionUpdateInput,
   FactionProgressTrack,
   FactionProgressTrackCreateInput,
   FactionProgressTrackUpdateInput,
@@ -57,6 +62,8 @@ import type {
   GMEventProposal,
   GMProposalCreateInput,
   GMProposalReviewInput,
+  GroupInteractionContext,
+  GroupInteractionCreateInput,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -81,6 +88,8 @@ import type {
   OffscreenEventFilters,
   OffscreenEventQueueItem,
   OffscreenResolution,
+  OrganizationConflict,
+  OrganizationConflictCreateInput,
   OrganizationCreateInput,
   OrganizationMembership,
   OrganizationMembershipCreateInput,
@@ -94,7 +103,11 @@ import type {
   PluginBinding,
   PluginCatalogEntry,
   PluginCategory,
+  PlotThread,
+  PlotThreadCreateInput,
   Scene,
+  SceneBeatDraft,
+  SceneBeatDraftCreateInput,
   SceneCreateInput,
   SceneUpdateInput,
   ProviderHealth,
@@ -108,6 +121,14 @@ import type {
   RuntimeStatus,
   ScaleReadiness,
   ResolutionRuleDryRun,
+  RelationshipEventSuggestion,
+  RelationshipSuggestionUpdateInput,
+  RouteAffinity,
+  RouteAffinityUpsertInput,
+  Rumor,
+  RumorCreateInput,
+  RumorPropagation,
+  RumorPropagationCreateInput,
   ScheduleRule,
   SceneLocationEdge,
   SceneLocationEdgeCreateInput,
@@ -137,6 +158,9 @@ import type {
   WorldlineComparison,
   WorldlineForkInput,
   WorldlineScopedFilters,
+  StoryHook,
+  StoryHookCreateInput,
+  TriggerConditionDryRun,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -1037,6 +1061,305 @@ export function disableScheduleRule(worldId: string, ruleId: string): Promise<vo
     method: "DELETE",
     csrf: true,
   });
+}
+
+export function listStoryHooks(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<StoryHook[]> {
+  return worldRequest<StoryHook[]>(
+    `/api/worlds/${worldId}/story-hooks${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createStoryHook(
+  worldId: string,
+  input: StoryHookCreateInput,
+): Promise<StoryHook> {
+  return worldRequest<StoryHook>(`/api/worlds/${worldId}/story-hooks`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listPlotThreads(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<PlotThread[]> {
+  return worldRequest<PlotThread[]>(
+    `/api/worlds/${worldId}/plot-threads${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createPlotThread(
+  worldId: string,
+  input: PlotThreadCreateInput,
+): Promise<PlotThread> {
+  return worldRequest<PlotThread>(`/api/worlds/${worldId}/plot-threads`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listRouteAffinities(
+  worldId: string,
+  filters: WorldlineScopedFilters & { agent_id?: string | null; status?: string | null } = {},
+): Promise<RouteAffinity[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "agent_id", filters.agent_id);
+  appendOptional(search, "status", filters.status);
+  return worldRequest<RouteAffinity[]>(
+    `/api/worlds/${worldId}/route-affinities${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function upsertRouteAffinity(
+  worldId: string,
+  input: RouteAffinityUpsertInput,
+): Promise<RouteAffinity> {
+  return worldRequest<RouteAffinity>(`/api/worlds/${worldId}/route-affinities`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listEventTriggerConditions(worldId: string): Promise<EventTriggerCondition[]> {
+  return worldRequest<EventTriggerCondition[]>(
+    `/api/worlds/${worldId}/event-trigger-conditions`,
+    { method: "GET" },
+  );
+}
+
+export function createEventTriggerCondition(
+  worldId: string,
+  input: EventTriggerConditionCreateInput,
+): Promise<EventTriggerCondition> {
+  return worldRequest<EventTriggerCondition>(
+    `/api/worlds/${worldId}/event-trigger-conditions`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function updateEventTriggerCondition(
+  worldId: string,
+  conditionId: string,
+  input: EventTriggerConditionUpdateInput,
+): Promise<EventTriggerCondition> {
+  return worldRequest<EventTriggerCondition>(
+    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function dryRunEventTriggerCondition(
+  worldId: string,
+  conditionId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<TriggerConditionDryRun> {
+  return worldRequest<TriggerConditionDryRun>(
+    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}/dry-run${worldlineSuffix(
+      filters,
+    )}`,
+    { method: "POST", csrf: true },
+  );
+}
+
+export function listSceneBeats(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<SceneBeatDraft[]> {
+  return worldRequest<SceneBeatDraft[]>(
+    `/api/worlds/${worldId}/scene-beats${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createSceneBeat(
+  worldId: string,
+  input: SceneBeatDraftCreateInput,
+): Promise<SceneBeatDraft> {
+  return worldRequest<SceneBeatDraft>(`/api/worlds/${worldId}/scene-beats`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listDailyEpisodes(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<DailyEpisodeDraft[]> {
+  return worldRequest<DailyEpisodeDraft[]>(
+    `/api/worlds/${worldId}/daily-episodes${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createDailyEpisode(
+  worldId: string,
+  input: DailyEpisodeDraftCreateInput,
+): Promise<DailyEpisodeDraft> {
+  return worldRequest<DailyEpisodeDraft>(`/api/worlds/${worldId}/daily-episodes`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listGroupInteractions(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<GroupInteractionContext[]> {
+  return worldRequest<GroupInteractionContext[]>(
+    `/api/worlds/${worldId}/group-interactions${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createGroupInteraction(
+  worldId: string,
+  input: GroupInteractionCreateInput,
+): Promise<GroupInteractionContext> {
+  return worldRequest<GroupInteractionContext>(`/api/worlds/${worldId}/group-interactions`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listRelationshipSuggestions(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<RelationshipEventSuggestion[]> {
+  return worldRequest<RelationshipEventSuggestion[]>(
+    `/api/worlds/${worldId}/relationship-suggestions${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function generateRelationshipSuggestions(
+  worldId: string,
+  filters: WorldlineScopedFilters & { limit?: number } = {},
+): Promise<RelationshipEventSuggestion[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<RelationshipEventSuggestion[]>(
+    `/api/worlds/${worldId}/relationship-suggestions/generate${searchSuffix(search)}`,
+    { method: "POST", csrf: true },
+  );
+}
+
+export function updateRelationshipSuggestion(
+  worldId: string,
+  suggestionId: string,
+  input: RelationshipSuggestionUpdateInput,
+): Promise<RelationshipEventSuggestion> {
+  return worldRequest<RelationshipEventSuggestion>(
+    `/api/worlds/${worldId}/relationship-suggestions/${suggestionId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listOrganizationConflicts(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<OrganizationConflict[]> {
+  return worldRequest<OrganizationConflict[]>(
+    `/api/worlds/${worldId}/organization-conflicts${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createOrganizationConflict(
+  worldId: string,
+  input: OrganizationConflictCreateInput,
+): Promise<OrganizationConflict> {
+  return worldRequest<OrganizationConflict>(`/api/worlds/${worldId}/organization-conflicts`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function resolveOrganizationConflict(
+  worldId: string,
+  conflictId: string,
+): Promise<OrganizationConflict> {
+  return worldRequest<OrganizationConflict>(
+    `/api/worlds/${worldId}/organization-conflicts/${conflictId}/resolve`,
+    { method: "POST", csrf: true },
+  );
+}
+
+export function listRumors(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<Rumor[]> {
+  return worldRequest<Rumor[]>(
+    `/api/worlds/${worldId}/rumors${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createRumor(worldId: string, input: RumorCreateInput): Promise<Rumor> {
+  return worldRequest<Rumor>(`/api/worlds/${worldId}/rumors`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listRumorPropagations(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<RumorPropagation[]> {
+  return worldRequest<RumorPropagation[]>(
+    `/api/worlds/${worldId}/rumor-propagations${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createRumorPropagation(
+  worldId: string,
+  input: RumorPropagationCreateInput,
+): Promise<RumorPropagation> {
+  return worldRequest<RumorPropagation>(`/api/worlds/${worldId}/rumor-propagations`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function deliverRumorPropagation(
+  worldId: string,
+  propagationId: string,
+): Promise<RumorPropagation> {
+  return worldRequest<RumorPropagation>(
+    `/api/worlds/${worldId}/rumor-propagations/${propagationId}/deliver`,
+    { method: "POST", csrf: true },
+  );
 }
 
 export function listAgentMemory(worldId: string, agentId: string): Promise<MemoryItem[]> {

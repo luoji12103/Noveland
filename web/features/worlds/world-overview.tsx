@@ -8,23 +8,35 @@ import {
   advanceWorldClock,
   bindPlayerActor,
   compareWorldlines,
+  createDailyEpisode,
   createFactionTrack,
+  createGroupInteraction,
   createGMAgenda,
   createGMProposal,
+  createOrganizationConflict,
+  createPlotThread,
+  createRumor,
+  createRumorPropagation,
   createLocationEdge,
   createOffscreenEvent,
   createOrganization,
   createOrganizationMembership,
   createResolutionRule,
   createScene,
+  createSceneBeat,
+  createStoryHook,
+  createEventTriggerCondition,
   createScheduleRule,
   createSnapshot,
   deactivateScene,
   deleteMembership,
+  deliverRumorPropagation,
+  dryRunEventTriggerCondition,
   dryRunResolutionRule,
   exportWorldComposition,
   forkWorldline,
   generateDailyLifeCandidates,
+  generateRelationshipSuggestions,
   importWorldComposition,
   getCalendarConflicts,
   getDailyLifePreview,
@@ -36,10 +48,12 @@ import {
   previewScheduleRule,
   recordPlayerChoice,
   reviewGMProposal,
+  resolveOrganizationConflict,
   resolveOffscreenEvents,
   resumeWorldClock,
   skipWorldClock,
   upsertAgentPresence,
+  upsertRouteAffinity,
   updateWorld,
   upsertWorldBible,
   upsertMembership,
@@ -62,6 +76,7 @@ import type {
   PlayerActor,
   PlayerChoice,
   ResolutionRuleDryRun,
+  TriggerConditionDryRun,
   Worldline,
   WorldlineComparison,
   OffscreenEventQueueItem,
@@ -69,6 +84,17 @@ import type {
   WorldClock,
   WorldCompositionValidation,
   WorldRole,
+  StoryHook,
+  PlotThread,
+  RouteAffinity,
+  EventTriggerCondition,
+  SceneBeatDraft,
+  DailyEpisodeDraft,
+  GroupInteractionContext,
+  RelationshipEventSuggestion,
+  OrganizationConflict,
+  Rumor,
+  RumorPropagation,
 } from "@/lib/worlds/types";
 import {
   formString,
@@ -96,6 +122,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [offscreenEvents, setOffscreenEvents] = useState(data.offscreenEvents);
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [ruleDryRun, setRuleDryRun] = useState<ResolutionRuleDryRun | null>(null);
+  const [triggerDryRun, setTriggerDryRun] = useState<TriggerConditionDryRun | null>(null);
   const [choicePreview, setChoicePreview] = useState<ChoiceConsequencePreview | null>(null);
   const [worldlineComparison, setWorldlineComparison] = useState<WorldlineComparison | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
@@ -479,6 +506,257 @@ export function WorldOverview({ data }: WorldOverviewProps) {
       },
       "Worldlines compared.",
       false,
+    );
+  }
+
+  async function handleCreateStoryHook(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createStoryHook(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          hook_key: formString(form, "hook_key"),
+          title: formString(form, "title"),
+          hook_type: formString(form, "hook_type") as "promise",
+          summary: formString(form, "summary"),
+          priority: optionalPositiveInteger(form, "priority") ?? 50,
+          owner_agent_id: optionalFormString(form, "owner_agent_id"),
+          target_agent_id: optionalFormString(form, "target_agent_id"),
+          due_at: optionalFormString(form, "due_at"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Story hook created.",
+    );
+  }
+
+  async function handleCreatePlotThread(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createPlotThread(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          thread_key: formString(form, "thread_key"),
+          title: formString(form, "title"),
+          thread_type: formString(form, "thread_type") as "personal",
+          summary: formString(form, "summary"),
+          stakes: optionalFormString(form, "stakes"),
+          next_beats: commaList(formString(form, "next_beats")),
+          participant_agent_ids: selectedValues(form, "participant_agent_ids"),
+          organization_ids: selectedValues(form, "organization_ids"),
+          priority: optionalPositiveInteger(form, "priority") ?? 50,
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Plot thread created.",
+    );
+  }
+
+  async function handleUpsertRouteAffinity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await upsertRouteAffinity(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          agent_id: formString(form, "agent_id"),
+          route_key: formString(form, "route_key"),
+          status: formString(form, "status") as "available",
+          affinity: signedInteger(form, "affinity") ?? 0,
+          stage: optionalPositiveInteger(form, "stage") ?? 0,
+          flags: commaList(formString(form, "flags")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Route affinity saved.",
+    );
+  }
+
+  async function handleCreateTriggerCondition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createEventTriggerCondition(selectedWorld.id, {
+          condition_key: formString(form, "condition_key"),
+          name: formString(form, "name"),
+          description: optionalFormString(form, "description"),
+          priority: optionalPositiveInteger(form, "priority") ?? 50,
+          conditions: jsonObject(formString(form, "conditions")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Trigger condition created.",
+    );
+  }
+
+  async function handleDryRunTriggerCondition(conditionId: string) {
+    await runAction(
+      async () => {
+        setTriggerDryRun(await dryRunEventTriggerCondition(selectedWorld.id, conditionId));
+      },
+      "Trigger condition dry-run completed.",
+      false,
+    );
+  }
+
+  async function handleCreateSceneBeat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createSceneBeat(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          source_kind: formString(form, "source_kind") as "manual",
+          source_ref: optionalFormString(form, "source_ref"),
+          title: formString(form, "title"),
+          participant_agent_ids: selectedValues(form, "participant_agent_ids"),
+          scene_id: optionalFormString(form, "scene_id"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Scene beat draft created.",
+    );
+  }
+
+  async function handleCreateDailyEpisode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createDailyEpisode(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          source_candidate_id: optionalFormString(form, "source_candidate_id"),
+          title: optionalFormString(form, "title"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Daily episode draft created.",
+    );
+  }
+
+  async function handleCreateGroupInteraction(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createGroupInteraction(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          context_key: formString(form, "context_key"),
+          title: formString(form, "title"),
+          interaction_type: formString(form, "interaction_type") as "casual",
+          scene_id: optionalFormString(form, "scene_id"),
+          organization_id: optionalFormString(form, "organization_id"),
+          participant_agent_ids: selectedValues(form, "participant_agent_ids"),
+          participant_roles: jsonObject(formString(form, "participant_roles")),
+          constraints: jsonObject(formString(form, "constraints")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Group interaction created.",
+    );
+  }
+
+  async function handleGenerateRelationshipSuggestions() {
+    await runAction(
+      () => generateRelationshipSuggestions(selectedWorld.id, { limit: 20 }),
+      "Relationship suggestions generated.",
+    );
+  }
+
+  async function handleCreateOrganizationConflict(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createOrganizationConflict(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          organization_id: formString(form, "organization_id"),
+          faction_track_id: optionalFormString(form, "faction_track_id"),
+          title: formString(form, "title"),
+          summary: formString(form, "summary"),
+          pressure_delta: signedInteger(form, "pressure_delta") ?? 0,
+          progress_delta: signedInteger(form, "progress_delta") ?? 0,
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Organization conflict created.",
+    );
+  }
+
+  async function handleResolveOrganizationConflict(conflictId: string) {
+    await runAction(
+      () => resolveOrganizationConflict(selectedWorld.id, conflictId),
+      "Organization conflict resolved.",
+    );
+  }
+
+  async function handleCreateRumor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createRumor(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          rumor_key: formString(form, "rumor_key"),
+          title: formString(form, "title"),
+          content: formString(form, "content"),
+          source_agent_id: optionalFormString(form, "source_agent_id"),
+          source_organization_id: optionalFormString(form, "source_organization_id"),
+          visibility: formString(form, "visibility") as "private",
+          known_agent_ids: selectedValues(form, "known_agent_ids"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Rumor created.",
+    );
+  }
+
+  async function handleCreateRumorPropagation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createRumorPropagation(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          rumor_id: formString(form, "rumor_id"),
+          source_agent_id: optionalFormString(form, "source_agent_id"),
+          target_agent_id: optionalFormString(form, "target_agent_id"),
+          target_organization_id: optionalFormString(form, "target_organization_id"),
+          propagation_reason: formString(form, "propagation_reason"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Rumor propagation created.",
+    );
+  }
+
+  async function handleDeliverRumorPropagation(propagationId: string) {
+    await runAction(
+      () => deliverRumorPropagation(selectedWorld.id, propagationId),
+      "Rumor delivered.",
     );
   }
 
@@ -1562,6 +1840,293 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         />
       </section>
 
+      <section className="management-panel" aria-labelledby="plot-route-rumor-title">
+        <h2 className="section-title" id="plot-route-rumor-title">
+          Plot, route, and rumor flow
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Hooks</p>
+            <p className="metric-value">{data.storyHooks.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Threads</p>
+            <p className="metric-value">{data.plotThreads.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Routes</p>
+            <p className="metric-value">{data.routeAffinities.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Rumors</p>
+            <p className="metric-value">{data.rumors.length}</p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateStoryHook}>
+                <h3>Story hook</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="hook_key" placeholder="hook-key" />
+                <input className="text-input" name="title" placeholder="Hook title" />
+                <select className="text-input" name="hook_type" defaultValue="promise">
+                  <option value="promise">promise</option>
+                  <option value="foreshadowing">foreshadowing</option>
+                  <option value="mystery">mystery</option>
+                  <option value="agreement">agreement</option>
+                  <option value="flag">flag</option>
+                </select>
+                <textarea className="text-input" name="summary" rows={3} placeholder="Summary" />
+                <AgentSelect agents={data.agents} name="owner_agent_id" label="Owner agent" />
+                <AgentSelect agents={data.agents} name="target_agent_id" label="Target agent" />
+                <input className="text-input" name="priority" placeholder="Priority" />
+                <input className="text-input" name="due_at" placeholder="2030-01-01T08:00:00Z" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create hook
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreatePlotThread}>
+                <h3>Plot thread</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="thread_key" placeholder="thread-key" />
+                <input className="text-input" name="title" placeholder="Thread title" />
+                <select className="text-input" name="thread_type" defaultValue="personal">
+                  <option value="personal">personal</option>
+                  <option value="organization">organization</option>
+                  <option value="daily">daily</option>
+                  <option value="main">main</option>
+                  <option value="hidden">hidden</option>
+                </select>
+                <textarea className="text-input" name="summary" rows={3} placeholder="Summary" />
+                <input className="text-input" name="stakes" placeholder="Stakes" />
+                <input className="text-input" name="next_beats" placeholder="beat,beat" />
+                <MultiAgentSelect agents={data.agents} name="participant_agent_ids" />
+                <MultiOrganizationSelect
+                  organizations={data.organizations}
+                  name="organization_ids"
+                />
+                <input className="text-input" name="priority" placeholder="Priority" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create thread
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleUpsertRouteAffinity}>
+                <h3>Route affinity</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <AgentSelect agents={data.agents} name="agent_id" label="Route agent" />
+                <input className="text-input" name="route_key" placeholder="route-key" />
+                <select className="text-input" name="status" defaultValue="available">
+                  <option value="locked">locked</option>
+                  <option value="available">available</option>
+                  <option value="active">active</option>
+                  <option value="completed">completed</option>
+                  <option value="blocked">blocked</option>
+                </select>
+                <input className="text-input" name="affinity" placeholder="Affinity" />
+                <input className="text-input" name="stage" placeholder="Stage" />
+                <input className="text-input" name="flags" placeholder="flag,flag" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save route
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateTriggerCondition}>
+                <h3>Event trigger</h3>
+                <input className="text-input" name="condition_key" placeholder="condition-key" />
+                <input className="text-input" name="name" placeholder="Condition name" />
+                <input className="text-input" name="description" placeholder="Description" />
+                <input className="text-input" name="priority" placeholder="Priority" />
+                <textarea
+                  className="text-input"
+                  name="conditions"
+                  rows={4}
+                  defaultValue='{"min_open_hooks":1}'
+                />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create trigger
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateSceneBeat}>
+                <h3>Scene beat draft</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <select className="text-input" name="source_kind" defaultValue="manual">
+                  <option value="manual">manual</option>
+                  <option value="event">event</option>
+                  <option value="proposal">proposal</option>
+                  <option value="daily_episode">daily_episode</option>
+                </select>
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <input className="text-input" name="title" placeholder="Beat title" />
+                <MultiAgentSelect agents={data.agents} name="participant_agent_ids" />
+                <SceneSelect scenes={data.scenes} name="scene_id" label="Scene" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Compose beat
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateDailyEpisode}>
+                <h3>Daily episode draft</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <select className="text-input" name="source_candidate_id" defaultValue="">
+                  <option value="">No source candidate</option>
+                  {data.dailyLifeCandidates
+                    .filter((candidate) => candidate.id !== null)
+                    .map((candidate) => (
+                      <option key={candidate.id ?? candidate.title} value={candidate.id ?? ""}>
+                        {candidate.title}
+                      </option>
+                    ))}
+                </select>
+                <input className="text-input" name="title" placeholder="Episode title" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create episode
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateGroupInteraction}>
+                <h3>Group interaction</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="context_key" placeholder="context-key" />
+                <input className="text-input" name="title" placeholder="Interaction title" />
+                <select className="text-input" name="interaction_type" defaultValue="casual">
+                  <option value="club">club</option>
+                  <option value="class">class</option>
+                  <option value="organization_meeting">organization_meeting</option>
+                  <option value="conflict">conflict</option>
+                  <option value="casual">casual</option>
+                </select>
+                <SceneSelect scenes={data.scenes} name="scene_id" label="Location" />
+                <OrganizationSelect
+                  organizations={data.organizations}
+                  name="organization_id"
+                  label="Organization"
+                />
+                <MultiAgentSelect agents={data.agents} name="participant_agent_ids" />
+                <textarea className="text-input" name="participant_roles" rows={3} defaultValue="{}" />
+                <textarea className="text-input" name="constraints" rows={3} defaultValue="{}" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create group context
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateOrganizationConflict}>
+                <h3>Organization conflict</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <OrganizationSelect
+                  organizations={data.organizations}
+                  name="organization_id"
+                  label="Organization"
+                />
+                <select className="text-input" name="faction_track_id" defaultValue="">
+                  <option value="">No faction track</option>
+                  {data.factionTracks.map((track) => (
+                    <option key={track.id} value={track.id}>
+                      {track.organization_name}: {track.name}
+                    </option>
+                  ))}
+                </select>
+                <input className="text-input" name="title" placeholder="Conflict title" />
+                <textarea className="text-input" name="summary" rows={3} placeholder="Summary" />
+                <input className="text-input" name="pressure_delta" placeholder="Pressure delta" />
+                <input className="text-input" name="progress_delta" placeholder="Progress delta" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create conflict
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateRumor}>
+                <h3>Rumor</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="rumor_key" placeholder="rumor-key" />
+                <input className="text-input" name="title" placeholder="Rumor title" />
+                <textarea className="text-input" name="content" rows={3} placeholder="Content" />
+                <AgentSelect agents={data.agents} name="source_agent_id" label="Source agent" />
+                <OrganizationSelect
+                  organizations={data.organizations}
+                  name="source_organization_id"
+                  label="Source organization"
+                />
+                <select className="text-input" name="visibility" defaultValue="private">
+                  <option value="private">private</option>
+                  <option value="group">group</option>
+                  <option value="public">public</option>
+                </select>
+                <MultiAgentSelect agents={data.agents} name="known_agent_ids" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create rumor
+                </button>
+              </form>
+            </div>
+            <form className="inline-form" onSubmit={handleCreateRumorPropagation}>
+              <select className="text-input" name="rumor_id" defaultValue="">
+                <option value="">Rumor</option>
+                {data.rumors.map((rumor) => (
+                  <option key={rumor.id} value={rumor.id}>
+                    {rumor.title}
+                  </option>
+                ))}
+              </select>
+              <AgentSelect agents={data.agents} name="source_agent_id" label="Source agent" />
+              <AgentSelect agents={data.agents} name="target_agent_id" label="Target agent" />
+              <OrganizationSelect
+                organizations={data.organizations}
+                name="target_organization_id"
+                label="Target organization"
+              />
+              <input className="text-input" name="propagation_reason" placeholder="Propagation reason" />
+              <input className="text-input" name="metadata" defaultValue="{}" />
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Queue rumor delivery
+              </button>
+            </form>
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => void handleGenerateRelationshipSuggestions()}
+              >
+                Generate relationship suggestions
+              </button>
+            </div>
+          </>
+        ) : null}
+        {triggerDryRun !== null ? (
+          <p className="status-detail">
+            Trigger {triggerDryRun.condition_key}:{" "}
+            {triggerDryRun.matched ? "matched" : "not matched"} -{" "}
+            {[...triggerDryRun.satisfied, ...triggerDryRun.unsatisfied].join(" ")}
+          </p>
+        ) : null}
+        <PlotRouteRumorView
+          hooks={data.storyHooks}
+          threads={data.plotThreads}
+          routes={data.routeAffinities}
+          triggers={data.triggerConditions}
+          sceneBeats={data.sceneBeats}
+          dailyEpisodes={data.dailyEpisodes}
+          groupInteractions={data.groupInteractions}
+          suggestions={data.relationshipSuggestions}
+          conflicts={data.organizationConflicts}
+          rumors={data.rumors}
+          propagations={data.rumorPropagations}
+          isBusy={isBusy}
+          canManage={data.canManageSelectedWorld}
+          onDryRunTrigger={handleDryRunTriggerCondition}
+          onResolveConflict={handleResolveOrganizationConflict}
+          onDeliverRumor={handleDeliverRumorPropagation}
+        />
+      </section>
+
       <div className="management-columns">
         <section className="management-panel" aria-labelledby="clock-title">
           <h2 className="section-title" id="clock-title">
@@ -2075,6 +2640,22 @@ function optionalPositiveInteger(form: FormData, key: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function signedInteger(form: FormData, key: string): number | null {
+  const value = optionalFormString(form, key);
+  if (value === null) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function selectedValues(form: FormData, key: string): string[] {
+  return form
+    .getAll(key)
+    .map((item) => (typeof item === "string" ? item : ""))
+    .filter((item) => item !== "");
+}
+
 function commaList(value: string): string[] {
   return value
     .split(",")
@@ -2088,6 +2669,110 @@ function formatPayload(event: WorldEventAuditEntry): string {
     return payload;
   }
   return `${payload.slice(0, 157)}...`;
+}
+
+function AgentSelect({
+  agents,
+  name,
+  label,
+}: {
+  agents: { id: string; display_name: string }[];
+  name: string;
+  label: string;
+}) {
+  return (
+    <select className="text-input" name={name} defaultValue="" aria-label={label}>
+      <option value="">{label}</option>
+      {agents.map((agent) => (
+        <option key={agent.id} value={agent.id}>
+          {agent.display_name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function MultiAgentSelect({
+  agents,
+  name,
+}: {
+  agents: { id: string; display_name: string }[];
+  name: string;
+}) {
+  return (
+    <select className="text-input" name={name} multiple size={Math.min(4, Math.max(2, agents.length))}>
+      {agents.map((agent) => (
+        <option key={agent.id} value={agent.id}>
+          {agent.display_name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SceneSelect({
+  scenes,
+  name,
+  label,
+}: {
+  scenes: { id: string; name: string }[];
+  name: string;
+  label: string;
+}) {
+  return (
+    <select className="text-input" name={name} defaultValue="" aria-label={label}>
+      <option value="">{label}</option>
+      {scenes.map((scene) => (
+        <option key={scene.id} value={scene.id}>
+          {scene.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function OrganizationSelect({
+  organizations,
+  name,
+  label,
+}: {
+  organizations: { id: string; name: string }[];
+  name: string;
+  label: string;
+}) {
+  return (
+    <select className="text-input" name={name} defaultValue="" aria-label={label}>
+      <option value="">{label}</option>
+      {organizations.map((organization) => (
+        <option key={organization.id} value={organization.id}>
+          {organization.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function MultiOrganizationSelect({
+  organizations,
+  name,
+}: {
+  organizations: { id: string; name: string }[];
+  name: string;
+}) {
+  return (
+    <select
+      className="text-input"
+      name={name}
+      multiple
+      size={Math.min(4, Math.max(2, organizations.length))}
+    >
+      {organizations.map((organization) => (
+        <option key={organization.id} value={organization.id}>
+          {organization.name}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 function DailyLifeView({
@@ -2138,6 +2823,248 @@ function DailyLifeView({
             }`,
           }))}
         />
+      </section>
+    </div>
+  );
+}
+
+function PlotRouteRumorView({
+  hooks,
+  threads,
+  routes,
+  triggers,
+  sceneBeats,
+  dailyEpisodes,
+  groupInteractions,
+  suggestions,
+  conflicts,
+  rumors,
+  propagations,
+  isBusy,
+  canManage,
+  onDryRunTrigger,
+  onResolveConflict,
+  onDeliverRumor,
+}: {
+  hooks: StoryHook[];
+  threads: PlotThread[];
+  routes: RouteAffinity[];
+  triggers: EventTriggerCondition[];
+  sceneBeats: SceneBeatDraft[];
+  dailyEpisodes: DailyEpisodeDraft[];
+  groupInteractions: GroupInteractionContext[];
+  suggestions: RelationshipEventSuggestion[];
+  conflicts: OrganizationConflict[];
+  rumors: Rumor[];
+  propagations: RumorPropagation[];
+  isBusy: boolean;
+  canManage: boolean;
+  onDryRunTrigger: (conditionId: string) => Promise<void>;
+  onResolveConflict: (conflictId: string) => Promise<void>;
+  onDeliverRumor: (propagationId: string) => Promise<void>;
+}) {
+  return (
+    <div className="management-columns">
+      <section aria-labelledby="plot-hooks-title">
+        <h3 id="plot-hooks-title">Hooks, threads, and routes</h3>
+        <div className="resource-list">
+          {hooks.length === 0 && threads.length === 0 && routes.length === 0 ? (
+            <article className="resource-row">
+              <div>
+                <h3>None yet</h3>
+                <p>No records are available.</p>
+              </div>
+            </article>
+          ) : null}
+          {hooks.map((hook) => (
+            <article className="resource-row" key={hook.id}>
+              <div>
+                <h3>{hook.title}</h3>
+                <p>
+                  {hook.hook_key} - {hook.hook_type} - {hook.status}
+                </p>
+                <p>{hook.summary}</p>
+              </div>
+            </article>
+          ))}
+          {threads.map((thread) => (
+            <article className="resource-row" key={thread.id}>
+              <div>
+                <h3>{thread.title}</h3>
+                <p>
+                  {thread.thread_key} - {thread.thread_type} - {thread.status}
+                </p>
+                <p>{thread.summary}</p>
+              </div>
+            </article>
+          ))}
+          {routes.map((route) => (
+            <article className="resource-row" key={route.id}>
+              <div>
+                <h3>{route.route_key}</h3>
+                <p>
+                  {route.agent_display_name} - {route.status} - affinity {route.affinity} /
+                  stage {route.stage}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section aria-labelledby="beats-triggers-title">
+        <h3 id="beats-triggers-title">Triggers and drafts</h3>
+        <div className="resource-list">
+          {triggers.length === 0 && sceneBeats.length === 0 && dailyEpisodes.length === 0 ? (
+            <article className="resource-row">
+              <div>
+                <h3>None yet</h3>
+                <p>No records are available.</p>
+              </div>
+            </article>
+          ) : null}
+          {triggers.map((trigger) => (
+            <article className="resource-row" key={trigger.id}>
+              <div>
+                <h3>{trigger.name}</h3>
+                <p>
+                  {trigger.condition_key} - {trigger.status} - priority {trigger.priority}
+                </p>
+              </div>
+              {canManage ? (
+                <div className="button-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void onDryRunTrigger(trigger.id)}
+                  >
+                    Dry-run trigger
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+          {sceneBeats.map((beat) => (
+            <article className="resource-row" key={beat.id}>
+              <div>
+                <h3>{beat.title}</h3>
+                <p>
+                  {beat.source_kind} - {beat.status} - {beat.scene_name ?? "no scene"}
+                </p>
+                <p>{beat.setup}</p>
+              </div>
+            </article>
+          ))}
+          {dailyEpisodes.map((episode) => (
+            <article className="resource-row" key={episode.id}>
+              <div>
+                <h3>{episode.title}</h3>
+                <p>{episode.status}</p>
+                <p>{episode.summary}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section aria-labelledby="rumor-flow-title">
+        <h3 id="rumor-flow-title">Groups, conflicts, and rumors</h3>
+        <div className="resource-list">
+          {groupInteractions.length === 0 &&
+          suggestions.length === 0 &&
+          conflicts.length === 0 &&
+          rumors.length === 0 &&
+          propagations.length === 0 ? (
+            <article className="resource-row">
+              <div>
+                <h3>None yet</h3>
+                <p>No records are available.</p>
+              </div>
+            </article>
+          ) : null}
+          {groupInteractions.map((context) => (
+            <article className="resource-row" key={context.id}>
+              <div>
+                <h3>{context.title}</h3>
+                <p>
+                  {context.interaction_type} - {context.status} -{" "}
+                  {context.scene_name ?? context.organization_name ?? "unscoped"}
+                </p>
+              </div>
+            </article>
+          ))}
+          {suggestions.map((suggestion) => (
+            <article className="resource-row" key={suggestion.id}>
+              <div>
+                <h3>{suggestion.title}</h3>
+                <p>
+                  {suggestion.status} - score {suggestion.score}
+                </p>
+                <p>{suggestion.reason}</p>
+              </div>
+            </article>
+          ))}
+          {conflicts.map((conflict) => (
+            <article className="resource-row" key={conflict.id}>
+              <div>
+                <h3>{conflict.title}</h3>
+                <p>
+                  {conflict.organization_name} - {conflict.status} - pressure{" "}
+                  {conflict.pressure_delta} / progress {conflict.progress_delta}
+                </p>
+              </div>
+              {canManage && conflict.status !== "resolved" ? (
+                <div className="button-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void onResolveConflict(conflict.id)}
+                  >
+                    Resolve conflict
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+          {rumors.map((rumor) => (
+            <article className="resource-row" key={rumor.id}>
+              <div>
+                <h3>{rumor.title}</h3>
+                <p>
+                  {rumor.visibility} - {rumor.status} - known by{" "}
+                  {rumor.known_agent_ids.length}
+                </p>
+                <p>{rumor.content}</p>
+              </div>
+            </article>
+          ))}
+          {propagations.map((propagation) => (
+            <article className="resource-row" key={propagation.id}>
+              <div>
+                <h3>{propagation.rumor_title}</h3>
+                <p>
+                  {propagation.status} to{" "}
+                  {propagation.target_agent_display_name ??
+                    propagation.target_organization_name ??
+                    "unassigned"}
+                </p>
+                <p>{propagation.propagation_reason}</p>
+              </div>
+              {canManage && propagation.status === "pending" ? (
+                <div className="button-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void onDeliverRumor(propagation.id)}
+                  >
+                    Deliver rumor
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </section>
     </div>
   );

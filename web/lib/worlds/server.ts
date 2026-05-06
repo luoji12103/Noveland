@@ -15,13 +15,16 @@ import type {
   ConversationDiagnosticsSummary,
   ConversationSession,
   ConversationTurn,
+  DailyEpisodeDraft,
   DailyLifeEventCandidate,
   DailyLifePreview,
   EventResolutionRule,
+  EventTriggerCondition,
   ExternalToolPolicy,
   FactionProgressTrack,
   GMAgenda,
   GMEventProposal,
+  GroupInteractionContext,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -33,11 +36,17 @@ import type {
   NarrativeArtifact,
   NarrativeArtifactFilters,
   OffscreenEventQueueItem,
+  OrganizationConflict,
   OrganizationMembership,
   PlayerActor,
   PlayerChoice,
+  PlotThread,
+  RelationshipEventSuggestion,
   PluginBinding,
   PluginCatalogEntry,
+  RouteAffinity,
+  Rumor,
+  RumorPropagation,
   ProviderHealth,
   ProviderProfile,
   RuntimeDiagnostic,
@@ -45,8 +54,10 @@ import type {
   RuntimeStatus,
   ScaleReadiness,
   Scene,
+  SceneBeatDraft,
   SceneLocationEdge,
   ScheduleRule,
+  StoryHook,
   World,
   WorldBible,
   WorldClock,
@@ -73,6 +84,17 @@ export type WorldWorkspaceData = {
   resolutionRules: EventResolutionRule[];
   playerActors: PlayerActor[];
   playerChoices: PlayerChoice[];
+  storyHooks: StoryHook[];
+  plotThreads: PlotThread[];
+  routeAffinities: RouteAffinity[];
+  triggerConditions: EventTriggerCondition[];
+  sceneBeats: SceneBeatDraft[];
+  dailyEpisodes: DailyEpisodeDraft[];
+  groupInteractions: GroupInteractionContext[];
+  relationshipSuggestions: RelationshipEventSuggestion[];
+  organizationConflicts: OrganizationConflict[];
+  rumors: Rumor[];
+  rumorPropagations: RumorPropagation[];
   organizationMemberships: OrganizationMembership[];
   factionTracks: FactionProgressTrack[];
   agentPresenceStates: AgentPresence[];
@@ -375,6 +397,17 @@ export async function getWorldWorkspaceData(
       resolutionRules,
       playerActors,
       playerChoices,
+      storyHooks,
+      plotThreads,
+      routeAffinities,
+      triggerConditions,
+      sceneBeats,
+      dailyEpisodes,
+      groupInteractions,
+      relationshipSuggestions,
+      organizationConflicts,
+      rumors,
+      rumorPropagations,
       memberships,
       worldBible,
       clock,
@@ -403,6 +436,29 @@ export async function getWorldWorkspaceData(
       ),
       apiFetchOptional<PlayerActor[]>(`/worlds/${worldId}/player-actors`, cookies),
       apiFetchOptional<PlayerChoice[]>(`/worlds/${worldId}/player-choices`, cookies),
+      apiFetchOptional<StoryHook[]>(`/worlds/${worldId}/story-hooks`, cookies),
+      apiFetchOptional<PlotThread[]>(`/worlds/${worldId}/plot-threads`, cookies),
+      apiFetchOptional<RouteAffinity[]>(`/worlds/${worldId}/route-affinities`, cookies),
+      apiFetchOptional<EventTriggerCondition[]>(
+        `/worlds/${worldId}/event-trigger-conditions`,
+        cookies,
+      ),
+      apiFetchOptional<SceneBeatDraft[]>(`/worlds/${worldId}/scene-beats`, cookies),
+      apiFetchOptional<DailyEpisodeDraft[]>(`/worlds/${worldId}/daily-episodes`, cookies),
+      apiFetchOptional<GroupInteractionContext[]>(
+        `/worlds/${worldId}/group-interactions`,
+        cookies,
+      ),
+      apiFetchOptional<RelationshipEventSuggestion[]>(
+        `/worlds/${worldId}/relationship-suggestions`,
+        cookies,
+      ),
+      apiFetchOptional<OrganizationConflict[]>(
+        `/worlds/${worldId}/organization-conflicts`,
+        cookies,
+      ),
+      apiFetchOptional<Rumor[]>(`/worlds/${worldId}/rumors`, cookies),
+      apiFetchOptional<RumorPropagation[]>(`/worlds/${worldId}/rumor-propagations`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       apiFetch<WorldBible | null>(`/worlds/${worldId}/bible`, cookies),
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
@@ -467,6 +523,17 @@ export async function getWorldWorkspaceData(
       resolutionRules: resolutionRules ?? [],
       playerActors: playerActors ?? [],
       playerChoices: playerChoices ?? [],
+      storyHooks: storyHooks ?? [],
+      plotThreads: plotThreads ?? [],
+      routeAffinities: routeAffinities ?? [],
+      triggerConditions: triggerConditions ?? [],
+      sceneBeats: sceneBeats ?? [],
+      dailyEpisodes: dailyEpisodes ?? [],
+      groupInteractions: groupInteractions ?? [],
+      relationshipSuggestions: relationshipSuggestions ?? [],
+      organizationConflicts: organizationConflicts ?? [],
+      rumors: rumors ?? [],
+      rumorPropagations: rumorPropagations ?? [],
       organizationMemberships: organizationMembershipGroups.flat(),
       factionTracks: factionTrackGroups.flat(),
       agentPresenceStates: agentPresenceStates.filter(
@@ -1034,6 +1101,17 @@ function emptyWorldWorkspaceData(
     resolutionRules: [],
     playerActors: [],
     playerChoices: [],
+    storyHooks: [],
+    plotThreads: [],
+    routeAffinities: [],
+    triggerConditions: [],
+    sceneBeats: [],
+    dailyEpisodes: [],
+    groupInteractions: [],
+    relationshipSuggestions: [],
+    organizationConflicts: [],
+    rumors: [],
+    rumorPropagations: [],
     organizationMemberships: [],
     factionTracks: [],
     agentPresenceStates: [],
