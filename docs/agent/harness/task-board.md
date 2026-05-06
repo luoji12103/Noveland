@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Living World GM / Choices / Worldlines
+- None
 
 ## Blocked
 - None
@@ -58,6 +58,7 @@
 - Tool Policy / Scale / v2 Readiness
 - Living World Character Foundation
 - Living World Autonomous Systems
+- Living World GM / Choices / Worldlines
 
 ## Upcoming Mainline
 - V2 phases 26-35 candidate after this bundle: promises/hooks, plot threads, route affinity, event flags, scene beats, daily episodes, group interactions, relationship suggestions, organization conflict, and rumor flow.

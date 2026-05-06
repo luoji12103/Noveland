@@ -1,11 +1,11 @@
 # Active Session Handoff
 
 - Date: 2026-05-06T00:00:00Z
-- Branch: feat/living-world-gm-choices-worldlines
+- Branch: main
 - Objective: Implement V2 living-world roadmap phases 16-25: GM agenda, event proposals, deterministic resolution rules, player actor/choices/consequences, branchable worldlines, snapshot fork, worldline memory isolation, and timeline comparison.
-- Status: Started from clean local `main`.
+- Status: V2 living-world phases 16-25 are complete, final gate passed, and `feat/living-world-gm-choices-worldlines` has been fast-forward merged into local `main`.
 
-## Planned Implementation
+## Completed Implementation
 
 - Add migration `20260505_0025_living_world_gm_choices_worldlines`.
 - Add primary/forked worldlines and scope events, snapshots, replay, memory, GM, player choices, and Web views by worldline.
@@ -13,22 +13,13 @@
 - Add player actor profiles, structured choice records, consequence preview/apply, and branch comparison.
 - Keep `MemoryService` as the only runtime memory boundary and prevent cross-worldline memory leakage.
 
-## Planned Checks
+## Gate Status
 
-- `cd backend && uv run pytest tests/test_api_worlds.py tests/test_memory_backend.py tests/test_runtime_daemon.py tests/test_replay_snapshot.py tests/test_schema_metadata.py tests/test_alembic_config.py`
-- `cd web && npm run test -- lib/worlds/client.test.ts features/worlds/world-overview.test.tsx features/agents/agent-builder.test.tsx`
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest`
-- `cd web && npm run lint`
-- `cd web && npm run typecheck`
-- `cd web && npm run test`
-- `cd web && npm run build`
-- `cd web && npm run check:next-env`
-- `cd web && npm run test:e2e`
-- `docker compose -f infra/compose.yaml config`
-- `git diff --check`
-- `git status --short --branch`
+- Targeted backend tests passed for world APIs, memory backend, runtime daemon, replay/snapshot, schema metadata, and Alembic config.
+- Targeted Web component/client tests passed for world/agent/world-client surfaces.
+- Full backend gate passed: `ruff`, `mypy`, and `pytest`.
+- Full Web gate passed: `lint`, `typecheck`, `test`, `build`, `check:next-env`, and `test:e2e`.
+- Compose config and `git diff --check` passed. `web/next-env.d.ts` churn from e2e was restored and rechecked.
 
 ## Risks
 

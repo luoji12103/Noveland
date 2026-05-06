@@ -328,10 +328,27 @@ POST /worlds
 GET /worlds/{world_id}
 PATCH /worlds/{world_id}
 DELETE /worlds/{world_id}
+GET /worlds/{world_id}/bible
+PUT /worlds/{world_id}/bible
+GET /worlds/{world_id}/worldlines
+POST /worlds/{world_id}/worldlines/fork
+GET /worlds/{world_id}/worldlines/{base_worldline_id}/compare/{compare_worldline_id}
 GET /worlds/{world_id}/scenes
 POST /worlds/{world_id}/scenes
 PATCH /worlds/{world_id}/scenes/{scene_id}
 DELETE /worlds/{world_id}/scenes/{scene_id}
+GET /worlds/{world_id}/location-edges
+POST /worlds/{world_id}/location-edges
+PATCH /worlds/{world_id}/location-edges/{edge_id}
+GET /worlds/{world_id}/organizations
+POST /worlds/{world_id}/organizations
+PATCH /worlds/{world_id}/organizations/{organization_id}
+GET /worlds/{world_id}/organization-memberships
+POST /worlds/{world_id}/organization-memberships
+PATCH /worlds/{world_id}/organization-memberships/{membership_id}
+GET /worlds/{world_id}/faction-tracks
+POST /worlds/{world_id}/faction-tracks
+PATCH /worlds/{world_id}/faction-tracks/{track_id}
 GET /worlds/{world_id}/memberships
 PUT /worlds/{world_id}/memberships/{user_id}
 DELETE /worlds/{world_id}/memberships/{user_id}
@@ -363,6 +380,27 @@ POST /worlds/{world_id}/schedule-rules
 POST /worlds/{world_id}/schedule-rules/preview
 PATCH /worlds/{world_id}/schedule-rules/{rule_id}
 DELETE /worlds/{world_id}/schedule-rules/{rule_id}
+GET /worlds/{world_id}/daily-life/preview
+POST /worlds/{world_id}/daily-life/generate
+GET /worlds/{world_id}/daily-life/candidates
+POST /worlds/{world_id}/offscreen-events
+GET /worlds/{world_id}/offscreen-events
+POST /worlds/{world_id}/offscreen-events/resolve
+GET /worlds/{world_id}/gm/agendas
+POST /worlds/{world_id}/gm/agendas
+PATCH /worlds/{world_id}/gm/agendas/{agenda_id}
+GET /worlds/{world_id}/gm/proposals
+POST /worlds/{world_id}/gm/proposals
+POST /worlds/{world_id}/gm/proposals/{proposal_id}/review
+GET /worlds/{world_id}/resolution-rules
+POST /worlds/{world_id}/resolution-rules
+PATCH /worlds/{world_id}/resolution-rules/{rule_id}
+POST /worlds/{world_id}/resolution-rules/{rule_id}/dry-run
+GET /worlds/{world_id}/player-actors
+PUT /worlds/{world_id}/player-actors
+GET /worlds/{world_id}/player-choices
+POST /worlds/{world_id}/player-choices
+POST /worlds/{world_id}/player-choices/preview
 GET /worlds/{world_id}/narrative-artifacts
 GET /worlds/{world_id}/narrative-artifacts/{artifact_id}
 POST /worlds/{world_id}/narrative-artifacts
@@ -423,7 +461,7 @@ DELETE /provider-profiles/{profile_id}
 
 Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material. Plugin binding and config diagnostics expose plugin identifiers, categories, and binding context only; they do not expose plugin config values or secrets.
 
-The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, scenes, agents, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, inline snapshots, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
+The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, story bibles, scenes, location edges, organizations, faction tracks, agents, relationships, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, snapshots, GM agenda/proposal/rule records, player actors, player choices, worldline forks, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 
 New snapshots store replay payload JSON in local object storage under `NOVELAND_OBJECT_STORAGE_ROOT` and keep only a safe `object://...` URI in the database. Older inline snapshot payloads remain readable.
 

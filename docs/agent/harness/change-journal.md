@@ -494,3 +494,14 @@
 - Tests added/updated: relationship memory write-job coverage; organization/membership/faction/presence/daily/offscreen/world-event importance API tests; deterministic GM runtime daemon tests; schema metadata/alembic coverage for `20260505_0024`; Web client/component tests; e2e mock backend coverage for new world APIs.
 - Docs updated: migration README, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Apply migration `20260505_0024` before using autonomous living-world data on persistent databases. GM v1 is deterministic and does not call providers, external tools, or direct memory backend SDKs. V2 phases 16-20 remain the next candidate bundle.
+
+## Living world GM choices worldlines entry
+
+- Date: 2026-05-06
+- Branch: feat/living-world-gm-choices-worldlines
+- Scope: V2 living-world roadmap phases 16-25 GM agenda, event proposals, deterministic resolution rules, player actor/choices/consequences, branchable worldlines, snapshot fork, worldline memory isolation, and timeline comparison.
+- Summary: Added primary/forked worldlines with compatibility defaults; scoped events, snapshots, replay, memory, relationships, faction tracks, presence, daily candidates, and offscreen queue by worldline; added GM agendas, event proposals, resolution-rule dry-runs, player actor profiles, choice records, consequence preview/apply, worldline fork copying, and timeline comparison; exposed dense Web/admin controls and Playwright mock routes for the new surfaces.
+- Files changed: `/backend/migrations/versions/20260505_0025_living_world_gm_choices_worldlines.py`, `/backend/packages/{events,memory,worlds}/src/noveland/**`, `/backend/services/{api,runtime}/src/noveland/services/**`, `/backend/tests/**`, `/web/features/worlds/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: worldline API/fork/compare tests; GM agenda/proposal/review/rule dry-run tests; player actor/choice/consequence tests; replay/snapshot/event/memory worldline-scope tests; schema metadata/Alembic coverage for `20260505_0025`; Web client/component tests; full Playwright mock alignment for new worldline and GM routes.
+- Docs updated: README endpoint list, migration README, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Apply migration `20260505_0025` before using worldline-scoped living-world data on persistent databases. GM work remains deterministic and does not call providers, external tools, subprocesses, or direct memory backend SDKs. V2 phases 26-35 are the next likely mainline bundle.
