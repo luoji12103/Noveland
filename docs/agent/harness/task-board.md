@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Living World GM / Choices / Worldlines
 
 ## Blocked
 - None
@@ -60,4 +60,4 @@
 - Living World Autonomous Systems
 
 ## Upcoming Mainline
-- V2 phases 16-20 candidate after this bundle: GM agenda planner, GM event proposal, event resolution rules, player actor model, and player choice records.
+- V2 phases 26-35 candidate after this bundle: promises/hooks, plot threads, route affinity, event flags, scene beats, daily episodes, group interactions, relationship suggestions, organization conflict, and rumor flow.
