@@ -44,9 +44,19 @@ import type {
   DailyLifeGenerateInput,
   DailyLifePreview,
   DailyLifePreviewFilters,
+  ChoiceConsequencePreview,
+  EventResolutionRule,
+  EventResolutionRuleCreateInput,
+  EventResolutionRuleUpdateInput,
   FactionProgressTrack,
   FactionProgressTrackCreateInput,
   FactionProgressTrackUpdateInput,
+  GMAgenda,
+  GMAgendaCreateInput,
+  GMAgendaUpdateInput,
+  GMEventProposal,
+  GMProposalCreateInput,
+  GMProposalReviewInput,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -77,6 +87,10 @@ import type {
   OrganizationMembershipUpdateInput,
   OrganizationUpdateInput,
   PersonaPolicyValidation,
+  PlayerActor,
+  PlayerActorBindInput,
+  PlayerChoice,
+  PlayerChoiceCreateInput,
   PluginBinding,
   PluginCatalogEntry,
   PluginCategory,
@@ -93,6 +107,7 @@ import type {
   RuntimeControlUpdateInput,
   RuntimeStatus,
   ScaleReadiness,
+  ResolutionRuleDryRun,
   ScheduleRule,
   SceneLocationEdge,
   SceneLocationEdgeCreateInput,
@@ -118,6 +133,10 @@ import type {
   WorldCompositionImportInput,
   WorldCompositionValidation,
   WorldOrganization,
+  Worldline,
+  WorldlineComparison,
+  WorldlineForkInput,
+  WorldlineScopedFilters,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -169,6 +188,208 @@ export function upsertWorldBible(
     body: input,
     csrf: true,
   });
+}
+
+export function listWorldlines(worldId: string): Promise<Worldline[]> {
+  return worldRequest<Worldline[]>(`/api/worlds/${worldId}/worldlines`, { method: "GET" });
+}
+
+export function forkWorldline(worldId: string, input: WorldlineForkInput): Promise<Worldline> {
+  return worldRequest<Worldline>(`/api/worlds/${worldId}/worldlines/fork`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function compareWorldlines(
+  worldId: string,
+  baseWorldlineId: string,
+  compareWorldlineId: string,
+): Promise<WorldlineComparison> {
+  return worldRequest<WorldlineComparison>(
+    `/api/worlds/${worldId}/worldlines/${baseWorldlineId}/compare/${compareWorldlineId}`,
+    { method: "GET" },
+  );
+}
+
+export function listGMAgendas(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<GMAgenda[]> {
+  return worldRequest<GMAgenda[]>(`/api/worlds/${worldId}/gm/agendas${worldlineSuffix(filters)}`, {
+    method: "GET",
+  });
+}
+
+export function createGMAgenda(worldId: string, input: GMAgendaCreateInput): Promise<GMAgenda> {
+  return worldRequest<GMAgenda>(`/api/worlds/${worldId}/gm/agendas`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateGMAgenda(
+  worldId: string,
+  agendaId: string,
+  input: GMAgendaUpdateInput,
+): Promise<GMAgenda> {
+  return worldRequest<GMAgenda>(`/api/worlds/${worldId}/gm/agendas/${agendaId}`, {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listGMProposals(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<GMEventProposal[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<GMEventProposal[]>(
+    `/api/worlds/${worldId}/gm/proposals${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createGMProposal(
+  worldId: string,
+  input: GMProposalCreateInput,
+): Promise<GMEventProposal> {
+  return worldRequest<GMEventProposal>(`/api/worlds/${worldId}/gm/proposals`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function reviewGMProposal(
+  worldId: string,
+  proposalId: string,
+  input: GMProposalReviewInput,
+): Promise<GMEventProposal> {
+  return worldRequest<GMEventProposal>(
+    `/api/worlds/${worldId}/gm/proposals/${proposalId}/review`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function listResolutionRules(worldId: string): Promise<EventResolutionRule[]> {
+  return worldRequest<EventResolutionRule[]>(`/api/worlds/${worldId}/resolution-rules`, {
+    method: "GET",
+  });
+}
+
+export function createResolutionRule(
+  worldId: string,
+  input: EventResolutionRuleCreateInput,
+): Promise<EventResolutionRule> {
+  return worldRequest<EventResolutionRule>(`/api/worlds/${worldId}/resolution-rules`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function updateResolutionRule(
+  worldId: string,
+  ruleId: string,
+  input: EventResolutionRuleUpdateInput,
+): Promise<EventResolutionRule> {
+  return worldRequest<EventResolutionRule>(
+    `/api/worlds/${worldId}/resolution-rules/${ruleId}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function dryRunResolutionRule(
+  worldId: string,
+  ruleId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<ResolutionRuleDryRun> {
+  return worldRequest<ResolutionRuleDryRun>(
+    `/api/worlds/${worldId}/resolution-rules/${ruleId}/dry-run${worldlineSuffix(filters)}`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
+}
+
+export function listPlayerActors(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<PlayerActor[]> {
+  return worldRequest<PlayerActor[]>(
+    `/api/worlds/${worldId}/player-actors${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function bindPlayerActor(
+  worldId: string,
+  input: PlayerActorBindInput,
+): Promise<PlayerActor> {
+  return worldRequest<PlayerActor>(`/api/worlds/${worldId}/player-actors`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listPlayerChoices(
+  worldId: string,
+  filters: WorldlineScopedFilters & { user_id?: string | null; limit?: number } = {},
+): Promise<PlayerChoice[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "user_id", filters.user_id);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<PlayerChoice[]>(
+    `/api/worlds/${worldId}/player-choices${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function recordPlayerChoice(
+  worldId: string,
+  input: PlayerChoiceCreateInput,
+): Promise<PlayerChoice> {
+  return worldRequest<PlayerChoice>(`/api/worlds/${worldId}/player-choices`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function previewPlayerChoiceConsequences(
+  worldId: string,
+  input: PlayerChoiceCreateInput,
+): Promise<ChoiceConsequencePreview> {
+  return worldRequest<ChoiceConsequencePreview>(
+    `/api/worlds/${worldId}/player-choices/preview`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function importWorldComposition(
@@ -286,29 +507,47 @@ export function listClockTransitions(worldId: string, limit = 20): Promise<World
   );
 }
 
-export function getReplayState(worldId: string): Promise<WorldReplayState> {
-  return worldRequest<WorldReplayState>(`/api/worlds/${worldId}/replay/state`, {
+export function getReplayState(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<WorldReplayState> {
+  return worldRequest<WorldReplayState>(`/api/worlds/${worldId}/replay/state${worldlineSuffix(filters)}`, {
     method: "GET",
   });
 }
 
-export function getLatestSnapshot(worldId: string): Promise<WorldSnapshot | null> {
-  return worldRequest<WorldSnapshot | null>(`/api/worlds/${worldId}/snapshots/latest`, {
-    method: "GET",
-  });
+export function getLatestSnapshot(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<WorldSnapshot | null> {
+  return worldRequest<WorldSnapshot | null>(
+    `/api/worlds/${worldId}/snapshots/latest${worldlineSuffix(filters)}`,
+    {
+      method: "GET",
+    },
+  );
 }
 
-export function createSnapshot(worldId: string): Promise<WorldSnapshot> {
-  return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots`, {
+export function createSnapshot(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<WorldSnapshot> {
+  return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots${worldlineSuffix(filters)}`, {
     method: "POST",
     csrf: true,
   });
 }
 
-export function getSnapshotIntegrity(worldId: string): Promise<WorldSnapshotIntegrity> {
-  return worldRequest<WorldSnapshotIntegrity>(`/api/worlds/${worldId}/snapshots/integrity`, {
-    method: "GET",
-  });
+export function getSnapshotIntegrity(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<WorldSnapshotIntegrity> {
+  return worldRequest<WorldSnapshotIntegrity>(
+    `/api/worlds/${worldId}/snapshots/integrity${worldlineSuffix(filters)}`,
+    {
+      method: "GET",
+    },
+  );
 }
 
 export function listWorldEvents(
@@ -316,6 +555,7 @@ export function listWorldEvents(
   filters: WorldEventAuditFilters = {},
 ): Promise<WorldEventAuditEntry[]> {
   const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
   if (filters.event_name) {
     search.set("event_name", filters.event_name);
   }
@@ -482,9 +722,10 @@ export function updateOrganizationMembership(
 export function listFactionTracks(
   worldId: string,
   organizationId: string,
+  filters: WorldlineScopedFilters = {},
 ): Promise<FactionProgressTrack[]> {
   return worldRequest<FactionProgressTrack[]>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks`,
+    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -527,9 +768,10 @@ export function listAgents(worldId: string): Promise<Agent[]> {
 export function listAgentRelationships(
   worldId: string,
   agentId: string,
+  filters: WorldlineScopedFilters = {},
 ): Promise<AgentRelationship[]> {
   return worldRequest<AgentRelationship[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships`,
+    `/api/worlds/${worldId}/agents/${agentId}/relationships${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -568,9 +810,10 @@ export function updateAgentRelationship(
 export function getAgentPresence(
   worldId: string,
   agentId: string,
+  filters: WorldlineScopedFilters = {},
 ): Promise<AgentPresence | null> {
   return worldRequest<AgentPresence | null>(
-    `/api/worlds/${worldId}/agents/${agentId}/presence`,
+    `/api/worlds/${worldId}/agents/${agentId}/presence${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -662,6 +905,7 @@ export function getDailyLifePreview(
   filters: DailyLifePreviewFilters = {},
 ): Promise<DailyLifePreview> {
   const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
   if (filters.start_world_time) {
     search.set("start_world_time", filters.start_world_time);
   }
@@ -693,6 +937,7 @@ export function listDailyLifeCandidates(
   filters: DailyLifeCandidateFilters = {},
 ): Promise<DailyLifeEventCandidate[]> {
   const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
   if (filters.status) {
     search.set("status", filters.status);
   }
@@ -722,6 +967,7 @@ export function listOffscreenEvents(
   filters: OffscreenEventFilters = {},
 ): Promise<OffscreenEventQueueItem[]> {
   const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
   if (filters.status) {
     search.set("status", filters.status);
   }
@@ -738,9 +984,13 @@ export function listOffscreenEvents(
 export function resolveOffscreenEvents(
   worldId: string,
   limit = 20,
+  worldlineId?: string | null,
 ): Promise<OffscreenResolution> {
+  const search = new URLSearchParams();
+  search.set("limit", String(limit));
+  appendOptional(search, "worldline_id", worldlineId);
   return worldRequest<OffscreenResolution>(
-    `/api/worlds/${worldId}/offscreen-events/resolve?limit=${encodeURIComponent(String(limit))}`,
+    `/api/worlds/${worldId}/offscreen-events/resolve?${search.toString()}`,
     {
       method: "POST",
       csrf: true,
@@ -1506,6 +1756,22 @@ type WorldRequestOptions = {
   body?: unknown;
   csrf?: boolean;
 };
+
+function appendOptional(search: URLSearchParams, key: string, value: string | null | undefined) {
+  if (value !== undefined && value !== null && value !== "") {
+    search.set(key, value);
+  }
+}
+
+function searchSuffix(search: URLSearchParams): string {
+  return search.size === 0 ? "" : `?${search.toString()}`;
+}
+
+function worldlineSuffix(filters: WorldlineScopedFilters): string {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  return searchSuffix(search);
+}
 
 async function worldRequest<T>(path: string, options: WorldRequestOptions): Promise<T> {
   return apiRequest<T>(path, options);

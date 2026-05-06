@@ -2,10 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelAgentCalendarEntry,
+  bindPlayerActor,
+  compareWorldlines,
   createAgentCalendarEntry,
   createAgentObservation,
   createAgentRelationship,
   createFactionTrack,
+  createGMAgenda,
+  createGMProposal,
   createLocationEdge,
   createMemoryBackendProfile,
   createNarrativeArtifact,
@@ -14,6 +18,7 @@ import {
   createOrganizationMembership,
   createAgentPreset,
   createProviderProfile,
+  createResolutionRule,
   createScheduleRule,
   createSnapshot,
   generateConversationNarrativeArtifacts,
@@ -32,8 +37,10 @@ import {
   deleteMemoryBackendProfile,
   disableProviderProfile,
   dryRunMemoryBackfill,
+  dryRunResolutionRule,
   deactivateScene,
   exportWorldComposition,
+  forkWorldline,
   getRuntimeControl,
   getRuntimeStatus,
   getScaleReadiness,
@@ -46,11 +53,16 @@ import {
   generateDailyLifeCandidates,
   listDailyLifeCandidates,
   listFactionTracks,
+  listGMAgendas,
+  listGMProposals,
   listLocationEdges,
   listOffscreenEvents,
   listOrganizationMemberships,
   listOrganizations,
   listPluginBindings,
+  listPlayerActors,
+  listPlayerChoices,
+  listResolutionRules,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
   listClockTransitions,
@@ -60,9 +72,12 @@ import {
   listMemoryBackendProfiles,
   listMemoryBackendProfileJobs,
   pauseWorldClock,
+  previewPlayerChoiceConsequences,
   previewScheduleRule,
   publishNarrativeArtifact,
   resolveOffscreenEvents,
+  recordPlayerChoice,
+  reviewGMProposal,
   resumeWorldClock,
   listAgentMemory,
   listAgentRelationships,
@@ -86,12 +101,14 @@ import {
   updateMemoryBackendProfile,
   updateAgent,
   updateFactionTrack,
+  updateGMAgenda,
   updateLocationEdge,
   updateOrganization,
   updateOrganizationMembership,
   updateAgentRelationship,
   updateAgentPreset,
   updateProviderProfile,
+  updateResolutionRule,
   unpublishNarrativeArtifact,
   updateAgentPersona,
   validateAgentPersona,
@@ -99,6 +116,7 @@ import {
   updateScheduleRule,
   upsertAgentPresence,
   upsertWorldBible,
+  listWorldlines,
 } from "@/lib/worlds/client";
 
 describe("world client", () => {
@@ -362,6 +380,91 @@ describe("world client", () => {
     expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBe(
       "csrf-token",
     );
+  });
+
+  it("maps gm choice and worldline requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "worldline-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "worldline-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ divergent_event_count: 1 }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "agenda-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "agenda-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "agenda-1", status: "paused" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "proposal-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "proposal-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "proposal-1", status: "resolved" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "rule-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "rule-1", status: "inactive" }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "actor-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "actor-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "choice-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ diagnostics: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "choice-2" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listWorldlines("world-1");
+    await forkWorldline("world-1", {
+      source_worldline_id: "worldline-1",
+      worldline_key: "alt-route",
+      name: "Alt Route",
+    });
+    await compareWorldlines("world-1", "worldline-1", "worldline-2");
+    await listGMAgendas("world-1", { worldline_id: "worldline-1" });
+    await createGMAgenda("world-1", { title: "Agenda", summary: "Summary" });
+    await updateGMAgenda("world-1", "agenda-1", { status: "paused" });
+    await listGMProposals("world-1", { status: "proposed", limit: 5 });
+    await createGMProposal("world-1", {
+      title: "Proposal",
+      reason: "Reason",
+      event_name: "gm.route_beat",
+    });
+    await reviewGMProposal("world-1", "proposal-1", { status: "resolved" });
+    await listResolutionRules("world-1");
+    await createResolutionRule("world-1", { rule_key: "trust-gate", name: "Trust Gate" });
+    await updateResolutionRule("world-1", "rule-1", { status: "inactive" });
+    await dryRunResolutionRule("world-1", "rule-1", { worldline_id: "worldline-1" });
+    await listPlayerActors("world-1", { worldline_id: "worldline-1" });
+    await bindPlayerActor("world-1", { display_name: "Player" });
+    await listPlayerChoices("world-1", { worldline_id: "worldline-1", limit: 5 });
+    await previewPlayerChoiceConsequences("world-1", {
+      player_actor_id: "actor-1",
+      choice_key: "help",
+      choice_kind: "intervention",
+      prompt: "Help?",
+      selected_option: "Yes",
+    });
+    await recordPlayerChoice("world-1", {
+      player_actor_id: "actor-1",
+      choice_key: "help",
+      choice_kind: "intervention",
+      prompt: "Help?",
+      selected_option: "Yes",
+    });
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/world-1/worldlines",
+      "/api/worlds/world-1/worldlines/fork",
+      "/api/worlds/world-1/worldlines/worldline-1/compare/worldline-2",
+      "/api/worlds/world-1/gm/agendas?worldline_id=worldline-1",
+      "/api/worlds/world-1/gm/agendas",
+      "/api/worlds/world-1/gm/agendas/agenda-1",
+      "/api/worlds/world-1/gm/proposals?status=proposed&limit=5",
+      "/api/worlds/world-1/gm/proposals",
+      "/api/worlds/world-1/gm/proposals/proposal-1/review",
+      "/api/worlds/world-1/resolution-rules",
+      "/api/worlds/world-1/resolution-rules",
+      "/api/worlds/world-1/resolution-rules/rule-1",
+      "/api/worlds/world-1/resolution-rules/rule-1/dry-run?worldline_id=worldline-1",
+      "/api/worlds/world-1/player-actors?worldline_id=worldline-1",
+      "/api/worlds/world-1/player-actors",
+      "/api/worlds/world-1/player-choices?worldline_id=worldline-1&limit=5",
+      "/api/worlds/world-1/player-choices/preview",
+      "/api/worlds/world-1/player-choices",
+    ]);
   });
 
   it("sends clock control requests", async () => {

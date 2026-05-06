@@ -6,17 +6,24 @@ import { useRouter } from "next/navigation";
 
 import {
   advanceWorldClock,
+  bindPlayerActor,
+  compareWorldlines,
   createFactionTrack,
+  createGMAgenda,
+  createGMProposal,
   createLocationEdge,
   createOffscreenEvent,
   createOrganization,
   createOrganizationMembership,
+  createResolutionRule,
   createScene,
   createScheduleRule,
   createSnapshot,
   deactivateScene,
   deleteMembership,
+  dryRunResolutionRule,
   exportWorldComposition,
+  forkWorldline,
   generateDailyLifeCandidates,
   importWorldComposition,
   getCalendarConflicts,
@@ -25,7 +32,10 @@ import {
   listOffscreenEvents,
   listWorldEvents,
   pauseWorldClock,
+  previewPlayerChoiceConsequences,
   previewScheduleRule,
+  recordPlayerChoice,
+  reviewGMProposal,
   resolveOffscreenEvents,
   resumeWorldClock,
   skipWorldClock,
@@ -45,6 +55,15 @@ import type {
   CalendarConflictReport,
   DailyLifePreview,
   DailyLifeEventCandidate,
+  ChoiceConsequencePreview,
+  EventResolutionRule,
+  GMAgenda,
+  GMEventProposal,
+  PlayerActor,
+  PlayerChoice,
+  ResolutionRuleDryRun,
+  Worldline,
+  WorldlineComparison,
   OffscreenEventQueueItem,
   WorldEventAuditEntry,
   WorldClock,
@@ -76,6 +95,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [dailyLifeCandidates, setDailyLifeCandidates] = useState(data.dailyLifeCandidates);
   const [offscreenEvents, setOffscreenEvents] = useState(data.offscreenEvents);
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
+  const [ruleDryRun, setRuleDryRun] = useState<ResolutionRuleDryRun | null>(null);
+  const [choicePreview, setChoicePreview] = useState<ChoiceConsequencePreview | null>(null);
+  const [worldlineComparison, setWorldlineComparison] = useState<WorldlineComparison | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
   const [compositionDraft, setCompositionDraft] = useState("");
   const [compositionValidation, setCompositionValidation] =
@@ -271,6 +293,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     await runAction(
       async () => {
         await createFactionTrack(selectedWorld.id, formString(form, "organization_id"), {
+          worldline_id: optionalFormString(form, "worldline_id"),
           track_key: formString(form, "track_key"),
           name: formString(form, "name"),
           track_type: formString(form, "track_type") as "goal",
@@ -282,6 +305,180 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         formElement.reset();
       },
       "Faction track created.",
+    );
+  }
+
+  async function handleForkWorldline(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await forkWorldline(selectedWorld.id, {
+          source_worldline_id: optionalFormString(form, "source_worldline_id"),
+          worldline_key: formString(form, "worldline_key"),
+          name: formString(form, "name"),
+          description: optionalFormString(form, "description"),
+          fork_event_sequence: optionalPositiveInteger(form, "fork_event_sequence"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Worldline forked.",
+    );
+  }
+
+  async function handleCreateGMAgenda(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createGMAgenda(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          title: formString(form, "title"),
+          summary: formString(form, "summary"),
+          priority: optionalPositiveInteger(form, "priority") ?? 50,
+          focus_agents: commaList(formString(form, "focus_agents")),
+          focus_organizations: commaList(formString(form, "focus_organizations")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "GM agenda created.",
+    );
+  }
+
+  async function handleCreateGMProposal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createGMProposal(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          agenda_id: optionalFormString(form, "agenda_id"),
+          title: formString(form, "title"),
+          reason: formString(form, "reason"),
+          event_name: formString(form, "event_name"),
+          proposed_payload: jsonObject(formString(form, "proposed_payload")),
+          importance: (optionalFormString(form, "importance") ?? "daily") as "route",
+          risk_score: optionalPositiveInteger(form, "risk_score") ?? 0,
+          affected_agents: commaList(formString(form, "affected_agents")),
+          affected_organizations: commaList(formString(form, "affected_organizations")),
+          source_context: jsonObject(formString(form, "source_context")),
+        });
+        formElement.reset();
+      },
+      "GM proposal created.",
+    );
+  }
+
+  async function handleCreateResolutionRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createResolutionRule(selectedWorld.id, {
+          rule_key: formString(form, "rule_key"),
+          name: formString(form, "name"),
+          priority: optionalPositiveInteger(form, "priority") ?? 50,
+          conditions: jsonObject(formString(form, "conditions")),
+          effects: jsonObject(formString(form, "effects")),
+        });
+        formElement.reset();
+      },
+      "Resolution rule created.",
+    );
+  }
+
+  async function handleDryRunResolutionRule(ruleId: string) {
+    await runAction(
+      async () => {
+        setRuleDryRun(await dryRunResolutionRule(selectedWorld.id, ruleId));
+      },
+      "Resolution rule dry-run completed.",
+      false,
+    );
+  }
+
+  async function handleBindPlayerActor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await bindPlayerActor(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          user_id: optionalFormString(form, "user_id"),
+          display_name: formString(form, "display_name"),
+          current_scene_id: optionalFormString(form, "current_scene_id"),
+          profile: jsonObject(formString(form, "profile")),
+        });
+        formElement.reset();
+      },
+      "Player actor bound.",
+    );
+  }
+
+  async function handlePlayerChoice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const applyChoice =
+      submitter instanceof HTMLButtonElement && submitter.value === "apply";
+    const form = new FormData(event.currentTarget);
+    const input = {
+      worldline_id: optionalFormString(form, "worldline_id"),
+      user_id: optionalFormString(form, "user_id"),
+      player_actor_id: formString(form, "player_actor_id"),
+      choice_key: formString(form, "choice_key"),
+      choice_kind: formString(form, "choice_kind") as "intervention",
+      prompt: formString(form, "prompt"),
+      selected_option: formString(form, "selected_option"),
+      context: jsonObject(formString(form, "context")),
+      effects: jsonObject(formString(form, "effects")),
+      apply: applyChoice,
+    };
+    await runAction(
+      async () => {
+        if (applyChoice) {
+          await recordPlayerChoice(selectedWorld.id, input);
+        } else {
+          setChoicePreview(await previewPlayerChoiceConsequences(selectedWorld.id, input));
+        }
+      },
+      applyChoice ? "Player choice recorded." : "Choice consequence preview loaded.",
+      applyChoice,
+    );
+  }
+
+  async function handleResolveProposal(proposalId: string) {
+    await runAction(
+      () =>
+        reviewGMProposal(selectedWorld.id, proposalId, {
+          status: "resolved",
+          review_note: "Resolved from workspace.",
+        }),
+      "GM proposal resolved.",
+    );
+  }
+
+  async function handleCompareWorldlines(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await runAction(
+      async () => {
+        setWorldlineComparison(
+          await compareWorldlines(
+            selectedWorld.id,
+            formString(form, "base_worldline_id"),
+            formString(form, "compare_worldline_id"),
+          ),
+        );
+      },
+      "Worldlines compared.",
+      false,
     );
   }
 
@@ -882,6 +1079,10 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             <p className="metric-label">Offscreen queue</p>
             <p className="metric-value">{offscreenEvents.length}</p>
           </div>
+          <div className="metric">
+            <p className="metric-label">Worldlines</p>
+            <p className="metric-value">{data.worldlines.length}</p>
+          </div>
         </div>
         {data.canManageSelectedWorld ? (
           <div className="management-columns">
@@ -1145,6 +1346,219 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           preview={dailyLifePreview}
           candidates={dailyLifeCandidates}
           offscreenEvents={offscreenEvents}
+        />
+      </section>
+
+      <section className="management-panel" aria-labelledby="gm-worldlines-title">
+        <h2 className="section-title" id="gm-worldlines-title">
+          GM choices and worldlines
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Agendas</p>
+            <p className="metric-value">{data.gmAgendas.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Proposals</p>
+            <p className="metric-value">{data.gmProposals.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Rules</p>
+            <p className="metric-value">{data.resolutionRules.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Choices</p>
+            <p className="metric-value">{data.playerChoices.length}</p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleForkWorldline}>
+                <h3>Worldline fork</h3>
+                <select className="text-input" name="source_worldline_id" defaultValue="">
+                  <option value="">Primary worldline</option>
+                  {data.worldlines.map((worldline) => (
+                    <option key={worldline.id} value={worldline.id}>
+                      {worldline.name}
+                    </option>
+                  ))}
+                </select>
+                <input className="text-input" name="worldline_key" placeholder="branch-key" />
+                <input className="text-input" name="name" placeholder="Branch name" />
+                <input className="text-input" name="description" placeholder="Description" />
+                <input className="text-input" name="fork_event_sequence" placeholder="Fork event sequence" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Fork worldline
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateGMAgenda}>
+                <h3>GM agenda</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="title" placeholder="Agenda title" />
+                <textarea className="text-input" name="summary" rows={3} placeholder="Summary" />
+                <input className="text-input" name="priority" placeholder="Priority" />
+                <input className="text-input" name="focus_agents" placeholder="agent-key,agent-key" />
+                <input className="text-input" name="focus_organizations" placeholder="organization-key" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create agenda
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateGMProposal}>
+                <h3>GM proposal</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <select className="text-input" name="agenda_id" defaultValue="">
+                  <option value="">No agenda</option>
+                  {data.gmAgendas.map((agenda) => (
+                    <option key={agenda.id} value={agenda.id}>
+                      {agenda.title}
+                    </option>
+                  ))}
+                </select>
+                <input className="text-input" name="title" placeholder="Proposal title" />
+                <textarea className="text-input" name="reason" rows={3} placeholder="Reason" />
+                <input className="text-input" name="event_name" placeholder="gm.route_beat" />
+                <select className="text-input" name="importance" defaultValue="route">
+                  <option value="daily">daily</option>
+                  <option value="relationship">relationship</option>
+                  <option value="organization">organization</option>
+                  <option value="route">route</option>
+                  <option value="main_plot">main_plot</option>
+                </select>
+                <input className="text-input" name="risk_score" placeholder="Risk score" />
+                <input className="text-input" name="affected_agents" placeholder="agent-key" />
+                <input className="text-input" name="affected_organizations" placeholder="organization-key" />
+                <textarea className="text-input" name="proposed_payload" rows={3} defaultValue="{}" />
+                <textarea className="text-input" name="source_context" rows={3} defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create proposal
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateResolutionRule}>
+                <h3>Resolution rule</h3>
+                <input className="text-input" name="rule_key" placeholder="rule-key" />
+                <input className="text-input" name="name" placeholder="Rule name" />
+                <input className="text-input" name="priority" placeholder="Priority" />
+                <textarea
+                  className="text-input"
+                  name="conditions"
+                  rows={3}
+                  defaultValue='{"min_relationship_trust":30}'
+                />
+                <textarea className="text-input" name="effects" rows={3} defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create rule
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleBindPlayerActor}>
+                <h3>Player actor</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="user_id" placeholder="User id, defaults to you" />
+                <input className="text-input" name="display_name" placeholder="Player display name" />
+                <select className="text-input" name="current_scene_id" defaultValue="">
+                  <option value="">No current scene</option>
+                  {data.scenes.map((scene) => (
+                    <option key={scene.id} value={scene.id}>
+                      {scene.name}
+                    </option>
+                  ))}
+                </select>
+                <textarea className="text-input" name="profile" rows={3} defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Bind actor
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handlePlayerChoice}>
+                <h3>Choice consequence</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <select className="text-input" name="player_actor_id" defaultValue="">
+                  <option value="">Player actor</option>
+                  {data.playerActors.map((actor) => (
+                    <option key={actor.id} value={actor.id}>
+                      {actor.display_name} ({actor.actor_ref})
+                    </option>
+                  ))}
+                </select>
+                <input className="text-input" name="user_id" placeholder="User id, defaults to you" />
+                <input className="text-input" name="choice_key" placeholder="choice-key" />
+                <select className="text-input" name="choice_kind" defaultValue="intervention">
+                  <option value="dialogue">dialogue</option>
+                  <option value="travel">travel</option>
+                  <option value="contact">contact</option>
+                  <option value="intervention">intervention</option>
+                  <option value="route">route</option>
+                </select>
+                <input className="text-input" name="prompt" placeholder="Prompt" />
+                <input className="text-input" name="selected_option" placeholder="Selected option" />
+                <textarea className="text-input" name="context" rows={3} defaultValue="{}" />
+                <textarea className="text-input" name="effects" rows={4} defaultValue='{"relationship_updates":[],"faction_updates":[],"offscreen_events":[]}' />
+                <div className="button-row">
+                  <button className="secondary-button" type="submit" value="preview" disabled={isBusy}>
+                    Preview consequences
+                  </button>
+                  <button className="primary-button" type="submit" value="apply" disabled={isBusy}>
+                    Record choice
+                  </button>
+                </div>
+              </form>
+            </div>
+            <form className="inline-form" onSubmit={handleCompareWorldlines}>
+              <select className="text-input" name="base_worldline_id" defaultValue="">
+                <option value="">Base worldline</option>
+                {data.worldlines.map((worldline) => (
+                  <option key={worldline.id} value={worldline.id}>
+                    {worldline.name}
+                  </option>
+                ))}
+              </select>
+              <select className="text-input" name="compare_worldline_id" defaultValue="">
+                <option value="">Compare worldline</option>
+                {data.worldlines.map((worldline) => (
+                  <option key={worldline.id} value={worldline.id}>
+                    {worldline.name}
+                  </option>
+                ))}
+              </select>
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Compare worldlines
+              </button>
+            </form>
+          </>
+        ) : null}
+        {ruleDryRun !== null ? (
+          <p className="status-detail">
+            Rule {ruleDryRun.rule_key}: {ruleDryRun.matched ? "matched" : "not matched"} -{" "}
+            {ruleDryRun.reasons.join(" ")}
+          </p>
+        ) : null}
+        {choicePreview !== null ? (
+          <p className="status-detail">
+            Choice preview: {choicePreview.diagnostics.join(", ")}
+          </p>
+        ) : null}
+        {worldlineComparison !== null ? (
+          <p className="status-detail">
+            Comparison: {worldlineComparison.divergent_event_count} events,{" "}
+            {worldlineComparison.relationship_delta_count} relationship deltas,{" "}
+            {worldlineComparison.faction_delta_count} faction deltas,{" "}
+            {worldlineComparison.choice_delta_count} choice deltas.
+          </p>
+        ) : null}
+        <GMWorldlineView
+          worldlines={data.worldlines}
+          agendas={data.gmAgendas}
+          proposals={data.gmProposals}
+          rules={data.resolutionRules}
+          actors={data.playerActors}
+          choices={data.playerChoices}
+          isBusy={isBusy}
+          canManage={data.canManageSelectedWorld}
+          onResolveProposal={handleResolveProposal}
+          onDryRunRule={handleDryRunResolutionRule}
         />
       </section>
 
@@ -1724,6 +2138,166 @@ function DailyLifeView({
             }`,
           }))}
         />
+      </section>
+    </div>
+  );
+}
+
+function WorldlineSelect({ worldlines }: { worldlines: Worldline[] }) {
+  return (
+    <select className="text-input" name="worldline_id" defaultValue="">
+      <option value="">Primary worldline</option>
+      {worldlines.map((worldline) => (
+        <option key={worldline.id} value={worldline.id}>
+          {worldline.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function GMWorldlineView({
+  worldlines,
+  agendas,
+  proposals,
+  rules,
+  actors,
+  choices,
+  isBusy,
+  canManage,
+  onResolveProposal,
+  onDryRunRule,
+}: {
+  worldlines: Worldline[];
+  agendas: GMAgenda[];
+  proposals: GMEventProposal[];
+  rules: EventResolutionRule[];
+  actors: PlayerActor[];
+  choices: PlayerChoice[];
+  isBusy: boolean;
+  canManage: boolean;
+  onResolveProposal: (proposalId: string) => Promise<void>;
+  onDryRunRule: (ruleId: string) => Promise<void>;
+}) {
+  return (
+    <div className="management-columns">
+      <section aria-labelledby="worldlines-list-title">
+        <h3 id="worldlines-list-title">Worldlines</h3>
+        <ResourceList
+          rows={worldlines.map((worldline) => ({
+            id: worldline.id,
+            title: `${worldline.name} (${worldline.worldline_key})`,
+            detail:
+              worldline.parent_worldline_id === null
+                ? `${worldline.status} primary`
+                : `${worldline.status} fork from sequence ${
+                    worldline.fork_event_sequence ?? "latest"
+                  }`,
+          }))}
+        />
+      </section>
+      <section aria-labelledby="gm-agenda-list-title">
+        <h3 id="gm-agenda-list-title">GM agenda and proposals</h3>
+        <div className="resource-list">
+          {agendas.length === 0 && proposals.length === 0 ? (
+            <article className="resource-row">
+              <div>
+                <h3>None yet</h3>
+                <p>No records are available.</p>
+              </div>
+            </article>
+          ) : null}
+          {agendas.map((agenda) => (
+            <article className="resource-row" key={agenda.id}>
+              <div>
+                <h3>{agenda.title}</h3>
+                <p>
+                  {agenda.status} - priority {agenda.priority}
+                </p>
+                <p>{agenda.summary}</p>
+              </div>
+            </article>
+          ))}
+          {proposals.map((proposal) => (
+            <article className="resource-row" key={proposal.id}>
+              <div>
+                <h3>{proposal.title}</h3>
+                <p>
+                  {proposal.status} - {proposal.importance} - risk {proposal.risk_score}
+                </p>
+                <p>{proposal.reason}</p>
+              </div>
+              {canManage && proposal.status !== "resolved" ? (
+                <div className="button-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void onResolveProposal(proposal.id)}
+                  >
+                    Resolve proposal
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      </section>
+      <section aria-labelledby="resolution-rule-list-title">
+        <h3 id="resolution-rule-list-title">Rules and choices</h3>
+        <div className="resource-list">
+          {rules.length === 0 && actors.length === 0 && choices.length === 0 ? (
+            <article className="resource-row">
+              <div>
+                <h3>None yet</h3>
+                <p>No records are available.</p>
+              </div>
+            </article>
+          ) : null}
+          {rules.map((rule) => (
+            <article className="resource-row" key={rule.id}>
+              <div>
+                <h3>{rule.name}</h3>
+                <p>
+                  {rule.rule_key} - {rule.status} - priority {rule.priority}
+                </p>
+              </div>
+              {canManage ? (
+                <div className="button-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void onDryRunRule(rule.id)}
+                  >
+                    Dry-run rule
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+          {actors.map((actor) => (
+            <article className="resource-row" key={actor.id}>
+              <div>
+                <h3>{actor.display_name}</h3>
+                <p>
+                  {actor.actor_ref} - {actor.is_active ? "active" : "inactive"}
+                </p>
+              </div>
+            </article>
+          ))}
+          {choices.map((choice) => (
+            <article className="resource-row" key={choice.id}>
+              <div>
+                <h3>{choice.choice_key}</h3>
+                <p>
+                  {choice.choice_kind} - {choice.applied_event_id === null ? "preview" : "applied"}
+                </p>
+                <p>{choice.selected_option}</p>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
     </div>
   );

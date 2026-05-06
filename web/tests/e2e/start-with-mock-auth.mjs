@@ -11,6 +11,7 @@ const adminUserId = "00000000-0000-4000-8000-000000000001";
 const memberUserId = "00000000-0000-4000-8000-000000000002";
 const candidateUserId = "00000000-0000-4000-8000-000000000003";
 const worldOneId = "10000000-0000-4000-8000-000000000001";
+const primaryWorldlineId = "11000000-0000-4000-8000-000000000001";
 const sceneHomeId = "20000000-0000-4000-8000-000000000001";
 const agentGuideId = "30000000-0000-4000-8000-000000000001";
 const membershipOwnerId = "40000000-0000-4000-8000-000000000001";
@@ -42,6 +43,23 @@ const worlds = [
     world_rules_plugin_identifier: "builtin.default_world_rules",
     world_rules_plugin_config: {},
     is_active: true,
+  },
+];
+const worldlines = [
+  {
+    id: primaryWorldlineId,
+    world_id: worldOneId,
+    worldline_key: "primary",
+    name: "Primary Worldline",
+    description: "Default branch for the living world.",
+    parent_worldline_id: null,
+    forked_from_snapshot_id: null,
+    fork_event_sequence: null,
+    status: "active",
+    created_by_actor_ref: "system:runtime",
+    metadata: { primary: true },
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
 const worldBibles = new Map([
@@ -107,6 +125,7 @@ const agentRelationships = [
   {
     id: "30500000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     source_agent_id: agentGuideId,
     source_agent_key: "guide",
     source_display_name: "Guide",
@@ -180,6 +199,7 @@ const factionTracks = [
   {
     id: "81200000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     organization_id: "81000000-0000-4000-8000-000000000001",
     organization_key: "student-council",
     organization_name: "Student Council",
@@ -198,6 +218,7 @@ const agentPresenceStates = [
   {
     id: "81300000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     agent_id: agentGuideId,
     agent_key: "guide",
     agent_display_name: "Guide",
@@ -216,6 +237,7 @@ const dailyLifeCandidates = [
   {
     id: "81400000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     agent_id: agentGuideId,
     agent_display_name: "Guide",
     scene_id: sceneHomeId,
@@ -236,6 +258,7 @@ const offscreenEvents = [
   {
     id: "81500000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     source_candidate_id: "81400000-0000-4000-8000-000000000001",
     event_name: "living_world.daily_life",
     title: "Guide daily life beat",
@@ -249,6 +272,75 @@ const offscreenEvents = [
     updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
+const gmAgendas = [
+  {
+    id: "81600000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    title: "Festival route pressure",
+    summary: "Keep the school festival route moving.",
+    priority: 70,
+    status: "active",
+    focus_agents: ["guide"],
+    focus_organizations: ["student-council"],
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const gmProposals = [
+  {
+    id: "81700000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    agenda_id: "81600000-0000-4000-8000-000000000001",
+    title: "Late-night club room",
+    reason: "Relationship tension is ready.",
+    event_name: "gm.route_pressure",
+    proposed_payload: {},
+    importance: "route",
+    risk_score: 20,
+    affected_agents: ["guide"],
+    affected_organizations: ["student-council"],
+    source_context: {},
+    status: "proposed",
+    review_note: null,
+    resolved_event_id: null,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const resolutionRules = [
+  {
+    id: "81800000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    rule_key: "trust-gate",
+    name: "Trust Gate",
+    description: null,
+    priority: 50,
+    status: "active",
+    conditions: { min_relationship_trust: 30 },
+    effects: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const playerActors = [
+  {
+    id: "81900000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: adminUserId,
+    actor_ref: `player:${adminUserId}:primary`,
+    display_name: "Admin Player",
+    current_scene_id: sceneHomeId,
+    profile: {},
+    is_active: true,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const playerChoices = [];
 const agentPresets = [];
 const memberships = [
   membership(membershipOwnerId, worldOneId, adminUserId, "world_admin"),
@@ -583,6 +675,7 @@ const worldEvents = new Map([
       {
         id: "76000000-0000-4000-8000-000000000001",
         world_id: worldOneId,
+        worldline_id: primaryWorldlineId,
         sequence: 1,
         event_name: "world.clock_advanced",
         importance: "system",
@@ -962,6 +1055,7 @@ async function handleWorldCollection(request, response) {
       is_active: true,
     };
     worlds.push(world);
+    worldlines.push(primaryWorldlineFor(world.id));
     memberships.push(membership(randomUUID(), world.id, currentSubject.user_id, "world_admin"));
     clocks.set(world.id, clockForWorld(world.id));
     replaySequences.set(world.id, 0);
@@ -1019,6 +1113,26 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "bible") {
     await handleWorldBible(request, response, currentSubject, worldId);
+    return;
+  }
+  if (resource === "worldlines") {
+    await handleWorldlines(request, response, currentSubject, worldId, segments[3], segments[4], segments[5]);
+    return;
+  }
+  if (resource === "gm") {
+    await handleGM(request, response, currentSubject, worldId, segments[3], segments[4], segments[5]);
+    return;
+  }
+  if (resource === "resolution-rules") {
+    await handleResolutionRules(request, response, currentSubject, worldId, segments[3], segments[4]);
+    return;
+  }
+  if (resource === "player-actors") {
+    await handlePlayerActors(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "player-choices") {
+    await handlePlayerChoices(request, response, currentSubject, worldId, segments[3], url);
     return;
   }
   if (resource === "schedule-rules") {
@@ -1130,6 +1244,299 @@ async function handleWorldBible(request, response, currentSubject, worldId) {
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleWorldlines(request, response, currentSubject, worldId, action, baseId, compareId) {
+  if (request.method === "GET" && action === undefined) {
+    sendJson(response, 200, worldlines.filter((worldline) => worldline.world_id === worldId));
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && action !== undefined && baseId === "compare" && compareId !== undefined) {
+    const choices = playerChoices.filter((choice) => choice.worldline_id === compareId);
+    sendJson(response, 200, {
+      base_worldline_id: action,
+      compare_worldline_id: compareId,
+      fork_event_sequence: worldlines.find((worldline) => worldline.id === compareId)?.fork_event_sequence ?? null,
+      divergent_event_count: choices.length,
+      relationship_delta_count: 0,
+      faction_delta_count: 0,
+      choice_delta_count: choices.length,
+    });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && action === "fork") {
+    const body = await readJson(request);
+    const source = body.source_worldline_id === undefined || body.source_worldline_id === null
+      ? worldlines.find((worldline) => worldline.world_id === worldId && worldline.parent_worldline_id === null)
+      : worldlines.find((worldline) => worldline.id === body.source_worldline_id && worldline.world_id === worldId);
+    const fork = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_key: body.worldline_key,
+      name: body.name,
+      description: body.description ?? null,
+      parent_worldline_id: source?.id ?? null,
+      forked_from_snapshot_id: body.forked_from_snapshot_id ?? null,
+      fork_event_sequence: body.fork_event_sequence ?? replayForWorld(worldId).source_sequence,
+      status: "active",
+      created_by_actor_ref: `user:${currentSubject.user_id}`,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    worldlines.push(fork);
+    sendJson(response, 201, fork);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleGM(request, response, currentSubject, worldId, resource, resourceId, action) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (resource === "agendas") {
+    await handleGMAgendas(request, response, currentSubject, worldId, resourceId);
+    return;
+  }
+  if (resource === "proposals") {
+    await handleGMProposals(request, response, currentSubject, worldId, resourceId, action);
+    return;
+  }
+  sendJson(response, 404, { detail: "not found" });
+}
+
+async function handleGMAgendas(request, response, currentSubject, worldId, agendaId) {
+  if (request.method === "GET" && agendaId === undefined) {
+    sendJson(response, 200, gmAgendas.filter((agenda) => agenda.world_id === worldId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && agendaId === undefined) {
+    const body = await readJson(request);
+    const agenda = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      title: body.title,
+      summary: body.summary,
+      priority: body.priority ?? 50,
+      status: "active",
+      focus_agents: body.focus_agents ?? [],
+      focus_organizations: body.focus_organizations ?? [],
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    gmAgendas.push(agenda);
+    sendJson(response, 201, agenda);
+    return;
+  }
+  const agenda = gmAgendas.find((item) => item.id === agendaId && item.world_id === worldId);
+  if (agenda === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(agenda, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, agenda);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleGMProposals(request, response, currentSubject, worldId, proposalId, action) {
+  if (request.method === "GET" && proposalId === undefined) {
+    sendJson(response, 200, gmProposals.filter((proposal) => proposal.world_id === worldId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && proposalId === undefined) {
+    const body = await readJson(request);
+    const proposal = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      agenda_id: body.agenda_id ?? null,
+      title: body.title,
+      reason: body.reason,
+      event_name: body.event_name,
+      proposed_payload: body.proposed_payload ?? {},
+      importance: body.importance ?? "daily",
+      risk_score: body.risk_score ?? 0,
+      affected_agents: body.affected_agents ?? [],
+      affected_organizations: body.affected_organizations ?? [],
+      source_context: body.source_context ?? {},
+      status: "proposed",
+      review_note: null,
+      resolved_event_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    gmProposals.push(proposal);
+    sendJson(response, 201, proposal);
+    return;
+  }
+  const proposal = gmProposals.find((item) => item.id === proposalId && item.world_id === worldId);
+  if (proposal === undefined || action !== "review") {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  const body = await readJson(request);
+  proposal.status = body.status;
+  proposal.review_note = body.review_note ?? null;
+  proposal.resolved_event_id = body.status === "resolved" ? randomUUID() : proposal.resolved_event_id;
+  proposal.updated_at = new Date().toISOString();
+  sendJson(response, 200, proposal);
+}
+
+async function handleResolutionRules(request, response, currentSubject, worldId, ruleId, action) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && ruleId === undefined) {
+    sendJson(response, 200, resolutionRules.filter((rule) => rule.world_id === worldId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && ruleId === undefined) {
+    const body = await readJson(request);
+    const rule = {
+      id: randomUUID(),
+      world_id: worldId,
+      rule_key: body.rule_key,
+      name: body.name,
+      description: body.description ?? null,
+      priority: body.priority ?? 50,
+      status: "active",
+      conditions: body.conditions ?? {},
+      effects: body.effects ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    resolutionRules.push(rule);
+    sendJson(response, 201, rule);
+    return;
+  }
+  const rule = resolutionRules.find((item) => item.id === ruleId && item.world_id === worldId);
+  if (rule === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && action === "dry-run") {
+    sendJson(response, 200, {
+      rule_id: rule.id,
+      rule_key: rule.rule_key,
+      matched: true,
+      reasons: ["Rule conditions are satisfied."],
+      effects: rule.effects,
+    });
+    return;
+  }
+  if (request.method === "PATCH") {
+    Object.assign(rule, await readJson(request), { updated_at: new Date().toISOString() });
+    sendJson(response, 200, rule);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handlePlayerActors(request, response, currentSubject, worldId) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, playerActors.filter((actor) => actor.world_id === worldId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const actor = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    user_id: body.user_id ?? currentSubject.user_id,
+    actor_ref: `player:${body.user_id ?? currentSubject.user_id}:primary`,
+    display_name: body.display_name,
+    current_scene_id: body.current_scene_id ?? null,
+    profile: body.profile ?? {},
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  playerActors.push(actor);
+  sendJson(response, 200, actor);
+}
+
+async function handlePlayerChoices(request, response, currentSubject, worldId, action) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && action === undefined) {
+    sendJson(response, 200, playerChoices.filter((choice) => choice.world_id === worldId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const preview = {
+    relationship_updates: body.effects?.relationship_updates ?? [],
+    faction_updates: body.effects?.faction_updates ?? [],
+    offscreen_events: body.effects?.offscreen_events ?? [],
+    diagnostics: [
+      `${(body.effects?.relationship_updates ?? []).length} relationship update(s)`,
+      `${(body.effects?.faction_updates ?? []).length} faction update(s)`,
+      `${(body.effects?.offscreen_events ?? []).length} offscreen event(s)`,
+    ],
+  };
+  if (request.method === "POST" && action === "preview") {
+    sendJson(response, 200, preview);
+    return;
+  }
+  const choice = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    user_id: body.user_id ?? currentSubject.user_id,
+    player_actor_id: body.player_actor_id,
+    choice_key: body.choice_key,
+    choice_kind: body.choice_kind,
+    prompt: body.prompt,
+    selected_option: body.selected_option,
+    context: body.context ?? {},
+    consequence_preview: preview,
+    applied_event_id: randomUUID(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  playerChoices.unshift(choice);
+  sendJson(response, 201, choice);
 }
 
 async function handleScenes(request, response, currentSubject, worldId, sceneId) {
@@ -1373,6 +1780,7 @@ async function handleFactionTracks(request, response, currentSubject, worldId, o
     const track = {
       id: randomUUID(),
       world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
       organization_id: organizationId,
       organization_key: organization?.organization_key ?? "unknown",
       organization_name: organization?.name ?? "Unknown",
@@ -1573,6 +1981,7 @@ async function handleAgentPresence(request, response, currentSubject, worldId, a
     const presence = existing ?? {
       id: randomUUID(),
       world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
       agent_id: agentId,
       agent_key: agent.agent_key,
       agent_display_name: agent.display_name,
@@ -1641,6 +2050,7 @@ async function handleAgentRelationships(
     const relationship = relationshipResponse({
       id: randomUUID(),
       world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
       source_agent_id: agentId,
       target_agent_id: targetAgent.id,
       relationship_type: body.relationship_type,
@@ -3071,11 +3481,12 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
     const snapshot = {
       id: randomUUID(),
       world_id: worldId,
+      worldline_id: primaryWorldlineId,
       covers_event_sequence: replay.source_sequence,
       schema_version: "world_state.v1",
       status: "valid",
       payload: null,
-      payload_uri: `object://worlds/${worldId}/snapshots/${replay.source_sequence}.json`,
+      payload_uri: `object://worlds/${worldId}/worldlines/${primaryWorldlineId}/snapshots/${replay.source_sequence}.json`,
       payload_location: "object",
       metadata: { source: "mock", storage: "local_object" },
       created_by_event_id: randomUUID(),
@@ -3207,6 +3618,7 @@ async function handleOffscreenEvents(request, response, currentSubject, worldId,
     const item = {
       id: randomUUID(),
       world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
       source_candidate_id: candidate?.id ?? null,
       event_name: body.event_name ?? "living_world.offscreen_event",
       title: candidate?.title ?? body.title,
@@ -3758,6 +4170,7 @@ function replayForWorld(worldId) {
   const projectedClock = projectClock(clocks.get(worldId) ?? clockForWorld(worldId));
   return {
     world_id: worldId,
+    worldline_id: primaryWorldlineId,
     schema_version: "world_state.v1",
     source_sequence: sourceSequence,
     clock:
@@ -3783,6 +4196,7 @@ function appendWorldEvent(worldId, input) {
   const event = {
     id: randomUUID(),
     world_id: worldId,
+    worldline_id: input.worldline_id ?? primaryWorldlineId,
     sequence: events.length + 1,
     event_name: input.event_name,
     importance: input.importance ?? "system",
@@ -3806,6 +4220,7 @@ function snapshotIntegrityForWorld(worldId) {
   if (latestSnapshot === null) {
     return {
       world_id: worldId,
+      worldline_id: primaryWorldlineId,
       status: "warning",
       latest_event_sequence: latestEventSequence,
       latest_snapshot_id: null,
@@ -3826,6 +4241,7 @@ function snapshotIntegrityForWorld(worldId) {
   const eventGap = Math.max(latestReplaySequence - latestSnapshot.covers_event_sequence, 0);
   return {
     world_id: worldId,
+    worldline_id: latestSnapshot.worldline_id ?? primaryWorldlineId,
     status: eventGap > 0 ? "warning" : "ok",
     latest_event_sequence: latestEventSequence,
     latest_snapshot_id: latestSnapshot.id,
@@ -3954,6 +4370,24 @@ function relationshipResponse(edge) {
     source_display_name: sourceAgent?.display_name ?? null,
     target_agent_key: targetAgent?.agent_key ?? null,
     target_display_name: targetAgent?.display_name ?? null,
+  };
+}
+
+function primaryWorldlineFor(worldId) {
+  return {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_key: "primary",
+    name: "Primary Worldline",
+    description: "Default branch for the living world.",
+    parent_worldline_id: null,
+    forked_from_snapshot_id: null,
+    fork_event_sequence: null,
+    status: "active",
+    created_by_actor_ref: "system:runtime",
+    metadata: { primary: true },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 }
 

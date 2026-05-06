@@ -119,7 +119,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
 
   await page.getByPlaceholder("Search email or display name").fill("candidate");
   await page.getByRole("button", { name: "Search users" }).click();
-  await expect(page.getByRole("heading", { name: "Candidate" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "Candidate", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Set world admin" }).click();
   await expect(page.getByText("candidate@example.test - world_admin").first()).toBeVisible();
 
@@ -135,9 +135,10 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Create snapshot" }).click();
   await expect(page.getByText("Snapshot created.")).toBeVisible();
 
-  await page.getByPlaceholder("rule-key").fill(`rule-${Date.now()}`);
-  await page.getByPlaceholder("Rule name").fill("E2E Rule");
-  await page.getByRole("button", { name: "Create schedule rule" }).click();
+  const scheduleRules = page.getByRole("region", { name: "Schedule rules" });
+  await scheduleRules.getByPlaceholder("rule-key").fill(`rule-${Date.now()}`);
+  await scheduleRules.getByPlaceholder("Rule name").fill("E2E Rule");
+  await scheduleRules.getByRole("button", { name: "Create schedule rule" }).click();
   await expect(page.getByRole("heading", { name: "E2E Rule" })).toBeVisible();
 
   await page.goto(`/worlds/${worldOneId}/agents`);

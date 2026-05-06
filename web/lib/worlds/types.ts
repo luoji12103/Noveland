@@ -70,6 +70,34 @@ export type EventImportance =
   | "route"
   | "main_plot";
 
+export type WorldlineStatus = "active" | "archived";
+
+export type Worldline = {
+  id: string;
+  world_id: string;
+  worldline_key: string;
+  name: string;
+  description: string | null;
+  parent_worldline_id: string | null;
+  forked_from_snapshot_id: string | null;
+  fork_event_sequence: number | null;
+  status: WorldlineStatus;
+  created_by_actor_ref: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorldlineComparison = {
+  base_worldline_id: string;
+  compare_worldline_id: string;
+  fork_event_sequence: number | null;
+  divergent_event_count: number;
+  relationship_delta_count: number;
+  faction_delta_count: number;
+  choice_delta_count: number;
+};
+
 export type SceneLocationEdge = {
   id: string;
   world_id: string;
@@ -133,6 +161,7 @@ export type FactionTrackType = "goal" | "conflict" | "resource" | "reputation" |
 export type FactionProgressTrack = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   organization_id: string;
   organization_key: string;
   organization_name: string;
@@ -152,6 +181,7 @@ export type PresenceVisibilityStatus = "visible" | "offscreen" | "hidden" | "una
 export type AgentPresence = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   agent_id: string;
   agent_key: string;
   agent_display_name: string;
@@ -171,6 +201,7 @@ export type DailyLifeCandidateStatus = "candidate" | "queued" | "dismissed";
 export type DailyLifeEventCandidate = {
   id: string | null;
   world_id: string;
+  worldline_id?: string | null;
   agent_id: string | null;
   agent_display_name: string | null;
   scene_id: string | null;
@@ -200,6 +231,7 @@ export type OffscreenEventStatus = "pending" | "resolved" | "cancelled" | "faile
 export type OffscreenEventQueueItem = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   source_candidate_id: string | null;
   event_name: string;
   title: string;
@@ -278,6 +310,7 @@ export type WorldBible = {
 export type AgentRelationship = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   source_agent_id: string;
   source_agent_key: string;
   source_display_name: string;
@@ -629,6 +662,7 @@ export type ReplayClock = {
 
 export type WorldReplayState = {
   world_id: string;
+  worldline_id?: string | null;
   schema_version: string;
   source_sequence: number;
   clock: ReplayClock | null;
@@ -639,6 +673,7 @@ export type WorldReplayState = {
 export type WorldSnapshot = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   covers_event_sequence: number;
   schema_version: string;
   status: string;
@@ -652,6 +687,7 @@ export type WorldSnapshot = {
 
 export type WorldSnapshotIntegrity = {
   world_id: string;
+  worldline_id?: string | null;
   status: "ok" | "warning" | "error";
   latest_event_sequence: number;
   latest_snapshot_id: string | null;
@@ -665,6 +701,7 @@ export type WorldSnapshotIntegrity = {
 export type WorldEventAuditEntry = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   sequence: number;
   event_name: string;
   importance: EventImportance;
@@ -680,6 +717,7 @@ export type WorldEventAuditEntry = {
 };
 
 export type WorldEventAuditFilters = {
+  worldline_id?: string | null;
   event_name?: string | null;
   actor_ref?: string | null;
   importance?: EventImportance | null;
@@ -716,6 +754,110 @@ export type CalendarConflictReport = {
   horizon_hours: number;
   conflict_count: number;
   conflicts: CalendarConflict[];
+};
+
+export type GMAgendaStatus = "active" | "paused" | "completed" | "archived";
+
+export type GMAgenda = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  title: string;
+  summary: string;
+  priority: number;
+  status: GMAgendaStatus;
+  focus_agents: string[];
+  focus_organizations: string[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GMProposalStatus = "proposed" | "accepted" | "rejected" | "resolved";
+
+export type GMEventProposal = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  agenda_id: string | null;
+  title: string;
+  reason: string;
+  event_name: string;
+  proposed_payload: Record<string, unknown>;
+  importance: Exclude<EventImportance, "system">;
+  risk_score: number;
+  affected_agents: string[];
+  affected_organizations: string[];
+  source_context: Record<string, unknown>;
+  status: GMProposalStatus;
+  review_note: string | null;
+  resolved_event_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResolutionRuleStatus = "active" | "inactive";
+
+export type EventResolutionRule = {
+  id: string;
+  world_id: string;
+  rule_key: string;
+  name: string;
+  description: string | null;
+  priority: number;
+  status: ResolutionRuleStatus;
+  conditions: Record<string, unknown>;
+  effects: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResolutionRuleDryRun = {
+  rule_id: string;
+  rule_key: string;
+  matched: boolean;
+  reasons: string[];
+  effects: Record<string, unknown>;
+};
+
+export type PlayerActor = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  actor_ref: string;
+  display_name: string;
+  current_scene_id: string | null;
+  profile: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlayerChoiceKind = "dialogue" | "travel" | "contact" | "intervention" | "route";
+
+export type PlayerChoice = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  player_actor_id: string;
+  choice_key: string;
+  choice_kind: PlayerChoiceKind;
+  prompt: string;
+  selected_option: string;
+  context: Record<string, unknown>;
+  consequence_preview: Record<string, unknown>;
+  applied_event_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChoiceConsequencePreview = {
+  relationship_updates: Record<string, unknown>[];
+  faction_updates: Record<string, unknown>[];
+  offscreen_events: Record<string, unknown>[];
+  diagnostics: string[];
 };
 
 export type CalendarEntry = {
@@ -1369,6 +1511,7 @@ export type OrganizationMembershipUpdateInput = Partial<
 >;
 
 export type FactionProgressTrackCreateInput = {
+  worldline_id?: string | null;
   track_key: string;
   name: string;
   track_type: FactionTrackType;
@@ -1386,6 +1529,7 @@ export type FactionProgressTrackUpdateInput = Partial<
 >;
 
 export type AgentPresenceInput = {
+  worldline_id?: string | null;
   current_scene_id?: string | null;
   visibility_status?: PresenceVisibilityStatus;
   encounter_eligible?: boolean;
@@ -1393,22 +1537,26 @@ export type AgentPresenceInput = {
 };
 
 export type DailyLifePreviewFilters = {
+  worldline_id?: string | null;
   start_world_time?: string | null;
   horizon_hours?: number;
   limit?: number;
 };
 
 export type DailyLifeGenerateInput = {
+  worldline_id?: string | null;
   horizon_hours?: number;
   limit?: number;
 };
 
 export type DailyLifeCandidateFilters = {
+  worldline_id?: string | null;
   status?: DailyLifeCandidateStatus | null;
   limit?: number;
 };
 
 export type OffscreenEventCreateInput = {
+  worldline_id?: string | null;
   candidate_id?: string | null;
   event_name?: string;
   title: string;
@@ -1418,6 +1566,7 @@ export type OffscreenEventCreateInput = {
 };
 
 export type OffscreenEventFilters = {
+  worldline_id?: string | null;
   status?: OffscreenEventStatus | null;
   limit?: number;
 };
@@ -1462,6 +1611,7 @@ export type WorldBibleInput = {
 };
 
 export type AgentRelationshipCreateInput = {
+  worldline_id?: string | null;
   source_agent_id: string;
   target_agent_id: string;
   relationship_type: RelationshipType;
@@ -1488,6 +1638,99 @@ export type AgentRelationshipUpdateInput = Partial<
     | "metadata"
   >
 >;
+
+export type WorldlineForkInput = {
+  source_worldline_id?: string | null;
+  worldline_key: string;
+  name: string;
+  description?: string | null;
+  forked_from_snapshot_id?: string | null;
+  fork_event_sequence?: number | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type WorldlineScopedFilters = {
+  worldline_id?: string | null;
+};
+
+export type GMAgendaCreateInput = {
+  worldline_id?: string | null;
+  title: string;
+  summary: string;
+  priority?: number;
+  focus_agents?: string[];
+  focus_organizations?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type GMAgendaUpdateInput = Partial<
+  Pick<
+    GMAgenda,
+    | "title"
+    | "summary"
+    | "priority"
+    | "status"
+    | "focus_agents"
+    | "focus_organizations"
+    | "metadata"
+  >
+>;
+
+export type GMProposalCreateInput = {
+  worldline_id?: string | null;
+  agenda_id?: string | null;
+  title: string;
+  reason: string;
+  event_name: string;
+  proposed_payload?: Record<string, unknown>;
+  importance?: Exclude<EventImportance, "system">;
+  risk_score?: number;
+  affected_agents?: string[];
+  affected_organizations?: string[];
+  source_context?: Record<string, unknown>;
+};
+
+export type GMProposalReviewInput = {
+  status: GMProposalStatus;
+  review_note?: string | null;
+};
+
+export type EventResolutionRuleCreateInput = {
+  rule_key: string;
+  name: string;
+  description?: string | null;
+  priority?: number;
+  conditions?: Record<string, unknown>;
+  effects?: Record<string, unknown>;
+};
+
+export type EventResolutionRuleUpdateInput = Partial<
+  Pick<
+    EventResolutionRule,
+    "name" | "description" | "priority" | "status" | "conditions" | "effects"
+  >
+>;
+
+export type PlayerActorBindInput = {
+  worldline_id?: string | null;
+  user_id?: string | null;
+  display_name: string;
+  current_scene_id?: string | null;
+  profile?: Record<string, unknown>;
+};
+
+export type PlayerChoiceCreateInput = {
+  worldline_id?: string | null;
+  user_id?: string | null;
+  player_actor_id: string;
+  choice_key: string;
+  choice_kind: PlayerChoiceKind;
+  prompt: string;
+  selected_option: string;
+  context?: Record<string, unknown>;
+  effects?: Record<string, unknown>;
+  apply?: boolean;
+};
 
 export type AgentPresetCreateInput = {
   preset_key: string;

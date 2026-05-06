@@ -17,8 +17,11 @@ import type {
   ConversationTurn,
   DailyLifeEventCandidate,
   DailyLifePreview,
+  EventResolutionRule,
   ExternalToolPolicy,
   FactionProgressTrack,
+  GMAgenda,
+  GMEventProposal,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -31,6 +34,8 @@ import type {
   NarrativeArtifactFilters,
   OffscreenEventQueueItem,
   OrganizationMembership,
+  PlayerActor,
+  PlayerChoice,
   PluginBinding,
   PluginCatalogEntry,
   ProviderHealth,
@@ -52,6 +57,7 @@ import type {
   WorldSnapshot,
   WorldSnapshotIntegrity,
   WorldOrganization,
+  Worldline,
 } from "@/lib/worlds/types";
 
 export type WorldWorkspaceData = {
@@ -61,6 +67,12 @@ export type WorldWorkspaceData = {
   locationEdges: SceneLocationEdge[];
   agents: Agent[];
   organizations: WorldOrganization[];
+  worldlines: Worldline[];
+  gmAgendas: GMAgenda[];
+  gmProposals: GMEventProposal[];
+  resolutionRules: EventResolutionRule[];
+  playerActors: PlayerActor[];
+  playerChoices: PlayerChoice[];
   organizationMemberships: OrganizationMembership[];
   factionTracks: FactionProgressTrack[];
   agentPresenceStates: AgentPresence[];
@@ -357,6 +369,12 @@ export async function getWorldWorkspaceData(
       locationEdges,
       agents,
       organizations,
+      worldlines,
+      gmAgendas,
+      gmProposals,
+      resolutionRules,
+      playerActors,
+      playerChoices,
       memberships,
       worldBible,
       clock,
@@ -376,6 +394,15 @@ export async function getWorldWorkspaceData(
       apiFetch<SceneLocationEdge[]>(`/worlds/${worldId}/location-edges`, cookies),
       apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
       apiFetch<WorldOrganization[]>(`/worlds/${worldId}/organizations`, cookies),
+      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetchOptional<GMAgenda[]>(`/worlds/${worldId}/gm/agendas`, cookies),
+      apiFetchOptional<GMEventProposal[]>(`/worlds/${worldId}/gm/proposals`, cookies),
+      apiFetchOptional<EventResolutionRule[]>(
+        `/worlds/${worldId}/resolution-rules`,
+        cookies,
+      ),
+      apiFetchOptional<PlayerActor[]>(`/worlds/${worldId}/player-actors`, cookies),
+      apiFetchOptional<PlayerChoice[]>(`/worlds/${worldId}/player-choices`, cookies),
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       apiFetch<WorldBible | null>(`/worlds/${worldId}/bible`, cookies),
       apiFetch<WorldClock>(`/worlds/${worldId}/clock`, cookies),
@@ -434,6 +461,12 @@ export async function getWorldWorkspaceData(
       locationEdges,
       agents,
       organizations,
+      worldlines,
+      gmAgendas: gmAgendas ?? [],
+      gmProposals: gmProposals ?? [],
+      resolutionRules: resolutionRules ?? [],
+      playerActors: playerActors ?? [],
+      playerChoices: playerChoices ?? [],
       organizationMemberships: organizationMembershipGroups.flat(),
       factionTracks: factionTrackGroups.flat(),
       agentPresenceStates: agentPresenceStates.filter(
@@ -995,6 +1028,12 @@ function emptyWorldWorkspaceData(
     locationEdges: [],
     agents: [],
     organizations: [],
+    worldlines: [],
+    gmAgendas: [],
+    gmProposals: [],
+    resolutionRules: [],
+    playerActors: [],
+    playerChoices: [],
     organizationMemberships: [],
     factionTracks: [],
     agentPresenceStates: [],
