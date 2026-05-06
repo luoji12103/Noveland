@@ -19,7 +19,8 @@ from noveland.memory.contracts import (
 )
 from noveland.memory.models import AgentMemoryItem
 from noveland.memory.utils import deterministic_embedding
-from sqlalchemy import select
+from noveland.worlds.worldlines import ensure_primary_worldline, primary_worldline_or_none
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.orm import Session
 
 BACKEND_NAME = "local_pgvector"
@@ -43,6 +44,7 @@ class LocalPgvectorMemoryBackend:
         model = AgentMemoryItem(
             id=uuid.uuid4(),
             world_id=turn.world_id,
+            worldline_id=_worldline_id(self._session, turn.world_id, turn.worldline_id),
             agent_id=turn.agent_id,
             source_event_id=turn.source_event_id,
             content=content,
@@ -74,6 +76,7 @@ class LocalPgvectorMemoryBackend:
             model = AgentMemoryItem(
                 id=uuid.uuid4(),
                 world_id=event.world_id,
+                worldline_id=_worldline_id(self._session, event.world_id, event.worldline_id),
                 agent_id=event.agent_id,
                 source_event_id=event.event_id,
                 content=event.content,
@@ -93,7 +96,13 @@ class LocalPgvectorMemoryBackend:
             backend_ids=backend_ids,
         )
 
-    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> Sequence[MemoryItemRecord]:
+        resolved_worldline_id = _worldline_id(self._session, world_id, worldline_id)
         models = self._session.scalars(
             select(AgentMemoryItem)
             .where(
@@ -101,6 +110,7 @@ class LocalPgvectorMemoryBackend:
                 AgentMemoryItem.agent_id == agent_id,
                 AgentMemoryItem.is_active.is_(True),
             )
+            .where(_memory_worldline_scope(self._session, world_id, resolved_worldline_id))
             .order_by(AgentMemoryItem.created_at.desc()),
         ).all()
         return [_record(model) for model in models]
@@ -108,13 +118,26 @@ class LocalPgvectorMemoryBackend:
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:
         started_at = datetime.now(UTC)
         query_embedding = deterministic_embedding(request.query_text)
+        resolved_worldline_id = _worldline_id(
+            self._session,
+            request.world_id,
+            request.worldline_id,
+        )
         scored = [
             _record(model, _cosine_similarity(query_embedding, model.embedding))
             for model in self._session.scalars(
-                select(AgentMemoryItem).where(
+                select(AgentMemoryItem)
+                .where(
                     AgentMemoryItem.world_id == request.world_id,
                     AgentMemoryItem.agent_id == request.agent_id,
                     AgentMemoryItem.is_active.is_(True),
+                )
+                .where(
+                    _memory_worldline_scope(
+                        self._session,
+                        request.world_id,
+                        resolved_worldline_id,
+                    ),
                 ),
             ).all()
         ]
@@ -127,12 +150,15 @@ class LocalPgvectorMemoryBackend:
         )
 
     def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
+        resolved_worldline_id = _worldline_id(self._session, scope.world_id, scope.worldline_id)
         models = self._session.scalars(
-            select(AgentMemoryItem).where(
+            select(AgentMemoryItem)
+            .where(
                 AgentMemoryItem.world_id == scope.world_id,
                 AgentMemoryItem.agent_id == scope.agent_id,
                 AgentMemoryItem.is_active.is_(True),
-            ),
+            )
+            .where(_memory_worldline_scope(self._session, scope.world_id, resolved_worldline_id)),
         ).all()
         deleted_count = 0
         for model in models:
@@ -177,3 +203,27 @@ def _aware_datetime(value: datetime | None) -> datetime | None:
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _worldline_id(
+    session: Session,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID | None,
+) -> uuid.UUID:
+    if worldline_id is not None:
+        return worldline_id
+    return ensure_primary_worldline(session, world_id).id
+
+
+def _memory_worldline_scope(
+    session: Session,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> ColumnElement[bool]:
+    primary = primary_worldline_or_none(session, world_id)
+    if primary is not None and primary.id == worldline_id:
+        return or_(
+            AgentMemoryItem.worldline_id == worldline_id,
+            AgentMemoryItem.worldline_id.is_(None),
+        )
+    return AgentMemoryItem.worldline_id == worldline_id

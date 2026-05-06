@@ -24,7 +24,7 @@ def test_migration_versions_are_linear_and_ordered() -> None:
     assert revision_matches_filename == [True] * len(migration_files)
     assert down_revisions[0] is None
     assert down_revisions[1:] == revisions[:-1]
-    assert revisions[-1] == "20260505_0024"
+    assert revisions[-1] == "20260505_0025"
 
 
 def test_every_migration_exposes_upgrade_and_downgrade() -> None:
@@ -36,9 +36,7 @@ def test_every_migration_exposes_upgrade_and_downgrade() -> None:
 
 def _migration_files() -> list[Path]:
     return sorted(
-        path
-        for path in Path("migrations/versions").glob("*.py")
-        if not path.name.startswith("__")
+        path for path in Path("migrations/versions").glob("*.py") if not path.name.startswith("__")
     )
 
 

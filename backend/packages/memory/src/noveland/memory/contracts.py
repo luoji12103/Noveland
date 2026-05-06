@@ -44,6 +44,7 @@ class MemoryMessage(_FrozenContract):
 
 class MemoryTurn(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID
     conversation_id: uuid.UUID | None = None
     turn_id: uuid.UUID | None = None
@@ -57,6 +58,7 @@ class MemoryTurn(_FrozenContract):
 
 class MemoryEvent(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID
     event_id: uuid.UUID
     run_id: uuid.UUID | None = None
@@ -87,6 +89,7 @@ class MemoryItemRecord(_FrozenContract):
 
 class MemorySearchRequest(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID
     query_text: str = Field(min_length=1, max_length=8_000)
     limit: int = Field(default=10, ge=1, le=50)
@@ -122,6 +125,7 @@ class MemoryContext(_FrozenContract):
 
 class MemoryDeleteScope(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID
     run_id: uuid.UUID | None = None
 
@@ -383,7 +387,12 @@ class MemoryBackend(Protocol):
     def record_events(self, events: Sequence[MemoryEvent]) -> MemoryWriteResult:
         """Persist one or more event-shaped memory payloads."""
 
-    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> Sequence[MemoryItemRecord]:
         """List memories for one agent scope."""
 
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:

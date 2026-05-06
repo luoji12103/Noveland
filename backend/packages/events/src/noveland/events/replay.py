@@ -38,6 +38,7 @@ class WorldReplayState(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     schema_version: str = WORLD_STATE_SCHEMA_VERSION
     source_sequence: int = Field(ge=0)
     clock: ClockReplayState | None = None
@@ -74,10 +75,23 @@ class WorldReplayService:
         self._settings = settings or load_settings()
         self._object_storage = LocalObjectStorage(self._settings.object_storage_root)
 
-    def replay_state(self, world_id: uuid.UUID) -> WorldReplayState:
-        latest_snapshot = self._event_store.latest_snapshot(world_id)
-        state = self._state_from_snapshot(world_id, latest_snapshot)
-        events = self._event_store.list_events_after(world_id, state.source_sequence)
+    def replay_state(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> WorldReplayState:
+        resolved_worldline_id = (
+            self._event_store.primary_worldline_id(world_id)
+            if worldline_id is None
+            else worldline_id
+        )
+        latest_snapshot = self._event_store.latest_snapshot(world_id, resolved_worldline_id)
+        state = self._state_from_snapshot(world_id, resolved_worldline_id, latest_snapshot)
+        events = self._event_store.list_events_after(
+            world_id,
+            state.source_sequence,
+            worldline_id=resolved_worldline_id,
+        )
 
         source_sequence = state.source_sequence
         clock = state.clock
@@ -96,6 +110,7 @@ class WorldReplayService:
 
         return WorldReplayState(
             world_id=world_id,
+            worldline_id=resolved_worldline_id,
             source_sequence=source_sequence,
             clock=clock,
             applied_event_count=applied_event_count,
@@ -107,15 +122,20 @@ class WorldReplayService:
         world_id: uuid.UUID,
         actor_ref: str,
         correlation_id: uuid.UUID | None = None,
+        worldline_id: uuid.UUID | None = None,
     ) -> WorldSnapshotRecord:
-        state = self.replay_state(world_id)
+        state = self.replay_state(world_id, worldline_id)
+        resolved_worldline_id = state.worldline_id
+        if resolved_worldline_id is None:
+            resolved_worldline_id = self._event_store.primary_worldline_id(world_id)
         object_record = self._object_storage.write_json(
-            _snapshot_object_key(world_id, state.source_sequence),
+            _snapshot_object_key(world_id, resolved_worldline_id, state.source_sequence),
             state.snapshot_payload(),
         )
         return self._event_store.record_snapshot(
             WorldSnapshotCreate(
                 world_id=world_id,
+                worldline_id=resolved_worldline_id,
                 covers_event_sequence=state.source_sequence,
                 schema_version=WORLD_STATE_SCHEMA_VERSION,
                 payload=None,
@@ -130,12 +150,28 @@ class WorldReplayService:
             ),
         )
 
-    def latest_snapshot(self, world_id: uuid.UUID) -> WorldSnapshotRecord | None:
-        return self._event_store.latest_snapshot(world_id)
+    def latest_snapshot(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> WorldSnapshotRecord | None:
+        return self._event_store.latest_snapshot(world_id, worldline_id)
 
-    def snapshot_integrity(self, world_id: uuid.UUID) -> WorldSnapshotIntegrityReport:
-        latest_event_sequence = self._event_store.latest_event_sequence(world_id)
-        latest_snapshot = self._event_store.latest_snapshot(world_id)
+    def snapshot_integrity(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> WorldSnapshotIntegrityReport:
+        resolved_worldline_id = (
+            self._event_store.primary_worldline_id(world_id)
+            if worldline_id is None
+            else worldline_id
+        )
+        latest_event_sequence = self._event_store.latest_event_sequence(
+            world_id,
+            resolved_worldline_id,
+        )
+        latest_snapshot = self._event_store.latest_snapshot(world_id, resolved_worldline_id)
         if latest_snapshot is None:
             return WorldSnapshotIntegrityReport(
                 world_id=world_id,
@@ -160,7 +196,11 @@ class WorldReplayService:
 
         event_gap = _replay_relevant_event_gap(
             latest_snapshot.covers_event_sequence,
-            self._event_store.list_events_after(world_id, latest_snapshot.covers_event_sequence),
+            self._event_store.list_events_after(
+                world_id,
+                latest_snapshot.covers_event_sequence,
+                worldline_id=resolved_worldline_id,
+            ),
         )
         if any(_is_error_issue(issue) for issue in issues):
             integrity_status = SnapshotIntegrityStatus.ERROR
@@ -195,11 +235,13 @@ class WorldReplayService:
     def _state_from_snapshot(
         self,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
         snapshot: WorldSnapshotRecord | None,
     ) -> WorldReplayState:
         if snapshot is None or snapshot.schema_version != WORLD_STATE_SCHEMA_VERSION:
             return WorldReplayState(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 source_sequence=0,
                 applied_event_count=0,
                 unhandled_event_count=0,
@@ -209,6 +251,7 @@ class WorldReplayService:
         if payload is None:
             return WorldReplayState(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 source_sequence=0,
                 applied_event_count=0,
                 unhandled_event_count=0,
@@ -221,6 +264,7 @@ class WorldReplayService:
         )
         return WorldReplayState(
             world_id=world_id,
+            worldline_id=worldline_id,
             source_sequence=snapshot.covers_event_sequence,
             clock=clock,
             applied_event_count=_nonnegative_int(payload.get("applied_event_count")),
@@ -240,8 +284,12 @@ def _snapshot_payload_is_valid(
     return state.source_sequence == snapshot.covers_event_sequence
 
 
-def _snapshot_object_key(world_id: uuid.UUID, source_sequence: int) -> str:
-    return f"worlds/{world_id}/snapshots/{source_sequence}.json"
+def _snapshot_object_key(
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    source_sequence: int,
+) -> str:
+    return f"worlds/{world_id}/worldlines/{worldline_id}/snapshots/{source_sequence}.json"
 
 
 def _payload_location(snapshot: WorldSnapshotRecord) -> str | None:
@@ -264,11 +312,7 @@ def _replay_relevant_event_gap(
 
 
 def _is_error_issue(issue: str) -> bool:
-    return (
-        "schema version" in issue
-        or "payload" in issue
-        or "future event sequence" in issue
-    )
+    return "schema version" in issue or "payload" in issue or "future event sequence" in issue
 
 
 def _clock_from_event(

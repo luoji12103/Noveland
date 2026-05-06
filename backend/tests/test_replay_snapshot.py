@@ -17,7 +17,7 @@ from noveland.events import (
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.memory.models import MemoryBackendProfile
-from noveland.worlds.models import World
+from noveland.worlds.models import World, Worldline
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -119,7 +119,9 @@ def test_replay_service_creates_object_snapshot_from_current_state(tmp_path: Pat
     assert snapshot.schema_version == WORLD_STATE_SCHEMA_VERSION
     assert snapshot.covers_event_sequence == 1
     assert snapshot.payload is None
-    assert snapshot.payload_uri == f"object://worlds/{world_id}/snapshots/1.json"
+    assert snapshot.payload_uri == (
+        f"object://worlds/{world_id}/worldlines/{snapshot.worldline_id}/snapshots/1.json"
+    )
     assert snapshot.metadata["storage"] == "local_object"
 
     with Session(engine) as session:
@@ -326,6 +328,7 @@ def _engine() -> Engine:
         cast(Table, User.__table__),
         cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, WorldSnapshotModel.__table__),
     ):

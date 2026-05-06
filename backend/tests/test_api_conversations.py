@@ -34,7 +34,7 @@ from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
-from noveland.worlds.models import Scene, World, WorldMembership
+from noveland.worlds.models import Scene, World, Worldline, WorldMembership
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -456,6 +456,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, PlatformRoleAssignment.__table__),
         cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),

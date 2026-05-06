@@ -36,6 +36,7 @@ from noveland.worlds.models import (
     World,
     WorldClockStateModel,
     WorldClockTransitionModel,
+    Worldline,
     WorldMembership,
 )
 from sqlalchemy import Table, create_engine
@@ -214,6 +215,7 @@ def _create_tables(engine: Engine) -> None:
         AuthSession.__table__,
         PlatformRoleAssignment.__table__,
         World.__table__,
+        Worldline.__table__,
         WorldMembership.__table__,
         WorldClockStateModel.__table__,
         WorldClockTransitionModel.__table__,

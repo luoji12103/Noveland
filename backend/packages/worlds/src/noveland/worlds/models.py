@@ -124,6 +124,45 @@ class WorldBible(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class Worldline(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "worldlines"
+    __table_args__ = (
+        UniqueConstraint("world_id", "worldline_key", name="uq_worldlines_world_key"),
+        CheckConstraint("status IN ('active', 'archived')", name="status"),
+        CheckConstraint(
+            "fork_event_sequence IS NULL OR fork_event_sequence >= 0",
+            name="fork_event_sequence_nonnegative",
+        ),
+        Index("ix_worldlines_world_status", "world_id", "status"),
+        Index("ix_worldlines_parent_worldline_id", "parent_worldline_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    forked_from_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_snapshots.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    fork_event_sequence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    created_by_actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
 class WorldMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "world_memberships"
     __table_args__ = (
@@ -274,6 +313,7 @@ class FactionProgressTrack(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint(
             "organization_id",
+            "worldline_id",
             "track_key",
             name="uq_faction_progress_tracks_organization_key",
         ),
@@ -285,11 +325,21 @@ class FactionProgressTrack(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("pressure >= 0 AND pressure <= 100", name="pressure_range"),
         Index("ix_faction_progress_tracks_world_organization", "world_id", "organization_id"),
         Index("ix_faction_progress_tracks_world_type", "world_id", "track_type"),
+        Index(
+            "ix_faction_progress_tracks_worldline_organization",
+            "world_id",
+            "worldline_id",
+            "organization_id",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     organization_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("world_organizations.id", ondelete="CASCADE"),
@@ -341,18 +391,33 @@ class SceneLocationEdge(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class AgentPresenceState(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "agent_presence_states"
     __table_args__ = (
-        UniqueConstraint("world_id", "agent_id", name="uq_agent_presence_states_world_agent"),
+        UniqueConstraint(
+            "world_id",
+            "worldline_id",
+            "agent_id",
+            name="uq_agent_presence_states_world_agent",
+        ),
         CheckConstraint(
             "visibility_status IN ('visible', 'offscreen', 'hidden', 'unavailable')",
             name="visibility_status",
         ),
         Index("ix_agent_presence_states_world_scene", "world_id", "current_scene_id"),
         Index("ix_agent_presence_states_world_agent", "world_id", "agent_id"),
+        Index(
+            "ix_agent_presence_states_worldline_agent",
+            "world_id",
+            "worldline_id",
+            "agent_id",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     agent_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="CASCADE"),
@@ -384,11 +449,21 @@ class DailyLifeEventCandidate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         Index("ix_daily_life_event_candidates_world_status", "world_id", "status"),
         Index("ix_daily_life_event_candidates_world_time", "world_id", "starts_at"),
+        Index(
+            "ix_daily_life_event_candidates_worldline_status",
+            "world_id",
+            "worldline_id",
+            "status",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL"),
@@ -423,11 +498,22 @@ class OffscreenEventQueueItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         Index("ix_offscreen_event_queue_world_status_due", "world_id", "status", "due_at"),
         Index("ix_offscreen_event_queue_world_importance", "world_id", "importance"),
+        Index(
+            "ix_offscreen_event_queue_worldline_status_due",
+            "world_id",
+            "worldline_id",
+            "status",
+            "due_at",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     source_candidate_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("daily_life_event_candidates.id", ondelete="SET NULL"),
@@ -449,6 +535,221 @@ class OffscreenEventQueueItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class GMAgenda(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "gm_agendas"
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'paused', 'completed', 'archived')", name="status"),
+        CheckConstraint("priority >= 0 AND priority <= 100", name="priority_range"),
+        Index("ix_gm_agendas_worldline_status", "world_id", "worldline_id", "status"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    focus_agents: Mapped[list[str]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    focus_organizations: Mapped[list[str]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class GMEventProposal(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "gm_event_proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('proposed', 'accepted', 'rejected', 'resolved')", name="status"
+        ),
+        CheckConstraint(
+            "importance IN ('daily', 'relationship', 'organization', 'route', 'main_plot')",
+            name="importance",
+        ),
+        CheckConstraint("risk_score >= 0 AND risk_score <= 100", name="risk_score_range"),
+        Index("ix_gm_event_proposals_worldline_status", "world_id", "worldline_id", "status"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agenda_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gm_agendas.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    event_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    proposed_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    importance: Mapped[str] = mapped_column(String(32), nullable=False)
+    risk_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    affected_agents: Mapped[list[str]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    affected_organizations: Mapped[list[str]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=list,
+    )
+    source_context: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="proposed")
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class EventResolutionRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "event_resolution_rules"
+    __table_args__ = (
+        UniqueConstraint("world_id", "rule_key", name="uq_event_resolution_rules_world_key"),
+        CheckConstraint("status IN ('active', 'inactive')", name="status"),
+        CheckConstraint("priority >= 0 AND priority <= 100", name="priority_range"),
+        Index("ix_event_resolution_rules_world_status", "world_id", "status"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    rule_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    conditions_json: Mapped[dict[str, Any]] = mapped_column(
+        "conditions",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    effects_json: Mapped[dict[str, Any]] = mapped_column(
+        "effects",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class PlayerActorProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "player_actor_profiles"
+    __table_args__ = (
+        UniqueConstraint(
+            "world_id",
+            "worldline_id",
+            "user_id",
+            name="uq_player_actor_profiles_scope_user",
+        ),
+        Index("ix_player_actor_profiles_worldline", "world_id", "worldline_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    current_scene_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("scenes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    profile_json: Mapped[dict[str, Any]] = mapped_column(
+        "profile",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class PlayerChoiceRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "player_choice_records"
+    __table_args__ = (
+        CheckConstraint(
+            "choice_kind IN ('dialogue', 'travel', 'contact', 'intervention', 'route')",
+            name="choice_kind",
+        ),
+        Index("ix_player_choice_records_worldline_user", "world_id", "worldline_id", "user_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    player_actor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("player_actor_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    choice_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    choice_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    selected_option: Mapped[str] = mapped_column(Text, nullable=False)
+    context_json: Mapped[dict[str, Any]] = mapped_column(
+        "context",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    consequence_preview: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    applied_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
 
 class WorldClockStateModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):

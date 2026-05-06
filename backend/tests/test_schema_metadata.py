@@ -57,13 +57,18 @@ def test_core_schema_tables_are_registered() -> None:
         "conversation_sessions",
         "conversation_turns",
         "daily_life_event_candidates",
+        "event_resolution_rules",
         "faction_progress_tracks",
+        "gm_agendas",
+        "gm_event_proposals",
         "memory_backend_profiles",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
         "offscreen_event_queue",
         "organization_memberships",
+        "player_actor_profiles",
+        "player_choice_records",
         "platform_settings",
         "platform_role_assignments",
         "provider_profiles",
@@ -79,6 +84,7 @@ def test_core_schema_tables_are_registered() -> None:
         "world_clock_states",
         "world_clock_transitions",
         "world_bibles",
+        "worldlines",
         "world_memberships",
         "world_organizations",
         "world_schedule_rules",
@@ -155,6 +161,55 @@ def test_living_world_autonomous_system_columns_are_registered() -> None:
     )
 
 
+def test_living_world_gm_choices_worldline_columns_are_registered() -> None:
+    assert {
+        "worldline_key",
+        "parent_worldline_id",
+        "forked_from_snapshot_id",
+        "fork_event_sequence",
+        "status",
+        "created_by_actor_ref",
+        "metadata",
+    } <= column_names("worldlines")
+    assert {"worldline_id"} <= column_names("world_events")
+    assert {"worldline_id"} <= column_names("world_snapshots")
+    assert {"worldline_id"} <= column_names("agent_memory_items")
+    assert {"worldline_id"} <= column_names("memory_write_jobs")
+    assert {"worldline_id"} <= column_names("memory_retrieval_logs")
+    assert {"worldline_id"} <= column_names("agent_relationship_edges")
+    assert {"worldline_id"} <= column_names("faction_progress_tracks")
+    assert {"worldline_id"} <= column_names("agent_presence_states")
+    assert {"worldline_id"} <= column_names("daily_life_event_candidates")
+    assert {"worldline_id"} <= column_names("offscreen_event_queue")
+    assert {"worldline_id", "title", "summary", "priority", "status"} <= column_names(
+        "gm_agendas",
+    )
+    assert {
+        "worldline_id",
+        "agenda_id",
+        "title",
+        "reason",
+        "proposed_payload",
+        "importance",
+        "risk_score",
+        "status",
+    } <= column_names("gm_event_proposals")
+    assert {"rule_key", "conditions", "effects", "status"} <= column_names(
+        "event_resolution_rules",
+    )
+    assert {"worldline_id", "user_id", "actor_ref", "profile"} <= column_names(
+        "player_actor_profiles",
+    )
+    assert {
+        "worldline_id",
+        "player_actor_id",
+        "choice_key",
+        "choice_kind",
+        "context",
+        "consequence_preview",
+    } <= column_names("player_choice_records")
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(
@@ -222,8 +277,17 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
         "world_clock_transitions",
         UniqueConstraint,
     )
-    assert "uq_world_events_world_sequence" in constraint_names(
+    assert "uq_world_events_worldline_sequence" in constraint_names(
         "world_events",
+        UniqueConstraint,
+    )
+    assert "uq_worldlines_world_key" in constraint_names("worldlines", UniqueConstraint)
+    assert "uq_event_resolution_rules_world_key" in constraint_names(
+        "event_resolution_rules",
+        UniqueConstraint,
+    )
+    assert "uq_player_actor_profiles_scope_user" in constraint_names(
+        "player_actor_profiles",
         UniqueConstraint,
     )
     assert "uq_memory_backend_profiles_profile_key" in constraint_names(
@@ -333,6 +397,24 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
     )
     assert "ck_world_events_importance" in constraint_names(
         "world_events",
+        CheckConstraint,
+    )
+    assert "ck_worldlines_status" in constraint_names("worldlines", CheckConstraint)
+    assert "ck_worldlines_fork_event_sequence_nonnegative" in constraint_names(
+        "worldlines",
+        CheckConstraint,
+    )
+    assert "ck_gm_agendas_status" in constraint_names("gm_agendas", CheckConstraint)
+    assert "ck_gm_event_proposals_status" in constraint_names(
+        "gm_event_proposals",
+        CheckConstraint,
+    )
+    assert "ck_event_resolution_rules_status" in constraint_names(
+        "event_resolution_rules",
+        CheckConstraint,
+    )
+    assert "ck_player_choice_records_choice_kind" in constraint_names(
+        "player_choice_records",
         CheckConstraint,
     )
     assert "ck_world_organizations_organization_type" in constraint_names(
@@ -492,6 +574,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("agents") == {"agent_presets.id", "scenes.id", "worlds.id"}
     assert foreign_key_targets("agent_relationship_edges") == {
         "agents.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("agent_presets") == set()
@@ -504,7 +587,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     }
     assert foreign_key_targets("world_clock_states") == {"worlds.id"}
     assert foreign_key_targets("world_clock_transitions") == {"worlds.id"}
-    assert foreign_key_targets("world_events") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("world_events") == {
+        "worldlines.id",
+        "worlds.id",
+        "world_events.id",
+    }
     assert foreign_key_targets("world_organizations") == {"worlds.id"}
     assert foreign_key_targets("organization_memberships") == {
         "agents.id",
@@ -512,6 +599,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worlds.id",
     }
     assert foreign_key_targets("faction_progress_tracks") == {
+        "worldlines.id",
         "world_organizations.id",
         "worlds.id",
     }
@@ -523,19 +611,26 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "agents.id",
         "scenes.id",
         "world_events.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("daily_life_event_candidates") == {
         "agents.id",
         "scenes.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("offscreen_event_queue") == {
         "daily_life_event_candidates.id",
         "world_events.id",
+        "worldlines.id",
         "worlds.id",
     }
-    assert foreign_key_targets("world_snapshots") == {"worlds.id", "world_events.id"}
+    assert foreign_key_targets("world_snapshots") == {
+        "worldlines.id",
+        "worlds.id",
+        "world_events.id",
+    }
     assert foreign_key_targets("conversation_sessions") == {"scenes.id", "worlds.id"}
     assert foreign_key_targets("conversation_participants") == {
         "agents.id",
@@ -551,18 +646,47 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
     assert foreign_key_targets("agent_memory_items") == {
         "agents.id",
         "world_events.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("memory_backend_profiles") == set()
     assert foreign_key_targets("memory_write_jobs") == {
         "agents.id",
         "memory_backend_profiles.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("memory_write_logs") == {"memory_write_jobs.id"}
     assert foreign_key_targets("memory_retrieval_logs") == {
         "agents.id",
         "memory_backend_profiles.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("worldlines") == {
+        "world_snapshots.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("gm_agendas") == {"worldlines.id", "worlds.id"}
+    assert foreign_key_targets("gm_event_proposals") == {
+        "gm_agendas.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("event_resolution_rules") == {"worlds.id"}
+    assert foreign_key_targets("player_actor_profiles") == {
+        "scenes.id",
+        "users.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("player_choice_records") == {
+        "player_actor_profiles.id",
+        "users.id",
+        "world_events.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("agent_profile_snapshots") == {"agents.id", "worlds.id"}
@@ -614,6 +738,9 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_relationship_edges_world_target" in index_names(
         "agent_relationship_edges",
     )
+    assert "ix_agent_relationship_edges_worldline_source" in index_names(
+        "agent_relationship_edges",
+    )
     assert "ix_agent_presets_is_active" in index_names("agent_presets")
     assert "ix_agent_personas_world_agent" in index_names("agent_personas")
     assert "ix_agent_observations_world_agent_observed" in index_names("agent_observations")
@@ -630,6 +757,9 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_world_events_world_event_name" in index_names("world_events")
     assert "ix_world_events_world_wall_time" in index_names("world_events")
     assert "ix_world_events_world_importance" in index_names("world_events")
+    assert "ix_world_events_worldline_sequence" in index_names("world_events")
+    assert "ix_worldlines_world_status" in index_names("worldlines")
+    assert "ix_worldlines_parent_worldline_id" in index_names("worldlines")
     assert "ix_scenes_world_region" in index_names("scenes")
     assert "ix_world_organizations_world_id" in index_names("world_organizations")
     assert "ix_world_organizations_world_type" in index_names("world_organizations")
@@ -641,18 +771,30 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
         "faction_progress_tracks",
     )
     assert "ix_faction_progress_tracks_world_type" in index_names("faction_progress_tracks")
+    assert "ix_faction_progress_tracks_worldline_organization" in index_names(
+        "faction_progress_tracks",
+    )
     assert "ix_scene_location_edges_world_source" in index_names("scene_location_edges")
     assert "ix_scene_location_edges_world_target" in index_names("scene_location_edges")
     assert "ix_agent_presence_states_world_agent" in index_names("agent_presence_states")
     assert "ix_agent_presence_states_world_scene" in index_names("agent_presence_states")
+    assert "ix_agent_presence_states_worldline_agent" in index_names(
+        "agent_presence_states",
+    )
     assert "ix_daily_life_event_candidates_world_status" in index_names(
         "daily_life_event_candidates",
     )
     assert "ix_daily_life_event_candidates_world_time" in index_names(
         "daily_life_event_candidates",
     )
+    assert "ix_daily_life_event_candidates_worldline_status" in index_names(
+        "daily_life_event_candidates",
+    )
     assert "ix_offscreen_event_queue_world_status_due" in index_names("offscreen_event_queue")
     assert "ix_offscreen_event_queue_world_importance" in index_names("offscreen_event_queue")
+    assert "ix_offscreen_event_queue_worldline_status_due" in index_names(
+        "offscreen_event_queue",
+    )
     assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")
@@ -662,6 +804,7 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_conversation_turns_speaker_agent_id" in index_names("conversation_turns")
     assert "ix_conversation_turns_run_id" in index_names("conversation_turns")
     assert "ix_world_snapshots_world_sequence" in index_names("world_snapshots")
+    assert "ix_world_snapshots_worldline_sequence" in index_names("world_snapshots")
     assert "ix_world_snapshots_world_latest_valid" in index_names("world_snapshots")
     assert "ix_agent_calendar_entries_world_agent_starts" in index_names(
         "agent_calendar_entries",
@@ -674,12 +817,20 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_agent_memory_items_world_agent" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_world_agent_active" in index_names("agent_memory_items")
     assert "ix_agent_memory_items_source_event_id" in index_names("agent_memory_items")
+    assert "ix_agent_memory_items_worldline_agent" in index_names("agent_memory_items")
+    assert "ix_agent_memory_items_worldline_agent_active" in index_names(
+        "agent_memory_items",
+    )
     assert "ix_memory_write_jobs_status_next_attempt_at" in index_names("memory_write_jobs")
     assert "ix_memory_write_jobs_world_agent" in index_names("memory_write_jobs")
     assert "ix_memory_write_jobs_backend_profile_id" in index_names("memory_write_jobs")
+    assert "ix_memory_write_jobs_worldline_agent" in index_names("memory_write_jobs")
     assert "ix_memory_write_logs_job_id" in index_names("memory_write_logs")
     assert "ix_memory_write_logs_occurred_at" in index_names("memory_write_logs")
     assert "ix_memory_retrieval_logs_world_agent" in index_names("memory_retrieval_logs")
+    assert "ix_memory_retrieval_logs_worldline_agent" in index_names(
+        "memory_retrieval_logs",
+    )
     assert "ix_memory_retrieval_logs_occurred_at" in index_names("memory_retrieval_logs")
     assert "ix_agent_profile_snapshots_world_agent" in index_names("agent_profile_snapshots")
     assert "ix_agent_runtime_runs_world_agent_started_at" in index_names("agent_runtime_runs")

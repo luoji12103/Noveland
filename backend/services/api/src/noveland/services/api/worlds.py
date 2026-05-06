@@ -102,23 +102,31 @@ from noveland.services.api.dependencies import (
     get_world_member_context,
 )
 from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
-from noveland.worlds import LivingWorldAutonomyService
+from noveland.worlds.autonomous import LivingWorldAutonomyService
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
+from noveland.worlds.gm import LivingWorldGMService, ResolutionRuleDryRun, WorldlineComparison
 from noveland.worlds.models import (
     AgentPresenceState,
     DailyLifeEventCandidate,
+    EventResolutionRule,
     FactionProgressTrack,
+    GMAgenda,
+    GMEventProposal,
     OffscreenEventQueueItem,
     OrganizationMembership,
+    PlayerActorProfile,
+    PlayerChoiceRecord,
     Scene,
     SceneLocationEdge,
     World,
     WorldBible,
     WorldClockTransitionModel,
+    Worldline,
     WorldMembership,
     WorldOrganization,
 )
+from noveland.worlds.worldlines import ensure_primary_worldline
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -170,6 +178,11 @@ PresenceVisibilityStatus = Literal["visible", "offscreen", "hidden", "unavailabl
 EventImportance = Literal["system", "daily", "relationship", "organization", "route", "main_plot"]
 OffscreenEventStatus = Literal["pending", "resolved", "cancelled", "failed"]
 DailyLifeCandidateStatus = Literal["candidate", "queued", "dismissed"]
+WorldlineStatus = Literal["active", "archived"]
+GMAgendaStatus = Literal["active", "paused", "completed", "archived"]
+GMProposalStatus = Literal["proposed", "accepted", "rejected", "resolved"]
+ResolutionRuleStatus = Literal["active", "inactive"]
+PlayerChoiceKind = Literal["dialogue", "travel", "contact", "intervention", "route"]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -281,6 +294,7 @@ class OrganizationMembershipUpdateRequest(_RequestModel):
 
 
 class FactionProgressTrackCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     track_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
     name: str = Field(min_length=1, max_length=160)
     track_type: FactionTrackType
@@ -300,6 +314,7 @@ class FactionProgressTrackUpdateRequest(_RequestModel):
 
 
 class AgentPresenceUpdateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     current_scene_id: uuid.UUID | None = None
     visibility_status: PresenceVisibilityStatus = "visible"
     encounter_eligible: bool = True
@@ -307,12 +322,14 @@ class AgentPresenceUpdateRequest(_RequestModel):
 
 
 class DailyLifeGenerateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     horizon_hours: int = Field(default=24, ge=1, le=168)
     limit: int = Field(default=20, ge=1, le=100)
 
 
 class OffscreenQueueCreateRequest(_RequestModel):
     candidate_id: uuid.UUID | None = None
+    worldline_id: uuid.UUID | None = None
     event_name: str = Field(default="living_world.offscreen_event", min_length=3, max_length=120)
     title: str = Field(min_length=1, max_length=160)
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -339,6 +356,94 @@ class WorldBibleUpsertRequest(_RequestModel):
     def continuity_config_status_is_known(cls, value: dict[str, Any]) -> dict[str, Any]:
         _validate_continuity_metadata(value, "continuity_config")
         return value
+
+
+class WorldlineForkRequest(_RequestModel):
+    source_worldline_id: uuid.UUID | None = None
+    worldline_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    forked_from_snapshot_id: uuid.UUID | None = None
+    fork_event_sequence: int | None = Field(default=None, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GMAgendaCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=160)
+    summary: str = Field(min_length=1, max_length=12_000)
+    priority: int = Field(default=50, ge=0, le=100)
+    focus_agents: list[str] = Field(default_factory=list, max_length=50)
+    focus_organizations: list[str] = Field(default_factory=list, max_length=50)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GMAgendaUpdateRequest(_RequestModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    summary: str | None = Field(default=None, min_length=1, max_length=12_000)
+    priority: int | None = Field(default=None, ge=0, le=100)
+    status: GMAgendaStatus | None = None
+    focus_agents: list[str] | None = None
+    focus_organizations: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class GMProposalCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    agenda_id: uuid.UUID | None = None
+    title: str = Field(min_length=1, max_length=160)
+    reason: str = Field(min_length=1, max_length=12_000)
+    event_name: str = Field(min_length=3, max_length=120)
+    proposed_payload: dict[str, Any] = Field(default_factory=dict)
+    importance: Literal["daily", "relationship", "organization", "route", "main_plot"] = "daily"
+    risk_score: int = Field(default=0, ge=0, le=100)
+    affected_agents: list[str] = Field(default_factory=list, max_length=50)
+    affected_organizations: list[str] = Field(default_factory=list, max_length=50)
+    source_context: dict[str, Any] = Field(default_factory=dict)
+
+
+class GMProposalReviewRequest(_RequestModel):
+    status: GMProposalStatus
+    review_note: str | None = Field(default=None, max_length=2000)
+
+
+class EventResolutionRuleCreateRequest(_RequestModel):
+    rule_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    priority: int = Field(default=50, ge=0, le=100)
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    effects: dict[str, Any] = Field(default_factory=dict)
+
+
+class EventResolutionRuleUpdateRequest(_RequestModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    status: ResolutionRuleStatus | None = None
+    conditions: dict[str, Any] | None = None
+    effects: dict[str, Any] | None = None
+
+
+class PlayerActorBindRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    display_name: str = Field(min_length=1, max_length=160)
+    current_scene_id: uuid.UUID | None = None
+    profile: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlayerChoiceCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID
+    choice_key: str = Field(min_length=1, max_length=120)
+    choice_kind: PlayerChoiceKind
+    prompt: str = Field(min_length=1, max_length=12_000)
+    selected_option: str = Field(min_length=1, max_length=12_000)
+    context: dict[str, Any] = Field(default_factory=dict)
+    effects: dict[str, Any] = Field(default_factory=dict)
+    apply: bool = True
 
 
 class MembershipUpsertRequest(_RequestModel):
@@ -376,6 +481,7 @@ class AgentUpdateRequest(_RequestModel):
 
 
 class AgentRelationshipCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     source_agent_id: uuid.UUID
     target_agent_id: uuid.UUID
     relationship_type: RelationshipType
@@ -466,6 +572,7 @@ class ScheduleRulePreviewRequest(_RequestModel):
 
 
 class MemorySearchRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     query_text: str = Field(min_length=1, max_length=8_000)
     limit: int = Field(default=10, ge=1, le=50)
 
@@ -628,6 +735,7 @@ class OrganizationMembershipResponse(BaseModel):
 class FactionProgressTrackResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     organization_id: uuid.UUID
     organization_key: str
     organization_name: str
@@ -645,6 +753,7 @@ class FactionProgressTrackResponse(BaseModel):
 class AgentPresenceResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID
     agent_key: str
     agent_display_name: str
@@ -662,6 +771,7 @@ class AgentPresenceResponse(BaseModel):
 class DailyLifeEventCandidateResponse(BaseModel):
     id: uuid.UUID | None
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID | None
     agent_display_name: str | None
     scene_id: uuid.UUID | None
@@ -689,6 +799,7 @@ class DailyLifePreviewResponse(BaseModel):
 class OffscreenEventQueueResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     source_candidate_id: uuid.UUID | None
     event_name: str
     title: str
@@ -707,6 +818,128 @@ class OffscreenResolutionResponse(BaseModel):
     resolved_count: int
     failed_count: int
     event_ids: list[uuid.UUID]
+
+
+class WorldlineResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_key: str
+    name: str
+    description: str | None
+    parent_worldline_id: uuid.UUID | None
+    forked_from_snapshot_id: uuid.UUID | None
+    fork_event_sequence: int | None
+    status: WorldlineStatus
+    created_by_actor_ref: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class WorldlineComparisonResponse(BaseModel):
+    base_worldline_id: uuid.UUID
+    compare_worldline_id: uuid.UUID
+    fork_event_sequence: int | None
+    divergent_event_count: int
+    relationship_delta_count: int
+    faction_delta_count: int
+    choice_delta_count: int
+
+
+class GMAgendaResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    title: str
+    summary: str
+    priority: int
+    status: GMAgendaStatus
+    focus_agents: list[str]
+    focus_organizations: list[str]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class GMProposalResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    agenda_id: uuid.UUID | None
+    title: str
+    reason: str
+    event_name: str
+    proposed_payload: dict[str, Any]
+    importance: Literal["daily", "relationship", "organization", "route", "main_plot"]
+    risk_score: int
+    affected_agents: list[str]
+    affected_organizations: list[str]
+    source_context: dict[str, Any]
+    status: GMProposalStatus
+    review_note: str | None
+    resolved_event_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EventResolutionRuleResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    rule_key: str
+    name: str
+    description: str | None
+    priority: int
+    status: ResolutionRuleStatus
+    conditions: dict[str, Any]
+    effects: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ResolutionRuleDryRunResponse(BaseModel):
+    rule_id: uuid.UUID
+    rule_key: str
+    matched: bool
+    reasons: list[str]
+    effects: dict[str, Any]
+
+
+class ChoiceConsequencePreviewResponse(BaseModel):
+    relationship_updates: list[dict[str, Any]]
+    faction_updates: list[dict[str, Any]]
+    offscreen_events: list[dict[str, Any]]
+    diagnostics: list[str]
+
+
+class PlayerActorResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    user_id: uuid.UUID
+    actor_ref: str
+    display_name: str
+    current_scene_id: uuid.UUID | None
+    profile: dict[str, Any]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlayerChoiceResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    user_id: uuid.UUID
+    player_actor_id: uuid.UUID
+    choice_key: str
+    choice_kind: PlayerChoiceKind
+    prompt: str
+    selected_option: str
+    context: dict[str, Any]
+    consequence_preview: dict[str, Any]
+    applied_event_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class UserSummaryResponse(BaseModel):
@@ -785,6 +1018,7 @@ class AgentResponse(BaseModel):
 class AgentRelationshipResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     source_agent_id: uuid.UUID
     source_agent_key: str
     source_display_name: str
@@ -1215,6 +1449,7 @@ class WorldClockTransitionResponse(BaseModel):
 class WorldSnapshotResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     covers_event_sequence: int
     schema_version: str
     status: str
@@ -1229,6 +1464,7 @@ class WorldSnapshotResponse(BaseModel):
 class WorldEventResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     sequence: int
     event_name: str
     importance: EventImportance
@@ -1472,6 +1708,7 @@ def import_world_composition(
     )
     db_session.add(world)
     db_session.flush()
+    ensure_primary_worldline(db_session, world.id, actor_ref=f"user:{owner.id}")
     _upsert_membership(db_session, world.id, owner.id, AuthRole.WORLD_ADMIN.value)
     WorldClockService(db_session).ensure_initialized(
         world.id,
@@ -1622,6 +1859,7 @@ def create_world(
     )
     db_session.add(world)
     db_session.flush()
+    ensure_primary_worldline(db_session, world.id, actor_ref=_actor_ref(subject))
     _upsert_membership(db_session, world.id, subject.user_id, AuthRole.WORLD_ADMIN.value)
     WorldClockService(db_session).ensure_initialized(
         world.id,
@@ -1676,6 +1914,445 @@ def upsert_world_bible(
     bible.metadata_json = bible_upsert.metadata
     db_session.flush()
     return _world_bible_response(bible)
+
+
+@router.get("/{world_id}/worldlines", response_model=list[WorldlineResponse])
+def list_worldlines(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[WorldlineResponse]:
+    _world_or_404(db_session, context.world_id)
+    ensure_primary_worldline(db_session, context.world_id)
+    worldlines = db_session.scalars(
+        select(Worldline)
+        .where(Worldline.world_id == context.world_id)
+        .order_by(Worldline.parent_worldline_id.is_not(None), Worldline.created_at),
+    ).all()
+    return [_worldline_response(worldline) for worldline in worldlines]
+
+
+@router.post(
+    "/{world_id}/worldlines/fork",
+    response_model=WorldlineResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def fork_worldline(
+    fork_request: WorldlineForkRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldlineResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        worldline = LivingWorldGMService(db_session).fork_worldline(
+            world_id=context.world_id,
+            source_worldline_id=fork_request.source_worldline_id,
+            worldline_key=fork_request.worldline_key,
+            name=fork_request.name,
+            description=fork_request.description,
+            forked_from_snapshot_id=fork_request.forked_from_snapshot_id,
+            fork_event_sequence=fork_request.fork_event_sequence,
+            actor_ref=_actor_ref(context.subject),
+            metadata=fork_request.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _worldline_response(worldline)
+
+
+@router.get(
+    "/{world_id}/worldlines/{base_worldline_id}/compare/{compare_worldline_id}",
+    response_model=WorldlineComparisonResponse,
+)
+def compare_worldlines(
+    base_worldline_id: uuid.UUID,
+    compare_worldline_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> WorldlineComparisonResponse:
+    _world_or_404(db_session, context.world_id)
+    try:
+        comparison = LivingWorldGMService(db_session).compare_worldlines(
+            world_id=context.world_id,
+            base_worldline_id=base_worldline_id,
+            compare_worldline_id=compare_worldline_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _worldline_comparison_response(comparison)
+
+
+@router.get("/{world_id}/gm/agendas", response_model=list[GMAgendaResponse])
+def list_gm_agendas(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> list[GMAgendaResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    agendas = db_session.scalars(
+        select(GMAgenda)
+        .where(
+            GMAgenda.world_id == context.world_id, GMAgenda.worldline_id == resolved_worldline.id
+        )
+        .order_by(GMAgenda.priority.desc(), GMAgenda.created_at.desc()),
+    ).all()
+    return [_gm_agenda_response(agenda) for agenda in agendas]
+
+
+@router.post(
+    "/{world_id}/gm/agendas", response_model=GMAgendaResponse, status_code=status.HTTP_201_CREATED
+)
+def create_gm_agenda(
+    agenda_create: GMAgendaCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMAgendaResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    agenda = LivingWorldGMService(db_session).create_agenda(
+        world_id=context.world_id,
+        worldline_id=agenda_create.worldline_id,
+        title=agenda_create.title,
+        summary=agenda_create.summary,
+        priority=agenda_create.priority,
+        focus_agents=agenda_create.focus_agents,
+        focus_organizations=agenda_create.focus_organizations,
+        metadata=agenda_create.metadata,
+    )
+    return _gm_agenda_response(agenda)
+
+
+@router.patch("/{world_id}/gm/agendas/{agenda_id}", response_model=GMAgendaResponse)
+def update_gm_agenda(
+    agenda_id: uuid.UUID,
+    agenda_update: GMAgendaUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMAgendaResponse:
+    require_csrf(request)
+    agenda = _gm_agenda_or_404(db_session, context.world_id, agenda_id)
+    for field_name in ("title", "summary", "priority", "status"):
+        if field_name in agenda_update.model_fields_set:
+            next_value = getattr(agenda_update, field_name)
+            if next_value is not None:
+                setattr(agenda, field_name, next_value)
+    if "focus_agents" in agenda_update.model_fields_set:
+        agenda.focus_agents = agenda_update.focus_agents or []
+    if "focus_organizations" in agenda_update.model_fields_set:
+        agenda.focus_organizations = agenda_update.focus_organizations or []
+    if "metadata" in agenda_update.model_fields_set:
+        agenda.metadata_json = agenda_update.metadata or {}
+    db_session.flush()
+    return _gm_agenda_response(agenda)
+
+
+@router.get("/{world_id}/gm/proposals", response_model=list[GMProposalResponse])
+def list_gm_proposals(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[GMProposalStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[GMProposalResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(GMEventProposal).where(
+        GMEventProposal.world_id == context.world_id,
+        GMEventProposal.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(GMEventProposal.status == status_filter)
+    proposals = db_session.scalars(
+        statement.order_by(GMEventProposal.created_at.desc()).limit(limit),
+    ).all()
+    return [_gm_proposal_response(proposal) for proposal in proposals]
+
+
+@router.post(
+    "/{world_id}/gm/proposals",
+    response_model=GMProposalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_gm_proposal(
+    proposal_create: GMProposalCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMProposalResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        proposal = LivingWorldGMService(db_session).create_proposal(
+            world_id=context.world_id,
+            worldline_id=proposal_create.worldline_id,
+            agenda_id=proposal_create.agenda_id,
+            title=proposal_create.title,
+            reason=proposal_create.reason,
+            event_name=proposal_create.event_name,
+            proposed_payload=proposal_create.proposed_payload,
+            importance=proposal_create.importance,
+            risk_score=proposal_create.risk_score,
+            affected_agents=proposal_create.affected_agents,
+            affected_organizations=proposal_create.affected_organizations,
+            source_context=proposal_create.source_context,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _gm_proposal_response(proposal)
+
+
+@router.post("/{world_id}/gm/proposals/{proposal_id}/review", response_model=GMProposalResponse)
+def review_gm_proposal(
+    proposal_id: uuid.UUID,
+    review_request: GMProposalReviewRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMProposalResponse:
+    require_csrf(request)
+    try:
+        proposal = LivingWorldGMService(db_session).review_proposal(
+            world_id=context.world_id,
+            proposal_id=proposal_id,
+            status=review_request.status,
+            review_note=review_request.review_note,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _gm_proposal_response(proposal)
+
+
+@router.get("/{world_id}/resolution-rules", response_model=list[EventResolutionRuleResponse])
+def list_resolution_rules(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[EventResolutionRuleResponse]:
+    _world_or_404(db_session, context.world_id)
+    rules = db_session.scalars(
+        select(EventResolutionRule)
+        .where(EventResolutionRule.world_id == context.world_id)
+        .order_by(EventResolutionRule.priority.desc(), EventResolutionRule.rule_key),
+    ).all()
+    return [_resolution_rule_response(rule) for rule in rules]
+
+
+@router.post(
+    "/{world_id}/resolution-rules",
+    response_model=EventResolutionRuleResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_resolution_rule(
+    rule_create: EventResolutionRuleCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EventResolutionRuleResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        rule = LivingWorldGMService(db_session).create_rule(
+            world_id=context.world_id,
+            rule_key=rule_create.rule_key,
+            name=rule_create.name,
+            description=rule_create.description,
+            priority=rule_create.priority,
+            conditions=rule_create.conditions,
+            effects=rule_create.effects,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _resolution_rule_response(rule)
+
+
+@router.patch("/{world_id}/resolution-rules/{rule_id}", response_model=EventResolutionRuleResponse)
+def update_resolution_rule(
+    rule_id: uuid.UUID,
+    rule_update: EventResolutionRuleUpdateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EventResolutionRuleResponse:
+    require_csrf(request)
+    rule = _resolution_rule_or_404(db_session, context.world_id, rule_id)
+    for field_name in ("name", "description", "priority", "status"):
+        if field_name in rule_update.model_fields_set:
+            next_value = getattr(rule_update, field_name)
+            if next_value is not None or field_name == "description":
+                setattr(rule, field_name, next_value)
+    if "conditions" in rule_update.model_fields_set:
+        rule.conditions_json = rule_update.conditions or {}
+    if "effects" in rule_update.model_fields_set:
+        rule.effects_json = rule_update.effects or {}
+    db_session.flush()
+    return _resolution_rule_response(rule)
+
+
+@router.post(
+    "/{world_id}/resolution-rules/{rule_id}/dry-run",
+    response_model=ResolutionRuleDryRunResponse,
+)
+def dry_run_resolution_rule(
+    rule_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> ResolutionRuleDryRunResponse:
+    require_csrf(request)
+    rule = _resolution_rule_or_404(db_session, context.world_id, rule_id)
+    result = LivingWorldGMService(db_session).dry_run_rule(
+        world_id=context.world_id,
+        rule=rule,
+        worldline_id=worldline_id,
+    )
+    return _resolution_rule_dry_run_response(result)
+
+
+@router.get("/{world_id}/player-actors", response_model=list[PlayerActorResponse])
+def list_player_actors(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> list[PlayerActorResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    actors = db_session.scalars(
+        select(PlayerActorProfile)
+        .where(
+            PlayerActorProfile.world_id == context.world_id,
+            PlayerActorProfile.worldline_id == resolved_worldline.id,
+        )
+        .order_by(PlayerActorProfile.display_name),
+    ).all()
+    return [_player_actor_response(actor) for actor in actors]
+
+
+@router.put("/{world_id}/player-actors", response_model=PlayerActorResponse)
+def bind_player_actor(
+    actor_bind: PlayerActorBindRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlayerActorResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    user_id = actor_bind.user_id or context.subject.user_id
+    _user_or_404(db_session, user_id)
+    if actor_bind.current_scene_id is not None:
+        _scene_or_404(db_session, context.world_id, actor_bind.current_scene_id)
+    actor = LivingWorldGMService(db_session).bind_player_actor(
+        world_id=context.world_id,
+        worldline_id=actor_bind.worldline_id,
+        user_id=user_id,
+        display_name=actor_bind.display_name,
+        current_scene_id=actor_bind.current_scene_id,
+        profile=actor_bind.profile,
+    )
+    return _player_actor_response(actor)
+
+
+@router.get("/{world_id}/player-choices", response_model=list[PlayerChoiceResponse])
+def list_player_choices(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[PlayerChoiceResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(PlayerChoiceRecord).where(
+        PlayerChoiceRecord.world_id == context.world_id,
+        PlayerChoiceRecord.worldline_id == resolved_worldline.id,
+    )
+    if user_id is not None:
+        statement = statement.where(PlayerChoiceRecord.user_id == user_id)
+    choices = db_session.scalars(
+        statement.order_by(PlayerChoiceRecord.created_at.desc()).limit(limit),
+    ).all()
+    return [_player_choice_response(choice) for choice in choices]
+
+
+@router.post(
+    "/{world_id}/player-choices",
+    response_model=PlayerChoiceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_player_choice(
+    choice_create: PlayerChoiceCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlayerChoiceResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    user_id = choice_create.user_id or context.subject.user_id
+    try:
+        choice = LivingWorldGMService(db_session).record_player_choice(
+            world_id=context.world_id,
+            worldline_id=choice_create.worldline_id,
+            user_id=user_id,
+            player_actor_id=choice_create.player_actor_id,
+            choice_key=choice_create.choice_key,
+            choice_kind=choice_create.choice_kind,
+            prompt=choice_create.prompt,
+            selected_option=choice_create.selected_option,
+            context=choice_create.context,
+            effects=choice_create.effects,
+            actor_ref=_actor_ref(context.subject),
+            apply=choice_create.apply,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _player_choice_response(choice)
+
+
+@router.post(
+    "/{world_id}/player-choices/preview",
+    response_model=ChoiceConsequencePreviewResponse,
+)
+def preview_player_choice_consequences(
+    choice_create: PlayerChoiceCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ChoiceConsequencePreviewResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    preview = LivingWorldGMService(db_session).choice_consequence_preview(
+        world_id=context.world_id,
+        worldline_id=choice_create.worldline_id,
+        effects=choice_create.effects,
+    )
+    return ChoiceConsequencePreviewResponse(
+        relationship_updates=preview.relationship_updates,
+        faction_updates=preview.faction_updates,
+        offscreen_events=preview.offscreen_events,
+        diagnostics=preview.diagnostics,
+    )
 
 
 @router.get("/{world_id}/composition-export", response_model=WorldCompositionExportResponse)
@@ -1983,18 +2660,26 @@ def skip_clock_endpoint(
 def replay_state(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> WorldReplayState:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session, load_settings()).replay_state(context.world_id)
+    return WorldReplayService(db_session, load_settings()).replay_state(
+        context.world_id,
+        worldline_id=worldline_id,
+    )
 
 
 @router.get("/{world_id}/snapshots/latest", response_model=WorldSnapshotResponse | None)
 def latest_snapshot(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> WorldSnapshotResponse | None:
     _world_or_404(db_session, context.world_id)
-    snapshot = WorldReplayService(db_session, load_settings()).latest_snapshot(context.world_id)
+    snapshot = WorldReplayService(db_session, load_settings()).latest_snapshot(
+        context.world_id,
+        worldline_id=worldline_id,
+    )
     if snapshot is None:
         return None
     return _snapshot_response(snapshot)
@@ -2007,9 +2692,13 @@ def latest_snapshot(
 def snapshot_integrity(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> WorldSnapshotIntegrityReport:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session, load_settings()).snapshot_integrity(context.world_id)
+    return WorldReplayService(db_session, load_settings()).snapshot_integrity(
+        context.world_id,
+        worldline_id=worldline_id,
+    )
 
 
 @router.get("/{world_id}/events", response_model=list[WorldEventResponse])
@@ -2021,6 +2710,7 @@ def list_world_events(
     sequence_after: Annotated[int | None, Query(ge=0)] = None,
     sequence_before: Annotated[int | None, Query(ge=1)] = None,
     importance: Annotated[EventImportance | None, Query()] = None,
+    worldline_id: uuid.UUID | None = None,
     wall_time_from: datetime | None = None,
     wall_time_to: datetime | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -2029,6 +2719,18 @@ def list_world_events(
     wall_time_from = _optional_query_time(wall_time_from, "wall_time_from")
     wall_time_to = _optional_query_time(wall_time_to, "wall_time_to")
     statement = select(WorldEventModel).where(WorldEventModel.world_id == context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = statement.where(
+        or_(
+            WorldEventModel.worldline_id == resolved_worldline.id,
+            WorldEventModel.worldline_id.is_(None),
+        )
+        if resolved_worldline.parent_worldline_id is None
+        else WorldEventModel.worldline_id == resolved_worldline.id
+    )
     if event_name is not None:
         statement = statement.where(WorldEventModel.event_name == event_name)
     if actor_ref is not None:
@@ -2102,6 +2804,7 @@ def preview_daily_life(
     start_world_time: Annotated[datetime | None, Query()] = None,
     horizon_hours: Annotated[int, Query(ge=1, le=168)] = 24,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    worldline_id: uuid.UUID | None = None,
 ) -> DailyLifePreviewResponse:
     _world_or_404(db_session, context.world_id)
     if start_world_time is not None:
@@ -2111,6 +2814,7 @@ def preview_daily_life(
         start_world_time=start_world_time,
         horizon_hours=horizon_hours,
         limit=limit,
+        worldline_id=worldline_id,
     )
     return DailyLifePreviewResponse(
         world_id=preview.world_id,
@@ -2139,6 +2843,7 @@ def generate_daily_life_candidates(
         world_id=context.world_id,
         horizon_hours=generate_request.horizon_hours,
         limit=generate_request.limit,
+        worldline_id=generate_request.worldline_id,
     )
     return [_daily_life_candidate_response(db_session, item) for item in candidates]
 
@@ -2151,11 +2856,17 @@ def list_daily_life_candidates(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     status_filter: Annotated[DailyLifeCandidateStatus | None, Query(alias="status")] = None,
+    worldline_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[DailyLifeEventCandidateResponse]:
     _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
     statement = select(DailyLifeEventCandidate).where(
         DailyLifeEventCandidate.world_id == context.world_id,
+        DailyLifeEventCandidate.worldline_id == resolved_worldline.id,
     )
     if status_filter is not None:
         statement = statement.where(DailyLifeEventCandidate.status == status_filter)
@@ -2189,6 +2900,11 @@ def create_offscreen_event(
         return _offscreen_queue_response(item)
     item = OffscreenEventQueueItem(
         world_id=context.world_id,
+        worldline_id=(
+            LivingWorldGMService(db_session)
+            .worldline_or_404(context.world_id, queue_create.worldline_id)
+            .id
+        ),
         event_name=queue_create.event_name,
         title=queue_create.title,
         payload_json=queue_create.payload,
@@ -2206,11 +2922,17 @@ def list_offscreen_events(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     status_filter: Annotated[OffscreenEventStatus | None, Query(alias="status")] = None,
+    worldline_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[OffscreenEventQueueResponse]:
     _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
     statement = select(OffscreenEventQueueItem).where(
         OffscreenEventQueueItem.world_id == context.world_id,
+        OffscreenEventQueueItem.worldline_id == resolved_worldline.id,
     )
     if status_filter is not None:
         statement = statement.where(OffscreenEventQueueItem.status == status_filter)
@@ -2226,6 +2948,7 @@ def resolve_offscreen_events(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    worldline_id: uuid.UUID | None = None,
 ) -> OffscreenResolutionResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
@@ -2234,6 +2957,7 @@ def resolve_offscreen_events(
         wall_time=datetime.now(UTC),
         limit=limit,
         actor_ref=_actor_ref(context.subject),
+        worldline_id=worldline_id,
     )
     RuntimeDiagnosticsService(db_session).record(
         RuntimeDiagnosticCreate(
@@ -2358,12 +3082,14 @@ def create_snapshot(
     request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> WorldSnapshotResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
     snapshot = WorldReplayService(db_session, load_settings()).create_snapshot(
         context.world_id,
         actor_ref=_actor_ref(context.subject),
+        worldline_id=worldline_id,
     )
     return _snapshot_response(snapshot)
 
@@ -2722,12 +3448,18 @@ def list_faction_tracks(
     organization_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> list[FactionProgressTrackResponse]:
     _organization_or_404(db_session, context.world_id, organization_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
     tracks = db_session.scalars(
         select(FactionProgressTrack)
         .where(
             FactionProgressTrack.world_id == context.world_id,
+            FactionProgressTrack.worldline_id == resolved_worldline.id,
             FactionProgressTrack.organization_id == organization_id,
         )
         .order_by(FactionProgressTrack.track_key),
@@ -2749,9 +3481,14 @@ def create_faction_track(
 ) -> FactionProgressTrackResponse:
     require_csrf(request)
     _organization_or_404(db_session, context.world_id, organization_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        track_create.worldline_id,
+    )
     existing = db_session.scalars(
         select(FactionProgressTrack).where(
             FactionProgressTrack.organization_id == organization_id,
+            FactionProgressTrack.worldline_id == resolved_worldline.id,
             FactionProgressTrack.track_key == track_create.track_key,
         ),
     ).one_or_none()
@@ -2759,6 +3496,7 @@ def create_faction_track(
         raise _conflict("Faction progress track already exists")
     track = FactionProgressTrack(
         world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
         organization_id=organization_id,
         track_key=track_create.track_key,
         name=track_create.name,
@@ -2800,6 +3538,7 @@ def update_faction_track(
         event = WorldEventStore(db_session).append_event(
             WorldEventAppend(
                 world_id=context.world_id,
+                worldline_id=track.worldline_id,
                 event_name="organization.faction_progress_updated",
                 importance=WorldEventImportance.ORGANIZATION,
                 payload={
@@ -3001,12 +3740,18 @@ def list_agent_relationships(
     agent_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> list[AgentRelationshipResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
     edges = db_session.scalars(
         select(AgentRelationshipEdge)
         .where(
             AgentRelationshipEdge.world_id == context.world_id,
+            AgentRelationshipEdge.worldline_id == resolved_worldline.id,
             AgentRelationshipEdge.source_agent_id == agent_id,
         )
         .order_by(AgentRelationshipEdge.relationship_type, AgentRelationshipEdge.created_at),
@@ -3022,11 +3767,17 @@ def get_agent_presence(
     agent_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> AgentPresenceResponse | None:
     _agent_or_404(db_session, context.world_id, agent_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
     presence = db_session.scalars(
         select(AgentPresenceState).where(
             AgentPresenceState.world_id == context.world_id,
+            AgentPresenceState.worldline_id == resolved_worldline.id,
             AgentPresenceState.agent_id == agent_id,
         ),
     ).one_or_none()
@@ -3048,14 +3799,23 @@ def upsert_agent_presence(
     _agent_or_404(db_session, context.world_id, agent_id)
     if presence_update.current_scene_id is not None:
         _scene_or_404(db_session, context.world_id, presence_update.current_scene_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        presence_update.worldline_id,
+    )
     presence = db_session.scalars(
         select(AgentPresenceState).where(
             AgentPresenceState.world_id == context.world_id,
+            AgentPresenceState.worldline_id == resolved_worldline.id,
             AgentPresenceState.agent_id == agent_id,
         ),
     ).one_or_none()
     if presence is None:
-        presence = AgentPresenceState(world_id=context.world_id, agent_id=agent_id)
+        presence = AgentPresenceState(
+            world_id=context.world_id,
+            worldline_id=resolved_worldline.id,
+            agent_id=agent_id,
+        )
         db_session.add(presence)
     presence.current_scene_id = presence_update.current_scene_id
     presence.visibility_status = presence_update.visibility_status
@@ -3085,6 +3845,10 @@ def create_agent_relationship(
         )
     _agent_or_404(db_session, context.world_id, relationship_create.source_agent_id)
     _agent_or_404(db_session, context.world_id, relationship_create.target_agent_id)
+    resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
+        context.world_id,
+        relationship_create.worldline_id,
+    )
     if relationship_create.source_agent_id == relationship_create.target_agent_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -3094,6 +3858,7 @@ def create_agent_relationship(
         select(AgentRelationshipEdge).where(
             AgentRelationshipEdge.source_agent_id == relationship_create.source_agent_id,
             AgentRelationshipEdge.target_agent_id == relationship_create.target_agent_id,
+            AgentRelationshipEdge.worldline_id == resolved_worldline.id,
             AgentRelationshipEdge.relationship_type == relationship_create.relationship_type,
         ),
     ).one_or_none()
@@ -3102,6 +3867,7 @@ def create_agent_relationship(
     edge = AgentRelationshipEdge(
         id=uuid.uuid4(),
         world_id=context.world_id,
+        worldline_id=resolved_worldline.id,
         source_agent_id=relationship_create.source_agent_id,
         target_agent_id=relationship_create.target_agent_id,
         relationship_type=relationship_create.relationship_type,
@@ -3119,6 +3885,7 @@ def create_agent_relationship(
     relationship_event = WorldEventStore(db_session).append_event(
         WorldEventAppend(
             world_id=context.world_id,
+            worldline_id=edge.worldline_id,
             event_name="relationship.edge_created",
             importance=WorldEventImportance.RELATIONSHIP,
             payload={
@@ -3171,6 +3938,7 @@ def update_agent_relationship(
     relationship_event = WorldEventStore(db_session).append_event(
         WorldEventAppend(
             world_id=context.world_id,
+            worldline_id=edge.worldline_id,
             event_name="relationship.edge_updated",
             importance=WorldEventImportance.RELATIONSHIP,
             payload={
@@ -3300,12 +4068,13 @@ def list_agent_memory(
     agent_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     memory_service = MemoryService(db_session, load_settings())
     return [
         _memory_item_response(item)
-        for item in memory_service.list_memories(context.world_id, agent_id)
+        for item in memory_service.list_memories(context.world_id, agent_id, worldline_id)
     ]
 
 
@@ -3326,6 +4095,7 @@ def search_agent_memory(
         for item in memory_service.search(
             MemoryLookupRequest(
                 world_id=context.world_id,
+                worldline_id=search_request.worldline_id,
                 agent_id=agent_id,
                 query_text=search_request.query_text,
                 limit=search_request.limit,
@@ -4043,6 +4813,7 @@ def _faction_track_response(
     return FactionProgressTrackResponse(
         id=track.id,
         world_id=track.world_id,
+        worldline_id=track.worldline_id,
         organization_id=track.organization_id,
         organization_key=organization.organization_key,
         organization_name=organization.name,
@@ -4068,6 +4839,7 @@ def _presence_response(db_session: Session, presence: AgentPresenceState) -> Age
     return AgentPresenceResponse(
         id=presence.id,
         world_id=presence.world_id,
+        worldline_id=presence.worldline_id,
         agent_id=presence.agent_id,
         agent_key=agent.agent_key,
         agent_display_name=agent.display_name,
@@ -4092,6 +4864,7 @@ def _daily_life_candidate_response(
     return DailyLifeEventCandidateResponse(
         id=candidate.id,
         world_id=candidate.world_id,
+        worldline_id=candidate.worldline_id,
         agent_id=candidate.agent_id,
         agent_display_name=None if agent is None else agent.display_name,
         scene_id=candidate.scene_id,
@@ -4113,6 +4886,7 @@ def _offscreen_queue_response(item: OffscreenEventQueueItem) -> OffscreenEventQu
     return OffscreenEventQueueResponse(
         id=item.id,
         world_id=item.world_id,
+        worldline_id=item.worldline_id,
         source_candidate_id=item.source_candidate_id,
         event_name=item.event_name,
         title=item.title,
@@ -4136,6 +4910,144 @@ def _offscreen_resolution_response(result: Any) -> OffscreenResolutionResponse:
         resolved_count=result.resolved_count,
         failed_count=result.failed_count,
         event_ids=result.event_ids,
+    )
+
+
+def _worldline_response(worldline: Worldline) -> WorldlineResponse:
+    return WorldlineResponse(
+        id=worldline.id,
+        world_id=worldline.world_id,
+        worldline_key=worldline.worldline_key,
+        name=worldline.name,
+        description=worldline.description,
+        parent_worldline_id=worldline.parent_worldline_id,
+        forked_from_snapshot_id=worldline.forked_from_snapshot_id,
+        fork_event_sequence=worldline.fork_event_sequence,
+        status=cast(WorldlineStatus, worldline.status),
+        created_by_actor_ref=worldline.created_by_actor_ref,
+        metadata=worldline.metadata_json,
+        created_at=worldline.created_at,
+        updated_at=worldline.updated_at,
+    )
+
+
+def _worldline_comparison_response(
+    comparison: WorldlineComparison,
+) -> WorldlineComparisonResponse:
+    return WorldlineComparisonResponse(
+        base_worldline_id=comparison.base_worldline_id,
+        compare_worldline_id=comparison.compare_worldline_id,
+        fork_event_sequence=comparison.fork_event_sequence,
+        divergent_event_count=comparison.divergent_event_count,
+        relationship_delta_count=comparison.relationship_delta_count,
+        faction_delta_count=comparison.faction_delta_count,
+        choice_delta_count=comparison.choice_delta_count,
+    )
+
+
+def _gm_agenda_response(agenda: GMAgenda) -> GMAgendaResponse:
+    return GMAgendaResponse(
+        id=agenda.id,
+        world_id=agenda.world_id,
+        worldline_id=agenda.worldline_id,
+        title=agenda.title,
+        summary=agenda.summary,
+        priority=agenda.priority,
+        status=cast(GMAgendaStatus, agenda.status),
+        focus_agents=agenda.focus_agents,
+        focus_organizations=agenda.focus_organizations,
+        metadata=agenda.metadata_json,
+        created_at=agenda.created_at,
+        updated_at=agenda.updated_at,
+    )
+
+
+def _gm_proposal_response(proposal: GMEventProposal) -> GMProposalResponse:
+    return GMProposalResponse(
+        id=proposal.id,
+        world_id=proposal.world_id,
+        worldline_id=proposal.worldline_id,
+        agenda_id=proposal.agenda_id,
+        title=proposal.title,
+        reason=proposal.reason,
+        event_name=proposal.event_name,
+        proposed_payload=proposal.proposed_payload,
+        importance=cast(
+            Literal["daily", "relationship", "organization", "route", "main_plot"],
+            proposal.importance,
+        ),
+        risk_score=proposal.risk_score,
+        affected_agents=proposal.affected_agents,
+        affected_organizations=proposal.affected_organizations,
+        source_context=proposal.source_context,
+        status=cast(GMProposalStatus, proposal.status),
+        review_note=proposal.review_note,
+        resolved_event_id=proposal.resolved_event_id,
+        created_at=proposal.created_at,
+        updated_at=proposal.updated_at,
+    )
+
+
+def _resolution_rule_response(rule: EventResolutionRule) -> EventResolutionRuleResponse:
+    return EventResolutionRuleResponse(
+        id=rule.id,
+        world_id=rule.world_id,
+        rule_key=rule.rule_key,
+        name=rule.name,
+        description=rule.description,
+        priority=rule.priority,
+        status=cast(ResolutionRuleStatus, rule.status),
+        conditions=rule.conditions_json,
+        effects=rule.effects_json,
+        created_at=rule.created_at,
+        updated_at=rule.updated_at,
+    )
+
+
+def _resolution_rule_dry_run_response(
+    dry_run: ResolutionRuleDryRun,
+) -> ResolutionRuleDryRunResponse:
+    return ResolutionRuleDryRunResponse(
+        rule_id=dry_run.rule_id,
+        rule_key=dry_run.rule_key,
+        matched=dry_run.matched,
+        reasons=dry_run.reasons,
+        effects=dry_run.effects,
+    )
+
+
+def _player_actor_response(actor: PlayerActorProfile) -> PlayerActorResponse:
+    return PlayerActorResponse(
+        id=actor.id,
+        world_id=actor.world_id,
+        worldline_id=actor.worldline_id,
+        user_id=actor.user_id,
+        actor_ref=actor.actor_ref,
+        display_name=actor.display_name,
+        current_scene_id=actor.current_scene_id,
+        profile=actor.profile_json,
+        is_active=actor.is_active,
+        created_at=actor.created_at,
+        updated_at=actor.updated_at,
+    )
+
+
+def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
+    return PlayerChoiceResponse(
+        id=choice.id,
+        world_id=choice.world_id,
+        worldline_id=choice.worldline_id,
+        user_id=choice.user_id,
+        player_actor_id=choice.player_actor_id,
+        choice_key=choice.choice_key,
+        choice_kind=cast(PlayerChoiceKind, choice.choice_kind),
+        prompt=choice.prompt,
+        selected_option=choice.selected_option,
+        context=choice.context_json,
+        consequence_preview=choice.consequence_preview,
+        applied_event_id=choice.applied_event_id,
+        created_at=choice.created_at,
+        updated_at=choice.updated_at,
     )
 
 
@@ -4205,6 +5117,7 @@ def _agent_relationship_response(
     return AgentRelationshipResponse(
         id=edge.id,
         world_id=edge.world_id,
+        worldline_id=edge.worldline_id,
         source_agent_id=edge.source_agent_id,
         source_agent_key=source_agent.agent_key,
         source_display_name=source_agent.display_name,
@@ -5023,6 +5936,7 @@ def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
     return WorldEventResponse(
         id=event.id,
         world_id=event.world_id,
+        worldline_id=event.worldline_id,
         sequence=event.sequence,
         event_name=event.event_name,
         importance=cast(EventImportance, event.importance),
@@ -5042,6 +5956,7 @@ def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
     return WorldSnapshotResponse(
         id=snapshot.id,
         world_id=snapshot.world_id,
+        worldline_id=snapshot.worldline_id,
         covers_event_sequence=snapshot.covers_event_sequence,
         schema_version=snapshot.schema_version,
         status=snapshot.status.value,
@@ -5134,6 +6049,28 @@ def _organization_membership_or_404(
             detail="Organization membership not found",
         )
     return membership
+
+
+def _gm_agenda_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    agenda_id: uuid.UUID,
+) -> GMAgenda:
+    agenda = db_session.get(GMAgenda, agenda_id)
+    if agenda is None or agenda.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return agenda
+
+
+def _resolution_rule_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    rule_id: uuid.UUID,
+) -> EventResolutionRule:
+    rule = db_session.get(EventResolutionRule, rule_id)
+    if rule is None or rule.world_id != world_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return rule
 
 
 def _faction_track_or_404(
@@ -5356,6 +6293,7 @@ def _record_relationship_memory(
     try:
         MemoryService(db_session, load_settings()).record_relationship_change(
             world_id=world_id,
+            worldline_id=edge.worldline_id,
             source_agent_id=edge.source_agent_id,
             target_agent_id=edge.target_agent_id,
             relationship_id=edge.id,

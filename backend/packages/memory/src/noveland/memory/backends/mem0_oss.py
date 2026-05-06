@@ -57,6 +57,7 @@ class Mem0OssMemoryBackend:
                 metadata={
                     **turn.metadata,
                     "world_id": str(turn.world_id),
+                    "worldline_id": _string(turn.worldline_id),
                     "agent_id": str(turn.agent_id),
                     "conversation_id": _string(turn.conversation_id),
                     "turn_id": _string(turn.turn_id),
@@ -90,6 +91,7 @@ class Mem0OssMemoryBackend:
                     metadata={
                         **event.metadata,
                         "world_id": str(event.world_id),
+                        "worldline_id": _string(event.worldline_id),
                         "agent_id": str(event.agent_id),
                         "event_id": str(event.event_id),
                         "run_id": _string(event.run_id),
@@ -108,10 +110,15 @@ class Mem0OssMemoryBackend:
             latency_ms=_elapsed_ms(started_at),
         )
 
-    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> Sequence[MemoryItemRecord]:
         try:
             payload = self._client_instance().get_all(
-                filters=_scope_filters(world_id, agent_id),
+                filters=_scope_filters(world_id, agent_id, worldline_id),
             )
         except Exception as exc:  # pragma: no cover - exercised through service tests
             raise MemorySearchFailedError(str(exc)) from exc
@@ -122,7 +129,7 @@ class Mem0OssMemoryBackend:
         try:
             payload = self._client_instance().search(
                 request.query_text,
-                filters=_scope_filters(request.world_id, request.agent_id),
+                filters=_scope_filters(request.world_id, request.agent_id, request.worldline_id),
                 top_k=request.limit,
             )
         except Exception as exc:  # pragma: no cover - exercised through service tests
@@ -137,15 +144,11 @@ class Mem0OssMemoryBackend:
         try:
             if scope.run_id is None:
                 result = self._client_instance().delete_all(
-                    user_id=str(scope.agent_id),
-                    agent_id=str(scope.agent_id),
-                    app_id=str(scope.world_id),
+                    **_scope_filters(scope.world_id, scope.agent_id, scope.worldline_id),
                 )
             else:
                 result = self._client_instance().delete_all(
-                    user_id=str(scope.agent_id),
-                    agent_id=str(scope.agent_id),
-                    app_id=str(scope.world_id),
+                    **_scope_filters(scope.world_id, scope.agent_id, scope.worldline_id),
                     run_id=str(scope.run_id),
                 )
         except Exception as exc:  # pragma: no cover - exercised through service tests
@@ -229,9 +232,16 @@ def _inject_secret(
     section_config.setdefault("api_key", secret_value)
 
 
-def _scope_filters(world_id: uuid.UUID, agent_id: uuid.UUID) -> dict[str, str]:
+def _scope_filters(
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    worldline_id: uuid.UUID | None = None,
+) -> dict[str, str]:
     scope_id = str(agent_id)
-    return {"app_id": str(world_id), "agent_id": scope_id, "user_id": scope_id}
+    filters = {"app_id": str(world_id), "agent_id": scope_id, "user_id": scope_id}
+    if worldline_id is not None:
+        filters["worldline_id"] = str(worldline_id)
+    return filters
 
 
 def _coerce_items(payload: Any, world_id: uuid.UUID, agent_id: uuid.UUID) -> list[MemoryItemRecord]:

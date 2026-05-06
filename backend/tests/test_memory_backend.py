@@ -38,7 +38,7 @@ from noveland.memory.models import (
     MemoryWriteLog,
 )
 from noveland.plugins.constants import BUILTIN_MEM0_OSS_MEMORY
-from noveland.worlds.models import World
+from noveland.worlds.models import World, Worldline
 from pydantic import ValidationError
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -693,6 +693,7 @@ def _engine() -> Engine:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, Agent.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),

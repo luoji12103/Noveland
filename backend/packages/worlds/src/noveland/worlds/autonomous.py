@@ -16,8 +16,14 @@ from noveland.worlds.models import (
     Scene,
     World,
 )
-from sqlalchemy import select
+from noveland.worlds.worldlines import (
+    ensure_primary_worldline,
+    primary_worldline_or_none,
+    worldline_or_404,
+)
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 DEFAULT_RUNTIME_ACTOR_REF = "system:runtime"
 
@@ -50,7 +56,9 @@ class LivingWorldAutonomyService:
         start_world_time: datetime | None = None,
         horizon_hours: int = 24,
         limit: int = 20,
+        worldline_id: uuid.UUID | None = None,
     ) -> DailyLifePreviewResult:
+        resolved_worldline_id = self._resolve_worldline_id(world_id, worldline_id)
         start = (
             _utc(start_world_time) if start_world_time is not None else self._world_time(world_id)
         )
@@ -58,10 +66,14 @@ class LivingWorldAutonomyService:
         for agent in self._enabled_agents(world_id):
             if len(candidates) >= limit:
                 break
-            scene_id = self._presence_scene_id(world_id, agent.id) or agent.home_scene_id
+            scene_id = (
+                self._presence_scene_id(world_id, resolved_worldline_id, agent.id)
+                or agent.home_scene_id
+            )
             candidates.append(
                 DailyLifeEventCandidate(
                     world_id=world_id,
+                    worldline_id=resolved_worldline_id,
                     agent_id=agent.id,
                     scene_id=scene_id,
                     title=f"{agent.display_name} daily life beat",
@@ -92,17 +104,21 @@ class LivingWorldAutonomyService:
         world_id: uuid.UUID,
         horizon_hours: int = 24,
         limit: int = 20,
+        worldline_id: uuid.UUID | None = None,
     ) -> list[DailyLifeEventCandidate]:
+        resolved_worldline_id = self._resolve_worldline_id(world_id, worldline_id)
         preview = self.preview_daily_life(
             world_id=world_id,
             horizon_hours=horizon_hours,
             limit=limit,
+            worldline_id=resolved_worldline_id,
         )
         persisted: list[DailyLifeEventCandidate] = []
         for candidate in preview.candidates:
             existing = self._session.scalars(
                 select(DailyLifeEventCandidate).where(
                     DailyLifeEventCandidate.world_id == world_id,
+                    DailyLifeEventCandidate.worldline_id == resolved_worldline_id,
                     DailyLifeEventCandidate.agent_id == candidate.agent_id,
                     DailyLifeEventCandidate.starts_at == candidate.starts_at,
                     DailyLifeEventCandidate.source_kind == candidate.source_kind,
@@ -127,6 +143,7 @@ class LivingWorldAutonomyService:
             raise ValueError("candidate not found")
         item = OffscreenEventQueueItem(
             world_id=candidate.world_id,
+            worldline_id=candidate.worldline_id,
             source_candidate_id=candidate.id,
             event_name=event_name,
             title=candidate.title,
@@ -153,6 +170,7 @@ class LivingWorldAutonomyService:
         wall_time: datetime | None = None,
         limit: int = 20,
         actor_ref: str = DEFAULT_RUNTIME_ACTOR_REF,
+        worldline_id: uuid.UUID | None = None,
     ) -> OffscreenResolutionResult:
         now = _utc(wall_time)
         statement = (
@@ -166,6 +184,19 @@ class LivingWorldAutonomyService:
         )
         if world_id is not None:
             statement = statement.where(OffscreenEventQueueItem.world_id == world_id)
+            resolved_worldline_id = (
+                ensure_primary_worldline(self._session, world_id).id
+                if worldline_id is None
+                else worldline_id
+            )
+            statement = statement.where(
+                _worldline_filter(
+                    self._session,
+                    world_id,
+                    resolved_worldline_id,
+                    OffscreenEventQueueItem.worldline_id,
+                ),
+            )
         items = self._session.scalars(
             statement.order_by(
                 OffscreenEventQueueItem.due_at,
@@ -181,6 +212,7 @@ class LivingWorldAutonomyService:
                 event = store.append_event(
                     WorldEventAppend(
                         world_id=item.world_id,
+                        worldline_id=item.worldline_id,
                         event_name=item.event_name,
                         importance=WorldEventImportance(item.importance),
                         payload=item.payload_json,
@@ -213,11 +245,13 @@ class LivingWorldAutonomyService:
         wall_time: datetime | None = None,
         limit: int = 20,
         actor_ref: str = DEFAULT_RUNTIME_ACTOR_REF,
+        worldline_id: uuid.UUID | None = None,
     ) -> OffscreenResolutionResult:
         return self.resolve_due_offscreen_events(
             wall_time=wall_time,
             limit=limit,
             actor_ref=actor_ref,
+            worldline_id=worldline_id,
         )
 
     def _apply_resolution_side_effects(
@@ -229,10 +263,15 @@ class LivingWorldAutonomyService:
             else self._session.get(DailyLifeEventCandidate, item.source_candidate_id)
         )
         if candidate is not None and candidate.agent_id is not None:
-            presence = self._presence_model(candidate.world_id, candidate.agent_id)
+            presence = self._presence_model(
+                candidate.world_id,
+                candidate.worldline_id,
+                candidate.agent_id,
+            )
             if presence is None:
                 presence = AgentPresenceState(
                     world_id=candidate.world_id,
+                    worldline_id=candidate.worldline_id,
                     agent_id=candidate.agent_id,
                 )
                 self._session.add(presence)
@@ -243,7 +282,10 @@ class LivingWorldAutonomyService:
         if item.importance == "organization":
             track = self._session.scalars(
                 select(FactionProgressTrack)
-                .where(FactionProgressTrack.world_id == item.world_id)
+                .where(
+                    FactionProgressTrack.world_id == item.world_id,
+                    FactionProgressTrack.worldline_id == item.worldline_id,
+                )
                 .order_by(FactionProgressTrack.updated_at.desc()),
             ).first()
             if track is not None:
@@ -261,18 +303,35 @@ class LivingWorldAutonomyService:
     def _presence_model(
         self,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
         agent_id: uuid.UUID,
     ) -> AgentPresenceState | None:
+        resolved_worldline_id = self._resolve_worldline_id(world_id, worldline_id)
         return self._session.scalars(
             select(AgentPresenceState).where(
                 AgentPresenceState.world_id == world_id,
+                AgentPresenceState.worldline_id == resolved_worldline_id,
                 AgentPresenceState.agent_id == agent_id,
             ),
         ).one_or_none()
 
-    def _presence_scene_id(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> uuid.UUID | None:
-        presence = self._presence_model(world_id, agent_id)
+    def _presence_scene_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        agent_id: uuid.UUID,
+    ) -> uuid.UUID | None:
+        presence = self._presence_model(world_id, worldline_id, agent_id)
         return None if presence is None else presence.current_scene_id
+
+    def _resolve_worldline_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> uuid.UUID:
+        if worldline_id is None:
+            return ensure_primary_worldline(self._session, world_id).id
+        return worldline_or_404(self._session, world_id, worldline_id).id
 
     def _world_time(self, world_id: uuid.UUID) -> datetime:
         return WorldClockService(self._session).view(world_id).effective_world_time
@@ -309,3 +368,15 @@ def _utc(value: datetime | None) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _worldline_filter(
+    session: Session,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    column: InstrumentedAttribute[uuid.UUID | None],
+) -> ColumnElement[bool]:
+    primary = primary_worldline_or_none(session, world_id)
+    if primary is not None and primary.id == worldline_id:
+        return or_(column == worldline_id, column.is_(None))
+    return column == worldline_id

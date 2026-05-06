@@ -14,7 +14,7 @@ from noveland.agents.models import Agent, AgentObservation, AgentPersona
 from noveland.auth.models import User
 from noveland.events import WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel
-from noveland.worlds.models import World
+from noveland.worlds.models import World, Worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -98,6 +98,7 @@ def _create_tables(engine: Engine) -> None:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, Agent.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, AgentPersona.__table__),

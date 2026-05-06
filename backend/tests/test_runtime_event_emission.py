@@ -24,7 +24,13 @@ from noveland.services.runtime.clock_tick import (
     RuntimeEventPublishError,
 )
 from noveland.worlds.clock_service import WorldClockService
-from noveland.worlds.models import Scene, World, WorldClockStateModel, WorldClockTransitionModel
+from noveland.worlds.models import (
+    Scene,
+    World,
+    WorldClockStateModel,
+    WorldClockTransitionModel,
+    Worldline,
+)
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -114,6 +120,7 @@ def _engine() -> Engine:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),

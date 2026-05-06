@@ -21,7 +21,7 @@ from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.clock_tick import RuntimeClockTicker
 from noveland.services.runtime.conversation_loop import ConversationRuntimeOrchestrator
 from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
-from noveland.worlds import LivingWorldAutonomyService
+from noveland.worlds.autonomous import LivingWorldAutonomyService
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

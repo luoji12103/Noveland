@@ -52,15 +52,21 @@ from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     AgentPresenceState,
     DailyLifeEventCandidate,
+    EventResolutionRule,
     FactionProgressTrack,
+    GMAgenda,
+    GMEventProposal,
     OffscreenEventQueueItem,
     OrganizationMembership,
+    PlayerActorProfile,
+    PlayerChoiceRecord,
     Scene,
     SceneLocationEdge,
     World,
     WorldBible,
     WorldClockStateModel,
     WorldClockTransitionModel,
+    Worldline,
     WorldMembership,
     WorldOrganization,
 )
@@ -931,6 +937,226 @@ def test_daily_life_and_offscreen_event_queue_are_world_scoped() -> None:
     assert other_queue_status == "pending"
 
 
+def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "gm-worldline-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    source_agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    target_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, member_token)
+    member_agendas = client.get(f"/worlds/{world_id}/gm/agendas")
+
+    _authenticate(client, owner_token)
+    primary = client.get(f"/worlds/{world_id}/worldlines").json()[0]
+    organization = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+        },
+    )
+    organization_id = organization.json()["id"]
+    track = client.post(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+        json={
+            "track_key": "festival-plan",
+            "name": "Festival Plan",
+            "track_type": "goal",
+            "progress": 10,
+            "pressure": 15,
+        },
+    )
+    relationship = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "rivalry",
+            "trust": 40,
+            "rivalry": 60,
+        },
+    )
+    presence = client.put(
+        f"/worlds/{world_id}/agents/{source_agent_id}/presence",
+        json={"current_scene_id": str(scene_id), "visibility_status": "visible"},
+    )
+    agenda = client.post(
+        f"/worlds/{world_id}/gm/agendas",
+        json={
+            "title": "Festival route pressure",
+            "summary": "Keep the school festival route moving.",
+            "priority": 70,
+            "focus_agents": ["hero", "rival"],
+            "focus_organizations": ["student-council"],
+        },
+    )
+    proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals",
+        json={
+            "agenda_id": agenda.json()["id"],
+            "title": "Rival notices the late-night work",
+            "reason": "The relationship tension is high enough for a route beat.",
+            "event_name": "gm.route_pressure",
+            "proposed_payload": {"beat": "late-night club room"},
+            "importance": "route",
+            "risk_score": 25,
+            "affected_agents": ["hero", "rival"],
+            "affected_organizations": ["student-council"],
+            "source_context": {"source": "test"},
+        },
+    )
+    resolved_proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals/{proposal.json()['id']}/review",
+        json={"status": "resolved", "review_note": "Accepted for test."},
+    )
+    rule = client.post(
+        f"/worlds/{world_id}/resolution-rules",
+        json={
+            "rule_key": "trust-gate",
+            "name": "Trust Gate",
+            "conditions": {"min_relationship_trust": 30, "min_pending_proposals": 0},
+            "effects": {"importance": "route"},
+        },
+    )
+    dry_run = client.post(f"/worlds/{world_id}/resolution-rules/{rule.json()['id']}/dry-run")
+    actor = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={
+            "display_name": "Player",
+            "current_scene_id": str(scene_id),
+            "profile": {"role": "transfer-student"},
+        },
+    )
+    primary_choice_payload = {
+        "player_actor_id": actor.json()["id"],
+        "choice_key": "help-festival",
+        "choice_kind": "intervention",
+        "prompt": "Help with festival prep?",
+        "selected_option": "Stay late and help.",
+        "effects": {
+            "relationship_updates": [
+                {"relationship_id": relationship.json()["id"], "trust_delta": 5}
+            ],
+            "faction_updates": [{"track_id": track.json()["id"], "progress_delta": 10}],
+            "offscreen_events": [
+                {
+                    "title": "Rival follows up",
+                    "event_name": "player.follow_up",
+                    "importance": "route",
+                }
+            ],
+        },
+        "apply": True,
+    }
+    preview = client.post(
+        f"/worlds/{world_id}/player-choices/preview",
+        json=primary_choice_payload,
+    )
+    primary_choice = client.post(f"/worlds/{world_id}/player-choices", json=primary_choice_payload)
+    fork = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={
+            "worldline_key": "festival-alt",
+            "name": "Festival Alternate",
+            "description": "Branch after the first festival choice.",
+        },
+    )
+    fork_id = fork.json()["id"]
+    fork_relationship = client.get(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        params={"worldline_id": fork_id},
+    )
+    fork_track = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+        params={"worldline_id": fork_id},
+    )
+    fork_presence = client.get(
+        f"/worlds/{world_id}/agents/{source_agent_id}/presence",
+        params={"worldline_id": fork_id},
+    )
+    fork_actors = client.get(f"/worlds/{world_id}/player-actors", params={"worldline_id": fork_id})
+    fork_choices_before = client.get(
+        f"/worlds/{world_id}/player-choices",
+        params={"worldline_id": fork_id},
+    )
+    fork_choice = client.post(
+        f"/worlds/{world_id}/player-choices",
+        json={
+            "worldline_id": fork_id,
+            "player_actor_id": fork_actors.json()[0]["id"],
+            "choice_key": "challenge-rival",
+            "choice_kind": "route",
+            "prompt": "Challenge the rival's plan?",
+            "selected_option": "Ask for a better plan.",
+            "effects": {
+                "relationship_updates": [
+                    {
+                        "relationship_id": fork_relationship.json()[0]["id"],
+                        "trust_delta": -10,
+                        "rivalry_delta": 5,
+                    }
+                ],
+                "faction_updates": [{"track_id": fork_track.json()[0]["id"], "pressure_delta": 5}],
+            },
+            "apply": True,
+        },
+    )
+    fork_relationship_after = client.get(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        params={"worldline_id": fork_id},
+    )
+    primary_relationship_after = client.get(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships"
+    )
+    comparison = client.get(
+        f"/worlds/{world_id}/worldlines/{primary['id']}/compare/{fork_id}",
+    )
+
+    assert member_agendas.status_code == 403
+    assert organization.status_code == 201
+    assert track.status_code == 201
+    assert relationship.status_code == 201
+    assert presence.status_code == 200
+    assert agenda.status_code == 201
+    assert proposal.status_code == 201
+    assert resolved_proposal.status_code == 200
+    assert resolved_proposal.json()["resolved_event_id"] is not None
+    assert dry_run.status_code == 200
+    assert dry_run.json()["matched"] is True
+    assert actor.status_code == 200
+    assert actor.json()["actor_ref"].endswith(":primary")
+    assert preview.status_code == 200
+    assert preview.json()["diagnostics"] == [
+        "1 relationship update(s)",
+        "1 faction update(s)",
+        "1 offscreen event(s)",
+    ]
+    assert primary_choice.status_code == 201
+    assert primary_choice.json()["applied_event_id"] is not None
+    assert fork.status_code == 201
+    assert fork.json()["parent_worldline_id"] == primary["id"]
+    assert fork_relationship.json()[0]["trust"] == 45
+    assert fork_track.json()[0]["progress"] == 20
+    assert fork_presence.json()["current_scene_id"] == str(scene_id)
+    assert fork_actors.json()[0]["actor_ref"].endswith(":festival-alt")
+    assert "forked_from_choice_id" in fork_choices_before.json()[0]["context"]
+    assert fork_choice.status_code == 201
+    assert fork_relationship_after.json()[0]["trust"] == 35
+    assert fork_relationship_after.json()[0]["rivalry"] == 65
+    assert primary_relationship_after.json()[0]["trust"] == 45
+    assert comparison.status_code == 200
+    assert comparison.json()["relationship_delta_count"] == 1
+    assert comparison.json()["faction_delta_count"] == 1
+    assert comparison.json()["choice_delta_count"] == 1
+    assert comparison.json()["divergent_event_count"] >= 1
+
+
 def test_membership_management_and_final_admin_guard() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -996,9 +1222,10 @@ def test_membership_management_and_final_admin_guard() -> None:
     assert access_review.json()["world_admin_count"] == 1
     assert access_review.json()["final_admin_risk"] is True
     assert access_review.json()["members"][0]["user_id"] == str(second_admin_id)
-    assert {
-        item["event_type"] for item in diagnostics.json()
-    } >= {"world.membership_upserted", "world.membership_deleted"}
+    assert {item["event_type"] for item in diagnostics.json()} >= {
+        "world.membership_upserted",
+        "world.membership_deleted",
+    }
 
 
 def test_platform_admin_manages_agent_presets_and_world_admin_lists_active_presets() -> None:
@@ -2107,6 +2334,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, PlatformRoleAssignment.__table__),
         cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
         cast(Table, WorldClockStateModel.__table__),
@@ -2128,6 +2356,11 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, DailyLifeEventCandidate.__table__),
         cast(Table, OffscreenEventQueueItem.__table__),
         cast(Table, WorldSnapshotModel.__table__),
+        cast(Table, GMAgenda.__table__),
+        cast(Table, GMEventProposal.__table__),
+        cast(Table, EventResolutionRule.__table__),
+        cast(Table, PlayerActorProfile.__table__),
+        cast(Table, PlayerChoiceRecord.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

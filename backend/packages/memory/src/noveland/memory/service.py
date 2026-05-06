@@ -65,6 +65,7 @@ from noveland.plugins.errors import (
     PluginNotFoundError,
 )
 from noveland.worlds.models import World
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Select, and_, func, join, or_, select
 from sqlalchemy.orm import Session
 
@@ -205,6 +206,7 @@ class MemoryService:
 
     def record_turn(self, turn: MemoryTurn) -> MemoryWriteJob:
         world = self._world_or_404(turn.world_id)
+        worldline_id = self._worldline_id(turn.world_id, turn.worldline_id)
         profile = self._backend_profile_for_world(world)
         existing = self._session.scalars(
             select(MemoryWriteJob).where(MemoryWriteJob.dedupe_key == turn.dedupe_key),
@@ -216,6 +218,7 @@ class MemoryService:
             raise MemoryValidationError("memory turn requires one stable source id")
         job = MemoryWriteJob(
             world_id=turn.world_id,
+            worldline_id=worldline_id,
             agent_id=turn.agent_id,
             backend_profile_id=profile.id,
             source_kind=MemoryWriteSourceKind.CONVERSATION_TURN.value
@@ -237,6 +240,7 @@ class MemoryService:
         jobs: list[MemoryWriteJob] = []
         for event in events:
             world = self._world_or_404(event.world_id)
+            worldline_id = self._worldline_id(event.world_id, event.worldline_id)
             profile = self._backend_profile_for_world(world)
             existing = self._session.scalars(
                 select(MemoryWriteJob).where(MemoryWriteJob.dedupe_key == event.dedupe_key),
@@ -246,6 +250,7 @@ class MemoryService:
                 continue
             job = MemoryWriteJob(
                 world_id=event.world_id,
+                worldline_id=worldline_id,
                 agent_id=event.agent_id,
                 backend_profile_id=profile.id,
                 source_kind=MemoryWriteSourceKind.WORLD_EVENT.value,
@@ -264,6 +269,7 @@ class MemoryService:
         self,
         *,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
         source_agent_id: uuid.UUID,
         target_agent_id: uuid.UUID,
         relationship_id: uuid.UUID,
@@ -283,6 +289,7 @@ class MemoryService:
             [
                 MemoryEvent(
                     world_id=world_id,
+                    worldline_id=worldline_id,
                     agent_id=source_agent_id,
                     event_id=relationship_id,
                     content=summary,
@@ -291,6 +298,7 @@ class MemoryService:
                 ),
                 MemoryEvent(
                     world_id=world_id,
+                    worldline_id=worldline_id,
                     agent_id=target_agent_id,
                     event_id=relationship_id,
                     content=summary,
@@ -313,9 +321,19 @@ class MemoryService:
             try:
                 backend = self._backend_for_job(job)
                 if job.source_kind == MemoryWriteSourceKind.WORLD_EVENT.value:
-                    result = backend.record_events([MemoryEvent.model_validate(job.payload_json)])
+                    result = backend.record_events(
+                        [
+                            MemoryEvent.model_validate(
+                                {**job.payload_json, "worldline_id": job.worldline_id},
+                            )
+                        ],
+                    )
                 else:
-                    result = backend.record_turn(MemoryTurn.model_validate(job.payload_json))
+                    result = backend.record_turn(
+                        MemoryTurn.model_validate(
+                            {**job.payload_json, "worldline_id": job.worldline_id},
+                        ),
+                    )
                 job.status = MemoryWriteJobStatus.SUCCEEDED.value
                 job.last_error = None
                 job.processed_at = datetime.now(UTC)
@@ -368,9 +386,20 @@ class MemoryService:
         self._session.flush()
         return processed
 
-    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> list[MemoryItemRecord]:
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> list[MemoryItemRecord]:
         try:
-            return list(self._backend_for_scope(world_id).list_memories(world_id, agent_id))
+            return list(
+                self._backend_for_scope(world_id).list_memories(
+                    world_id,
+                    agent_id,
+                    self._worldline_id(world_id, worldline_id),
+                )
+            )
         except Exception:
             return []
 
@@ -384,6 +413,7 @@ class MemoryService:
         self._session.add(
             MemoryRetrievalLog(
                 world_id=request.world_id,
+                worldline_id=self._worldline_id(request.world_id, request.worldline_id),
                 agent_id=request.agent_id,
                 backend_profile_id=self._world_or_404(request.world_id).memory_backend_profile_id,
                 backend=result.backend,
@@ -408,6 +438,7 @@ class MemoryService:
         search_result = self.search(
             MemorySearchRequest(
                 world_id=world_id,
+                worldline_id=self._worldline_id(world_id, None),
                 agent_id=agent_id,
                 query_text=query_text,
                 limit=max_context_items,
@@ -512,9 +543,7 @@ class MemoryService:
     ) -> list[MemoryWriteLogRecord]:
         safe_limit = max(1, min(limit, 100))
         statement: Select[tuple[MemoryWriteLog]] = (
-            select(MemoryWriteLog)
-            .order_by(MemoryWriteLog.occurred_at.desc())
-            .limit(safe_limit)
+            select(MemoryWriteLog).order_by(MemoryWriteLog.occurred_at.desc()).limit(safe_limit)
         )
         if profile_id is not None:
             statement = (
@@ -706,9 +735,7 @@ class MemoryService:
         ).all():
             session_model = self._session.get(ConversationSession, turn.session_id)
             world = (
-                None
-                if session_model is None
-                else self._session.get(World, session_model.world_id)
+                None if session_model is None else self._session.get(World, session_model.world_id)
             )
             record(
                 source_kind=MemoryWriteSourceKind.CONVERSATION_TURN,
@@ -1156,6 +1183,16 @@ class MemoryService:
         if world is None:
             raise LookupError("World not found")
         return world
+
+    def _worldline_id(self, world_id: uuid.UUID, worldline_id: uuid.UUID | None) -> uuid.UUID:
+        if worldline_id is not None:
+            from noveland.worlds.models import Worldline
+
+            worldline = self._session.get(Worldline, worldline_id)
+            if worldline is None or worldline.world_id != world_id:
+                raise MemoryValidationError("worldline does not exist for world")
+            return worldline.id
+        return ensure_primary_worldline(self._session, world_id).id
 
 
 def _profile_record(model: MemoryBackendProfile) -> MemoryBackendProfileRecord:

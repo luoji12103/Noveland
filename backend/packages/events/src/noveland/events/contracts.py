@@ -32,6 +32,7 @@ class _FrozenContract(BaseModel):
 
 class WorldEventAppend(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     event_name: str = Field(min_length=3, max_length=120, pattern=EVENT_NAME_PATTERN)
     payload: dict[str, Any] = Field(default_factory=dict)
     importance: WorldEventImportance = WorldEventImportance.SYSTEM
@@ -59,6 +60,7 @@ class WorldEventAppend(_FrozenContract):
 
 class WorldEventRecord(WorldEventAppend):
     id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     sequence: int = Field(gt=0)
     created_at: datetime
 
@@ -72,6 +74,7 @@ class WorldEventRecord(WorldEventAppend):
 
 class WorldSnapshotCreate(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     covers_event_sequence: int = Field(ge=0)
     schema_version: str = Field(min_length=1, max_length=80)
     payload: dict[str, Any] | None = None
@@ -101,6 +104,7 @@ class WorldSnapshotCreate(_FrozenContract):
 class WorldSnapshotRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     covers_event_sequence: int = Field(ge=0)
     schema_version: str = Field(min_length=1, max_length=80)
     status: WorldSnapshotStatus = WorldSnapshotStatus.VALID

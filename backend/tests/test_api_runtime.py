@@ -35,7 +35,7 @@ from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
-from noveland.worlds.models import Scene, World
+from noveland.worlds.models import Scene, World, Worldline
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -513,6 +513,7 @@ def _create_tables(engine: Engine) -> None:
         AuthSession.__table__,
         PlatformRoleAssignment.__table__,
         World.__table__,
+        Worldline.__table__,
         Scene.__table__,
         RuntimeControlState.__table__,
         ProviderProfile.__table__,

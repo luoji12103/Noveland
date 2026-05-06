@@ -24,7 +24,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "world_events"
     __table_args__ = (
-        UniqueConstraint("world_id", "sequence", name="uq_world_events_world_sequence"),
+        UniqueConstraint(
+            "world_id",
+            "worldline_id",
+            "sequence",
+            name="uq_world_events_worldline_sequence",
+        ),
         CheckConstraint("sequence > 0", name="sequence_positive"),
         CheckConstraint(
             "event_name ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'",
@@ -36,6 +41,7 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="importance",
         ),
         Index("ix_world_events_world_sequence", "world_id", "sequence"),
+        Index("ix_world_events_worldline_sequence", "world_id", "worldline_id", "sequence"),
         Index("ix_world_events_world_event_name", "world_id", "event_name"),
         Index("ix_world_events_world_wall_time", "world_id", "wall_time"),
         Index("ix_world_events_world_importance", "world_id", "importance"),
@@ -44,6 +50,10 @@ class WorldEventModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     event_name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -76,8 +86,15 @@ class WorldSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("payload IS NOT NULL OR payload_uri IS NOT NULL", name="payload_or_uri"),
         Index("ix_world_snapshots_world_sequence", "world_id", "covers_event_sequence"),
         Index(
+            "ix_world_snapshots_worldline_sequence",
+            "world_id",
+            "worldline_id",
+            "covers_event_sequence",
+        ),
+        Index(
             "ix_world_snapshots_world_latest_valid",
             "world_id",
+            "worldline_id",
             "status",
             "covers_event_sequence",
         ),
@@ -86,6 +103,10 @@ class WorldSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     covers_event_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     schema_version: Mapped[str] = mapped_column(String(80), nullable=False)

@@ -105,6 +105,8 @@ class AgentRelationshipEdge(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "agent_relationship_edges"
     __table_args__ = (
         UniqueConstraint(
+            "world_id",
+            "worldline_id",
             "source_agent_id",
             "target_agent_id",
             "relationship_type",
@@ -125,11 +127,21 @@ class AgentRelationshipEdge(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("debt >= 0 AND debt <= 100", name="debt_range"),
         Index("ix_agent_relationship_edges_world_source", "world_id", "source_agent_id"),
         Index("ix_agent_relationship_edges_world_target", "world_id", "target_agent_id"),
+        Index(
+            "ix_agent_relationship_edges_worldline_source",
+            "world_id",
+            "worldline_id",
+            "source_agent_id",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     source_agent_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="CASCADE"),

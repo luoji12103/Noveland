@@ -18,7 +18,7 @@ from noveland.observability import (
     redact_diagnostic_details,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
-from noveland.worlds.models import Scene, World
+from noveland.worlds.models import Scene, World, Worldline
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -107,6 +107,7 @@ def _engine() -> Engine:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),

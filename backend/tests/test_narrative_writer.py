@@ -31,7 +31,7 @@ from noveland.narrative import (
     NarrativeArtifact,
     NarrativeGenerationMode,
 )
-from noveland.worlds.models import Scene, World
+from noveland.worlds.models import Scene, World, Worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -214,6 +214,7 @@ def _engine() -> Engine:
     for table in (
         cast(Table, User.__table__),
         cast(Table, World.__table__),
+        cast(Table, Worldline.__table__),
         cast(Table, Scene.__table__),
         cast(Table, Agent.__table__),
         cast(Table, ConversationSession.__table__),

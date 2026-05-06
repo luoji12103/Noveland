@@ -22,8 +22,9 @@ from noveland.events.errors import (
     SnapshotValidationError,
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.worlds.worldlines import ensure_primary_worldline, primary_worldline_or_none
 from pydantic import ValidationError
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -38,11 +39,16 @@ class WorldEventStore:
 
     def append_event(self, event: EventAppendInput) -> WorldEventRecord:
         event_input = _coerce_event_append(event)
+        worldline_id = self._resolve_write_worldline_id(
+            event_input.world_id,
+            event_input.worldline_id,
+        )
         try:
-            sequence = self._next_sequence(event_input.world_id)
+            sequence = self._next_sequence(event_input.world_id, worldline_id)
             event_model = WorldEventModel(
                 id=uuid.uuid4(),
                 world_id=event_input.world_id,
+                worldline_id=worldline_id,
                 sequence=sequence,
                 event_name=event_input.event_name,
                 importance=event_input.importance.value,
@@ -66,12 +72,14 @@ class WorldEventStore:
         world_id: uuid.UUID,
         sequence: int,
         limit: int | None = None,
+        worldline_id: uuid.UUID | None = None,
     ) -> list[WorldEventRecord]:
         if sequence < 0:
             raise EventValidationError("sequence must be non-negative")
         if limit is not None and limit <= 0:
             raise EventValidationError("limit must be positive when provided")
 
+        resolved_worldline_id = self._resolve_read_worldline_id(world_id, worldline_id)
         statement = (
             select(WorldEventModel)
             .where(
@@ -80,6 +88,7 @@ class WorldEventStore:
             )
             .order_by(WorldEventModel.sequence.asc())
         )
+        statement = self._scope_events_statement(statement, world_id, resolved_worldline_id)
         if limit is not None:
             statement = statement.limit(limit)
 
@@ -93,6 +102,7 @@ class WorldEventStore:
         snapshot_event = self.append_event(
             WorldEventAppend(
                 world_id=snapshot_input.world_id,
+                worldline_id=snapshot_input.worldline_id,
                 event_name=SNAPSHOT_EVENT_NAME,
                 payload={
                     "covers_event_sequence": snapshot_input.covers_event_sequence,
@@ -110,6 +120,7 @@ class WorldEventStore:
             snapshot_model = WorldSnapshotModel(
                 id=uuid.uuid4(),
                 world_id=snapshot_input.world_id,
+                worldline_id=snapshot_event.worldline_id,
                 covers_event_sequence=snapshot_input.covers_event_sequence,
                 schema_version=snapshot_input.schema_version,
                 status=snapshot_input.status.value,
@@ -126,7 +137,12 @@ class WorldEventStore:
 
         return _snapshot_record_from_model(snapshot_model)
 
-    def latest_snapshot(self, world_id: uuid.UUID) -> WorldSnapshotRecord | None:
+    def latest_snapshot(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> WorldSnapshotRecord | None:
+        resolved_worldline_id = self._resolve_read_worldline_id(world_id, worldline_id)
         statement = (
             select(WorldSnapshotModel)
             .where(
@@ -139,35 +155,108 @@ class WorldEventStore:
             )
             .limit(1)
         )
+        statement = self._scope_snapshots_statement(statement, world_id, resolved_worldline_id)
         snapshot_model = self._session.scalars(statement).first()
         if snapshot_model is None:
             return None
         return _snapshot_record_from_model(snapshot_model)
 
-    def latest_event_sequence(self, world_id: uuid.UUID) -> int:
-        latest_sequence = self._session.execute(
-            select(func.max(WorldEventModel.sequence)).where(
-                WorldEventModel.world_id == world_id,
-            ),
-        ).scalar_one()
+    def latest_event_sequence(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> int:
+        resolved_worldline_id = self._resolve_read_worldline_id(world_id, worldline_id)
+        statement = select(func.max(WorldEventModel.sequence)).where(
+            WorldEventModel.world_id == world_id,
+        )
+        statement = self._scope_events_statement(statement, world_id, resolved_worldline_id)
+        latest_sequence = self._session.execute(statement).scalar_one()
         return int(latest_sequence or 0)
 
-    def _next_sequence(self, world_id: uuid.UUID) -> int:
-        worlds_table = Base.metadata.tables["worlds"]
+    def primary_worldline_id(self, world_id: uuid.UUID) -> uuid.UUID:
+        return ensure_primary_worldline(self._session, world_id).id
+
+    def _next_sequence(self, world_id: uuid.UUID, worldline_id: uuid.UUID) -> int:
+        worldlines_table = Base.metadata.tables["worldlines"]
         locked_world = self._session.execute(
-            select(worlds_table.c.id)
-            .where(worlds_table.c.id == world_id)
+            select(worldlines_table.c.id)
+            .where(
+                worldlines_table.c.id == worldline_id,
+                worldlines_table.c.world_id == world_id,
+            )
             .with_for_update(),
         ).first()
         if locked_world is None:
-            raise EventAppendError("world does not exist")
+            raise EventAppendError("worldline does not exist")
 
-        latest_sequence = self._session.execute(
-            select(func.max(WorldEventModel.sequence)).where(
-                WorldEventModel.world_id == world_id,
-            ),
-        ).scalar_one()
+        sequence_statement = select(func.max(WorldEventModel.sequence)).where(
+            WorldEventModel.world_id == world_id,
+        )
+        sequence_statement = self._scope_events_statement(
+            sequence_statement,
+            world_id,
+            worldline_id,
+        )
+        latest_sequence = self._session.execute(sequence_statement).scalar_one()
         return int(latest_sequence or 0) + 1
+
+    def _resolve_write_worldline_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> uuid.UUID:
+        if worldline_id is not None:
+            return worldline_id
+        return ensure_primary_worldline(self._session, world_id).id
+
+    def _resolve_read_worldline_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        if worldline_id is not None:
+            return worldline_id
+        worldline = primary_worldline_or_none(self._session, world_id)
+        return None if worldline is None else worldline.id
+
+    def _is_primary_worldline(self, world_id: uuid.UUID, worldline_id: uuid.UUID) -> bool:
+        worldline = primary_worldline_or_none(self._session, world_id)
+        return worldline is not None and worldline.id == worldline_id
+
+    def _scope_events_statement(
+        self,
+        statement: Any,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> Any:
+        if worldline_id is None:
+            return statement.where(WorldEventModel.worldline_id.is_(None))
+        if self._is_primary_worldline(world_id, worldline_id):
+            return statement.where(
+                or_(
+                    WorldEventModel.worldline_id == worldline_id,
+                    WorldEventModel.worldline_id.is_(None),
+                ),
+            )
+        return statement.where(WorldEventModel.worldline_id == worldline_id)
+
+    def _scope_snapshots_statement(
+        self,
+        statement: Any,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> Any:
+        if worldline_id is None:
+            return statement.where(WorldSnapshotModel.worldline_id.is_(None))
+        if self._is_primary_worldline(world_id, worldline_id):
+            return statement.where(
+                or_(
+                    WorldSnapshotModel.worldline_id == worldline_id,
+                    WorldSnapshotModel.worldline_id.is_(None),
+                ),
+            )
+        return statement.where(WorldSnapshotModel.worldline_id == worldline_id)
 
 
 def _coerce_event_append(event: EventAppendInput) -> WorldEventAppend:
@@ -192,6 +281,7 @@ def _event_record_from_model(event_model: WorldEventModel) -> WorldEventRecord:
     return WorldEventRecord(
         id=event_model.id,
         world_id=event_model.world_id,
+        worldline_id=event_model.worldline_id,
         sequence=event_model.sequence,
         event_name=event_model.event_name,
         importance=WorldEventImportance(event_model.importance),
@@ -209,6 +299,7 @@ def _snapshot_record_from_model(snapshot_model: WorldSnapshotModel) -> WorldSnap
     return WorldSnapshotRecord(
         id=snapshot_model.id,
         world_id=snapshot_model.world_id,
+        worldline_id=snapshot_model.worldline_id,
         covers_event_sequence=snapshot_model.covers_event_sequence,
         schema_version=snapshot_model.schema_version,
         status=WorldSnapshotStatus(snapshot_model.status),
