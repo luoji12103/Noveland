@@ -505,3 +505,14 @@
 - Tests added/updated: worldline API/fork/compare tests; GM agenda/proposal/review/rule dry-run tests; player actor/choice/consequence tests; replay/snapshot/event/memory worldline-scope tests; schema metadata/Alembic coverage for `20260505_0025`; Web client/component tests; full Playwright mock alignment for new worldline and GM routes.
 - Docs updated: README endpoint list, migration README, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Apply migration `20260505_0025` before using worldline-scoped living-world data on persistent databases. GM work remains deterministic and does not call providers, external tools, subprocesses, or direct memory backend SDKs. V2 phases 26-35 are the next likely mainline bundle.
+
+## Living world plot route rumor flow entry
+
+- Date: 2026-05-06
+- Branch: feat/living-world-plot-route-rumor-flow
+- Scope: V2 living-world roadmap phases 26-35 promise/foreshadowing tracking, plot threads, route affinity, event flags, scene beats, daily episodes, group interactions, relationship suggestions, organization conflict, and rumor/information flow v1.
+- Summary: Added worldline-scoped plot/route/rumor persistence and services; deterministic trigger dry-runs, scene beat and daily episode draft generation, relationship suggestion generation, organization conflict resolution, and rumor delivery; world-admin API surfaces; and dense Web/admin controls plus Playwright mock alignment.
+- Files changed: `/backend/migrations/versions/20260506_0026_living_world_plot_route_rumor_flow.py`, `/backend/packages/{agents,worlds}/src/noveland/**`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/{test_api_worlds,test_schema_metadata,test_alembic_config}.py`, `/backend/migrations/README.md`, `/web/features/worlds/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/harness/**`
+- Tests added/updated: world-admin API coverage for plot/route/rumor flows, worldline scoping, trigger dry-run, deterministic drafts, relationship suggestions, organization conflict event emission, rumor delivery, schema metadata, Alembic head, Web client routes, world overview rendering, and e2e mock backend route alignment.
+- Docs updated: migration README, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Apply migration `20260506_0026` before using plot/route/rumor data on persistent databases. Rumor flow is v1 propagation/visibility only; character knowledge state, secrets, emotional state, relationship decay/repair, player journal, notifications, intervention controls, and GM style/continuity review remain later V2 phases.

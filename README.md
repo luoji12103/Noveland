@@ -392,6 +392,41 @@ PATCH /worlds/{world_id}/gm/agendas/{agenda_id}
 GET /worlds/{world_id}/gm/proposals
 POST /worlds/{world_id}/gm/proposals
 POST /worlds/{world_id}/gm/proposals/{proposal_id}/review
+GET /worlds/{world_id}/story-hooks
+POST /worlds/{world_id}/story-hooks
+PATCH /worlds/{world_id}/story-hooks/{hook_id}
+GET /worlds/{world_id}/plot-threads
+POST /worlds/{world_id}/plot-threads
+PATCH /worlds/{world_id}/plot-threads/{thread_id}
+GET /worlds/{world_id}/route-affinities
+PUT /worlds/{world_id}/route-affinities
+GET /worlds/{world_id}/event-trigger-conditions
+POST /worlds/{world_id}/event-trigger-conditions
+PATCH /worlds/{world_id}/event-trigger-conditions/{condition_id}
+POST /worlds/{world_id}/event-trigger-conditions/{condition_id}/dry-run
+GET /worlds/{world_id}/scene-beats
+POST /worlds/{world_id}/scene-beats
+PATCH /worlds/{world_id}/scene-beats/{beat_id}
+GET /worlds/{world_id}/daily-episodes
+POST /worlds/{world_id}/daily-episodes
+PATCH /worlds/{world_id}/daily-episodes/{episode_id}
+GET /worlds/{world_id}/group-interactions
+POST /worlds/{world_id}/group-interactions
+PATCH /worlds/{world_id}/group-interactions/{context_id}
+GET /worlds/{world_id}/relationship-suggestions
+POST /worlds/{world_id}/relationship-suggestions/generate
+PATCH /worlds/{world_id}/relationship-suggestions/{suggestion_id}
+GET /worlds/{world_id}/organization-conflicts
+POST /worlds/{world_id}/organization-conflicts
+PATCH /worlds/{world_id}/organization-conflicts/{conflict_id}
+POST /worlds/{world_id}/organization-conflicts/{conflict_id}/resolve
+GET /worlds/{world_id}/rumors
+POST /worlds/{world_id}/rumors
+PATCH /worlds/{world_id}/rumors/{rumor_id}
+GET /worlds/{world_id}/rumor-propagations
+POST /worlds/{world_id}/rumor-propagations
+PATCH /worlds/{world_id}/rumor-propagations/{propagation_id}
+POST /worlds/{world_id}/rumor-propagations/{propagation_id}/deliver
 GET /worlds/{world_id}/resolution-rules
 POST /worlds/{world_id}/resolution-rules
 PATCH /worlds/{world_id}/resolution-rules/{rule_id}
@@ -461,7 +496,9 @@ DELETE /provider-profiles/{profile_id}
 
 Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material. Plugin binding and config diagnostics expose plugin identifiers, categories, and binding context only; they do not expose plugin config values or secrets.
 
-The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, story bibles, scenes, location edges, organizations, faction tracks, agents, relationships, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, snapshots, GM agenda/proposal/rule records, player actors, player choices, worldline forks, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
+The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, story bibles, scenes, location edges, organizations, faction tracks, agents, relationships, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, snapshots, GM agenda/proposal/rule records, player actors, player choices, worldline forks, plot threads, route affinity, event flags, scene beat drafts, daily episode drafts, group contexts, relationship suggestions, organization conflicts, rumors, rumor propagations, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
+
+Plot/route/rumor-flow generation is deterministic in this version. Scene beat and daily episode endpoints create structured drafts only; they do not call providers, external tools, subprocesses, or a sandbox runtime.
 
 New snapshots store replay payload JSON in local object storage under `NOVELAND_OBJECT_STORAGE_ROOT` and keep only a safe `object://...` URI in the database. Older inline snapshot payloads remain readable.
 

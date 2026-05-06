@@ -59,6 +59,7 @@
 - Living World Character Foundation
 - Living World Autonomous Systems
 - Living World GM / Choices / Worldlines
+- Living World Plot / Route / Rumor Flow
 
 ## Upcoming Mainline
-- V2 phases 26-35 candidate after this bundle: promises/hooks, plot threads, route affinity, event flags, scene beats, daily episodes, group interactions, relationship suggestions, organization conflict, and rumor flow.
+- V2 phases 36-45 candidate after this bundle: character knowledge state, secrets/revelations, emotional state, relationship decay/repair, world-state dashboard v2, player-facing journal, in-world notification feed, intervention controls, GM style guardrails, and narrative continuity review.
