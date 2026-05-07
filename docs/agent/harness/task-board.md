@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Living World Knowledge / Player / Guardrails
 
 ## Blocked
 - None

@@ -1,28 +1,26 @@
 # Active Session Handoff
 
-- Date: 2026-05-06T00:00:00Z
-- Branch: main
-- Objective: Continue V2 living-world roadmap after phases 1-35; keep acceptance gaps recorded for a consolidated cleanup after the remaining V2 phases are complete.
-- Status: V2 living-world phases 1-35 have implementation baselines and passing targeted checks. A 2026-05-06 acceptance review recorded deferred quality gaps in `docs/agent/harness/debug-journal.md` and `docs/agent/harness/task-board.md`; do not treat those gaps as active work until the planned follow-on phases are complete or explicitly requested.
+- Date: 2026-05-07T00:00:00Z
+- Branch: feat/living-world-knowledge-player-guardrails
+- Objective: Implement V2 living-world roadmap phases 36-45: character knowledge state, secrets/revelations, emotional state, relationship decay/repair, world-state dashboard v2, player-facing journal, in-world notifications, intervention controls, GM style guardrails, and narrative continuity review.
+- Status: Started from local `main` after committing the V2 phases 1-35 acceptance follow-up notes. This branch should also close the recorded acceptance gaps where they naturally align with phases 36-45.
 
-## Completed Implementation
+## Planned Implementation
 
-- Add migration `20260506_0026_living_world_plot_route_rumor_flow`.
-- Add worldline-scoped story hooks/promises, plot threads, route affinities, scene beat drafts, daily episode drafts, group contexts, relationship suggestions, organization conflicts, rumors, and rumor propagation records.
-- Add deterministic `LivingWorldPlotService` flows for trigger dry-runs, scene beat composition, daily episode generation, relationship suggestions, organization conflict resolution, and rumor delivery.
-- Extend world-admin APIs and dense Web world overview panels for plot, route, and rumor flow controls.
-- Keep scene beat and daily episode generation deterministic; no provider, LLM, external tool, subprocess, or sandbox execution is introduced.
-- Update agent observation filtering so delivered-rumor observations remain visible only to the affected agent context.
+- Add migration `20260507_0027_living_world_knowledge_player_guardrails`.
+- Add worldline-scoped character knowledge, secrets/reveals, emotional state, relationship repair records, player journals, notifications, interventions, GM style reviews, and narrative continuity reviews.
+- Keep all new generation/review behavior deterministic; no provider calls, external tools, subprocesses, or sandbox execution.
+- Extend runtime, GM, narrative, and conversation paths to consume worldline, bible, hook, knowledge, secret, and group context where existing schemas support it.
+- Extend existing world/admin/reader Web surfaces and mock backend routes rather than creating a parallel app.
 
-## Gate Status
+## Gate Plan
 
-- Backend targeted and full gates passed: `ruff`, `mypy`, and `pytest`.
-- Web targeted and full gates passed: `lint`, `typecheck`, `test`, `build`, `check:next-env`, and `test:e2e`.
-- Compose config and `git diff --check` passed. `web/next-env.d.ts` churn from e2e was restored and rechecked.
+- Backend targeted checks for world API, memory, runtime daemon, replay/snapshot, schema metadata, and Alembic config.
+- Web targeted checks for world client and overview surfaces.
+- Final full backend/Web/compose gate before fast-forward merge back to local `main`.
 
 ## Risks
 
-- Persistent databases must apply migration `20260506_0026` before using plot, route, or rumor-flow state.
-- Rumor flow is v1 propagation/visibility only; full per-character knowledge state, secrets/revelations, emotional state, and relationship decay/repair remain later V2 phases.
-- New Web e2e mock routes should remain aligned with backend route names whenever these APIs evolve.
-- Deferred acceptance cleanup now includes V2 phases 1-35 semantic gaps: world bible runtime/narrative consumption, runtime memory worldline scope, richer GM/rule dry-runs, `apply=false` choice event logging, historical worldline fork semantics, unresolved hook use in narrative paths, fuller trigger condition coverage, runtime daily episode generation, and conversation-engine group context execution.
+- Persistent databases must apply migrations through `20260507_0027` before using these V2 phases.
+- Historical worldline fork semantics should either reconstruct from available replay/snapshot state or reject unsupported historical fork requests; do not silently claim historical state while copying current state.
+- `web/next-env.d.ts` may churn during build/e2e and must be restored before final status.
