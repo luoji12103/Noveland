@@ -63,3 +63,4 @@
 
 ## Upcoming Mainline
 - V2 phases 36-45 candidate after this bundle: character knowledge state, secrets/revelations, emotional state, relationship decay/repair, world-state dashboard v2, player-facing journal, in-world notification feed, intervention controls, GM style guardrails, and narrative continuity review.
+- Deferred acceptance cleanup after V2 phases 36-50: close the V2 phases 1-35 quality gaps recorded in `debug-journal.md` on 2026-05-06, including world bible runtime/narrative consumption, worldline-aware runtime memory context, richer GM/rule dry-runs, `apply=false` choice event logging, historical snapshot/event worldline fork semantics, unresolved hook use in narrative paths, fuller event trigger condition coverage, runtime daily episode generation, and conversation-engine group interaction execution.

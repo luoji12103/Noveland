@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-06T00:00:00Z
-- Branch: feat/living-world-plot-route-rumor-flow
-- Objective: Implement V2 living-world roadmap phases 26-35: promise/foreshadowing tracking, plot threads, route affinity, event flags, scene beat drafts, daily episodes, group interaction contexts, relationship event suggestions, organization conflict, and rumor flow.
-- Status: V2 living-world phases 26-35 are complete. Final backend/Web/compose gates passed; merge back to local `main` is the remaining action.
+- Branch: main
+- Objective: Continue V2 living-world roadmap after phases 1-35; keep acceptance gaps recorded for a consolidated cleanup after the remaining V2 phases are complete.
+- Status: V2 living-world phases 1-35 have implementation baselines and passing targeted checks. A 2026-05-06 acceptance review recorded deferred quality gaps in `docs/agent/harness/debug-journal.md` and `docs/agent/harness/task-board.md`; do not treat those gaps as active work until the planned follow-on phases are complete or explicitly requested.
 
 ## Completed Implementation
 
@@ -25,3 +25,4 @@
 - Persistent databases must apply migration `20260506_0026` before using plot, route, or rumor-flow state.
 - Rumor flow is v1 propagation/visibility only; full per-character knowledge state, secrets/revelations, emotional state, and relationship decay/repair remain later V2 phases.
 - New Web e2e mock routes should remain aligned with backend route names whenever these APIs evolve.
+- Deferred acceptance cleanup now includes V2 phases 1-35 semantic gaps: world bible runtime/narrative consumption, runtime memory worldline scope, richer GM/rule dry-runs, `apply=false` choice event logging, historical worldline fork semantics, unresolved hook use in narrative paths, fuller trigger condition coverage, runtime daily episode generation, and conversation-engine group context execution.
