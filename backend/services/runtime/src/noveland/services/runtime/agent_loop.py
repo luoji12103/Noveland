@@ -128,6 +128,7 @@ class AgentRuntimeOrchestrator:
         agent_id: uuid.UUID,
         prompt_text: str,
         trigger_source: str,
+        worldline_id: uuid.UUID | None = None,
         provider_profile_id: uuid.UUID | None = None,
         source_calendar_entry_id: uuid.UUID | None = None,
         source_schedule_rule_id: uuid.UUID | None = None,
@@ -147,6 +148,7 @@ class AgentRuntimeOrchestrator:
         memory_context = (
             memory_service.build_context(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 agent_id=agent_id,
                 query_text=memory_query_text or prompt_text,
                 max_context_items=max_context_items,
@@ -166,6 +168,7 @@ class AgentRuntimeOrchestrator:
             "observation_ids": [str(observation.id) for observation in observations],
             "observation_count": len(observations),
             "memory_retrieval_enabled": retrieve_memory,
+            "worldline_id": None if worldline_id is None else str(worldline_id),
             "memory_backend": None if memory_context is None else memory_context.backend,
             "memory_hit_count": 0 if memory_context is None else len(memory_context.items),
         }
@@ -186,6 +189,7 @@ class AgentRuntimeOrchestrator:
 
         self._append_event(
             world_id=world_id,
+            worldline_id=worldline_id,
             event_name=AGENT_RUN_STARTED_EVENT_NAME,
             payload={
                 "agent_id": str(agent_id),
@@ -229,6 +233,7 @@ class AgentRuntimeOrchestrator:
             )
             created_event = self._append_event(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 event_name=AGENT_RUN_COMPLETED_EVENT_NAME,
                 payload={
                     "agent_id": str(agent_id),
@@ -244,6 +249,7 @@ class AgentRuntimeOrchestrator:
                     memory_job = memory_service.record_turn(
                         MemoryTurn(
                             world_id=world_id,
+                            worldline_id=worldline_id,
                             agent_id=agent_id,
                             run_id=run_model.id,
                             source_event_id=created_event.id,
@@ -267,6 +273,7 @@ class AgentRuntimeOrchestrator:
                     )
                     self._append_event(
                         world_id=world_id,
+                        worldline_id=worldline_id,
                         event_name=MEMORY_ITEM_CREATED_EVENT_NAME,
                         payload={
                             "agent_id": str(agent_id),
@@ -306,6 +313,7 @@ class AgentRuntimeOrchestrator:
                 )
                 self._append_event(
                     world_id=world_id,
+                    worldline_id=worldline_id,
                     event_name=NARRATIVE_ARTIFACT_CREATED_EVENT_NAME,
                     payload={
                         "artifact_id": str(artifact.id),
@@ -358,6 +366,7 @@ class AgentRuntimeOrchestrator:
                 )
             failed_event = self._append_event(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 event_name=AGENT_RUN_FAILED_EVENT_NAME,
                 payload={
                     "agent_id": str(agent_id),
@@ -569,6 +578,7 @@ class AgentRuntimeOrchestrator:
         self,
         *,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
         event_name: str,
         payload: dict[str, Any],
         actor_ref: str,
@@ -576,6 +586,7 @@ class AgentRuntimeOrchestrator:
         return WorldEventStore(self._session).append_event(
             WorldEventAppend(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 event_name=event_name,
                 payload=payload,
                 wall_time=datetime.now(UTC),

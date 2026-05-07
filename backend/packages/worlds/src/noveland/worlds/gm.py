@@ -6,9 +6,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from noveland.agents.models import AgentRelationshipEdge
-from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventStore
+from noveland.events import (
+    WorldEventAppend,
+    WorldEventImportance,
+    WorldEventRecord,
+    WorldEventStore,
+)
+from noveland.events.models import WorldSnapshotModel
 from noveland.worlds.models import (
     AgentPresenceState,
+    CharacterKnowledgeFact,
     DailyLifeEventCandidate,
     EventResolutionRule,
     FactionProgressTrack,
@@ -25,6 +32,7 @@ from noveland.worlds.models import (
     RumorPropagation,
     RumorRecord,
     SceneBeatDraft,
+    SecretRecord,
     StoryHook,
     Worldline,
 )
@@ -95,11 +103,12 @@ class LivingWorldGMService:
             is not None
         ):
             raise ValueError("worldline key already exists")
-        if fork_event_sequence is None:
-            fork_event_sequence = WorldEventStore(self._session).latest_event_sequence(
-                world_id,
-                source.id,
-            )
+        fork_event_sequence = self._validated_current_fork_sequence(
+            world_id=world_id,
+            source=source,
+            forked_from_snapshot_id=forked_from_snapshot_id,
+            fork_event_sequence=fork_event_sequence,
+        )
         fork = Worldline(
             id=uuid.uuid4(),
             world_id=world_id,
@@ -121,6 +130,42 @@ class LivingWorldGMService:
         self._copy_worldline_state(world_id=world_id, source=source, target=fork)
         self._session.flush()
         return fork
+
+    def _validated_current_fork_sequence(
+        self,
+        *,
+        world_id: uuid.UUID,
+        source: Worldline,
+        forked_from_snapshot_id: uuid.UUID | None,
+        fork_event_sequence: int | None,
+    ) -> int:
+        store = WorldEventStore(self._session)
+        latest_sequence = store.latest_event_sequence(world_id, source.id)
+        if forked_from_snapshot_id is not None:
+            snapshot = self._session.get(WorldSnapshotModel, forked_from_snapshot_id)
+            if (
+                snapshot is None
+                or snapshot.world_id != world_id
+                or snapshot.worldline_id != source.id
+            ):
+                raise ValueError("fork snapshot not found")
+            if snapshot.covers_event_sequence != latest_sequence:
+                raise ValueError(
+                    "historical snapshot fork reconstruction is not supported yet; "
+                    "fork from the latest snapshot or latest event sequence"
+                )
+            if (
+                fork_event_sequence is not None
+                and fork_event_sequence != snapshot.covers_event_sequence
+            ):
+                raise ValueError("fork event sequence must match the selected snapshot")
+            return int(snapshot.covers_event_sequence)
+        if fork_event_sequence is not None and fork_event_sequence != latest_sequence:
+            raise ValueError(
+                "historical event fork reconstruction is not supported yet; "
+                "fork from the latest event sequence"
+            )
+        return latest_sequence
 
     def create_agenda(
         self,
@@ -276,6 +321,14 @@ class LivingWorldGMService:
         )
         self._session.add(choice)
         self._session.flush()
+        recorded_event = self._append_choice_recorded_event(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            player_actor=player_actor,
+            choice=choice,
+            actor_ref=actor_ref,
+        )
+        choice.applied_event_id = recorded_event.id
         if apply:
             self.apply_choice_consequences(
                 world_id=world_id,
@@ -399,6 +452,73 @@ class LivingWorldGMService:
             if count < pending_proposals:
                 matched = False
                 reasons.append("Pending proposal count is below threshold.")
+        min_faction_pressure = _optional_int(conditions.get("min_faction_pressure"))
+        if min_faction_pressure is not None:
+            track = self._session.scalars(
+                select(FactionProgressTrack)
+                .where(
+                    FactionProgressTrack.world_id == world_id,
+                    FactionProgressTrack.worldline_id == worldline.id,
+                )
+                .order_by(FactionProgressTrack.pressure.desc()),
+            ).first()
+            pressure = None if track is None else track.pressure
+            if pressure is None or pressure < min_faction_pressure:
+                matched = False
+                reasons.append("No faction track meets min_faction_pressure.")
+        required_scene_id = _uuid_or_none(conditions.get("scene_id"))
+        if required_scene_id is not None:
+            presence = self._session.scalars(
+                select(AgentPresenceState).where(
+                    AgentPresenceState.world_id == world_id,
+                    AgentPresenceState.worldline_id == worldline.id,
+                    AgentPresenceState.current_scene_id == required_scene_id,
+                ),
+            ).first()
+            if presence is None:
+                matched = False
+                reasons.append("No agent presence matches required scene_id.")
+        min_player_choices = _optional_int(conditions.get("min_player_choices"))
+        if min_player_choices is not None:
+            count = len(
+                self._session.scalars(
+                    select(PlayerChoiceRecord.id).where(
+                        PlayerChoiceRecord.world_id == world_id,
+                        PlayerChoiceRecord.worldline_id == worldline.id,
+                    ),
+                ).all(),
+            )
+            if count < min_player_choices:
+                matched = False
+                reasons.append("Player choice count is below threshold.")
+        min_known_facts = _optional_int(conditions.get("min_known_facts"))
+        if min_known_facts is not None:
+            count = len(
+                self._session.scalars(
+                    select(CharacterKnowledgeFact.id).where(
+                        CharacterKnowledgeFact.world_id == world_id,
+                        CharacterKnowledgeFact.worldline_id == worldline.id,
+                        CharacterKnowledgeFact.is_active.is_(True),
+                    ),
+                ).all(),
+            )
+            if count < min_known_facts:
+                matched = False
+                reasons.append("Known fact count is below threshold.")
+        max_hidden_secrets = _optional_int(conditions.get("max_hidden_secrets"))
+        if max_hidden_secrets is not None:
+            count = len(
+                self._session.scalars(
+                    select(SecretRecord.id).where(
+                        SecretRecord.world_id == world_id,
+                        SecretRecord.worldline_id == worldline.id,
+                        SecretRecord.status == "hidden",
+                    ),
+                ).all(),
+            )
+            if count > max_hidden_secrets:
+                matched = False
+                reasons.append("Hidden secret count is above threshold.")
         if matched:
             reasons.append("Rule conditions are satisfied.")
         return ResolutionRuleDryRun(
@@ -502,10 +622,22 @@ class LivingWorldGMService:
                     status="pending",
                 ),
             )
-        event = WorldEventStore(self._session).append_event(
+        self._session.flush()
+        return preview
+
+    def _append_choice_recorded_event(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        player_actor: PlayerActorProfile,
+        choice: PlayerChoiceRecord,
+        actor_ref: str,
+    ) -> WorldEventRecord:
+        return WorldEventStore(self._session).append_event(
             WorldEventAppend(
                 world_id=world_id,
-                worldline_id=worldline.id,
+                worldline_id=worldline_id,
                 event_name="player.choice_recorded",
                 payload={
                     "choice_id": str(choice.id),
@@ -519,9 +651,6 @@ class LivingWorldGMService:
                 actor_ref=actor_ref,
             ),
         )
-        choice.applied_event_id = event.id
-        self._session.flush()
-        return preview
 
     def compare_worldlines(
         self,

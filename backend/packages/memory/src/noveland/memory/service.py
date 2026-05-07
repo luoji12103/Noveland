@@ -431,6 +431,7 @@ class MemoryService:
         self,
         *,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
         agent_id: uuid.UUID,
         query_text: str,
         max_context_items: int,
@@ -438,7 +439,7 @@ class MemoryService:
         search_result = self.search(
             MemorySearchRequest(
                 world_id=world_id,
-                worldline_id=self._worldline_id(world_id, None),
+                worldline_id=self._worldline_id(world_id, worldline_id),
                 agent_id=agent_id,
                 query_text=query_text,
                 limit=max_context_items,

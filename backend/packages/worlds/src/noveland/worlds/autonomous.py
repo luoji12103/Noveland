@@ -10,12 +10,14 @@ from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventSt
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.models import (
     AgentPresenceState,
+    DailyEpisodeDraft,
     DailyLifeEventCandidate,
     FactionProgressTrack,
     OffscreenEventQueueItem,
     Scene,
     World,
 )
+from noveland.worlds.plot import LivingWorldPlotService
 from noveland.worlds.worldlines import (
     ensure_primary_worldline,
     primary_worldline_or_none,
@@ -225,6 +227,7 @@ class LivingWorldAutonomyService:
                 item.resolved_event_id = event.id
                 item.last_error = None
                 self._apply_resolution_side_effects(item, event.id)
+                self._create_daily_episode_draft(item)
                 resolved += 1
                 event_ids.append(event.id)
             except Exception as exc:
@@ -290,6 +293,32 @@ class LivingWorldAutonomyService:
             ).first()
             if track is not None:
                 track.progress = min(100, track.progress + 1)
+
+    def _create_daily_episode_draft(self, item: OffscreenEventQueueItem) -> None:
+        if item.importance != "daily" or item.source_candidate_id is None:
+            return
+        existing = self._session.scalars(
+            select(DailyEpisodeDraft).where(
+                DailyEpisodeDraft.world_id == item.world_id,
+                DailyEpisodeDraft.worldline_id == item.worldline_id,
+                DailyEpisodeDraft.source_candidate_id == item.source_candidate_id,
+            ),
+        ).first()
+        if existing is not None:
+            return
+        LivingWorldPlotService(self._session).generate_daily_episode(
+            world_id=item.world_id,
+            worldline_id=item.worldline_id,
+            source_candidate_id=item.source_candidate_id,
+            title=item.title,
+            metadata={
+                "source": "offscreen_resolution",
+                "offscreen_queue_item_id": str(item.id),
+                "resolved_event_id": None
+                if item.resolved_event_id is None
+                else str(item.resolved_event_id),
+            },
+        )
 
     def _enabled_agents(self, world_id: uuid.UUID) -> list[Agent]:
         return list(

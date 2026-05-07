@@ -105,6 +105,7 @@ class ConversationCreateRequest(_RequestModel):
     memory_config: ConversationMemoryConfigRequest = Field(
         default_factory=lambda: ConversationMemoryConfigRequest(),
     )
+    group_context: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_scope(self) -> ConversationCreateRequest:
@@ -123,6 +124,7 @@ class ConversationUpdateRequest(_RequestModel):
     policy: ConversationPolicyRequest | None = None
     writer_config: ConversationWriterConfigRequest | None = None
     memory_config: ConversationMemoryConfigRequest | None = None
+    group_context: dict[str, Any] | None = None
 
 
 class ConversationParticipantRequest(_RequestModel):
@@ -266,6 +268,7 @@ class ConversationSessionResponse(BaseModel):
     policy: ConversationPolicyResponse
     writer_config: ConversationWriterConfigResponse
     memory_config: ConversationMemoryConfigResponse
+    group_context: dict[str, Any]
     terminal_reason: str | None
     created_at: str
     updated_at: str
@@ -363,6 +366,10 @@ def create_conversation(
     _validate_scene_reference(db_session, context.world_id, conversation_create.scene_id)
     _validate_writer_config_binding(db_session, conversation_create.writer_config)
     try:
+        writer_config = _writer_config_with_group_context(
+            conversation_create.writer_config,
+            conversation_create.group_context,
+        )
         session = ConversationService(db_session).create_session(
             ConversationSessionCreate(
                 world_id=context.world_id,
@@ -375,7 +382,7 @@ def create_conversation(
                 opening_prompt=conversation_create.opening_prompt,
                 max_turns=conversation_create.max_turns,
                 policy=_policy_contract(conversation_create.policy),
-                writer_config=_writer_config_contract(conversation_create.writer_config),
+                writer_config=writer_config,
                 memory_config=_memory_config_contract(conversation_create.memory_config),
             ),
         )
@@ -409,6 +416,12 @@ def update_conversation(
     if conversation_update.writer_config is not None:
         _validate_writer_config_binding(db_session, conversation_update.writer_config)
     try:
+        writer_config = None
+        if conversation_update.writer_config is not None:
+            writer_config = _writer_config_with_group_context(
+                conversation_update.writer_config,
+                conversation_update.group_context or {},
+            )
         session = ConversationService(db_session).update_session(
             context.world_id,
             conversation_id,
@@ -420,9 +433,7 @@ def update_conversation(
                 policy=None
                 if conversation_update.policy is None
                 else _policy_contract(conversation_update.policy),
-                writer_config=None
-                if conversation_update.writer_config is None
-                else _writer_config_contract(conversation_update.writer_config),
+                writer_config=writer_config,
                 memory_config=None
                 if conversation_update.memory_config is None
                 else _memory_config_contract(conversation_update.memory_config),
@@ -899,6 +910,19 @@ def _writer_config_contract(
     )
 
 
+def _writer_config_with_group_context(
+    writer_config: ConversationWriterConfigRequest,
+    group_context: dict[str, Any],
+) -> ConversationWriterConfig:
+    contract = _writer_config_contract(writer_config)
+    config = contract.model_dump(mode="json")
+    if group_context:
+        plugin_config = dict(config.get("writer_plugin_config") or {})
+        plugin_config["group_context"] = group_context
+        config["writer_plugin_config"] = plugin_config
+    return ConversationWriterConfig(**config)
+
+
 def _memory_config_contract(
     memory_config: ConversationMemoryConfigRequest,
 ) -> ConversationMemoryConfig:
@@ -959,10 +983,16 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
             include_agent_observations=session.memory_config.include_agent_observations,
             memory_query_strategy=session.memory_config.memory_query_strategy,
         ),
+        group_context=_group_context_from_writer_config(session.writer_config),
         terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
     )
+
+
+def _group_context_from_writer_config(writer_config: ConversationWriterConfig) -> dict[str, Any]:
+    raw = writer_config.writer_plugin_config.get("group_context")
+    return raw if isinstance(raw, dict) else {}
 
 
 def _participant_response(

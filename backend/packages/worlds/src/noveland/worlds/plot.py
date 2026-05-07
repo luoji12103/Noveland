@@ -7,8 +7,10 @@ from typing import Any
 
 from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventStore
+from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.models import (
     AgentPresenceState,
+    CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventTriggerCondition,
@@ -20,6 +22,7 @@ from noveland.worlds.models import (
     RumorPropagation,
     RumorRecord,
     SceneBeatDraft,
+    SecretRecord,
     StoryHook,
     Worldline,
 )
@@ -274,6 +277,64 @@ class LivingWorldPlotService:
                 unsatisfied.append("No eligible agent is present at the required scene.")
             else:
                 satisfied.append("At least one agent is present at the required scene.")
+        min_faction_pressure = _optional_int(checks.get("min_faction_pressure"))
+        if min_faction_pressure is not None:
+            track = self._session.scalars(
+                select(FactionProgressTrack)
+                .where(
+                    FactionProgressTrack.world_id == world_id,
+                    FactionProgressTrack.worldline_id == worldline.id,
+                )
+                .order_by(FactionProgressTrack.pressure.desc()),
+            ).first()
+            value = None if track is None else track.pressure
+            _record_threshold(
+                "faction pressure",
+                value,
+                min_faction_pressure,
+                satisfied,
+                unsatisfied,
+            )
+        min_player_choices = _optional_int(checks.get("min_player_choices"))
+        if min_player_choices is not None:
+            from noveland.worlds.models import PlayerChoiceRecord
+
+            count = len(
+                self._session.scalars(
+                    select(PlayerChoiceRecord.id).where(
+                        PlayerChoiceRecord.world_id == world_id,
+                        PlayerChoiceRecord.worldline_id == worldline.id,
+                    ),
+                ).all(),
+            )
+            _record_threshold("player choices", count, min_player_choices, satisfied, unsatisfied)
+        min_known_facts = _optional_int(checks.get("min_known_facts"))
+        if min_known_facts is not None:
+            count = len(
+                self._session.scalars(
+                    select(CharacterKnowledgeFact.id).where(
+                        CharacterKnowledgeFact.world_id == world_id,
+                        CharacterKnowledgeFact.worldline_id == worldline.id,
+                        CharacterKnowledgeFact.is_active.is_(True),
+                    ),
+                ).all(),
+            )
+            _record_threshold("known facts", count, min_known_facts, satisfied, unsatisfied)
+        max_hidden_secrets = _optional_int(checks.get("max_hidden_secrets"))
+        if max_hidden_secrets is not None:
+            count = len(
+                self._session.scalars(
+                    select(SecretRecord.id).where(
+                        SecretRecord.world_id == world_id,
+                        SecretRecord.worldline_id == worldline.id,
+                        SecretRecord.status == "hidden",
+                    ),
+                ).all(),
+            )
+            if count > max_hidden_secrets:
+                unsatisfied.append(f"hidden secrets above {max_hidden_secrets}.")
+            else:
+                satisfied.append(f"hidden secrets within {max_hidden_secrets}.")
         if not checks:
             satisfied.append("No conditions configured.")
         return TriggerDryRun(
@@ -514,6 +575,24 @@ class LivingWorldPlotService:
         )
         propagation.delivered_event_id = event.id
         propagation.status = "delivered"
+        if propagation.target_agent_id is not None:
+            LivingWorldGuardrailService(self._session).upsert_knowledge_fact(
+                world_id=world_id,
+                worldline_id=propagation.worldline_id,
+                agent_id=propagation.target_agent_id,
+                fact_key=f"rumor:{rumor.rumor_key}",
+                knowledge_kind="guess",
+                content=rumor.content,
+                confidence=60,
+                visibility="private",
+                source_event_id=event.id,
+                source_ref=str(rumor.id),
+                metadata={
+                    "rumor_id": str(rumor.id),
+                    "propagation_id": str(propagation.id),
+                    "source": "rumor_delivery",
+                },
+            )
         self._session.flush()
         return propagation
 
