@@ -3,7 +3,7 @@
 - Date: 2026-05-07T12:45:00Z
 - Branch: feat/living-world-beta-release-readiness
 - Objective: Implement V2 living-world roadmap phases 46-50: route and ending planning, long-run simulation evaluation, authoring toolchain v2, living-world release profile, and galgame living-world beta validation.
-- Status: Implementation and targeted checks completed on the feature branch. Awaiting full final gate and local fast-forward merge back to `main`; no push is planned.
+- Status: Implementation and full final gate completed on the feature branch. Ready for local fast-forward merge back to `main`; no push is planned.
 
 ## Completed Implementation
 
@@ -20,8 +20,20 @@
 - `cd web && npm run test -- lib/worlds/client.test.ts features/worlds/world-overview.test.tsx`
 - `cd web && npm run typecheck`
 
+## Final Gate Passed
+
+- `cd backend && uv run ruff check .`
+- `cd backend && uv run mypy .`
+- `cd backend && uv run pytest`
+- `cd web && npm run lint`
+- `cd web && npm run typecheck`
+- `cd web && npm run test`
+- `cd web && npm run build`
+- `cd web && npm run check:next-env`
+- `cd web && npm run test:e2e`
+- `docker compose -f infra/compose.yaml config`
+- `git diff --check`
+
 ## Remaining Closeout
 
-- Run the full final gate.
-- Restore `web/next-env.d.ts` if build or e2e changes it, then rerun `npm run check:next-env`.
-- If clean, merge `feat/living-world-beta-release-readiness` into local `main` with `git merge --ff-only`.
+- Merge `feat/living-world-beta-release-readiness` into local `main` with `git merge --ff-only`.
