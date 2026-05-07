@@ -1,34 +1,28 @@
 # Active Session Handoff
 
 - Date: 2026-05-07T00:00:00Z
-- Branch: feat/living-world-knowledge-player-guardrails
-- Objective: Implement V2 living-world roadmap phases 36-45: character knowledge state, secrets/revelations, emotional state, relationship decay/repair, world-state dashboard v2, player-facing journal, in-world notifications, intervention controls, GM style guardrails, and narrative continuity review.
-- Status: Implementation and final gate completed on the feature branch. Ready for local fast-forward merge into `main`; do not push unless explicitly requested.
+- Branch: feat/living-world-beta-release-readiness
+- Objective: Implement V2 living-world roadmap phases 46-50: route and ending planning, long-run simulation evaluation, authoring toolchain v2, living-world release profile, and galgame living-world beta validation.
+- Status: Started from clean local `main`, which already contains the V2 phases 36-45 guardrails work. No push is planned.
 
-## Completed Implementation
+## Planned Implementation
 
-- Added migration `20260507_0027_living_world_knowledge_player_guardrails`.
-- Added worldline-scoped character knowledge, secrets/reveals, emotional state, relationship repair records, player journals, notifications, interventions, GM style reviews, and narrative continuity reviews.
-- Added `LivingWorldGuardrailService` plus world-admin/member API surfaces and dense Web world overview panels for the new state.
-- Folded in recorded V2 phases 1-35 acceptance gaps where aligned with this bundle: `apply=false` choice event logging, runtime memory worldline scope, unsupported historical fork rejection, expanded deterministic dry-run context, rumor-to-knowledge propagation, daily episode creation from resolved low-risk offscreen events, and group interaction context propagation.
-- Updated Web client/server types, route mappings, component tests, and Playwright mock backend routes.
+- Add migration `20260507_0028_living_world_beta_release_readiness`.
+- Add worldline-scoped route milestones and ending candidates tied to route/plot state.
+- Add deterministic long-run living-world evaluation runs with concrete recommendations.
+- Add sequel-world authoring templates and preview/apply import jobs for source notes, character templates, event templates, and route templates.
+- Add living-world release profile records and operator documentation.
+- Add beta checklist runs/items proving a sample world covers 7-day simulation, branch saves, relationship changes, faction progress, GM/event loop, player interventions, journal/notifications, and narrative output.
+- Extend existing world/admin Web surfaces and mock backend routes rather than creating a parallel app.
 
-## Final Gate Results
+## Gate Plan
 
-- `cd backend && uv run ruff check .`: passed
-- `cd backend && uv run mypy .`: passed
-- `cd backend && uv run pytest`: passed, 162 passed and 7 skipped
-- `cd web && npm run lint`: passed
-- `cd web && npm run typecheck`: passed
-- `cd web && npm run test`: passed, 60 passed
-- `cd web && npm run build`: passed
-- `cd web && npm run check:next-env`: passed after restoring generated `web/next-env.d.ts` churn
-- `cd web && npm run test:e2e`: passed, 10 passed
-- `docker compose -f infra/compose.yaml config`: passed
-- `git diff --check`: passed
+- Backend targeted checks for world API, schema metadata, and Alembic config.
+- Web targeted checks for world client and world overview.
+- Full final backend/Web/compose gate before local fast-forward merge back to `main`.
 
-## Risks And Follow-Up
+## Risks
 
-- Persistent databases must apply migrations through `20260507_0027` before using these V2 phase 36-45 features.
-- GM style and continuity review remain deterministic warning/reporting surfaces, not provider generation and not hard blocking by default.
-- V2 phases 46-50 are the next candidate bundle: route/ending planning, long-run simulation evaluation, authoring toolchain v2, release profile, and beta validation.
+- Persistent databases must apply migrations through `20260507_0028` before using beta readiness data.
+- Long-run evaluation remains deterministic and local; it does not call providers, external tools, subprocesses, or sandbox execution.
+- Beta validation records checklist/evidence readiness, not a public production launch.

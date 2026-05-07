@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- Living World Beta Release Readiness
 
 ## Blocked
 - None
@@ -63,5 +63,5 @@
 - Living World Knowledge / Player / Guardrails
 
 ## Upcoming Mainline
-- V2 phases 46-50 candidate after this bundle: route/ending planning, long-run simulation evaluation, authoring toolchain v2, living-world release profile, and beta validation.
-- Remaining V2 acceptance hardening should be rolled into phases 46-50: deeper runtime/narrative world-bible consumption, broader long-run eval coverage, and fuller release/beta checklist evidence.
+- None. V2 phases 46-50 are the active final roadmap bundle.
+- Remaining V2 acceptance hardening is folded into beta release readiness: route/ending evidence, long-run eval coverage, authoring import checks, release profile guidance, and beta checklist evidence.
