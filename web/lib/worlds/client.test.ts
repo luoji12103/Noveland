@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  applyAuthoringTemplate,
   applyRelationshipRepair,
   cancelAgentCalendarEntry,
   bindPlayerActor,
@@ -8,13 +9,17 @@ import {
   createAgentCalendarEntry,
   createAgentObservation,
   createAgentRelationship,
+  createAuthoringTemplate,
+  createBetaChecklist,
   createDailyEpisode,
+  createEndingCandidate,
   createFactionTrack,
   createGMAgenda,
   createGMProposal,
   createGMStyleReview,
   createGroupInteraction,
   createIntervention,
+  createLongRunEval,
   createNarrativeContinuityReview,
   createNotification,
   createLocationEdge,
@@ -30,6 +35,7 @@ import {
   createProviderProfile,
   createRelationshipRepair,
   createResolutionRule,
+  createRouteMilestone,
   createScheduleRule,
   createSnapshot,
   createRumor,
@@ -44,6 +50,7 @@ import {
   getConversationMemorySummary,
   getConversationSpeakerPreview,
   getExternalToolPolicy,
+  getReleaseProfile,
   getLivingWorldDashboard,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
@@ -55,6 +62,7 @@ import {
   deactivateAgentPreset,
   deleteMemoryBackendProfile,
   disableProviderProfile,
+  dryRunEndingCandidate,
   dryRunMemoryBackfill,
   dryRunResolutionRule,
   dryRunEventTriggerCondition,
@@ -72,6 +80,10 @@ import {
   getSnapshotIntegrity,
   getWorldBible,
   generateDailyLifeCandidates,
+  listAuthoringTemplates,
+  listBetaChecklistItems,
+  listBetaChecklists,
+  listEndingCandidates,
   listEmotionalStates,
   listDailyLifeCandidates,
   listFactionTracks,
@@ -97,6 +109,8 @@ import {
   listRelationshipSuggestions,
   listRelationshipRepairs,
   listRouteAffinities,
+  listRouteMilestones,
+  listLongRunEvals,
   listRumors,
   listRumorPropagations,
   listNarrativeContinuityReviews,
@@ -113,6 +127,7 @@ import {
   listMemoryBackendProfiles,
   listMemoryBackendProfileJobs,
   pauseWorldClock,
+  previewAuthoringTemplate,
   previewPlayerChoiceConsequences,
   previewScheduleRule,
   publishNarrativeArtifact,
@@ -162,6 +177,7 @@ import {
   upsertAgentPresence,
   upsertEmotionalState,
   upsertKnowledgeFact,
+  upsertReleaseProfile,
   upsertRouteAffinity,
   upsertWorldBible,
   listWorldlines,
@@ -773,6 +789,76 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[3][0]).toBe(
       "/api/worlds/world-1/clock/transitions?limit=5",
     );
+  });
+
+  it("maps beta release readiness requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "milestone-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "milestone-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "ending-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "ending-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "eval-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "eval-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "template-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "template-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "job-1", status: "preview" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "job-2", status: "applied" }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "profile-1", status: "ready" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "checklist-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "checklist-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "item-1" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listRouteMilestones("world-1", { worldline_id: "worldline-1" });
+    await createRouteMilestone("world-1", {
+      milestone_key: "festival-promise",
+      title: "Festival promise",
+    });
+    await listEndingCandidates("world-1", { status: "available", ending_type: "normal" });
+    await createEndingCandidate("world-1", {
+      ending_key: "hero-normal",
+      title: "Hero normal",
+      ending_type: "normal",
+    });
+    await dryRunEndingCandidate("world-1", "ending-2", { worldline_id: "worldline-1" });
+    await listLongRunEvals("world-1", { worldline_id: "worldline-1" });
+    await createLongRunEval("world-1", { eval_key: "seven-day", horizon_days: 7 });
+    await listAuthoringTemplates("world-1", { template_kind: "world_bundle" });
+    await createAuthoringTemplate("world-1", {
+      template_key: "hero-source",
+      template_kind: "world_bundle",
+      name: "Hero source",
+    });
+    await previewAuthoringTemplate("world-1", "template-2");
+    await applyAuthoringTemplate("world-1", "template-2", { metadata: { operator: "test" } });
+    await getReleaseProfile("world-1");
+    await upsertReleaseProfile("world-1", { profile_key: "beta", status: "ready" });
+    await listBetaChecklists("world-1", { worldline_id: "worldline-1" });
+    await createBetaChecklist("world-1", { run_key: "beta-readiness" });
+    await listBetaChecklistItems("world-1", "checklist-2");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/world-1/route-milestones?worldline_id=worldline-1",
+      "/api/worlds/world-1/route-milestones",
+      "/api/worlds/world-1/ending-candidates?status=available&ending_type=normal",
+      "/api/worlds/world-1/ending-candidates",
+      "/api/worlds/world-1/ending-candidates/ending-2/dry-run?worldline_id=worldline-1",
+      "/api/worlds/world-1/long-run-evals?worldline_id=worldline-1",
+      "/api/worlds/world-1/long-run-evals",
+      "/api/worlds/world-1/authoring-templates?template_kind=world_bundle",
+      "/api/worlds/world-1/authoring-templates",
+      "/api/worlds/world-1/authoring-templates/template-2/preview",
+      "/api/worlds/world-1/authoring-templates/template-2/apply",
+      "/api/worlds/world-1/release-profile",
+      "/api/worlds/world-1/release-profile",
+      "/api/worlds/world-1/beta-checklists?worldline_id=worldline-1",
+      "/api/worlds/world-1/beta-checklists",
+      "/api/worlds/world-1/beta-checklists/checklist-2/items",
+    ]);
   });
 
   it("maps replay and snapshot requests", async () => {

@@ -479,6 +479,130 @@ const routeAffinities = [
     updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
+const routeMilestones = [
+  {
+    id: "83600000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    route_affinity_id: "82300000-0000-4000-8000-000000000001",
+    plot_thread_id: "82200000-0000-4000-8000-000000000001",
+    agent_id: agentGuideId,
+    milestone_key: "festival-confession-lock",
+    title: "Festival confession lock",
+    description: "The guide route can lock a confession branch.",
+    stage: 2,
+    status: "active",
+    conditions: { min_route_stage: 1 },
+    evidence_metadata: { route: "guide-route" },
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const endingCandidates = [
+  {
+    id: "83700000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    route_affinity_id: "82300000-0000-4000-8000-000000000001",
+    plot_thread_id: "82200000-0000-4000-8000-000000000001",
+    agent_id: agentGuideId,
+    ending_key: "guide-normal",
+    title: "Guide normal ending",
+    ending_type: "normal",
+    status: "available",
+    requirements: { min_route_stage: 1 },
+    outcome_summary: "The festival route closes in a quiet post-canon scene.",
+    evidence_metadata: { route: "guide-route" },
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const longRunEvals = [
+  {
+    id: "83800000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    eval_key: "seven-day-beta-eval",
+    horizon_days: 7,
+    status: "warning",
+    started_at: "2026-04-17T00:00:00.000Z",
+    finished_at: "2026-04-17T00:00:01.000Z",
+    metrics: { event_count: 1, route_count: 1 },
+    recommendations: [{ action: "add_daily_episode", reason: "low daily density" }],
+    blockers: [],
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:01.000Z",
+  },
+];
+const authoringTemplates = [
+  {
+    id: "83900000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    template_key: "sequel-world-bundle",
+    template_kind: "world_bundle",
+    name: "Sequel world bundle",
+    description: "Source notes, character, event, and route template bundle.",
+    content: { source_notes: [], characters: [], events: [], routes: [] },
+    validation_issues: [],
+    is_active: true,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const authoringImportJobs = [];
+const releaseProfiles = new Map([
+  [
+    worldOneId,
+    {
+      id: "84000000-0000-4000-8000-000000000001",
+      world_id: worldOneId,
+      profile_key: "living-world-beta",
+      status: "ready",
+      branch_policy: { branch_review: true },
+      backup_policy: { snapshot_before_beta: true },
+      content_review_policy: { continuity_review_required: true },
+      player_permission_policy: { invite_only: true },
+      worldline_policy: { forks_allowed: true },
+      checklist: { sample_world_required: true },
+      metadata: {},
+      created_at: "2026-04-17T00:00:00.000Z",
+      updated_at: "2026-04-17T00:00:00.000Z",
+    },
+  ],
+]);
+const betaChecklistRuns = [
+  {
+    id: "84100000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    run_key: "sample-world-beta",
+    status: "warning",
+    summary: "Sample world beta has non-blocking recommendations.",
+    evidence: { days: 7 },
+    blocker_count: 0,
+    created_by_actor_ref: `user:${adminUserId}`,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const betaChecklistItems = [
+  {
+    id: "84200000-0000-4000-8000-000000000001",
+    run_id: "84100000-0000-4000-8000-000000000001",
+    item_key: "seven-day-simulation",
+    title: "7-day simulation",
+    status: "warning",
+    evidence: { eval_run_id: "83800000-0000-4000-8000-000000000001" },
+    recommendation: "Increase daily episode density before public beta.",
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
 const triggerConditions = [
   {
     id: "82400000-0000-4000-8000-000000000001",
@@ -1506,6 +1630,54 @@ async function handleWorldResource(request, response, url) {
     await handleRouteAffinities(request, response, currentSubject, worldId, url);
     return;
   }
+  if (resource === "route-milestones") {
+    await handleRouteMilestones(request, response, currentSubject, worldId, segments[3], url);
+    return;
+  }
+  if (resource === "ending-candidates") {
+    await handleEndingCandidates(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments[4],
+      url,
+    );
+    return;
+  }
+  if (resource === "long-run-evals") {
+    await handleLongRunEvals(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "authoring-templates") {
+    await handleAuthoringTemplates(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments[4],
+      url,
+    );
+    return;
+  }
+  if (resource === "release-profile") {
+    await handleReleaseProfile(request, response, currentSubject, worldId);
+    return;
+  }
+  if (resource === "beta-checklists") {
+    await handleBetaChecklists(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments[4],
+      url,
+    );
+    return;
+  }
   if (resource === "event-trigger-conditions") {
     await handleEventTriggerConditions(
       request,
@@ -2022,6 +2194,374 @@ async function handleRouteAffinities(request, response, currentSubject, worldId,
       Object.assign(route, body, { updated_at: new Date().toISOString() });
     }
     sendJson(response, 200, routeAffinityResponse(route));
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleRouteMilestones(request, response, currentSubject, worldId, milestoneId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && milestoneId === undefined) {
+    const status = url.searchParams.get("status");
+    sendJson(
+      response,
+      200,
+      routeMilestones
+        .filter((milestone) => matchesWorldline(milestone, worldId, url))
+        .filter((milestone) => status === null || milestone.status === status)
+        .map(routeMilestoneResponse),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && milestoneId === undefined) {
+    const body = await readJson(request);
+    const milestone = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      route_affinity_id: body.route_affinity_id ?? null,
+      plot_thread_id: body.plot_thread_id ?? null,
+      agent_id: body.agent_id ?? null,
+      milestone_key: body.milestone_key,
+      title: body.title,
+      description: body.description ?? null,
+      stage: body.stage ?? 0,
+      status: body.status ?? "planned",
+      conditions: body.conditions ?? {},
+      evidence_metadata: body.evidence_metadata ?? {},
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    routeMilestones.push(milestone);
+    sendJson(response, 201, routeMilestoneResponse(milestone));
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleEndingCandidates(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  endingId,
+  action,
+  url,
+) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && endingId === undefined) {
+    const status = url.searchParams.get("status");
+    const endingType = url.searchParams.get("ending_type");
+    sendJson(
+      response,
+      200,
+      endingCandidates
+        .filter((ending) => matchesWorldline(ending, worldId, url))
+        .filter((ending) => status === null || ending.status === status)
+        .filter((ending) => endingType === null || ending.ending_type === endingType)
+        .map(endingCandidateResponse),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && endingId === undefined) {
+    const body = await readJson(request);
+    const ending = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      route_affinity_id: body.route_affinity_id ?? null,
+      plot_thread_id: body.plot_thread_id ?? null,
+      agent_id: body.agent_id ?? null,
+      ending_key: body.ending_key,
+      title: body.title,
+      ending_type: body.ending_type ?? "normal",
+      status: body.status ?? "planned",
+      requirements: body.requirements ?? {},
+      outcome_summary: body.outcome_summary ?? null,
+      evidence_metadata: body.evidence_metadata ?? {},
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    endingCandidates.push(ending);
+    sendJson(response, 201, endingCandidateResponse(ending));
+    return;
+  }
+  const ending = endingCandidates.find((item) => item.id === endingId && item.world_id === worldId);
+  if (ending === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && action === "dry-run") {
+    const route =
+      ending.route_affinity_id === null
+        ? null
+        : routeAffinities.find((item) => item.id === ending.route_affinity_id);
+    const minRouteStage = Number(ending.requirements.min_route_stage ?? 0);
+    const stage = Number(route?.stage ?? 0);
+    sendJson(response, 200, {
+      ending_id: ending.id,
+      ending_key: ending.ending_key,
+      matched: stage >= minRouteStage,
+      satisfied: stage >= minRouteStage ? [`route_stage >= ${minRouteStage}`] : [],
+      unsatisfied: stage >= minRouteStage ? [] : [`route_stage < ${minRouteStage}`],
+      evidence: { route_stage: stage, requirement: minRouteStage },
+    });
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleLongRunEvals(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, longRunEvals.filter((run) => matchesWorldline(run, worldId, url)));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    const eventCount = (worldEvents.get(worldId) ?? []).filter(
+      (event) => event.worldline_id === worldlineId,
+    ).length;
+    const run = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: worldlineId,
+      eval_key: body.eval_key,
+      horizon_days: body.horizon_days ?? 7,
+      status: eventCount === 0 ? "warning" : "completed",
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
+      metrics: { event_count: eventCount, route_count: routeAffinities.length },
+      recommendations:
+        eventCount === 0
+          ? [{ action: "seed_world_events", reason: "no event activity in eval window" }]
+          : [{ action: "review_daily_density", reason: "keep route and daily beats balanced" }],
+      blockers: [],
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    longRunEvals.unshift(run);
+    sendJson(response, 201, run);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleAuthoringTemplates(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  templateId,
+  action,
+  url,
+) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && templateId === undefined) {
+    const kind = url.searchParams.get("template_kind");
+    sendJson(
+      response,
+      200,
+      authoringTemplates
+        .filter((template) => template.world_id === worldId)
+        .filter((template) => kind === null || template.template_kind === kind),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && templateId === undefined) {
+    const body = await readJson(request);
+    const template = {
+      id: randomUUID(),
+      world_id: worldId,
+      template_key: body.template_key,
+      template_kind: body.template_kind,
+      name: body.name,
+      description: body.description ?? null,
+      content: body.content ?? {},
+      validation_issues: [],
+      is_active: true,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    authoringTemplates.push(template);
+    sendJson(response, 201, template);
+    return;
+  }
+  const template = authoringTemplates.find(
+    (item) => item.id === templateId && item.world_id === worldId,
+  );
+  if (template === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && (action === "preview" || action === "apply")) {
+    const body = await readJson(request);
+    const job = {
+      id: randomUUID(),
+      world_id: worldId,
+      template_id: template.id,
+      status: action === "apply" ? "applied" : "preview",
+      preview_summary: {
+        template_key: template.template_key,
+        source_notes: Array.isArray(template.content.source_notes)
+          ? template.content.source_notes.length
+          : 0,
+        characters: Array.isArray(template.content.characters) ? template.content.characters.length : 0,
+        events: Array.isArray(template.content.events) ? template.content.events.length : 0,
+        routes: Array.isArray(template.content.routes) ? template.content.routes.length : 0,
+      },
+      applied_refs: action === "apply" ? { template_id: template.id } : {},
+      validation_issues: template.validation_issues,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    authoringImportJobs.unshift(job);
+    sendJson(response, 200, job);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleReleaseProfile(request, response, currentSubject, worldId) {
+  if (request.method === "GET") {
+    sendJson(response, 200, releaseProfiles.get(worldId) ?? null);
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PUT") {
+    const body = await readJson(request);
+    const existing = releaseProfiles.get(worldId);
+    const profile = {
+      id: existing?.id ?? randomUUID(),
+      world_id: worldId,
+      profile_key: body.profile_key ?? existing?.profile_key ?? "living-world-beta",
+      status: body.status ?? existing?.status ?? "draft",
+      branch_policy: body.branch_policy ?? existing?.branch_policy ?? {},
+      backup_policy: body.backup_policy ?? existing?.backup_policy ?? {},
+      content_review_policy:
+        body.content_review_policy ?? existing?.content_review_policy ?? {},
+      player_permission_policy:
+        body.player_permission_policy ?? existing?.player_permission_policy ?? {},
+      worldline_policy: body.worldline_policy ?? existing?.worldline_policy ?? {},
+      checklist: body.checklist ?? existing?.checklist ?? {},
+      metadata: body.metadata ?? existing?.metadata ?? {},
+      created_at: existing?.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    releaseProfiles.set(worldId, profile);
+    sendJson(response, 200, profile);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleBetaChecklists(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  runId,
+  action,
+  url,
+) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && runId === undefined) {
+    sendJson(
+      response,
+      200,
+      betaChecklistRuns.filter((run) => matchesWorldline(run, worldId, url)),
+    );
+    return;
+  }
+  if (request.method === "GET" && action === "items") {
+    sendJson(response, 200, betaChecklistItems.filter((item) => item.run_id === runId));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && runId === undefined) {
+    const body = await readJson(request);
+    const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    const run = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: worldlineId,
+      run_key: body.run_key ?? "sample-world-beta",
+      status: longRunEvals.length === 0 ? "blocked" : "warning",
+      summary:
+        longRunEvals.length === 0
+          ? "Beta checklist is blocked until a long-run eval exists."
+          : "Sample world beta has non-blocking recommendations.",
+      evidence: { eval_runs: longRunEvals.length, worldlines: worldlines.length },
+      blocker_count: longRunEvals.length === 0 ? 1 : 0,
+      created_by_actor_ref: `user:${currentSubject.user_id}`,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    const item = {
+      id: randomUUID(),
+      run_id: run.id,
+      item_key: "seven-day-simulation",
+      title: "7-day simulation",
+      status: run.blocker_count === 0 ? "warning" : "blocked",
+      evidence: { eval_runs: longRunEvals.length },
+      recommendation:
+        run.blocker_count === 0
+          ? "Review daily density before public beta."
+          : "Run a seven-day eval before beta validation.",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    betaChecklistRuns.unshift(run);
+    betaChecklistItems.push(item);
+    sendJson(response, 201, run);
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
@@ -5940,6 +6480,24 @@ function routeAffinityResponse(route) {
   const agent = agentFor(route.agent_id);
   return {
     ...route,
+    agent_key: agent?.agent_key ?? null,
+    agent_display_name: agent?.display_name ?? null,
+  };
+}
+
+function routeMilestoneResponse(milestone) {
+  const agent = milestone.agent_id === null ? null : agentFor(milestone.agent_id);
+  return {
+    ...milestone,
+    agent_key: agent?.agent_key ?? null,
+    agent_display_name: agent?.display_name ?? null,
+  };
+}
+
+function endingCandidateResponse(ending) {
+  const agent = ending.agent_id === null ? null : agentFor(ending.agent_id);
+  return {
+    ...ending,
     agent_key: agent?.agent_key ?? null,
     agent_display_name: agent?.display_name ?? null,
   };

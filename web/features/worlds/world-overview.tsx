@@ -6,15 +6,20 @@ import { useRouter } from "next/navigation";
 
 import {
   advanceWorldClock,
+  applyAuthoringTemplate,
   bindPlayerActor,
   compareWorldlines,
+  createAuthoringTemplate,
+  createBetaChecklist,
   createDailyEpisode,
+  createEndingCandidate,
   createFactionTrack,
   createGroupInteraction,
   createGMStyleReview,
   createGMAgenda,
   createGMProposal,
   createIntervention,
+  createLongRunEval,
   createNarrativeContinuityReview,
   createNotification,
   createOrganizationConflict,
@@ -29,6 +34,7 @@ import {
   createOrganization,
   createOrganizationMembership,
   createResolutionRule,
+  createRouteMilestone,
   createScene,
   createSceneBeat,
   createStoryHook,
@@ -39,6 +45,7 @@ import {
   deleteMembership,
   deliverRumorPropagation,
   dryRunEventTriggerCondition,
+  dryRunEndingCandidate,
   dryRunResolutionRule,
   exportWorldComposition,
   forkWorldline,
@@ -51,6 +58,7 @@ import {
   listOffscreenEvents,
   listWorldEvents,
   pauseWorldClock,
+  previewAuthoringTemplate,
   previewPlayerChoiceConsequences,
   previewScheduleRule,
   recordPlayerChoice,
@@ -64,6 +72,7 @@ import {
   upsertAgentPresence,
   upsertEmotionalState,
   upsertKnowledgeFact,
+  upsertReleaseProfile,
   upsertRouteAffinity,
   updateWorld,
   upsertWorldBible,
@@ -83,6 +92,12 @@ import type {
   DailyLifePreview,
   DailyLifeEventCandidate,
   ChoiceConsequencePreview,
+  AuthoringImportJob,
+  AuthoringTemplate,
+  BetaChecklistItem,
+  BetaChecklistRun,
+  EndingCandidate,
+  EndingDryRun,
   EventResolutionRule,
   GMAgenda,
   GMEventProposal,
@@ -103,6 +118,9 @@ import type {
   StoryHook,
   PlotThread,
   RouteAffinity,
+  RouteMilestone,
+  LongRunEvalRun,
+  LivingWorldReleaseProfile,
   EventTriggerCondition,
   SceneBeatDraft,
   DailyEpisodeDraft,
@@ -144,6 +162,8 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [schedulePreview, setSchedulePreview] = useState<ScheduleRulePreview | null>(null);
   const [ruleDryRun, setRuleDryRun] = useState<ResolutionRuleDryRun | null>(null);
   const [triggerDryRun, setTriggerDryRun] = useState<TriggerConditionDryRun | null>(null);
+  const [endingDryRun, setEndingDryRun] = useState<EndingDryRun | null>(null);
+  const [authoringJob, setAuthoringJob] = useState<AuthoringImportJob | null>(null);
   const [choicePreview, setChoicePreview] = useState<ChoiceConsequencePreview | null>(null);
   const [worldlineComparison, setWorldlineComparison] = useState<WorldlineComparison | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
@@ -988,6 +1008,165 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         formElement.reset();
       },
       "Continuity review created.",
+    );
+  }
+
+  async function handleCreateRouteMilestone(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createRouteMilestone(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          milestone_key: formString(form, "milestone_key"),
+          title: formString(form, "title"),
+          description: optionalFormString(form, "description"),
+          stage: optionalPositiveInteger(form, "stage") ?? 0,
+          status: formString(form, "status") as "planned",
+          route_affinity_id: optionalFormString(form, "route_affinity_id"),
+          plot_thread_id: optionalFormString(form, "plot_thread_id"),
+          agent_id: optionalFormString(form, "agent_id"),
+          conditions: jsonObject(formString(form, "conditions")),
+          evidence_metadata: jsonObject(formString(form, "evidence_metadata")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Route milestone created.",
+    );
+  }
+
+  async function handleCreateEndingCandidate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createEndingCandidate(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          ending_key: formString(form, "ending_key"),
+          title: formString(form, "title"),
+          ending_type: formString(form, "ending_type") as "normal",
+          status: formString(form, "status") as "planned",
+          route_affinity_id: optionalFormString(form, "route_affinity_id"),
+          plot_thread_id: optionalFormString(form, "plot_thread_id"),
+          agent_id: optionalFormString(form, "agent_id"),
+          requirements: jsonObject(formString(form, "requirements")),
+          outcome_summary: optionalFormString(form, "outcome_summary"),
+          evidence_metadata: jsonObject(formString(form, "evidence_metadata")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Ending candidate created.",
+    );
+  }
+
+  async function handleDryRunEndingCandidate(endingId: string) {
+    await runAction(
+      async () => {
+        setEndingDryRun(await dryRunEndingCandidate(selectedWorld.id, endingId));
+      },
+      "Ending dry-run completed.",
+      false,
+    );
+  }
+
+  async function handleCreateLongRunEval(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createLongRunEval(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          eval_key: formString(form, "eval_key"),
+          horizon_days: optionalPositiveInteger(form, "horizon_days") ?? 7,
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Long-run eval recorded.",
+    );
+  }
+
+  async function handleCreateAuthoringTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createAuthoringTemplate(selectedWorld.id, {
+          template_key: formString(form, "template_key"),
+          template_kind: formString(form, "template_kind") as "world_bundle",
+          name: formString(form, "name"),
+          description: optionalFormString(form, "description"),
+          content: jsonObject(formString(form, "content")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Authoring template created.",
+    );
+  }
+
+  async function handlePreviewAuthoringTemplate(templateId: string) {
+    await runAction(
+      async () => {
+        setAuthoringJob(await previewAuthoringTemplate(selectedWorld.id, templateId));
+      },
+      "Authoring preview created.",
+      false,
+    );
+  }
+
+  async function handleApplyAuthoringTemplate(templateId: string) {
+    await runAction(
+      async () => {
+        setAuthoringJob(await applyAuthoringTemplate(selectedWorld.id, templateId));
+      },
+      "Authoring template applied.",
+    );
+  }
+
+  async function handleUpsertReleaseProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await upsertReleaseProfile(selectedWorld.id, {
+          profile_key: formString(form, "profile_key"),
+          status: formString(form, "status") as "draft",
+          branch_policy: jsonObject(formString(form, "branch_policy")),
+          backup_policy: jsonObject(formString(form, "backup_policy")),
+          content_review_policy: jsonObject(formString(form, "content_review_policy")),
+          player_permission_policy: jsonObject(formString(form, "player_permission_policy")),
+          worldline_policy: jsonObject(formString(form, "worldline_policy")),
+          checklist: jsonObject(formString(form, "checklist")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Release profile saved.",
+    );
+  }
+
+  async function handleCreateBetaChecklist(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createBetaChecklist(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          run_key: formString(form, "run_key"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Beta checklist created.",
     );
   }
 
@@ -2602,6 +2781,299 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         />
       </section>
 
+      <section className="management-panel" aria-labelledby="beta-release-readiness-title">
+        <h2 className="section-title" id="beta-release-readiness-title">
+          Beta release readiness
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Route milestones</p>
+            <p className="metric-value">{data.routeMilestones.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Ending candidates</p>
+            <p className="metric-value">{data.endingCandidates.length}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Latest eval</p>
+            <p className="metric-value">{data.longRunEvals[0]?.status ?? "none"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Release profile</p>
+            <p className="metric-value">{data.releaseProfile?.status ?? "unset"}</p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Beta blockers</p>
+            <p className="metric-value">{data.betaChecklists[0]?.blocker_count ?? 0}</p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateRouteMilestone}>
+                <h3>Route milestone</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="milestone_key" placeholder="milestone-key" />
+                <input className="text-input" name="title" placeholder="Milestone title" />
+                <textarea className="text-input" name="description" rows={2} placeholder="Description" />
+                <input className="text-input" name="stage" defaultValue="1" />
+                <select className="text-input" name="status" defaultValue="planned">
+                  <option value="planned">planned</option>
+                  <option value="active">active</option>
+                  <option value="completed">completed</option>
+                  <option value="blocked">blocked</option>
+                </select>
+                <select className="text-input" name="route_affinity_id" defaultValue="">
+                  <option value="">Route affinity</option>
+                  {data.routeAffinities.map((route) => (
+                    <option key={route.id} value={route.id}>
+                      {route.route_key}
+                    </option>
+                  ))}
+                </select>
+                <select className="text-input" name="plot_thread_id" defaultValue="">
+                  <option value="">Plot thread</option>
+                  {data.plotThreads.map((thread) => (
+                    <option key={thread.id} value={thread.id}>
+                      {thread.title}
+                    </option>
+                  ))}
+                </select>
+                <AgentSelect agents={data.agents} name="agent_id" label="Route agent" />
+                <textarea className="text-input" name="conditions" rows={3} defaultValue="{}" />
+                <textarea
+                  className="text-input"
+                  name="evidence_metadata"
+                  rows={3}
+                  defaultValue="{}"
+                />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create milestone
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateEndingCandidate}>
+                <h3>Ending candidate</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="ending_key" placeholder="ending-key" />
+                <input className="text-input" name="title" placeholder="Ending title" />
+                <select className="text-input" name="ending_type" defaultValue="normal">
+                  <option value="normal">normal</option>
+                  <option value="bad">bad</option>
+                  <option value="hidden">hidden</option>
+                  <option value="epilogue">epilogue</option>
+                </select>
+                <select className="text-input" name="status" defaultValue="planned">
+                  <option value="planned">planned</option>
+                  <option value="available">available</option>
+                  <option value="locked">locked</option>
+                  <option value="achieved">achieved</option>
+                  <option value="retired">retired</option>
+                </select>
+                <select className="text-input" name="route_affinity_id" defaultValue="">
+                  <option value="">Route affinity</option>
+                  {data.routeAffinities.map((route) => (
+                    <option key={route.id} value={route.id}>
+                      {route.route_key}
+                    </option>
+                  ))}
+                </select>
+                <select className="text-input" name="plot_thread_id" defaultValue="">
+                  <option value="">Plot thread</option>
+                  {data.plotThreads.map((thread) => (
+                    <option key={thread.id} value={thread.id}>
+                      {thread.title}
+                    </option>
+                  ))}
+                </select>
+                <AgentSelect agents={data.agents} name="agent_id" label="Route agent" />
+                <textarea className="text-input" name="requirements" rows={3} defaultValue="{}" />
+                <textarea
+                  className="text-input"
+                  name="outcome_summary"
+                  rows={2}
+                  placeholder="Outcome summary"
+                />
+                <textarea
+                  className="text-input"
+                  name="evidence_metadata"
+                  rows={3}
+                  defaultValue="{}"
+                />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create ending
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateLongRunEval}>
+                <h3>Long-run eval</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="eval_key" placeholder="seven-day-eval" />
+                <input className="text-input" name="horizon_days" defaultValue="7" />
+                <textarea className="text-input" name="metadata" rows={3} defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Run eval
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateAuthoringTemplate}>
+                <h3>Authoring template</h3>
+                <input className="text-input" name="template_key" placeholder="template-key" />
+                <select className="text-input" name="template_kind" defaultValue="world_bundle">
+                  <option value="source_notes">source_notes</option>
+                  <option value="character">character</option>
+                  <option value="event">event</option>
+                  <option value="route">route</option>
+                  <option value="world_bundle">world_bundle</option>
+                </select>
+                <input className="text-input" name="name" placeholder="Template name" />
+                <textarea className="text-input" name="description" rows={2} placeholder="Description" />
+                <textarea
+                  className="text-input"
+                  name="content"
+                  rows={6}
+                  defaultValue={JSON.stringify(
+                    {
+                      source_notes: [],
+                      characters: [],
+                      events: [],
+                      routes: [],
+                    },
+                    null,
+                    2,
+                  )}
+                />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create template
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleUpsertReleaseProfile}>
+                <h3>Release profile</h3>
+                <input
+                  className="text-input"
+                  name="profile_key"
+                  defaultValue={data.releaseProfile?.profile_key ?? "living-world-beta"}
+                />
+                <select
+                  className="text-input"
+                  name="status"
+                  defaultValue={data.releaseProfile?.status ?? "draft"}
+                >
+                  <option value="draft">draft</option>
+                  <option value="ready">ready</option>
+                  <option value="blocked">blocked</option>
+                  <option value="released">released</option>
+                </select>
+                <textarea
+                  className="text-input"
+                  name="branch_policy"
+                  rows={3}
+                  defaultValue={JSON.stringify(
+                    data.releaseProfile?.branch_policy ?? { worldlines: "review forks before publish" },
+                    null,
+                    2,
+                  )}
+                />
+                <textarea
+                  className="text-input"
+                  name="backup_policy"
+                  rows={3}
+                  defaultValue={JSON.stringify(
+                    data.releaseProfile?.backup_policy ?? { snapshots: "before beta run" },
+                    null,
+                    2,
+                  )}
+                />
+                <textarea
+                  className="text-input"
+                  name="content_review_policy"
+                  rows={3}
+                  defaultValue={JSON.stringify(
+                    data.releaseProfile?.content_review_policy ?? {
+                      continuity_review: "warnings reviewed",
+                    },
+                    null,
+                    2,
+                  )}
+                />
+                <textarea
+                  className="text-input"
+                  name="player_permission_policy"
+                  rows={3}
+                  defaultValue={JSON.stringify(
+                    data.releaseProfile?.player_permission_policy ?? { beta_players: "invited" },
+                    null,
+                    2,
+                  )}
+                />
+                <textarea
+                  className="text-input"
+                  name="worldline_policy"
+                  rows={3}
+                  defaultValue={JSON.stringify(
+                    data.releaseProfile?.worldline_policy ?? { branching: "enabled" },
+                    null,
+                    2,
+                  )}
+                />
+                <textarea
+                  className="text-input"
+                  name="checklist"
+                  rows={3}
+                  defaultValue={JSON.stringify(data.releaseProfile?.checklist ?? {}, null, 2)}
+                />
+                <input
+                  className="text-input"
+                  name="metadata"
+                  defaultValue={JSON.stringify(data.releaseProfile?.metadata ?? {}, null, 2)}
+                />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save release profile
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateBetaChecklist}>
+                <h3>Beta checklist</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="run_key" placeholder="seven-day-beta" />
+                <textarea className="text-input" name="metadata" rows={3} defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Run checklist
+                </button>
+              </form>
+            </div>
+          </>
+        ) : null}
+        {endingDryRun !== null ? (
+          <p className="status-detail">
+            Ending {endingDryRun.ending_key}:{" "}
+            {endingDryRun.matched ? "available" : "blocked"}; satisfied{" "}
+            {endingDryRun.satisfied.length}, missing {endingDryRun.unsatisfied.length}.
+          </p>
+        ) : null}
+        {authoringJob !== null ? (
+          <p className="status-detail">
+            Authoring job {authoringJob.status}: issues {authoringJob.validation_issues.length}.
+          </p>
+        ) : null}
+        <BetaReleaseReadinessView
+          milestones={data.routeMilestones}
+          endings={data.endingCandidates}
+          evals={data.longRunEvals}
+          templates={data.authoringTemplates}
+          latestAuthoringJob={authoringJob}
+          releaseProfile={data.releaseProfile}
+          checklists={data.betaChecklists}
+          checklistItems={data.betaChecklistItems}
+          isBusy={isBusy}
+          canManage={data.canManageSelectedWorld}
+          onDryRunEnding={handleDryRunEndingCandidate}
+          onPreviewTemplate={handlePreviewAuthoringTemplate}
+          onApplyTemplate={handleApplyAuthoringTemplate}
+        />
+      </section>
+
       <div className="management-columns">
         <section className="management-panel" aria-labelledby="clock-title">
           <h2 className="section-title" id="clock-title">
@@ -3788,6 +4260,214 @@ function KnowledgePlayerGuardrailsView({
                     {review.source_kind} - issues {review.issues.length}
                   </p>
                   <p>{review.reviewed_text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
+  );
+}
+
+function BetaReleaseReadinessView({
+  milestones,
+  endings,
+  evals,
+  templates,
+  latestAuthoringJob,
+  releaseProfile,
+  checklists,
+  checklistItems,
+  isBusy,
+  canManage,
+  onDryRunEnding,
+  onPreviewTemplate,
+  onApplyTemplate,
+}: {
+  milestones: RouteMilestone[];
+  endings: EndingCandidate[];
+  evals: LongRunEvalRun[];
+  templates: AuthoringTemplate[];
+  latestAuthoringJob: AuthoringImportJob | null;
+  releaseProfile: LivingWorldReleaseProfile | null;
+  checklists: BetaChecklistRun[];
+  checklistItems: BetaChecklistItem[];
+  isBusy: boolean;
+  canManage: boolean;
+  onDryRunEnding: (endingId: string) => Promise<void>;
+  onPreviewTemplate: (templateId: string) => Promise<void>;
+  onApplyTemplate: (templateId: string) => Promise<void>;
+}) {
+  return (
+    <>
+      {releaseProfile !== null ? (
+        <p className="status-detail">
+          Release profile {releaseProfile.profile_key}: {releaseProfile.status}.
+        </p>
+      ) : (
+        <p className="status-detail">No release profile recorded.</p>
+      )}
+      {latestAuthoringJob !== null ? (
+        <p className="status-detail">
+          Latest authoring job {latestAuthoringJob.status}:{" "}
+          {JSON.stringify(latestAuthoringJob.preview_summary)}
+        </p>
+      ) : null}
+      <div className="management-columns">
+        <section aria-labelledby="route-ending-list-title">
+          <h3 id="route-ending-list-title">Route milestones and endings</h3>
+          <div className="resource-list">
+            {milestones.length === 0 && endings.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {milestones.map((milestone) => (
+              <article className="resource-row" key={milestone.id}>
+                <div>
+                  <h3>{milestone.title}</h3>
+                  <p>
+                    {milestone.milestone_key} - stage {milestone.stage} -{" "}
+                    {milestone.status}
+                  </p>
+                  <p>{milestone.description ?? "No description."}</p>
+                </div>
+              </article>
+            ))}
+            {endings.map((ending) => (
+              <article className="resource-row" key={ending.id}>
+                <div>
+                  <h3>{ending.title}</h3>
+                  <p>
+                    {ending.ending_key} - {ending.ending_type} - {ending.status}
+                  </p>
+                  <p>{ending.outcome_summary ?? "No outcome summary."}</p>
+                </div>
+                {canManage ? (
+                  <div className="button-row">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onDryRunEnding(ending.id)}
+                    >
+                      Dry-run ending
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="long-eval-list-title">
+          <h3 id="long-eval-list-title">Long-run evals</h3>
+          <div className="resource-list">
+            {evals.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {evals.map((evalRun) => (
+              <article className="resource-row" key={evalRun.id}>
+                <div>
+                  <h3>{evalRun.eval_key}</h3>
+                  <p>
+                    {evalRun.status} - {evalRun.horizon_days} days - blockers{" "}
+                    {evalRun.blockers.length}
+                  </p>
+                  <p>
+                    recommendations {evalRun.recommendations.length} - metrics{" "}
+                    {Object.keys(evalRun.metrics).length}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="authoring-template-list-title">
+          <h3 id="authoring-template-list-title">Authoring templates</h3>
+          <div className="resource-list">
+            {templates.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {templates.map((template) => (
+              <article className="resource-row" key={template.id}>
+                <div>
+                  <h3>{template.name}</h3>
+                  <p>
+                    {template.template_key} - {template.template_kind} - issues{" "}
+                    {template.validation_issues.length}
+                  </p>
+                  <p>{template.description ?? "No description."}</p>
+                </div>
+                {canManage ? (
+                  <div className="button-row">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onPreviewTemplate(template.id)}
+                    >
+                      Preview template
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onApplyTemplate(template.id)}
+                    >
+                      Apply template
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+      <div className="management-columns">
+        <section aria-labelledby="beta-checklist-list-title">
+          <h3 id="beta-checklist-list-title">Beta checklist</h3>
+          <div className="resource-list">
+            {checklists.length === 0 && checklistItems.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {checklists.map((checklist) => (
+              <article className="resource-row" key={checklist.id}>
+                <div>
+                  <h3>{checklist.run_key}</h3>
+                  <p>
+                    {checklist.status} - blockers {checklist.blocker_count}
+                  </p>
+                  <p>{checklist.summary}</p>
+                </div>
+              </article>
+            ))}
+            {checklistItems.map((item) => (
+              <article className="resource-row" key={item.id}>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>
+                    {item.item_key} - {item.status}
+                  </p>
+                  <p>{item.recommendation ?? "No recommendation."}</p>
                 </div>
               </article>
             ))}

@@ -923,6 +923,165 @@ export type RouteAffinity = {
   updated_at: string;
 };
 
+export type RouteMilestoneStatus = "planned" | "active" | "completed" | "blocked";
+
+export type RouteMilestone = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  route_affinity_id: string | null;
+  plot_thread_id: string | null;
+  agent_id: string | null;
+  agent_key: string | null;
+  agent_display_name: string | null;
+  milestone_key: string;
+  title: string;
+  description: string | null;
+  stage: number;
+  status: RouteMilestoneStatus;
+  conditions: Record<string, unknown>;
+  evidence_metadata: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EndingType = "normal" | "bad" | "hidden" | "epilogue";
+export type EndingStatus = "planned" | "available" | "locked" | "achieved" | "retired";
+
+export type EndingCandidate = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  route_affinity_id: string | null;
+  plot_thread_id: string | null;
+  agent_id: string | null;
+  agent_key: string | null;
+  agent_display_name: string | null;
+  ending_key: string;
+  title: string;
+  ending_type: EndingType;
+  status: EndingStatus;
+  requirements: Record<string, unknown>;
+  outcome_summary: string | null;
+  evidence_metadata: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EndingDryRun = {
+  ending_id: string;
+  ending_key: string;
+  matched: boolean;
+  satisfied: string[];
+  unsatisfied: string[];
+  evidence: Record<string, unknown>;
+};
+
+export type LongRunEvalStatus = "completed" | "warning" | "failed";
+
+export type LongRunEvalRun = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  eval_key: string;
+  horizon_days: number;
+  status: LongRunEvalStatus;
+  started_at: string;
+  finished_at: string;
+  metrics: Record<string, unknown>;
+  recommendations: Record<string, unknown>[];
+  blockers: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AuthoringTemplateKind =
+  | "source_notes"
+  | "character"
+  | "event"
+  | "route"
+  | "world_bundle";
+
+export type AuthoringTemplate = {
+  id: string;
+  world_id: string;
+  template_key: string;
+  template_kind: AuthoringTemplateKind;
+  name: string;
+  description: string | null;
+  content: Record<string, unknown>;
+  validation_issues: Record<string, unknown>[];
+  is_active: boolean;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AuthoringImportStatus = "preview" | "applied" | "failed";
+
+export type AuthoringImportJob = {
+  id: string;
+  world_id: string;
+  template_id: string | null;
+  status: AuthoringImportStatus;
+  preview_summary: Record<string, unknown>;
+  applied_refs: Record<string, unknown>;
+  validation_issues: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReleaseProfileStatus = "draft" | "ready" | "blocked" | "released";
+
+export type LivingWorldReleaseProfile = {
+  id: string;
+  world_id: string;
+  profile_key: string;
+  status: ReleaseProfileStatus;
+  branch_policy: Record<string, unknown>;
+  backup_policy: Record<string, unknown>;
+  content_review_policy: Record<string, unknown>;
+  player_permission_policy: Record<string, unknown>;
+  worldline_policy: Record<string, unknown>;
+  checklist: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BetaChecklistStatus = "pending" | "passed" | "warning" | "blocked";
+
+export type BetaChecklistRun = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  run_key: string;
+  status: BetaChecklistStatus;
+  summary: string;
+  evidence: Record<string, unknown>;
+  blocker_count: number;
+  created_by_actor_ref: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BetaChecklistItem = {
+  id: string;
+  run_id: string;
+  item_key: string;
+  title: string;
+  status: BetaChecklistStatus;
+  evidence: Record<string, unknown>;
+  recommendation: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TriggerConditionStatus = "active" | "inactive";
 
 export type EventTriggerCondition = {
@@ -2432,6 +2591,74 @@ export type NarrativeContinuityReviewCreateInput = {
   source_kind: string;
   source_ref?: string | null;
   reviewed_text: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type RouteMilestoneCreateInput = {
+  worldline_id?: string | null;
+  milestone_key: string;
+  title: string;
+  description?: string | null;
+  stage?: number;
+  status?: RouteMilestoneStatus;
+  route_affinity_id?: string | null;
+  plot_thread_id?: string | null;
+  agent_id?: string | null;
+  conditions?: Record<string, unknown>;
+  evidence_metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type EndingCandidateCreateInput = {
+  worldline_id?: string | null;
+  ending_key: string;
+  title: string;
+  ending_type: EndingType;
+  status?: EndingStatus;
+  route_affinity_id?: string | null;
+  plot_thread_id?: string | null;
+  agent_id?: string | null;
+  requirements?: Record<string, unknown>;
+  outcome_summary?: string | null;
+  evidence_metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type LongRunEvalCreateInput = {
+  worldline_id?: string | null;
+  eval_key: string;
+  horizon_days?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type AuthoringTemplateCreateInput = {
+  template_key: string;
+  template_kind: AuthoringTemplateKind;
+  name: string;
+  description?: string | null;
+  content?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type AuthoringTemplateApplyInput = {
+  metadata?: Record<string, unknown>;
+};
+
+export type ReleaseProfileUpsertInput = {
+  profile_key?: string;
+  status?: ReleaseProfileStatus;
+  branch_policy?: Record<string, unknown>;
+  backup_policy?: Record<string, unknown>;
+  content_review_policy?: Record<string, unknown>;
+  player_permission_policy?: Record<string, unknown>;
+  worldline_policy?: Record<string, unknown>;
+  checklist?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type BetaChecklistRunCreateInput = {
+  worldline_id?: string | null;
+  run_key?: string;
   metadata?: Record<string, unknown>;
 };
 

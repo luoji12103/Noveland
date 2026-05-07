@@ -9,6 +9,10 @@ import type {
   AgentPersona,
   AgentRelationship,
   AgentRun,
+  AuthoringImportJob,
+  AuthoringTemplate,
+  BetaChecklistItem,
+  BetaChecklistRun,
   CalendarConflictReport,
   CalendarEntry,
   CharacterEmotionalState,
@@ -20,6 +24,7 @@ import type {
   DailyEpisodeDraft,
   DailyLifeEventCandidate,
   DailyLifePreview,
+  EndingCandidate,
   EventResolutionRule,
   EventTriggerCondition,
   ExternalToolPolicy,
@@ -29,7 +34,9 @@ import type {
   GMEventProposal,
   GroupInteractionContext,
   InWorldNotification,
+  LivingWorldReleaseProfile,
   LivingWorldDashboard,
+  LongRunEvalRun,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -54,6 +61,7 @@ import type {
   PluginBinding,
   PluginCatalogEntry,
   RouteAffinity,
+  RouteMilestone,
   Rumor,
   RumorPropagation,
   SecretRecord,
@@ -107,6 +115,14 @@ export type WorldWorkspaceData = {
   storyHooks: StoryHook[];
   plotThreads: PlotThread[];
   routeAffinities: RouteAffinity[];
+  routeMilestones: RouteMilestone[];
+  endingCandidates: EndingCandidate[];
+  longRunEvals: LongRunEvalRun[];
+  authoringTemplates: AuthoringTemplate[];
+  authoringImportJobs: AuthoringImportJob[];
+  releaseProfile: LivingWorldReleaseProfile | null;
+  betaChecklists: BetaChecklistRun[];
+  betaChecklistItems: BetaChecklistItem[];
   triggerConditions: EventTriggerCondition[];
   sceneBeats: SceneBeatDraft[];
   dailyEpisodes: DailyEpisodeDraft[];
@@ -430,6 +446,12 @@ export async function getWorldWorkspaceData(
       storyHooks,
       plotThreads,
       routeAffinities,
+      routeMilestones,
+      endingCandidates,
+      longRunEvals,
+      authoringTemplates,
+      releaseProfile,
+      betaChecklists,
       triggerConditions,
       sceneBeats,
       dailyEpisodes,
@@ -488,6 +510,12 @@ export async function getWorldWorkspaceData(
       apiFetchOptional<StoryHook[]>(`/worlds/${worldId}/story-hooks`, cookies),
       apiFetchOptional<PlotThread[]>(`/worlds/${worldId}/plot-threads`, cookies),
       apiFetchOptional<RouteAffinity[]>(`/worlds/${worldId}/route-affinities`, cookies),
+      apiFetchOptional<RouteMilestone[]>(`/worlds/${worldId}/route-milestones`, cookies),
+      apiFetchOptional<EndingCandidate[]>(`/worlds/${worldId}/ending-candidates`, cookies),
+      apiFetchOptional<LongRunEvalRun[]>(`/worlds/${worldId}/long-run-evals`, cookies),
+      apiFetchOptional<AuthoringTemplate[]>(`/worlds/${worldId}/authoring-templates`, cookies),
+      apiFetchOptional<LivingWorldReleaseProfile>(`/worlds/${worldId}/release-profile`, cookies),
+      apiFetchOptional<BetaChecklistRun[]>(`/worlds/${worldId}/beta-checklists`, cookies),
       apiFetchOptional<EventTriggerCondition[]>(
         `/worlds/${worldId}/event-trigger-conditions`,
         cookies,
@@ -563,6 +591,19 @@ export async function getWorldWorkspaceData(
           ),
         ),
       ]);
+    const betaChecklistItems =
+      betaChecklists === null
+        ? []
+        : (
+            await Promise.all(
+              betaChecklists.slice(0, 3).map((run) =>
+                apiFetchOptional<BetaChecklistItem[]>(
+                  `/worlds/${worldId}/beta-checklists/${run.id}/items`,
+                  cookies,
+                ),
+              ),
+            )
+          ).flatMap((items) => items ?? []);
     return {
       worlds,
       selectedWorld,
@@ -589,6 +630,14 @@ export async function getWorldWorkspaceData(
       storyHooks: storyHooks ?? [],
       plotThreads: plotThreads ?? [],
       routeAffinities: routeAffinities ?? [],
+      routeMilestones: routeMilestones ?? [],
+      endingCandidates: endingCandidates ?? [],
+      longRunEvals: longRunEvals ?? [],
+      authoringTemplates: authoringTemplates ?? [],
+      authoringImportJobs: [],
+      releaseProfile,
+      betaChecklists: betaChecklists ?? [],
+      betaChecklistItems,
       triggerConditions: triggerConditions ?? [],
       sceneBeats: sceneBeats ?? [],
       dailyEpisodes: dailyEpisodes ?? [],
@@ -1177,6 +1226,14 @@ function emptyWorldWorkspaceData(
     storyHooks: [],
     plotThreads: [],
     routeAffinities: [],
+    routeMilestones: [],
+    endingCandidates: [],
+    longRunEvals: [],
+    authoringTemplates: [],
+    authoringImportJobs: [],
+    releaseProfile: null,
+    betaChecklists: [],
+    betaChecklistItems: [],
     triggerConditions: [],
     sceneBeats: [],
     dailyEpisodes: [],

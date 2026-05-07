@@ -18,6 +18,13 @@ import type {
   AgentRunCreateInput,
   AgentRunDetail,
   AgentUpdateInput,
+  AuthoringImportJob,
+  AuthoringTemplate,
+  AuthoringTemplateApplyInput,
+  AuthoringTemplateCreateInput,
+  BetaChecklistItem,
+  BetaChecklistRun,
+  BetaChecklistRunCreateInput,
   CalendarEntry,
   CalendarEntryCreateInput,
   CalendarConflictFilters,
@@ -38,6 +45,9 @@ import type {
   ConversationSpeakerPreview,
   ConversationTurn,
   ConversationUpdateInput,
+  EndingCandidate,
+  EndingCandidateCreateInput,
+  EndingDryRun,
   ExternalToolPolicy,
   EmotionalStateUpsertInput,
   AgentPresence,
@@ -73,7 +83,10 @@ import type {
   InterventionCreateInput,
   JournalEntryCreateInput,
   KnowledgeFactUpsertInput,
+  LivingWorldReleaseProfile,
   LivingWorldDashboard,
+  LongRunEvalCreateInput,
+  LongRunEvalRun,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -142,6 +155,8 @@ import type {
   RelationshipSuggestionUpdateInput,
   RouteAffinity,
   RouteAffinityUpsertInput,
+  RouteMilestone,
+  RouteMilestoneCreateInput,
   Rumor,
   RumorCreateInput,
   RumorPropagation,
@@ -180,6 +195,7 @@ import type {
   StoryHook,
   StoryHookCreateInput,
   TriggerConditionDryRun,
+  ReleaseProfileUpsertInput,
 } from "@/lib/worlds/types";
 
 export class WorldClientError extends Error {
@@ -1147,6 +1163,185 @@ export function upsertRouteAffinity(
     body: input,
     csrf: true,
   });
+}
+
+export function listRouteMilestones(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<RouteMilestone[]> {
+  return worldRequest<RouteMilestone[]>(
+    `/api/worlds/${worldId}/route-milestones${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createRouteMilestone(
+  worldId: string,
+  input: RouteMilestoneCreateInput,
+): Promise<RouteMilestone> {
+  return worldRequest<RouteMilestone>(`/api/worlds/${worldId}/route-milestones`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listEndingCandidates(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; ending_type?: string | null } = {},
+): Promise<EndingCandidate[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  appendOptional(search, "ending_type", filters.ending_type);
+  return worldRequest<EndingCandidate[]>(
+    `/api/worlds/${worldId}/ending-candidates${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createEndingCandidate(
+  worldId: string,
+  input: EndingCandidateCreateInput,
+): Promise<EndingCandidate> {
+  return worldRequest<EndingCandidate>(`/api/worlds/${worldId}/ending-candidates`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function dryRunEndingCandidate(
+  worldId: string,
+  endingId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<EndingDryRun> {
+  return worldRequest<EndingDryRun>(
+    `/api/worlds/${worldId}/ending-candidates/${endingId}/dry-run${worldlineSuffix(filters)}`,
+    { method: "POST", csrf: true },
+  );
+}
+
+export function listLongRunEvals(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<LongRunEvalRun[]> {
+  return worldRequest<LongRunEvalRun[]>(
+    `/api/worlds/${worldId}/long-run-evals${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createLongRunEval(
+  worldId: string,
+  input: LongRunEvalCreateInput,
+): Promise<LongRunEvalRun> {
+  return worldRequest<LongRunEvalRun>(`/api/worlds/${worldId}/long-run-evals`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listAuthoringTemplates(
+  worldId: string,
+  filters: { template_kind?: string | null } = {},
+): Promise<AuthoringTemplate[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "template_kind", filters.template_kind);
+  return worldRequest<AuthoringTemplate[]>(
+    `/api/worlds/${worldId}/authoring-templates${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createAuthoringTemplate(
+  worldId: string,
+  input: AuthoringTemplateCreateInput,
+): Promise<AuthoringTemplate> {
+  return worldRequest<AuthoringTemplate>(`/api/worlds/${worldId}/authoring-templates`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function previewAuthoringTemplate(
+  worldId: string,
+  templateId: string,
+  input: AuthoringTemplateApplyInput = {},
+): Promise<AuthoringImportJob> {
+  return worldRequest<AuthoringImportJob>(
+    `/api/worlds/${worldId}/authoring-templates/${templateId}/preview`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function applyAuthoringTemplate(
+  worldId: string,
+  templateId: string,
+  input: AuthoringTemplateApplyInput = {},
+): Promise<AuthoringImportJob> {
+  return worldRequest<AuthoringImportJob>(
+    `/api/worlds/${worldId}/authoring-templates/${templateId}/apply`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function getReleaseProfile(worldId: string): Promise<LivingWorldReleaseProfile | null> {
+  return worldRequest<LivingWorldReleaseProfile | null>(`/api/worlds/${worldId}/release-profile`, {
+    method: "GET",
+  });
+}
+
+export function upsertReleaseProfile(
+  worldId: string,
+  input: ReleaseProfileUpsertInput,
+): Promise<LivingWorldReleaseProfile> {
+  return worldRequest<LivingWorldReleaseProfile>(`/api/worlds/${worldId}/release-profile`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listBetaChecklists(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<BetaChecklistRun[]> {
+  return worldRequest<BetaChecklistRun[]>(
+    `/api/worlds/${worldId}/beta-checklists${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function createBetaChecklist(
+  worldId: string,
+  input: BetaChecklistRunCreateInput,
+): Promise<BetaChecklistRun> {
+  return worldRequest<BetaChecklistRun>(`/api/worlds/${worldId}/beta-checklists`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listBetaChecklistItems(
+  worldId: string,
+  runId: string,
+): Promise<BetaChecklistItem[]> {
+  return worldRequest<BetaChecklistItem[]>(
+    `/api/worlds/${worldId}/beta-checklists/${runId}/items`,
+    { method: "GET" },
+  );
 }
 
 export function listEventTriggerConditions(worldId: string): Promise<EventTriggerCondition[]> {

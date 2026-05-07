@@ -76,7 +76,7 @@ describe("WorldOverview", () => {
           ],
         },
       ],
-  }, 40000);
+    });
     vi.mocked(previewScheduleRule).mockResolvedValue({
       world_id: "world-1",
       kind: "timetable",
@@ -190,12 +190,13 @@ describe("WorldOverview", () => {
     expect(screen.getByRole("heading", { name: "Daily life and offscreen queue" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plot, route, and rumor flow" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Knowledge, player, and guardrails" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Beta release readiness" })).toBeInTheDocument();
     expect(screen.getByText("classroom to courtyard")).toBeInTheDocument();
     expect(screen.getByText("Student Council (club)")).toBeInTheDocument();
     expect(screen.getByText("Guide presence")).toBeInTheDocument();
     expect(screen.getByText("Festival promise")).toBeInTheDocument();
-    expect(screen.getByText("Festival route")).toBeInTheDocument();
-    expect(screen.getByText("guide-route")).toBeInTheDocument();
+    expect(screen.getAllByText("Festival route").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("guide-route").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Late rehearsal rumor").length).toBeGreaterThan(0);
     expect(screen.getByText("rival-route-note")).toBeInTheDocument();
     expect(screen.getByText("Hidden letter")).toBeInTheDocument();
@@ -204,6 +205,12 @@ describe("WorldOverview", () => {
     expect(screen.getByText("Club room notice")).toBeInTheDocument();
     expect(screen.getByText("GM style: warning")).toBeInTheDocument();
     expect(screen.getByText("Continuity: warning")).toBeInTheDocument();
+    expect(screen.getByText("Festival confession lock")).toBeInTheDocument();
+    expect(screen.getByText("Guide normal ending")).toBeInTheDocument();
+    expect(screen.getByText("seven-day-beta-eval")).toBeInTheDocument();
+    expect(screen.getByText("Sequel world bundle")).toBeInTheDocument();
+    expect(screen.getByText("sample-world-beta")).toBeInTheDocument();
+    expect(screen.getByText("7-day simulation")).toBeInTheDocument();
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
@@ -759,6 +766,129 @@ const workspaceData: WorldWorkspaceData = {
       metadata: {},
       created_at: "2026-05-05T12:00:00.000Z",
       updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  routeMilestones: [
+    {
+      id: "milestone-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      route_affinity_id: "route-1",
+      plot_thread_id: "thread-1",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      milestone_key: "confession-lock",
+      title: "Festival confession lock",
+      description: "The route can now lock the confession branch.",
+      stage: 3,
+      status: "active",
+      conditions: { route_stage_min: 2 },
+      evidence_metadata: { choice: "help-festival" },
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  endingCandidates: [
+    {
+      id: "ending-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      route_affinity_id: "route-1",
+      plot_thread_id: "thread-1",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      ending_key: "guide-normal",
+      title: "Guide normal ending",
+      ending_type: "normal",
+      status: "available",
+      requirements: { min_route_stage: 2 },
+      outcome_summary: "The festival route closes with a quiet confession.",
+      evidence_metadata: { route: "guide-route" },
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  longRunEvals: [
+    {
+      id: "eval-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      eval_key: "seven-day-beta-eval",
+      horizon_days: 7,
+      status: "warning",
+      started_at: "2026-05-07T12:00:00.000Z",
+      finished_at: "2026-05-07T12:00:01.000Z",
+      metrics: { event_density: 4, route_activity: 1 },
+      recommendations: [{ action: "add_daily_episode", reason: "low daily density" }],
+      blockers: [],
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:01.000Z",
+    },
+  ],
+  authoringTemplates: [
+    {
+      id: "template-1",
+      world_id: "world-1",
+      template_key: "sequel-world-bundle",
+      template_kind: "world_bundle",
+      name: "Sequel world bundle",
+      description: "Source notes, character, event, and route template bundle.",
+      content: { source_notes: [], characters: [], events: [], routes: [] },
+      validation_issues: [],
+      is_active: true,
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  authoringImportJobs: [],
+  releaseProfile: {
+    id: "release-profile-1",
+    world_id: "world-1",
+    profile_key: "living-world-beta",
+    status: "ready",
+    branch_policy: { branch_review: true },
+    backup_policy: { snapshot_before_beta: true },
+    content_review_policy: { continuity_review_required: true },
+    player_permission_policy: { invite_only: true },
+    worldline_policy: { forks_allowed: true },
+    checklist: { sample_world_required: true },
+    metadata: {},
+    created_at: "2026-05-07T12:00:00.000Z",
+    updated_at: "2026-05-07T12:00:00.000Z",
+  },
+  betaChecklists: [
+    {
+      id: "checklist-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      run_key: "sample-world-beta",
+      status: "warning",
+      summary: "Sample world beta has non-blocking recommendations.",
+      evidence: { days: 7 },
+      blocker_count: 0,
+      created_by_actor_ref: "user:user-1",
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  betaChecklistItems: [
+    {
+      id: "checklist-item-1",
+      run_id: "checklist-1",
+      item_key: "seven-day-simulation",
+      title: "7-day simulation",
+      status: "warning",
+      evidence: { eval_run_id: "eval-1" },
+      recommendation: "Increase daily episode density before public beta.",
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
     },
   ],
   triggerConditions: [
