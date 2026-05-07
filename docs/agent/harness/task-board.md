@@ -66,3 +66,4 @@
 ## Upcoming Mainline
 - None. V2 phases 1-50 are implemented in local roadmap bundles.
 - Future work should come from beta evidence, operator feedback, and targeted hardening rather than a new phase-number branch.
+- Use `docs/agent/harness/debug-journal.md` acceptance reports for phases 1-35 and 36-50 as the source of record when selecting future hardening work.

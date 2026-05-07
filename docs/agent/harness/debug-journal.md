@@ -59,3 +59,34 @@ No debug entries yet.
   - Phase 29: plot trigger dry-run covers open hooks, route affinity, relationship tension, and scene presence, but not the full roadmap matrix of time, faction state, hook state variants, and player choices.
   - Phase 31: daily episode drafts are deterministic/admin-created from candidates, but runtime does not yet automatically create low-risk daily narrative drafts from low-risk event proposals.
   - Phase 32: group interaction contexts exist as worldline-scoped admin state, but the conversation engine has not yet been extended to execute with group context, organization refs, location constraints, and participant roles.
+
+## 2026-05-07 V2 phases 36-50 acceptance quality report
+
+- Date: 2026-05-07
+- Branch: main
+- Issue: V2 living-world phases 36-50 are implemented and merged into local `main`, but the final acceptance quality needed to be recorded alongside the existing phases 1-35 follow-up record so future hardening can separate accepted baseline behavior from beta-evidence-driven improvements.
+- Reproduction: Review `docs/agent/harness/roadmap-v2-living-world.md` phases 36-50 against the completed implementation entries in `docs/agent/harness/change-journal.md` and the final gate recorded for the beta-readiness bundle:
+  - `cd backend && uv run ruff check .`
+  - `cd backend && uv run mypy .`
+  - `cd backend && uv run pytest`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run build`
+  - `cd web && npm run check:next-env`
+  - `cd web && npm run test:e2e`
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
+- Root cause: The last V2 bundles intentionally delivered deterministic baselines, review surfaces, and beta-readiness infrastructure rather than a public production launch. Without a quality report, later work could confuse infrastructure acceptance with narrative-quality or launch-readiness guarantees.
+- Fix:
+  - Phases 36-45 are accepted as the knowledge/player/guardrails baseline. Evidence includes migration `20260507_0027_living_world_knowledge_player_guardrails.py`, worldline-scoped knowledge facts, secrets/reveals, emotional states, relationship repair records, player journal entries, notifications, interventions, GM style diagnostics, narrative continuity reviews, Web world overview panels, Playwright mock routes, and backend/Web tests.
+  - The phases 36-45 bundle also closed the earlier phases 1-35 follow-up gaps that naturally belonged there: `apply=false` choices now log `player.choice_recorded` events, runtime memory context propagates `worldline_id`, unsupported historical forks are rejected instead of silently copying current state, deterministic dry-runs inspect a broader context surface, rumor delivery updates knowledge state, low-risk resolved offscreen events can create daily episode drafts, and conversation writer config can carry group interaction context.
+  - Phases 46-50 are accepted as beta-release-readiness infrastructure. Evidence includes migration `20260507_0028_living_world_beta_release_readiness.py`, route milestones, ending candidates, deterministic ending dry-runs, long-run eval runs with blockers/recommendations, sequel-world authoring templates and import jobs, release profile records, beta checklist runs/items, operator docs at `docs/agent/operations/living-world-release-profile.md`, Web beta-readiness panels, Playwright mock routes, and backend/Web tests.
+- Regression test: The beta-readiness final gate passed after `web/next-env.d.ts` build/e2e churn was restored and `npm run check:next-env` was rerun. Current acceptance logging is docs-only and should be protected with `git diff --check`.
+- Remaining risk:
+  - Phases 36-37: knowledge and secret handling provide worldline-scoped visibility/reveal state, but real narrative leak prevention still depends on future beta evidence, prompt usage, and publication review tuning.
+  - Phases 38-39: emotional state and relationship repair are deterministic rule baselines; calibration against authored worlds and long-run play traces remains future work.
+  - Phases 40-45: dashboard, journal, notification, intervention, style, and continuity surfaces are operational baselines. GM style and continuity reviews warn/report by default and are not hard publication blockers unless a future policy explicitly promotes them.
+  - Phases 46-50: route/ending planning, long-run eval, authoring templates, release profiles, and beta checklists capture readiness evidence; they do not constitute a public production launch or guarantee narrative quality.
+  - Persistent databases must apply migrations `20260507_0027` and `20260507_0028` before using the final V2 data surfaces.
+  - The 50-phase V2 roadmap has no remaining phase-number work. Future work should come from beta evidence, operator feedback, and targeted hardening rather than new phase-number branches.

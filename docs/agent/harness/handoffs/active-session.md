@@ -1,24 +1,20 @@
 # Active Session Handoff
 
-- Date: 2026-05-07T12:45:00Z
-- Branch: feat/living-world-beta-release-readiness
-- Objective: Implement V2 living-world roadmap phases 46-50: route and ending planning, long-run simulation evaluation, authoring toolchain v2, living-world release profile, and galgame living-world beta validation.
-- Status: Implementation and full final gate completed on the feature branch. Ready for local fast-forward merge back to `main`; no push is planned.
+- Date: 2026-05-07T16:10:00Z
+- Branch: main
+- Objective: Record V2 living-world phases 36-50 acceptance quality after the completed roadmap implementation.
+- Status: V2 phases 1-50 are implemented and merged into local `main`. Current work is docs-only acceptance logging; no push is planned.
 
-## Completed Implementation
+## Completed Roadmap State
 
-- Added migration `20260507_0028_living_world_beta_release_readiness`.
-- Added worldline-scoped route milestones, ending candidates, ending dry-runs, long-run eval runs, authoring templates/import jobs, release profiles, and beta checklist runs/items.
-- Extended world admin API, Web world overview, Web client/server types, component tests, and Playwright mock backend routes for the beta-readiness surfaces.
-- Added operator documentation at `docs/agent/operations/living-world-release-profile.md`.
+- V2 phases 36-45 delivered knowledge facts, secrets/reveals, emotional states, relationship repair, player journal, notifications, interventions, GM style diagnostics, and narrative continuity review.
+- V2 phases 46-50 delivered route/ending planning, long-run evals, sequel-world authoring templates, release profile records, and beta checklist evidence.
+- The final beta-readiness gate passed, and `feat/living-world-beta-release-readiness` has already been fast-forward merged into local `main`.
 
-## Targeted Checks Passed
+## Acceptance Logging
 
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest tests/test_alembic_config.py tests/test_schema_metadata.py tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist`
-- `cd web && npm run test -- lib/worlds/client.test.ts features/worlds/world-overview.test.tsx`
-- `cd web && npm run typecheck`
+- `docs/agent/harness/debug-journal.md` now records the phases 36-50 acceptance quality report beside the existing phases 1-35 follow-up record.
+- `docs/agent/harness/task-board.md` points future hardening selection to those acceptance reports and beta/operator evidence.
 
 ## Final Gate Passed
 
@@ -36,4 +32,4 @@
 
 ## Remaining Closeout
 
-- Merge `feat/living-world-beta-release-readiness` into local `main` with `git merge --ff-only`.
+- For this docs-only acceptance logging update, run `git diff --check` and commit the harness changes on `main`.
