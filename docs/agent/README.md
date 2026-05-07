@@ -16,7 +16,8 @@ It exists to keep the project stable while the implementation is still evolving.
 8. `harness/roadmap.md`
 9. `harness/roadmap-v2-living-world.md`
 10. `operations/runtime-recovery.md`
-11. `harness/handoffs/active-session.md`
+11. `operations/living-world-release-profile.md`
+12. `harness/handoffs/active-session.md`
 
 ## Project stance
 
@@ -47,6 +48,7 @@ It exists to keep the project stable while the implementation is still evolving.
 - `harness/debug-journal.md`
 - `harness/handoffs/active-session.md`
 - `operations/runtime-recovery.md`
+- `operations/living-world-release-profile.md`
 
 ## Definitions
 

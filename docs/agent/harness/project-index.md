@@ -19,6 +19,7 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/sandbox-options.md` — design-only sandbox option comparison and selection criteria.
 - `docs/agent/operations/external-tool-policy.md` — policy-only external tool allow/deny boundary; no execution path.
 - `docs/agent/operations/scale-readiness.md` — derived scale-readiness report interpretation.
+- `docs/agent/operations/living-world-release-profile.md` — living-world release profile and beta checklist operator workflow.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 
 ## Current entrypoints
@@ -71,7 +72,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.runtime` — platform-admin runtime control, supervision, external tool policy, scale readiness, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
-  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, and filtered narrative artifact router
+  - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
   - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
@@ -87,6 +88,7 @@ Fast orientation for a new coding session.
 - `backend/packages/worlds/`
   - `noveland.worlds.clock` — pure world clock state and transition logic
   - `noveland.worlds.clock_service` — persistent world clock state and transition audit service
+  - `noveland.worlds.beta` — deterministic route/ending, eval, authoring, release profile, and beta checklist service
   - `noveland.worlds.models` — world, membership, scene, and clock ORM models
 - `backend/packages/agents/`
   - `noveland.agents.contracts` — persona, filtered observation, and agent preset DTOs
@@ -146,7 +148,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, and plugin diagnostic component support
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, and V2 living-world state through beta release readiness
 
 ## Update rule
 

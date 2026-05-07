@@ -100,6 +100,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/worlds/src/noveland/worlds/clock.py`
 - `backend/packages/worlds/src/noveland/worlds/clock_service.py`
 - `backend/packages/worlds/src/noveland/worlds/autonomous.py`
+- `backend/packages/worlds/src/noveland/worlds/beta.py`
 - `backend/packages/worlds/src/noveland/worlds/gm.py`
 - `backend/packages/worlds/src/noveland/worlds/guardrails.py`
 - `backend/packages/worlds/src/noveland/worlds/models.py`
@@ -117,6 +118,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260505_0025_living_world_gm_choices_worldlines.py`
 - `backend/migrations/versions/20260506_0026_living_world_plot_route_rumor_flow.py`
 - `backend/migrations/versions/20260507_0027_living_world_knowledge_player_guardrails.py`
+- `backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`
@@ -199,6 +201,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/operations/memory-queue-readiness.md`
 - `docs/agent/operations/external-tool-policy.md`
 - `docs/agent/operations/scale-readiness.md`
+- `docs/agent/operations/living-world-release-profile.md`
 - `docs/agent/harness/v2-readiness-review.md`
 - `docs/agent/operations/performance-budget.md`
 - `docs/agent/operations/runtime-supervision.md`

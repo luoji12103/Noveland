@@ -101,6 +101,7 @@ Deployment and supervision references:
 - `docs/agent/operations/sandbox-options.md`
 - `docs/agent/operations/external-tool-policy.md`
 - `docs/agent/operations/scale-readiness.md`
+- `docs/agent/operations/living-world-release-profile.md`
 
 Run a local backup readiness check from `backend/`:
 
@@ -400,6 +401,22 @@ POST /worlds/{world_id}/plot-threads
 PATCH /worlds/{world_id}/plot-threads/{thread_id}
 GET /worlds/{world_id}/route-affinities
 PUT /worlds/{world_id}/route-affinities
+GET /worlds/{world_id}/route-milestones
+POST /worlds/{world_id}/route-milestones
+GET /worlds/{world_id}/ending-candidates
+POST /worlds/{world_id}/ending-candidates
+POST /worlds/{world_id}/ending-candidates/{ending_id}/dry-run
+GET /worlds/{world_id}/long-run-evals
+POST /worlds/{world_id}/long-run-evals
+GET /worlds/{world_id}/authoring-templates
+POST /worlds/{world_id}/authoring-templates
+POST /worlds/{world_id}/authoring-templates/{template_id}/preview
+POST /worlds/{world_id}/authoring-templates/{template_id}/apply
+GET /worlds/{world_id}/release-profile
+PUT /worlds/{world_id}/release-profile
+GET /worlds/{world_id}/beta-checklists
+POST /worlds/{world_id}/beta-checklists
+GET /worlds/{world_id}/beta-checklists/{run_id}/items
 GET /worlds/{world_id}/event-trigger-conditions
 POST /worlds/{world_id}/event-trigger-conditions
 PATCH /worlds/{world_id}/event-trigger-conditions/{condition_id}
@@ -496,9 +513,9 @@ DELETE /provider-profiles/{profile_id}
 
 Provider profiles are non-secret records. API keys stay in `NOVELAND_PROVIDER_API_KEYS_JSON`, keyed by each profile's `api_key_ref`. Profiles include timeout, retry, optional per-process rate-limit, and last test-call status fields; test-call responses and diagnostics never expose API key material. Plugin binding and config diagnostics expose plugin identifiers, categories, and binding context only; they do not expose plugin config values or secrets.
 
-The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, story bibles, scenes, location edges, organizations, faction tracks, agents, relationships, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, snapshots, GM agenda/proposal/rule records, player actors, player choices, worldline forks, plot threads, route affinity, event flags, scene beat drafts, daily episode drafts, group contexts, relationship suggestions, organization conflicts, rumors, rumor propagations, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
+The protected Web workspace reads this API through server-side helpers and same-origin `/api/worlds/*` proxy routes. It can create and update worlds, story bibles, scenes, location edges, organizations, faction tracks, agents, relationships, memberships, agent calendar entries, private agent memory items, world schedule rules, world clock state, snapshots, GM agenda/proposal/rule records, player actors, player choices, worldline forks, plot threads, route affinity, route milestones, ending candidates, long-run evals, authoring templates, release profiles, beta checklists, event flags, scene beat drafts, daily episode drafts, group contexts, relationship suggestions, organization conflicts, rumors, rumor propagations, and conversation sessions according to the current user's backend permissions, while exposing a separate read-only reader for narrative consumption.
 
-Plot/route/rumor-flow generation is deterministic in this version. Scene beat and daily episode endpoints create structured drafts only; they do not call providers, external tools, subprocesses, or a sandbox runtime.
+Plot/route/rumor-flow and beta readiness checks are deterministic in this version. Scene beat, daily episode, long-run eval, authoring preview/apply, release profile, and beta checklist endpoints do not call providers, external tools, subprocesses, or a sandbox runtime.
 
 New snapshots store replay payload JSON in local object storage under `NOVELAND_OBJECT_STORAGE_ROOT` and keep only a safe `object://...` URI in the database. Older inline snapshot payloads remain readable.
 

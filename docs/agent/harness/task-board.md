@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- Living World Beta Release Readiness
+- None
 
 ## Blocked
 - None
@@ -61,7 +61,8 @@
 - Living World GM / Choices / Worldlines
 - Living World Plot / Route / Rumor Flow
 - Living World Knowledge / Player / Guardrails
+- Living World Beta Release Readiness
 
 ## Upcoming Mainline
-- None. V2 phases 46-50 are the active final roadmap bundle.
-- Remaining V2 acceptance hardening is folded into beta release readiness: route/ending evidence, long-run eval coverage, authoring import checks, release profile guidance, and beta checklist evidence.
+- None. V2 phases 1-50 are implemented in local roadmap bundles.
+- Future work should come from beta evidence, operator feedback, and targeted hardening rather than a new phase-number branch.

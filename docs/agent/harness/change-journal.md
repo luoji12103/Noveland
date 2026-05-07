@@ -527,3 +527,14 @@
 - Tests added/updated: backend API/schema/Alembic coverage for knowledge, secrets, emotional state, relationship repair, journal, notification, intervention, style review, continuity review, dashboard, daily episode generation, memory write jobs, and fork rejection; Web client route tests; world overview rendering tests; Playwright mock backend alignment.
 - Docs updated: migration README, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Apply migration `20260507_0027` before using knowledge/player/guardrail state on persistent databases. Review work is deterministic diagnostics only; it does not hard-block publication by default and does not call providers, external tools, subprocesses, or sandbox execution. V2 phases 46-50 remain as the next candidate bundle.
+
+## Living world beta release readiness entry
+
+- Date: 2026-05-07
+- Branch: feat/living-world-beta-release-readiness
+- Scope: V2 living-world roadmap phases 46-50 route/ending planning, long-run simulation evaluation, authoring toolchain v2, living-world release profile, and galgame living-world beta validation.
+- Summary: Added worldline-scoped route milestones and ending candidates, deterministic ending dry-runs, long-run evaluation runs with recommendations/blockers, sequel-world authoring templates with preview/apply import jobs, release profile records, and beta checklist runs/items for sample-world readiness evidence. Web world overview now exposes dense beta-readiness panels, and the Playwright mock backend covers all new routes.
+- Files changed: `/backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`, `/backend/packages/worlds/src/noveland/worlds/{models,beta}.py`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/{test_api_worlds,test_schema_metadata,test_alembic_config}.py`, `/backend/migrations/README.md`, `/web/features/worlds/**`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/operations/living-world-release-profile.md`, `/docs/agent/harness/**`
+- Tests added/updated: backend API/schema/Alembic coverage for route milestones, endings, long-run evals, authoring templates/imports, release profiles, and beta checklist evidence; Web client route mapping and world overview rendering tests; Playwright mock backend alignment.
+- Docs updated: migration README, release profile operator note, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Apply migration `20260507_0028` before using beta readiness state on persistent databases. Long-run eval and beta validation are deterministic local evidence capture, not provider generation, external tool execution, or a public production launch.
