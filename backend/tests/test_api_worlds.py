@@ -51,10 +51,15 @@ from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSI
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     AgentPresenceState,
+    AuthoringImportJob,
+    AuthoringTemplate,
+    BetaChecklistItem,
+    BetaChecklistRun,
     CharacterEmotionalState,
     CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
+    EndingCandidate,
     EventResolutionRule,
     EventTriggerCondition,
     FactionProgressTrack,
@@ -63,6 +68,8 @@ from noveland.worlds.models import (
     GMStyleReview,
     GroupInteractionContext,
     InWorldNotification,
+    LivingWorldReleaseProfile,
+    LongRunEvalRun,
     NarrativeContinuityReview,
     OffscreenEventQueueItem,
     OrganizationConflictEvent,
@@ -75,6 +82,7 @@ from noveland.worlds.models import (
     RelationshipEventSuggestion,
     RelationshipRepairRecord,
     RouteAffinity,
+    RouteMilestone,
     RumorPropagation,
     RumorRecord,
     Scene,
@@ -1687,6 +1695,330 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert member_notifications_after_auth.json() == []
 
 
+def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "beta-release-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    target_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, member_token)
+    member_milestones = client.get(f"/worlds/{world_id}/route-milestones")
+    member_release_profile = client.get(f"/worlds/{world_id}/release-profile")
+
+    _authenticate(client, owner_token)
+    primary = client.get(f"/worlds/{world_id}/worldlines").json()[0]
+    relationship = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/relationships",
+        json={
+            "source_agent_id": str(agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "friendship",
+            "affection": 30,
+            "trust": 40,
+        },
+    )
+    organization = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+        },
+    )
+    track = client.post(
+        f"/worlds/{world_id}/organizations/{organization.json()['id']}/faction-tracks",
+        json={
+            "track_key": "festival-plan",
+            "name": "Festival Plan",
+            "track_type": "goal",
+            "progress": 60,
+            "pressure": 30,
+        },
+    )
+    route = client.put(
+        f"/worlds/{world_id}/route-affinities",
+        json={
+            "agent_id": str(agent_id),
+            "route_key": "hero-route",
+            "status": "active",
+            "affinity": 55,
+            "stage": 3,
+            "flags": ["festival-helped"],
+        },
+    )
+    thread = client.post(
+        f"/worlds/{world_id}/plot-threads",
+        json={
+            "thread_key": "hero-route-thread",
+            "title": "Hero Route Thread",
+            "thread_type": "personal",
+            "summary": "Hero route is moving.",
+            "participant_agent_ids": [str(agent_id), str(target_agent_id)],
+            "organization_ids": [organization.json()["id"]],
+        },
+    )
+    milestone = client.post(
+        f"/worlds/{world_id}/route-milestones",
+        json={
+            "milestone_key": "festival-promise",
+            "title": "Festival promise",
+            "description": "The player kept the festival promise.",
+            "stage": 3,
+            "status": "completed",
+            "route_affinity_id": route.json()["id"],
+            "plot_thread_id": thread.json()["id"],
+            "agent_id": str(agent_id),
+            "conditions": {"required_flags": ["festival-helped"]},
+            "evidence_metadata": {"choice": "help-festival"},
+        },
+    )
+    duplicate_milestone = client.post(
+        f"/worlds/{world_id}/route-milestones",
+        json={"milestone_key": "festival-promise", "title": "Duplicate"},
+    )
+    ending = client.post(
+        f"/worlds/{world_id}/ending-candidates",
+        json={
+            "ending_key": "hero-normal",
+            "title": "Hero normal ending",
+            "ending_type": "normal",
+            "status": "available",
+            "route_affinity_id": route.json()["id"],
+            "plot_thread_id": thread.json()["id"],
+            "agent_id": str(agent_id),
+            "requirements": {
+                "min_route_affinity": 50,
+                "min_route_stage": 3,
+                "required_flags": ["festival-helped"],
+                "min_completed_milestones": 1,
+            },
+            "outcome_summary": "A post-canon school festival ending.",
+        },
+    )
+    ending_dry_run = client.post(
+        f"/worlds/{world_id}/ending-candidates/{ending.json()['id']}/dry-run",
+    )
+    agenda = client.post(
+        f"/worlds/{world_id}/gm/agendas",
+        json={"title": "Beta route agenda", "summary": "Keep beta route checks moving."},
+    )
+    proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals",
+        json={
+            "agenda_id": agenda.json()["id"],
+            "title": "Beta route event",
+            "reason": "Needs final route evidence.",
+            "event_name": "gm.beta_route_event",
+            "importance": "route",
+        },
+    )
+    actor = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={"display_name": "Player", "current_scene_id": str(scene_id)},
+    )
+    choice = client.post(
+        f"/worlds/{world_id}/player-choices",
+        json={
+            "player_actor_id": actor.json()["id"],
+            "choice_key": "beta-choice",
+            "choice_kind": "route",
+            "prompt": "Help finish beta?",
+            "selected_option": "Stay after school.",
+            "effects": {
+                "relationship_updates": [
+                    {"relationship_id": relationship.json()["id"], "trust_delta": 5}
+                ],
+                "faction_updates": [{"track_id": track.json()["id"], "progress_delta": 5}],
+            },
+        },
+    )
+    intervention = client.post(
+        f"/worlds/{world_id}/interventions",
+        json={
+            "player_actor_id": actor.json()["id"],
+            "intervention_kind": "observe",
+            "target_agent_id": str(agent_id),
+            "prompt": "Observe the festival route.",
+        },
+    )
+    journal = client.post(
+        f"/worlds/{world_id}/player-journal",
+        json={
+            "entry_kind": "choice",
+            "title": "Beta choice",
+            "body": "The player helped the beta route.",
+        },
+    )
+    notification = client.post(
+        f"/worlds/{world_id}/notifications",
+        json={
+            "notification_kind": "intervention",
+            "title": "Beta follow-up",
+            "body": "The route is ready for review.",
+        },
+    )
+    artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Beta chapter",
+        "A published beta chapter.",
+        artifact_kind="chapter_draft",
+    )
+    _publish_narrative_artifact(engine, world_id, artifact_id, owner_id)
+    for minute in range(1, 8):
+        _seed_world_event(
+            engine,
+            world_id,
+            event_name="living_world.daily_tick",
+            actor_ref="runtime:beta",
+            minute=minute,
+            payload={"day": minute},
+            importance=WorldEventImportance.DAILY,
+        )
+    fork = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={"worldline_key": "beta-alt", "name": "Beta Alt"},
+    )
+    eval_run = client.post(
+        f"/worlds/{world_id}/long-run-evals",
+        json={"eval_key": "seven-day", "horizon_days": 7},
+    )
+    template = client.post(
+        f"/worlds/{world_id}/authoring-templates",
+        json={
+            "template_key": "hero-source",
+            "template_kind": "world_bundle",
+            "name": "Hero sequel bundle",
+            "content": {
+                "source_notes": "Post-canon school festival sequel.",
+                "characters": [
+                    {
+                        "agent_key": "new-transfer",
+                        "display_name": "New Transfer",
+                        "character_profile": {"story_function": "route catalyst"},
+                    }
+                ],
+                "routes": [
+                    {
+                        "agent_key": "hero",
+                        "route_key": "hero-route",
+                        "affinity": 60,
+                        "stage": 3,
+                    }
+                ],
+            },
+        },
+    )
+    preview = client.post(
+        f"/worlds/{world_id}/authoring-templates/{template.json()['id']}/preview",
+        json={},
+    )
+    apply = client.post(
+        f"/worlds/{world_id}/authoring-templates/{template.json()['id']}/apply",
+        json={"metadata": {"operator": "test"}},
+    )
+    release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {"beta": "required"},
+        },
+    )
+    release_profile_read = client.get(f"/worlds/{world_id}/release-profile")
+    checklist = client.post(
+        f"/worlds/{world_id}/beta-checklists",
+        json={"run_key": "beta-readiness"},
+    )
+    checklist_items = client.get(
+        f"/worlds/{world_id}/beta-checklists/{checklist.json()['id']}/items",
+    )
+    listed_milestones = client.get(f"/worlds/{world_id}/route-milestones")
+    listed_endings = client.get(f"/worlds/{world_id}/ending-candidates")
+    listed_evals = client.get(f"/worlds/{world_id}/long-run-evals")
+    listed_templates = client.get(f"/worlds/{world_id}/authoring-templates")
+    listed_checklists = client.get(f"/worlds/{world_id}/beta-checklists")
+    with Session(engine) as session:
+        persisted_counts = {
+            "milestones": session.query(RouteMilestone).count(),
+            "endings": session.query(EndingCandidate).count(),
+            "evals": session.query(LongRunEvalRun).count(),
+            "templates": session.query(AuthoringTemplate).count(),
+            "jobs": session.query(AuthoringImportJob).count(),
+            "profiles": session.query(LivingWorldReleaseProfile).count(),
+            "checklists": session.query(BetaChecklistRun).count(),
+        }
+
+    assert member_milestones.status_code == 403
+    assert member_release_profile.status_code == 200
+    assert member_release_profile.json() is None
+    assert milestone.status_code == 201
+    assert milestone.json()["status"] == "completed"
+    assert duplicate_milestone.status_code == 409 or duplicate_milestone.status_code == 422
+    assert ending.status_code == 201
+    assert ending_dry_run.status_code == 200
+    assert ending_dry_run.json()["matched"] is True
+    assert agenda.status_code == 201
+    assert proposal.status_code == 201
+    assert choice.status_code == 201
+    assert intervention.status_code == 201
+    assert journal.status_code == 201
+    assert notification.status_code == 201
+    assert fork.status_code == 201
+    assert eval_run.status_code == 201
+    assert eval_run.json()["metrics"]["horizon_days"] == 7
+    assert eval_run.json()["metrics"]["events"] >= 7
+    assert isinstance(eval_run.json()["recommendations"], list)
+    assert template.status_code == 201
+    assert preview.status_code == 200
+    assert preview.json()["status"] == "preview"
+    assert preview.json()["preview_summary"]["character_count"] == 1
+    assert apply.status_code == 200
+    assert apply.json()["status"] == "applied"
+    assert "world_bible_id" in apply.json()["applied_refs"]
+    assert release_profile.status_code == 200
+    assert release_profile.json()["status"] == "ready"
+    assert release_profile_read.json()["branch_policy"] == {"forks": "enabled"}
+    assert checklist.status_code == 201
+    assert checklist.json()["status"] in {"passed", "warning"}
+    assert checklist_items.status_code == 200
+    assert {item["item_key"] for item in checklist_items.json()} == {
+        "seven_day_simulation",
+        "branch_saves",
+        "relationship_changes",
+        "faction_progress",
+        "gm_event_loop",
+        "player_interventions",
+        "journal_notifications",
+        "narrative_output",
+    }
+    assert all(item["status"] != "blocked" for item in checklist_items.json())
+    assert listed_milestones.json()[0]["milestone_key"] == "festival-promise"
+    assert listed_endings.json()[0]["ending_key"] == "hero-normal"
+    assert listed_evals.json()[0]["eval_key"] == "seven-day"
+    assert listed_templates.json()[0]["template_key"] == "hero-source"
+    assert listed_checklists.json()[0]["run_key"] == "beta-readiness"
+    assert persisted_counts == {
+        "milestones": 1,
+        "endings": 1,
+        "evals": 1,
+        "templates": 1,
+        "jobs": 2,
+        "profiles": 1,
+        "checklists": 1,
+    }
+
+
 def test_membership_management_and_final_admin_guard() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -2911,6 +3243,14 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, PlayerInterventionRecord.__table__),
         cast(Table, GMStyleReview.__table__),
         cast(Table, NarrativeContinuityReview.__table__),
+        cast(Table, RouteMilestone.__table__),
+        cast(Table, EndingCandidate.__table__),
+        cast(Table, LongRunEvalRun.__table__),
+        cast(Table, AuthoringTemplate.__table__),
+        cast(Table, AuthoringImportJob.__table__),
+        cast(Table, LivingWorldReleaseProfile.__table__),
+        cast(Table, BetaChecklistRun.__table__),
+        cast(Table, BetaChecklistItem.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

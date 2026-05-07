@@ -103,16 +103,22 @@ from noveland.services.api.dependencies import (
 )
 from noveland.services.runtime import AgentRunExecution, AgentRuntimeOrchestrator
 from noveland.worlds.autonomous import LivingWorldAutonomyService
+from noveland.worlds.beta import EndingDryRun, LivingWorldBetaService
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.gm import LivingWorldGMService, ResolutionRuleDryRun, WorldlineComparison
 from noveland.worlds.guardrails import LivingWorldDashboard, LivingWorldGuardrailService
 from noveland.worlds.models import (
     AgentPresenceState,
+    AuthoringImportJob,
+    AuthoringTemplate,
+    BetaChecklistItem,
+    BetaChecklistRun,
     CharacterEmotionalState,
     CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
+    EndingCandidate,
     EventResolutionRule,
     EventTriggerCondition,
     FactionProgressTrack,
@@ -121,6 +127,8 @@ from noveland.worlds.models import (
     GMStyleReview,
     GroupInteractionContext,
     InWorldNotification,
+    LivingWorldReleaseProfile,
+    LongRunEvalRun,
     NarrativeContinuityReview,
     OffscreenEventQueueItem,
     OrganizationConflictEvent,
@@ -133,6 +141,7 @@ from noveland.worlds.models import (
     RelationshipEventSuggestion,
     RelationshipRepairRecord,
     RouteAffinity,
+    RouteMilestone,
     RumorPropagation,
     RumorRecord,
     Scene,
@@ -235,6 +244,15 @@ NotificationStatus = Literal["unread", "read", "archived"]
 InterventionKind = Literal["observe", "reply", "travel", "contact", "push_event"]
 InterventionStatus = Literal["recorded", "resolved", "cancelled"]
 ReviewStatus = Literal["pass", "warning", "fail"]
+RouteMilestoneStatus = Literal["planned", "active", "completed", "blocked"]
+EndingType = Literal["normal", "bad", "hidden", "epilogue"]
+EndingStatus = Literal["planned", "available", "locked", "achieved", "retired"]
+LongRunEvalStatus = Literal["completed", "warning", "failed"]
+AuthoringTemplateKind = Literal["source_notes", "character", "event", "route", "world_bundle"]
+AuthoringImportStatus = Literal["preview", "applied", "failed"]
+ReleaseProfileStatus = Literal["draft", "ready", "blocked", "released"]
+BetaChecklistStatus = Literal["pending", "passed", "warning", "blocked"]
+BetaChecklistItemStatus = Literal["pending", "passed", "warning", "blocked"]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -807,6 +825,74 @@ class NarrativeContinuityReviewCreateRequest(_RequestModel):
     source_kind: str = Field(min_length=1, max_length=40)
     source_ref: str | None = Field(default=None, max_length=160)
     reviewed_text: str = Field(min_length=1, max_length=80_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RouteMilestoneCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    milestone_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=12_000)
+    stage: int = Field(default=0, ge=0)
+    status: RouteMilestoneStatus = "planned"
+    route_affinity_id: uuid.UUID | None = None
+    plot_thread_id: uuid.UUID | None = None
+    agent_id: uuid.UUID | None = None
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    evidence_metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EndingCandidateCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    ending_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    ending_type: EndingType
+    status: EndingStatus = "planned"
+    route_affinity_id: uuid.UUID | None = None
+    plot_thread_id: uuid.UUID | None = None
+    agent_id: uuid.UUID | None = None
+    requirements: dict[str, Any] = Field(default_factory=dict)
+    outcome_summary: str | None = Field(default=None, max_length=12_000)
+    evidence_metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LongRunEvalCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    eval_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    horizon_days: int = Field(default=7, ge=1, le=90)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuthoringTemplateCreateRequest(_RequestModel):
+    template_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    template_kind: AuthoringTemplateKind
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=12_000)
+    content: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuthoringTemplateApplyRequest(_RequestModel):
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReleaseProfileUpsertRequest(_RequestModel):
+    profile_key: str = Field(default="default", pattern=SLUG_PATTERN, max_length=120)
+    status: ReleaseProfileStatus = "draft"
+    branch_policy: dict[str, Any] = Field(default_factory=dict)
+    backup_policy: dict[str, Any] = Field(default_factory=dict)
+    content_review_policy: dict[str, Any] = Field(default_factory=dict)
+    player_permission_policy: dict[str, Any] = Field(default_factory=dict)
+    worldline_policy: dict[str, Any] = Field(default_factory=dict)
+    checklist: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BetaChecklistRunCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    run_key: str = Field(default="beta-readiness", pattern=SLUG_PATTERN, max_length=120)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -1691,6 +1777,145 @@ class LivingWorldDashboardResponse(BaseModel):
     pending_intervention_count: int
     active_route_count: int
     pressure_summary: dict[str, int]
+
+
+class RouteMilestoneResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    route_affinity_id: uuid.UUID | None
+    plot_thread_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    agent_key: str | None
+    agent_display_name: str | None
+    milestone_key: str
+    title: str
+    description: str | None
+    stage: int
+    status: RouteMilestoneStatus
+    conditions: dict[str, Any]
+    evidence_metadata: dict[str, Any]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class EndingCandidateResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    route_affinity_id: uuid.UUID | None
+    plot_thread_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    agent_key: str | None
+    agent_display_name: str | None
+    ending_key: str
+    title: str
+    ending_type: EndingType
+    status: EndingStatus
+    requirements: dict[str, Any]
+    outcome_summary: str | None
+    evidence_metadata: dict[str, Any]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class EndingDryRunResponse(BaseModel):
+    ending_id: uuid.UUID
+    ending_key: str
+    matched: bool
+    satisfied: list[str]
+    unsatisfied: list[str]
+    evidence: dict[str, Any]
+
+
+class LongRunEvalResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    eval_key: str
+    horizon_days: int
+    status: LongRunEvalStatus
+    started_at: datetime
+    finished_at: datetime
+    metrics: dict[str, Any]
+    recommendations: list[dict[str, Any]]
+    blockers: list[dict[str, Any]]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AuthoringTemplateResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    template_key: str
+    template_kind: AuthoringTemplateKind
+    name: str
+    description: str | None
+    content: dict[str, Any]
+    validation_issues: list[dict[str, Any]]
+    is_active: bool
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AuthoringImportJobResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    template_id: uuid.UUID | None
+    status: AuthoringImportStatus
+    preview_summary: dict[str, Any]
+    applied_refs: dict[str, Any]
+    validation_issues: list[dict[str, Any]]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReleaseProfileResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    profile_key: str
+    status: ReleaseProfileStatus
+    branch_policy: dict[str, Any]
+    backup_policy: dict[str, Any]
+    content_review_policy: dict[str, Any]
+    player_permission_policy: dict[str, Any]
+    worldline_policy: dict[str, Any]
+    checklist: dict[str, Any]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class BetaChecklistRunResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    run_key: str
+    status: BetaChecklistStatus
+    summary: str
+    evidence: dict[str, Any]
+    blocker_count: int
+    created_by_actor_ref: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class BetaChecklistItemResponse(BaseModel):
+    id: uuid.UUID
+    run_id: uuid.UUID
+    item_key: str
+    title: str
+    status: BetaChecklistItemStatus
+    evidence: dict[str, Any]
+    recommendation: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 class UserSummaryResponse(BaseModel):
@@ -4664,6 +4889,398 @@ def create_narrative_continuity_review(
         metadata=review_create.metadata,
     )
     return _narrative_continuity_review_response(review)
+
+
+@router.get("/{world_id}/route-milestones", response_model=list[RouteMilestoneResponse])
+def list_route_milestones(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[RouteMilestoneStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[RouteMilestoneResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldBetaService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RouteMilestone).where(
+        RouteMilestone.world_id == context.world_id,
+        RouteMilestone.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(RouteMilestone.status == status_filter)
+    milestones = db_session.scalars(
+        statement.order_by(RouteMilestone.stage, RouteMilestone.created_at.desc()).limit(limit),
+    ).all()
+    return [_route_milestone_response(db_session, milestone) for milestone in milestones]
+
+
+@router.post(
+    "/{world_id}/route-milestones",
+    response_model=RouteMilestoneResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_route_milestone(
+    milestone_create: RouteMilestoneCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RouteMilestoneResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        milestone = LivingWorldBetaService(db_session).create_route_milestone(
+            world_id=context.world_id,
+            worldline_id=milestone_create.worldline_id,
+            milestone_key=milestone_create.milestone_key,
+            title=milestone_create.title,
+            description=milestone_create.description,
+            stage=milestone_create.stage,
+            status=milestone_create.status,
+            route_affinity_id=milestone_create.route_affinity_id,
+            plot_thread_id=milestone_create.plot_thread_id,
+            agent_id=milestone_create.agent_id,
+            conditions=milestone_create.conditions,
+            evidence_metadata=milestone_create.evidence_metadata,
+            metadata=milestone_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _route_milestone_response(db_session, milestone)
+
+
+@router.get("/{world_id}/ending-candidates", response_model=list[EndingCandidateResponse])
+def list_ending_candidates(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[EndingStatus | None, Query(alias="status")] = None,
+    ending_type: EndingType | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[EndingCandidateResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldBetaService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(EndingCandidate).where(
+        EndingCandidate.world_id == context.world_id,
+        EndingCandidate.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(EndingCandidate.status == status_filter)
+    if ending_type is not None:
+        statement = statement.where(EndingCandidate.ending_type == ending_type)
+    endings = db_session.scalars(
+        statement.order_by(EndingCandidate.ending_type, EndingCandidate.updated_at.desc()).limit(
+            limit
+        ),
+    ).all()
+    return [_ending_candidate_response(db_session, ending) for ending in endings]
+
+
+@router.post(
+    "/{world_id}/ending-candidates",
+    response_model=EndingCandidateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_ending_candidate(
+    ending_create: EndingCandidateCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EndingCandidateResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        ending = LivingWorldBetaService(db_session).create_ending_candidate(
+            world_id=context.world_id,
+            worldline_id=ending_create.worldline_id,
+            ending_key=ending_create.ending_key,
+            title=ending_create.title,
+            ending_type=ending_create.ending_type,
+            status=ending_create.status,
+            route_affinity_id=ending_create.route_affinity_id,
+            plot_thread_id=ending_create.plot_thread_id,
+            agent_id=ending_create.agent_id,
+            requirements=ending_create.requirements,
+            outcome_summary=ending_create.outcome_summary,
+            evidence_metadata=ending_create.evidence_metadata,
+            metadata=ending_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return _ending_candidate_response(db_session, ending)
+
+
+@router.post(
+    "/{world_id}/ending-candidates/{ending_id}/dry-run",
+    response_model=EndingDryRunResponse,
+)
+def dry_run_ending_candidate(
+    ending_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> EndingDryRunResponse:
+    require_csrf(request)
+    ending = _ending_candidate_or_404(db_session, context.world_id, ending_id)
+    try:
+        dry_run = LivingWorldBetaService(db_session).dry_run_ending(
+            world_id=context.world_id,
+            worldline_id=worldline_id,
+            ending=ending,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _ending_dry_run_response(dry_run)
+
+
+@router.get("/{world_id}/long-run-evals", response_model=list[LongRunEvalResponse])
+def list_long_run_evals(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[LongRunEvalResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldBetaService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    runs = db_session.scalars(
+        select(LongRunEvalRun)
+        .where(
+            LongRunEvalRun.world_id == context.world_id,
+            LongRunEvalRun.worldline_id == resolved_worldline.id,
+        )
+        .order_by(LongRunEvalRun.created_at.desc())
+        .limit(limit),
+    ).all()
+    return [_long_run_eval_response(run) for run in runs]
+
+
+@router.post(
+    "/{world_id}/long-run-evals",
+    response_model=LongRunEvalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_long_run_eval(
+    eval_create: LongRunEvalCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> LongRunEvalResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    run = LivingWorldBetaService(db_session).run_long_eval(
+        world_id=context.world_id,
+        worldline_id=eval_create.worldline_id,
+        eval_key=eval_create.eval_key,
+        horizon_days=eval_create.horizon_days,
+        metadata=eval_create.metadata,
+    )
+    return _long_run_eval_response(run)
+
+
+@router.get("/{world_id}/authoring-templates", response_model=list[AuthoringTemplateResponse])
+def list_authoring_templates(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    template_kind: AuthoringTemplateKind | None = None,
+) -> list[AuthoringTemplateResponse]:
+    _world_or_404(db_session, context.world_id)
+    statement = select(AuthoringTemplate).where(AuthoringTemplate.world_id == context.world_id)
+    if template_kind is not None:
+        statement = statement.where(AuthoringTemplate.template_kind == template_kind)
+    templates = db_session.scalars(
+        statement.order_by(AuthoringTemplate.template_kind, AuthoringTemplate.template_key),
+    ).all()
+    return [_authoring_template_response(template) for template in templates]
+
+
+@router.post(
+    "/{world_id}/authoring-templates",
+    response_model=AuthoringTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_authoring_template(
+    template_create: AuthoringTemplateCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringTemplateResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    try:
+        template = LivingWorldBetaService(db_session).create_authoring_template(
+            world_id=context.world_id,
+            template_key=template_create.template_key,
+            template_kind=template_create.template_kind,
+            name=template_create.name,
+            description=template_create.description,
+            content=template_create.content,
+            metadata=template_create.metadata,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _authoring_template_response(template)
+
+
+@router.post(
+    "/{world_id}/authoring-templates/{template_id}/preview",
+    response_model=AuthoringImportJobResponse,
+)
+def preview_authoring_template(
+    template_id: uuid.UUID,
+    preview_create: AuthoringTemplateApplyRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringImportJobResponse:
+    require_csrf(request)
+    template = _authoring_template_or_404(db_session, context.world_id, template_id)
+    try:
+        job = LivingWorldBetaService(db_session).preview_authoring_template(
+            world_id=context.world_id,
+            template=template,
+            metadata=preview_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _authoring_import_job_response(job)
+
+
+@router.post(
+    "/{world_id}/authoring-templates/{template_id}/apply",
+    response_model=AuthoringImportJobResponse,
+)
+def apply_authoring_template(
+    template_id: uuid.UUID,
+    apply_create: AuthoringTemplateApplyRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringImportJobResponse:
+    require_csrf(request)
+    template = _authoring_template_or_404(db_session, context.world_id, template_id)
+    try:
+        job = LivingWorldBetaService(db_session).apply_authoring_template(
+            world_id=context.world_id,
+            template=template,
+            metadata=apply_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _authoring_import_job_response(job)
+
+
+@router.get("/{world_id}/release-profile", response_model=ReleaseProfileResponse | None)
+def get_release_profile(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ReleaseProfileResponse | None:
+    _world_or_404(db_session, context.world_id)
+    profile = LivingWorldBetaService(db_session).get_release_profile(world_id=context.world_id)
+    return None if profile is None else _release_profile_response(profile)
+
+
+@router.put("/{world_id}/release-profile", response_model=ReleaseProfileResponse)
+def upsert_release_profile(
+    profile_upsert: ReleaseProfileUpsertRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ReleaseProfileResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    profile = LivingWorldBetaService(db_session).upsert_release_profile(
+        world_id=context.world_id,
+        profile_key=profile_upsert.profile_key,
+        status=profile_upsert.status,
+        branch_policy=profile_upsert.branch_policy,
+        backup_policy=profile_upsert.backup_policy,
+        content_review_policy=profile_upsert.content_review_policy,
+        player_permission_policy=profile_upsert.player_permission_policy,
+        worldline_policy=profile_upsert.worldline_policy,
+        checklist=profile_upsert.checklist,
+        metadata=profile_upsert.metadata,
+    )
+    return _release_profile_response(profile)
+
+
+@router.get("/{world_id}/beta-checklists", response_model=list[BetaChecklistRunResponse])
+def list_beta_checklists(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[BetaChecklistRunResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldBetaService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    runs = db_session.scalars(
+        select(BetaChecklistRun)
+        .where(
+            BetaChecklistRun.world_id == context.world_id,
+            BetaChecklistRun.worldline_id == resolved_worldline.id,
+        )
+        .order_by(BetaChecklistRun.created_at.desc())
+        .limit(limit),
+    ).all()
+    return [_beta_checklist_run_response(run) for run in runs]
+
+
+@router.post(
+    "/{world_id}/beta-checklists",
+    response_model=BetaChecklistRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_beta_checklist(
+    checklist_create: BetaChecklistRunCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> BetaChecklistRunResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    run = LivingWorldBetaService(db_session).run_beta_checklist(
+        world_id=context.world_id,
+        worldline_id=checklist_create.worldline_id,
+        run_key=checklist_create.run_key,
+        actor_ref=_actor_ref(context.subject),
+        metadata=checklist_create.metadata,
+    )
+    return _beta_checklist_run_response(run)
+
+
+@router.get(
+    "/{world_id}/beta-checklists/{run_id}/items",
+    response_model=list[BetaChecklistItemResponse],
+)
+def list_beta_checklist_items(
+    run_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[BetaChecklistItemResponse]:
+    _world_or_404(db_session, context.world_id)
+    run = _beta_checklist_run_or_404(db_session, context.world_id, run_id)
+    items = db_session.scalars(
+        select(BetaChecklistItem)
+        .where(BetaChecklistItem.run_id == run.id)
+        .order_by(BetaChecklistItem.item_key),
+    ).all()
+    return [_beta_checklist_item_response(item) for item in items]
 
 
 @router.get("/{world_id}/composition-export", response_model=WorldCompositionExportResponse)
@@ -7875,6 +8492,171 @@ def _living_world_dashboard_response(
     )
 
 
+def _route_milestone_response(
+    db_session: Session,
+    milestone: RouteMilestone,
+) -> RouteMilestoneResponse:
+    agent = None if milestone.agent_id is None else db_session.get(Agent, milestone.agent_id)
+    return RouteMilestoneResponse(
+        id=milestone.id,
+        world_id=milestone.world_id,
+        worldline_id=milestone.worldline_id,
+        route_affinity_id=milestone.route_affinity_id,
+        plot_thread_id=milestone.plot_thread_id,
+        agent_id=milestone.agent_id,
+        agent_key=None if agent is None else agent.agent_key,
+        agent_display_name=None if agent is None else agent.display_name,
+        milestone_key=milestone.milestone_key,
+        title=milestone.title,
+        description=milestone.description,
+        stage=milestone.stage,
+        status=cast(RouteMilestoneStatus, milestone.status),
+        conditions=milestone.conditions,
+        evidence_metadata=milestone.evidence_metadata,
+        metadata=milestone.metadata_json,
+        created_at=milestone.created_at,
+        updated_at=milestone.updated_at,
+    )
+
+
+def _ending_candidate_response(
+    db_session: Session,
+    ending: EndingCandidate,
+) -> EndingCandidateResponse:
+    agent = None if ending.agent_id is None else db_session.get(Agent, ending.agent_id)
+    return EndingCandidateResponse(
+        id=ending.id,
+        world_id=ending.world_id,
+        worldline_id=ending.worldline_id,
+        route_affinity_id=ending.route_affinity_id,
+        plot_thread_id=ending.plot_thread_id,
+        agent_id=ending.agent_id,
+        agent_key=None if agent is None else agent.agent_key,
+        agent_display_name=None if agent is None else agent.display_name,
+        ending_key=ending.ending_key,
+        title=ending.title,
+        ending_type=cast(EndingType, ending.ending_type),
+        status=cast(EndingStatus, ending.status),
+        requirements=ending.requirements,
+        outcome_summary=ending.outcome_summary,
+        evidence_metadata=ending.evidence_metadata,
+        metadata=ending.metadata_json,
+        created_at=ending.created_at,
+        updated_at=ending.updated_at,
+    )
+
+
+def _ending_dry_run_response(dry_run: EndingDryRun) -> EndingDryRunResponse:
+    return EndingDryRunResponse(
+        ending_id=dry_run.ending_id,
+        ending_key=dry_run.ending_key,
+        matched=dry_run.matched,
+        satisfied=dry_run.satisfied,
+        unsatisfied=dry_run.unsatisfied,
+        evidence=dry_run.evidence,
+    )
+
+
+def _long_run_eval_response(run: LongRunEvalRun) -> LongRunEvalResponse:
+    return LongRunEvalResponse(
+        id=run.id,
+        world_id=run.world_id,
+        worldline_id=run.worldline_id,
+        eval_key=run.eval_key,
+        horizon_days=run.horizon_days,
+        status=cast(LongRunEvalStatus, run.status),
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+        metrics=run.metrics,
+        recommendations=run.recommendations,
+        blockers=run.blockers,
+        metadata=run.metadata_json,
+        created_at=run.created_at,
+        updated_at=run.updated_at,
+    )
+
+
+def _authoring_template_response(template: AuthoringTemplate) -> AuthoringTemplateResponse:
+    return AuthoringTemplateResponse(
+        id=template.id,
+        world_id=template.world_id,
+        template_key=template.template_key,
+        template_kind=cast(AuthoringTemplateKind, template.template_kind),
+        name=template.name,
+        description=template.description,
+        content=template.content,
+        validation_issues=template.validation_issues,
+        is_active=template.is_active,
+        metadata=template.metadata_json,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    )
+
+
+def _authoring_import_job_response(job: AuthoringImportJob) -> AuthoringImportJobResponse:
+    return AuthoringImportJobResponse(
+        id=job.id,
+        world_id=job.world_id,
+        template_id=job.template_id,
+        status=cast(AuthoringImportStatus, job.status),
+        preview_summary=job.preview_summary,
+        applied_refs=job.applied_refs,
+        validation_issues=job.validation_issues,
+        metadata=job.metadata_json,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
+def _release_profile_response(profile: LivingWorldReleaseProfile) -> ReleaseProfileResponse:
+    return ReleaseProfileResponse(
+        id=profile.id,
+        world_id=profile.world_id,
+        profile_key=profile.profile_key,
+        status=cast(ReleaseProfileStatus, profile.status),
+        branch_policy=profile.branch_policy,
+        backup_policy=profile.backup_policy,
+        content_review_policy=profile.content_review_policy,
+        player_permission_policy=profile.player_permission_policy,
+        worldline_policy=profile.worldline_policy,
+        checklist=profile.checklist,
+        metadata=profile.metadata_json,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
+
+
+def _beta_checklist_run_response(run: BetaChecklistRun) -> BetaChecklistRunResponse:
+    return BetaChecklistRunResponse(
+        id=run.id,
+        world_id=run.world_id,
+        worldline_id=run.worldline_id,
+        run_key=run.run_key,
+        status=cast(BetaChecklistStatus, run.status),
+        summary=run.summary,
+        evidence=run.evidence,
+        blocker_count=run.blocker_count,
+        created_by_actor_ref=run.created_by_actor_ref,
+        metadata=run.metadata_json,
+        created_at=run.created_at,
+        updated_at=run.updated_at,
+    )
+
+
+def _beta_checklist_item_response(item: BetaChecklistItem) -> BetaChecklistItemResponse:
+    return BetaChecklistItemResponse(
+        id=item.id,
+        run_id=item.run_id,
+        item_key=item.item_key,
+        title=item.title,
+        status=cast(BetaChecklistItemStatus, item.status),
+        evidence=item.evidence,
+        recommendation=item.recommendation,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
 def _world_bible_response(bible: WorldBible) -> WorldBibleResponse:
     return WorldBibleResponse(
         id=bible.id,
@@ -9023,6 +9805,48 @@ def _rumor_propagation_or_404(
             detail="Rumor propagation not found",
         )
     return propagation
+
+
+def _ending_candidate_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    ending_id: uuid.UUID,
+) -> EndingCandidate:
+    ending = db_session.get(EndingCandidate, ending_id)
+    if ending is None or ending.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ending candidate not found",
+        )
+    return ending
+
+
+def _authoring_template_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    template_id: uuid.UUID,
+) -> AuthoringTemplate:
+    template = db_session.get(AuthoringTemplate, template_id)
+    if template is None or template.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Authoring template not found",
+        )
+    return template
+
+
+def _beta_checklist_run_or_404(
+    db_session: Session,
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> BetaChecklistRun:
+    run = db_session.get(BetaChecklistRun, run_id)
+    if run is None or run.world_id != world_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Beta checklist run not found",
+        )
+    return run
 
 
 def _ensure_agent_string_refs(

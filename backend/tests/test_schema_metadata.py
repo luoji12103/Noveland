@@ -53,6 +53,10 @@ def test_core_schema_tables_are_registered() -> None:
         "agent_memory_items",
         "agent_profile_snapshots",
         "auth_sessions",
+        "authoring_import_jobs",
+        "authoring_templates",
+        "beta_checklist_items",
+        "beta_checklist_runs",
         "conversation_participants",
         "conversation_sessions",
         "conversation_turns",
@@ -60,6 +64,7 @@ def test_core_schema_tables_are_registered() -> None:
         "character_knowledge_facts",
         "daily_episode_drafts",
         "daily_life_event_candidates",
+        "ending_candidates",
         "event_resolution_rules",
         "event_trigger_conditions",
         "faction_progress_tracks",
@@ -68,6 +73,8 @@ def test_core_schema_tables_are_registered() -> None:
         "gm_style_reviews",
         "group_interaction_contexts",
         "in_world_notifications",
+        "living_world_release_profiles",
+        "long_run_eval_runs",
         "memory_backend_profiles",
         "memory_retrieval_logs",
         "memory_write_jobs",
@@ -91,6 +98,7 @@ def test_core_schema_tables_are_registered() -> None:
         "narrative_artifacts",
         "narrative_publications",
         "route_affinities",
+        "route_milestones",
         "rumor_propagations",
         "rumor_records",
         "scenes",
@@ -419,6 +427,80 @@ def test_living_world_knowledge_player_guardrail_columns_are_registered() -> Non
     } <= column_names("narrative_continuity_reviews")
 
 
+def test_living_world_beta_release_readiness_columns_are_registered() -> None:
+    assert {
+        "worldline_id",
+        "route_affinity_id",
+        "plot_thread_id",
+        "agent_id",
+        "milestone_key",
+        "stage",
+        "status",
+        "conditions",
+        "evidence_metadata",
+    } <= column_names("route_milestones")
+    assert {
+        "worldline_id",
+        "route_affinity_id",
+        "plot_thread_id",
+        "agent_id",
+        "ending_key",
+        "ending_type",
+        "status",
+        "requirements",
+        "outcome_summary",
+        "evidence_metadata",
+    } <= column_names("ending_candidates")
+    assert {
+        "worldline_id",
+        "eval_key",
+        "horizon_days",
+        "status",
+        "started_at",
+        "finished_at",
+        "metrics",
+        "recommendations",
+        "blockers",
+    } <= column_names("long_run_eval_runs")
+    assert {
+        "template_key",
+        "template_kind",
+        "name",
+        "content",
+        "validation_issues",
+        "is_active",
+    } <= column_names("authoring_templates")
+    assert {
+        "template_id",
+        "status",
+        "preview_summary",
+        "applied_refs",
+        "validation_issues",
+    } <= column_names("authoring_import_jobs")
+    assert {
+        "profile_key",
+        "status",
+        "branch_policy",
+        "backup_policy",
+        "content_review_policy",
+        "player_permission_policy",
+        "worldline_policy",
+        "checklist",
+    } <= column_names("living_world_release_profiles")
+    assert {
+        "worldline_id",
+        "run_key",
+        "status",
+        "summary",
+        "evidence",
+        "blocker_count",
+        "created_by_actor_ref",
+    } <= column_names("beta_checklist_runs")
+    assert {"run_id", "item_key", "title", "status", "evidence", "recommendation"} <= column_names(
+        "beta_checklist_items",
+    )
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(
@@ -527,6 +609,26 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_character_emotional_states_scope_agent" in constraint_names(
         "character_emotional_states",
+        UniqueConstraint,
+    )
+    assert "uq_route_milestones_scope_key" in constraint_names(
+        "route_milestones",
+        UniqueConstraint,
+    )
+    assert "uq_ending_candidates_scope_key" in constraint_names(
+        "ending_candidates",
+        UniqueConstraint,
+    )
+    assert "uq_authoring_templates_world_key" in constraint_names(
+        "authoring_templates",
+        UniqueConstraint,
+    )
+    assert "uq_living_world_release_profiles_world_id" in constraint_names(
+        "living_world_release_profiles",
+        UniqueConstraint,
+    )
+    assert "uq_beta_checklist_items_run_key" in constraint_names(
+        "beta_checklist_items",
         UniqueConstraint,
     )
     assert "uq_memory_backend_profiles_profile_key" in constraint_names(
@@ -750,6 +852,42 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
     )
     assert "ck_narrative_continuity_reviews_status" in constraint_names(
         "narrative_continuity_reviews",
+        CheckConstraint,
+    )
+    assert "ck_route_milestones_status" in constraint_names(
+        "route_milestones",
+        CheckConstraint,
+    )
+    assert "ck_ending_candidates_ending_type" in constraint_names(
+        "ending_candidates",
+        CheckConstraint,
+    )
+    assert "ck_ending_candidates_status" in constraint_names(
+        "ending_candidates",
+        CheckConstraint,
+    )
+    assert "ck_long_run_eval_runs_status" in constraint_names(
+        "long_run_eval_runs",
+        CheckConstraint,
+    )
+    assert "ck_authoring_templates_template_kind" in constraint_names(
+        "authoring_templates",
+        CheckConstraint,
+    )
+    assert "ck_authoring_import_jobs_status" in constraint_names(
+        "authoring_import_jobs",
+        CheckConstraint,
+    )
+    assert "ck_living_world_release_profiles_status" in constraint_names(
+        "living_world_release_profiles",
+        CheckConstraint,
+    )
+    assert "ck_beta_checklist_runs_status" in constraint_names(
+        "beta_checklist_runs",
+        CheckConstraint,
+    )
+    assert "ck_beta_checklist_items_status" in constraint_names(
+        "beta_checklist_items",
         CheckConstraint,
     )
     assert "ck_world_organizations_organization_type" in constraint_names(
