@@ -56,6 +56,8 @@ def test_core_schema_tables_are_registered() -> None:
         "conversation_participants",
         "conversation_sessions",
         "conversation_turns",
+        "character_emotional_states",
+        "character_knowledge_facts",
         "daily_episode_drafts",
         "daily_life_event_candidates",
         "event_resolution_rules",
@@ -63,20 +65,26 @@ def test_core_schema_tables_are_registered() -> None:
         "faction_progress_tracks",
         "gm_agendas",
         "gm_event_proposals",
+        "gm_style_reviews",
         "group_interaction_contexts",
+        "in_world_notifications",
         "memory_backend_profiles",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
+        "narrative_continuity_reviews",
         "offscreen_event_queue",
         "organization_conflict_events",
         "organization_memberships",
         "player_actor_profiles",
         "player_choice_records",
+        "player_intervention_records",
+        "player_journal_entries",
         "platform_settings",
         "plot_threads",
         "platform_role_assignments",
         "provider_profiles",
+        "relationship_repair_records",
         "relationship_event_suggestions",
         "runtime_control_states",
         "runtime_diagnostic_events",
@@ -88,6 +96,7 @@ def test_core_schema_tables_are_registered() -> None:
         "scenes",
         "scene_beat_drafts",
         "scene_location_edges",
+        "secret_records",
         "story_hooks",
         "user_credentials",
         "users",
@@ -319,6 +328,97 @@ def test_living_world_plot_route_rumor_flow_columns_are_registered() -> None:
     } <= column_names("rumor_propagations")
 
 
+def test_living_world_knowledge_player_guardrail_columns_are_registered() -> None:
+    assert {
+        "worldline_id",
+        "agent_id",
+        "fact_key",
+        "knowledge_kind",
+        "content",
+        "source_event_id",
+        "confidence",
+        "visibility",
+        "is_active",
+    } <= column_names("character_knowledge_facts")
+    assert {
+        "worldline_id",
+        "secret_key",
+        "title",
+        "holder_agent_ids",
+        "reveal_conditions",
+        "consequence_metadata",
+        "visibility",
+        "status",
+        "revealed_event_id",
+    } <= column_names("secret_records")
+    assert {
+        "worldline_id",
+        "agent_id",
+        "mood",
+        "stress",
+        "fatigue",
+        "anticipation",
+        "jealousy",
+        "anger",
+        "source_event_id",
+        "expires_at",
+    } <= column_names("character_emotional_states")
+    assert {
+        "worldline_id",
+        "relationship_id",
+        "repair_kind",
+        "reason",
+        "score_delta",
+        "status",
+        "applied_event_id",
+    } <= column_names("relationship_repair_records")
+    assert {
+        "worldline_id",
+        "user_id",
+        "player_actor_id",
+        "entry_kind",
+        "title",
+        "source_event_id",
+        "visibility",
+    } <= column_names("player_journal_entries")
+    assert {
+        "worldline_id",
+        "user_id",
+        "notification_kind",
+        "title",
+        "source_event_id",
+        "status",
+    } <= column_names("in_world_notifications")
+    assert {
+        "worldline_id",
+        "user_id",
+        "player_actor_id",
+        "intervention_kind",
+        "target_agent_id",
+        "target_scene_id",
+        "choice_id",
+        "event_id",
+        "status",
+    } <= column_names("player_intervention_records")
+    assert {
+        "worldline_id",
+        "source_kind",
+        "source_ref",
+        "reviewed_text",
+        "status",
+        "diagnostics",
+    } <= column_names("gm_style_reviews")
+    assert {
+        "worldline_id",
+        "artifact_id",
+        "source_kind",
+        "source_ref",
+        "reviewed_text",
+        "status",
+        "issues",
+    } <= column_names("narrative_continuity_reviews")
+
+
 def test_core_schema_unique_constraints_are_explicit() -> None:
     assert "uq_users_email" in constraint_names("users", UniqueConstraint)
     assert "uq_user_credentials_user_id" in constraint_names(
@@ -415,6 +515,18 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
     )
     assert "uq_rumor_records_scope_key" in constraint_names(
         "rumor_records",
+        UniqueConstraint,
+    )
+    assert "uq_character_knowledge_facts_scope_agent_key" in constraint_names(
+        "character_knowledge_facts",
+        UniqueConstraint,
+    )
+    assert "uq_secret_records_scope_key" in constraint_names(
+        "secret_records",
+        UniqueConstraint,
+    )
+    assert "uq_character_emotional_states_scope_agent" in constraint_names(
+        "character_emotional_states",
         UniqueConstraint,
     )
     assert "uq_memory_backend_profiles_profile_key" in constraint_names(
@@ -588,6 +700,56 @@ def test_core_schema_check_constraints_capture_initial_enums() -> None:
     assert "ck_rumor_records_status" in constraint_names("rumor_records", CheckConstraint)
     assert "ck_rumor_propagations_status" in constraint_names(
         "rumor_propagations",
+        CheckConstraint,
+    )
+    assert "ck_character_knowledge_facts_knowledge_kind" in constraint_names(
+        "character_knowledge_facts",
+        CheckConstraint,
+    )
+    assert "ck_character_knowledge_facts_visibility" in constraint_names(
+        "character_knowledge_facts",
+        CheckConstraint,
+    )
+    assert "ck_secret_records_status" in constraint_names("secret_records", CheckConstraint)
+    assert "ck_secret_records_visibility" in constraint_names("secret_records", CheckConstraint)
+    assert "ck_character_emotional_states_stress_range" in constraint_names(
+        "character_emotional_states",
+        CheckConstraint,
+    )
+    assert "ck_relationship_repair_records_repair_kind" in constraint_names(
+        "relationship_repair_records",
+        CheckConstraint,
+    )
+    assert "ck_relationship_repair_records_status" in constraint_names(
+        "relationship_repair_records",
+        CheckConstraint,
+    )
+    assert "ck_player_journal_entries_entry_kind" in constraint_names(
+        "player_journal_entries",
+        CheckConstraint,
+    )
+    assert "ck_in_world_notifications_notification_kind" in constraint_names(
+        "in_world_notifications",
+        CheckConstraint,
+    )
+    assert "ck_in_world_notifications_status" in constraint_names(
+        "in_world_notifications",
+        CheckConstraint,
+    )
+    assert "ck_player_intervention_records_intervention_kind" in constraint_names(
+        "player_intervention_records",
+        CheckConstraint,
+    )
+    assert "ck_player_intervention_records_status" in constraint_names(
+        "player_intervention_records",
+        CheckConstraint,
+    )
+    assert "ck_gm_style_reviews_status" in constraint_names(
+        "gm_style_reviews",
+        CheckConstraint,
+    )
+    assert "ck_narrative_continuity_reviews_status" in constraint_names(
+        "narrative_continuity_reviews",
         CheckConstraint,
     )
     assert "ck_world_organizations_organization_type" in constraint_names(
@@ -920,6 +1082,58 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worldlines.id",
         "worlds.id",
     }
+    assert foreign_key_targets("character_knowledge_facts") == {
+        "agents.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("secret_records") == {
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("character_emotional_states") == {
+        "agents.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("relationship_repair_records") == {
+        "agent_relationship_edges.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("player_journal_entries") == {
+        "player_actor_profiles.id",
+        "users.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("in_world_notifications") == {
+        "users.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("player_intervention_records") == {
+        "agents.id",
+        "player_actor_profiles.id",
+        "player_choice_records.id",
+        "scenes.id",
+        "users.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("gm_style_reviews") == {"worldlines.id", "worlds.id"}
+    assert foreign_key_targets("narrative_continuity_reviews") == {
+        "narrative_artifacts.id",
+        "worldlines.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("agent_profile_snapshots") == {"agents.id", "worlds.id"}
     assert foreign_key_targets("provider_profiles") == set()
     assert foreign_key_targets("runtime_control_states") == set()
@@ -1062,6 +1276,49 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_rumor_records_worldline_visibility" in index_names("rumor_records")
     assert "ix_rumor_propagations_rumor_status" in index_names("rumor_propagations")
     assert "ix_rumor_propagations_worldline_target" in index_names("rumor_propagations")
+    assert "ix_character_knowledge_facts_worldline_agent" in index_names(
+        "character_knowledge_facts",
+    )
+    assert "ix_character_knowledge_facts_worldline_kind" in index_names(
+        "character_knowledge_facts",
+    )
+    assert "ix_secret_records_worldline_status" in index_names("secret_records")
+    assert "ix_secret_records_worldline_visibility" in index_names("secret_records")
+    assert "ix_character_emotional_states_worldline_agent" in index_names(
+        "character_emotional_states",
+    )
+    assert "ix_relationship_repair_records_worldline_status" in index_names(
+        "relationship_repair_records",
+    )
+    assert "ix_relationship_repair_records_relationship" in index_names(
+        "relationship_repair_records",
+    )
+    assert "ix_player_journal_entries_worldline_user" in index_names(
+        "player_journal_entries",
+    )
+    assert "ix_player_journal_entries_source_event" in index_names(
+        "player_journal_entries",
+    )
+    assert "ix_in_world_notifications_worldline_user" in index_names(
+        "in_world_notifications",
+    )
+    assert "ix_in_world_notifications_source_event" in index_names(
+        "in_world_notifications",
+    )
+    assert "ix_player_intervention_records_worldline_user" in index_names(
+        "player_intervention_records",
+    )
+    assert "ix_player_intervention_records_choice" in index_names(
+        "player_intervention_records",
+    )
+    assert "ix_gm_style_reviews_worldline_status" in index_names("gm_style_reviews")
+    assert "ix_gm_style_reviews_source" in index_names("gm_style_reviews")
+    assert "ix_narrative_continuity_reviews_worldline_status" in index_names(
+        "narrative_continuity_reviews",
+    )
+    assert "ix_narrative_continuity_reviews_artifact" in index_names(
+        "narrative_continuity_reviews",
+    )
     assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")

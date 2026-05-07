@@ -51,6 +51,8 @@ from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSI
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     AgentPresenceState,
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventResolutionRule,
@@ -58,20 +60,27 @@ from noveland.worlds.models import (
     FactionProgressTrack,
     GMAgenda,
     GMEventProposal,
+    GMStyleReview,
     GroupInteractionContext,
+    InWorldNotification,
+    NarrativeContinuityReview,
     OffscreenEventQueueItem,
     OrganizationConflictEvent,
     OrganizationMembership,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlayerInterventionRecord,
+    PlayerJournalEntry,
     PlotThread,
     RelationshipEventSuggestion,
+    RelationshipRepairRecord,
     RouteAffinity,
     RumorPropagation,
     RumorRecord,
     Scene,
     SceneBeatDraft,
     SceneLocationEdge,
+    SecretRecord,
     StoryHook,
     World,
     WorldBible,
@@ -1408,6 +1417,276 @@ def test_plot_route_rumor_flow_admin_apis_are_worldline_scoped() -> None:
     assert primary["id"] != fork_id
 
 
+def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "knowledge-player-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    source_agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    target_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, member_token)
+    member_knowledge = client.get(f"/worlds/{world_id}/knowledge")
+
+    _authenticate(client, owner_token)
+    primary = client.get(f"/worlds/{world_id}/worldlines").json()[0]
+    client.put(
+        f"/worlds/{world_id}/bible",
+        json={
+            "source_material": "Canon after-school club route.",
+            "forbidden_changes": [{"label": "destroy the school"}],
+        },
+    )
+    relationship = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "friendship",
+            "affection": 20,
+            "trust": 30,
+        },
+    )
+    candidate = client.post(f"/worlds/{world_id}/daily-life/generate", json={"limit": 1})
+    queued = client.post(
+        f"/worlds/{world_id}/offscreen-events",
+        json={
+            "candidate_id": candidate.json()[0]["id"],
+            "event_name": "living_world.daily_life",
+            "title": "Due daily life",
+            "due_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+            "importance": "daily",
+        },
+    )
+    resolved = client.post(f"/worlds/{world_id}/offscreen-events/resolve", params={"limit": 5})
+    with Session(engine) as session:
+        episode_count = len(
+            session.scalars(
+                select(DailyEpisodeDraft.id).where(
+                    DailyEpisodeDraft.world_id == world_id,
+                    DailyEpisodeDraft.source_candidate_id == uuid.UUID(candidate.json()[0]["id"]),
+                ),
+            ).all(),
+        )
+    knowledge = client.put(
+        f"/worlds/{world_id}/knowledge",
+        json={
+            "agent_id": str(target_agent_id),
+            "fact_key": "rival-route-note",
+            "knowledge_kind": "fact",
+            "content": "The rival noticed the late rehearsal.",
+            "confidence": 90,
+        },
+    )
+    secret = client.post(
+        f"/worlds/{world_id}/secrets",
+        json={
+            "secret_key": "hidden-letter",
+            "title": "Hidden letter",
+            "content": "The letter was left in the club room.",
+            "holder_agent_ids": [str(target_agent_id)],
+        },
+    )
+    revealed = client.post(f"/worlds/{world_id}/secrets/{secret.json()['id']}/reveal")
+    emotional_state = client.put(
+        f"/worlds/{world_id}/emotional-states",
+        json={
+            "agent_id": str(target_agent_id),
+            "mood": "restless",
+            "stress": 40,
+            "fatigue": 20,
+            "anticipation": 60,
+            "jealousy": 5,
+            "anger": 10,
+        },
+    )
+    repair = client.post(
+        f"/worlds/{world_id}/relationship-repairs",
+        json={
+            "relationship_id": relationship.json()["id"],
+            "repair_kind": "apology",
+            "reason": "The hero apologizes for missing practice.",
+            "score_delta": {"trust": 8, "affection": 3},
+        },
+    )
+    applied_repair = client.post(
+        f"/worlds/{world_id}/relationship-repairs/{repair.json()['id']}/apply",
+    )
+    actor = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={"display_name": "Player", "current_scene_id": str(scene_id)},
+    )
+    choice = client.post(
+        f"/worlds/{world_id}/player-choices",
+        json={
+            "player_actor_id": actor.json()["id"],
+            "choice_key": "observe-secret",
+            "choice_kind": "dialogue",
+            "prompt": "Ask about the hidden letter?",
+            "selected_option": "Stay quiet.",
+            "apply": False,
+        },
+    )
+    journal = client.post(
+        f"/worlds/{world_id}/player-journal",
+        json={
+            "entry_kind": "event",
+            "title": "Late rehearsal",
+            "body": "The route tension moved without direct intervention.",
+        },
+    )
+    notification = client.post(
+        f"/worlds/{world_id}/notifications",
+        json={
+            "notification_kind": "rumor",
+            "title": "Club room rumor",
+            "body": "Someone mentioned a hidden letter.",
+            "source_event_id": resolved.json()["event_ids"][0],
+        },
+    )
+    intervention = client.post(
+        f"/worlds/{world_id}/interventions",
+        json={
+            "player_actor_id": actor.json()["id"],
+            "intervention_kind": "contact",
+            "target_agent_id": str(target_agent_id),
+            "prompt": "Send a short message after school.",
+        },
+    )
+    style_review = client.post(
+        f"/worlds/{world_id}/gm-style-reviews",
+        json={
+            "source_kind": "manual",
+            "reviewed_text": "As an AI chatbot, I can answer the user.",
+        },
+    )
+    continuity_review = client.post(
+        f"/worlds/{world_id}/narrative-continuity-reviews",
+        json={
+            "source_kind": "manual",
+            "reviewed_text": "Everyone knows we destroy the school at the same time.",
+        },
+    )
+    listed_knowledge = client.get(f"/worlds/{world_id}/knowledge")
+    listed_secrets = client.get(f"/worlds/{world_id}/secrets")
+    listed_emotional_states = client.get(f"/worlds/{world_id}/emotional-states")
+    listed_repairs = client.get(f"/worlds/{world_id}/relationship-repairs")
+    listed_interventions = client.get(f"/worlds/{world_id}/interventions")
+    listed_style_reviews = client.get(f"/worlds/{world_id}/gm-style-reviews")
+    listed_continuity_reviews = client.get(
+        f"/worlds/{world_id}/narrative-continuity-reviews",
+    )
+    dashboard = client.get(f"/worlds/{world_id}/living-world-dashboard")
+    fork_with_old_sequence = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={
+            "worldline_key": "old-sequence",
+            "name": "Old Sequence",
+            "fork_event_sequence": 0,
+        },
+    )
+    fork = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={"worldline_key": "knowledge-alt", "name": "Knowledge Alt"},
+    )
+    member_journal = client.get(f"/worlds/{world_id}/player-journal")
+    member_notifications = client.get(f"/worlds/{world_id}/notifications")
+    with Session(engine) as session:
+        choice_events = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.world_id == world_id,
+                WorldEventModel.event_name == "player.choice_recorded",
+            ),
+        ).all()
+        repair_memory_jobs = session.scalars(
+            select(MemoryWriteJob).where(
+                MemoryWriteJob.world_id == world_id,
+                MemoryWriteJob.worldline_id == uuid.UUID(primary["id"]),
+                MemoryWriteJob.dedupe_key.like("relationship:%repair:%"),
+            ),
+        ).all()
+        secret_knowledge = session.scalars(
+            select(CharacterKnowledgeFact).where(
+                CharacterKnowledgeFact.world_id == world_id,
+                CharacterKnowledgeFact.agent_id == target_agent_id,
+                CharacterKnowledgeFact.fact_key == "secret:hidden-letter",
+            ),
+        ).one()
+
+    _authenticate(client, member_token)
+    member_journal_after_auth = client.get(f"/worlds/{world_id}/player-journal")
+    member_notifications_after_auth = client.get(f"/worlds/{world_id}/notifications")
+
+    assert member_knowledge.status_code == 403
+    assert queued.status_code == 201
+    assert resolved.json()["resolved_count"] == 1
+    assert episode_count == 1
+    assert knowledge.status_code == 200
+    assert knowledge.json()["agent_display_name"] == "rival"
+    assert secret.status_code == 201
+    assert revealed.status_code == 200
+    assert revealed.json()["status"] == "revealed"
+    assert secret_knowledge.knowledge_kind == "secret"
+    assert emotional_state.status_code == 200
+    assert emotional_state.json()["mood"] == "restless"
+    assert applied_repair.status_code == 200
+    assert applied_repair.json()["applied_event_id"] is not None
+    assert len(repair_memory_jobs) == 2
+    assert choice.status_code == 201
+    assert choice.json()["applied_event_id"] is not None
+    assert len(choice_events) == 1
+    assert journal.status_code == 201
+    assert notification.status_code == 201
+    assert intervention.status_code == 201
+    assert intervention.json()["choice_id"] is not None
+    assert intervention.json()["event_id"] is not None
+    assert style_review.status_code == 201
+    assert style_review.json()["status"] == "warning"
+    assert any(
+        item["code"] == "generic_chatbot_drift"
+        for item in style_review.json()["diagnostics"]
+    )
+    assert continuity_review.status_code == 201
+    assert continuity_review.json()["status"] == "warning"
+    assert any(
+        item["code"] == "knowledge_leak_risk"
+        for item in continuity_review.json()["issues"]
+    )
+    assert listed_knowledge.status_code == 200
+    assert any(item["fact_key"] == "rival-route-note" for item in listed_knowledge.json())
+    assert listed_secrets.status_code == 200
+    assert listed_secrets.json()[0]["secret_key"] == "hidden-letter"
+    assert listed_emotional_states.status_code == 200
+    assert listed_emotional_states.json()[0]["mood"] == "restless"
+    assert listed_repairs.status_code == 200
+    assert listed_repairs.json()[0]["repair_kind"] == "apology"
+    assert listed_interventions.status_code == 200
+    assert listed_interventions.json()[0]["intervention_kind"] == "contact"
+    assert listed_style_reviews.status_code == 200
+    assert listed_style_reviews.json()[0]["status"] == "warning"
+    assert listed_continuity_reviews.status_code == 200
+    assert listed_continuity_reviews.json()[0]["status"] == "warning"
+    assert dashboard.status_code == 200
+    assert dashboard.json()["knowledge_count"] >= 2
+    assert dashboard.json()["hidden_secret_count"] == 0
+    assert dashboard.json()["emotional_state_count"] == 1
+    assert dashboard.json()["unread_notification_count"] == 1
+    assert dashboard.json()["pending_intervention_count"] == 1
+    assert fork_with_old_sequence.status_code == 422
+    assert "historical event fork reconstruction is not supported" in fork_with_old_sequence.json()[
+        "detail"
+    ]
+    assert fork.status_code == 201
+    assert fork.json()["parent_worldline_id"] == primary["id"]
+    assert member_journal.status_code == 200
+    assert member_notifications.status_code == 200
+    assert member_journal_after_auth.json() == []
+    assert member_notifications_after_auth.json() == []
+
+
 def test_membership_management_and_final_admin_guard() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -2623,6 +2902,15 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, OrganizationConflictEvent.__table__),
         cast(Table, RumorRecord.__table__),
         cast(Table, RumorPropagation.__table__),
+        cast(Table, CharacterKnowledgeFact.__table__),
+        cast(Table, SecretRecord.__table__),
+        cast(Table, CharacterEmotionalState.__table__),
+        cast(Table, RelationshipRepairRecord.__table__),
+        cast(Table, PlayerJournalEntry.__table__),
+        cast(Table, InWorldNotification.__table__),
+        cast(Table, PlayerInterventionRecord.__table__),
+        cast(Table, GMStyleReview.__table__),
+        cast(Table, NarrativeContinuityReview.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

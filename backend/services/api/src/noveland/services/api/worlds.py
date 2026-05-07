@@ -106,8 +106,11 @@ from noveland.worlds.autonomous import LivingWorldAutonomyService
 from noveland.worlds.clock import WorldClockError
 from noveland.worlds.clock_service import WorldClockService, WorldClockView
 from noveland.worlds.gm import LivingWorldGMService, ResolutionRuleDryRun, WorldlineComparison
+from noveland.worlds.guardrails import LivingWorldDashboard, LivingWorldGuardrailService
 from noveland.worlds.models import (
     AgentPresenceState,
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventResolutionRule,
@@ -115,20 +118,27 @@ from noveland.worlds.models import (
     FactionProgressTrack,
     GMAgenda,
     GMEventProposal,
+    GMStyleReview,
     GroupInteractionContext,
+    InWorldNotification,
+    NarrativeContinuityReview,
     OffscreenEventQueueItem,
     OrganizationConflictEvent,
     OrganizationMembership,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlayerInterventionRecord,
+    PlayerJournalEntry,
     PlotThread,
     RelationshipEventSuggestion,
+    RelationshipRepairRecord,
     RouteAffinity,
     RumorPropagation,
     RumorRecord,
     Scene,
     SceneBeatDraft,
     SceneLocationEdge,
+    SecretRecord,
     StoryHook,
     World,
     WorldBible,
@@ -210,6 +220,21 @@ OrganizationConflictStatus = Literal["proposed", "resolved", "dismissed"]
 RumorStatus = Literal["active", "resolved", "false", "archived"]
 RumorVisibility = Literal["private", "group", "public"]
 RumorPropagationStatus = Literal["pending", "delivered", "blocked"]
+KnowledgeKind = Literal["fact", "secret", "guess", "misbelief"]
+KnowledgeVisibility = Literal["private", "shared", "public"]
+SecretVisibility = Literal["private", "holders", "public"]
+SecretStatus = Literal["hidden", "revealed", "archived"]
+RelationshipRepairKind = Literal[
+    "decay", "repair", "conflict", "apology", "kept_promise", "shared_event"
+]
+RelationshipRepairStatus = Literal["proposed", "applied", "dismissed"]
+JournalEntryKind = Literal["choice", "relationship", "event", "narrative", "private_note"]
+JournalVisibility = Literal["player_private", "world_admin"]
+NotificationKind = Literal["message", "invitation", "rumor", "promise", "incident", "intervention"]
+NotificationStatus = Literal["unread", "read", "archived"]
+InterventionKind = Literal["observe", "reply", "travel", "contact", "push_event"]
+InterventionStatus = Literal["recorded", "resolved", "cancelled"]
+ReviewStatus = Literal["pass", "warning", "fail"]
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
 root_router = APIRouter(tags=["worlds"])
@@ -678,6 +703,113 @@ class RumorPropagationUpdateRequest(_RequestModel):
     metadata: dict[str, Any] | None = None
 
 
+class KnowledgeFactUpsertRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    agent_id: uuid.UUID
+    fact_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    knowledge_kind: KnowledgeKind = "fact"
+    content: str = Field(min_length=1, max_length=12_000)
+    confidence: int = Field(default=80, ge=0, le=100)
+    visibility: KnowledgeVisibility = "private"
+    source_event_id: uuid.UUID | None = None
+    source_ref: str | None = Field(default=None, max_length=160)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SecretCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    secret_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
+    title: str = Field(min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=12_000)
+    holder_agent_ids: list[str] = Field(default_factory=list, max_length=100)
+    reveal_conditions: dict[str, Any] = Field(default_factory=dict)
+    consequence_metadata: dict[str, Any] = Field(default_factory=dict)
+    visibility: SecretVisibility = "holders"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EmotionalStateUpsertRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    agent_id: uuid.UUID
+    mood: str = Field(default="neutral", min_length=1, max_length=80)
+    stress: int = Field(default=0, ge=0, le=100)
+    fatigue: int = Field(default=0, ge=0, le=100)
+    anticipation: int = Field(default=0, ge=0, le=100)
+    jealousy: int = Field(default=0, ge=0, le=100)
+    anger: int = Field(default=0, ge=0, le=100)
+    source_event_id: uuid.UUID | None = None
+    expires_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("expires_at", mode="after")
+    @classmethod
+    def expires_at_must_be_timezone_aware(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return _timezone_aware(value, "expires_at")
+
+
+class RelationshipRepairCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    relationship_id: uuid.UUID
+    repair_kind: RelationshipRepairKind
+    reason: str = Field(min_length=1, max_length=12_000)
+    score_delta: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class JournalEntryCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
+    entry_kind: JournalEntryKind
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1, max_length=12_000)
+    source_event_id: uuid.UUID | None = None
+    source_ref: str | None = Field(default=None, max_length=160)
+    visibility: JournalVisibility = "player_private"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class NotificationCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    notification_kind: NotificationKind
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1, max_length=12_000)
+    source_event_id: uuid.UUID | None = None
+    source_ref: str | None = Field(default=None, max_length=160)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class InterventionCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID
+    intervention_kind: InterventionKind
+    target_agent_id: uuid.UUID | None = None
+    target_scene_id: uuid.UUID | None = None
+    prompt: str = Field(min_length=1, max_length=12_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GMStyleReviewCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    source_kind: str = Field(min_length=1, max_length=40)
+    source_ref: str | None = Field(default=None, max_length=160)
+    reviewed_text: str = Field(min_length=1, max_length=80_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class NarrativeContinuityReviewCreateRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    artifact_id: uuid.UUID | None = None
+    source_kind: str = Field(min_length=1, max_length=40)
+    source_ref: str | None = Field(default=None, max_length=160)
+    reviewed_text: str = Field(min_length=1, max_length=80_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class MembershipUpsertRequest(_RequestModel):
     user_id: uuid.UUID
     role: WorldRole
@@ -810,6 +942,7 @@ class MemorySearchRequest(_RequestModel):
 
 
 class AgentRunRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
     prompt: str | None = None
     provider_profile_id: uuid.UUID | None = None
     create_memory: bool = True
@@ -1392,6 +1525,172 @@ class RumorPropagationResponse(BaseModel):
     metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class KnowledgeFactResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_key: str
+    agent_display_name: str
+    fact_key: str
+    knowledge_kind: KnowledgeKind
+    content: str
+    source_event_id: uuid.UUID | None
+    source_ref: str | None
+    confidence: int
+    visibility: KnowledgeVisibility
+    is_active: bool
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class SecretResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    secret_key: str
+    title: str
+    content: str
+    holder_agent_ids: list[str]
+    reveal_conditions: dict[str, Any]
+    consequence_metadata: dict[str, Any]
+    visibility: SecretVisibility
+    status: SecretStatus
+    revealed_event_id: uuid.UUID | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class EmotionalStateResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_key: str
+    agent_display_name: str
+    mood: str
+    stress: int
+    fatigue: int
+    anticipation: int
+    jealousy: int
+    anger: int
+    source_event_id: uuid.UUID | None
+    expires_at: datetime | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RelationshipRepairResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    relationship_id: uuid.UUID
+    repair_kind: RelationshipRepairKind
+    reason: str
+    score_delta: dict[str, Any]
+    status: RelationshipRepairStatus
+    applied_event_id: uuid.UUID | None
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class JournalEntryResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    user_id: uuid.UUID
+    player_actor_id: uuid.UUID | None
+    entry_kind: JournalEntryKind
+    title: str
+    body: str
+    source_event_id: uuid.UUID | None
+    source_ref: str | None
+    visibility: JournalVisibility
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class InWorldNotificationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    user_id: uuid.UUID
+    notification_kind: NotificationKind
+    title: str
+    body: str
+    source_event_id: uuid.UUID | None
+    source_ref: str | None
+    status: NotificationStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlayerInterventionResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    user_id: uuid.UUID
+    player_actor_id: uuid.UUID
+    intervention_kind: InterventionKind
+    target_agent_id: uuid.UUID | None
+    target_scene_id: uuid.UUID | None
+    prompt: str
+    choice_id: uuid.UUID | None
+    event_id: uuid.UUID | None
+    status: InterventionStatus
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class GMStyleReviewResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    source_kind: str
+    source_ref: str | None
+    reviewed_text: str
+    status: ReviewStatus
+    diagnostics: list[dict[str, Any]]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class NarrativeContinuityReviewResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    artifact_id: uuid.UUID | None
+    source_kind: str
+    source_ref: str | None
+    reviewed_text: str
+    status: ReviewStatus
+    issues: list[dict[str, Any]]
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+class LivingWorldDashboardResponse(BaseModel):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    knowledge_count: int
+    hidden_secret_count: int
+    emotional_state_count: int
+    open_hook_count: int
+    unread_notification_count: int
+    pending_intervention_count: int
+    active_route_count: int
+    pressure_summary: dict[str, int]
 
 
 class UserSummaryResponse(BaseModel):
@@ -3816,6 +4115,557 @@ def deliver_rumor_propagation(
     return _rumor_propagation_response(db_session, propagation)
 
 
+@router.get("/{world_id}/living-world-dashboard", response_model=LivingWorldDashboardResponse)
+def get_living_world_dashboard(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+) -> LivingWorldDashboardResponse:
+    _world_or_404(db_session, context.world_id)
+    dashboard = LivingWorldGuardrailService(db_session).dashboard(
+        world_id=context.world_id,
+        worldline_id=worldline_id,
+        user_id=context.subject.user_id,
+    )
+    return _living_world_dashboard_response(dashboard)
+
+
+@router.get("/{world_id}/knowledge", response_model=list[KnowledgeFactResponse])
+def list_knowledge_facts(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    agent_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[KnowledgeFactResponse]:
+    _world_or_404(db_session, context.world_id)
+    if agent_id is not None:
+        _agent_or_404(db_session, context.world_id, agent_id)
+    facts = LivingWorldGuardrailService(db_session).list_agent_knowledge(
+        world_id=context.world_id,
+        worldline_id=worldline_id,
+        agent_id=agent_id,
+        limit=limit,
+    )
+    return [_knowledge_fact_response(db_session, fact) for fact in facts]
+
+
+@router.put("/{world_id}/knowledge", response_model=KnowledgeFactResponse)
+def upsert_knowledge_fact(
+    knowledge_upsert: KnowledgeFactUpsertRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> KnowledgeFactResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, knowledge_upsert.agent_id)
+    fact = LivingWorldGuardrailService(db_session).upsert_knowledge_fact(
+        world_id=context.world_id,
+        worldline_id=knowledge_upsert.worldline_id,
+        agent_id=knowledge_upsert.agent_id,
+        fact_key=knowledge_upsert.fact_key,
+        knowledge_kind=knowledge_upsert.knowledge_kind,
+        content=knowledge_upsert.content,
+        confidence=knowledge_upsert.confidence,
+        visibility=knowledge_upsert.visibility,
+        source_event_id=knowledge_upsert.source_event_id,
+        source_ref=knowledge_upsert.source_ref,
+        metadata=knowledge_upsert.metadata,
+    )
+    return _knowledge_fact_response(db_session, fact)
+
+
+@router.get("/{world_id}/secrets", response_model=list[SecretResponse])
+def list_secrets(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[SecretStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[SecretResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(SecretRecord).where(
+        SecretRecord.world_id == context.world_id,
+        SecretRecord.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(SecretRecord.status == status_filter)
+    secrets = db_session.scalars(
+        statement.order_by(SecretRecord.updated_at.desc()).limit(limit)
+    ).all()
+    return [_secret_response(secret) for secret in secrets]
+
+
+@router.post(
+    "/{world_id}/secrets", response_model=SecretResponse, status_code=status.HTTP_201_CREATED
+)
+def create_secret(
+    secret_create: SecretCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SecretResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    _ensure_agent_string_refs(db_session, context.world_id, secret_create.holder_agent_ids)
+    try:
+        secret = LivingWorldGuardrailService(db_session).create_secret(
+            world_id=context.world_id,
+            worldline_id=secret_create.worldline_id,
+            secret_key=secret_create.secret_key,
+            title=secret_create.title,
+            content=secret_create.content,
+            holder_agent_ids=secret_create.holder_agent_ids,
+            reveal_conditions=secret_create.reveal_conditions,
+            consequence_metadata=secret_create.consequence_metadata,
+            visibility=secret_create.visibility,
+            metadata=secret_create.metadata,
+        )
+    except ValueError as exc:
+        raise _conflict(str(exc)) from exc
+    return _secret_response(secret)
+
+
+@router.post("/{world_id}/secrets/{secret_id}/reveal", response_model=SecretResponse)
+def reveal_secret(
+    secret_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SecretResponse:
+    require_csrf(request)
+    try:
+        secret = LivingWorldGuardrailService(db_session).reveal_secret(
+            world_id=context.world_id,
+            secret_id=secret_id,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _secret_response(secret)
+
+
+@router.get("/{world_id}/emotional-states", response_model=list[EmotionalStateResponse])
+def list_emotional_states(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    agent_id: uuid.UUID | None = None,
+) -> list[EmotionalStateResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(CharacterEmotionalState).where(
+        CharacterEmotionalState.world_id == context.world_id,
+        CharacterEmotionalState.worldline_id == resolved_worldline.id,
+    )
+    if agent_id is not None:
+        _agent_or_404(db_session, context.world_id, agent_id)
+        statement = statement.where(CharacterEmotionalState.agent_id == agent_id)
+    states = db_session.scalars(statement.order_by(CharacterEmotionalState.updated_at.desc())).all()
+    return [_emotional_state_response(db_session, state_item) for state_item in states]
+
+
+@router.put("/{world_id}/emotional-states", response_model=EmotionalStateResponse)
+def upsert_emotional_state(
+    state_upsert: EmotionalStateUpsertRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> EmotionalStateResponse:
+    require_csrf(request)
+    _agent_or_404(db_session, context.world_id, state_upsert.agent_id)
+    state_item = LivingWorldGuardrailService(db_session).upsert_emotional_state(
+        world_id=context.world_id,
+        worldline_id=state_upsert.worldline_id,
+        agent_id=state_upsert.agent_id,
+        mood=state_upsert.mood,
+        stress=state_upsert.stress,
+        fatigue=state_upsert.fatigue,
+        anticipation=state_upsert.anticipation,
+        jealousy=state_upsert.jealousy,
+        anger=state_upsert.anger,
+        source_event_id=state_upsert.source_event_id,
+        expires_at=state_upsert.expires_at,
+        metadata=state_upsert.metadata,
+    )
+    return _emotional_state_response(db_session, state_item)
+
+
+@router.get("/{world_id}/relationship-repairs", response_model=list[RelationshipRepairResponse])
+def list_relationship_repairs(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[RelationshipRepairStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[RelationshipRepairResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(RelationshipRepairRecord).where(
+        RelationshipRepairRecord.world_id == context.world_id,
+        RelationshipRepairRecord.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(RelationshipRepairRecord.status == status_filter)
+    records = db_session.scalars(
+        statement.order_by(RelationshipRepairRecord.created_at.desc()).limit(limit),
+    ).all()
+    return [_relationship_repair_response(record) for record in records]
+
+
+@router.post(
+    "/{world_id}/relationship-repairs",
+    response_model=RelationshipRepairResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_relationship_repair(
+    repair_create: RelationshipRepairCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RelationshipRepairResponse:
+    require_csrf(request)
+    try:
+        repair = LivingWorldGuardrailService(db_session).propose_relationship_repair(
+            world_id=context.world_id,
+            worldline_id=repair_create.worldline_id,
+            relationship_id=repair_create.relationship_id,
+            repair_kind=repair_create.repair_kind,
+            reason=repair_create.reason,
+            score_delta=repair_create.score_delta,
+            metadata=repair_create.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _relationship_repair_response(repair)
+
+
+@router.post(
+    "/{world_id}/relationship-repairs/{repair_id}/apply",
+    response_model=RelationshipRepairResponse,
+)
+def apply_relationship_repair(
+    repair_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> RelationshipRepairResponse:
+    require_csrf(request)
+    try:
+        repair = LivingWorldGuardrailService(db_session, load_settings()).apply_relationship_repair(
+            world_id=context.world_id,
+            repair_id=repair_id,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _relationship_repair_response(repair)
+
+
+@router.get("/{world_id}/player-journal", response_model=list[JournalEntryResponse])
+def list_player_journal(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[JournalEntryResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    requested_user_id = user_id or context.subject.user_id
+    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    statement = select(PlayerJournalEntry).where(
+        PlayerJournalEntry.world_id == context.world_id,
+        PlayerJournalEntry.worldline_id == resolved_worldline.id,
+        PlayerJournalEntry.user_id == requested_user_id,
+    )
+    entries = db_session.scalars(
+        statement.order_by(PlayerJournalEntry.created_at.desc()).limit(limit)
+    ).all()
+    return [_journal_entry_response(entry) for entry in entries]
+
+
+@router.post(
+    "/{world_id}/player-journal",
+    response_model=JournalEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_player_journal_entry(
+    entry_create: JournalEntryCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> JournalEntryResponse:
+    require_csrf(request)
+    user_id = entry_create.user_id or context.subject.user_id
+    _user_or_404(db_session, user_id)
+    entry = LivingWorldGuardrailService(db_session).create_journal_entry(
+        world_id=context.world_id,
+        worldline_id=entry_create.worldline_id,
+        user_id=user_id,
+        player_actor_id=entry_create.player_actor_id,
+        entry_kind=entry_create.entry_kind,
+        title=entry_create.title,
+        body=entry_create.body,
+        source_event_id=entry_create.source_event_id,
+        source_ref=entry_create.source_ref,
+        visibility=entry_create.visibility,
+        metadata=entry_create.metadata,
+    )
+    return _journal_entry_response(entry)
+
+
+@router.get("/{world_id}/notifications", response_model=list[InWorldNotificationResponse])
+def list_notifications(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[NotificationStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[InWorldNotificationResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(InWorldNotification).where(
+        InWorldNotification.world_id == context.world_id,
+        InWorldNotification.worldline_id == resolved_worldline.id,
+        InWorldNotification.user_id == context.subject.user_id,
+    )
+    if context.role == AuthRole.WORLD_ADMIN.value:
+        statement = select(InWorldNotification).where(
+            InWorldNotification.world_id == context.world_id,
+            InWorldNotification.worldline_id == resolved_worldline.id,
+        )
+    if status_filter is not None:
+        statement = statement.where(InWorldNotification.status == status_filter)
+    notifications = db_session.scalars(
+        statement.order_by(InWorldNotification.created_at.desc()).limit(limit)
+    ).all()
+    return [_notification_response(notification) for notification in notifications]
+
+
+@router.post(
+    "/{world_id}/notifications",
+    response_model=InWorldNotificationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_notification(
+    notification_create: NotificationCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> InWorldNotificationResponse:
+    require_csrf(request)
+    user_id = notification_create.user_id or context.subject.user_id
+    _user_or_404(db_session, user_id)
+    notification = LivingWorldGuardrailService(db_session).create_notification(
+        world_id=context.world_id,
+        worldline_id=notification_create.worldline_id,
+        user_id=user_id,
+        notification_kind=notification_create.notification_kind,
+        title=notification_create.title,
+        body=notification_create.body,
+        source_event_id=notification_create.source_event_id,
+        source_ref=notification_create.source_ref,
+        metadata=notification_create.metadata,
+    )
+    return _notification_response(notification)
+
+
+@router.get("/{world_id}/interventions", response_model=list[PlayerInterventionResponse])
+def list_interventions(
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
+    status_filter: Annotated[InterventionStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[PlayerInterventionResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    requested_user_id = user_id or context.subject.user_id
+    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    statement = select(PlayerInterventionRecord).where(
+        PlayerInterventionRecord.world_id == context.world_id,
+        PlayerInterventionRecord.worldline_id == resolved_worldline.id,
+        PlayerInterventionRecord.user_id == requested_user_id,
+    )
+    if context.role == AuthRole.WORLD_ADMIN.value and user_id is None:
+        statement = select(PlayerInterventionRecord).where(
+            PlayerInterventionRecord.world_id == context.world_id,
+            PlayerInterventionRecord.worldline_id == resolved_worldline.id,
+        )
+    if status_filter is not None:
+        statement = statement.where(PlayerInterventionRecord.status == status_filter)
+    interventions = db_session.scalars(
+        statement.order_by(PlayerInterventionRecord.created_at.desc()).limit(limit),
+    ).all()
+    return [_intervention_response(intervention) for intervention in interventions]
+
+
+@router.post(
+    "/{world_id}/interventions",
+    response_model=PlayerInterventionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_intervention(
+    intervention_create: InterventionCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> PlayerInterventionResponse:
+    require_csrf(request)
+    user_id = intervention_create.user_id or context.subject.user_id
+    if user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if intervention_create.target_agent_id is not None:
+        _agent_or_404(db_session, context.world_id, intervention_create.target_agent_id)
+    if intervention_create.target_scene_id is not None:
+        _scene_or_404(db_session, context.world_id, intervention_create.target_scene_id)
+    try:
+        intervention = LivingWorldGuardrailService(db_session).record_intervention(
+            world_id=context.world_id,
+            worldline_id=intervention_create.worldline_id,
+            user_id=user_id,
+            player_actor_id=intervention_create.player_actor_id,
+            intervention_kind=intervention_create.intervention_kind,
+            target_agent_id=intervention_create.target_agent_id,
+            target_scene_id=intervention_create.target_scene_id,
+            prompt=intervention_create.prompt,
+            metadata=intervention_create.metadata,
+            actor_ref=_actor_ref(context.subject),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+    return _intervention_response(intervention)
+
+
+@router.get("/{world_id}/gm-style-reviews", response_model=list[GMStyleReviewResponse])
+def list_gm_style_reviews(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[ReviewStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[GMStyleReviewResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(GMStyleReview).where(
+        GMStyleReview.world_id == context.world_id,
+        GMStyleReview.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(GMStyleReview.status == status_filter)
+    reviews = db_session.scalars(
+        statement.order_by(GMStyleReview.created_at.desc()).limit(limit),
+    ).all()
+    return [_gm_style_review_response(review) for review in reviews]
+
+
+@router.post(
+    "/{world_id}/gm-style-reviews",
+    response_model=GMStyleReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_gm_style_review(
+    review_create: GMStyleReviewCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMStyleReviewResponse:
+    require_csrf(request)
+    review = LivingWorldGuardrailService(db_session).review_gm_style(
+        world_id=context.world_id,
+        worldline_id=review_create.worldline_id,
+        source_kind=review_create.source_kind,
+        source_ref=review_create.source_ref,
+        reviewed_text=review_create.reviewed_text,
+        metadata=review_create.metadata,
+    )
+    return _gm_style_review_response(review)
+
+
+@router.get(
+    "/{world_id}/narrative-continuity-reviews",
+    response_model=list[NarrativeContinuityReviewResponse],
+)
+def list_narrative_continuity_reviews(
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
+    status_filter: Annotated[ReviewStatus | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[NarrativeContinuityReviewResponse]:
+    _world_or_404(db_session, context.world_id)
+    resolved_worldline = LivingWorldGuardrailService(db_session).worldline_or_404(
+        context.world_id,
+        worldline_id,
+    )
+    statement = select(NarrativeContinuityReview).where(
+        NarrativeContinuityReview.world_id == context.world_id,
+        NarrativeContinuityReview.worldline_id == resolved_worldline.id,
+    )
+    if status_filter is not None:
+        statement = statement.where(NarrativeContinuityReview.status == status_filter)
+    reviews = db_session.scalars(
+        statement.order_by(NarrativeContinuityReview.created_at.desc()).limit(limit),
+    ).all()
+    return [_narrative_continuity_review_response(review) for review in reviews]
+
+
+@router.post(
+    "/{world_id}/narrative-continuity-reviews",
+    response_model=NarrativeContinuityReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_narrative_continuity_review(
+    review_create: NarrativeContinuityReviewCreateRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeContinuityReviewResponse:
+    require_csrf(request)
+    if review_create.artifact_id is not None:
+        artifact = db_session.get(NarrativeArtifact, review_create.artifact_id)
+        if artifact is None or artifact.world_id != context.world_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+    review = LivingWorldGuardrailService(db_session).review_narrative_continuity(
+        world_id=context.world_id,
+        worldline_id=review_create.worldline_id,
+        artifact_id=review_create.artifact_id,
+        source_kind=review_create.source_kind,
+        source_ref=review_create.source_ref,
+        reviewed_text=review_create.reviewed_text,
+        metadata=review_create.metadata,
+    )
+    return _narrative_continuity_review_response(review)
+
+
 @router.get("/{world_id}/composition-export", response_model=WorldCompositionExportResponse)
 def export_world_composition(
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
@@ -5854,6 +6704,7 @@ def run_agent(
     return _agent_run_response(
         orchestrator.run_agent(
             world_id=context.world_id,
+            worldline_id=run_request.worldline_id,
             agent_id=agent_id,
             prompt_text=prompt,
             trigger_source="manual",
@@ -6823,6 +7674,204 @@ def _rumor_propagation_response(
         metadata=propagation.metadata_json,
         created_at=propagation.created_at,
         updated_at=propagation.updated_at,
+    )
+
+
+def _knowledge_fact_response(
+    db_session: Session,
+    fact: CharacterKnowledgeFact,
+) -> KnowledgeFactResponse:
+    agent = _agent_or_404(db_session, fact.world_id, fact.agent_id)
+    return KnowledgeFactResponse(
+        id=fact.id,
+        world_id=fact.world_id,
+        worldline_id=fact.worldline_id,
+        agent_id=fact.agent_id,
+        agent_key=agent.agent_key,
+        agent_display_name=agent.display_name,
+        fact_key=fact.fact_key,
+        knowledge_kind=cast(KnowledgeKind, fact.knowledge_kind),
+        content=fact.content,
+        source_event_id=fact.source_event_id,
+        source_ref=fact.source_ref,
+        confidence=fact.confidence,
+        visibility=cast(KnowledgeVisibility, fact.visibility),
+        is_active=fact.is_active,
+        metadata=fact.metadata_json,
+        created_at=fact.created_at,
+        updated_at=fact.updated_at,
+    )
+
+
+def _secret_response(secret: SecretRecord) -> SecretResponse:
+    return SecretResponse(
+        id=secret.id,
+        world_id=secret.world_id,
+        worldline_id=secret.worldline_id,
+        secret_key=secret.secret_key,
+        title=secret.title,
+        content=secret.content,
+        holder_agent_ids=secret.holder_agent_ids,
+        reveal_conditions=secret.reveal_conditions,
+        consequence_metadata=secret.consequence_metadata,
+        visibility=cast(SecretVisibility, secret.visibility),
+        status=cast(SecretStatus, secret.status),
+        revealed_event_id=secret.revealed_event_id,
+        metadata=secret.metadata_json,
+        created_at=secret.created_at,
+        updated_at=secret.updated_at,
+    )
+
+
+def _emotional_state_response(
+    db_session: Session,
+    state_item: CharacterEmotionalState,
+) -> EmotionalStateResponse:
+    agent = _agent_or_404(db_session, state_item.world_id, state_item.agent_id)
+    return EmotionalStateResponse(
+        id=state_item.id,
+        world_id=state_item.world_id,
+        worldline_id=state_item.worldline_id,
+        agent_id=state_item.agent_id,
+        agent_key=agent.agent_key,
+        agent_display_name=agent.display_name,
+        mood=state_item.mood,
+        stress=state_item.stress,
+        fatigue=state_item.fatigue,
+        anticipation=state_item.anticipation,
+        jealousy=state_item.jealousy,
+        anger=state_item.anger,
+        source_event_id=state_item.source_event_id,
+        expires_at=state_item.expires_at,
+        metadata=state_item.metadata_json,
+        created_at=state_item.created_at,
+        updated_at=state_item.updated_at,
+    )
+
+
+def _relationship_repair_response(repair: RelationshipRepairRecord) -> RelationshipRepairResponse:
+    return RelationshipRepairResponse(
+        id=repair.id,
+        world_id=repair.world_id,
+        worldline_id=repair.worldline_id,
+        relationship_id=repair.relationship_id,
+        repair_kind=cast(RelationshipRepairKind, repair.repair_kind),
+        reason=repair.reason,
+        score_delta=repair.score_delta,
+        status=cast(RelationshipRepairStatus, repair.status),
+        applied_event_id=repair.applied_event_id,
+        metadata=repair.metadata_json,
+        created_at=repair.created_at,
+        updated_at=repair.updated_at,
+    )
+
+
+def _journal_entry_response(entry: PlayerJournalEntry) -> JournalEntryResponse:
+    return JournalEntryResponse(
+        id=entry.id,
+        world_id=entry.world_id,
+        worldline_id=entry.worldline_id,
+        user_id=entry.user_id,
+        player_actor_id=entry.player_actor_id,
+        entry_kind=cast(JournalEntryKind, entry.entry_kind),
+        title=entry.title,
+        body=entry.body,
+        source_event_id=entry.source_event_id,
+        source_ref=entry.source_ref,
+        visibility=cast(JournalVisibility, entry.visibility),
+        metadata=entry.metadata_json,
+        created_at=entry.created_at,
+        updated_at=entry.updated_at,
+    )
+
+
+def _notification_response(notification: InWorldNotification) -> InWorldNotificationResponse:
+    return InWorldNotificationResponse(
+        id=notification.id,
+        world_id=notification.world_id,
+        worldline_id=notification.worldline_id,
+        user_id=notification.user_id,
+        notification_kind=cast(NotificationKind, notification.notification_kind),
+        title=notification.title,
+        body=notification.body,
+        source_event_id=notification.source_event_id,
+        source_ref=notification.source_ref,
+        status=cast(NotificationStatus, notification.status),
+        metadata=notification.metadata_json,
+        created_at=notification.created_at,
+        updated_at=notification.updated_at,
+    )
+
+
+def _intervention_response(intervention: PlayerInterventionRecord) -> PlayerInterventionResponse:
+    return PlayerInterventionResponse(
+        id=intervention.id,
+        world_id=intervention.world_id,
+        worldline_id=intervention.worldline_id,
+        user_id=intervention.user_id,
+        player_actor_id=intervention.player_actor_id,
+        intervention_kind=cast(InterventionKind, intervention.intervention_kind),
+        target_agent_id=intervention.target_agent_id,
+        target_scene_id=intervention.target_scene_id,
+        prompt=intervention.prompt,
+        choice_id=intervention.choice_id,
+        event_id=intervention.event_id,
+        status=cast(InterventionStatus, intervention.status),
+        metadata=intervention.metadata_json,
+        created_at=intervention.created_at,
+        updated_at=intervention.updated_at,
+    )
+
+
+def _gm_style_review_response(review: GMStyleReview) -> GMStyleReviewResponse:
+    return GMStyleReviewResponse(
+        id=review.id,
+        world_id=review.world_id,
+        worldline_id=review.worldline_id,
+        source_kind=review.source_kind,
+        source_ref=review.source_ref,
+        reviewed_text=review.reviewed_text,
+        status=cast(ReviewStatus, review.status),
+        diagnostics=review.diagnostics,
+        metadata=review.metadata_json,
+        created_at=review.created_at,
+        updated_at=review.updated_at,
+    )
+
+
+def _narrative_continuity_review_response(
+    review: NarrativeContinuityReview,
+) -> NarrativeContinuityReviewResponse:
+    return NarrativeContinuityReviewResponse(
+        id=review.id,
+        world_id=review.world_id,
+        worldline_id=review.worldline_id,
+        artifact_id=review.artifact_id,
+        source_kind=review.source_kind,
+        source_ref=review.source_ref,
+        reviewed_text=review.reviewed_text,
+        status=cast(ReviewStatus, review.status),
+        issues=review.issues,
+        metadata=review.metadata_json,
+        created_at=review.created_at,
+        updated_at=review.updated_at,
+    )
+
+
+def _living_world_dashboard_response(
+    dashboard: LivingWorldDashboard,
+) -> LivingWorldDashboardResponse:
+    return LivingWorldDashboardResponse(
+        world_id=dashboard.world_id,
+        worldline_id=dashboard.worldline_id,
+        knowledge_count=dashboard.knowledge_count,
+        hidden_secret_count=dashboard.hidden_secret_count,
+        emotional_state_count=dashboard.emotional_state_count,
+        open_hook_count=dashboard.open_hook_count,
+        unread_notification_count=dashboard.unread_notification_count,
+        pending_intervention_count=dashboard.pending_intervention_count,
+        active_route_count=dashboard.active_route_count,
+        pressure_summary=dashboard.pressure_summary,
     )
 
 
