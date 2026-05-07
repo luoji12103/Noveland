@@ -23,6 +23,8 @@ import type {
   CalendarConflictFilters,
   CalendarConflictReport,
   CalendarEntryUpdateInput,
+  CharacterEmotionalState,
+  CharacterKnowledgeFact,
   ConversationAdvanceResult,
   ConversationNarrativeArtifactSet,
   ConversationNarrativePromptPreview,
@@ -37,6 +39,7 @@ import type {
   ConversationTurn,
   ConversationUpdateInput,
   ExternalToolPolicy,
+  EmotionalStateUpsertInput,
   AgentPresence,
   AgentPresenceInput,
   DailyLifeCandidateFilters,
@@ -59,11 +62,18 @@ import type {
   GMAgenda,
   GMAgendaCreateInput,
   GMAgendaUpdateInput,
+  GMStyleReview,
+  GMStyleReviewCreateInput,
   GMEventProposal,
   GMProposalCreateInput,
   GMProposalReviewInput,
   GroupInteractionContext,
   GroupInteractionCreateInput,
+  InWorldNotification,
+  InterventionCreateInput,
+  JournalEntryCreateInput,
+  KnowledgeFactUpsertInput,
+  LivingWorldDashboard,
   MemberCandidate,
   MemoryBackendProfile,
   MemoryBackendProfileCreateInput,
@@ -82,8 +92,11 @@ import type {
   NarrativeArtifact,
   NarrativeArtifactCreateInput,
   NarrativeArtifactFilters,
+  NarrativeContinuityReview,
+  NarrativeContinuityReviewCreateInput,
   NarrativePublication,
   NarrativePublicationInput,
+  NotificationCreateInput,
   OffscreenEventCreateInput,
   OffscreenEventFilters,
   OffscreenEventQueueItem,
@@ -100,6 +113,8 @@ import type {
   PlayerActorBindInput,
   PlayerChoice,
   PlayerChoiceCreateInput,
+  PlayerInterventionRecord,
+  PlayerJournalEntry,
   PluginBinding,
   PluginCatalogEntry,
   PluginCategory,
@@ -122,6 +137,8 @@ import type {
   ScaleReadiness,
   ResolutionRuleDryRun,
   RelationshipEventSuggestion,
+  RelationshipRepairCreateInput,
+  RelationshipRepairRecord,
   RelationshipSuggestionUpdateInput,
   RouteAffinity,
   RouteAffinityUpsertInput,
@@ -129,6 +146,8 @@ import type {
   RumorCreateInput,
   RumorPropagation,
   RumorPropagationCreateInput,
+  SecretCreateInput,
+  SecretRecord,
   ScheduleRule,
   SceneLocationEdge,
   SceneLocationEdgeCreateInput,
@@ -1359,6 +1378,277 @@ export function deliverRumorPropagation(
   return worldRequest<RumorPropagation>(
     `/api/worlds/${worldId}/rumor-propagations/${propagationId}/deliver`,
     { method: "POST", csrf: true },
+  );
+}
+
+export function getLivingWorldDashboard(
+  worldId: string,
+  filters: WorldlineScopedFilters = {},
+): Promise<LivingWorldDashboard> {
+  return worldRequest<LivingWorldDashboard>(
+    `/api/worlds/${worldId}/living-world-dashboard${worldlineSuffix(filters)}`,
+    { method: "GET" },
+  );
+}
+
+export function listKnowledgeFacts(
+  worldId: string,
+  filters: WorldlineScopedFilters & { agent_id?: string | null; limit?: number } = {},
+): Promise<CharacterKnowledgeFact[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "agent_id", filters.agent_id);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<CharacterKnowledgeFact[]>(
+    `/api/worlds/${worldId}/knowledge${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function upsertKnowledgeFact(
+  worldId: string,
+  input: KnowledgeFactUpsertInput,
+): Promise<CharacterKnowledgeFact> {
+  return worldRequest<CharacterKnowledgeFact>(`/api/worlds/${worldId}/knowledge`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listSecrets(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<SecretRecord[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<SecretRecord[]>(`/api/worlds/${worldId}/secrets${searchSuffix(search)}`, {
+    method: "GET",
+  });
+}
+
+export function createSecret(worldId: string, input: SecretCreateInput): Promise<SecretRecord> {
+  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function revealSecret(worldId: string, secretId: string): Promise<SecretRecord> {
+  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets/${secretId}/reveal`, {
+    method: "POST",
+    csrf: true,
+  });
+}
+
+export function listEmotionalStates(
+  worldId: string,
+  filters: WorldlineScopedFilters & { agent_id?: string | null } = {},
+): Promise<CharacterEmotionalState[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "agent_id", filters.agent_id);
+  return worldRequest<CharacterEmotionalState[]>(
+    `/api/worlds/${worldId}/emotional-states${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function upsertEmotionalState(
+  worldId: string,
+  input: EmotionalStateUpsertInput,
+): Promise<CharacterEmotionalState> {
+  return worldRequest<CharacterEmotionalState>(`/api/worlds/${worldId}/emotional-states`, {
+    method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listRelationshipRepairs(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<RelationshipRepairRecord[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<RelationshipRepairRecord[]>(
+    `/api/worlds/${worldId}/relationship-repairs${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createRelationshipRepair(
+  worldId: string,
+  input: RelationshipRepairCreateInput,
+): Promise<RelationshipRepairRecord> {
+  return worldRequest<RelationshipRepairRecord>(`/api/worlds/${worldId}/relationship-repairs`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function applyRelationshipRepair(
+  worldId: string,
+  repairId: string,
+): Promise<RelationshipRepairRecord> {
+  return worldRequest<RelationshipRepairRecord>(
+    `/api/worlds/${worldId}/relationship-repairs/${repairId}/apply`,
+    { method: "POST", csrf: true },
+  );
+}
+
+export function listPlayerJournal(
+  worldId: string,
+  filters: WorldlineScopedFilters & { user_id?: string | null; limit?: number } = {},
+): Promise<PlayerJournalEntry[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "user_id", filters.user_id);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<PlayerJournalEntry[]>(
+    `/api/worlds/${worldId}/player-journal${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createPlayerJournalEntry(
+  worldId: string,
+  input: JournalEntryCreateInput,
+): Promise<PlayerJournalEntry> {
+  return worldRequest<PlayerJournalEntry>(`/api/worlds/${worldId}/player-journal`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listNotifications(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<InWorldNotification[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<InWorldNotification[]>(
+    `/api/worlds/${worldId}/notifications${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createNotification(
+  worldId: string,
+  input: NotificationCreateInput,
+): Promise<InWorldNotification> {
+  return worldRequest<InWorldNotification>(`/api/worlds/${worldId}/notifications`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listInterventions(
+  worldId: string,
+  filters: WorldlineScopedFilters & {
+    user_id?: string | null;
+    status?: string | null;
+    limit?: number;
+  } = {},
+): Promise<PlayerInterventionRecord[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "user_id", filters.user_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<PlayerInterventionRecord[]>(
+    `/api/worlds/${worldId}/interventions${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createIntervention(
+  worldId: string,
+  input: InterventionCreateInput,
+): Promise<PlayerInterventionRecord> {
+  return worldRequest<PlayerInterventionRecord>(`/api/worlds/${worldId}/interventions`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listGMStyleReviews(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<GMStyleReview[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<GMStyleReview[]>(
+    `/api/worlds/${worldId}/gm-style-reviews${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createGMStyleReview(
+  worldId: string,
+  input: GMStyleReviewCreateInput,
+): Promise<GMStyleReview> {
+  return worldRequest<GMStyleReview>(`/api/worlds/${worldId}/gm-style-reviews`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function listNarrativeContinuityReviews(
+  worldId: string,
+  filters: WorldlineScopedFilters & { status?: string | null; limit?: number } = {},
+): Promise<NarrativeContinuityReview[]> {
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "status", filters.status);
+  if (filters.limit !== undefined) {
+    search.set("limit", String(filters.limit));
+  }
+  return worldRequest<NarrativeContinuityReview[]>(
+    `/api/worlds/${worldId}/narrative-continuity-reviews${searchSuffix(search)}`,
+    { method: "GET" },
+  );
+}
+
+export function createNarrativeContinuityReview(
+  worldId: string,
+  input: NarrativeContinuityReviewCreateInput,
+): Promise<NarrativeContinuityReview> {
+  return worldRequest<NarrativeContinuityReview>(
+    `/api/worlds/${worldId}/narrative-continuity-reviews`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
   );
 }
 

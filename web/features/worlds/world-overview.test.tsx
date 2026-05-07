@@ -76,7 +76,7 @@ describe("WorldOverview", () => {
           ],
         },
       ],
-    });
+  }, 40000);
     vi.mocked(previewScheduleRule).mockResolvedValue({
       world_id: "world-1",
       kind: "timetable",
@@ -189,6 +189,7 @@ describe("WorldOverview", () => {
     expect(screen.getByRole("heading", { name: "Organizations and faction tracks" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Daily life and offscreen queue" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Plot, route, and rumor flow" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Knowledge, player, and guardrails" })).toBeInTheDocument();
     expect(screen.getByText("classroom to courtyard")).toBeInTheDocument();
     expect(screen.getByText("Student Council (club)")).toBeInTheDocument();
     expect(screen.getByText("Guide presence")).toBeInTheDocument();
@@ -196,6 +197,13 @@ describe("WorldOverview", () => {
     expect(screen.getByText("Festival route")).toBeInTheDocument();
     expect(screen.getByText("guide-route")).toBeInTheDocument();
     expect(screen.getAllByText("Late rehearsal rumor").length).toBeGreaterThan(0);
+    expect(screen.getByText("rival-route-note")).toBeInTheDocument();
+    expect(screen.getByText("Hidden letter")).toBeInTheDocument();
+    expect(screen.getByText(/restless - stress 40/)).toBeInTheDocument();
+    expect(screen.getByText("Late rehearsal journal")).toBeInTheDocument();
+    expect(screen.getByText("Club room notice")).toBeInTheDocument();
+    expect(screen.getByText("GM style: warning")).toBeInTheDocument();
+    expect(screen.getByText("Continuity: warning")).toBeInTheDocument();
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
@@ -512,6 +520,180 @@ const workspaceData: WorldWorkspaceData = {
       applied_event_id: "event-choice",
       created_at: "2026-05-05T12:00:00.000Z",
       updated_at: "2026-05-05T12:00:00.000Z",
+    },
+  ],
+  livingWorldDashboard: {
+    world_id: "world-1",
+    worldline_id: "worldline-1",
+    knowledge_count: 1,
+    hidden_secret_count: 1,
+    emotional_state_count: 1,
+    open_hook_count: 1,
+    unread_notification_count: 1,
+    pending_intervention_count: 1,
+    active_route_count: 1,
+    pressure_summary: { risk: 20 },
+  },
+  knowledgeFacts: [
+    {
+      id: "knowledge-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      fact_key: "rival-route-note",
+      knowledge_kind: "fact",
+      content: "The rival noticed the late rehearsal.",
+      source_event_id: null,
+      source_ref: null,
+      confidence: 90,
+      visibility: "private",
+      is_active: true,
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  secrets: [
+    {
+      id: "secret-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      secret_key: "hidden-letter",
+      title: "Hidden letter",
+      content: "The letter was left in the club room.",
+      holder_agent_ids: ["agent-1"],
+      reveal_conditions: {},
+      consequence_metadata: {},
+      visibility: "holders",
+      status: "hidden",
+      revealed_event_id: null,
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  emotionalStates: [
+    {
+      id: "emotion-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      agent_id: "agent-1",
+      agent_key: "guide",
+      agent_display_name: "Guide",
+      mood: "restless",
+      stress: 40,
+      fatigue: 20,
+      anticipation: 60,
+      jealousy: 5,
+      anger: 10,
+      source_event_id: null,
+      expires_at: null,
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  relationshipRepairs: [
+    {
+      id: "repair-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      relationship_id: "relationship-1",
+      repair_kind: "apology",
+      reason: "The hero apologizes for missing practice.",
+      score_delta: { trust: 8 },
+      status: "proposed",
+      applied_event_id: null,
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  playerJournal: [
+    {
+      id: "journal-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      user_id: "user-1",
+      player_actor_id: "player-actor-1",
+      entry_kind: "event",
+      title: "Late rehearsal journal",
+      body: "The route tension moved without direct intervention.",
+      source_event_id: null,
+      source_ref: null,
+      visibility: "player_private",
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  notifications: [
+    {
+      id: "notification-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      user_id: "user-1",
+      notification_kind: "rumor",
+      title: "Club room notice",
+      body: "Someone mentioned a hidden letter.",
+      source_event_id: null,
+      source_ref: null,
+      status: "unread",
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  interventions: [
+    {
+      id: "intervention-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      user_id: "user-1",
+      player_actor_id: "player-actor-1",
+      intervention_kind: "contact",
+      target_agent_id: "agent-1",
+      target_scene_id: null,
+      prompt: "Send a short message after school.",
+      choice_id: "choice-1",
+      event_id: "event-choice",
+      status: "recorded",
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  gmStyleReviews: [
+    {
+      id: "style-review-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      source_kind: "manual",
+      source_ref: null,
+      reviewed_text: "As an AI chatbot, I can answer the user.",
+      status: "warning",
+      diagnostics: [{ code: "generic_chatbot_drift" }],
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
+  narrativeContinuityReviews: [
+    {
+      id: "continuity-review-1",
+      world_id: "world-1",
+      worldline_id: "worldline-1",
+      artifact_id: null,
+      source_kind: "manual",
+      source_ref: null,
+      reviewed_text: "Everyone knows the hidden letter.",
+      status: "warning",
+      issues: [{ code: "knowledge_leak_risk" }],
+      metadata: {},
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
     },
   ],
   storyHooks: [

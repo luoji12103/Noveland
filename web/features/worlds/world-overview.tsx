@@ -11,12 +11,19 @@ import {
   createDailyEpisode,
   createFactionTrack,
   createGroupInteraction,
+  createGMStyleReview,
   createGMAgenda,
   createGMProposal,
+  createIntervention,
+  createNarrativeContinuityReview,
+  createNotification,
   createOrganizationConflict,
   createPlotThread,
+  createPlayerJournalEntry,
+  createRelationshipRepair,
   createRumor,
   createRumorPropagation,
+  createSecret,
   createLocationEdge,
   createOffscreenEvent,
   createOrganization,
@@ -51,8 +58,12 @@ import {
   resolveOrganizationConflict,
   resolveOffscreenEvents,
   resumeWorldClock,
+  revealSecret,
   skipWorldClock,
+  applyRelationshipRepair,
   upsertAgentPresence,
+  upsertEmotionalState,
+  upsertKnowledgeFact,
   upsertRouteAffinity,
   updateWorld,
   upsertWorldBible,
@@ -67,14 +78,19 @@ import type {
   RuntimeDiagnostic,
   ScheduleRulePreview,
   CalendarConflictReport,
+  CharacterEmotionalState,
+  CharacterKnowledgeFact,
   DailyLifePreview,
   DailyLifeEventCandidate,
   ChoiceConsequencePreview,
   EventResolutionRule,
   GMAgenda,
   GMEventProposal,
+  GMStyleReview,
   PlayerActor,
   PlayerChoice,
+  PlayerInterventionRecord,
+  PlayerJournalEntry,
   ResolutionRuleDryRun,
   TriggerConditionDryRun,
   Worldline,
@@ -95,6 +111,11 @@ import type {
   OrganizationConflict,
   Rumor,
   RumorPropagation,
+  InWorldNotification,
+  LivingWorldDashboard,
+  NarrativeContinuityReview,
+  RelationshipRepairRecord,
+  SecretRecord,
 } from "@/lib/worlds/types";
 import {
   formString,
@@ -757,6 +778,216 @@ export function WorldOverview({ data }: WorldOverviewProps) {
     await runAction(
       () => deliverRumorPropagation(selectedWorld.id, propagationId),
       "Rumor delivered.",
+    );
+  }
+
+  async function handleUpsertKnowledge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await upsertKnowledgeFact(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          agent_id: formString(form, "agent_id"),
+          fact_key: formString(form, "fact_key"),
+          knowledge_kind: formString(form, "knowledge_kind") as "fact",
+          content: formString(form, "content"),
+          confidence: optionalPositiveInteger(form, "confidence") ?? 80,
+          visibility: formString(form, "visibility") as "private",
+          source_event_id: optionalFormString(form, "source_event_id"),
+          source_ref: optionalFormString(form, "source_ref"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Knowledge fact saved.",
+    );
+  }
+
+  async function handleCreateSecret(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createSecret(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          secret_key: formString(form, "secret_key"),
+          title: formString(form, "title"),
+          content: formString(form, "content"),
+          holder_agent_ids: selectedValues(form, "holder_agent_ids"),
+          reveal_conditions: jsonObject(formString(form, "reveal_conditions")),
+          consequence_metadata: jsonObject(formString(form, "consequence_metadata")),
+          visibility: formString(form, "visibility") as "holders",
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Secret created.",
+    );
+  }
+
+  async function handleRevealSecret(secretId: string) {
+    await runAction(() => revealSecret(selectedWorld.id, secretId), "Secret revealed.");
+  }
+
+  async function handleUpsertEmotionalState(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await upsertEmotionalState(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          agent_id: formString(form, "agent_id"),
+          mood: formString(form, "mood"),
+          stress: optionalPositiveInteger(form, "stress") ?? 0,
+          fatigue: optionalPositiveInteger(form, "fatigue") ?? 0,
+          anticipation: optionalPositiveInteger(form, "anticipation") ?? 0,
+          jealousy: optionalPositiveInteger(form, "jealousy") ?? 0,
+          anger: optionalPositiveInteger(form, "anger") ?? 0,
+          source_event_id: optionalFormString(form, "source_event_id"),
+          expires_at: optionalFormString(form, "expires_at"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Emotional state saved.",
+    );
+  }
+
+  async function handleCreateRelationshipRepair(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createRelationshipRepair(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          relationship_id: formString(form, "relationship_id"),
+          repair_kind: formString(form, "repair_kind") as "repair",
+          reason: formString(form, "reason"),
+          score_delta: jsonObject(formString(form, "score_delta")),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Relationship repair proposed.",
+    );
+  }
+
+  async function handleApplyRelationshipRepair(repairId: string) {
+    await runAction(
+      () => applyRelationshipRepair(selectedWorld.id, repairId),
+      "Relationship repair applied.",
+    );
+  }
+
+  async function handleCreateJournalEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createPlayerJournalEntry(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          user_id: optionalFormString(form, "user_id"),
+          player_actor_id: optionalFormString(form, "player_actor_id"),
+          entry_kind: formString(form, "entry_kind") as "event",
+          title: formString(form, "title"),
+          body: formString(form, "body"),
+          source_event_id: optionalFormString(form, "source_event_id"),
+          source_ref: optionalFormString(form, "source_ref"),
+          visibility: formString(form, "visibility") as "player_private",
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Journal entry created.",
+    );
+  }
+
+  async function handleCreateNotification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createNotification(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          user_id: optionalFormString(form, "user_id"),
+          notification_kind: formString(form, "notification_kind") as "message",
+          title: formString(form, "title"),
+          body: formString(form, "body"),
+          source_event_id: optionalFormString(form, "source_event_id"),
+          source_ref: optionalFormString(form, "source_ref"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Notification created.",
+    );
+  }
+
+  async function handleCreateIntervention(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createIntervention(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          user_id: optionalFormString(form, "user_id"),
+          player_actor_id: formString(form, "player_actor_id"),
+          intervention_kind: formString(form, "intervention_kind") as "contact",
+          target_agent_id: optionalFormString(form, "target_agent_id"),
+          target_scene_id: optionalFormString(form, "target_scene_id"),
+          prompt: formString(form, "prompt"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Intervention recorded.",
+    );
+  }
+
+  async function handleCreateGMStyleReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createGMStyleReview(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          source_kind: formString(form, "source_kind"),
+          source_ref: optionalFormString(form, "source_ref"),
+          reviewed_text: formString(form, "reviewed_text"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "GM style review created.",
+    );
+  }
+
+  async function handleCreateContinuityReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    await runAction(
+      async () => {
+        await createNarrativeContinuityReview(selectedWorld.id, {
+          worldline_id: optionalFormString(form, "worldline_id"),
+          artifact_id: optionalFormString(form, "artifact_id"),
+          source_kind: formString(form, "source_kind"),
+          source_ref: optionalFormString(form, "source_ref"),
+          reviewed_text: formString(form, "reviewed_text"),
+          metadata: jsonObject(formString(form, "metadata")),
+        });
+        formElement.reset();
+      },
+      "Continuity review created.",
     );
   }
 
@@ -1500,6 +1731,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             </form>
             <form className="management-form" onSubmit={handleCreateFactionTrack}>
               <h3>Faction track</h3>
+              <WorldlineSelect worldlines={data.worldlines} />
               <select className="text-input" name="organization_id" defaultValue="">
                 <option value="">Organization</option>
                 {data.organizations.map((organization) => (
@@ -2124,6 +2356,249 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           onDryRunTrigger={handleDryRunTriggerCondition}
           onResolveConflict={handleResolveOrganizationConflict}
           onDeliverRumor={handleDeliverRumorPropagation}
+        />
+      </section>
+
+      <section className="management-panel" aria-labelledby="knowledge-player-guardrails-title">
+        <h2 className="section-title" id="knowledge-player-guardrails-title">
+          Knowledge, player, and guardrails
+        </h2>
+        <div className="dashboard-grid">
+          <div className="metric">
+            <p className="metric-label">Knowledge</p>
+            <p className="metric-value">
+              {data.livingWorldDashboard?.knowledge_count ?? data.knowledgeFacts.length}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Hidden secrets</p>
+            <p className="metric-value">
+              {data.livingWorldDashboard?.hidden_secret_count ?? data.secrets.length}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Emotional states</p>
+            <p className="metric-value">
+              {data.livingWorldDashboard?.emotional_state_count ?? data.emotionalStates.length}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Unread notifications</p>
+            <p className="metric-value">
+              {data.livingWorldDashboard?.unread_notification_count ?? data.notifications.length}
+            </p>
+          </div>
+          <div className="metric">
+            <p className="metric-label">Pending interventions</p>
+            <p className="metric-value">
+              {data.livingWorldDashboard?.pending_intervention_count ?? data.interventions.length}
+            </p>
+          </div>
+        </div>
+        {data.canManageSelectedWorld ? (
+          <>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleUpsertKnowledge}>
+                <h3>Knowledge fact</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <AgentSelect agents={data.agents} name="agent_id" label="Agent" />
+                <input className="text-input" name="fact_key" placeholder="fact-key" />
+                <select className="text-input" name="knowledge_kind" defaultValue="fact">
+                  <option value="fact">fact</option>
+                  <option value="secret">secret</option>
+                  <option value="guess">guess</option>
+                  <option value="misbelief">misbelief</option>
+                </select>
+                <textarea className="text-input" name="content" rows={3} placeholder="Content" />
+                <input className="text-input" name="confidence" placeholder="Confidence" />
+                <select className="text-input" name="visibility" defaultValue="private">
+                  <option value="private">private</option>
+                  <option value="shared">shared</option>
+                  <option value="public">public</option>
+                </select>
+                <input className="text-input" name="source_event_id" placeholder="Source event id" />
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save knowledge
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateSecret}>
+                <h3>Secret</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="secret_key" placeholder="secret-key" />
+                <input className="text-input" name="title" placeholder="Secret title" />
+                <textarea className="text-input" name="content" rows={3} placeholder="Content" />
+                <MultiAgentSelect agents={data.agents} name="holder_agent_ids" />
+                <textarea
+                  className="text-input"
+                  name="reveal_conditions"
+                  rows={3}
+                  defaultValue="{}"
+                />
+                <textarea
+                  className="text-input"
+                  name="consequence_metadata"
+                  rows={3}
+                  defaultValue="{}"
+                />
+                <select className="text-input" name="visibility" defaultValue="holders">
+                  <option value="private">private</option>
+                  <option value="holders">holders</option>
+                  <option value="public">public</option>
+                </select>
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create secret
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleUpsertEmotionalState}>
+                <h3>Emotional state</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <AgentSelect agents={data.agents} name="agent_id" label="Agent" />
+                <input className="text-input" name="mood" placeholder="Mood" />
+                <input className="text-input" name="stress" placeholder="Stress" />
+                <input className="text-input" name="fatigue" placeholder="Fatigue" />
+                <input className="text-input" name="anticipation" placeholder="Anticipation" />
+                <input className="text-input" name="jealousy" placeholder="Jealousy" />
+                <input className="text-input" name="anger" placeholder="Anger" />
+                <input className="text-input" name="source_event_id" placeholder="Source event id" />
+                <input className="text-input" name="expires_at" placeholder="Expires at" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save emotion
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateRelationshipRepair}>
+                <h3>Relationship repair</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="relationship_id" placeholder="Relationship id" />
+                <select className="text-input" name="repair_kind" defaultValue="repair">
+                  <option value="decay">decay</option>
+                  <option value="repair">repair</option>
+                  <option value="conflict">conflict</option>
+                  <option value="apology">apology</option>
+                  <option value="kept_promise">kept_promise</option>
+                  <option value="shared_event">shared_event</option>
+                </select>
+                <textarea className="text-input" name="reason" rows={3} placeholder="Reason" />
+                <textarea className="text-input" name="score_delta" rows={3} defaultValue="{}" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Propose repair
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateJournalEntry}>
+                <h3>Player journal</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="user_id" placeholder="User id" />
+                <PlayerActorSelect actors={data.playerActors} name="player_actor_id" />
+                <select className="text-input" name="entry_kind" defaultValue="event">
+                  <option value="choice">choice</option>
+                  <option value="relationship">relationship</option>
+                  <option value="event">event</option>
+                  <option value="narrative">narrative</option>
+                  <option value="private_note">private_note</option>
+                </select>
+                <input className="text-input" name="title" placeholder="Entry title" />
+                <textarea className="text-input" name="body" rows={3} placeholder="Body" />
+                <input className="text-input" name="source_event_id" placeholder="Source event id" />
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <select className="text-input" name="visibility" defaultValue="player_private">
+                  <option value="player_private">player_private</option>
+                  <option value="world_admin">world_admin</option>
+                </select>
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create journal
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateNotification}>
+                <h3>Notification</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="user_id" placeholder="User id" />
+                <select className="text-input" name="notification_kind" defaultValue="message">
+                  <option value="message">message</option>
+                  <option value="invitation">invitation</option>
+                  <option value="rumor">rumor</option>
+                  <option value="promise">promise</option>
+                  <option value="incident">incident</option>
+                  <option value="intervention">intervention</option>
+                </select>
+                <input className="text-input" name="title" placeholder="Notification title" />
+                <textarea className="text-input" name="body" rows={3} placeholder="Body" />
+                <input className="text-input" name="source_event_id" placeholder="Source event id" />
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Create notification
+                </button>
+              </form>
+            </div>
+            <div className="management-columns">
+              <form className="management-form" onSubmit={handleCreateIntervention}>
+                <h3>Intervention</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="user_id" placeholder="User id" />
+                <PlayerActorSelect actors={data.playerActors} name="player_actor_id" />
+                <select className="text-input" name="intervention_kind" defaultValue="contact">
+                  <option value="observe">observe</option>
+                  <option value="reply">reply</option>
+                  <option value="travel">travel</option>
+                  <option value="contact">contact</option>
+                  <option value="push_event">push_event</option>
+                </select>
+                <AgentSelect agents={data.agents} name="target_agent_id" label="Target agent" />
+                <SceneSelect scenes={data.scenes} name="target_scene_id" label="Target scene" />
+                <textarea className="text-input" name="prompt" rows={3} placeholder="Prompt" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Record intervention
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateGMStyleReview}>
+                <h3>GM style review</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="source_kind" defaultValue="manual" />
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <textarea className="text-input" name="reviewed_text" rows={6} placeholder="Text" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Review style
+                </button>
+              </form>
+              <form className="management-form" onSubmit={handleCreateContinuityReview}>
+                <h3>Continuity review</h3>
+                <WorldlineSelect worldlines={data.worldlines} />
+                <input className="text-input" name="artifact_id" placeholder="Artifact id" />
+                <input className="text-input" name="source_kind" defaultValue="manual" />
+                <input className="text-input" name="source_ref" placeholder="Source ref" />
+                <textarea className="text-input" name="reviewed_text" rows={6} placeholder="Text" />
+                <input className="text-input" name="metadata" defaultValue="{}" />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Review continuity
+                </button>
+              </form>
+            </div>
+          </>
+        ) : null}
+        <KnowledgePlayerGuardrailsView
+          dashboard={data.livingWorldDashboard}
+          knowledgeFacts={data.knowledgeFacts}
+          secrets={data.secrets}
+          emotionalStates={data.emotionalStates}
+          relationshipRepairs={data.relationshipRepairs}
+          playerJournal={data.playerJournal}
+          notifications={data.notifications}
+          interventions={data.interventions}
+          gmStyleReviews={data.gmStyleReviews}
+          narrativeContinuityReviews={data.narrativeContinuityReviews}
+          isBusy={isBusy}
+          canManage={data.canManageSelectedWorld}
+          onRevealSecret={handleRevealSecret}
+          onApplyRepair={handleApplyRelationshipRepair}
         />
       </section>
 
@@ -3080,6 +3555,246 @@ function WorldlineSelect({ worldlines }: { worldlines: Worldline[] }) {
         </option>
       ))}
     </select>
+  );
+}
+
+function PlayerActorSelect({ actors, name }: { actors: PlayerActor[]; name: string }) {
+  return (
+    <select className="text-input" name={name} defaultValue="">
+      <option value="">Player actor</option>
+      {actors.map((actor) => (
+        <option key={actor.id} value={actor.id}>
+          {actor.display_name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function KnowledgePlayerGuardrailsView({
+  dashboard,
+  knowledgeFacts,
+  secrets,
+  emotionalStates,
+  relationshipRepairs,
+  playerJournal,
+  notifications,
+  interventions,
+  gmStyleReviews,
+  narrativeContinuityReviews,
+  isBusy,
+  canManage,
+  onRevealSecret,
+  onApplyRepair,
+}: {
+  dashboard: LivingWorldDashboard | null;
+  knowledgeFacts: CharacterKnowledgeFact[];
+  secrets: SecretRecord[];
+  emotionalStates: CharacterEmotionalState[];
+  relationshipRepairs: RelationshipRepairRecord[];
+  playerJournal: PlayerJournalEntry[];
+  notifications: InWorldNotification[];
+  interventions: PlayerInterventionRecord[];
+  gmStyleReviews: GMStyleReview[];
+  narrativeContinuityReviews: NarrativeContinuityReview[];
+  isBusy: boolean;
+  canManage: boolean;
+  onRevealSecret: (secretId: string) => Promise<void>;
+  onApplyRepair: (repairId: string) => Promise<void>;
+}) {
+  return (
+    <>
+      {dashboard !== null ? (
+        <p className="status-detail">
+          Dashboard worldline {dashboard.worldline_id}: open hooks {dashboard.open_hook_count},
+          active routes {dashboard.active_route_count}.
+        </p>
+      ) : null}
+      <div className="management-columns">
+        <section aria-labelledby="knowledge-list-title">
+          <h3 id="knowledge-list-title">Knowledge and secrets</h3>
+          <div className="resource-list">
+            {knowledgeFacts.length === 0 && secrets.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {knowledgeFacts.map((fact) => (
+              <article className="resource-row" key={fact.id}>
+                <div>
+                  <h3>{fact.fact_key}</h3>
+                  <p>
+                    {fact.agent_display_name} - {fact.knowledge_kind} - confidence{" "}
+                    {fact.confidence}
+                  </p>
+                  <p>{fact.content}</p>
+                </div>
+              </article>
+            ))}
+            {secrets.map((secret) => (
+              <article className="resource-row" key={secret.id}>
+                <div>
+                  <h3>{secret.title}</h3>
+                  <p>
+                    {secret.secret_key} - {secret.status} - holders{" "}
+                    {secret.holder_agent_ids.length}
+                  </p>
+                  <p>{secret.content}</p>
+                </div>
+                {canManage && secret.status === "hidden" ? (
+                  <div className="button-row">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onRevealSecret(secret.id)}
+                    >
+                      Reveal secret
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="emotion-repair-list-title">
+          <h3 id="emotion-repair-list-title">Emotion and relationship repair</h3>
+          <div className="resource-list">
+            {emotionalStates.length === 0 && relationshipRepairs.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {emotionalStates.map((state) => (
+              <article className="resource-row" key={state.id}>
+                <div>
+                  <h3>{state.agent_display_name}</h3>
+                  <p>
+                    {state.mood} - stress {state.stress} - fatigue {state.fatigue}
+                  </p>
+                  <p>
+                    anticipation {state.anticipation}, jealousy {state.jealousy}, anger{" "}
+                    {state.anger}
+                  </p>
+                </div>
+              </article>
+            ))}
+            {relationshipRepairs.map((repair) => (
+              <article className="resource-row" key={repair.id}>
+                <div>
+                  <h3>{repair.repair_kind}</h3>
+                  <p>
+                    {repair.status} - relationship {repair.relationship_id}
+                  </p>
+                  <p>{repair.reason}</p>
+                </div>
+                {canManage && repair.status === "proposed" ? (
+                  <div className="button-row">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void onApplyRepair(repair.id)}
+                    >
+                      Apply repair
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+        <section aria-labelledby="player-feed-list-title">
+          <h3 id="player-feed-list-title">Player journal and feed</h3>
+          <div className="resource-list">
+            {playerJournal.length === 0 && notifications.length === 0 && interventions.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {playerJournal.map((entry) => (
+              <article className="resource-row" key={entry.id}>
+                <div>
+                  <h3>{entry.title}</h3>
+                  <p>
+                    {entry.entry_kind} - {entry.visibility}
+                  </p>
+                  <p>{entry.body}</p>
+                </div>
+              </article>
+            ))}
+            {notifications.map((notification) => (
+              <article className="resource-row" key={notification.id}>
+                <div>
+                  <h3>{notification.title}</h3>
+                  <p>
+                    {notification.notification_kind} - {notification.status}
+                  </p>
+                  <p>{notification.body}</p>
+                </div>
+              </article>
+            ))}
+            {interventions.map((intervention) => (
+              <article className="resource-row" key={intervention.id}>
+                <div>
+                  <h3>{intervention.intervention_kind}</h3>
+                  <p>
+                    {intervention.status} - event {intervention.event_id ?? "none"}
+                  </p>
+                  <p>{intervention.prompt}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+      <div className="management-columns">
+        <section aria-labelledby="guardrail-review-list-title">
+          <h3 id="guardrail-review-list-title">Style and continuity reviews</h3>
+          <div className="resource-list">
+            {gmStyleReviews.length === 0 && narrativeContinuityReviews.length === 0 ? (
+              <article className="resource-row">
+                <div>
+                  <h3>None yet</h3>
+                  <p>No records are available.</p>
+                </div>
+              </article>
+            ) : null}
+            {gmStyleReviews.map((review) => (
+              <article className="resource-row" key={review.id}>
+                <div>
+                  <h3>GM style: {review.status}</h3>
+                  <p>
+                    {review.source_kind} - diagnostics {review.diagnostics.length}
+                  </p>
+                  <p>{review.reviewed_text}</p>
+                </div>
+              </article>
+            ))}
+            {narrativeContinuityReviews.map((review) => (
+              <article className="resource-row" key={review.id}>
+                <div>
+                  <h3>Continuity: {review.status}</h3>
+                  <p>
+                    {review.source_kind} - issues {review.issues.length}
+                  </p>
+                  <p>{review.reviewed_text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
 

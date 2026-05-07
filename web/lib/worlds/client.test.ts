@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  applyRelationshipRepair,
   cancelAgentCalendarEntry,
   bindPlayerActor,
   compareWorldlines,
@@ -11,7 +12,11 @@ import {
   createFactionTrack,
   createGMAgenda,
   createGMProposal,
+  createGMStyleReview,
   createGroupInteraction,
+  createIntervention,
+  createNarrativeContinuityReview,
+  createNotification,
   createLocationEdge,
   createMemoryBackendProfile,
   createNarrativeArtifact,
@@ -20,14 +25,17 @@ import {
   createOrganizationConflict,
   createOrganizationMembership,
   createAgentPreset,
+  createPlayerJournalEntry,
   createPlotThread,
   createProviderProfile,
+  createRelationshipRepair,
   createResolutionRule,
   createScheduleRule,
   createSnapshot,
   createRumor,
   createRumorPropagation,
   createSceneBeat,
+  createSecret,
   createStoryHook,
   createEventTriggerCondition,
   generateConversationNarrativeArtifacts,
@@ -36,6 +44,7 @@ import {
   getConversationMemorySummary,
   getConversationSpeakerPreview,
   getExternalToolPolicy,
+  getLivingWorldDashboard,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
   getDailyLifePreview,
@@ -63,11 +72,15 @@ import {
   getSnapshotIntegrity,
   getWorldBible,
   generateDailyLifeCandidates,
+  listEmotionalStates,
   listDailyLifeCandidates,
   listFactionTracks,
   listGMAgendas,
+  listGMStyleReviews,
   listGMProposals,
   listGroupInteractions,
+  listInterventions,
+  listKnowledgeFacts,
   listDailyEpisodes,
   listEventTriggerConditions,
   listLocationEdges,
@@ -78,12 +91,17 @@ import {
   listPluginBindings,
   listPlayerActors,
   listPlayerChoices,
+  listPlayerJournal,
   listPlotThreads,
   listResolutionRules,
   listRelationshipSuggestions,
+  listRelationshipRepairs,
   listRouteAffinities,
   listRumors,
   listRumorPropagations,
+  listNarrativeContinuityReviews,
+  listNotifications,
+  listSecrets,
   listSceneBeats,
   listStoryHooks,
   listWorldEvents,
@@ -100,6 +118,7 @@ import {
   publishNarrativeArtifact,
   resolveOffscreenEvents,
   recordPlayerChoice,
+  revealSecret,
   reviewGMProposal,
   resumeWorldClock,
   listAgentMemory,
@@ -141,6 +160,8 @@ import {
   updateRuntimeControl,
   updateScheduleRule,
   upsertAgentPresence,
+  upsertEmotionalState,
+  upsertKnowledgeFact,
   upsertRouteAffinity,
   upsertWorldBible,
   listWorldlines,
@@ -617,6 +638,114 @@ describe("world client", () => {
       "/api/worlds/world-1/rumor-propagations?worldline_id=worldline-1",
       "/api/worlds/world-1/rumor-propagations",
       "/api/worlds/world-1/rumor-propagations/propagation-2/deliver",
+    ]);
+  });
+
+  it("maps knowledge, player, and guardrail requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ worldline_id: "worldline-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "knowledge-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "knowledge-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "secret-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "secret-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "secret-2", status: "revealed" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "emotion-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "emotion-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "repair-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "repair-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "repair-2", status: "applied" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "journal-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "journal-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "notification-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "notification-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "intervention-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "intervention-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "style-review-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "style-review-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse([{ id: "continuity-review-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "continuity-review-2" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getLivingWorldDashboard("world-1", { worldline_id: "worldline-1" });
+    await listKnowledgeFacts("world-1", {
+      worldline_id: "worldline-1",
+      agent_id: "agent-1",
+      limit: 5,
+    });
+    await upsertKnowledgeFact("world-1", {
+      agent_id: "agent-1",
+      fact_key: "club-note",
+      content: "Guide noticed the club room.",
+    });
+    await listSecrets("world-1", { status: "hidden", limit: 5 });
+    await createSecret("world-1", {
+      secret_key: "hidden-letter",
+      title: "Hidden letter",
+      content: "Letter.",
+    });
+    await revealSecret("world-1", "secret-2");
+    await listEmotionalStates("world-1", { agent_id: "agent-1" });
+    await upsertEmotionalState("world-1", { agent_id: "agent-1", mood: "restless" });
+    await listRelationshipRepairs("world-1", { status: "proposed", limit: 5 });
+    await createRelationshipRepair("world-1", {
+      relationship_id: "relationship-1",
+      repair_kind: "apology",
+      reason: "Missed practice.",
+    });
+    await applyRelationshipRepair("world-1", "repair-2");
+    await listPlayerJournal("world-1", { user_id: "user-1", limit: 5 });
+    await createPlayerJournalEntry("world-1", {
+      entry_kind: "event",
+      title: "Journal",
+      body: "Body",
+    });
+    await listNotifications("world-1", { status: "unread", limit: 5 });
+    await createNotification("world-1", {
+      notification_kind: "rumor",
+      title: "Notice",
+      body: "Body",
+    });
+    await listInterventions("world-1", { status: "recorded", limit: 5 });
+    await createIntervention("world-1", {
+      player_actor_id: "actor-1",
+      intervention_kind: "contact",
+      prompt: "Message.",
+    });
+    await listGMStyleReviews("world-1", { status: "warning", limit: 5 });
+    await createGMStyleReview("world-1", {
+      source_kind: "manual",
+      reviewed_text: "As an AI chatbot.",
+    });
+    await listNarrativeContinuityReviews("world-1", { status: "warning", limit: 5 });
+    await createNarrativeContinuityReview("world-1", {
+      source_kind: "manual",
+      reviewed_text: "Everyone knows.",
+    });
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/world-1/living-world-dashboard?worldline_id=worldline-1",
+      "/api/worlds/world-1/knowledge?worldline_id=worldline-1&agent_id=agent-1&limit=5",
+      "/api/worlds/world-1/knowledge",
+      "/api/worlds/world-1/secrets?status=hidden&limit=5",
+      "/api/worlds/world-1/secrets",
+      "/api/worlds/world-1/secrets/secret-2/reveal",
+      "/api/worlds/world-1/emotional-states?agent_id=agent-1",
+      "/api/worlds/world-1/emotional-states",
+      "/api/worlds/world-1/relationship-repairs?status=proposed&limit=5",
+      "/api/worlds/world-1/relationship-repairs",
+      "/api/worlds/world-1/relationship-repairs/repair-2/apply",
+      "/api/worlds/world-1/player-journal?user_id=user-1&limit=5",
+      "/api/worlds/world-1/player-journal",
+      "/api/worlds/world-1/notifications?status=unread&limit=5",
+      "/api/worlds/world-1/notifications",
+      "/api/worlds/world-1/interventions?status=recorded&limit=5",
+      "/api/worlds/world-1/interventions",
+      "/api/worlds/world-1/gm-style-reviews?status=warning&limit=5",
+      "/api/worlds/world-1/gm-style-reviews",
+      "/api/worlds/world-1/narrative-continuity-reviews?status=warning&limit=5",
+      "/api/worlds/world-1/narrative-continuity-reviews",
     ]);
   });
 

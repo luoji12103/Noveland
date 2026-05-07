@@ -1104,6 +1104,204 @@ export type RumorPropagation = {
   updated_at: string;
 };
 
+export type KnowledgeKind = "fact" | "secret" | "guess" | "misbelief";
+export type KnowledgeVisibility = "private" | "shared" | "public";
+
+export type CharacterKnowledgeFact = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  agent_id: string;
+  agent_key: string;
+  agent_display_name: string;
+  fact_key: string;
+  knowledge_kind: KnowledgeKind;
+  content: string;
+  source_event_id: string | null;
+  source_ref: string | null;
+  confidence: number;
+  visibility: KnowledgeVisibility;
+  is_active: boolean;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SecretStatus = "hidden" | "revealed" | "archived";
+export type SecretVisibility = "private" | "holders" | "public";
+
+export type SecretRecord = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  secret_key: string;
+  title: string;
+  content: string;
+  holder_agent_ids: string[];
+  reveal_conditions: Record<string, unknown>;
+  consequence_metadata: Record<string, unknown>;
+  visibility: SecretVisibility;
+  status: SecretStatus;
+  revealed_event_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CharacterEmotionalState = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  agent_id: string;
+  agent_key: string;
+  agent_display_name: string;
+  mood: string;
+  stress: number;
+  fatigue: number;
+  anticipation: number;
+  jealousy: number;
+  anger: number;
+  source_event_id: string | null;
+  expires_at: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RelationshipRepairKind =
+  | "decay"
+  | "repair"
+  | "conflict"
+  | "apology"
+  | "kept_promise"
+  | "shared_event";
+export type RelationshipRepairStatus = "proposed" | "applied" | "dismissed";
+
+export type RelationshipRepairRecord = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  relationship_id: string;
+  repair_kind: RelationshipRepairKind;
+  reason: string;
+  score_delta: Record<string, unknown>;
+  status: RelationshipRepairStatus;
+  applied_event_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JournalEntryKind = "choice" | "relationship" | "event" | "narrative" | "private_note";
+export type JournalVisibility = "player_private" | "world_admin";
+
+export type PlayerJournalEntry = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  player_actor_id: string | null;
+  entry_kind: JournalEntryKind;
+  title: string;
+  body: string;
+  source_event_id: string | null;
+  source_ref: string | null;
+  visibility: JournalVisibility;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationKind =
+  | "message"
+  | "invitation"
+  | "rumor"
+  | "promise"
+  | "incident"
+  | "intervention";
+export type NotificationStatus = "unread" | "read" | "archived";
+
+export type InWorldNotification = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  notification_kind: NotificationKind;
+  title: string;
+  body: string;
+  source_event_id: string | null;
+  source_ref: string | null;
+  status: NotificationStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InterventionKind = "observe" | "reply" | "travel" | "contact" | "push_event";
+export type InterventionStatus = "recorded" | "resolved" | "cancelled";
+
+export type PlayerInterventionRecord = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  player_actor_id: string;
+  intervention_kind: InterventionKind;
+  target_agent_id: string | null;
+  target_scene_id: string | null;
+  prompt: string;
+  choice_id: string | null;
+  event_id: string | null;
+  status: InterventionStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReviewStatus = "pass" | "warning" | "fail";
+
+export type GMStyleReview = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  source_kind: string;
+  source_ref: string | null;
+  reviewed_text: string;
+  status: ReviewStatus;
+  diagnostics: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NarrativeContinuityReview = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  artifact_id: string | null;
+  source_kind: string;
+  source_ref: string | null;
+  reviewed_text: string;
+  status: ReviewStatus;
+  issues: Record<string, unknown>[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LivingWorldDashboard = {
+  world_id: string;
+  worldline_id: string;
+  knowledge_count: number;
+  hidden_secret_count: number;
+  emotional_state_count: number;
+  open_hook_count: number;
+  unread_notification_count: number;
+  pending_intervention_count: number;
+  active_route_count: number;
+  pressure_summary: Record<string, number>;
+};
+
 export type ChoiceConsequencePreview = {
   relationship_updates: Record<string, unknown>[];
   faction_updates: Record<string, unknown>[];
@@ -2134,6 +2332,106 @@ export type RumorPropagationCreateInput = {
   target_agent_id?: string | null;
   target_organization_id?: string | null;
   propagation_reason: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type KnowledgeFactUpsertInput = {
+  worldline_id?: string | null;
+  agent_id: string;
+  fact_key: string;
+  knowledge_kind?: KnowledgeKind;
+  content: string;
+  confidence?: number;
+  visibility?: KnowledgeVisibility;
+  source_event_id?: string | null;
+  source_ref?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type SecretCreateInput = {
+  worldline_id?: string | null;
+  secret_key: string;
+  title: string;
+  content: string;
+  holder_agent_ids?: string[];
+  reveal_conditions?: Record<string, unknown>;
+  consequence_metadata?: Record<string, unknown>;
+  visibility?: SecretVisibility;
+  metadata?: Record<string, unknown>;
+};
+
+export type EmotionalStateUpsertInput = {
+  worldline_id?: string | null;
+  agent_id: string;
+  mood?: string;
+  stress?: number;
+  fatigue?: number;
+  anticipation?: number;
+  jealousy?: number;
+  anger?: number;
+  source_event_id?: string | null;
+  expires_at?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type RelationshipRepairCreateInput = {
+  worldline_id?: string | null;
+  relationship_id: string;
+  repair_kind: RelationshipRepairKind;
+  reason: string;
+  score_delta?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type JournalEntryCreateInput = {
+  worldline_id?: string | null;
+  user_id?: string | null;
+  player_actor_id?: string | null;
+  entry_kind: JournalEntryKind;
+  title: string;
+  body: string;
+  source_event_id?: string | null;
+  source_ref?: string | null;
+  visibility?: JournalVisibility;
+  metadata?: Record<string, unknown>;
+};
+
+export type NotificationCreateInput = {
+  worldline_id?: string | null;
+  user_id?: string | null;
+  notification_kind: NotificationKind;
+  title: string;
+  body: string;
+  source_event_id?: string | null;
+  source_ref?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type InterventionCreateInput = {
+  worldline_id?: string | null;
+  user_id?: string | null;
+  player_actor_id: string;
+  intervention_kind: InterventionKind;
+  target_agent_id?: string | null;
+  target_scene_id?: string | null;
+  prompt: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type GMStyleReviewCreateInput = {
+  worldline_id?: string | null;
+  source_kind: string;
+  source_ref?: string | null;
+  reviewed_text: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type NarrativeContinuityReviewCreateInput = {
+  worldline_id?: string | null;
+  artifact_id?: string | null;
+  source_kind: string;
+  source_ref?: string | null;
+  reviewed_text: string;
   metadata?: Record<string, unknown>;
 };
 

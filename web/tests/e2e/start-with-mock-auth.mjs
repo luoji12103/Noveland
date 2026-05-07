@@ -341,6 +341,85 @@ const playerActors = [
   },
 ];
 const playerChoices = [];
+const knowledgeFacts = [
+  {
+    id: "83200000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    agent_id: agentGuideId,
+    fact_key: "festival-note",
+    knowledge_kind: "fact",
+    content: "Guide knows the festival plan is behind schedule.",
+    source_event_id: null,
+    source_ref: null,
+    confidence: 90,
+    visibility: "private",
+    is_active: true,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const secrets = [
+  {
+    id: "83300000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    secret_key: "hidden-letter",
+    title: "Hidden letter",
+    content: "A letter was left in the club room.",
+    holder_agent_ids: [agentGuideId],
+    reveal_conditions: {},
+    consequence_metadata: {},
+    visibility: "holders",
+    status: "hidden",
+    revealed_event_id: null,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const emotionalStates = [
+  {
+    id: "83400000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    agent_id: agentGuideId,
+    mood: "focused",
+    stress: 20,
+    fatigue: 10,
+    anticipation: 40,
+    jealousy: 0,
+    anger: 0,
+    source_event_id: null,
+    expires_at: null,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const relationshipRepairs = [];
+const playerJournal = [];
+const notifications = [
+  {
+    id: "83500000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: adminUserId,
+    notification_kind: "rumor",
+    title: "Club room notice",
+    body: "Someone mentioned the hidden letter.",
+    source_event_id: null,
+    source_ref: null,
+    status: "unread",
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const interventions = [];
+const gmStyleReviews = [];
+const narrativeContinuityReviews = [];
 const storyHooks = [
   {
     id: "82100000-0000-4000-8000-000000000001",
@@ -1333,6 +1412,54 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "player-choices") {
     await handlePlayerChoices(request, response, currentSubject, worldId, segments[3], url);
+    return;
+  }
+  if (resource === "living-world-dashboard") {
+    handleLivingWorldDashboard(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "knowledge") {
+    await handleKnowledgeFacts(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "secrets") {
+    await handleSecrets(request, response, currentSubject, worldId, segments[3], segments[4], url);
+    return;
+  }
+  if (resource === "emotional-states") {
+    await handleEmotionalStates(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "relationship-repairs") {
+    await handleRelationshipRepairs(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments[4],
+      url,
+    );
+    return;
+  }
+  if (resource === "player-journal") {
+    await handlePlayerJournal(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "notifications") {
+    await handleNotifications(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "interventions") {
+    await handleInterventions(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "gm-style-reviews") {
+    await handleGMStyleReviews(request, response, currentSubject, worldId, url);
+    return;
+  }
+  if (resource === "narrative-continuity-reviews") {
+    await handleNarrativeContinuityReviews(request, response, currentSubject, worldId, url);
     return;
   }
   if (resource === "schedule-rules") {
@@ -2361,6 +2488,488 @@ async function handleRumorPropagations(
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function handleLivingWorldDashboard(request, response, currentSubject, worldId, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const worldlineId = url.searchParams.get("worldline_id") ?? primaryWorldlineId;
+  sendJson(response, 200, {
+    world_id: worldId,
+    worldline_id: worldlineId,
+    knowledge_count: knowledgeFacts.filter((item) => item.world_id === worldId).length,
+    hidden_secret_count: secrets.filter(
+      (item) => item.world_id === worldId && item.status === "hidden",
+    ).length,
+    emotional_state_count: emotionalStates.filter((item) => item.world_id === worldId).length,
+    open_hook_count: storyHooks.filter((item) => item.world_id === worldId && item.status === "open").length,
+    unread_notification_count: notifications.filter(
+      (item) => item.world_id === worldId && item.status === "unread",
+    ).length,
+    pending_intervention_count: interventions.filter(
+      (item) => item.world_id === worldId && item.status === "recorded",
+    ).length,
+    active_route_count: routeAffinities.filter(
+      (item) => item.world_id === worldId && item.status === "active",
+    ).length,
+    pressure_summary: { risk: 20 },
+  });
+}
+
+async function handleKnowledgeFacts(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    const agentId = url.searchParams.get("agent_id");
+    sendJson(
+      response,
+      200,
+      knowledgeFacts
+        .filter((fact) => matchesWorldline(fact, worldId, url))
+        .filter((fact) => agentId === null || fact.agent_id === agentId)
+        .map(knowledgeFactResponse),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PUT") {
+    const body = await readJson(request);
+    const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    let fact = knowledgeFacts.find(
+      (item) =>
+        item.world_id === worldId
+        && item.worldline_id === worldlineId
+        && item.agent_id === body.agent_id
+        && item.fact_key === body.fact_key,
+    );
+    if (fact === undefined) {
+      fact = {
+        id: randomUUID(),
+        world_id: worldId,
+        worldline_id: worldlineId,
+        agent_id: body.agent_id,
+        fact_key: body.fact_key,
+        knowledge_kind: body.knowledge_kind ?? "fact",
+        content: body.content,
+        source_event_id: body.source_event_id ?? null,
+        source_ref: body.source_ref ?? null,
+        confidence: body.confidence ?? 80,
+        visibility: body.visibility ?? "private",
+        is_active: true,
+        metadata: body.metadata ?? {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      knowledgeFacts.push(fact);
+    } else {
+      Object.assign(fact, body, { updated_at: new Date().toISOString() });
+    }
+    sendJson(response, 200, knowledgeFactResponse(fact));
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleSecrets(request, response, currentSubject, worldId, secretId, action, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && secretId === undefined) {
+    sendJson(response, 200, secrets.filter((secret) => matchesWorldline(secret, worldId, url)));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && secretId === undefined) {
+    const body = await readJson(request);
+    const secret = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      secret_key: body.secret_key,
+      title: body.title,
+      content: body.content,
+      holder_agent_ids: body.holder_agent_ids ?? [],
+      reveal_conditions: body.reveal_conditions ?? {},
+      consequence_metadata: body.consequence_metadata ?? {},
+      visibility: body.visibility ?? "holders",
+      status: "hidden",
+      revealed_event_id: null,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    secrets.push(secret);
+    sendJson(response, 201, secret);
+    return;
+  }
+  const secret = secrets.find((item) => item.id === secretId && item.world_id === worldId);
+  if (secret === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && action === "reveal") {
+    const event = appendWorldEvent(worldId, {
+      worldline_id: secret.worldline_id,
+      event_name: "secret.revealed",
+      importance: "route",
+      payload: { secret_id: secret.id, title: secret.title },
+      actor_ref: `user:${currentSubject.user_id}`,
+    });
+    secret.status = "revealed";
+    secret.revealed_event_id = event.id;
+    secret.updated_at = new Date().toISOString();
+    sendJson(response, 200, secret);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleEmotionalStates(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    const agentId = url.searchParams.get("agent_id");
+    sendJson(
+      response,
+      200,
+      emotionalStates
+        .filter((state) => matchesWorldline(state, worldId, url))
+        .filter((state) => agentId === null || state.agent_id === agentId)
+        .map(emotionalStateResponse),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "PUT") {
+    const body = await readJson(request);
+    const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    let state = emotionalStates.find(
+      (item) =>
+        item.world_id === worldId && item.worldline_id === worldlineId && item.agent_id === body.agent_id,
+    );
+    if (state === undefined) {
+      state = {
+        id: randomUUID(),
+        world_id: worldId,
+        worldline_id: worldlineId,
+        agent_id: body.agent_id,
+        mood: body.mood ?? "neutral",
+        stress: body.stress ?? 0,
+        fatigue: body.fatigue ?? 0,
+        anticipation: body.anticipation ?? 0,
+        jealousy: body.jealousy ?? 0,
+        anger: body.anger ?? 0,
+        source_event_id: body.source_event_id ?? null,
+        expires_at: body.expires_at ?? null,
+        metadata: body.metadata ?? {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      emotionalStates.push(state);
+    } else {
+      Object.assign(state, body, { updated_at: new Date().toISOString() });
+    }
+    sendJson(response, 200, emotionalStateResponse(state));
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handleRelationshipRepairs(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  repairId,
+  action,
+  url,
+) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET" && repairId === undefined) {
+    sendJson(
+      response,
+      200,
+      relationshipRepairs.filter((repair) => matchesWorldline(repair, worldId, url)),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method === "POST" && repairId === undefined) {
+    const body = await readJson(request);
+    const repair = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
+      relationship_id: body.relationship_id,
+      repair_kind: body.repair_kind,
+      reason: body.reason,
+      score_delta: body.score_delta ?? {},
+      status: "proposed",
+      applied_event_id: null,
+      metadata: body.metadata ?? {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    relationshipRepairs.push(repair);
+    sendJson(response, 201, repair);
+    return;
+  }
+  const repair = relationshipRepairs.find((item) => item.id === repairId && item.world_id === worldId);
+  if (repair === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && action === "apply") {
+    const event = appendWorldEvent(worldId, {
+      worldline_id: repair.worldline_id,
+      event_name: "relationship.repair_applied",
+      importance: "relationship",
+      payload: { repair_id: repair.id },
+      actor_ref: `user:${currentSubject.user_id}`,
+    });
+    repair.status = "applied";
+    repair.applied_event_id = event.id;
+    repair.updated_at = new Date().toISOString();
+    sendJson(response, 200, repair);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+async function handlePlayerJournal(request, response, currentSubject, worldId, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      playerJournal
+        .filter((entry) => matchesWorldline(entry, worldId, url))
+        .filter((entry) => canManageWorld(currentSubject, worldId) || entry.user_id === currentSubject.user_id),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const entry = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    user_id: body.user_id ?? currentSubject.user_id,
+    player_actor_id: body.player_actor_id ?? null,
+    entry_kind: body.entry_kind,
+    title: body.title,
+    body: body.body,
+    source_event_id: body.source_event_id ?? null,
+    source_ref: body.source_ref ?? null,
+    visibility: body.visibility ?? "player_private",
+    metadata: body.metadata ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  playerJournal.push(entry);
+  sendJson(response, 201, entry);
+}
+
+async function handleNotifications(request, response, currentSubject, worldId, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      notifications
+        .filter((notification) => matchesWorldline(notification, worldId, url))
+        .filter(
+          (notification) =>
+            canManageWorld(currentSubject, worldId) || notification.user_id === currentSubject.user_id,
+        ),
+    );
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const notification = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    user_id: body.user_id ?? currentSubject.user_id,
+    notification_kind: body.notification_kind,
+    title: body.title,
+    body: body.body,
+    source_event_id: body.source_event_id ?? null,
+    source_ref: body.source_ref ?? null,
+    status: "unread",
+    metadata: body.metadata ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  notifications.push(notification);
+  sendJson(response, 201, notification);
+}
+
+async function handleInterventions(request, response, currentSubject, worldId, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      interventions
+        .filter((intervention) => matchesWorldline(intervention, worldId, url))
+        .filter(
+          (intervention) =>
+            canManageWorld(currentSubject, worldId) || intervention.user_id === currentSubject.user_id,
+        ),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const event = appendWorldEvent(worldId, {
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    event_name: "player.intervention_recorded",
+    importance: "daily",
+    payload: { intervention_kind: body.intervention_kind, prompt: body.prompt },
+    actor_ref: `user:${currentSubject.user_id}`,
+  });
+  const intervention = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    user_id: body.user_id ?? currentSubject.user_id,
+    player_actor_id: body.player_actor_id,
+    intervention_kind: body.intervention_kind,
+    target_agent_id: body.target_agent_id ?? null,
+    target_scene_id: body.target_scene_id ?? null,
+    prompt: body.prompt,
+    choice_id: null,
+    event_id: event.id,
+    status: "recorded",
+    metadata: body.metadata ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  interventions.push(intervention);
+  sendJson(response, 201, intervention);
+}
+
+async function handleGMStyleReviews(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(response, 200, gmStyleReviews.filter((review) => matchesWorldline(review, worldId, url)));
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const diagnostics = body.reviewed_text.includes("AI chatbot")
+    ? [{ code: "generic_chatbot_drift", severity: "warning" }]
+    : [];
+  const review = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    source_kind: body.source_kind,
+    source_ref: body.source_ref ?? null,
+    reviewed_text: body.reviewed_text,
+    status: diagnostics.length > 0 ? "warning" : "pass",
+    diagnostics,
+    metadata: body.metadata ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  gmStyleReviews.push(review);
+  sendJson(response, 201, review);
+}
+
+async function handleNarrativeContinuityReviews(request, response, currentSubject, worldId, url) {
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  if (request.method === "GET") {
+    sendJson(
+      response,
+      200,
+      narrativeContinuityReviews.filter((review) => matchesWorldline(review, worldId, url)),
+    );
+    return;
+  }
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  const body = await readJson(request);
+  const issues = body.reviewed_text.includes("Everyone knows")
+    ? [{ code: "knowledge_leak_risk", severity: "warning" }]
+    : [];
+  const review = {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: body.worldline_id ?? primaryWorldlineId,
+    artifact_id: body.artifact_id ?? null,
+    source_kind: body.source_kind,
+    source_ref: body.source_ref ?? null,
+    reviewed_text: body.reviewed_text,
+    status: issues.length > 0 ? "warning" : "pass",
+    issues,
+    metadata: body.metadata ?? {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  narrativeContinuityReviews.push(review);
+  sendJson(response, 201, review);
 }
 
 async function handlePlayerActors(request, response, currentSubject, worldId) {
@@ -5273,6 +5882,24 @@ function relationshipResponse(edge) {
     source_display_name: sourceAgent?.display_name ?? null,
     target_agent_key: targetAgent?.agent_key ?? null,
     target_display_name: targetAgent?.display_name ?? null,
+  };
+}
+
+function knowledgeFactResponse(fact) {
+  const agent = agentFor(fact.agent_id);
+  return {
+    ...fact,
+    agent_key: agent?.agent_key ?? null,
+    agent_display_name: agent?.display_name ?? null,
+  };
+}
+
+function emotionalStateResponse(state) {
+  const agent = agentFor(state.agent_id);
+  return {
+    ...state,
+    agent_key: agent?.agent_key ?? null,
+    agent_display_name: agent?.display_name ?? null,
   };
 }
 

@@ -11,6 +11,8 @@ import type {
   AgentRun,
   CalendarConflictReport,
   CalendarEntry,
+  CharacterEmotionalState,
+  CharacterKnowledgeFact,
   ConversationParticipant,
   ConversationDiagnosticsSummary,
   ConversationSession,
@@ -23,8 +25,11 @@ import type {
   ExternalToolPolicy,
   FactionProgressTrack,
   GMAgenda,
+  GMStyleReview,
   GMEventProposal,
   GroupInteractionContext,
+  InWorldNotification,
+  LivingWorldDashboard,
   MemoryBackendProfile,
   MemoryBackendHealth,
   MemoryBackendLogs,
@@ -35,18 +40,23 @@ import type {
   Membership,
   NarrativeArtifact,
   NarrativeArtifactFilters,
+  NarrativeContinuityReview,
   OffscreenEventQueueItem,
   OrganizationConflict,
   OrganizationMembership,
   PlayerActor,
   PlayerChoice,
+  PlayerInterventionRecord,
+  PlayerJournalEntry,
   PlotThread,
   RelationshipEventSuggestion,
+  RelationshipRepairRecord,
   PluginBinding,
   PluginCatalogEntry,
   RouteAffinity,
   Rumor,
   RumorPropagation,
+  SecretRecord,
   ProviderHealth,
   ProviderProfile,
   RuntimeDiagnostic,
@@ -84,6 +94,16 @@ export type WorldWorkspaceData = {
   resolutionRules: EventResolutionRule[];
   playerActors: PlayerActor[];
   playerChoices: PlayerChoice[];
+  livingWorldDashboard: LivingWorldDashboard | null;
+  knowledgeFacts: CharacterKnowledgeFact[];
+  secrets: SecretRecord[];
+  emotionalStates: CharacterEmotionalState[];
+  relationshipRepairs: RelationshipRepairRecord[];
+  playerJournal: PlayerJournalEntry[];
+  notifications: InWorldNotification[];
+  interventions: PlayerInterventionRecord[];
+  gmStyleReviews: GMStyleReview[];
+  narrativeContinuityReviews: NarrativeContinuityReview[];
   storyHooks: StoryHook[];
   plotThreads: PlotThread[];
   routeAffinities: RouteAffinity[];
@@ -397,6 +417,16 @@ export async function getWorldWorkspaceData(
       resolutionRules,
       playerActors,
       playerChoices,
+      livingWorldDashboard,
+      knowledgeFacts,
+      secrets,
+      emotionalStates,
+      relationshipRepairs,
+      playerJournal,
+      notifications,
+      interventions,
+      gmStyleReviews,
+      narrativeContinuityReviews,
       storyHooks,
       plotThreads,
       routeAffinities,
@@ -436,6 +466,25 @@ export async function getWorldWorkspaceData(
       ),
       apiFetchOptional<PlayerActor[]>(`/worlds/${worldId}/player-actors`, cookies),
       apiFetchOptional<PlayerChoice[]>(`/worlds/${worldId}/player-choices`, cookies),
+      apiFetchOptional<LivingWorldDashboard>(`/worlds/${worldId}/living-world-dashboard`, cookies),
+      apiFetchOptional<CharacterKnowledgeFact[]>(`/worlds/${worldId}/knowledge`, cookies),
+      apiFetchOptional<SecretRecord[]>(`/worlds/${worldId}/secrets`, cookies),
+      apiFetchOptional<CharacterEmotionalState[]>(
+        `/worlds/${worldId}/emotional-states`,
+        cookies,
+      ),
+      apiFetchOptional<RelationshipRepairRecord[]>(
+        `/worlds/${worldId}/relationship-repairs`,
+        cookies,
+      ),
+      apiFetchOptional<PlayerJournalEntry[]>(`/worlds/${worldId}/player-journal`, cookies),
+      apiFetchOptional<InWorldNotification[]>(`/worlds/${worldId}/notifications`, cookies),
+      apiFetchOptional<PlayerInterventionRecord[]>(`/worlds/${worldId}/interventions`, cookies),
+      apiFetchOptional<GMStyleReview[]>(`/worlds/${worldId}/gm-style-reviews`, cookies),
+      apiFetchOptional<NarrativeContinuityReview[]>(
+        `/worlds/${worldId}/narrative-continuity-reviews`,
+        cookies,
+      ),
       apiFetchOptional<StoryHook[]>(`/worlds/${worldId}/story-hooks`, cookies),
       apiFetchOptional<PlotThread[]>(`/worlds/${worldId}/plot-threads`, cookies),
       apiFetchOptional<RouteAffinity[]>(`/worlds/${worldId}/route-affinities`, cookies),
@@ -483,7 +532,11 @@ export async function getWorldWorkspaceData(
       ),
       apiFetchOptional<RuntimeDiagnostic[]>(`/worlds/${worldId}/diagnostics`, cookies),
     ]);
-    const [organizationMembershipGroups, factionTrackGroups, agentPresenceStates] =
+    const [
+      organizationMembershipGroups,
+      factionTrackGroups,
+      agentPresenceStates,
+    ] =
       await Promise.all([
         Promise.all(
           organizations.map((organization) =>
@@ -523,6 +576,16 @@ export async function getWorldWorkspaceData(
       resolutionRules: resolutionRules ?? [],
       playerActors: playerActors ?? [],
       playerChoices: playerChoices ?? [],
+      livingWorldDashboard,
+      knowledgeFacts: knowledgeFacts ?? [],
+      secrets: secrets ?? [],
+      emotionalStates: emotionalStates ?? [],
+      relationshipRepairs: relationshipRepairs ?? [],
+      playerJournal: playerJournal ?? [],
+      notifications: notifications ?? [],
+      interventions: interventions ?? [],
+      gmStyleReviews: gmStyleReviews ?? [],
+      narrativeContinuityReviews: narrativeContinuityReviews ?? [],
       storyHooks: storyHooks ?? [],
       plotThreads: plotThreads ?? [],
       routeAffinities: routeAffinities ?? [],
@@ -1101,6 +1164,16 @@ function emptyWorldWorkspaceData(
     resolutionRules: [],
     playerActors: [],
     playerChoices: [],
+    livingWorldDashboard: null,
+    knowledgeFacts: [],
+    secrets: [],
+    emotionalStates: [],
+    relationshipRepairs: [],
+    playerJournal: [],
+    notifications: [],
+    interventions: [],
+    gmStyleReviews: [],
+    narrativeContinuityReviews: [],
     storyHooks: [],
     plotThreads: [],
     routeAffinities: [],
