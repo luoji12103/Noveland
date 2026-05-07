@@ -3,24 +3,32 @@
 - Date: 2026-05-07T00:00:00Z
 - Branch: feat/living-world-knowledge-player-guardrails
 - Objective: Implement V2 living-world roadmap phases 36-45: character knowledge state, secrets/revelations, emotional state, relationship decay/repair, world-state dashboard v2, player-facing journal, in-world notifications, intervention controls, GM style guardrails, and narrative continuity review.
-- Status: Started from local `main` after committing the V2 phases 1-35 acceptance follow-up notes. This branch should also close the recorded acceptance gaps where they naturally align with phases 36-45.
+- Status: Implementation and final gate completed on the feature branch. Ready for local fast-forward merge into `main`; do not push unless explicitly requested.
 
-## Planned Implementation
+## Completed Implementation
 
-- Add migration `20260507_0027_living_world_knowledge_player_guardrails`.
-- Add worldline-scoped character knowledge, secrets/reveals, emotional state, relationship repair records, player journals, notifications, interventions, GM style reviews, and narrative continuity reviews.
-- Keep all new generation/review behavior deterministic; no provider calls, external tools, subprocesses, or sandbox execution.
-- Extend runtime, GM, narrative, and conversation paths to consume worldline, bible, hook, knowledge, secret, and group context where existing schemas support it.
-- Extend existing world/admin/reader Web surfaces and mock backend routes rather than creating a parallel app.
+- Added migration `20260507_0027_living_world_knowledge_player_guardrails`.
+- Added worldline-scoped character knowledge, secrets/reveals, emotional state, relationship repair records, player journals, notifications, interventions, GM style reviews, and narrative continuity reviews.
+- Added `LivingWorldGuardrailService` plus world-admin/member API surfaces and dense Web world overview panels for the new state.
+- Folded in recorded V2 phases 1-35 acceptance gaps where aligned with this bundle: `apply=false` choice event logging, runtime memory worldline scope, unsupported historical fork rejection, expanded deterministic dry-run context, rumor-to-knowledge propagation, daily episode creation from resolved low-risk offscreen events, and group interaction context propagation.
+- Updated Web client/server types, route mappings, component tests, and Playwright mock backend routes.
 
-## Gate Plan
+## Final Gate Results
 
-- Backend targeted checks for world API, memory, runtime daemon, replay/snapshot, schema metadata, and Alembic config.
-- Web targeted checks for world client and overview surfaces.
-- Final full backend/Web/compose gate before fast-forward merge back to local `main`.
+- `cd backend && uv run ruff check .`: passed
+- `cd backend && uv run mypy .`: passed
+- `cd backend && uv run pytest`: passed, 162 passed and 7 skipped
+- `cd web && npm run lint`: passed
+- `cd web && npm run typecheck`: passed
+- `cd web && npm run test`: passed, 60 passed
+- `cd web && npm run build`: passed
+- `cd web && npm run check:next-env`: passed after restoring generated `web/next-env.d.ts` churn
+- `cd web && npm run test:e2e`: passed, 10 passed
+- `docker compose -f infra/compose.yaml config`: passed
+- `git diff --check`: passed
 
-## Risks
+## Risks And Follow-Up
 
-- Persistent databases must apply migrations through `20260507_0027` before using these V2 phases.
-- Historical worldline fork semantics should either reconstruct from available replay/snapshot state or reject unsupported historical fork requests; do not silently claim historical state while copying current state.
-- `web/next-env.d.ts` may churn during build/e2e and must be restored before final status.
+- Persistent databases must apply migrations through `20260507_0027` before using these V2 phase 36-45 features.
+- GM style and continuity review remain deterministic warning/reporting surfaces, not provider generation and not hard blocking by default.
+- V2 phases 46-50 are the next candidate bundle: route/ending planning, long-run simulation evaluation, authoring toolchain v2, release profile, and beta validation.

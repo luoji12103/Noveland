@@ -101,6 +101,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/worlds/src/noveland/worlds/clock_service.py`
 - `backend/packages/worlds/src/noveland/worlds/autonomous.py`
 - `backend/packages/worlds/src/noveland/worlds/gm.py`
+- `backend/packages/worlds/src/noveland/worlds/guardrails.py`
 - `backend/packages/worlds/src/noveland/worlds/models.py`
 - `backend/packages/worlds/src/noveland/worlds/plot.py`
 - `backend/packages/worlds/src/noveland/worlds/worldlines.py`
@@ -115,6 +116,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260505_0024_living_world_autonomous_systems.py`
 - `backend/migrations/versions/20260505_0025_living_world_gm_choices_worldlines.py`
 - `backend/migrations/versions/20260506_0026_living_world_plot_route_rumor_flow.py`
+- `backend/migrations/versions/20260507_0027_living_world_knowledge_player_guardrails.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`
