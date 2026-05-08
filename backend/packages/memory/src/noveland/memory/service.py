@@ -65,9 +65,9 @@ from noveland.plugins.errors import (
     PluginNotFoundError,
 )
 from noveland.worlds.models import World
-from noveland.worlds.worldlines import ensure_primary_worldline
-from sqlalchemy import Select, and_, func, join, or_, select
-from sqlalchemy.orm import Session
+from noveland.worlds.worldlines import ensure_primary_worldline, primary_worldline_or_none
+from sqlalchemy import ColumnElement, Select, and_, func, join, or_, select
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 MEMORY_BACKFILL_EVENT_NAMES = frozenset(
     {
@@ -85,6 +85,7 @@ class _BackfillCandidate:
         *,
         source_kind: MemoryWriteSourceKind,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
         agent_id: uuid.UUID,
         source_id: uuid.UUID,
         dedupe_key: str,
@@ -94,6 +95,7 @@ class _BackfillCandidate:
     ) -> None:
         self.source_kind = source_kind
         self.world_id = world_id
+        self.worldline_id = worldline_id
         self.agent_id = agent_id
         self.source_id = source_id
         self.dedupe_key = dedupe_key
@@ -436,17 +438,19 @@ class MemoryService:
         query_text: str,
         max_context_items: int,
     ) -> MemoryContext:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         search_result = self.search(
             MemorySearchRequest(
                 world_id=world_id,
-                worldline_id=self._worldline_id(world_id, worldline_id),
+                worldline_id=resolved_worldline_id,
                 agent_id=agent_id,
                 query_text=query_text,
                 limit=max_context_items,
             ),
         )
-        snapshot = self.get_profile_snapshot(world_id, agent_id)
+        snapshot = self.get_profile_snapshot(world_id, agent_id, resolved_worldline_id)
         return MemoryContext(
+            worldline_id=resolved_worldline_id,
             backend=search_result.backend,
             items=[
                 MemoryContextItem(
@@ -465,31 +469,57 @@ class MemoryService:
         self,
         world_id: uuid.UUID,
         agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
     ) -> MemoryProfileSnapshotRecord | None:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         model = self._session.scalars(
             select(AgentProfileSnapshotModel).where(
                 AgentProfileSnapshotModel.world_id == world_id,
                 AgentProfileSnapshotModel.agent_id == agent_id,
-            ),
-        ).one_or_none()
+            )
+            .where(
+                self._primary_compatible_worldline_scope(
+                    AgentProfileSnapshotModel.worldline_id,
+                    world_id,
+                    resolved_worldline_id,
+                ),
+            )
+            .order_by(AgentProfileSnapshotModel.worldline_id.is_(None)),
+        ).first()
         return None if model is None else _snapshot_record(model)
 
     def refresh_profile_snapshot(
         self,
         world_id: uuid.UUID,
         agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
     ) -> MemoryProfileSnapshotRecord:
-        items = self.list_memories(world_id, agent_id)
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
+        items = self.list_memories(world_id, agent_id, resolved_worldline_id)
         snapshot = _build_snapshot(items)
         model = self._session.scalars(
             select(AgentProfileSnapshotModel).where(
                 AgentProfileSnapshotModel.world_id == world_id,
                 AgentProfileSnapshotModel.agent_id == agent_id,
-            ),
-        ).one_or_none()
+            )
+            .where(
+                self._primary_compatible_worldline_scope(
+                    AgentProfileSnapshotModel.worldline_id,
+                    world_id,
+                    resolved_worldline_id,
+                ),
+            )
+            .order_by(AgentProfileSnapshotModel.worldline_id.is_(None)),
+        ).first()
         if model is None:
-            model = AgentProfileSnapshotModel(world_id=world_id, agent_id=agent_id)
+            model = AgentProfileSnapshotModel(
+                world_id=world_id,
+                worldline_id=resolved_worldline_id,
+                agent_id=agent_id,
+            )
             self._session.add(model)
+        else:
+            model.worldline_id = resolved_worldline_id
         model.aliases = snapshot.aliases
         model.identity_notes = snapshot.identity_notes
         model.durable_preferences = snapshot.durable_preferences
@@ -505,7 +535,11 @@ class MemoryService:
         except Exception as exc:
             raise MemoryPrivacyDeletionError(str(exc)) from exc
         if scope.run_id is None:
-            self._scrub_local_scope_data(scope.world_id, scope.agent_id)
+            self._scrub_local_scope_data(
+                scope.world_id,
+                scope.agent_id,
+                self._worldline_id(scope.world_id, scope.worldline_id),
+            )
         self._session.flush()
         return result
 
@@ -818,6 +852,7 @@ class MemoryService:
                     [
                         MemoryEvent(
                             world_id=candidate.world_id,
+                            worldline_id=candidate.worldline_id,
                             agent_id=candidate.agent_id,
                             event_id=candidate.source_id,
                             content=candidate.content,
@@ -830,6 +865,7 @@ class MemoryService:
                 self.record_turn(
                     MemoryTurn(
                         world_id=candidate.world_id,
+                        worldline_id=candidate.worldline_id,
                         agent_id=candidate.agent_id,
                         conversation_id=candidate.conversation_id,
                         turn_id=candidate.source_id
@@ -1049,6 +1085,7 @@ class MemoryService:
                 _BackfillCandidate(
                     source_kind=MemoryWriteSourceKind.AGENT_RUN,
                     world_id=run.world_id,
+                    worldline_id=run.worldline_id,
                     agent_id=run.agent_id,
                     source_id=run.id,
                     dedupe_key=f"agent-run:{run.id}",
@@ -1077,6 +1114,7 @@ class MemoryService:
                 _BackfillCandidate(
                     source_kind=MemoryWriteSourceKind.CONVERSATION_TURN,
                     world_id=session_model.world_id,
+                    worldline_id=session_model.worldline_id,
                     agent_id=turn.speaker_agent_id,
                     source_id=turn.id,
                     conversation_id=session_model.id,
@@ -1103,6 +1141,7 @@ class MemoryService:
                 _BackfillCandidate(
                     source_kind=MemoryWriteSourceKind.WORLD_EVENT,
                     world_id=event.world_id,
+                    worldline_id=event.worldline_id,
                     agent_id=agent_id,
                     source_id=event.id,
                     dedupe_key=f"world-event:{event.id}",
@@ -1137,11 +1176,23 @@ class MemoryService:
             return "skipped_disabled_profile_count"
         return None
 
-    def _scrub_local_scope_data(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> None:
+    def _scrub_local_scope_data(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> None:
         for job in self._session.scalars(
             select(MemoryWriteJob).where(
                 MemoryWriteJob.world_id == world_id,
                 MemoryWriteJob.agent_id == agent_id,
+            )
+            .where(
+                self._primary_compatible_worldline_scope(
+                    MemoryWriteJob.worldline_id,
+                    world_id,
+                    worldline_id,
+                ),
             ),
         ).all():
             job.last_error = "deleted_by_forget_scope"
@@ -1152,6 +1203,7 @@ class MemoryService:
                 write_log.response_summary = {"redacted": True}
                 write_log.correlation_ids = {
                     "world_id": str(world_id),
+                    "worldline_id": str(worldline_id),
                     "agent_id": str(agent_id),
                     "redacted": True,
                 }
@@ -1159,6 +1211,13 @@ class MemoryService:
             select(MemoryRetrievalLog).where(
                 MemoryRetrievalLog.world_id == world_id,
                 MemoryRetrievalLog.agent_id == agent_id,
+            )
+            .where(
+                self._primary_compatible_worldline_scope(
+                    MemoryRetrievalLog.worldline_id,
+                    world_id,
+                    worldline_id,
+                ),
             ),
         ).all():
             retrieval_log.query_text = "[redacted]"
@@ -1169,8 +1228,16 @@ class MemoryService:
             select(AgentProfileSnapshotModel).where(
                 AgentProfileSnapshotModel.world_id == world_id,
                 AgentProfileSnapshotModel.agent_id == agent_id,
-            ),
-        ).one_or_none()
+            )
+            .where(
+                self._primary_compatible_worldline_scope(
+                    AgentProfileSnapshotModel.worldline_id,
+                    world_id,
+                    worldline_id,
+                ),
+            )
+            .order_by(AgentProfileSnapshotModel.worldline_id.is_(None)),
+        ).first()
         if snapshot is not None:
             snapshot.aliases = []
             snapshot.identity_notes = []
@@ -1195,6 +1262,17 @@ class MemoryService:
             return worldline.id
         return ensure_primary_worldline(self._session, world_id).id
 
+    def _primary_compatible_worldline_scope(
+        self,
+        column: ColumnElement[uuid.UUID | None] | InstrumentedAttribute[uuid.UUID | None],
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> ColumnElement[bool]:
+        primary = primary_worldline_or_none(self._session, world_id)
+        if primary is not None and primary.id == worldline_id:
+            return or_(column == worldline_id, column.is_(None))
+        return column == worldline_id
+
 
 def _profile_record(model: MemoryBackendProfile) -> MemoryBackendProfileRecord:
     return MemoryBackendProfileRecord(
@@ -1217,6 +1295,7 @@ def _snapshot_record(model: AgentProfileSnapshotModel) -> MemoryProfileSnapshotR
     return MemoryProfileSnapshotRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         agent_id=model.agent_id,
         aliases=model.aliases,
         identity_notes=model.identity_notes,
@@ -1254,6 +1333,7 @@ def _write_job_record(
     return MemoryWriteJobRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         agent_id=model.agent_id,
         backend_profile_id=model.backend_profile_id,
         backend_profile_key=profile.profile_key,
@@ -1324,6 +1404,7 @@ def _retrieval_log_record(model: MemoryRetrievalLog) -> MemoryRetrievalLogRecord
     return MemoryRetrievalLogRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         agent_id=model.agent_id,
         backend_profile_id=model.backend_profile_id,
         backend=model.backend,

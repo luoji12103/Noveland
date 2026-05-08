@@ -59,11 +59,22 @@ class ConversationSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "mode",
             "status",
         ),
+        Index(
+            "ix_conversation_sessions_worldline_mode_status",
+            "world_id",
+            "worldline_id",
+            "mode",
+            "status",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     scene_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scenes.id", ondelete="CASCADE"),

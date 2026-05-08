@@ -35,6 +35,7 @@ from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import Scene, World, Worldline, WorldMembership
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -52,6 +53,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     scene_id = _seed_scene(engine, world_id, "square")
     first_agent_id = _seed_agent(engine, world_id, "guide", scene_id)
     second_agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
+    fork_id = _seed_fork_worldline(engine, world_id)
     _seed_provider_profile(engine)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
@@ -74,6 +76,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
             "title": "Manual chain",
             "scope_type": "scene",
             "mode": "manual_chain",
+            "worldline_id": str(fork_id),
             "scene_id": str(scene_id),
             "max_turns": 3,
             "policy": _policy_json(),
@@ -113,8 +116,16 @@ def test_conversation_api_enforces_access_and_manual_advance(
 
     _authenticate(client, stranger_token)
     stranger_list = client.get(f"/worlds/{world_id}/conversations")
+    with Session(engine) as session:
+        event_worldline_ids = {
+            event.worldline_id
+            for event in session.scalars(
+                select(WorldEventModel).order_by(WorldEventModel.sequence.asc()),
+            )
+        }
 
     assert create_response.status_code == 201
+    assert create_response.json()["worldline_id"] == str(fork_id)
     assert replace_participants.status_code == 200
     assert seed_response.status_code == 200
     assert advance_response.status_code == 200
@@ -130,6 +141,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
     assert member_advance.status_code == 403
     assert stranger_list.status_code == 404
+    assert event_worldline_ids == {fork_id}
 
 
 def test_conversation_memory_summary_reports_config_and_runtime_diagnostics() -> None:
@@ -588,6 +600,24 @@ def _seed_provider_profile(engine: Engine) -> uuid.UUID:
         )
         session.commit()
     return profile_id
+
+
+def _seed_fork_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        primary = ensure_primary_worldline(session, world_id)
+        fork = Worldline(
+            world_id=world_id,
+            worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
+            name="Fork",
+            description="Forked test worldline",
+            parent_worldline_id=primary.id,
+            status="active",
+            created_by_actor_ref="test:conversation-api",
+            metadata_json={},
+        )
+        session.add(fork)
+        session.commit()
+        return fork.id
 
 
 def _add_membership(

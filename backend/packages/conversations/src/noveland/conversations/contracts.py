@@ -114,6 +114,7 @@ class ConversationMemoryConfig(_FrozenContract):
 
 class ConversationSessionCreate(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     scene_id: uuid.UUID | None = None
     session_key: str = Field(pattern=SESSION_KEY_PATTERN, max_length=80)
     title: str = Field(min_length=1, max_length=160)
@@ -158,6 +159,7 @@ class ConversationSeed(_FrozenContract):
 class ConversationSessionRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     scene_id: uuid.UUID | None
     session_key: str
     title: str

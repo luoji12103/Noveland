@@ -48,7 +48,9 @@ from noveland.plugins.errors import (
 )
 from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from noveland.worlds.clock_service import WorldClockService
-from noveland.worlds.models import World
+from noveland.worlds.models import World, Worldline
+from noveland.worlds.worldlines import ensure_primary_worldline
+from sqlalchemy import inspect as inspect_sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -64,6 +66,7 @@ NARRATIVE_ARTIFACT_CREATED_EVENT_NAME = "narrative.artifact_created"
 class AgentRunExecution:
     run_id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID
     agent_id: uuid.UUID
     status: str
     prompt_text: str
@@ -94,13 +97,20 @@ class AgentRuntimeOrchestrator:
         self._profile_service = profile_service
         self._settings = settings
 
-    def list_runs(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> list[AgentRunExecution]:
+    def list_runs(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> list[AgentRunExecution]:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         return [
             _run_record(model)
             for model in self._session.scalars(
                 select(AgentRuntimeRun)
                 .where(
                     AgentRuntimeRun.world_id == world_id,
+                    AgentRuntimeRun.worldline_id == resolved_worldline_id,
                     AgentRuntimeRun.agent_id == agent_id,
                 )
                 .order_by(AgentRuntimeRun.started_at.desc()),
@@ -112,11 +122,14 @@ class AgentRuntimeOrchestrator:
         world_id: uuid.UUID,
         agent_id: uuid.UUID,
         run_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
     ) -> AgentRunExecution | None:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         model = self._session.scalars(
             select(AgentRuntimeRun).where(
                 AgentRuntimeRun.id == run_id,
                 AgentRuntimeRun.world_id == world_id,
+                AgentRuntimeRun.worldline_id == resolved_worldline_id,
                 AgentRuntimeRun.agent_id == agent_id,
             ),
         ).one_or_none()
@@ -138,6 +151,7 @@ class AgentRuntimeOrchestrator:
         max_context_items: int = 5,
         create_narrative_artifact: bool = True,
     ) -> AgentRunExecution:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         started_at = datetime.now(UTC)
         agent = self._agent_or_404(world_id, agent_id)
         observation_service = AgentObservationService(self._session)
@@ -148,7 +162,7 @@ class AgentRuntimeOrchestrator:
         memory_context = (
             memory_service.build_context(
                 world_id=world_id,
-                worldline_id=worldline_id,
+                worldline_id=resolved_worldline_id,
                 agent_id=agent_id,
                 query_text=memory_query_text or prompt_text,
                 max_context_items=max_context_items,
@@ -168,12 +182,13 @@ class AgentRuntimeOrchestrator:
             "observation_ids": [str(observation.id) for observation in observations],
             "observation_count": len(observations),
             "memory_retrieval_enabled": retrieve_memory,
-            "worldline_id": None if worldline_id is None else str(worldline_id),
+            "worldline_id": str(resolved_worldline_id),
             "memory_backend": None if memory_context is None else memory_context.backend,
             "memory_hit_count": 0 if memory_context is None else len(memory_context.items),
         }
         run_model = AgentRuntimeRun(
             world_id=world_id,
+            worldline_id=resolved_worldline_id,
             agent_id=agent_id,
             provider_profile_id=provider_profile_id,
             source_calendar_entry_id=source_calendar_entry_id,
@@ -189,7 +204,7 @@ class AgentRuntimeOrchestrator:
 
         self._append_event(
             world_id=world_id,
-            worldline_id=worldline_id,
+            worldline_id=resolved_worldline_id,
             event_name=AGENT_RUN_STARTED_EVENT_NAME,
             payload={
                 "agent_id": str(agent_id),
@@ -233,7 +248,7 @@ class AgentRuntimeOrchestrator:
             )
             created_event = self._append_event(
                 world_id=world_id,
-                worldline_id=worldline_id,
+                worldline_id=resolved_worldline_id,
                 event_name=AGENT_RUN_COMPLETED_EVENT_NAME,
                 payload={
                     "agent_id": str(agent_id),
@@ -249,7 +264,7 @@ class AgentRuntimeOrchestrator:
                     memory_job = memory_service.record_turn(
                         MemoryTurn(
                             world_id=world_id,
-                            worldline_id=worldline_id,
+                            worldline_id=resolved_worldline_id,
                             agent_id=agent_id,
                             run_id=run_model.id,
                             source_event_id=created_event.id,
@@ -273,7 +288,7 @@ class AgentRuntimeOrchestrator:
                     )
                     self._append_event(
                         world_id=world_id,
-                        worldline_id=worldline_id,
+                        worldline_id=resolved_worldline_id,
                         event_name=MEMORY_ITEM_CREATED_EVENT_NAME,
                         payload={
                             "agent_id": str(agent_id),
@@ -313,7 +328,7 @@ class AgentRuntimeOrchestrator:
                 )
                 self._append_event(
                     world_id=world_id,
-                    worldline_id=worldline_id,
+                    worldline_id=resolved_worldline_id,
                     event_name=NARRATIVE_ARTIFACT_CREATED_EVENT_NAME,
                     payload={
                         "artifact_id": str(artifact.id),
@@ -366,7 +381,7 @@ class AgentRuntimeOrchestrator:
                 )
             failed_event = self._append_event(
                 world_id=world_id,
-                worldline_id=worldline_id,
+                worldline_id=resolved_worldline_id,
                 event_name=AGENT_RUN_FAILED_EVENT_NAME,
                 payload={
                     "agent_id": str(agent_id),
@@ -412,6 +427,7 @@ class AgentRuntimeOrchestrator:
             )
             enabled_agents = self._enabled_agents(world_id)
             due_entries_by_agent = _entries_by_agent(due_entries)
+            primary_worldline_id = ensure_primary_worldline(self._session, world_id).id
 
             for agent in enabled_agents:
                 if executed_runs >= batch_limit:
@@ -422,6 +438,7 @@ class AgentRuntimeOrchestrator:
 
                 self._append_event(
                     world_id=world_id,
+                    worldline_id=primary_worldline_id,
                     event_name=CALENDAR_ENTRY_DUE_EVENT_NAME,
                     payload={
                         "agent_id": str(agent.id),
@@ -434,6 +451,7 @@ class AgentRuntimeOrchestrator:
                 first_rule_id = due_rules[0].id if due_rules else None
                 self.run_agent(
                     world_id=world_id,
+                    worldline_id=primary_worldline_id,
                     agent_id=agent.id,
                     prompt_text=_due_prompt(agent, world_time, agent_due_entries, due_rules),
                     trigger_source="runtime_tick",
@@ -452,6 +470,7 @@ class AgentRuntimeOrchestrator:
         artifact_kind: NarrativeArtifactKind,
         agent_id: uuid.UUID | None = None,
     ) -> NarrativeArtifactRecord:
+        worldline_id = ensure_primary_worldline(self._session, world_id).id
         artifact = NarrativeArtifactService(self._session).create_artifact(
             NarrativeArtifactCreate(
                 world_id=world_id,
@@ -463,6 +482,7 @@ class AgentRuntimeOrchestrator:
         )
         self._append_event(
             world_id=world_id,
+            worldline_id=worldline_id,
             event_name=NARRATIVE_ARTIFACT_CREATED_EVENT_NAME,
             payload={
                 "artifact_id": str(artifact.id),
@@ -552,6 +572,14 @@ class AgentRuntimeOrchestrator:
             raise LookupError("World not found")
         return world
 
+    def _worldline_id(self, world_id: uuid.UUID, worldline_id: uuid.UUID | None) -> uuid.UUID:
+        if worldline_id is None:
+            return ensure_primary_worldline(self._session, world_id).id
+        worldline = self._session.get(Worldline, worldline_id)
+        if worldline is None or worldline.world_id != world_id:
+            raise LookupError("Worldline not found")
+        return worldline.id
+
     def _plugin_instance(
         self,
         *,
@@ -632,9 +660,16 @@ def _entries_by_agent(
 
 
 def _run_record(model: AgentRuntimeRun) -> AgentRunExecution:
+    worldline_id = model.worldline_id
+    if worldline_id is None:
+        session = inspect_sqlalchemy(model).session
+        if session is None:
+            raise RuntimeError("Agent runtime run is detached and missing worldline_id")
+        worldline_id = ensure_primary_worldline(session, model.world_id).id
     return AgentRunExecution(
         run_id=model.id,
         world_id=model.world_id,
+        worldline_id=worldline_id,
         agent_id=model.agent_id,
         status=model.status,
         prompt_text=model.prompt_text,

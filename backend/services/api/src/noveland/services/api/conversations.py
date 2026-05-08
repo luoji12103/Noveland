@@ -93,6 +93,7 @@ class ConversationPolicyRequest(_RequestModel):
 
 class ConversationCreateRequest(_RequestModel):
     session_key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$", max_length=80)
+    worldline_id: uuid.UUID | None = None
     title: str = Field(min_length=1, max_length=160)
     scope_type: Literal["scene", "world"]
     mode: Literal["manual_chain", "auto_dialogue"]
@@ -255,6 +256,7 @@ class ConversationMemorySummaryResponse(BaseModel):
 class ConversationSessionResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     scene_id: uuid.UUID | None
     session_key: str
     title: str
@@ -373,6 +375,7 @@ def create_conversation(
         session = ConversationService(db_session).create_session(
             ConversationSessionCreate(
                 world_id=context.world_id,
+                worldline_id=conversation_create.worldline_id,
                 scene_id=conversation_create.scene_id,
                 session_key=conversation_create.session_key,
                 title=conversation_create.title,
@@ -941,6 +944,7 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
     return ConversationSessionResponse(
         id=session.id,
         world_id=session.world_id,
+        worldline_id=session.worldline_id,
         scene_id=session.scene_id,
         session_key=session.session_key,
         title=session.title,

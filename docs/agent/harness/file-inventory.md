@@ -119,6 +119,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260506_0026_living_world_plot_route_rumor_flow.py`
 - `backend/migrations/versions/20260507_0027_living_world_knowledge_player_guardrails.py`
 - `backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`
+- `backend/migrations/versions/20260507_0029_runtime_worldline_memory_isolation.py`
 - `backend/packages/calendar/`
 - `backend/packages/calendar/src/noveland/calendar/contracts.py`
 - `backend/packages/calendar/src/noveland/calendar/models.py`

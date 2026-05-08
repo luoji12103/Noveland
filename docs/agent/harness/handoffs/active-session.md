@@ -1,35 +1,31 @@
 # Active Session Handoff
 
-- Date: 2026-05-07T16:10:00Z
-- Branch: main
-- Objective: Record V2 living-world phases 36-50 acceptance quality after the completed roadmap implementation.
-- Status: V2 phases 1-50 are implemented and merged into local `main`. Current work is docs-only acceptance logging; no push is planned.
+- Date: 2026-05-08T05:35:00Z
+- Branch: fix/v2-runtime-worldline-memory-isolation
+- Objective: Complete V2 acceptance remediation bundle 1 for runtime worldline and memory isolation.
+- Status: Implementation and targeted checks are complete on the feature branch. Final gate and fast-forward merge to local `main` remain.
 
-## Completed Roadmap State
+## Completed This Bundle
 
-- V2 phases 36-45 delivered knowledge facts, secrets/reveals, emotional states, relationship repair, player journal, notifications, interventions, GM style diagnostics, and narrative continuity review.
-- V2 phases 46-50 delivered route/ending planning, long-run evals, sequel-world authoring templates, release profile records, and beta checklist evidence.
-- The final beta-readiness gate passed, and `feat/living-world-beta-release-readiness` has already been fast-forward merged into local `main`.
+- Added migration `20260507_0029_runtime_worldline_memory_isolation.py` for `worldline_id` on runtime runs, conversation sessions, and agent profile snapshots.
+- Propagated resolved worldline scope through agent runtime runs, conversation sessions, conversation runtime turns, runtime events, memory context, memory write jobs, retrieval logs, profile snapshots, fake/local memory backend filters, memory forget/delete scrubbing, and backfill candidates.
+- Preserved backward compatibility by resolving omitted worldlines to the primary worldline and treating legacy NULL memory/profile rows as primary-worldline data.
+- Exposed worldline metadata on agent run, memory snapshot, memory write job, and memory retrieval log response contracts.
 
-## Acceptance Logging
-
-- `docs/agent/harness/debug-journal.md` now records the phases 36-50 acceptance quality report beside the existing phases 1-35 follow-up record.
-- `docs/agent/harness/task-board.md` points future hardening selection to those acceptance reports and beta/operator evidence.
-
-## Final Gate Passed
+## Checks Passed
 
 - `cd backend && uv run ruff check .`
 - `cd backend && uv run mypy .`
 - `cd backend && uv run pytest`
+- `cd backend && uv run pytest tests/test_memory_backend.py tests/test_runtime_daemon.py tests/test_conversation_services.py tests/test_api_conversations.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_alembic_config.py -q`
 - `cd web && npm run lint`
 - `cd web && npm run typecheck`
-- `cd web && npm run test`
-- `cd web && npm run build`
-- `cd web && npm run check:next-env`
-- `cd web && npm run test:e2e`
-- `docker compose -f infra/compose.yaml config`
+- `cd web && npm run test -- lib/worlds/client.test.ts features/worlds/world-overview.test.tsx features/agents/agent-builder.test.tsx features/admin/memory-backend-admin.test.tsx`
 - `git diff --check`
 
 ## Remaining Closeout
 
-- For this docs-only acceptance logging update, run `git diff --check` and commit the harness changes on `main`.
+- Run the full Web test/build/e2e and compose config portions of the final gate.
+- Restore `web/next-env.d.ts` if build/e2e churns it, then rerun `npm run check:next-env`.
+- Commit the branch and fast-forward merge back into local `main` if the final gate remains clean.
+- Start the next remediation branch from clean `main`: `feat/v2-prompt-leak-publish-guardrails`.

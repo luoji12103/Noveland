@@ -30,6 +30,7 @@ from noveland.memory.models import (
 )
 from noveland.narrative.models import NarrativeArtifact
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.services.runtime.agent_loop import AgentRuntimeOrchestrator
 from noveland.services.runtime.daemon import RuntimeDaemon
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.models import (
@@ -46,6 +47,7 @@ from noveland.worlds.models import (
     Worldline,
     WorldOrganization,
 )
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -150,6 +152,107 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     assert finished_diagnostic.details["processed_memory_jobs"] == 1
 
 
+def test_run_agent_scopes_run_events_and_memory_jobs_to_fork_worldline(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "runtime-fork.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "runtime-fork-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    fork_id = _seed_fork_worldline(engine, world_id)
+    _seed_provider_profile(engine, "runtime-profile", "runtime-ref")
+
+    def fake_invoke_profile(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile, prompt
+        return ProviderCompletion(text="Fork runtime response", raw_response={"ok": True})
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
+
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+        provider_api_keys_json={"runtime-ref": "secret-key"},
+        runtime_loop_interval_seconds=1,
+        runtime_batch_limit=20,
+    )
+    with Session(engine) as session:
+        profile_service = ProviderProfileService(session, settings)
+        run = AgentRuntimeOrchestrator(session, profile_service, settings).run_agent(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            prompt_text="Fork prompt",
+            trigger_source="manual",
+            create_narrative_artifact=False,
+        )
+        run_model = session.get(AgentRuntimeRun, run.run_id)
+        events = session.scalars(
+            select(WorldEventModel).order_by(WorldEventModel.sequence.asc()),
+        ).all()
+        job = session.scalars(
+            select(MemoryWriteJob).where(MemoryWriteJob.dedupe_key == f"agent-run:{run.run_id}"),
+        ).one()
+        run_model_worldline_id = None if run_model is None else run_model.worldline_id
+        event_names = {event.event_name for event in events}
+        event_worldline_ids = {event.worldline_id for event in events}
+        job_worldline_id = job.worldline_id
+        session.commit()
+
+    assert run.worldline_id == fork_id
+    assert run_model_worldline_id == fork_id
+    assert event_names == {
+        "agent.run_started",
+        "agent.run_completed",
+        "memory.item_created",
+    }
+    assert event_worldline_ids == {fork_id}
+    assert job_worldline_id == fork_id
+
+
+def test_run_agent_rejects_cross_world_worldline(tmp_path: Path) -> None:
+    database_path = tmp_path / "runtime-cross-worldline.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    source_world_id = _seed_world(engine, user_id, "source-world")
+    other_world_id = _seed_world(engine, user_id, "other-world")
+    agent_id = _seed_agent(engine, source_world_id, "guide")
+    other_worldline_id = _seed_fork_worldline(engine, other_world_id)
+    _seed_provider_profile(engine, "runtime-profile", "runtime-ref")
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+        provider_api_keys_json={"runtime-ref": "secret-key"},
+    )
+
+    with Session(engine) as session:
+        profile_service = ProviderProfileService(session, settings)
+        with pytest.raises(LookupError, match="Worldline not found"):
+            AgentRuntimeOrchestrator(session, profile_service, settings).run_agent(
+                world_id=source_world_id,
+                worldline_id=other_worldline_id,
+                agent_id=agent_id,
+                prompt_text="Should fail",
+                trigger_source="manual",
+                create_narrative_artifact=False,
+            )
+
+
 def test_runtime_daemon_advances_running_auto_conversation(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -162,9 +265,10 @@ def test_runtime_daemon_advances_running_auto_conversation(
     user_id = _seed_user(engine)
     world_id = _seed_world(engine, user_id, "conversation-world")
     agent_id = _seed_agent(engine, world_id, "speaker")
+    fork_id = _seed_fork_worldline(engine, world_id)
     _seed_provider_profile(engine, "runtime-profile", "runtime-ref")
     _seed_runtime_control(engine, "running")
-    _seed_running_conversation(engine, world_id, agent_id)
+    _seed_running_conversation(engine, world_id, agent_id, fork_id)
 
     def fake_invoke_profile(
         self: ProviderProfileService,
@@ -197,6 +301,8 @@ def test_runtime_daemon_advances_running_auto_conversation(
         turns = session.scalars(
             select(ConversationTurn).order_by(ConversationTurn.turn_index.asc()),
         ).all()
+        run_model = session.scalars(select(AgentRuntimeRun)).one()
+        memories = session.scalars(select(AgentMemoryItem)).all()
         events = session.scalars(
             select(WorldEventModel).order_by(WorldEventModel.sequence),
         ).all()
@@ -204,10 +310,15 @@ def test_runtime_daemon_advances_running_auto_conversation(
     assert result.executed_runs == 1
     assert result.processed_memory_jobs == 1
     assert session_model.next_turn_index == 1
+    assert session_model.worldline_id == fork_id
     assert len(turns) == 1
     assert turns[0].speaker_kind == "agent"
     assert turns[0].output_text is not None
     assert {event.actor_ref for event in events} == {"system:runtime"}
+    assert turns[0].run_id is not None
+    assert run_model.worldline_id == fork_id
+    assert {memory.worldline_id for memory in memories} == {fork_id}
+    assert {event.worldline_id for event in events} == {fork_id}
 
 
 def _create_tables(engine: Engine) -> None:
@@ -343,13 +454,19 @@ def _seed_runtime_control(engine: Engine, desired_state: str) -> None:
         session.commit()
 
 
-def _seed_running_conversation(engine: Engine, world_id: uuid.UUID, agent_id: uuid.UUID) -> None:
+def _seed_running_conversation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    worldline_id: uuid.UUID | None = None,
+) -> None:
     session_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ConversationSession(
                 id=session_id,
                 world_id=world_id,
+                worldline_id=worldline_id,
                 scene_id=None,
                 session_key="runtime-session",
                 title="Runtime session",
@@ -385,3 +502,21 @@ def _seed_running_conversation(engine: Engine, world_id: uuid.UUID, agent_id: uu
             ),
         )
         session.commit()
+
+
+def _seed_fork_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        primary = ensure_primary_worldline(session, world_id)
+        fork = Worldline(
+            world_id=world_id,
+            worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
+            name="Fork",
+            description="Forked test worldline",
+            parent_worldline_id=primary.id,
+            status="active",
+            created_by_actor_ref="test:runtime",
+            metadata_json={},
+        )
+        session.add(fork)
+        session.commit()
+        return fork.id

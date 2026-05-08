@@ -46,6 +46,8 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
+from noveland.worlds.models import Worldline
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -105,9 +107,11 @@ class ConversationService:
     def create_session(self, conversation: ConversationSessionCreate) -> ConversationSessionRecord:
         if self._session_key_exists(conversation.world_id, conversation.session_key):
             raise ConversationValidationError("Conversation session key already exists")
+        worldline_id = self._worldline_id(conversation.world_id, conversation.worldline_id)
         model = ConversationSession(
             id=uuid.uuid4(),
             world_id=conversation.world_id,
+            worldline_id=worldline_id,
             scene_id=conversation.scene_id,
             session_key=conversation.session_key,
             title=conversation.title,
@@ -316,6 +320,7 @@ class ConversationService:
         if model.status == ConversationSessionStatus.DRAFT.value:
             self._append_event(
                 world_id=model.world_id,
+                worldline_id=model.worldline_id,
                 event_name=CONVERSATION_SESSION_STARTED_EVENT_NAME,
                 payload={
                     "conversation_id": str(model.id),
@@ -450,6 +455,7 @@ class ConversationService:
         if emit_started_event:
             self._append_event(
                 world_id=session_model.world_id,
+                worldline_id=session_model.worldline_id,
                 event_name=CONVERSATION_SESSION_STARTED_EVENT_NAME,
                 payload={
                     "conversation_id": str(session_model.id),
@@ -500,6 +506,7 @@ class ConversationService:
             session_model.next_turn_index += 1
             self._append_event(
                 world_id=session_model.world_id,
+                worldline_id=session_model.worldline_id,
                 event_name=CONVERSATION_TURN_COMPLETED_EVENT_NAME,
                 payload={
                     "conversation_id": str(session_model.id),
@@ -556,6 +563,7 @@ class ConversationService:
             session_model.next_turn_index += 1
             self._append_event(
                 world_id=session_model.world_id,
+                worldline_id=session_model.worldline_id,
                 event_name=CONVERSATION_TURN_SKIPPED_EVENT_NAME,
                 payload={
                     "conversation_id": str(session_model.id),
@@ -596,6 +604,7 @@ class ConversationService:
         else:
             self._append_event(
                 world_id=session_model.world_id,
+                worldline_id=session_model.worldline_id,
                 event_name=CONVERSATION_TURN_FAILED_EVENT_NAME,
                 payload={
                     "conversation_id": str(session_model.id),
@@ -925,6 +934,7 @@ class ConversationService:
         session_model.terminal_reason = ConversationTerminalReason.MAX_TURNS_REACHED.value
         self._append_event(
             world_id=session_model.world_id,
+            worldline_id=session_model.worldline_id,
             event_name=CONVERSATION_SESSION_COMPLETED_EVENT_NAME,
             payload={
                 "conversation_id": str(session_model.id),
@@ -948,6 +958,7 @@ class ConversationService:
         session_model.terminal_reason = terminal_reason.value
         self._append_event(
             world_id=session_model.world_id,
+            worldline_id=session_model.worldline_id,
             event_name=event_name,
             payload={
                 **details,
@@ -989,6 +1000,7 @@ class ConversationService:
         }
         self._append_event(
             world_id=session_model.world_id,
+            worldline_id=session_model.worldline_id,
             event_name=CONVERSATION_SESSION_FAILED_EVENT_NAME,
             payload=payload,
         )
@@ -1030,18 +1042,28 @@ class ConversationService:
         self,
         *,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
         event_name: str,
         payload: dict[str, object],
     ) -> None:
         WorldEventStore(self._session).append_event(
             WorldEventAppend(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 event_name=event_name,
                 payload=payload,
                 wall_time=datetime.now(UTC),
                 actor_ref=self._actor_ref,
             ),
         )
+
+    def _worldline_id(self, world_id: uuid.UUID, worldline_id: uuid.UUID | None) -> uuid.UUID:
+        if worldline_id is None:
+            return ensure_primary_worldline(self._session, world_id).id
+        worldline = self._session.get(Worldline, worldline_id)
+        if worldline is None or worldline.world_id != world_id:
+            raise ConversationValidationError("Conversation worldline must belong to the world")
+        return worldline.id
 
 
 def _session_record(model: ConversationSession) -> ConversationSessionRecord:
@@ -1053,6 +1075,7 @@ def _session_record(model: ConversationSession) -> ConversationSessionRecord:
     return ConversationSessionRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         scene_id=model.scene_id,
         session_key=model.session_key,
         title=model.title,

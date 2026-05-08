@@ -39,6 +39,7 @@ from noveland.memory.models import (
 )
 from noveland.plugins.constants import BUILTIN_MEM0_OSS_MEMORY
 from noveland.worlds.models import World, Worldline
+from noveland.worlds.worldlines import ensure_primary_worldline
 from pydantic import ValidationError
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -105,6 +106,72 @@ def test_local_pgvector_memory_backend_records_lists_searches_and_deletes_scope(
     assert after_delete == []
 
 
+def test_local_pgvector_memory_backend_isolates_worldline_list_search_and_delete() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    primary_id, fork_id = _seed_worldlines(engine, world_id)
+
+    with Session(engine) as session:
+        backend = LocalPgvectorMemoryBackend(session)
+        backend.record_turn(
+            MemoryTurn(
+                world_id=world_id,
+                worldline_id=primary_id,
+                agent_id=agent_id,
+                messages=[MemoryMessage(role="assistant", content="primary tea")],
+                dedupe_key="primary-turn",
+            ),
+        )
+        backend.record_turn(
+            MemoryTurn(
+                world_id=world_id,
+                worldline_id=fork_id,
+                agent_id=agent_id,
+                messages=[MemoryMessage(role="assistant", content="branch tea")],
+                dedupe_key="fork-turn",
+            ),
+        )
+        session.add(
+            AgentMemoryItem(
+                world_id=world_id,
+                worldline_id=None,
+                agent_id=agent_id,
+                content="legacy tea",
+                metadata_json={"source": "legacy"},
+                embedding=[0.25] * 1536,
+                visibility="private",
+                is_active=True,
+            ),
+        )
+        session.flush()
+
+        primary_items = backend.list_memories(world_id, agent_id, primary_id)
+        fork_items = backend.list_memories(world_id, agent_id, fork_id)
+        fork_search = backend.search(
+            MemorySearchRequest(
+                world_id=world_id,
+                worldline_id=fork_id,
+                agent_id=agent_id,
+                query_text="tea",
+            ),
+        )
+        delete_result = backend.delete_scope(
+            MemoryDeleteScope(world_id=world_id, worldline_id=fork_id, agent_id=agent_id),
+        )
+        after_delete_primary = backend.list_memories(world_id, agent_id, primary_id)
+        after_delete_fork = backend.list_memories(world_id, agent_id, fork_id)
+        session.commit()
+
+    assert {item.content for item in primary_items} == {"primary tea", "legacy tea"}
+    assert [item.content for item in fork_items] == ["branch tea"]
+    assert [item.content for item in fork_search.items] == ["branch tea"]
+    assert delete_result.deleted_count == 1
+    assert {item.content for item in after_delete_primary} == {"primary tea", "legacy tea"}
+    assert after_delete_fork == []
+
+
 def test_fake_memory_backend_matches_long_term_memory_contract() -> None:
     world_id = uuid.uuid4()
     agent_id = uuid.uuid4()
@@ -141,6 +208,55 @@ def test_fake_memory_backend_matches_long_term_memory_contract() -> None:
     assert len(search_result.items) == 2
     assert delete_result.deleted_count == 2
     assert backend.healthcheck().status.value == "ok"
+
+
+def test_fake_memory_backend_isolates_worldlines() -> None:
+    world_id = uuid.uuid4()
+    primary_id = uuid.uuid4()
+    fork_id = uuid.uuid4()
+    agent_id = uuid.uuid4()
+    backend = FakeMemoryBackend()
+
+    backend.record_turn(
+        MemoryTurn(
+            world_id=world_id,
+            worldline_id=primary_id,
+            agent_id=agent_id,
+            messages=[MemoryMessage(role="assistant", content="primary memory")],
+            dedupe_key="primary-turn",
+        ),
+    )
+    backend.record_events(
+        [
+            MemoryEvent(
+                world_id=world_id,
+                worldline_id=fork_id,
+                agent_id=agent_id,
+                event_id=uuid.uuid4(),
+                content="fork memory",
+                dedupe_key="fork-event",
+            )
+        ],
+    )
+
+    primary_items = backend.list_memories(world_id, agent_id, primary_id)
+    fork_search = backend.search(
+        MemorySearchRequest(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            query_text="fork",
+        ),
+    )
+    delete_result = backend.delete_scope(
+        MemoryDeleteScope(world_id=world_id, worldline_id=fork_id, agent_id=agent_id),
+    )
+
+    assert [item.content for item in primary_items] == ["primary memory"]
+    assert [item.content for item in fork_search.items] == ["fork memory"]
+    assert delete_result.deleted_count == 1
+    assert backend.list_memories(world_id, agent_id, primary_id)
+    assert backend.list_memories(world_id, agent_id, fork_id) == []
 
 
 def test_mem0_oss_backend_translates_sdk_payloads() -> None:
@@ -307,6 +423,7 @@ def test_memory_service_delete_scope_scrubs_logs_and_snapshots() -> None:
     assert snapshot == MemoryProfileSnapshotRecord(
         id=snapshot.id,
         world_id=world_id,
+        worldline_id=snapshot.worldline_id,
         agent_id=agent_id,
         aliases=[],
         identity_notes=[],
@@ -317,6 +434,209 @@ def test_memory_service_delete_scope_scrubs_logs_and_snapshots() -> None:
         created_at=snapshot.created_at,
         updated_at=snapshot.updated_at,
     )
+
+
+def test_memory_service_build_context_and_delete_scope_are_worldline_scoped() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    primary_id, fork_id = _seed_worldlines(engine, world_id)
+
+    with Session(engine) as session:
+        profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="scoped-local-memory",
+                name="Scoped local memory",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        world = session.get(World, world_id)
+        assert world is not None
+        world.memory_backend_profile_id = profile.id
+        session.add_all(
+            [
+                AgentMemoryItem(
+                    world_id=world_id,
+                    worldline_id=primary_id,
+                    agent_id=agent_id,
+                    content="primary memory prefers quiet mornings",
+                    metadata_json={"scope": "primary"},
+                    embedding=[0.2] * 1536,
+                    visibility="private",
+                    is_active=True,
+                ),
+                AgentMemoryItem(
+                    world_id=world_id,
+                    worldline_id=fork_id,
+                    agent_id=agent_id,
+                    content="fork memory prefers rainy evenings",
+                    metadata_json={"scope": "fork"},
+                    embedding=[0.4] * 1536,
+                    visibility="private",
+                    is_active=True,
+                ),
+                AgentProfileSnapshotModel(
+                    world_id=world_id,
+                    worldline_id=primary_id,
+                    agent_id=agent_id,
+                    aliases=["primary"],
+                    identity_notes=["primary identity"],
+                    durable_preferences=["primary preference"],
+                    long_lived_goals=[],
+                    language_style_preferences=[],
+                ),
+                AgentProfileSnapshotModel(
+                    world_id=world_id,
+                    worldline_id=fork_id,
+                    agent_id=agent_id,
+                    aliases=["fork"],
+                    identity_notes=["fork identity"],
+                    durable_preferences=["fork preference"],
+                    long_lived_goals=[],
+                    language_style_preferences=[],
+                ),
+            ],
+        )
+        primary_job = MemoryWriteJob(
+            world_id=world_id,
+            worldline_id=primary_id,
+            agent_id=agent_id,
+            backend_profile_id=profile.id,
+            source_kind="agent_run",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "primary"},
+            dedupe_key="primary-job",
+            status="succeeded",
+            attempt_count=1,
+            next_attempt_at=datetime.now(UTC),
+        )
+        fork_job = MemoryWriteJob(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            backend_profile_id=profile.id,
+            source_kind="agent_run",
+            source_id=uuid.uuid4(),
+            payload_json={"content": "fork"},
+            dedupe_key="fork-job",
+            status="succeeded",
+            attempt_count=1,
+            next_attempt_at=datetime.now(UTC),
+        )
+        session.add_all([primary_job, fork_job])
+        session.flush()
+        session.add_all(
+            [
+                MemoryWriteLog(
+                    job_id=primary_job.id,
+                    backend="local_pgvector",
+                    success=True,
+                    latency_ms=1,
+                    request_summary={"prompt": "primary-secret"},
+                    response_summary={"stored": True},
+                    correlation_ids={"run": "primary"},
+                ),
+                MemoryWriteLog(
+                    job_id=fork_job.id,
+                    backend="local_pgvector",
+                    success=True,
+                    latency_ms=1,
+                    request_summary={"prompt": "fork-secret"},
+                    response_summary={"stored": True},
+                    correlation_ids={"run": "fork"},
+                ),
+                MemoryRetrievalLog(
+                    world_id=world_id,
+                    worldline_id=primary_id,
+                    agent_id=agent_id,
+                    backend_profile_id=profile.id,
+                    backend="local_pgvector",
+                    query_text="primary",
+                    hit_count=1,
+                    selected_item_ids=["primary"],
+                    latency_ms=1,
+                    context_item_count=1,
+                ),
+                MemoryRetrievalLog(
+                    world_id=world_id,
+                    worldline_id=fork_id,
+                    agent_id=agent_id,
+                    backend_profile_id=profile.id,
+                    backend="local_pgvector",
+                    query_text="fork",
+                    hit_count=1,
+                    selected_item_ids=["fork"],
+                    latency_ms=1,
+                    context_item_count=1,
+                ),
+            ],
+        )
+        session.flush()
+
+        service = MemoryService(session, AppSettings())
+        context = service.build_context(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            query_text="memory",
+            max_context_items=5,
+        )
+        delete_result = service.delete_scope(
+            MemoryDeleteScope(world_id=world_id, worldline_id=fork_id, agent_id=agent_id),
+        )
+        primary_snapshot = service.get_profile_snapshot(world_id, agent_id, primary_id)
+        fork_snapshot = service.get_profile_snapshot(world_id, agent_id, fork_id)
+        primary_write_log = session.scalars(
+            select(MemoryWriteLog).where(MemoryWriteLog.job_id == primary_job.id),
+        ).one()
+        fork_write_log = session.scalars(
+            select(MemoryWriteLog).where(MemoryWriteLog.job_id == fork_job.id),
+        ).one()
+        retrieval_logs = session.scalars(
+            select(MemoryRetrievalLog).order_by(MemoryRetrievalLog.occurred_at.asc()),
+        ).all()
+        remaining_primary = LocalPgvectorMemoryBackend(session).list_memories(
+            world_id,
+            agent_id,
+            primary_id,
+        )
+        remaining_fork = LocalPgvectorMemoryBackend(session).list_memories(
+            world_id,
+            agent_id,
+            fork_id,
+        )
+        primary_write_summary = dict(primary_write_log.request_summary)
+        fork_write_summary = dict(fork_write_log.request_summary)
+        retrieval_query_texts = [
+            (log.worldline_id, log.query_text)
+            for log in retrieval_logs
+        ]
+        remaining_primary_content = [item.content for item in remaining_primary]
+        remaining_fork_content = [item.content for item in remaining_fork]
+        session.commit()
+
+    assert context.worldline_id == fork_id
+    assert [item.content for item in context.items] == ["fork memory prefers rainy evenings"]
+    assert delete_result.deleted_count == 1
+    assert primary_snapshot is not None
+    assert primary_snapshot.aliases == ["primary"]
+    assert fork_snapshot is not None
+    assert fork_snapshot.aliases == []
+    assert primary_write_summary == {"prompt": "primary-secret"}
+    assert fork_write_summary == {"redacted": True}
+    primary_retrieval_queries = [
+        query for worldline_id, query in retrieval_query_texts if worldline_id == primary_id
+    ]
+    fork_retrieval_queries = [
+        query for worldline_id, query in retrieval_query_texts if worldline_id == fork_id
+    ]
+    assert primary_retrieval_queries == ["primary"]
+    assert all(
+        query == "[redacted]" for query in fork_retrieval_queries
+    )
+    assert remaining_primary_content == ["primary memory prefers quiet mornings"]
+    assert remaining_fork_content == []
 
 
 def test_memory_service_lists_summarizes_and_retries_write_jobs() -> None:
@@ -684,6 +1004,92 @@ def test_memory_backfill_execution_enqueues_candidates_idempotently() -> None:
     assert readiness.issues == []
 
 
+def test_memory_backfill_preserves_source_worldline_ids() -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    _primary_id, fork_id = _seed_worldlines(engine, world_id)
+    now = datetime.now(UTC)
+
+    with Session(engine) as session:
+        profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="worldline-backfill",
+                name="Worldline backfill",
+                backend_kind=MemoryBackendKind.LOCAL_PGVECTOR,
+            )
+        )
+        world = session.get(World, world_id)
+        assert world is not None
+        world.memory_backend_profile_id = profile.id
+        run = AgentRuntimeRun(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            status="succeeded",
+            trigger_source="runtime_tick",
+            prompt_text="Remember fork run",
+            response_text="Fork run memory",
+            diagnostics={},
+            started_at=now,
+            finished_at=now,
+        )
+        conversation = ConversationSession(
+            world_id=world_id,
+            worldline_id=fork_id,
+            session_key="fork-backfill-conversation",
+            title="Fork backfill conversation",
+            scope_type="world",
+            mode="auto_dialogue",
+            status="running",
+            objective="test",
+            opening_prompt="test",
+            max_turns=3,
+            next_turn_index=1,
+            policy_config={},
+            writer_config={},
+            memory_config={},
+        )
+        event = WorldEventModel(
+            world_id=world_id,
+            worldline_id=fork_id,
+            sequence=1,
+            event_name="agent.run_completed",
+            payload={"agent_id": str(agent_id), "content": "Fork event memory"},
+            wall_time=now,
+            actor_ref="agent:guide",
+        )
+        session.add_all([run, conversation, event])
+        session.flush()
+        turn = ConversationTurn(
+            session_id=conversation.id,
+            turn_index=0,
+            speaker_kind="agent",
+            speaker_agent_id=agent_id,
+            input_text="input",
+            output_text="Fork conversation memory",
+            status="succeeded",
+        )
+        session.add(turn)
+        session.flush()
+        expected_dedupe_keys = {
+            f"agent-run:{run.id}",
+            f"conversation-turn:{turn.id}",
+            f"world-event:{event.id}",
+        }
+
+        result = MemoryService(session, AppSettings()).execute_backfill(limit=10)
+        jobs = session.scalars(select(MemoryWriteJob)).all()
+        job_dedupe_keys = {job.dedupe_key for job in jobs}
+        job_worldline_ids = {job.worldline_id for job in jobs}
+        session.commit()
+
+    assert result.enqueued_count == 3
+    assert job_dedupe_keys == expected_dedupe_keys
+    assert job_worldline_ids == {fork_id}
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -749,6 +1155,24 @@ def _seed_agent(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
         )
         session.commit()
     return agent_id
+
+
+def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    with Session(engine) as session:
+        primary = ensure_primary_worldline(session, world_id)
+        fork = Worldline(
+            world_id=world_id,
+            worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
+            name="Fork",
+            description="Forked test worldline",
+            parent_worldline_id=primary.id,
+            status="active",
+            created_by_actor_ref="test:memory",
+            metadata_json={},
+        )
+        session.add(fork)
+        session.commit()
+        return primary.id, fork.id
 
 
 class _FakeMem0Client:

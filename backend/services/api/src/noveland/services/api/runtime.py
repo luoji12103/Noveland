@@ -294,6 +294,7 @@ class MemoryWriteLogResponse(BaseModel):
 class MemoryRetrievalLogResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     backend_profile_id: uuid.UUID | None
     backend: str
@@ -313,6 +314,7 @@ class MemoryBackendLogsResponse(BaseModel):
 class MemoryWriteJobResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     backend_profile_id: uuid.UUID
     backend_profile_key: str

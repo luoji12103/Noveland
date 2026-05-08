@@ -851,6 +851,7 @@ const memoryWriteJobs = [
   {
     id: "71900000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     agent_id: agentGuideId,
     backend_profile_id: memoryProfilePrimaryId,
     backend_profile_key: "primary-mem0",
@@ -876,6 +877,7 @@ const memoryRetrievalLogs = [
   {
     id: "71800000-0000-4000-8000-000000000002",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     agent_id: agentGuideId,
     backend_profile_id: memoryProfilePrimaryId,
     backend: "builtin.mem0_oss_memory",
@@ -982,6 +984,7 @@ const agentRuns = [
   {
     run_id: "72000000-0000-4000-8000-000000000001",
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     agent_id: agentGuideId,
     status: "succeeded",
     prompt_text: "Initial prompt",
@@ -5176,6 +5179,7 @@ async function handleAgentRun(request, response, currentSubject, worldId, agentI
     const run = {
       run_id: randomUUID(),
       world_id: worldId,
+      worldline_id: body.worldline_id ?? primaryWorldlineId,
       agent_id: agentId,
       status: "succeeded",
       prompt_text: body.prompt ?? "Manual run",

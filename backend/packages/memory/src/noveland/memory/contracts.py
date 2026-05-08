@@ -117,6 +117,7 @@ class AgentProfileSnapshot(_FrozenContract):
 
 
 class MemoryContext(_FrozenContract):
+    worldline_id: uuid.UUID
     backend: str
     items: list[MemoryContextItem]
     profile_snapshot: AgentProfileSnapshot | None = None
@@ -200,6 +201,7 @@ class MemoryBackendProfileRecord(_FrozenContract):
 class MemoryProfileSnapshotRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     aliases: list[str] = Field(default_factory=list)
     identity_notes: list[str] = Field(default_factory=list)
@@ -240,6 +242,7 @@ class MemoryWriteLogRecord(_FrozenContract):
 class MemoryWriteJobRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     backend_profile_id: uuid.UUID
     backend_profile_key: str
@@ -320,6 +323,7 @@ class MemoryBackfillExecutionResult(_FrozenContract):
 class MemoryRetrievalLogRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     backend_profile_id: uuid.UUID | None = None
     backend: str

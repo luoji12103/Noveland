@@ -31,7 +31,8 @@ from noveland.conversations.models import (
 from noveland.events.models import WorldEventModel
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.worlds.models import Scene, World, Worldline
-from sqlalchemy import Table, create_engine
+from noveland.worlds.worldlines import ensure_primary_worldline
+from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -108,6 +109,53 @@ def test_manual_chain_round_robin_and_completion() -> None:
     assert [turn.speaker_kind.value for turn in turns] == ["operator", "agent", "agent"]
     assert turns[1].output_text == "First response"
     assert turns[2].output_text == "Second response"
+
+
+def test_conversation_service_scopes_session_and_events_to_worldline() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    fork_id = _seed_fork_worldline(engine, world_id)
+    first_agent_id = _seed_agent(engine, world_id, "first")
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                worldline_id=fork_id,
+                session_key="fork-chat",
+                title="Fork chat",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=1,
+                policy=_default_policy(),
+                writer_config=_default_writer_config(),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [ConversationParticipantDefinition(agent_id=first_agent_id, turn_order=0)],
+        )
+        prepared = service.prepare_next_turn(world_id, created.id)
+        service.finalize_turn(
+            prepared,
+            response_text="Fork response",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+        events = session.scalars(
+            select(WorldEventModel).order_by(WorldEventModel.sequence.asc()),
+        ).all()
+
+    assert created.worldline_id == fork_id
+    assert {event.event_name for event in events} >= {
+        "conversation.session_started",
+        "conversation.turn_completed",
+        "conversation.session_completed",
+    }
+    assert {event.worldline_id for event in events} == {fork_id}
 
 
 def test_prepare_next_turn_skips_disabled_participant_and_marks_failed_without_available_agent(
@@ -466,3 +514,21 @@ def _seed_agent(
         )
         session.commit()
     return agent_id
+
+
+def _seed_fork_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        primary = ensure_primary_worldline(session, world_id)
+        fork = Worldline(
+            world_id=world_id,
+            worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
+            name="Fork",
+            description="Forked test worldline",
+            parent_worldline_id=primary.id,
+            status="active",
+            created_by_actor_ref="test:conversation",
+            metadata_json={},
+        )
+        session.add(fork)
+        session.commit()
+        return fork.id

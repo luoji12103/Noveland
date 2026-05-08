@@ -62,8 +62,13 @@
 - Living World Plot / Route / Rumor Flow
 - Living World Knowledge / Player / Guardrails
 - Living World Beta Release Readiness
+- V2 Runtime Worldline + Memory Isolation Remediation
 
 ## Upcoming Mainline
-- None. V2 phases 1-50 are implemented in local roadmap bundles.
-- Future work should come from beta evidence, operator feedback, and targeted hardening rather than a new phase-number branch.
+- Next remediation bundles are `feat/v2-prompt-leak-publish-guardrails`,
+  `feat/v2-runtime-gm-narrative-execution`, and
+  `feat/v2-beta-acceptance-gating-hardening`, in that order.
+- V2 phases 1-50 are implemented in local roadmap bundles; remaining work should come
+  from acceptance reports, beta evidence, operator feedback, and targeted hardening rather
+  than a new phase-number branch.
 - Use `docs/agent/harness/debug-journal.md` acceptance reports for phases 1-35 and 36-50 as the source of record when selecting future hardening work.

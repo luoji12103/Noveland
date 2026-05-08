@@ -2275,6 +2275,7 @@ class MemoryItemResponse(BaseModel):
 class MemoryProfileSnapshotResponse(BaseModel):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
     agent_id: uuid.UUID
     aliases: list[str]
     identity_notes: list[str]
@@ -2294,6 +2295,7 @@ class MemoryDeleteResponse(BaseModel):
 class AgentRunResponse(BaseModel):
     run_id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID
     agent_id: uuid.UUID
     status: str
     prompt_text: str
@@ -7040,11 +7042,13 @@ def get_agent_memory_profile_snapshot(
     agent_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> MemoryProfileSnapshotResponse | None:
     _agent_or_404(db_session, context.world_id, agent_id)
     snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
         context.world_id,
         agent_id,
+        worldline_id,
     )
     return None if snapshot is None else _memory_profile_snapshot_response(snapshot)
 
@@ -7058,12 +7062,14 @@ def refresh_agent_memory_profile_snapshot(
     request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> MemoryProfileSnapshotResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
     snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
         context.world_id,
         agent_id,
+        worldline_id,
     )
     return _memory_profile_snapshot_response(snapshot)
 
@@ -7077,11 +7083,16 @@ def forget_agent_memory(
     request: Request,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> MemoryDeleteResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
     result = MemoryService(db_session, load_settings()).delete_scope(
-        MemoryDeleteScope(world_id=context.world_id, agent_id=agent_id),
+        MemoryDeleteScope(
+            world_id=context.world_id,
+            worldline_id=worldline_id,
+            agent_id=agent_id,
+        ),
     )
     return MemoryDeleteResponse(backend=result.backend, deleted_count=result.deleted_count)
 
@@ -7225,6 +7236,7 @@ def list_agent_runs(
     agent_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> list[AgentRunResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     settings = load_settings()
@@ -7233,7 +7245,10 @@ def list_agent_runs(
         ProviderProfileService(db_session, settings),
         settings,
     )
-    return [_agent_run_response(run) for run in orchestrator.list_runs(context.world_id, agent_id)]
+    return [
+        _agent_run_response(run)
+        for run in orchestrator.list_runs(context.world_id, agent_id, worldline_id)
+    ]
 
 
 @router.get(
@@ -7245,6 +7260,7 @@ def get_agent_run_detail(
     run_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: uuid.UUID | None = None,
 ) -> AgentRunDetailResponse:
     _agent_or_404(db_session, context.world_id, agent_id)
     settings = load_settings()
@@ -7253,7 +7269,7 @@ def get_agent_run_detail(
         ProviderProfileService(db_session, settings),
         settings,
     )
-    run = orchestrator.get_run(context.world_id, agent_id, run_id)
+    run = orchestrator.get_run(context.world_id, agent_id, run_id, worldline_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     provider_profile = (
@@ -9432,6 +9448,7 @@ def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
     return AgentRunResponse(
         run_id=run.run_id,
         world_id=run.world_id,
+        worldline_id=run.worldline_id,
         agent_id=run.agent_id,
         status=run.status,
         prompt_text=run.prompt_text,

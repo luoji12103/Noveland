@@ -98,6 +98,7 @@ from noveland.worlds.models import (
     WorldMembership,
     WorldOrganization,
 )
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -2760,6 +2761,67 @@ def test_agent_runs_and_narrative_artifacts_api(
     ]
 
 
+def test_agent_run_apis_filter_by_worldline() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "run-worldline@example.test")
+    world_id = _seed_world(engine, owner_id, "run-worldline-world")
+    agent_id = _seed_agent(engine, world_id, "guide")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    primary_id, fork_id = _seed_worldlines(engine, world_id)
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        primary_run = AgentRuntimeRun(
+            world_id=world_id,
+            worldline_id=primary_id,
+            agent_id=agent_id,
+            status="succeeded",
+            trigger_source="manual",
+            prompt_text="Primary prompt",
+            response_text="Primary response",
+            diagnostics={},
+            started_at=now - timedelta(minutes=2),
+            finished_at=now - timedelta(minutes=2),
+        )
+        fork_run = AgentRuntimeRun(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            status="succeeded",
+            trigger_source="manual",
+            prompt_text="Fork prompt",
+            response_text="Fork response",
+            diagnostics={},
+            started_at=now - timedelta(minutes=1),
+            finished_at=now - timedelta(minutes=1),
+        )
+        session.add_all([primary_run, fork_run])
+        session.commit()
+        primary_run_id = primary_run.id
+        fork_run_id = fork_run.id
+
+    _authenticate(client, token)
+    fork_list = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/runs",
+        params={"worldline_id": str(fork_id)},
+    )
+    primary_detail_from_fork = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/runs/{primary_run_id}",
+        params={"worldline_id": str(fork_id)},
+    )
+    fork_detail = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/runs/{fork_run_id}",
+        params={"worldline_id": str(fork_id)},
+    )
+
+    assert fork_list.status_code == 200
+    assert [run["run_id"] for run in fork_list.json()] == [str(fork_run_id)]
+    assert fork_list.json()[0]["worldline_id"] == str(fork_id)
+    assert primary_detail_from_fork.status_code == 404
+    assert fork_detail.status_code == 200
+    assert fork_detail.json()["run"]["run_id"] == str(fork_run_id)
+    assert fork_detail.json()["run"]["worldline_id"] == str(fork_id)
+
+
 def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -3377,6 +3439,24 @@ def _add_membership(
             ),
         )
         session.commit()
+
+
+def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
+    with Session(engine) as session:
+        primary = ensure_primary_worldline(session, world_id)
+        fork = Worldline(
+            world_id=world_id,
+            worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
+            name="Fork",
+            description="Forked test worldline",
+            parent_worldline_id=primary.id,
+            status="active",
+            created_by_actor_ref="test:api-worlds",
+            metadata_json={},
+        )
+        session.add(fork)
+        session.commit()
+        return primary.id, fork.id
 
 
 def _seed_provider_profile(

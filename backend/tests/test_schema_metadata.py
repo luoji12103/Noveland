@@ -639,7 +639,7 @@ def test_core_schema_unique_constraints_are_explicit() -> None:
         "memory_write_jobs",
         UniqueConstraint,
     )
-    assert "uq_agent_profile_snapshots_world_agent" in constraint_names(
+    assert "uq_agent_profile_snapshots_worldline_agent" in constraint_names(
         "agent_profile_snapshots",
         UniqueConstraint,
     )
@@ -1104,7 +1104,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worlds.id",
         "world_events.id",
     }
-    assert foreign_key_targets("conversation_sessions") == {"scenes.id", "worlds.id"}
+    assert foreign_key_targets("conversation_sessions") == {
+        "scenes.id",
+        "worldlines.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("conversation_participants") == {
         "agents.id",
         "conversation_sessions.id",
@@ -1272,7 +1276,11 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worldlines.id",
         "worlds.id",
     }
-    assert foreign_key_targets("agent_profile_snapshots") == {"agents.id", "worlds.id"}
+    assert foreign_key_targets("agent_profile_snapshots") == {
+        "agents.id",
+        "worldlines.id",
+        "worlds.id",
+    }
     assert foreign_key_targets("provider_profiles") == set()
     assert foreign_key_targets("runtime_control_states") == set()
     assert foreign_key_targets("agent_runtime_runs") == {
@@ -1280,6 +1288,7 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "agents.id",
         "provider_profiles.id",
         "world_events.id",
+        "worldlines.id",
         "world_schedule_rules.id",
         "worlds.id",
     }
@@ -1460,6 +1469,9 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     assert "ix_conversation_sessions_world_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_scene_id" in index_names("conversation_sessions")
     assert "ix_conversation_sessions_world_mode_status" in index_names("conversation_sessions")
+    assert "ix_conversation_sessions_worldline_mode_status" in index_names(
+        "conversation_sessions",
+    )
     assert "ix_conversation_participants_session_id" in index_names("conversation_participants")
     assert "ix_conversation_participants_agent_id" in index_names("conversation_participants")
     assert "ix_conversation_turns_session_id" in index_names("conversation_turns")
@@ -1494,8 +1506,13 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
         "memory_retrieval_logs",
     )
     assert "ix_memory_retrieval_logs_occurred_at" in index_names("memory_retrieval_logs")
-    assert "ix_agent_profile_snapshots_world_agent" in index_names("agent_profile_snapshots")
+    assert "ix_agent_profile_snapshots_worldline_agent" in index_names(
+        "agent_profile_snapshots",
+    )
     assert "ix_agent_runtime_runs_world_agent_started_at" in index_names("agent_runtime_runs")
+    assert "ix_agent_runtime_runs_worldline_agent_started_at" in index_names(
+        "agent_runtime_runs",
+    )
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")

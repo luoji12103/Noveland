@@ -23,9 +23,10 @@ BACKEND_NAME = "fake_memory"
 
 class FakeMemoryBackend:
     def __init__(self) -> None:
-        self._items_by_scope: dict[tuple[uuid.UUID, uuid.UUID], list[MemoryItemRecord]] = (
-            defaultdict(list)
-        )
+        self._items_by_scope: dict[
+            tuple[uuid.UUID, uuid.UUID | None, uuid.UUID],
+            list[MemoryItemRecord],
+        ] = defaultdict(list)
 
     def record_turn(self, turn: MemoryTurn) -> MemoryWriteResult:
         content = " ".join(message.content for message in turn.messages).strip()
@@ -43,7 +44,7 @@ class FakeMemoryBackend:
             created_at=datetime.now(UTC),
             score=None,
         )
-        self._items_by_scope[(turn.world_id, turn.agent_id)].insert(0, item)
+        self._items_by_scope[(turn.world_id, turn.worldline_id, turn.agent_id)].insert(0, item)
         return MemoryWriteResult(
             backend=BACKEND_NAME,
             source_dedupe_key=turn.dedupe_key,
@@ -63,7 +64,10 @@ class FakeMemoryBackend:
                 backend=BACKEND_NAME,
                 created_at=datetime.now(UTC),
             )
-            self._items_by_scope[(event.world_id, event.agent_id)].insert(0, item)
+            self._items_by_scope[(event.world_id, event.worldline_id, event.agent_id)].insert(
+                0,
+                item,
+            )
             backend_ids.append(item.id)
         dedupe_key = events[0].dedupe_key if events else "no-events"
         return MemoryWriteResult(
@@ -73,20 +77,28 @@ class FakeMemoryBackend:
             backend_ids=backend_ids,
         )
 
-    def list_memories(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Sequence[MemoryItemRecord]:
-        return list(self._items_by_scope[(world_id, agent_id)])
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> Sequence[MemoryItemRecord]:
+        return list(self._items_by_scope[(world_id, worldline_id, agent_id)])
 
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:
         matches = [
             item
-            for item in self._items_by_scope[(request.world_id, request.agent_id)]
+            for item in self._items_by_scope[
+                (request.world_id, request.worldline_id, request.agent_id)
+            ]
             if request.query_text.lower() in item.content.lower()
         ][: request.limit]
         return MemorySearchResult(backend=BACKEND_NAME, items=matches, latency_ms=0)
 
     def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
-        deleted_count = len(self._items_by_scope[(scope.world_id, scope.agent_id)])
-        self._items_by_scope[(scope.world_id, scope.agent_id)] = []
+        key = (scope.world_id, scope.worldline_id, scope.agent_id)
+        deleted_count = len(self._items_by_scope[key])
+        self._items_by_scope[key] = []
         return MemoryDeleteResult(backend=BACKEND_NAME, deleted_count=deleted_count)
 
     def healthcheck(self) -> MemoryBackendHealth:

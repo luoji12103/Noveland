@@ -88,7 +88,10 @@ test("platform admin manages presets and world composition import/export", async
   await expect(page.getByText("Provider key: none")).toBeVisible();
   await page.getByPlaceholder("agent-key").fill(`preset-agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("Preset Agent");
-  await page.getByRole("button", { name: "Create agent" }).click();
+  await Promise.all([
+    page.waitForURL(/\/agents\/[0-9a-f-]+$/),
+    page.getByRole("button", { name: "Create agent" }).click(),
+  ]);
   await expect(page.getByText("Source preset: Storyteller (storyteller)")).toBeVisible();
   await expect(page.locator('textarea[name="persona_text"]')).toHaveValue("Writes clearly.");
 
@@ -253,7 +256,12 @@ test("world member sees read-only workspace pages", async ({ page }) => {
 
   await page.goto(`/worlds/${worldOneId}/reader`);
   await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
-  await page.getByRole("link", { name: "Seed conversation summary" }).click();
+  const summaryLink = page.getByRole("link", { name: "Seed conversation summary" }).first();
+  await expect(summaryLink).toBeVisible();
+  await Promise.all([
+    page.waitForURL(/\/reader\/[0-9a-f-]+$/),
+    summaryLink.click(),
+  ]);
   await expect(page).toHaveURL(/\/reader\/[0-9a-f-]+$/);
   await expect(page.getByText("Summary for the seeded conversation.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open source conversation" })).toBeVisible();

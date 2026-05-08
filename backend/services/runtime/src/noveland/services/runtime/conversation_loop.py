@@ -53,6 +53,7 @@ class ConversationRuntimeOrchestrator:
         policy = prepared.session.policy
         run = self._run_agent_turn(
             world_id=world_id,
+            worldline_id=prepared.session.worldline_id,
             agent_id=prepared.speaker_agent_id,
             prompt_text=prepared.prompt_text,
             trigger_source=trigger_source,
@@ -65,12 +66,13 @@ class ConversationRuntimeOrchestrator:
         }:
             retry_run = self._run_agent_turn(
                 world_id=world_id,
-                    agent_id=prepared.speaker_agent_id,
-                    prompt_text=prepared.prompt_text,
-                    trigger_source=f"{trigger_source}:retry",
-                    memory_config=prepared.session.memory_config,
-                    objective=prepared.session.objective,
-                )
+                worldline_id=prepared.session.worldline_id,
+                agent_id=prepared.speaker_agent_id,
+                prompt_text=prepared.prompt_text,
+                trigger_source=f"{trigger_source}:retry",
+                memory_config=prepared.session.memory_config,
+                objective=prepared.session.objective,
+            )
             retry_diagnostics = dict(retry_run.diagnostics)
             retry_diagnostics["attempt_count"] = 2
             retry_diagnostics["initial_error"] = _error_text(run.diagnostics)
@@ -96,6 +98,7 @@ class ConversationRuntimeOrchestrator:
         self,
         *,
         world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
         agent_id: uuid.UUID,
         prompt_text: str,
         trigger_source: str,
@@ -109,6 +112,7 @@ class ConversationRuntimeOrchestrator:
             memory_query_text = prompt_text[-2_000:]
         return self._agent_orchestrator.run_agent(
             world_id=world_id,
+            worldline_id=worldline_id,
             agent_id=agent_id,
             prompt_text=prompt_text,
             trigger_source=trigger_source,

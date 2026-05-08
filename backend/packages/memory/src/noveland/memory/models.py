@@ -272,13 +272,27 @@ class MemoryRetrievalLog(UUIDPrimaryKeyMixin, Base):
 class AgentProfileSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "agent_profile_snapshots"
     __table_args__ = (
-        UniqueConstraint("world_id", "agent_id", name="uq_agent_profile_snapshots_world_agent"),
-        Index("ix_agent_profile_snapshots_world_agent", "world_id", "agent_id"),
+        UniqueConstraint(
+            "world_id",
+            "worldline_id",
+            "agent_id",
+            name="uq_agent_profile_snapshots_worldline_agent",
+        ),
+        Index(
+            "ix_agent_profile_snapshots_worldline_agent",
+            "world_id",
+            "worldline_id",
+            "agent_id",
+        ),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     agent_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="CASCADE"),

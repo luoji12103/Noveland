@@ -1198,7 +1198,14 @@ export function WorldOverview({ data }: WorldOverviewProps) {
 
   async function setMembership(userId: string, role: WorldRole) {
     await runAction(
-      () => upsertMembership(selectedWorld.id, userId, role),
+      async () => {
+        const membership = await upsertMembership(selectedWorld.id, userId, role);
+        setMemberCandidates((candidates) =>
+          candidates.map((candidate) =>
+            candidate.id === membership.user_id ? { ...candidate, role: membership.role } : candidate,
+          ),
+        );
+      },
       "Membership saved.",
     );
   }

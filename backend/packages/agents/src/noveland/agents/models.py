@@ -223,12 +223,23 @@ class AgentRuntimeRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="trigger_source",
         ),
         Index("ix_agent_runtime_runs_world_agent_started_at", "world_id", "agent_id", "started_at"),
+        Index(
+            "ix_agent_runtime_runs_worldline_agent_started_at",
+            "world_id",
+            "worldline_id",
+            "agent_id",
+            "started_at",
+        ),
         Index("ix_agent_runtime_runs_provider_profile_id", "provider_profile_id"),
     )
 
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=True,
     )
     agent_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("agents.id", ondelete="CASCADE"),

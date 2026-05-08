@@ -1567,6 +1567,7 @@ export type MemoryWriteJobStatusSummary = {
 export type MemoryWriteJob = {
   id: string;
   world_id: string;
+  worldline_id: string | null;
   agent_id: string;
   backend_profile_id: string;
   backend_profile_key: string;
@@ -1595,6 +1596,7 @@ export type MemoryWriteJobList = {
 export type MemoryRetrievalLog = {
   id: string;
   world_id: string;
+  worldline_id: string | null;
   agent_id: string;
   backend_profile_id: string | null;
   backend: string;
