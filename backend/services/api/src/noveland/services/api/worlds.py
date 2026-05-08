@@ -39,6 +39,20 @@ from noveland.calendar import (
     ScheduleRuleUpdate,
 )
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
+from noveland.conversations import (
+    ConversationErrorPolicy,
+    ConversationMemoryConfig,
+    ConversationMode,
+    ConversationParticipantDefinition,
+    ConversationPolicyConfig,
+    ConversationScopeType,
+    ConversationService,
+    ConversationSessionCreate,
+    ConversationSessionRecord,
+    ConversationSpeakerPolicyMode,
+    ConversationValidationError,
+    ConversationWriterConfig,
+)
 from noveland.conversations.models import ConversationTurn
 from noveland.core.settings import load_settings
 from noveland.events import (
@@ -84,6 +98,7 @@ from noveland.observability import (
 from noveland.plugins.builtins import get_builtin_plugin_registry
 from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import (
+    BUILTIN_DEFAULT_NARRATIVE_WRITER,
     BUILTIN_DEFAULT_PERSONA_POLICY,
     BUILTIN_DEFAULT_WORLD_RULES,
     BUILTIN_MEM0_OSS_MEMORY,
@@ -478,6 +493,16 @@ class GMProposalReviewRequest(_RequestModel):
     review_note: str | None = Field(default=None, max_length=2000)
 
 
+class GMMacroPlanRequest(_RequestModel):
+    worldline_id: uuid.UUID | None = None
+    limit: int = Field(default=20, ge=1, le=100)
+    execute: bool = False
+
+
+class LowRiskProposalDraftRequest(_RequestModel):
+    proposal_id: uuid.UUID
+
+
 class EventResolutionRuleCreateRequest(_RequestModel):
     rule_key: str = Field(pattern=SLUG_PATTERN, max_length=80)
     name: str = Field(min_length=1, max_length=160)
@@ -640,6 +665,52 @@ class DailyEpisodeDraftUpdateRequest(_RequestModel):
     metadata: dict[str, Any] | None = None
 
 
+class ConversationPolicyRequest(_RequestModel):
+    error_policy: Literal[
+        "fail_session",
+        "skip_turn",
+        "retry_once_then_fail",
+        "retry_once_then_skip",
+    ] = "retry_once_then_skip"
+    max_consecutive_failed_turns: int = Field(default=3, ge=1, le=20)
+    loop_guard_window: int = Field(default=6, ge=2, le=20)
+    repeat_output_threshold: int = Field(default=3, ge=2, le=20)
+    speaker_policy: Literal["round_robin", "least_recent", "priority_order", "manual_next"] = (
+        "round_robin"
+    )
+    manual_next_agent_id: uuid.UUID | None = None
+    participant_repeat_cooldown: int = Field(default=0, ge=0, le=20)
+    min_enabled_participants: int = Field(default=1, ge=1, le=20)
+    max_turn_budget: int | None = Field(default=None, ge=1, le=200)
+
+
+class ConversationWriterConfigRequest(_RequestModel):
+    provider_profile_id: uuid.UUID | None = None
+    writer_plugin_identifier: str = Field(
+        default=BUILTIN_DEFAULT_NARRATIVE_WRITER,
+        min_length=1,
+        max_length=120,
+    )
+    writer_plugin_config: dict[str, Any] = Field(default_factory=dict)
+    auto_generate_on_complete: bool = False
+    generate_summary: bool = True
+    generate_chapter: bool = True
+    style_guide: str = Field(default="", max_length=4_000)
+    target_length: Literal["brief", "standard", "expanded"] = "standard"
+    source_constraints: str = Field(default="", max_length=4_000)
+    include_prompt_preview: bool = True
+
+
+class ConversationMemoryConfigRequest(_RequestModel):
+    write_turn_memory: bool = True
+    retrieve_memory: bool = True
+    max_context_items: int = Field(default=5, ge=1, le=20)
+    query_window: int = Field(default=8, ge=1, le=50)
+    include_recent_turns: bool = True
+    include_agent_observations: bool = True
+    memory_query_strategy: Literal["prompt", "objective", "transcript"] = "prompt"
+
+
 class GroupInteractionCreateRequest(_RequestModel):
     worldline_id: uuid.UUID | None = None
     context_key: str = Field(pattern=SLUG_PATTERN, max_length=120)
@@ -663,6 +734,21 @@ class GroupInteractionUpdateRequest(_RequestModel):
     constraints: dict[str, Any] | None = None
     status: GroupInteractionStatus | None = None
     metadata: dict[str, Any] | None = None
+
+
+class GroupInteractionExecuteRequest(_RequestModel):
+    session_key: str | None = Field(default=None, pattern=SLUG_PATTERN, max_length=80)
+    mode: Literal["manual_chain", "auto_dialogue"] = "manual_chain"
+    max_turns: int = Field(default=12, ge=1, le=200)
+    policy: ConversationPolicyRequest = Field(default_factory=ConversationPolicyRequest)
+    writer_config: ConversationWriterConfigRequest = Field(
+        default_factory=ConversationWriterConfigRequest
+    )
+    memory_config: ConversationMemoryConfigRequest = Field(
+        default_factory=ConversationMemoryConfigRequest
+    )
+    opening_prompt: str | None = Field(default=None, max_length=12_000)
+    objective: str | None = Field(default=None, max_length=8_000)
 
 
 class RelationshipSuggestionUpdateRequest(_RequestModel):
@@ -1357,6 +1443,24 @@ class ResolutionRuleDryRunResponse(BaseModel):
     effects: dict[str, Any]
 
 
+class GMMacroPlanItemResponse(BaseModel):
+    item_kind: str
+    rule_id: uuid.UUID
+    rule_key: str
+    priority: int
+    title: str
+    payload: dict[str, Any]
+    source_context: dict[str, Any]
+
+
+class GMMacroPlanResponse(BaseModel):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    planned_items: list[GMMacroPlanItemResponse]
+    diagnostics: list[str]
+    execution: dict[str, Any] | None = None
+
+
 class ChoiceConsequencePreviewResponse(BaseModel):
     relationship_updates: list[dict[str, Any]]
     faction_updates: list[dict[str, Any]]
@@ -1535,6 +1639,69 @@ class GroupInteractionContextResponse(BaseModel):
     metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class ConversationPolicyResponse(BaseModel):
+    error_policy: str
+    max_consecutive_failed_turns: int
+    loop_guard_window: int
+    repeat_output_threshold: int
+    speaker_policy: str
+    manual_next_agent_id: uuid.UUID | None
+    participant_repeat_cooldown: int
+    min_enabled_participants: int
+    max_turn_budget: int | None
+
+
+class ConversationWriterConfigResponse(BaseModel):
+    provider_profile_id: uuid.UUID | None
+    writer_plugin_identifier: str
+    writer_plugin_config: dict[str, Any]
+    auto_generate_on_complete: bool
+    generate_summary: bool
+    generate_chapter: bool
+    style_guide: str
+    target_length: str
+    source_constraints: str
+    include_prompt_preview: bool
+
+
+class ConversationMemoryConfigResponse(BaseModel):
+    write_turn_memory: bool
+    retrieve_memory: bool
+    max_context_items: int
+    query_window: int
+    include_recent_turns: bool
+    include_agent_observations: bool
+    memory_query_strategy: str
+
+
+class ConversationSessionResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None
+    scene_id: uuid.UUID | None
+    session_key: str
+    title: str
+    scope_type: str
+    mode: str
+    status: str
+    objective: str
+    opening_prompt: str
+    max_turns: int
+    next_turn_index: int
+    policy: ConversationPolicyResponse
+    writer_config: ConversationWriterConfigResponse
+    memory_config: ConversationMemoryConfigResponse
+    group_context: dict[str, Any]
+    terminal_reason: str | None
+    created_at: str
+    updated_at: str
+
+
+class GroupInteractionExecutionResponse(BaseModel):
+    group_context: GroupInteractionContextResponse
+    session: ConversationSessionResponse
 
 
 class RelationshipEventSuggestionResponse(BaseModel):
@@ -3062,6 +3229,39 @@ def list_gm_proposals(
     return [_gm_proposal_response(proposal) for proposal in proposals]
 
 
+@router.post("/{world_id}/gm/macro-plan", response_model=GMMacroPlanResponse)
+def plan_gm_macro_events(
+    plan_request: GMMacroPlanRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GMMacroPlanResponse:
+    require_csrf(request)
+    _world_or_404(db_session, context.world_id)
+    service = LivingWorldGMService(db_session)
+    plan = service.plan_macro_events(
+        world_id=context.world_id,
+        worldline_id=plan_request.worldline_id,
+        limit=plan_request.limit,
+    )
+    execution = None
+    if plan_request.execute:
+        result = service.execute_macro_plan(
+            world_id=context.world_id,
+            worldline_id=plan.worldline_id,
+            plan=plan,
+            actor_ref=_actor_ref(context.subject),
+            limit=plan_request.limit,
+        )
+        execution = {
+            "proposal_count": result.proposal_count,
+            "offscreen_event_count": result.offscreen_event_count,
+            "proposal_ids": [str(item_id) for item_id in result.proposal_ids],
+            "offscreen_event_ids": [str(item_id) for item_id in result.offscreen_event_ids],
+        }
+    return _gm_macro_plan_response(plan, execution=execution)
+
+
 @router.post(
     "/{world_id}/gm/proposals",
     response_model=GMProposalResponse,
@@ -3115,6 +3315,32 @@ def review_gm_proposal(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return _gm_proposal_response(proposal)
+
+
+@router.post(
+    "/{world_id}/gm/proposals/{proposal_id}/draft-low-risk",
+    response_model=SceneBeatDraftResponse | DailyEpisodeDraftResponse,
+)
+def draft_low_risk_gm_proposal(
+    proposal_id: uuid.UUID,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> SceneBeatDraftResponse | DailyEpisodeDraftResponse:
+    require_csrf(request)
+    try:
+        draft = LivingWorldGMService(db_session).create_daily_draft_from_low_risk_proposal(
+            world_id=context.world_id,
+            proposal_id=proposal_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    if isinstance(draft, DailyEpisodeDraft):
+        return _daily_episode_response(draft)
+    return _scene_beat_response(db_session, draft)
 
 
 @router.get("/{world_id}/resolution-rules", response_model=list[EventResolutionRuleResponse])
@@ -3932,6 +4158,101 @@ def update_group_interaction(
         group_context.metadata_json = group_update.metadata or {}
     db_session.flush()
     return _group_context_response(db_session, group_context)
+
+
+@router.post(
+    "/{world_id}/group-interactions/{context_id}/execute",
+    response_model=GroupInteractionExecutionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def execute_group_interaction(
+    context_id: uuid.UUID,
+    execute_request: GroupInteractionExecuteRequest,
+    request: Request,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GroupInteractionExecutionResponse:
+    require_csrf(request)
+    group_context = _group_context_or_404(db_session, context.world_id, context_id)
+    if group_context.status in {"completed", "archived"}:
+        raise _conflict("Completed or archived group interaction contexts cannot execute")
+    if not group_context.participant_agent_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Group interaction requires at least one participant",
+        )
+    participant_ids = [_uuid_or_none(raw) for raw in group_context.participant_agent_ids]
+    if any(participant_id is None for participant_id in participant_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Group interaction contains an invalid participant id",
+        )
+    parsed_participant_ids = [
+        participant_id for participant_id in participant_ids if participant_id is not None
+    ]
+    if len(set(parsed_participant_ids)) != len(parsed_participant_ids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Group interaction participants must be unique",
+        )
+    _ensure_agent_string_refs(db_session, context.world_id, group_context.participant_agent_ids)
+    if group_context.scene_id is not None:
+        _scene_or_404(db_session, context.world_id, group_context.scene_id)
+    if group_context.organization_id is not None:
+        _organization_or_404(db_session, context.world_id, group_context.organization_id)
+
+    session_key = execute_request.session_key or f"group-{group_context.context_key}"
+    service = ConversationService(db_session)
+    try:
+        session_record = service.create_session(
+            ConversationSessionCreate(
+                world_id=context.world_id,
+                worldline_id=group_context.worldline_id,
+                scene_id=group_context.scene_id,
+                session_key=session_key,
+                title=group_context.title,
+                scope_type=(
+                    ConversationScopeType.SCENE
+                    if group_context.scene_id is not None
+                    else ConversationScopeType.WORLD
+                ),
+                mode=ConversationMode(execute_request.mode),
+                objective=execute_request.objective
+                or _group_interaction_objective(group_context),
+                opening_prompt=execute_request.opening_prompt
+                or f"Begin group interaction: {group_context.title}",
+                max_turns=execute_request.max_turns,
+                policy=_conversation_policy_contract(execute_request.policy),
+                writer_config=_conversation_writer_config_with_group_context(
+                    execute_request.writer_config,
+                    _group_interaction_conversation_context(group_context),
+                ),
+                memory_config=_conversation_memory_config_contract(execute_request.memory_config),
+            ),
+        )
+        service.replace_participants(
+            context.world_id,
+            session_record.id,
+            [
+                ConversationParticipantDefinition(agent_id=participant_id, turn_order=index)
+                for index, participant_id in enumerate(parsed_participant_ids)
+            ],
+        )
+    except ConversationValidationError as exc:
+        raise _conversation_http_error(str(exc)) from exc
+
+    if group_context.status == "planned":
+        group_context.status = "active"
+    group_context.metadata_json = {
+        **(group_context.metadata_json or {}),
+        "conversation_session_id": str(session_record.id),
+        "executed_at": datetime.now(UTC).isoformat(),
+    }
+    db_session.flush()
+    return GroupInteractionExecutionResponse(
+        group_context=_group_context_response(db_session, group_context),
+        session=_conversation_session_response(session_record),
+    )
 
 
 @router.get(
@@ -7949,6 +8270,31 @@ def _gm_proposal_response(proposal: GMEventProposal) -> GMProposalResponse:
     )
 
 
+def _gm_macro_plan_response(
+    plan: Any,
+    *,
+    execution: dict[str, Any] | None = None,
+) -> GMMacroPlanResponse:
+    return GMMacroPlanResponse(
+        world_id=plan.world_id,
+        worldline_id=plan.worldline_id,
+        planned_items=[
+            GMMacroPlanItemResponse(
+                item_kind=item.item_kind,
+                rule_id=item.rule_id,
+                rule_key=item.rule_key,
+                priority=item.priority,
+                title=item.title,
+                payload=item.payload,
+                source_context=item.source_context,
+            )
+            for item in plan.planned_items
+        ],
+        diagnostics=plan.diagnostics,
+        execution=execution,
+    )
+
+
 def _resolution_rule_response(rule: EventResolutionRule) -> EventResolutionRuleResponse:
     return EventResolutionRuleResponse(
         id=rule.id,
@@ -8185,6 +8531,157 @@ def _group_context_response(
         created_at=group_context.created_at,
         updated_at=group_context.updated_at,
     )
+
+
+def _conversation_policy_contract(policy: ConversationPolicyRequest) -> ConversationPolicyConfig:
+    return ConversationPolicyConfig(
+        error_policy=ConversationErrorPolicy(policy.error_policy),
+        max_consecutive_failed_turns=policy.max_consecutive_failed_turns,
+        loop_guard_window=policy.loop_guard_window,
+        repeat_output_threshold=policy.repeat_output_threshold,
+        speaker_policy=ConversationSpeakerPolicyMode(policy.speaker_policy),
+        manual_next_agent_id=policy.manual_next_agent_id,
+        participant_repeat_cooldown=policy.participant_repeat_cooldown,
+        min_enabled_participants=policy.min_enabled_participants,
+        max_turn_budget=policy.max_turn_budget,
+    )
+
+
+def _conversation_writer_config_contract(
+    writer_config: ConversationWriterConfigRequest,
+) -> ConversationWriterConfig:
+    return ConversationWriterConfig(
+        provider_profile_id=writer_config.provider_profile_id,
+        writer_plugin_identifier=writer_config.writer_plugin_identifier,
+        writer_plugin_config=writer_config.writer_plugin_config,
+        auto_generate_on_complete=writer_config.auto_generate_on_complete,
+        generate_summary=writer_config.generate_summary,
+        generate_chapter=writer_config.generate_chapter,
+        style_guide=writer_config.style_guide,
+        target_length=writer_config.target_length,
+        source_constraints=writer_config.source_constraints,
+        include_prompt_preview=writer_config.include_prompt_preview,
+    )
+
+
+def _conversation_writer_config_with_group_context(
+    writer_config: ConversationWriterConfigRequest,
+    group_context: dict[str, Any],
+) -> ConversationWriterConfig:
+    contract = _conversation_writer_config_contract(writer_config)
+    config = contract.model_dump(mode="json")
+    plugin_config = dict(config.get("writer_plugin_config") or {})
+    plugin_config["group_context"] = group_context
+    config["writer_plugin_config"] = plugin_config
+    return ConversationWriterConfig(**config)
+
+
+def _conversation_memory_config_contract(
+    memory_config: ConversationMemoryConfigRequest,
+) -> ConversationMemoryConfig:
+    return ConversationMemoryConfig(
+        write_turn_memory=memory_config.write_turn_memory,
+        retrieve_memory=memory_config.retrieve_memory,
+        max_context_items=memory_config.max_context_items,
+        query_window=memory_config.query_window,
+        include_recent_turns=memory_config.include_recent_turns,
+        include_agent_observations=memory_config.include_agent_observations,
+        memory_query_strategy=memory_config.memory_query_strategy,
+    )
+
+
+def _group_interaction_conversation_context(
+    group_context: GroupInteractionContext,
+) -> dict[str, Any]:
+    return {
+        "group_interaction_context_id": str(group_context.id),
+        "context_key": group_context.context_key,
+        "title": group_context.title,
+        "interaction_type": group_context.interaction_type,
+        "scene_id": None if group_context.scene_id is None else str(group_context.scene_id),
+        "organization_id": None
+        if group_context.organization_id is None
+        else str(group_context.organization_id),
+        "participant_roles": group_context.participant_roles,
+        "constraints": group_context.constraints,
+        "metadata": group_context.metadata_json,
+    }
+
+
+def _group_interaction_objective(group_context: GroupInteractionContext) -> str:
+    constraints = group_context.constraints or {}
+    objective = constraints.get("objective")
+    if isinstance(objective, str) and objective:
+        return objective
+    return f"Run group interaction {group_context.title} with the configured participant roles."
+
+
+def _conversation_http_error(detail: str) -> HTTPException:
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    if "already" in detail or "completed" in detail or "unique" in detail:
+        status_code = status.HTTP_409_CONFLICT
+    return HTTPException(status_code=status_code, detail=detail)
+
+
+def _conversation_session_response(
+    session: ConversationSessionRecord,
+) -> ConversationSessionResponse:
+    return ConversationSessionResponse(
+        id=session.id,
+        world_id=session.world_id,
+        worldline_id=session.worldline_id,
+        scene_id=session.scene_id,
+        session_key=session.session_key,
+        title=session.title,
+        scope_type=session.scope_type.value,
+        mode=session.mode.value,
+        status=session.status.value,
+        objective=session.objective,
+        opening_prompt=session.opening_prompt,
+        max_turns=session.max_turns,
+        next_turn_index=session.next_turn_index,
+        policy=ConversationPolicyResponse(
+            error_policy=session.policy.error_policy.value,
+            max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
+            loop_guard_window=session.policy.loop_guard_window,
+            repeat_output_threshold=session.policy.repeat_output_threshold,
+            speaker_policy=session.policy.speaker_policy.value,
+            manual_next_agent_id=session.policy.manual_next_agent_id,
+            participant_repeat_cooldown=session.policy.participant_repeat_cooldown,
+            min_enabled_participants=session.policy.min_enabled_participants,
+            max_turn_budget=session.policy.max_turn_budget,
+        ),
+        writer_config=ConversationWriterConfigResponse(
+            provider_profile_id=session.writer_config.provider_profile_id,
+            writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
+            writer_plugin_config=session.writer_config.writer_plugin_config,
+            auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
+            generate_summary=session.writer_config.generate_summary,
+            generate_chapter=session.writer_config.generate_chapter,
+            style_guide=session.writer_config.style_guide,
+            target_length=session.writer_config.target_length,
+            source_constraints=session.writer_config.source_constraints,
+            include_prompt_preview=session.writer_config.include_prompt_preview,
+        ),
+        memory_config=ConversationMemoryConfigResponse(
+            write_turn_memory=session.memory_config.write_turn_memory,
+            retrieve_memory=session.memory_config.retrieve_memory,
+            max_context_items=session.memory_config.max_context_items,
+            query_window=session.memory_config.query_window,
+            include_recent_turns=session.memory_config.include_recent_turns,
+            include_agent_observations=session.memory_config.include_agent_observations,
+            memory_query_strategy=session.memory_config.memory_query_strategy,
+        ),
+        group_context=_group_context_from_writer_config(session.writer_config),
+        terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
+        created_at=session.created_at.isoformat(),
+        updated_at=session.updated_at.isoformat(),
+    )
+
+
+def _group_context_from_writer_config(writer_config: ConversationWriterConfig) -> dict[str, Any]:
+    raw = writer_config.writer_plugin_config.get("group_context")
+    return raw if isinstance(raw, dict) else {}
 
 
 def _relationship_suggestion_response(

@@ -116,3 +116,4 @@ class ConversationNarrativePromptPreview(_FrozenContract):
     source_turn_count: int
     existing_artifact_count: int
     warnings: list[str]
+    living_world_context: dict[str, Any] = Field(default_factory=dict)

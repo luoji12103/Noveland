@@ -68,7 +68,9 @@ import {
   dryRunEventTriggerCondition,
   deactivateScene,
   deliverRumorPropagation,
+  draftLowRiskGMProposal,
   exportWorldComposition,
+  executeGroupInteraction,
   forkWorldline,
   getRuntimeControl,
   getRuntimeStatus,
@@ -152,6 +154,7 @@ import {
   listMemberCandidates,
   listScheduleRules,
   listWorldDiagnostics,
+  planGMMacroEvents,
   searchAgentMemory,
   testProviderProfile,
   importWorldComposition,
@@ -459,6 +462,8 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse([{ id: "proposal-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "proposal-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "proposal-1", status: "resolved" }))
+      .mockResolvedValueOnce(jsonResponse({ planned_items: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: "beat-1", source_kind: "proposal" }))
       .mockResolvedValueOnce(jsonResponse([{ id: "rule-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "rule-1" }, 201))
       .mockResolvedValueOnce(jsonResponse({ id: "rule-1", status: "inactive" }))
@@ -487,6 +492,8 @@ describe("world client", () => {
       event_name: "gm.route_beat",
     });
     await reviewGMProposal("world-1", "proposal-1", { status: "resolved" });
+    await planGMMacroEvents("world-1", { worldline_id: "worldline-1", execute: true });
+    await draftLowRiskGMProposal("world-1", "proposal-1");
     await listResolutionRules("world-1");
     await createResolutionRule("world-1", { rule_key: "trust-gate", name: "Trust Gate" });
     await updateResolutionRule("world-1", "rule-1", { status: "inactive" });
@@ -519,6 +526,8 @@ describe("world client", () => {
       "/api/worlds/world-1/gm/proposals?status=proposed&limit=5",
       "/api/worlds/world-1/gm/proposals",
       "/api/worlds/world-1/gm/proposals/proposal-1/review",
+      "/api/worlds/world-1/gm/macro-plan",
+      "/api/worlds/world-1/gm/proposals/proposal-1/draft-low-risk",
       "/api/worlds/world-1/resolution-rules",
       "/api/worlds/world-1/resolution-rules",
       "/api/worlds/world-1/resolution-rules/rule-1",
@@ -551,6 +560,7 @@ describe("world client", () => {
       .mockResolvedValueOnce(jsonResponse({ id: "episode-2" }, 201))
       .mockResolvedValueOnce(jsonResponse([{ id: "group-1" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "group-2" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "conversation-1" } }, 201))
       .mockResolvedValueOnce(jsonResponse([{ id: "suggestion-1" }]))
       .mockResolvedValueOnce(jsonResponse([{ id: "suggestion-2" }]))
       .mockResolvedValueOnce(jsonResponse({ id: "suggestion-2", status: "accepted" }))
@@ -603,6 +613,7 @@ describe("world client", () => {
       title: "Club meeting",
       interaction_type: "club",
     });
+    await executeGroupInteraction("world-1", "group-2", { session_key: "club-meeting-session" });
     await listRelationshipSuggestions("world-1", { worldline_id: "worldline-1" });
     await generateRelationshipSuggestions("world-1", { worldline_id: "worldline-1", limit: 5 });
     await updateRelationshipSuggestion("world-1", "suggestion-2", { status: "accepted" });
@@ -643,6 +654,7 @@ describe("world client", () => {
       "/api/worlds/world-1/daily-episodes",
       "/api/worlds/world-1/group-interactions?worldline_id=worldline-1",
       "/api/worlds/world-1/group-interactions",
+      "/api/worlds/world-1/group-interactions/group-2/execute",
       "/api/worlds/world-1/relationship-suggestions?worldline_id=worldline-1",
       "/api/worlds/world-1/relationship-suggestions/generate?worldline_id=worldline-1&limit=5",
       "/api/worlds/world-1/relationship-suggestions/suggestion-2",

@@ -560,3 +560,14 @@
 - Tests added/updated: backend coverage for runtime holder/non-holder secret filtering, conversation speaker-specific context filtering, narrative writer leak-safe prompts, publish blocker 422 behavior, and warning-override publication gate metadata; Web client/workspace coverage for structured blocker summaries and publication gate display.
 - Docs updated: task board, change journal, and active handoff.
 - Follow-up notes: Bundle 3 should build on this selector for world bible/open-hook context packs, group interaction execution, expanded trigger evaluation, and deterministic GM proposal planning.
+
+## V2 runtime GM narrative execution remediation entry
+
+- Date: 2026-05-08
+- Branch: feat/v2-runtime-gm-narrative-execution
+- Scope: V2 acceptance remediation bundle 3 for living-world runtime/narrative consumption depth, group interaction execution, expanded condition evaluation, and deterministic GM macro planning.
+- Summary: Added a shared world condition evaluator for GM rules and event triggers; added living-world context packs that carry bounded world bible constraints, forbidden changes, open hooks, plot threads, route states, and continuity warnings into runtime/narrative prompts and metadata; added deterministic GM macro planning/execution and low-risk GM proposal draft conversion; and added group interaction execution into conversation sessions with participant roles, organization refs, scene constraints, and writer group context metadata.
+- Files changed: `/backend/packages/worlds/src/noveland/worlds/{conditions,living_context,gm,plot,autonomous}.py`, `/backend/packages/narrative/src/noveland/narrative/**`, `/backend/services/{api,runtime}/src/noveland/services/**`, `/backend/tests/{test_api_worlds,test_api_conversations,test_narrative_writer,test_runtime_daemon}.py`, `/web/lib/worlds/**`, `/web/tests/e2e/start-with-mock-auth.mjs`, `/docs/agent/harness/**`
+- Tests added/updated: backend coverage for context-pack narrative metadata, group interaction execution, centralized trigger/rule condition evaluation, GM macro planning/execution, and low-risk daily draft conversion; Web client route mapping tests; Playwright mock backend route alignment for macro planning, draft conversion, and group execution.
+- Docs updated: task board, change journal, file inventory, and active handoff.
+- Follow-up notes: Bundle 4 should harden beta acceptance gates using the now-reliable worldline scope, leak-safe prompt/review boundary, and richer GM/narrative execution evidence. GM macro planning remains deterministic and does not call providers, external tools, subprocesses, or sandbox execution.

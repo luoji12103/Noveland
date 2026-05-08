@@ -1,51 +1,37 @@
 # Active Session Handoff
 
-- Date: 2026-05-08T06:26:23Z
-- Branch: feat/v2-prompt-leak-publish-guardrails
-- Objective: Complete V2 acceptance remediation bundle 2 for prompt boundary filtering, leak reviews, and narrative publish guardrails.
-- Status: Implementation and targeted checks are complete on the feature branch. Final gate and fast-forward merge to local `main` remain.
+- Date: 2026-05-08T07:42:00Z
+- Branch: feat/v2-runtime-gm-narrative-execution
+- Objective: Complete V2 acceptance remediation bundle 3 for runtime GM planning, narrative context-pack consumption, group interaction execution, and expanded deterministic condition evaluation.
+- Status: Implementation and targeted backend/Web checks are complete on the feature branch. Full final gate and fast-forward merge to local `main` remain.
 
 ## Completed Before This Bundle
 
-- Added migration `20260507_0029_runtime_worldline_memory_isolation.py` for `worldline_id` on runtime runs, conversation sessions, and agent profile snapshots.
-- Propagated resolved worldline scope through agent runtime runs, conversation sessions, conversation runtime turns, runtime events, memory context, memory write jobs, retrieval logs, profile snapshots, fake/local memory backend filters, memory forget/delete scrubbing, and backfill candidates.
-- Preserved backward compatibility by resolving omitted worldlines to the primary worldline and treating legacy NULL memory/profile rows as primary-worldline data.
-- Exposed worldline metadata on agent run, memory snapshot, memory write job, and memory retrieval log response contracts.
+- Bundle 1 `fix/v2-runtime-worldline-memory-isolation` landed first-class worldline scope for runtime runs, conversations, memory snapshots, retrieval/write paths, backfill, and forget/delete behavior.
+- Bundle 2 `feat/v2-prompt-leak-publish-guardrails` landed leak-safe prompt context selection, speaker-scoped prompt filtering, narrative leak review, and publish blockers.
 
-## Bundle 1 Checks Passed
+## Bundle 3 Implementation Notes
 
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest`
-- `cd backend && uv run pytest tests/test_memory_backend.py tests/test_runtime_daemon.py tests/test_conversation_services.py tests/test_api_conversations.py tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_alembic_config.py -q`
-- `cd web && npm run lint`
+- Added a shared deterministic condition evaluator for GM rules and plot/event trigger dry-runs, covering time windows, scene/presence, hooks, plot threads, route state/flags/milestones, faction pressure, relationships, player choices, knowledge, and secrets.
+- Added a living-world context pack on top of the prompt-safe selector, exposing bounded world bible constraints, forbidden changes, open hooks, plot threads, route states, continuity warnings, and diagnostics to runtime and narrative paths.
+- Integrated context packs into agent runtime prompts/diagnostics, narrative prompt preview/generation, and artifact metadata.
+- Added deterministic GM macro planning/execution that turns matched rule effects into GM proposals or offscreen queue items without provider calls.
+- Added low-risk daily GM proposal conversion into scene beat or daily episode drafts.
+- Added group interaction execution that creates a conversation session with participant roles, organization/location constraints, and writer group context metadata.
+- Updated Web client types/routes/tests and the Playwright mock backend for macro planning, low-risk proposal drafts, and group interaction execution.
+
+## Bundle 3 Targeted Checks Passed
+
+- `cd backend && uv run ruff check <touched backend files>`
+- `cd backend && uv run mypy <touched backend files>`
+- `cd backend && uv run pytest tests/test_api_worlds.py tests/test_runtime_daemon.py tests/test_narrative_writer.py tests/test_api_conversations.py`
+- `cd web && npm run test -- lib/worlds/client.test.ts`
 - `cd web && npm run typecheck`
-- `cd web && npm run test`
-- `cd web && npm run build`
-- `cd web && npm run test:e2e`
-- `cd web && npm run check:next-env`
-- `docker compose -f infra/compose.yaml config`
-- `git diff --check`
-
-## Bundle 2 Implementation Notes
-
-- Added a shared living-world context selector that allows only public facts, agent-visible knowledge, revealed or holder secrets, bounded emotional state, and bounded relationship summaries into prompts/reviews.
-- Integrated the selector into agent runtime prompts, conversation turn prompts, narrative prompt previews/generation, and publish-time continuity reviews.
-- Added a publish gate that blocks hidden secret leaks and failed continuity reviews by default; warning-only publication requires explicit override metadata.
-- Updated Web publish controls to surface blocker/gate metadata without exposing hidden secret content.
-
-## Bundle 2 Checks Passed
-
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest tests/test_runtime_daemon.py tests/test_conversation_services.py tests/test_api_worlds.py tests/test_narrative_writer.py -q`
-- `cd web && npm run typecheck`
-- `cd web && npm run test -- lib/worlds/client.test.ts features/worlds/narrative-workspace.test.tsx`
-- `git diff --check`
+- `node --check web/tests/e2e/start-with-mock-auth.mjs`
 
 ## Remaining Closeout
 
-- Run the full backend pytest suite and the broader Web lint/test/build/e2e gate.
+- Run the full backend/Web final gate.
 - Restore `web/next-env.d.ts` if build/e2e churns it, then rerun `npm run check:next-env`.
 - Commit the branch and fast-forward merge back into local `main` if the final gate remains clean.
-- Start the next remediation branch from clean `main`: `feat/v2-runtime-gm-narrative-execution`.
+- Start the final remediation branch from clean `main`: `feat/v2-beta-acceptance-gating-hardening`.

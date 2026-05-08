@@ -436,7 +436,7 @@ class ConversationNarrativeWriterService:
 
         if needs_summary:
             if summary_artifact is None:
-                summary_prompt = _append_living_world_prompt_context(
+                summary_prompt, summary_context = _with_living_world_prompt_context(
                     self._session,
                     _apply_writer_controls(
                         writer_plugin.build_summary_prompt(
@@ -467,12 +467,13 @@ class ConversationNarrativeWriterService:
                             turns=turns,
                             provider=provider,
                             generation_mode=generate.generation_mode,
+                            living_world_context=summary_context,
                         ),
                     ),
                 )
             artifacts.append(summary_artifact)
         elif needs_chapter and summary_text is None:
-            summary_prompt = _append_living_world_prompt_context(
+            summary_prompt, _summary_context = _with_living_world_prompt_context(
                 self._session,
                 _apply_writer_controls(
                     writer_plugin.build_summary_prompt(
@@ -499,7 +500,7 @@ class ConversationNarrativeWriterService:
                 NarrativeArtifactKind.CHAPTER_DRAFT,
             )
             if chapter_artifact is None:
-                chapter_prompt = _append_living_world_prompt_context(
+                chapter_prompt, chapter_context = _with_living_world_prompt_context(
                     self._session,
                     _apply_writer_controls(
                         writer_plugin.build_chapter_prompt(
@@ -530,6 +531,7 @@ class ConversationNarrativeWriterService:
                             turns=turns,
                             provider=provider,
                             generation_mode=generate.generation_mode,
+                            living_world_context=chapter_context,
                         ),
                     ),
                 )
@@ -557,6 +559,14 @@ class ConversationNarrativeWriterService:
             warnings.append("conversation has no turns")
         if session.writer_config.source_constraints:
             warnings.append("source constraints are applied")
+        living_world_context = cast(dict[str, object], bundle["living_world_context"])
+        context_pack = living_world_context.get("context_pack")
+        if isinstance(context_pack, dict):
+            diagnostics = context_pack.get("diagnostics")
+            if isinstance(diagnostics, dict) and diagnostics.get("forbidden_change_count"):
+                warnings.append("world bible forbidden changes are in scope")
+            if isinstance(diagnostics, dict) and diagnostics.get("open_hook_count"):
+                warnings.append("open story hooks are in scope")
         return ConversationNarrativePromptPreview(
             world_id=generate.world_id,
             conversation_id=generate.conversation_id,
@@ -568,6 +578,7 @@ class ConversationNarrativeWriterService:
             source_turn_count=len(turns),
             existing_artifact_count=existing_count,
             warnings=warnings,
+            living_world_context=living_world_context,
         )
 
     def auto_generate_for_completed_conversation(
@@ -691,7 +702,7 @@ class ConversationNarrativeWriterService:
             ),
             session=session,
         )
-        summary_prompt = _append_living_world_prompt_context(
+        summary_prompt, summary_context = _with_living_world_prompt_context(
             self._session,
             summary_prompt,
             world_id=generate.world_id,
@@ -712,7 +723,7 @@ class ConversationNarrativeWriterService:
             ),
             session=session,
         )
-        chapter_prompt = _append_living_world_prompt_context(
+        chapter_prompt, chapter_context = _with_living_world_prompt_context(
             self._session,
             chapter_prompt,
             world_id=generate.world_id,
@@ -731,6 +742,10 @@ class ConversationNarrativeWriterService:
             "needs_chapter": needs_chapter,
             "summary_prompt": summary_prompt,
             "chapter_prompt": chapter_prompt,
+            "living_world_context": _merge_living_world_contexts(
+                summary_context,
+                chapter_context,
+            ),
         }
 
     def _agents_by_id(
@@ -767,9 +782,11 @@ def _metadata(
     turns: list[ConversationTurnRecord],
     provider: ProviderProfileRecord,
     generation_mode: NarrativeGenerationMode,
+    living_world_context: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "generation_mode": generation_mode.value,
+        "worldline_id": None if session.worldline_id is None else str(session.worldline_id),
         "source_turn_count": len(turns),
         "source_turn_end_index": None if not turns else turns[-1].turn_index,
         "scope_type": session.scope_type.value,
@@ -777,6 +794,7 @@ def _metadata(
         "writer_target_length": session.writer_config.target_length,
         "writer_has_style_guide": bool(session.writer_config.style_guide),
         "writer_has_source_constraints": bool(session.writer_config.source_constraints),
+        "living_world_context": living_world_context or {},
     }
 
 
@@ -792,6 +810,55 @@ def _apply_writer_controls(prompt: str, *, session: ConversationSessionRecord) -
     return "\n".join([*control_lines, "", prompt])
 
 
+def _with_living_world_prompt_context(
+    session: Session,
+    prompt: str,
+    *,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID | None,
+    participants: Sequence[object],
+) -> tuple[str, dict[str, object]]:
+    selector = LivingWorldContextSelector(session)
+    context_lines: list[str] = []
+    participants_metadata: list[dict[str, object]] = []
+    context_pack = selector.select_context_pack(
+        world_id=world_id,
+        worldline_id=worldline_id,
+        limit=5,
+    )
+    context_pack_text = context_pack.to_prompt_text()
+    if context_pack_text:
+        context_lines.append(context_pack_text)
+    for participant in participants:
+        agent_id = getattr(participant, "agent_id", None)
+        if not isinstance(agent_id, uuid.UUID):
+            continue
+        context = selector.select_for_agent_prompt(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            agent_id=agent_id,
+            limit=3,
+        )
+        context_text = context.to_prompt_text()
+        participants_metadata.append(
+            {
+                "agent_id": str(agent_id),
+                "diagnostics": context.diagnostics,
+            },
+        )
+        if context_text:
+            context_lines.append(f"Participant {agent_id}:\n{context_text}")
+    metadata = {
+        "context_pack": context_pack.to_metadata(),
+        "participant_count": len(participants_metadata),
+        "participants": participants_metadata,
+        "aggregate": _aggregate_living_context_diagnostics(participants_metadata),
+    }
+    if not context_lines:
+        return prompt, metadata
+    return "\n".join([prompt, "", "Leak-safe living-world context:", *context_lines]), metadata
+
+
 def _append_living_world_prompt_context(
     session: Session,
     prompt: str,
@@ -800,23 +867,76 @@ def _append_living_world_prompt_context(
     worldline_id: uuid.UUID | None,
     participants: Sequence[object],
 ) -> str:
-    selector = LivingWorldContextSelector(session)
-    context_lines: list[str] = []
-    for participant in participants:
-        agent_id = getattr(participant, "agent_id", None)
-        if not isinstance(agent_id, uuid.UUID):
+    prompt_with_context, _metadata = _with_living_world_prompt_context(
+        session,
+        prompt,
+        world_id=world_id,
+        worldline_id=worldline_id,
+        participants=participants,
+    )
+    return prompt_with_context
+
+
+def _aggregate_living_context_diagnostics(
+    participants_metadata: list[dict[str, object]],
+) -> dict[str, object]:
+    aggregate: dict[str, object] = {
+        "public_fact_count": 0,
+        "agent_knowledge_count": 0,
+        "visible_secret_count": 0,
+        "hidden_secret_count": 0,
+        "relationship_summary_count": 0,
+        "emotional_state_included_count": 0,
+    }
+    for participant in participants_metadata:
+        diagnostics = participant.get("diagnostics")
+        if not isinstance(diagnostics, dict):
             continue
-        context_text = selector.select_for_agent_prompt(
-            world_id=world_id,
-            worldline_id=worldline_id,
-            agent_id=agent_id,
-            limit=3,
-        ).to_prompt_text()
-        if context_text:
-            context_lines.append(f"Participant {agent_id}:\n{context_text}")
-    if not context_lines:
-        return prompt
-    return "\n".join([prompt, "", "Leak-safe living-world context:", *context_lines])
+        for key in (
+            "public_fact_count",
+            "agent_knowledge_count",
+            "visible_secret_count",
+            "hidden_secret_count",
+            "relationship_summary_count",
+        ):
+            aggregate[key] = _int_value(aggregate.get(key)) + _int_value(diagnostics.get(key))
+        if diagnostics.get("emotional_state_included"):
+            aggregate["emotional_state_included_count"] = (
+                _int_value(aggregate.get("emotional_state_included_count")) + 1
+            )
+    return aggregate
+
+
+def _merge_living_world_contexts(
+    left: dict[str, object],
+    right: dict[str, object],
+) -> dict[str, object]:
+    if not left:
+        return right
+    if not right:
+        return left
+    return {
+        "context_pack": left.get("context_pack") or right.get("context_pack") or {},
+        "participant_count": max(
+            _int_value(left.get("participant_count")),
+            _int_value(right.get("participant_count")),
+        ),
+        "participants": left.get("participants") or right.get("participants") or [],
+        "aggregate": left.get("aggregate") or right.get("aggregate") or {},
+    }
+
+
+def _int_value(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
 
 
 def _artifact_review_context(artifact: NarrativeArtifact) -> dict[str, object]:

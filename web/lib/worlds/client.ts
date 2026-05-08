@@ -72,6 +72,8 @@ import type {
   GMAgenda,
   GMAgendaCreateInput,
   GMAgendaUpdateInput,
+  GMMacroPlan,
+  GMMacroPlanInput,
   GMStyleReview,
   GMStyleReviewCreateInput,
   GMEventProposal,
@@ -79,6 +81,8 @@ import type {
   GMProposalReviewInput,
   GroupInteractionContext,
   GroupInteractionCreateInput,
+  GroupInteractionExecuteInput,
+  GroupInteractionExecution,
   InWorldNotification,
   InterventionCreateInput,
   JournalEntryCreateInput,
@@ -338,6 +342,30 @@ export function reviewGMProposal(
     {
       method: "POST",
       body: input,
+      csrf: true,
+    },
+  );
+}
+
+export function planGMMacroEvents(
+  worldId: string,
+  input: GMMacroPlanInput = {},
+): Promise<GMMacroPlan> {
+  return worldRequest<GMMacroPlan>(`/api/worlds/${worldId}/gm/macro-plan`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function draftLowRiskGMProposal(
+  worldId: string,
+  proposalId: string,
+): Promise<SceneBeatDraft | DailyEpisodeDraft> {
+  return worldRequest<SceneBeatDraft | DailyEpisodeDraft>(
+    `/api/worlds/${worldId}/gm/proposals/${proposalId}/draft-low-risk`,
+    {
+      method: "POST",
       csrf: true,
     },
   );
@@ -1454,6 +1482,21 @@ export function createGroupInteraction(
     body: input,
     csrf: true,
   });
+}
+
+export function executeGroupInteraction(
+  worldId: string,
+  contextId: string,
+  input: GroupInteractionExecuteInput = {},
+): Promise<GroupInteractionExecution> {
+  return worldRequest<GroupInteractionExecution>(
+    `/api/worlds/${worldId}/group-interactions/${contextId}/execute`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function listRelationshipSuggestions(

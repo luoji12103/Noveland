@@ -9,7 +9,12 @@ from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
+    NarrativeContinuityReview,
+    PlotThread,
+    RouteAffinity,
     SecretRecord,
+    StoryHook,
+    WorldBible,
 )
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import or_, select
@@ -43,6 +48,50 @@ class LivingWorldPromptContext:
         if not sections:
             return None
         return "\n\n".join(["Living-world context:", *sections])
+
+
+@dataclass(frozen=True, slots=True)
+class LivingWorldContextPack:
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    bible_constraints: list[str]
+    forbidden_changes: list[str]
+    open_hooks: list[str]
+    active_plot_threads: list[str]
+    route_states: list[str]
+    continuity_warnings: list[str]
+    diagnostics: dict[str, Any]
+
+    def to_prompt_text(self) -> str | None:
+        sections: list[str] = []
+        if self.bible_constraints:
+            sections.append(_section("World bible constraints", self.bible_constraints))
+        if self.forbidden_changes:
+            sections.append(_section("Forbidden continuity changes", self.forbidden_changes))
+        if self.open_hooks:
+            sections.append(_section("Open story hooks", self.open_hooks))
+        if self.active_plot_threads:
+            sections.append(_section("Active plot threads", self.active_plot_threads))
+        if self.route_states:
+            sections.append(_section("Route state", self.route_states))
+        if self.continuity_warnings:
+            sections.append(_section("Continuity warnings", self.continuity_warnings))
+        if not sections:
+            return None
+        return "\n\n".join(["Living-world execution context:", *sections])
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "world_id": str(self.world_id),
+            "worldline_id": str(self.worldline_id),
+            "diagnostics": self.diagnostics,
+            "bible_constraints": self.bible_constraints,
+            "forbidden_changes": self.forbidden_changes,
+            "open_hooks": self.open_hooks,
+            "active_plot_threads": self.active_plot_threads,
+            "route_states": self.route_states,
+            "continuity_warnings": self.continuity_warnings,
+        }
 
 
 class LivingWorldContextSelector:
@@ -163,6 +212,96 @@ class LivingWorldContextSelector:
             "hidden_secret_leak_count": len(leak_matches),
             "hidden_secret_leaks": leak_matches,
         }
+
+    def select_context_pack(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        limit: int = 5,
+    ) -> LivingWorldContextPack:
+        resolved_worldline = worldline_or_404(self._session, world_id, worldline_id)
+        row_limit = max(1, min(limit, 10))
+        bible = self._session.scalars(
+            select(WorldBible).where(WorldBible.world_id == world_id),
+        ).one_or_none()
+        bible_constraints: list[str] = []
+        forbidden_changes: list[str] = []
+        if bible is not None:
+            bible_constraints = _bible_constraint_lines(bible, row_limit)
+            forbidden_changes = _forbidden_change_lines(bible, row_limit)
+        open_hooks = [
+            _hook_line(hook)
+            for hook in self._session.scalars(
+                select(StoryHook)
+                .where(
+                    StoryHook.world_id == world_id,
+                    StoryHook.worldline_id == resolved_worldline.id,
+                    StoryHook.status == "open",
+                )
+                .order_by(StoryHook.priority.desc(), StoryHook.updated_at.desc())
+                .limit(row_limit),
+            ).all()
+        ]
+        active_threads = [
+            _plot_thread_line(thread)
+            for thread in self._session.scalars(
+                select(PlotThread)
+                .where(
+                    PlotThread.world_id == world_id,
+                    PlotThread.worldline_id == resolved_worldline.id,
+                    PlotThread.status.in_(["active", "dormant"]),
+                    PlotThread.thread_type != "hidden",
+                )
+                .order_by(PlotThread.priority.desc(), PlotThread.updated_at.desc())
+                .limit(row_limit),
+            ).all()
+        ]
+        route_states = [
+            _route_line(route)
+            for route in self._session.scalars(
+                select(RouteAffinity)
+                .where(
+                    RouteAffinity.world_id == world_id,
+                    RouteAffinity.worldline_id == resolved_worldline.id,
+                    RouteAffinity.status.in_(["available", "active", "blocked"]),
+                )
+                .order_by(RouteAffinity.stage.desc(), RouteAffinity.affinity.desc())
+                .limit(row_limit),
+            ).all()
+        ]
+        continuity_warnings = [
+            _continuity_warning_line(review)
+            for review in self._session.scalars(
+                select(NarrativeContinuityReview)
+                .where(
+                    NarrativeContinuityReview.world_id == world_id,
+                    NarrativeContinuityReview.worldline_id == resolved_worldline.id,
+                    NarrativeContinuityReview.status.in_(["warning", "fail"]),
+                )
+                .order_by(NarrativeContinuityReview.created_at.desc())
+                .limit(row_limit),
+            ).all()
+        ]
+        return LivingWorldContextPack(
+            world_id=world_id,
+            worldline_id=resolved_worldline.id,
+            bible_constraints=bible_constraints,
+            forbidden_changes=forbidden_changes,
+            open_hooks=open_hooks,
+            active_plot_threads=active_threads,
+            route_states=route_states,
+            continuity_warnings=continuity_warnings,
+            diagnostics={
+                "world_bible_included": bible is not None,
+                "bible_constraint_count": len(bible_constraints),
+                "forbidden_change_count": len(forbidden_changes),
+                "open_hook_count": len(open_hooks),
+                "active_plot_thread_count": len(active_threads),
+                "route_state_count": len(route_states),
+                "continuity_warning_count": len(continuity_warnings),
+            },
+        )
 
     def _knowledge_rows(
         self,
@@ -337,8 +476,87 @@ def _relationship_line(target_name: str, edge: AgentRelationshipEdge) -> str:
     )
 
 
+def _bible_constraint_lines(bible: WorldBible, limit: int) -> list[str]:
+    lines: list[str] = []
+    if bible.source_material:
+        lines.append(f"source material: {_truncate(bible.source_material)}")
+    setting_rules = bible.setting_rules or {}
+    for key, value in list(setting_rules.items())[:limit]:
+        lines.append(f"{key}: {_truncate(_stringify_metadata_value(value))}")
+    sequel_boundaries = bible.sequel_boundaries or {}
+    for key, value in list(sequel_boundaries.items())[: max(0, limit - len(lines))]:
+        lines.append(f"sequel boundary {key}: {_truncate(_stringify_metadata_value(value))}")
+    continuity_config = bible.continuity_config or {}
+    for key, value in list(continuity_config.items())[: max(0, limit - len(lines))]:
+        lines.append(f"continuity {key}: {_truncate(_stringify_metadata_value(value))}")
+    return lines[:limit]
+
+
+def _forbidden_change_lines(bible: WorldBible, limit: int) -> list[str]:
+    lines: list[str] = []
+    for change in (bible.forbidden_changes or [])[:limit]:
+        if isinstance(change, dict):
+            title = str(change.get("title") or change.get("key") or "forbidden change")
+            reason = _stringify_metadata_value(
+                change.get("reason") or change.get("description") or change
+            )
+            lines.append(f"{title}: {_truncate(reason)}")
+        else:
+            lines.append(_truncate(str(change)))
+    return lines
+
+
+def _hook_line(hook: StoryHook) -> str:
+    due = "" if hook.due_at is None else f"; due {hook.due_at.isoformat()}"
+    return (
+        f"{hook.title} ({hook.hook_type}, priority {hook.priority}{due}): "
+        f"{_truncate(hook.summary)}"
+    )
+
+
+def _plot_thread_line(thread: PlotThread) -> str:
+    next_beats = "; next " + ", ".join(thread.next_beats[:2]) if thread.next_beats else ""
+    return (
+        f"{thread.title} ({thread.thread_type}, {thread.status}, priority {thread.priority}): "
+        f"{_truncate(thread.summary)}{next_beats}"
+    )
+
+
+def _route_line(route: RouteAffinity) -> str:
+    flags = ", ".join(route.flags[:4]) if route.flags else "no flags"
+    return (
+        f"{route.route_key}: {route.status}; stage {route.stage}; "
+        f"affinity {route.affinity}; flags {flags}"
+    )
+
+
+def _continuity_warning_line(review: NarrativeContinuityReview) -> str:
+    issue_count = len(review.issues or [])
+    issue_types = sorted(
+        {
+            str(issue.get("type") or issue.get("code") or "issue")
+            for issue in review.issues
+            if isinstance(issue, dict)
+        }
+    )
+    suffix = "" if not issue_types else f"; {', '.join(issue_types[:4])}"
+    return f"{review.status} review from {review.source_kind}: {issue_count} issue(s){suffix}"
+
+
 def _agent_is_holder(secret: SecretRecord, agent_id: uuid.UUID | None) -> bool:
     return agent_id is not None and str(agent_id) in set(secret.holder_agent_ids or [])
+
+
+def _stringify_metadata_value(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return ", ".join(_stringify_metadata_value(item) for item in value[:6])
+    if isinstance(value, dict):
+        return ", ".join(
+            f"{key}={_stringify_metadata_value(item)}" for key, item in list(value.items())[:6]
+        )
+    return str(value)
 
 
 def _truncate(value: str, limit: int = 320) -> str:

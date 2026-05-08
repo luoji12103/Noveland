@@ -8,6 +8,7 @@ from noveland.agents.models import Agent
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventStore
 from noveland.worlds.clock_service import WorldClockService
+from noveland.worlds.gm import LivingWorldGMService
 from noveland.worlds.models import (
     AgentPresenceState,
     DailyEpisodeDraft,
@@ -16,6 +17,7 @@ from noveland.worlds.models import (
     OffscreenEventQueueItem,
     Scene,
     World,
+    Worldline,
 )
 from noveland.worlds.plot import LivingWorldPlotService
 from noveland.worlds.worldlines import (
@@ -250,6 +252,21 @@ class LivingWorldAutonomyService:
         actor_ref: str = DEFAULT_RUNTIME_ACTOR_REF,
         worldline_id: uuid.UUID | None = None,
     ) -> OffscreenResolutionResult:
+        target_worlds = [world.id for world in self._active_worlds(worldline_id=worldline_id)]
+        for world_id in target_worlds:
+            gm_service = LivingWorldGMService(self._session)
+            plan = gm_service.plan_macro_events(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                limit=limit,
+            )
+            gm_service.execute_macro_plan(
+                world_id=world_id,
+                worldline_id=plan.worldline_id,
+                plan=plan,
+                actor_ref=actor_ref,
+                limit=limit,
+            )
         return self.resolve_due_offscreen_events(
             wall_time=wall_time,
             limit=limit,
@@ -328,6 +345,14 @@ class LivingWorldAutonomyService:
                 .order_by(Agent.agent_key),
             ).all(),
         )
+
+    def _active_worlds(self, *, worldline_id: uuid.UUID | None = None) -> list[World]:
+        statement = select(World).where(World.is_active.is_(True))
+        if worldline_id is not None:
+            statement = statement.join(Worldline, Worldline.world_id == World.id).where(
+                Worldline.id == worldline_id,
+            )
+        return list(self._session.scalars(statement.order_by(World.slug)).all())
 
     def _presence_model(
         self,

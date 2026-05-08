@@ -171,10 +171,15 @@ class AgentRuntimeOrchestrator:
             if retrieve_memory
             else None
         )
-        living_context = LivingWorldContextSelector(self._session).select_for_agent_prompt(
+        context_selector = LivingWorldContextSelector(self._session)
+        living_context = context_selector.select_for_agent_prompt(
             world_id=world_id,
             worldline_id=resolved_worldline_id,
             agent_id=agent_id,
+        )
+        living_context_pack = context_selector.select_context_pack(
+            world_id=world_id,
+            worldline_id=resolved_worldline_id,
         )
         provider_prompt = self._build_agent_prompt(
             agent,
@@ -184,6 +189,7 @@ class AgentRuntimeOrchestrator:
             memory_context=_join_prompt_contexts(
                 _memory_context_text(memory_context),
                 living_context.to_prompt_text(),
+                living_context_pack.to_prompt_text(),
             ),
         )
         prompt_context = {
@@ -195,6 +201,7 @@ class AgentRuntimeOrchestrator:
             "memory_backend": None if memory_context is None else memory_context.backend,
             "memory_hit_count": 0 if memory_context is None else len(memory_context.items),
             "living_context": living_context.diagnostics,
+            "living_context_pack": living_context_pack.diagnostics,
         }
         run_model = AgentRuntimeRun(
             world_id=world_id,
@@ -336,6 +343,7 @@ class AgentRuntimeOrchestrator:
                         metadata={
                             "trigger_source": trigger_source,
                             "worldline_id": str(resolved_worldline_id),
+                            "living_context_pack": living_context_pack.to_metadata(),
                         },
                     ),
                 )

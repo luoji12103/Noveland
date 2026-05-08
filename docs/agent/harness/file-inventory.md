@@ -101,6 +101,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/worlds/src/noveland/worlds/clock_service.py`
 - `backend/packages/worlds/src/noveland/worlds/autonomous.py`
 - `backend/packages/worlds/src/noveland/worlds/beta.py`
+- `backend/packages/worlds/src/noveland/worlds/conditions.py`
 - `backend/packages/worlds/src/noveland/worlds/gm.py`
 - `backend/packages/worlds/src/noveland/worlds/guardrails.py`
 - `backend/packages/worlds/src/noveland/worlds/living_context.py`

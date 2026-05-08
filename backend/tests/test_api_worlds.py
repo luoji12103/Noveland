@@ -22,7 +22,11 @@ from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
-from noveland.conversations.models import ConversationSession, ConversationTurn
+from noveland.conversations.models import (
+    ConversationParticipant,
+    ConversationSession,
+    ConversationTurn,
+)
 from noveland.events import (
     CLOCK_ADVANCED_EVENT_NAME,
     WorldEventAppend,
@@ -1424,6 +1428,217 @@ def test_plot_route_rumor_flow_admin_apis_are_worldline_scoped() -> None:
     assert fork_rumors.json()[0]["rumor_key"] == rumor.json()["rumor_key"]
     assert fork_rumors.json()[0]["worldline_id"] == fork_id
     assert primary["id"] != fork_id
+
+
+def test_group_interaction_execute_creates_conversation_session() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "group-exec-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    first_agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    second_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, owner_token)
+    group_context = client.post(
+        f"/worlds/{world_id}/group-interactions",
+        json={
+            "context_key": "festival-meeting",
+            "title": "Festival meeting",
+            "interaction_type": "club",
+            "scene_id": str(scene_id),
+            "participant_agent_ids": [str(first_agent_id), str(second_agent_id)],
+            "participant_roles": {str(first_agent_id): "organizer"},
+            "constraints": {"objective": "Discuss the late rehearsal."},
+        },
+    )
+    executed = client.post(
+        f"/worlds/{world_id}/group-interactions/{group_context.json()['id']}/execute",
+        json={"session_key": "festival-meeting-session", "max_turns": 8},
+    )
+
+    assert group_context.status_code == 201
+    assert executed.status_code == 201
+    body = executed.json()
+    assert body["group_context"]["status"] == "active"
+    assert body["group_context"]["metadata"]["conversation_session_id"] == body["session"]["id"]
+    assert body["session"]["session_key"] == "festival-meeting-session"
+    assert body["session"]["worldline_id"] == group_context.json()["worldline_id"]
+    assert body["session"]["scene_id"] == str(scene_id)
+    assert body["session"]["scope_type"] == "scene"
+    assert body["session"]["group_context"]["group_interaction_context_id"] == group_context.json()[
+        "id"
+    ]
+    with Session(engine) as session:
+        participants = session.scalars(
+            select(ConversationParticipant).where(
+                ConversationParticipant.session_id == uuid.UUID(body["session"]["id"]),
+            )
+        ).all()
+    assert [participant.agent_id for participant in participants] == [
+        first_agent_id,
+        second_agent_id,
+    ]
+
+
+def test_gm_macro_planner_uses_extended_conditions_and_creates_outputs() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "gm-macro-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    source_agent_id = _seed_agent(engine, world_id, "hero", scene_id=scene_id)
+    target_agent_id = _seed_agent(engine, world_id, "rival", scene_id=scene_id)
+
+    _authenticate(client, owner_token)
+    organization = client.post(
+        f"/worlds/{world_id}/organizations",
+        json={
+            "organization_key": "student-council",
+            "name": "Student Council",
+            "organization_type": "club",
+        },
+    )
+    track = client.post(
+        f"/worlds/{world_id}/organizations/{organization.json()['id']}/faction-tracks",
+        json={
+            "track_key": "festival-pressure",
+            "name": "Festival Pressure",
+            "track_type": "conflict",
+            "pressure": 45,
+        },
+    )
+    relationship = client.post(
+        f"/worlds/{world_id}/agents/{source_agent_id}/relationships",
+        json={
+            "source_agent_id": str(source_agent_id),
+            "target_agent_id": str(target_agent_id),
+            "relationship_type": "rivalry",
+            "trust": 45,
+            "rivalry": 50,
+        },
+    )
+    route = client.put(
+        f"/worlds/{world_id}/route-affinities",
+        json={
+            "agent_id": str(target_agent_id),
+            "route_key": "rival-route",
+            "status": "active",
+            "affinity": 40,
+            "stage": 3,
+            "flags": ["festival-helped"],
+        },
+    )
+    thread = client.post(
+        f"/worlds/{world_id}/plot-threads",
+        json={
+            "thread_key": "festival-route",
+            "title": "Festival Route",
+            "thread_type": "personal",
+            "summary": "The route is underway.",
+            "priority": 60,
+        },
+    )
+    with Session(engine) as session:
+        session.add(
+            RouteMilestone(
+                world_id=world_id,
+                worldline_id=uuid.UUID(route.json()["worldline_id"]),
+                route_affinity_id=uuid.UUID(route.json()["id"]),
+                plot_thread_id=uuid.UUID(thread.json()["id"]),
+                agent_id=target_agent_id,
+                milestone_key="late-rehearsal",
+                title="Late rehearsal",
+                stage=2,
+                status="completed",
+                conditions={},
+                evidence_metadata={},
+                metadata_json={},
+            )
+        )
+        session.commit()
+    client.put(
+        f"/worlds/{world_id}/agents/{source_agent_id}/presence",
+        json={"current_scene_id": str(scene_id), "visibility_status": "visible"},
+    )
+    rule = client.post(
+        f"/worlds/{world_id}/resolution-rules",
+        json={
+            "rule_key": "festival-macro",
+            "name": "Festival Macro",
+            "conditions": {
+                "min_relationship_trust": 30,
+                "min_relationship_tension": 40,
+                "min_faction_pressure": 40,
+                "min_route_stage": 3,
+                "required_flags": ["festival-helped"],
+                "min_completed_milestones": 1,
+                "plot_thread_status": "active",
+                "plot_thread_key": "festival-route",
+                "scene_id": str(scene_id),
+            },
+            "effects": {
+                "proposals": [
+                    {
+                        "title": "Rival follows up",
+                        "reason": "Festival route pressure is ready.",
+                        "event_name": "gm.route_follow_up",
+                        "importance": "daily",
+                        "risk_score": 10,
+                        "affected_agents": [str(source_agent_id), str(target_agent_id)],
+                        "proposed_payload": {
+                            "participant_agent_ids": [
+                                str(source_agent_id),
+                                str(target_agent_id),
+                            ],
+                            "scene_id": str(scene_id),
+                        },
+                    }
+                ],
+                "offscreen_events": [
+                    {
+                        "title": "Council rumor circulates",
+                        "event_name": "gm.offscreen_rumor",
+                        "importance": "daily",
+                        "payload": {"track_id": track.json()["id"]},
+                    }
+                ],
+            },
+        },
+    )
+    dry_run = client.post(f"/worlds/{world_id}/resolution-rules/{rule.json()['id']}/dry-run")
+    planned = client.post(f"/worlds/{world_id}/gm/macro-plan", json={"limit": 5})
+    executed = client.post(
+        f"/worlds/{world_id}/gm/macro-plan",
+        json={"limit": 5, "execute": True},
+    )
+    proposal_id = executed.json()["execution"]["proposal_ids"][0]
+    draft = client.post(f"/worlds/{world_id}/gm/proposals/{proposal_id}/draft-low-risk")
+
+    assert organization.status_code == 201
+    assert track.status_code == 201
+    assert relationship.status_code == 201
+    assert route.status_code == 200
+    assert thread.status_code == 201
+    assert dry_run.status_code == 200
+    assert dry_run.json()["matched"] is True
+    assert any("route stage meets 3" in reason for reason in dry_run.json()["reasons"])
+    assert planned.status_code == 200
+    assert [item["item_kind"] for item in planned.json()["planned_items"]] == [
+        "proposal",
+        "offscreen_event",
+    ]
+    assert executed.status_code == 200
+    assert executed.json()["execution"]["proposal_count"] == 1
+    assert executed.json()["execution"]["offscreen_event_count"] == 1
+    assert draft.status_code == 200
+    assert draft.json()["source_kind"] == "proposal"
+    with Session(engine) as session:
+        proposal = session.get(GMEventProposal, uuid.UUID(proposal_id))
+        offscreen_count = len(session.scalars(select(OffscreenEventQueueItem)).all())
+    assert proposal is not None
+    assert proposal.source_context["rule_key"] == "festival-macro"
+    assert offscreen_count == 1
 
 
 def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
@@ -3412,6 +3627,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, NarrativePublication.__table__),

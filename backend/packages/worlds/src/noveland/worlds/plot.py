@@ -7,10 +7,9 @@ from typing import Any
 
 from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventStore
+from noveland.worlds.conditions import evaluate_world_conditions
 from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.models import (
-    AgentPresenceState,
-    CharacterKnowledgeFact,
     DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventTriggerCondition,
@@ -22,7 +21,6 @@ from noveland.worlds.models import (
     RumorPropagation,
     RumorRecord,
     SceneBeatDraft,
-    SecretRecord,
     StoryHook,
     Worldline,
 )
@@ -215,134 +213,18 @@ class LivingWorldPlotService:
         condition: EventTriggerCondition,
     ) -> TriggerDryRun:
         worldline = self.worldline_or_404(world_id, worldline_id)
-        checks = condition.conditions_json
-        satisfied: list[str] = []
-        unsatisfied: list[str] = []
-        min_open_hooks = _optional_int(checks.get("min_open_hooks"))
-        if min_open_hooks is not None:
-            count = len(
-                self._session.scalars(
-                    select(StoryHook.id).where(
-                        StoryHook.world_id == world_id,
-                        StoryHook.worldline_id == worldline.id,
-                        StoryHook.status == "open",
-                    ),
-                ).all(),
-            )
-            _record_threshold("open hooks", count, min_open_hooks, satisfied, unsatisfied)
-        min_route_affinity = _optional_int(checks.get("min_route_affinity"))
-        if min_route_affinity is not None:
-            route = self._session.scalars(
-                select(RouteAffinity)
-                .where(
-                    RouteAffinity.world_id == world_id,
-                    RouteAffinity.worldline_id == worldline.id,
-                )
-                .order_by(RouteAffinity.affinity.desc()),
-            ).first()
-            value = None if route is None else route.affinity
-            _record_threshold("route affinity", value, min_route_affinity, satisfied, unsatisfied)
-        min_relationship_tension = _optional_int(checks.get("min_relationship_tension"))
-        if min_relationship_tension is not None:
-            relationship = self._session.scalars(
-                select(AgentRelationshipEdge)
-                .where(
-                    AgentRelationshipEdge.world_id == world_id,
-                    AgentRelationshipEdge.worldline_id == worldline.id,
-                )
-                .order_by(
-                    AgentRelationshipEdge.hostility.desc(), AgentRelationshipEdge.rivalry.desc()
-                ),
-            ).first()
-            value = (
-                None if relationship is None else max(relationship.hostility, relationship.rivalry)
-            )
-            _record_threshold(
-                "relationship tension",
-                value,
-                min_relationship_tension,
-                satisfied,
-                unsatisfied,
-            )
-        required_scene_id = _uuid_or_none(checks.get("scene_id"))
-        if required_scene_id is not None:
-            presence = self._session.scalars(
-                select(AgentPresenceState).where(
-                    AgentPresenceState.world_id == world_id,
-                    AgentPresenceState.worldline_id == worldline.id,
-                    AgentPresenceState.current_scene_id == required_scene_id,
-                ),
-            ).first()
-            if presence is None:
-                unsatisfied.append("No eligible agent is present at the required scene.")
-            else:
-                satisfied.append("At least one agent is present at the required scene.")
-        min_faction_pressure = _optional_int(checks.get("min_faction_pressure"))
-        if min_faction_pressure is not None:
-            track = self._session.scalars(
-                select(FactionProgressTrack)
-                .where(
-                    FactionProgressTrack.world_id == world_id,
-                    FactionProgressTrack.worldline_id == worldline.id,
-                )
-                .order_by(FactionProgressTrack.pressure.desc()),
-            ).first()
-            value = None if track is None else track.pressure
-            _record_threshold(
-                "faction pressure",
-                value,
-                min_faction_pressure,
-                satisfied,
-                unsatisfied,
-            )
-        min_player_choices = _optional_int(checks.get("min_player_choices"))
-        if min_player_choices is not None:
-            from noveland.worlds.models import PlayerChoiceRecord
-
-            count = len(
-                self._session.scalars(
-                    select(PlayerChoiceRecord.id).where(
-                        PlayerChoiceRecord.world_id == world_id,
-                        PlayerChoiceRecord.worldline_id == worldline.id,
-                    ),
-                ).all(),
-            )
-            _record_threshold("player choices", count, min_player_choices, satisfied, unsatisfied)
-        min_known_facts = _optional_int(checks.get("min_known_facts"))
-        if min_known_facts is not None:
-            count = len(
-                self._session.scalars(
-                    select(CharacterKnowledgeFact.id).where(
-                        CharacterKnowledgeFact.world_id == world_id,
-                        CharacterKnowledgeFact.worldline_id == worldline.id,
-                        CharacterKnowledgeFact.is_active.is_(True),
-                    ),
-                ).all(),
-            )
-            _record_threshold("known facts", count, min_known_facts, satisfied, unsatisfied)
-        max_hidden_secrets = _optional_int(checks.get("max_hidden_secrets"))
-        if max_hidden_secrets is not None:
-            count = len(
-                self._session.scalars(
-                    select(SecretRecord.id).where(
-                        SecretRecord.world_id == world_id,
-                        SecretRecord.worldline_id == worldline.id,
-                        SecretRecord.status == "hidden",
-                    ),
-                ).all(),
-            )
-            if count > max_hidden_secrets:
-                unsatisfied.append(f"hidden secrets above {max_hidden_secrets}.")
-            else:
-                satisfied.append(f"hidden secrets within {max_hidden_secrets}.")
-        if not checks:
-            satisfied.append("No conditions configured.")
+        evaluation = evaluate_world_conditions(
+            self._session,
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conditions=condition.conditions_json,
+        )
         return TriggerDryRun(
             condition_id=condition.id,
             condition_key=condition.condition_key,
-            matched=not unsatisfied,
-            satisfied=satisfied,
-            unsatisfied=unsatisfied,
+            matched=evaluation.matched,
+            satisfied=evaluation.satisfied,
+            unsatisfied=evaluation.unsatisfied,
         )
 
     def compose_scene_beat(

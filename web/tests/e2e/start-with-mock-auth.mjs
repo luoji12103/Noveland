@@ -1702,7 +1702,15 @@ async function handleWorldResource(request, response, url) {
     return;
   }
   if (resource === "group-interactions") {
-    await handleGroupInteractions(request, response, currentSubject, worldId, segments[3], url);
+    await handleGroupInteractions(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments[4],
+      url,
+    );
     return;
   }
   if (resource === "relationship-suggestions") {
@@ -1885,6 +1893,10 @@ async function handleGM(request, response, currentSubject, worldId, resource, re
     await handleGMAgendas(request, response, currentSubject, worldId, resourceId);
     return;
   }
+  if (resource === "macro-plan") {
+    await handleGMMacroPlan(request, response, worldId);
+    return;
+  }
   if (resource === "proposals") {
     await handleGMProposals(request, response, currentSubject, worldId, resourceId, action);
     return;
@@ -1934,6 +1946,73 @@ async function handleGMAgendas(request, response, currentSubject, worldId, agend
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
+async function handleGMMacroPlan(request, response, worldId) {
+  if (!hasValidCsrf(request)) {
+    sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+    return;
+  }
+  if (request.method !== "POST") {
+    sendJson(response, 405, { detail: "method not allowed" });
+    return;
+  }
+  const body = await readJson(request);
+  const worldlineId = body.worldline_id ?? primaryWorldlineId;
+  const plannedItems = resolutionRules
+    .filter((rule) => rule.world_id === worldId && rule.status === "active")
+    .flatMap((rule) => {
+      const proposals = Array.isArray(rule.effects?.proposals) ? rule.effects.proposals : [];
+      const offscreen = Array.isArray(rule.effects?.offscreen_events)
+        ? rule.effects.offscreen_events
+        : [];
+      return [
+        ...proposals.map((proposal, index) => ({
+          item_kind: "proposal",
+          rule_id: rule.id,
+          rule_key: rule.rule_key,
+          priority: rule.priority,
+          title: proposal.title ?? rule.name,
+          payload: proposal,
+          source_context: {
+            source: "gm_macro_planner",
+            rule_id: rule.id,
+            rule_key: rule.rule_key,
+            effect_index: index,
+          },
+        })),
+        ...offscreen.map((item, index) => ({
+          item_kind: "offscreen_event",
+          rule_id: rule.id,
+          rule_key: rule.rule_key,
+          priority: rule.priority,
+          title: item.title ?? rule.name,
+          payload: item,
+          source_context: {
+            source: "gm_macro_planner",
+            rule_id: rule.id,
+            rule_key: rule.rule_key,
+            effect_index: index,
+          },
+        })),
+      ];
+    })
+    .slice(0, body.limit ?? 20);
+  const execution = body.execute
+    ? {
+        proposal_count: plannedItems.filter((item) => item.item_kind === "proposal").length,
+        offscreen_event_count: plannedItems.filter((item) => item.item_kind === "offscreen_event").length,
+        proposal_ids: [],
+        offscreen_event_ids: [],
+      }
+    : null;
+  sendJson(response, 200, {
+    world_id: worldId,
+    worldline_id: worldlineId,
+    planned_items: plannedItems,
+    diagnostics: plannedItems.length === 0 ? ["No matched GM macro effects."] : [],
+    execution,
+  });
+}
+
 async function handleGMProposals(request, response, currentSubject, worldId, proposalId, action) {
   if (request.method === "GET" && proposalId === undefined) {
     sendJson(response, 200, gmProposals.filter((proposal) => proposal.world_id === worldId));
@@ -1971,6 +2050,44 @@ async function handleGMProposals(request, response, currentSubject, worldId, pro
   }
   const proposal = gmProposals.find((item) => item.id === proposalId && item.world_id === worldId);
   if (proposal === undefined || action !== "review") {
+    if (proposal !== undefined && action === "draft-low-risk" && request.method === "POST") {
+      if (proposal.risk_score > 25 || proposal.importance !== "daily") {
+        sendJson(response, 422, {
+          detail: "only low-risk daily proposals can become deterministic drafts",
+        });
+        return;
+      }
+      const payload = proposal.proposed_payload ?? {};
+      const participantAgentIds = Array.isArray(payload.participant_agent_ids)
+        ? payload.participant_agent_ids
+        : [agentGuideId];
+      const sceneId = payload.scene_id ?? sceneHomeId;
+      const now = new Date().toISOString();
+      const beat = {
+        id: randomUUID(),
+        world_id: worldId,
+        worldline_id: proposal.worldline_id ?? primaryWorldlineId,
+        source_kind: "proposal",
+        source_ref: proposal.id,
+        title: proposal.title,
+        setup: `Set up ${proposal.title}.`,
+        dialogue_beats: participantAgentIds.map((agentId) => ({
+          speaker: agentFor(agentId)?.agent_key ?? agentId,
+          intent: "advance a low-risk daily beat",
+        })),
+        choice_points: [],
+        aftermath: proposal.reason,
+        participant_agent_ids: participantAgentIds,
+        scene_id: sceneId,
+        status: "draft",
+        metadata: { source: "gm_low_risk_proposal", proposal_id: proposal.id },
+        created_at: now,
+        updated_at: now,
+      };
+      sceneBeatDrafts.push(beat);
+      sendJson(response, 200, sceneBeatResponse(beat));
+      return;
+    }
     sendJson(response, 404, { detail: "Not found" });
     return;
   }
@@ -2726,7 +2843,15 @@ async function handleDailyEpisodes(request, response, currentSubject, worldId, e
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleGroupInteractions(request, response, currentSubject, worldId, contextId, url) {
+async function handleGroupInteractions(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  contextId,
+  action,
+  url,
+) {
   if (!canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
@@ -2766,6 +2891,112 @@ async function handleGroupInteractions(request, response, currentSubject, worldI
     };
     groupInteractions.push(context);
     sendJson(response, 201, groupInteractionResponse(context));
+    return;
+  }
+  const context = groupInteractions.find((item) => item.id === contextId && item.world_id === worldId);
+  if (context === undefined) {
+    sendJson(response, 404, { detail: "Not found" });
+    return;
+  }
+  if (request.method === "POST" && action === "execute") {
+    if (context.status === "completed" || context.status === "archived") {
+      sendJson(response, 409, { detail: "group interaction cannot be executed from this status" });
+      return;
+    }
+    if (context.participant_agent_ids.length === 0) {
+      sendJson(response, 422, { detail: "group interaction requires participants" });
+      return;
+    }
+    const body = await readJson(request);
+    const now = new Date().toISOString();
+    const groupContext = {
+      group_interaction_context_id: context.id,
+      context_key: context.context_key,
+      title: context.title,
+      interaction_type: context.interaction_type,
+      scene_id: context.scene_id,
+      organization_id: context.organization_id,
+      participant_roles: context.participant_roles,
+      constraints: context.constraints,
+      metadata: context.metadata,
+    };
+    const session = {
+      id: randomUUID(),
+      world_id: worldId,
+      worldline_id: context.worldline_id ?? primaryWorldlineId,
+      scene_id: context.scene_id,
+      session_key: body.session_key ?? `group-${context.context_key}`,
+      title: context.title,
+      scope_type: context.scene_id === null ? "world" : "scene",
+      mode: body.mode ?? "manual_chain",
+      status: "draft",
+      objective:
+        body.objective ??
+        context.constraints?.objective ??
+        `Run group interaction ${context.title} with configured participant roles.`,
+      opening_prompt: body.opening_prompt ?? context.title,
+      max_turns: body.max_turns ?? 12,
+      next_turn_index: 0,
+      policy: body.policy ?? {
+        error_policy: "fail_session",
+        max_consecutive_failed_turns: 1,
+        loop_guard_window: 4,
+        repeat_output_threshold: 2,
+        speaker_policy: "round_robin",
+        manual_next_agent_id: null,
+        participant_repeat_cooldown: 0,
+        min_enabled_participants: 1,
+        max_turn_budget: null,
+      },
+      writer_config: body.writer_config ?? {
+        provider_profile_id: null,
+        writer_plugin_identifier: "builtin.default_narrative_writer",
+        writer_plugin_config: { group_context: groupContext },
+        auto_generate_on_complete: false,
+        generate_summary: true,
+        generate_chapter: true,
+        style_guide: "",
+        target_length: "standard",
+        source_constraints: "",
+        include_prompt_preview: true,
+      },
+      memory_config: body.memory_config ?? {
+        write_turn_memory: true,
+        retrieve_memory: true,
+        max_context_items: 5,
+        query_window: 8,
+        include_recent_turns: true,
+        include_agent_observations: true,
+        memory_query_strategy: "prompt",
+      },
+      group_context: groupContext,
+      terminal_reason: null,
+      created_at: now,
+      updated_at: now,
+    };
+    session.writer_config.writer_plugin_config = {
+      ...(session.writer_config.writer_plugin_config ?? {}),
+      group_context: groupContext,
+    };
+    conversations.push(session);
+    conversationParticipants.push(
+      ...context.participant_agent_ids.map((agentId, index) => ({
+        id: randomUUID(),
+        session_id: session.id,
+        agent_id: agentId,
+        turn_order: index,
+        is_enabled: true,
+        created_at: now,
+        updated_at: now,
+      })),
+    );
+    context.status = "active";
+    context.metadata = { ...(context.metadata ?? {}), conversation_session_id: session.id };
+    context.updated_at = now;
+    sendJson(response, 200, {
+      group_context: groupInteractionResponse(context),
+      session,
+    });
     return;
   }
   sendJson(response, 405, { detail: "method not allowed" });

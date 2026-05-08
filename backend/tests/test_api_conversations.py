@@ -43,9 +43,14 @@ from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
+    NarrativeContinuityReview,
+    PlotThread,
+    RouteAffinity,
     Scene,
     SecretRecord,
+    StoryHook,
     World,
+    WorldBible,
     Worldline,
     WorldMembership,
 )
@@ -487,6 +492,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, WorldBible.__table__),
         cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
@@ -507,6 +513,10 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, SecretRecord.__table__),
         cast(Table, CharacterKnowledgeFact.__table__),
         cast(Table, CharacterEmotionalState.__table__),
+        cast(Table, StoryHook.__table__),
+        cast(Table, PlotThread.__table__),
+        cast(Table, RouteAffinity.__table__),
+        cast(Table, NarrativeContinuityReview.__table__),
     ):
         table.create(engine)
     app = create_app()

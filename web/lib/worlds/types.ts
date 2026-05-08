@@ -563,6 +563,7 @@ export type ConversationMemorySummary = ConversationMemoryConfig & {
 export type ConversationSession = {
   id: string;
   world_id: string;
+  worldline_id?: string | null;
   scene_id: string | null;
   session_key: string;
   title: string;
@@ -576,6 +577,7 @@ export type ConversationSession = {
   policy: ConversationPolicy;
   writer_config: ConversationWriterConfig;
   memory_config: ConversationMemoryConfig;
+  group_context?: Record<string, unknown>;
   terminal_reason: ConversationTerminalReason | null;
   created_at: string;
   updated_at: string;
@@ -794,6 +796,24 @@ export type GMEventProposal = {
   resolved_event_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type GMMacroPlanItem = {
+  item_kind: string;
+  rule_id: string;
+  rule_key: string;
+  priority: number;
+  title: string;
+  payload: Record<string, unknown>;
+  source_context: Record<string, unknown>;
+};
+
+export type GMMacroPlan = {
+  world_id: string;
+  worldline_id: string;
+  planned_items: GMMacroPlanItem[];
+  diagnostics: string[];
+  execution: Record<string, unknown> | null;
 };
 
 export type ResolutionRuleStatus = "active" | "inactive";
@@ -2306,6 +2326,12 @@ export type GMProposalReviewInput = {
   review_note?: string | null;
 };
 
+export type GMMacroPlanInput = {
+  worldline_id?: string | null;
+  limit?: number;
+  execute?: boolean;
+};
+
 export type EventResolutionRuleCreateInput = {
   rule_key: string;
   name: string;
@@ -2457,6 +2483,22 @@ export type GroupInteractionCreateInput = {
   participant_roles?: Record<string, unknown>;
   constraints?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+};
+
+export type GroupInteractionExecuteInput = {
+  session_key?: string | null;
+  mode?: ConversationMode;
+  max_turns?: number;
+  policy?: Partial<ConversationPolicy>;
+  writer_config?: Partial<ConversationWriterConfig>;
+  memory_config?: Partial<ConversationMemoryConfig>;
+  opening_prompt?: string | null;
+  objective?: string | null;
+};
+
+export type GroupInteractionExecution = {
+  group_context: GroupInteractionContext;
+  session: ConversationSession;
 };
 
 export type RelationshipSuggestionUpdateInput = {

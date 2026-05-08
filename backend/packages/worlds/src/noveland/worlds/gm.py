@@ -13,9 +13,10 @@ from noveland.events import (
     WorldEventStore,
 )
 from noveland.events.models import WorldSnapshotModel
+from noveland.worlds.conditions import evaluate_world_conditions
 from noveland.worlds.models import (
     AgentPresenceState,
-    CharacterKnowledgeFact,
+    DailyEpisodeDraft,
     DailyLifeEventCandidate,
     EventResolutionRule,
     FactionProgressTrack,
@@ -32,10 +33,10 @@ from noveland.worlds.models import (
     RumorPropagation,
     RumorRecord,
     SceneBeatDraft,
-    SecretRecord,
     StoryHook,
     Worldline,
 )
+from noveland.worlds.plot import LivingWorldPlotService
 from noveland.worlds.worldlines import ensure_primary_worldline, worldline_or_404
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -67,6 +68,33 @@ class WorldlineComparison:
     relationship_delta_count: int
     faction_delta_count: int
     choice_delta_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class GMMacroPlanItem:
+    item_kind: str
+    rule_id: uuid.UUID
+    rule_key: str
+    priority: int
+    title: str
+    payload: dict[str, Any]
+    source_context: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class GMMacroPlanResult:
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    planned_items: list[GMMacroPlanItem]
+    diagnostics: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class GMMacroExecutionResult:
+    proposal_count: int
+    offscreen_event_count: int
+    proposal_ids: list[uuid.UUID]
+    offscreen_event_ids: list[uuid.UUID]
 
 
 class LivingWorldGMService:
@@ -421,112 +449,206 @@ class LivingWorldGMService:
         worldline_id: uuid.UUID | None,
     ) -> ResolutionRuleDryRun:
         worldline = self.worldline_or_404(world_id, worldline_id)
-        conditions = rule.conditions_json
-        reasons: list[str] = []
-        matched = True
-        min_relationship_trust = _optional_int(conditions.get("min_relationship_trust"))
-        if min_relationship_trust is not None:
-            relationship = self._session.scalars(
-                select(AgentRelationshipEdge)
-                .where(
-                    AgentRelationshipEdge.world_id == world_id,
-                    AgentRelationshipEdge.worldline_id == worldline.id,
-                )
-                .order_by(AgentRelationshipEdge.trust.desc()),
-            ).first()
-            trust = relationship.trust if relationship is not None else None
-            if trust is None or trust < min_relationship_trust:
-                matched = False
-                reasons.append("No relationship meets min_relationship_trust.")
-        pending_proposals = _optional_int(conditions.get("min_pending_proposals"))
-        if pending_proposals is not None:
-            count = len(
-                self._session.scalars(
-                    select(GMEventProposal.id).where(
-                        GMEventProposal.world_id == world_id,
-                        GMEventProposal.worldline_id == worldline.id,
-                        GMEventProposal.status == "proposed",
-                    ),
-                ).all(),
-            )
-            if count < pending_proposals:
-                matched = False
-                reasons.append("Pending proposal count is below threshold.")
-        min_faction_pressure = _optional_int(conditions.get("min_faction_pressure"))
-        if min_faction_pressure is not None:
-            track = self._session.scalars(
-                select(FactionProgressTrack)
-                .where(
-                    FactionProgressTrack.world_id == world_id,
-                    FactionProgressTrack.worldline_id == worldline.id,
-                )
-                .order_by(FactionProgressTrack.pressure.desc()),
-            ).first()
-            pressure = None if track is None else track.pressure
-            if pressure is None or pressure < min_faction_pressure:
-                matched = False
-                reasons.append("No faction track meets min_faction_pressure.")
-        required_scene_id = _uuid_or_none(conditions.get("scene_id"))
-        if required_scene_id is not None:
-            presence = self._session.scalars(
-                select(AgentPresenceState).where(
-                    AgentPresenceState.world_id == world_id,
-                    AgentPresenceState.worldline_id == worldline.id,
-                    AgentPresenceState.current_scene_id == required_scene_id,
-                ),
-            ).first()
-            if presence is None:
-                matched = False
-                reasons.append("No agent presence matches required scene_id.")
-        min_player_choices = _optional_int(conditions.get("min_player_choices"))
-        if min_player_choices is not None:
-            count = len(
-                self._session.scalars(
-                    select(PlayerChoiceRecord.id).where(
-                        PlayerChoiceRecord.world_id == world_id,
-                        PlayerChoiceRecord.worldline_id == worldline.id,
-                    ),
-                ).all(),
-            )
-            if count < min_player_choices:
-                matched = False
-                reasons.append("Player choice count is below threshold.")
-        min_known_facts = _optional_int(conditions.get("min_known_facts"))
-        if min_known_facts is not None:
-            count = len(
-                self._session.scalars(
-                    select(CharacterKnowledgeFact.id).where(
-                        CharacterKnowledgeFact.world_id == world_id,
-                        CharacterKnowledgeFact.worldline_id == worldline.id,
-                        CharacterKnowledgeFact.is_active.is_(True),
-                    ),
-                ).all(),
-            )
-            if count < min_known_facts:
-                matched = False
-                reasons.append("Known fact count is below threshold.")
-        max_hidden_secrets = _optional_int(conditions.get("max_hidden_secrets"))
-        if max_hidden_secrets is not None:
-            count = len(
-                self._session.scalars(
-                    select(SecretRecord.id).where(
-                        SecretRecord.world_id == world_id,
-                        SecretRecord.worldline_id == worldline.id,
-                        SecretRecord.status == "hidden",
-                    ),
-                ).all(),
-            )
-            if count > max_hidden_secrets:
-                matched = False
-                reasons.append("Hidden secret count is above threshold.")
-        if matched:
+        evaluation = evaluate_world_conditions(
+            self._session,
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conditions=rule.conditions_json,
+        )
+        reasons = [*evaluation.satisfied, *evaluation.unsatisfied]
+        if evaluation.matched:
             reasons.append("Rule conditions are satisfied.")
         return ResolutionRuleDryRun(
             rule_id=rule.id,
             rule_key=rule.rule_key,
-            matched=matched,
+            matched=evaluation.matched,
             reasons=reasons,
             effects=rule.effects_json,
+        )
+
+    def plan_macro_events(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        limit: int = 20,
+    ) -> GMMacroPlanResult:
+        worldline = self.worldline_or_404(world_id, worldline_id)
+        rules = self._session.scalars(
+            select(EventResolutionRule)
+            .where(
+                EventResolutionRule.world_id == world_id,
+                EventResolutionRule.status == "active",
+            )
+            .order_by(EventResolutionRule.priority.desc(), EventResolutionRule.rule_key)
+            .limit(max(1, min(limit, 100))),
+        ).all()
+        diagnostics: list[str] = []
+        items: list[GMMacroPlanItem] = []
+        remaining = max(1, min(limit, 100))
+        for rule in rules:
+            if remaining <= 0:
+                break
+            evaluation = evaluate_world_conditions(
+                self._session,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                conditions=rule.conditions_json,
+            )
+            if not evaluation.matched:
+                diagnostics.append(f"{rule.rule_key}: skipped; {', '.join(evaluation.unsatisfied)}")
+                continue
+            source_context = {
+                "source": "gm_macro_planner",
+                "rule_id": str(rule.id),
+                "rule_key": rule.rule_key,
+                "condition_evidence": evaluation.evidence,
+                "satisfied": evaluation.satisfied,
+            }
+            for index, proposal in enumerate(_list_of_dicts(rule.effects_json.get("proposals"))):
+                if remaining <= 0:
+                    break
+                items.append(
+                    GMMacroPlanItem(
+                        item_kind="proposal",
+                        rule_id=rule.id,
+                        rule_key=rule.rule_key,
+                        priority=rule.priority,
+                        title=str(proposal.get("title") or rule.name),
+                        payload=proposal,
+                        source_context={**source_context, "effect_index": index},
+                    ),
+                )
+                remaining -= 1
+            for index, offscreen in enumerate(
+                _list_of_dicts(rule.effects_json.get("offscreen_events"))
+            ):
+                if remaining <= 0:
+                    break
+                items.append(
+                    GMMacroPlanItem(
+                        item_kind="offscreen_event",
+                        rule_id=rule.id,
+                        rule_key=rule.rule_key,
+                        priority=rule.priority,
+                        title=str(offscreen.get("title") or rule.name),
+                        payload=offscreen,
+                        source_context={**source_context, "effect_index": index},
+                    ),
+                )
+                remaining -= 1
+        return GMMacroPlanResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            planned_items=items,
+            diagnostics=diagnostics,
+        )
+
+    def execute_macro_plan(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        plan: GMMacroPlanResult | None = None,
+        actor_ref: str,
+        limit: int = 20,
+    ) -> GMMacroExecutionResult:
+        worldline = self.worldline_or_404(world_id, worldline_id)
+        plan = plan or self.plan_macro_events(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            limit=limit,
+        )
+        proposal_ids: list[uuid.UUID] = []
+        offscreen_event_ids: list[uuid.UUID] = []
+        for item in plan.planned_items[: max(1, min(limit, 100))]:
+            if item.item_kind == "proposal":
+                proposal = self.create_proposal(
+                    world_id=world_id,
+                    worldline_id=worldline.id,
+                    agenda_id=_uuid_or_none(item.payload.get("agenda_id")),
+                    title=item.title,
+                    reason=str(item.payload.get("reason") or f"Matched GM rule {item.rule_key}."),
+                    event_name=str(item.payload.get("event_name") or "gm.macro_proposal"),
+                    proposed_payload=_dict_or_empty(item.payload.get("proposed_payload")),
+                    importance=str(item.payload.get("importance") or "daily"),
+                    risk_score=_bounded_percent(_optional_int(item.payload.get("risk_score")) or 0),
+                    affected_agents=_list_of_strings(item.payload.get("affected_agents")),
+                    affected_organizations=_list_of_strings(
+                        item.payload.get("affected_organizations")
+                    ),
+                    source_context=item.source_context,
+                )
+                proposal_ids.append(proposal.id)
+                continue
+            if item.item_kind == "offscreen_event":
+                due_at = _datetime_or_now(item.payload.get("due_at"))
+                offscreen = OffscreenEventQueueItem(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline.id,
+                    event_name=str(item.payload.get("event_name") or "gm.offscreen_event"),
+                    title=item.title,
+                    payload_json={
+                        **_dict_or_empty(item.payload.get("payload")),
+                        "source_context": item.source_context,
+                        "actor_ref": actor_ref,
+                    },
+                    due_at=due_at,
+                    importance=str(item.payload.get("importance") or "daily"),
+                    status="pending",
+                )
+                self._session.add(offscreen)
+                self._session.flush()
+                offscreen_event_ids.append(offscreen.id)
+        self._session.flush()
+        return GMMacroExecutionResult(
+            proposal_count=len(proposal_ids),
+            offscreen_event_count=len(offscreen_event_ids),
+            proposal_ids=proposal_ids,
+            offscreen_event_ids=offscreen_event_ids,
+        )
+
+    def create_daily_draft_from_low_risk_proposal(
+        self,
+        *,
+        world_id: uuid.UUID,
+        proposal_id: uuid.UUID,
+    ) -> SceneBeatDraft | DailyEpisodeDraft:
+        proposal = self._proposal_or_404(world_id, proposal_id)
+        if proposal.worldline_id is None:
+            raise ValueError("proposal worldline is required")
+        if proposal.risk_score > 25 or proposal.importance != "daily":
+            raise ValueError("only low-risk daily proposals can become deterministic drafts")
+        payload = proposal.proposed_payload or {}
+        participant_agent_ids = _list_of_strings(payload.get("participant_agent_ids"))
+        scene_id = _uuid_or_none(payload.get("scene_id"))
+        candidate_id = _uuid_or_none(payload.get("source_candidate_id"))
+        plot_service = LivingWorldPlotService(self._session)
+        if candidate_id is not None:
+            return plot_service.generate_daily_episode(
+                world_id=world_id,
+                worldline_id=proposal.worldline_id,
+                source_candidate_id=candidate_id,
+                title=proposal.title,
+                metadata={
+                    "source": "gm_low_risk_proposal",
+                    "proposal_id": str(proposal.id),
+                },
+            )
+        return plot_service.compose_scene_beat(
+            world_id=world_id,
+            worldline_id=proposal.worldline_id,
+            source_kind="proposal",
+            source_ref=str(proposal.id),
+            title=proposal.title,
+            participant_agent_ids=participant_agent_ids,
+            scene_id=scene_id,
+            metadata={
+                "source": "gm_low_risk_proposal",
+                "proposal_id": str(proposal.id),
+                "importance": proposal.importance,
+            },
         )
 
     def choice_consequence_preview(
@@ -1334,6 +1456,8 @@ class LivingWorldGMService:
 
 
 def _optional_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
     if isinstance(value, int):
         return value
     if isinstance(value, str):
@@ -1355,10 +1479,32 @@ def _uuid_or_none(value: object) -> uuid.UUID | None:
     return None
 
 
+def _datetime_or_now(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value)
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+        except ValueError:
+            return datetime.now(UTC)
+    return datetime.now(UTC)
+
+
+def _dict_or_empty(value: object) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
 def _list_of_dicts(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [dict(item) for item in value if isinstance(item, dict)]
+
+
+def _list_of_strings(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item)]
 
 
 def _bounded_percent(value: int) -> int:

@@ -226,6 +226,7 @@ class ConversationNarrativePromptPreviewResponse(BaseModel):
     source_turn_count: int
     existing_artifact_count: int
     warnings: list[str]
+    living_world_context: dict[str, Any] = Field(default_factory=dict)
 
 
 class ConversationMemoryConfigResponse(BaseModel):
@@ -1154,6 +1155,7 @@ def _narrative_prompt_preview_response(
         source_turn_count=preview.source_turn_count,
         existing_artifact_count=preview.existing_artifact_count,
         warnings=preview.warnings,
+        living_world_context=preview.living_world_context,
     )
 
 

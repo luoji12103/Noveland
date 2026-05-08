@@ -40,6 +40,8 @@ from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
     NarrativeContinuityReview,
+    PlotThread,
+    RouteAffinity,
     Scene,
     SecretRecord,
     StoryHook,
@@ -198,6 +200,111 @@ def test_writer_prompt_uses_leak_safe_participant_context() -> None:
 
     assert "Scribe plans a public festival scene." in profile_service.prompts[0]
     assert "nonholder forbidden content" not in profile_service.prompts[0]
+
+
+def test_writer_context_pack_records_bible_hooks_and_route_metadata() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    scene_id = _seed_scene(engine, world_id)
+    agent_id = _seed_agent(engine, world_id, scene_id)
+    profile_service = FakeProfileService()
+
+    with Session(engine) as session:
+        worldline_id = ensure_primary_worldline(session, world_id).id
+        session.add_all(
+            [
+                WorldBible(
+                    world_id=world_id,
+                    source_material="Original school romance route.",
+                    canon_timeline=[],
+                    setting_rules={"tone": "daily-life galgame"},
+                    forbidden_changes=[
+                        {"title": "No generic chatbot drift", "reason": "Keep sequel tone."}
+                    ],
+                    sequel_boundaries={},
+                    continuity_config={},
+                    metadata_json={},
+                ),
+                StoryHook(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    hook_key="festival-promise",
+                    title="Festival promise",
+                    hook_type="promise",
+                    summary="Scribe promised to help after school.",
+                    status="open",
+                    priority=80,
+                    metadata_json={},
+                ),
+                PlotThread(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    thread_key="festival-route",
+                    title="Festival route",
+                    thread_type="personal",
+                    status="active",
+                    summary="A festival route is opening.",
+                    next_beats=["after-school rehearsal"],
+                    priority=70,
+                    metadata_json={},
+                ),
+                RouteAffinity(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    agent_id=agent_id,
+                    route_key="scribe-route",
+                    status="active",
+                    affinity=35,
+                    stage=2,
+                    flags=["festival"],
+                    metadata_json={},
+                ),
+            ],
+        )
+        conversation_id = _seed_conversation(
+            session,
+            world_id=world_id,
+            scene_id=scene_id,
+            agent_id=agent_id,
+            writer_config=ConversationWriterConfig(
+                provider_profile_id=profile_service.profile.id,
+                auto_generate_on_complete=False,
+                generate_summary=True,
+                generate_chapter=False,
+            ),
+        )
+        writer = ConversationNarrativeWriterService(session, profile_service)
+        artifacts = writer.generate_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet.SUMMARY_ONLY,
+                provider_profile_id=profile_service.profile.id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+        preview = writer.preview_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet.SUMMARY_ONLY,
+                provider_profile_id=profile_service.profile.id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+
+    prompt = profile_service.prompts[0]
+    metadata = artifacts[0].metadata["living_world_context"]
+    context_pack = metadata["context_pack"]
+    assert "World bible constraints" in prompt
+    assert "Forbidden continuity changes" in prompt
+    assert "Festival promise" in prompt
+    assert "Festival route" in prompt
+    assert metadata["context_pack"]["diagnostics"]["open_hook_count"] == 1
+    assert context_pack["diagnostics"]["forbidden_change_count"] == 1
+    assert artifacts[0].metadata["worldline_id"] == str(worldline_id)
+    assert preview.living_world_context["context_pack"]["diagnostics"]["route_state_count"] == 1
+    assert "open story hooks are in scope" in preview.warnings
 
 
 def test_publish_blocks_hidden_secret_leak_and_records_review() -> None:
@@ -362,6 +469,8 @@ def _engine() -> Engine:
         cast(Table, NarrativeContinuityReview.__table__),
         cast(Table, WorldBible.__table__),
         cast(Table, StoryHook.__table__),
+        cast(Table, PlotThread.__table__),
+        cast(Table, RouteAffinity.__table__),
     ):
         table.create(engine)
     return engine

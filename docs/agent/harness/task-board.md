@@ -64,10 +64,10 @@
 - Living World Beta Release Readiness
 - V2 Runtime Worldline + Memory Isolation Remediation
 - V2 Prompt Boundary + Publish Guardrails Remediation
+- V2 Runtime GM + Narrative Execution Depth Remediation
 
 ## Upcoming Mainline
-- Next remediation bundles are `feat/v2-runtime-gm-narrative-execution` and
-  `feat/v2-beta-acceptance-gating-hardening`, in that order.
+- Next remediation bundle is `feat/v2-beta-acceptance-gating-hardening`.
 - V2 phases 1-50 are implemented in local roadmap bundles; remaining work should come
   from acceptance reports, beta evidence, operator feedback, and targeted hardening rather
   than a new phase-number branch.
