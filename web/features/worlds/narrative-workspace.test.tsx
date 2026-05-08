@@ -58,12 +58,14 @@ describe("NarrativeWorkspace", () => {
     expect(screen.getByRole("heading", { name: "Published artifacts" })).toBeVisible();
     expect(screen.getByText(/Draft chapter/)).toBeVisible();
     expect(screen.getByText(/Published chapter/)).toBeVisible();
+    expect(screen.getByText("Publication gate: warning (1 issue)")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => {
       expect(publishNarrativeArtifact).toHaveBeenCalledWith("world-1", "artifact-draft", {
         reader_visible: true,
         metadata: { channel: "reader" },
+        override_style_warning: true,
       });
     });
 
@@ -115,6 +117,12 @@ const publication = {
   status: "published" as const,
   reader_visible: true,
   metadata: { channel: "reader" },
+  publication_gate: {
+    review_id: "review-1",
+    status: "warning",
+    override_style_warning: true,
+    issue_count: 1,
+  },
   published_at: "2026-04-21T00:03:00.000Z",
   unpublished_at: null,
   published_by_user_id: "user-1",

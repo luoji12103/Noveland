@@ -46,6 +46,7 @@ from noveland.observability import (
     RuntimeDiagnosticRecord,
     RuntimeDiagnosticsService,
 )
+from noveland.worlds.living_context import LivingWorldContextSelector
 from noveland.worlds.models import Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import func, select
@@ -675,6 +676,15 @@ class ConversationService:
             if session_model.scope_type == ConversationScopeType.SCENE.value
             else "scope=world"
         )
+        living_context_text = None
+        if speaker_agent is not None:
+            living_context = LivingWorldContextSelector(self._session).select_for_agent_prompt(
+                world_id=session_model.world_id,
+                worldline_id=session_model.worldline_id,
+                agent_id=speaker_agent.id,
+                limit=4,
+            )
+            living_context_text = living_context.to_prompt_text()
 
         lines = [
             f"Conversation session: {session_model.title} ({session_model.session_key}).",
@@ -687,6 +697,8 @@ class ConversationService:
             "Recent transcript:",
             *(transcript_lines or ["- none"]),
             f"Previous turn output: {previous_output or 'No previous turn output.'}",
+            "Speaker living-world context:",
+            living_context_text or "- none",
             (
                 "Continue the conversation. Respond as the current speaker and move the "
                 "dialogue forward."

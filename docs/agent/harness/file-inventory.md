@@ -103,6 +103,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/worlds/src/noveland/worlds/beta.py`
 - `backend/packages/worlds/src/noveland/worlds/gm.py`
 - `backend/packages/worlds/src/noveland/worlds/guardrails.py`
+- `backend/packages/worlds/src/noveland/worlds/living_context.py`
 - `backend/packages/worlds/src/noveland/worlds/models.py`
 - `backend/packages/worlds/src/noveland/worlds/plot.py`
 - `backend/packages/worlds/src/noveland/worlds/worldlines.py`

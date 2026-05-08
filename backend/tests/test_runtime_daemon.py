@@ -8,7 +8,13 @@ from typing import cast
 import pytest
 from noveland.adapters import ProviderCompletion, ProviderProfileService
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
+from noveland.agents.models import (
+    Agent,
+    AgentObservation,
+    AgentPersona,
+    AgentRelationshipEdge,
+    AgentRuntimeRun,
+)
 from noveland.auth.models import User
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import (
@@ -35,12 +41,15 @@ from noveland.services.runtime.daemon import RuntimeDaemon
 from noveland.worlds.clock_service import WorldClockService
 from noveland.worlds.models import (
     AgentPresenceState,
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
     DailyLifeEventCandidate,
     FactionProgressTrack,
     OffscreenEventQueueItem,
     OrganizationMembership,
     Scene,
     SceneLocationEdge,
+    SecretRecord,
     World,
     WorldClockStateModel,
     WorldClockTransitionModel,
@@ -220,6 +229,86 @@ def test_run_agent_scopes_run_events_and_memory_jobs_to_fork_worldline(
     assert job_worldline_id == fork_id
 
 
+def test_run_agent_living_context_filters_hidden_secrets_by_holder(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "runtime-living-context.sqlite3"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    engine = create_engine(database_url)
+    _create_tables(engine)
+
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id, "runtime-secret-world")
+    holder_agent_id = _seed_agent(engine, world_id, "holder")
+    non_holder_agent_id = _seed_agent(engine, world_id, "observer")
+    worldline_id = _seed_hidden_secret(
+        engine,
+        world_id,
+        holder_agent_id=holder_agent_id,
+        title="Sealed Letter",
+        content="vault phrase heliotrope",
+    )
+    _seed_provider_profile(engine, "runtime-profile", "runtime-ref")
+    captured_prompts: list[str] = []
+
+    def fake_invoke_profile(
+        self: ProviderProfileService,
+        profile: object,
+        prompt: str,
+    ) -> ProviderCompletion:
+        del self, profile
+        captured_prompts.append(prompt)
+        return ProviderCompletion(text="Runtime response", raw_response={"ok": True})
+
+    monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
+
+    settings = AppSettings.model_construct(
+        environment="local",
+        database_url=database_url,
+        nats_url="nats://localhost:4222",
+        object_storage_root=tmp_path / "object-storage",
+        provider_api_keys_json={"runtime-ref": "secret-key"},
+        runtime_loop_interval_seconds=1,
+        runtime_batch_limit=20,
+    )
+    with Session(engine) as session:
+        profile_service = ProviderProfileService(session, settings)
+        orchestrator = AgentRuntimeOrchestrator(session, profile_service, settings)
+        non_holder_run = orchestrator.run_agent(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            agent_id=non_holder_agent_id,
+            prompt_text="Observe the room.",
+            trigger_source="manual",
+            create_memory=False,
+            retrieve_memory=False,
+            create_narrative_artifact=False,
+        )
+        holder_run = orchestrator.run_agent(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            agent_id=holder_agent_id,
+            prompt_text="Read what you know.",
+            trigger_source="manual",
+            create_memory=False,
+            retrieve_memory=False,
+            create_narrative_artifact=False,
+        )
+        session.commit()
+
+    assert len(captured_prompts) == 2
+    assert "vault phrase heliotrope" not in captured_prompts[0]
+    assert "Sealed Letter" not in captured_prompts[0]
+    assert "Allowed secret context" not in captured_prompts[0]
+    assert "Allowed secret context" in captured_prompts[1]
+    assert "Sealed Letter: vault phrase heliotrope" in captured_prompts[1]
+    assert non_holder_run.diagnostics["living_context"]["visible_secret_count"] == 0
+    assert non_holder_run.diagnostics["living_context"]["hidden_secret_count"] == 1
+    assert holder_run.diagnostics["living_context"]["visible_secret_count"] == 1
+    assert holder_run.diagnostics["living_context"]["hidden_secret_count"] == 0
+
+
 def test_run_agent_rejects_cross_world_worldline(tmp_path: Path) -> None:
     database_path = tmp_path / "runtime-cross-worldline.sqlite3"
     database_url = f"sqlite+pysqlite:///{database_path}"
@@ -332,10 +421,14 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldClockTransitionModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, WorldOrganization.__table__),
         cast(Table, OrganizationMembership.__table__),
         cast(Table, FactionProgressTrack.__table__),
         cast(Table, SceneLocationEdge.__table__),
+        cast(Table, CharacterKnowledgeFact.__table__),
+        cast(Table, SecretRecord.__table__),
+        cast(Table, CharacterEmotionalState.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
@@ -401,6 +494,36 @@ def _seed_agent(engine: Engine, world_id: uuid.UUID, agent_key: str) -> uuid.UUI
         )
         session.commit()
     return agent_id
+
+
+def _seed_hidden_secret(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    holder_agent_id: uuid.UUID,
+    title: str,
+    content: str,
+) -> uuid.UUID:
+    with Session(engine) as session:
+        worldline = ensure_primary_worldline(session, world_id)
+        session.add(
+            SecretRecord(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline.id,
+                secret_key=f"secret-{uuid.uuid4().hex[:8]}",
+                title=title,
+                content=content,
+                holder_agent_ids=[str(holder_agent_id)],
+                reveal_conditions={},
+                consequence_metadata={},
+                visibility="holders",
+                status="hidden",
+                metadata_json={},
+            ),
+        )
+        session.commit()
+        return worldline.id
 
 
 def _seed_provider_profile(engine: Engine, profile_key: str, api_key_ref: str) -> None:

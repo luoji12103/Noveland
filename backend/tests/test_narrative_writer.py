@@ -4,7 +4,7 @@ import uuid
 from typing import cast
 
 from noveland.adapters import ProviderCompletion, ProviderProfileRecord, ProviderType
-from noveland.agents.models import Agent
+from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.auth.models import User
 from noveland.conversations import (
     ConversationErrorPolicy,
@@ -29,9 +29,25 @@ from noveland.narrative import (
     ConversationNarrativeGenerate,
     ConversationNarrativeWriterService,
     NarrativeArtifact,
+    NarrativeArtifactCreate,
+    NarrativeArtifactKind,
+    NarrativeArtifactService,
     NarrativeGenerationMode,
+    NarrativePublicationBlockedError,
 )
-from noveland.worlds.models import Scene, World, Worldline
+from noveland.narrative.models import NarrativePublication
+from noveland.worlds.models import (
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
+    NarrativeContinuityReview,
+    Scene,
+    SecretRecord,
+    StoryHook,
+    World,
+    WorldBible,
+    Worldline,
+)
+from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -117,6 +133,122 @@ def test_auto_generate_is_idempotent_for_completed_session() -> None:
     assert len(second) == 2
     assert len(stored) == 2
     assert len(profile_service.prompts) == 2
+
+
+def test_writer_prompt_uses_leak_safe_participant_context() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    scene_id = _seed_scene(engine, world_id)
+    agent_id = _seed_agent(engine, world_id, scene_id)
+    other_agent_id = _seed_agent(engine, world_id, scene_id, agent_key="outsider")
+    profile_service = FakeProfileService()
+
+    with Session(engine) as session:
+        worldline_id = ensure_primary_worldline(session, world_id).id
+        session.add_all(
+            [
+                SecretRecord(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    secret_key="hidden-letter",
+                    title="Hidden letter",
+                    content="nonholder forbidden content",
+                    holder_agent_ids=[str(other_agent_id)],
+                    reveal_conditions={},
+                    consequence_metadata={},
+                    visibility="holders",
+                    status="hidden",
+                    metadata_json={},
+                ),
+                CharacterKnowledgeFact(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    agent_id=agent_id,
+                    fact_key="daily-plan",
+                    knowledge_kind="fact",
+                    content="Scribe plans a public festival scene.",
+                    confidence=90,
+                    visibility="private",
+                    is_active=True,
+                    metadata_json={},
+                ),
+            ],
+        )
+        conversation_id = _seed_conversation(
+            session,
+            world_id=world_id,
+            scene_id=scene_id,
+            agent_id=agent_id,
+            writer_config=ConversationWriterConfig(
+                provider_profile_id=profile_service.profile.id,
+                auto_generate_on_complete=False,
+                generate_summary=True,
+                generate_chapter=False,
+            ),
+        )
+        ConversationNarrativeWriterService(session, profile_service).generate_for_conversation(
+            ConversationNarrativeGenerate(
+                world_id=world_id,
+                conversation_id=conversation_id,
+                artifact_set=ConversationNarrativeArtifactSet.SUMMARY_ONLY,
+                provider_profile_id=profile_service.profile.id,
+                generation_mode=NarrativeGenerationMode.MANUAL,
+            ),
+        )
+
+    assert "Scribe plans a public festival scene." in profile_service.prompts[0]
+    assert "nonholder forbidden content" not in profile_service.prompts[0]
+
+
+def test_publish_blocks_hidden_secret_leak_and_records_review() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    scene_id = _seed_scene(engine, world_id)
+    agent_id = _seed_agent(engine, world_id, scene_id)
+
+    with Session(engine) as session:
+        worldline_id = ensure_primary_worldline(session, world_id).id
+        session.add(
+            SecretRecord(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                secret_key="hidden-letter",
+                title="Hidden letter",
+                content="forbidden hidden content",
+                holder_agent_ids=[],
+                reveal_conditions={},
+                consequence_metadata={},
+                visibility="holders",
+                status="hidden",
+                metadata_json={},
+            ),
+        )
+        artifact = NarrativeArtifactService(session).create_artifact(
+            NarrativeArtifactCreate(
+                world_id=world_id,
+                agent_id=agent_id,
+                title="Leaky draft",
+                content="This draft says forbidden hidden content.",
+                artifact_kind=NarrativeArtifactKind.AGENT_NOTE,
+                metadata={"worldline_id": str(worldline_id)},
+            ),
+        )
+        try:
+            NarrativeArtifactService(session).publish_artifact(
+                world_id,
+                artifact.id,
+                actor_user_id=None,
+            )
+        except NarrativePublicationBlockedError as exc:
+            blocked = exc
+        else:
+            raise AssertionError("expected publication to be blocked")
+        review = session.get(NarrativeContinuityReview, blocked.review_id)
+
+    assert blocked.review_status == "fail"
+    assert review is not None
+    assert review.status == "fail"
+    assert any(issue["code"] == "hidden_secret_leak" for issue in review.issues)
 
 
 class FakeProfileService:
@@ -220,8 +352,16 @@ def _engine() -> Engine:
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
+        cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, NarrativePublication.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, SecretRecord.__table__),
+        cast(Table, CharacterKnowledgeFact.__table__),
+        cast(Table, CharacterEmotionalState.__table__),
+        cast(Table, NarrativeContinuityReview.__table__),
+        cast(Table, WorldBible.__table__),
+        cast(Table, StoryHook.__table__),
     ):
         table.create(engine)
     return engine
@@ -262,7 +402,12 @@ def _seed_scene(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
     return scene_id
 
 
-def _seed_agent(engine: Engine, world_id: uuid.UUID, scene_id: uuid.UUID) -> uuid.UUID:
+def _seed_agent(
+    engine: Engine,
+    world_id: uuid.UUID,
+    scene_id: uuid.UUID,
+    agent_key: str = "scribe",
+) -> uuid.UUID:
     agent_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
@@ -270,8 +415,8 @@ def _seed_agent(engine: Engine, world_id: uuid.UUID, scene_id: uuid.UUID) -> uui
                 id=agent_id,
                 world_id=world_id,
                 home_scene_id=scene_id,
-                agent_key="scribe",
-                display_name="Scribe",
+                agent_key=agent_key,
+                display_name=agent_key.title(),
                 kind="narrative_agent",
                 config={},
                 is_enabled=True,

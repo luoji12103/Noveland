@@ -48,6 +48,7 @@ from noveland.plugins.errors import (
 )
 from noveland.services.runtime.identity import RUNTIME_ACTOR_REF
 from noveland.worlds.clock_service import WorldClockService
+from noveland.worlds.living_context import LivingWorldContextSelector
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import inspect as inspect_sqlalchemy
@@ -170,12 +171,20 @@ class AgentRuntimeOrchestrator:
             if retrieve_memory
             else None
         )
+        living_context = LivingWorldContextSelector(self._session).select_for_agent_prompt(
+            world_id=world_id,
+            worldline_id=resolved_worldline_id,
+            agent_id=agent_id,
+        )
         provider_prompt = self._build_agent_prompt(
             agent,
             prompt_text,
             persona,
             observations,
-            memory_context=_memory_context_text(memory_context),
+            memory_context=_join_prompt_contexts(
+                _memory_context_text(memory_context),
+                living_context.to_prompt_text(),
+            ),
         )
         prompt_context = {
             "persona_enabled": persona is not None and persona.is_enabled,
@@ -185,6 +194,7 @@ class AgentRuntimeOrchestrator:
             "worldline_id": str(resolved_worldline_id),
             "memory_backend": None if memory_context is None else memory_context.backend,
             "memory_hit_count": 0 if memory_context is None else len(memory_context.items),
+            "living_context": living_context.diagnostics,
         }
         run_model = AgentRuntimeRun(
             world_id=world_id,
@@ -323,7 +333,10 @@ class AgentRuntimeOrchestrator:
                         title=f"{agent.display_name} runtime note",
                         content=completion.text,
                         artifact_kind=NarrativeArtifactKind.AGENT_NOTE,
-                        metadata={"trigger_source": trigger_source},
+                        metadata={
+                            "trigger_source": trigger_source,
+                            "worldline_id": str(resolved_worldline_id),
+                        },
                     ),
                 )
                 self._append_event(
@@ -730,3 +743,10 @@ def _memory_context_text(context: MemoryContext | None) -> str | None:
             prefix = "- " if score is None else f"- [{score:.3f}] "
             lines.append(f"{prefix}{item.content}")
     return None if not lines else "\n".join(lines)
+
+
+def _join_prompt_contexts(*contexts: str | None) -> str | None:
+    present = [context for context in contexts if context]
+    if not present:
+        return None
+    return "\n\n".join(present)

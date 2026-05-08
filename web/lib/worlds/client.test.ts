@@ -1081,7 +1081,10 @@ describe("world client", () => {
     await previewConversationNarrativePrompt("world-1", "conversation-1", "summary_only");
     await generateConversationNarrativeArtifacts("world-1", "conversation-1", "summary_only");
     await createNarrativeArtifact("world-1", { title: "Artifact", content: "Body" });
-    await publishNarrativeArtifact("world-1", "artifact-4", { reader_visible: true });
+    await publishNarrativeArtifact("world-1", "artifact-4", {
+      reader_visible: true,
+      override_style_warning: true,
+    });
     await unpublishNarrativeArtifact("world-1", "artifact-4");
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/agents/agent-1/runs");
@@ -1219,6 +1222,33 @@ describe("world client", () => {
     await expect(createWorld({ slug: "first-world", name: "First World" })).rejects.toMatchObject({
       name: "WorldClientError",
       status: 409,
+    });
+  });
+
+  it("summarizes structured publication gate errors", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail: {
+              message: "Narrative publication blocked by continuity review",
+              review_id: "review-1",
+              review_status: "fail",
+              issues: [{ code: "hidden_secret_leak" }],
+            },
+          },
+          422,
+        ),
+      ),
+    );
+
+    await expect(
+      publishNarrativeArtifact("world-1", "artifact-1", { reader_visible: true }),
+    ).rejects.toMatchObject({
+      message: "Narrative publication blocked by continuity review (fail)",
+      status: 422,
     });
   });
 });

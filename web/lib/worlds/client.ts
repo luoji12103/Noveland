@@ -2625,7 +2625,20 @@ async function csrfToken(): Promise<string> {
 async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : null;
+    if (typeof body.detail === "string") {
+      return body.detail;
+    }
+    if (body.detail !== null && typeof body.detail === "object" && !Array.isArray(body.detail)) {
+      const detail = body.detail as Record<string, unknown>;
+      const message = typeof detail.message === "string" ? detail.message : null;
+      const reviewStatus =
+        typeof detail.review_status === "string" ? detail.review_status : null;
+      if (message !== null && reviewStatus !== null) {
+        return `${message} (${reviewStatus})`;
+      }
+      return message;
+    }
+    return null;
   } catch {
     return null;
   }

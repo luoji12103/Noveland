@@ -73,6 +73,7 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
       await publishNarrativeArtifact(worldId, artifactId, {
         reader_visible: true,
         metadata: { channel: "reader" },
+        override_style_warning: true,
       });
       setNotice("Narrative artifact published.");
       router.refresh();
@@ -233,6 +234,9 @@ function ArtifactList({
                       : ` at ${formatDateTime(artifact.publication.published_at)}`}
                   </p>
                 ) : null}
+                {artifact.publication?.publication_gate ? (
+                  <p>{publicationGateLabel(artifact.publication.publication_gate)}</p>
+                ) : null}
               </div>
               {canManage ? (
                 <div className="button-row">
@@ -271,6 +275,12 @@ function formatDateTime(value: string): string {
     timeStyle: "short",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function publicationGateLabel(gate: Record<string, unknown>): string {
+  const status = typeof gate.status === "string" ? gate.status : "unknown";
+  const issueCount = typeof gate.issue_count === "number" ? gate.issue_count : 0;
+  return `Publication gate: ${status} (${issueCount} issue${issueCount === 1 ? "" : "s"})`;
 }
 
 function mergeArtifacts(current: NarrativeArtifact[], incoming: NarrativeArtifact[]): NarrativeArtifact[] {

@@ -63,10 +63,10 @@
 - Living World Knowledge / Player / Guardrails
 - Living World Beta Release Readiness
 - V2 Runtime Worldline + Memory Isolation Remediation
+- V2 Prompt Boundary + Publish Guardrails Remediation
 
 ## Upcoming Mainline
-- Next remediation bundles are `feat/v2-prompt-leak-publish-guardrails`,
-  `feat/v2-runtime-gm-narrative-execution`, and
+- Next remediation bundles are `feat/v2-runtime-gm-narrative-execution` and
   `feat/v2-beta-acceptance-gating-hardening`, in that order.
 - V2 phases 1-50 are implemented in local roadmap bundles; remaining work should come
   from acceptance reports, beta evidence, operator feedback, and targeted hardening rather

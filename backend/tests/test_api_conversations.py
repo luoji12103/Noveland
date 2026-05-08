@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters import ProviderCompletion, ProviderProfileService
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentObservation, AgentPersona, AgentRuntimeRun
+from noveland.agents.models import (
+    Agent,
+    AgentObservation,
+    AgentPersona,
+    AgentRelationshipEdge,
+    AgentRuntimeRun,
+)
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -34,7 +40,15 @@ from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
-from noveland.worlds.models import Scene, World, Worldline, WorldMembership
+from noveland.worlds.models import (
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
+    Scene,
+    SecretRecord,
+    World,
+    Worldline,
+    WorldMembership,
+)
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -473,6 +487,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentRelationshipEdge.__table__),
         cast(Table, AgentPersona.__table__),
         cast(Table, AgentObservation.__table__),
         cast(Table, AgentCalendarEntry.__table__),
@@ -489,6 +504,9 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, SecretRecord.__table__),
+        cast(Table, CharacterKnowledgeFact.__table__),
+        cast(Table, CharacterEmotionalState.__table__),
     ):
         table.create(engine)
     app = create_app()

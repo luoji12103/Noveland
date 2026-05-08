@@ -3213,7 +3213,10 @@ def test_narrative_publication_workflow_filters_reader_visibility() -> None:
     assert publish.status_code == 200
     assert publish.json()["status"] == "published"
     assert publish.json()["reader_visible"] is True
-    assert publish.json()["metadata"] == {"channel": "reader"}
+    assert publish.json()["metadata"]["channel"] == "reader"
+    assert publish.json()["metadata"]["override_style_warning"] is False
+    assert publish.json()["publication_gate"]["status"] == "pass"
+    assert publish.json()["publication_gate"]["issue_count"] == 0
     assert publish.json()["published_by_user_id"] == str(owner_id)
     assert member_after_publish.status_code == 200
     assert member_after_publish.json()[0]["id"] == str(draft_id)
@@ -3223,10 +3226,98 @@ def test_narrative_publication_workflow_filters_reader_visibility() -> None:
     assert unpublish.status_code == 200
     assert unpublish.json()["status"] == "unpublished"
     assert unpublish.json()["reader_visible"] is False
-    assert unpublish.json()["metadata"] == {"channel": "reader", "reason": "revision"}
+    assert unpublish.json()["metadata"]["channel"] == "reader"
+    assert unpublish.json()["metadata"]["reason"] == "revision"
+    assert unpublish.json()["metadata"]["publication_gate"]["status"] == "pass"
     assert member_after_unpublish.status_code == 200
     assert member_after_unpublish.json() == []
     assert member_unpublished_detail.status_code == 404
+
+
+def test_narrative_publication_blocks_hidden_secret_leak() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "publication-secret-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    secret_id = _seed_secret_record(
+        engine,
+        world_id,
+        secret_key="sealed-letter",
+        title="Sealed Letter",
+        content="vault phrase heliotrope",
+    )
+    draft_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Draft chapter",
+        "The chapter exposes vault phrase heliotrope to every reader.",
+        artifact_kind="chapter_draft",
+    )
+
+    _authenticate(client, owner_token)
+    publish = client.post(
+        f"/worlds/{world_id}/narrative-artifacts/{draft_id}/publish",
+        json={"reader_visible": True},
+    )
+
+    assert publish.status_code == 422
+    detail = publish.json()["detail"]
+    assert detail["review_status"] == "fail"
+    assert detail["issues"][0]["code"] == "hidden_secret_leak"
+    assert detail["issues"][0]["secret_id"] == str(secret_id)
+    assert detail["issues"][0]["matched_fields"] == ["content"]
+    assert detail["review_id"]
+    with Session(engine) as session:
+        assert session.scalars(select(NarrativePublication)).all() == []
+
+
+def test_narrative_publication_gate_metadata_succeeds_with_warning_override() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id, "publication-warning-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    draft_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Draft chapter",
+        "An out of character marker appears in this draft.",
+        artifact_kind="chapter_draft",
+    )
+
+    _authenticate(client, owner_token)
+    blocked = client.post(
+        f"/worlds/{world_id}/narrative-artifacts/{draft_id}/publish",
+        json={"reader_visible": True, "metadata": {"channel": "reader"}},
+    )
+    published = client.post(
+        f"/worlds/{world_id}/narrative-artifacts/{draft_id}/publish",
+        json={
+            "reader_visible": True,
+            "metadata": {"channel": "reader"},
+            "override_style_warning": True,
+        },
+    )
+
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"]["review_status"] == "warning"
+    assert published.status_code == 200
+    assert published.json()["status"] == "published"
+    metadata = published.json()["metadata"]
+    gate = published.json()["publication_gate"]
+    assert metadata["channel"] == "reader"
+    assert metadata["override_style_warning"] is True
+    assert metadata["publication_gate"] == gate
+    assert gate["status"] == "warning"
+    assert gate["override_style_warning"] is True
+    assert gate["issue_count"] == 1
+    assert gate["review_id"]
+    with Session(engine) as session:
+        reviews = session.scalars(
+            select(NarrativeContinuityReview).order_by(NarrativeContinuityReview.created_at),
+        ).all()
+        publication = session.scalars(select(NarrativePublication)).one()
+        assert [review.status for review in reviews] == ["warning"]
+        assert publication.published_metadata["publication_gate"]["review_id"] == gate["review_id"]
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -3635,6 +3726,38 @@ def _publish_narrative_artifact(
         )
         session.commit()
     return publication_id
+
+
+def _seed_secret_record(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    secret_key: str,
+    title: str,
+    content: str,
+    holder_agent_ids: list[str] | None = None,
+) -> uuid.UUID:
+    secret_id = uuid.uuid4()
+    with Session(engine) as session:
+        worldline = ensure_primary_worldline(session, world_id)
+        session.add(
+            SecretRecord(
+                id=secret_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                secret_key=secret_key,
+                title=title,
+                content=content,
+                holder_agent_ids=holder_agent_ids or [],
+                reveal_conditions={},
+                consequence_metadata={},
+                visibility="holders",
+                status="hidden",
+                metadata_json={},
+            ),
+        )
+        session.commit()
+    return secret_id
 
 
 def _membership_role(engine: Engine, world_id: uuid.UUID, user_id: uuid.UUID) -> str | None:

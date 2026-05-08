@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Protocol, cast
 
@@ -35,6 +36,8 @@ from noveland.plugins.errors import (
     PluginFactoryError,
     PluginNotFoundError,
 )
+from noveland.worlds.guardrails import LivingWorldGuardrailService
+from noveland.worlds.living_context import LivingWorldContextSelector
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -243,7 +246,39 @@ class NarrativeArtifactService:
         if artifact is None or artifact.world_id != world_id:
             raise NarrativeArtifactNotFoundError
 
+        publish_metadata = metadata or {}
+        review_context = _artifact_review_context(artifact)
+        review = LivingWorldGuardrailService(self._session).review_narrative_continuity(
+            world_id=world_id,
+            worldline_id=_artifact_worldline_id(artifact),
+            artifact_id=artifact_id,
+            source_kind="publication",
+            source_ref=str(artifact_id),
+            reviewed_text=artifact.content,
+            metadata={
+                **review_context,
+                "publish_request_metadata": publish_metadata,
+            },
+        )
+        override = bool(publish_metadata.get("override_style_warning"))
+        if review.status == "fail" or (review.status == "warning" and not override):
+            raise NarrativePublicationBlockedError(
+                "Narrative publication blocked by continuity review",
+                review_id=review.id,
+                review_status=review.status,
+                issues=review.issues,
+            )
+
         now = datetime.now(UTC)
+        merged_metadata = {
+            **publish_metadata,
+            "publication_gate": {
+                "review_id": str(review.id),
+                "status": review.status,
+                "override_style_warning": override,
+                "issue_count": len(review.issues),
+            },
+        }
         publication = self._publication_for_artifact(world_id, artifact_id)
         if publication is None:
             publication = NarrativePublication(
@@ -252,7 +287,7 @@ class NarrativeArtifactService:
                 source_draft_id=artifact_id,
                 status=NarrativePublicationStatus.PUBLISHED.value,
                 reader_visible=reader_visible,
-                published_metadata=metadata or {},
+                published_metadata=merged_metadata,
                 published_at=now,
                 unpublished_at=None,
                 published_by_user_id=actor_user_id,
@@ -261,7 +296,7 @@ class NarrativeArtifactService:
         else:
             publication.status = NarrativePublicationStatus.PUBLISHED.value
             publication.reader_visible = reader_visible
-            publication.published_metadata = metadata or publication.published_metadata or {}
+            publication.published_metadata = merged_metadata
             publication.published_at = now
             publication.unpublished_at = None
             publication.published_by_user_id = actor_user_id
@@ -312,6 +347,21 @@ class NarrativeArtifactNotFoundError(Exception):
 
 class NarrativePublicationNotFoundError(Exception):
     pass
+
+
+class NarrativePublicationBlockedError(Exception):
+    def __init__(
+        self,
+        message: str,
+        *,
+        review_id: uuid.UUID,
+        review_status: str,
+        issues: list[dict[str, object]],
+    ) -> None:
+        super().__init__(message)
+        self.review_id = review_id
+        self.review_status = review_status
+        self.issues = issues
 
 
 class ConversationNarrativeWriterService:
@@ -386,8 +436,8 @@ class ConversationNarrativeWriterService:
 
         if needs_summary:
             if summary_artifact is None:
-                summary_text = self._profile_service.invoke_profile(
-                    provider,
+                summary_prompt = _append_living_world_prompt_context(
+                    self._session,
                     _apply_writer_controls(
                         writer_plugin.build_summary_prompt(
                             session=session,
@@ -397,6 +447,13 @@ class ConversationNarrativeWriterService:
                         ),
                         session=session,
                     ),
+                    world_id=generate.world_id,
+                    worldline_id=session.worldline_id,
+                    participants=participants,
+                )
+                summary_text = self._profile_service.invoke_profile(
+                    provider,
+                    summary_prompt,
                 ).text.strip()
                 summary_artifact = self._artifact_service.create_artifact(
                     NarrativeArtifactCreate(
@@ -415,8 +472,8 @@ class ConversationNarrativeWriterService:
                 )
             artifacts.append(summary_artifact)
         elif needs_chapter and summary_text is None:
-            summary_text = self._profile_service.invoke_profile(
-                provider,
+            summary_prompt = _append_living_world_prompt_context(
+                self._session,
                 _apply_writer_controls(
                     writer_plugin.build_summary_prompt(
                         session=session,
@@ -426,6 +483,13 @@ class ConversationNarrativeWriterService:
                     ),
                     session=session,
                 ),
+                world_id=generate.world_id,
+                worldline_id=session.worldline_id,
+                participants=participants,
+            )
+            summary_text = self._profile_service.invoke_profile(
+                provider,
+                summary_prompt,
             ).text.strip()
 
         if needs_chapter:
@@ -435,6 +499,22 @@ class ConversationNarrativeWriterService:
                 NarrativeArtifactKind.CHAPTER_DRAFT,
             )
             if chapter_artifact is None:
+                chapter_prompt = _append_living_world_prompt_context(
+                    self._session,
+                    _apply_writer_controls(
+                        writer_plugin.build_chapter_prompt(
+                            session=session,
+                            participants=participants,
+                            turns=turns,
+                            agents_by_id=agents_by_id,
+                            summary_text=summary_text or "No summary available.",
+                        ),
+                        session=session,
+                    ),
+                    world_id=generate.world_id,
+                    worldline_id=session.worldline_id,
+                    participants=participants,
+                )
                 chapter_artifact = self._artifact_service.create_artifact(
                     NarrativeArtifactCreate(
                         world_id=generate.world_id,
@@ -442,16 +522,7 @@ class ConversationNarrativeWriterService:
                         title=f"{session.title} chapter draft",
                         content=self._profile_service.invoke_profile(
                             provider,
-                            _apply_writer_controls(
-                                writer_plugin.build_chapter_prompt(
-                                    session=session,
-                                    participants=participants,
-                                    turns=turns,
-                                    agents_by_id=agents_by_id,
-                                    summary_text=summary_text or "No summary available.",
-                                ),
-                                session=session,
-                            ),
+                            chapter_prompt,
                         ).text.strip(),
                         artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
                         metadata=_metadata(
@@ -620,6 +691,13 @@ class ConversationNarrativeWriterService:
             ),
             session=session,
         )
+        summary_prompt = _append_living_world_prompt_context(
+            self._session,
+            summary_prompt,
+            world_id=generate.world_id,
+            worldline_id=session.worldline_id,
+            participants=participants,
+        )
         chapter_prompt = _apply_writer_controls(
             writer_plugin.build_chapter_prompt(
                 session=session,
@@ -633,6 +711,13 @@ class ConversationNarrativeWriterService:
                 ),
             ),
             session=session,
+        )
+        chapter_prompt = _append_living_world_prompt_context(
+            self._session,
+            chapter_prompt,
+            world_id=generate.world_id,
+            worldline_id=session.worldline_id,
+            participants=participants,
         )
         return {
             "session": session,
@@ -705,6 +790,55 @@ def _apply_writer_controls(prompt: str, *, session: ConversationSessionRecord) -
     if session.writer_config.source_constraints:
         control_lines.append(f"- Source constraints: {session.writer_config.source_constraints}")
     return "\n".join([*control_lines, "", prompt])
+
+
+def _append_living_world_prompt_context(
+    session: Session,
+    prompt: str,
+    *,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID | None,
+    participants: Sequence[object],
+) -> str:
+    selector = LivingWorldContextSelector(session)
+    context_lines: list[str] = []
+    for participant in participants:
+        agent_id = getattr(participant, "agent_id", None)
+        if not isinstance(agent_id, uuid.UUID):
+            continue
+        context_text = selector.select_for_agent_prompt(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            agent_id=agent_id,
+            limit=3,
+        ).to_prompt_text()
+        if context_text:
+            context_lines.append(f"Participant {agent_id}:\n{context_text}")
+    if not context_lines:
+        return prompt
+    return "\n".join([prompt, "", "Leak-safe living-world context:", *context_lines])
+
+
+def _artifact_review_context(artifact: NarrativeArtifact) -> dict[str, object]:
+    metadata = artifact.artifact_metadata or {}
+    worldline_id = metadata.get("worldline_id")
+    agent_id = None if artifact.agent_id is None else str(artifact.agent_id)
+    return {
+        "worldline_id": worldline_id if isinstance(worldline_id, str) else None,
+        "agent_id": agent_id,
+        "artifact_kind": artifact.artifact_kind,
+        "artifact_metadata": metadata,
+    }
+
+
+def _artifact_worldline_id(artifact: NarrativeArtifact) -> uuid.UUID | None:
+    raw_worldline_id = (artifact.artifact_metadata or {}).get("worldline_id")
+    if not isinstance(raw_worldline_id, str):
+        return None
+    try:
+        return uuid.UUID(raw_worldline_id)
+    except ValueError:
+        return None
 
 
 def _record(model: NarrativeArtifact) -> NarrativeArtifactRecord:

@@ -549,3 +549,14 @@
 - Tests added/updated: backend coverage for fork-scoped runtime run events and memory jobs, cross-world worldline rejection, conversation session/event worldline propagation, API run filtering by worldline, fake/local memory worldline isolation, memory build/delete scope isolation, backfill worldline preservation, legacy primary NULL compatibility, schema metadata, and Alembic head. Web memory-admin fixture updated for worldline-aware write jobs.
 - Docs updated: migration README, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Apply migration `20260507_0029` before relying on runtime run, conversation session, or profile snapshot worldline scope in persistent databases. Remaining remediation bundles should proceed in order: prompt leak/publish guardrails, runtime GM/narrative execution depth, then beta acceptance gate hardening.
+
+## V2 prompt leak publish guardrails remediation entry
+
+- Date: 2026-05-08
+- Branch: feat/v2-prompt-leak-publish-guardrails
+- Scope: V2 acceptance remediation bundle 2 for leak-safe prompt context selection, speaker-scoped conversation prompts, narrative prompt/review boundaries, and publish-time blocker handling.
+- Summary: Added a shared living-world context selector that admits only public facts, agent-visible knowledge, holder/revealed secrets, bounded emotional state, and relationship summaries into prompts; integrated it into agent runtime, conversation speaker prompts, and narrative writer generation/preview; expanded continuity review to detect hidden secret leaks without persisting secret text in diagnostics; and added a publish gate that blocks failed/leaky narrative artifacts while recording review metadata on successful publication.
+- Files changed: `/backend/packages/worlds/src/noveland/worlds/living_context.py`, `/backend/packages/{conversations,narrative,worlds}/src/noveland/**`, `/backend/services/{api,runtime}/src/noveland/services/**`, `/backend/tests/{test_api_worlds,test_conversation_services,test_narrative_writer,test_runtime_daemon}.py`, `/web/features/{workspace,worlds}/**`, `/web/lib/worlds/**`, `/docs/agent/harness/**`
+- Tests added/updated: backend coverage for runtime holder/non-holder secret filtering, conversation speaker-specific context filtering, narrative writer leak-safe prompts, publish blocker 422 behavior, and warning-override publication gate metadata; Web client/workspace coverage for structured blocker summaries and publication gate display.
+- Docs updated: task board, change journal, and active handoff.
+- Follow-up notes: Bundle 3 should build on this selector for world bible/open-hook context packs, group interaction execution, expanded trigger evaluation, and deterministic GM proposal planning.

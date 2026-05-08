@@ -9,6 +9,7 @@ from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.core.settings import AppSettings
 from noveland.events import WorldEventAppend, WorldEventImportance, WorldEventStore
 from noveland.memory import MemoryService
+from noveland.worlds.living_context import LivingWorldContextSelector
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
@@ -527,6 +528,24 @@ class LivingWorldGuardrailService:
     ) -> NarrativeContinuityReview:
         worldline = self.worldline_or_404(world_id, worldline_id)
         issues = self._continuity_issues(world_id, worldline.id, reviewed_text, metadata)
+        leak_context = LivingWorldContextSelector(self._session).select_for_review(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            reviewed_text=reviewed_text,
+            agent_id=_uuid_or_none(metadata.get("agent_id")),
+        )
+        for leak in leak_context["hidden_secret_leaks"]:
+            issues.append(
+                {
+                    "severity": "error",
+                    "code": "hidden_secret_leak",
+                    "message": (
+                        "Text appears to expose a hidden secret outside its visibility boundary."
+                    ),
+                    "secret_id": leak["secret_id"],
+                    "matched_fields": leak["matched_fields"],
+                }
+            )
         review = NarrativeContinuityReview(
             id=uuid.uuid4(),
             world_id=world_id,
@@ -537,7 +556,13 @@ class LivingWorldGuardrailService:
             reviewed_text=reviewed_text,
             status=_review_status(issues),
             issues=issues,
-            metadata_json=metadata,
+            metadata_json={
+                **metadata,
+                "living_context_review": {
+                    "hidden_secret_count": leak_context["hidden_secret_count"],
+                    "hidden_secret_leak_count": leak_context["hidden_secret_leak_count"],
+                },
+            },
         )
         self._session.add(review)
         self._session.flush()

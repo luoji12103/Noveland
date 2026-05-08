@@ -15,6 +15,7 @@ from noveland.narrative.services import (
     ConversationNarrativeWriterService,
     NarrativeArtifactNotFoundError,
     NarrativeArtifactService,
+    NarrativePublicationBlockedError,
     NarrativePublicationNotFoundError,
 )
 
@@ -36,6 +37,7 @@ __all__ = [
     "NarrativePublicationStatus",
     "NarrativeArtifactNotFoundError",
     "NarrativeArtifactService",
+    "NarrativePublicationBlockedError",
     "NarrativePublicationNotFoundError",
     "PACKAGE_NAME",
 ]

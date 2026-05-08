@@ -80,7 +80,9 @@ export function messageForError(error: unknown): string {
       return "Forbidden";
     }
     if (error.status === 422) {
-      return "Check the fields and try again.";
+      return error.message === "World request failed."
+        ? "Check the fields and try again."
+        : error.message;
     }
     return error.message;
   }

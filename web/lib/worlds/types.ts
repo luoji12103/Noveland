@@ -1989,6 +1989,7 @@ export type NarrativePublication = {
   published_by_user_id: string | null;
   created_at: string;
   updated_at: string;
+  publication_gate?: Record<string, unknown> | null;
 };
 
 export type WorldDashboardData = {
@@ -2894,6 +2895,7 @@ export type NarrativeArtifactCreateInput = {
 export type NarrativePublicationInput = {
   reader_visible?: boolean;
   metadata?: Record<string, unknown>;
+  override_style_warning?: boolean;
 };
 
 export type NarrativeArtifactFilters = {

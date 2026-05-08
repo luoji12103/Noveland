@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentRuntimeRun
+from noveland.agents.models import Agent, AgentRelationshipEdge, AgentRuntimeRun
 from noveland.auth.models import User
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations import (
@@ -30,7 +30,14 @@ from noveland.conversations.models import (
 )
 from noveland.events.models import WorldEventModel
 from noveland.observability.models import RuntimeDiagnosticEvent
-from noveland.worlds.models import Scene, World, Worldline
+from noveland.worlds.models import (
+    CharacterEmotionalState,
+    CharacterKnowledgeFact,
+    Scene,
+    SecretRecord,
+    World,
+    Worldline,
+)
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
@@ -258,6 +265,62 @@ def test_speaker_policy_preview_and_least_recent_selection() -> None:
     assert next_prepared.speaker_agent_id == second_agent_id
 
 
+def test_prepare_next_turn_filters_living_context_by_speaker() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+    first_agent_id = _seed_agent(engine, world_id, "first")
+    second_agent_id = _seed_agent(engine, world_id, "second")
+    worldline_id = _seed_speaker_secrets(
+        engine,
+        world_id,
+        first_agent_id=first_agent_id,
+        second_agent_id=second_agent_id,
+    )
+
+    with Session(engine) as session:
+        service = ConversationService(session)
+        created = service.create_session(
+            ConversationSessionCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                session_key="speaker-filter-world",
+                title="Speaker filter world",
+                scope_type=ConversationScopeType.WORLD,
+                mode=ConversationMode.MANUAL_CHAIN,
+                max_turns=2,
+                policy=_default_policy(),
+                writer_config=_default_writer_config(),
+            ),
+        )
+        service.replace_participants(
+            world_id,
+            created.id,
+            [
+                ConversationParticipantDefinition(agent_id=first_agent_id, turn_order=0),
+                ConversationParticipantDefinition(agent_id=second_agent_id, turn_order=1),
+            ],
+        )
+
+        first_prepared = service.prepare_next_turn(world_id, created.id)
+        service.finalize_turn(
+            first_prepared,
+            response_text="First response",
+            run_id=None,
+            diagnostics={},
+            succeeded=True,
+        )
+        second_prepared = service.prepare_next_turn(world_id, created.id)
+
+    assert first_prepared.speaker_agent_id == first_agent_id
+    assert "First Secret: first-only cipher" in first_prepared.prompt_text
+    assert "Second Secret" not in first_prepared.prompt_text
+    assert "second-only cipher" not in first_prepared.prompt_text
+    assert second_prepared.speaker_agent_id == second_agent_id
+    assert "Second Secret: second-only cipher" in second_prepared.prompt_text
+    assert "First Secret" not in second_prepared.prompt_text
+    assert "first-only cipher" not in second_prepared.prompt_text
+
+
 def test_min_enabled_participants_guardrail_marks_failed() -> None:
     engine = _engine()
     world_id = _seed_world(engine)
@@ -445,6 +508,10 @@ def _engine() -> Engine:
         cast(Table, Scene.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentRelationshipEdge.__table__),
+        cast(Table, CharacterKnowledgeFact.__table__),
+        cast(Table, SecretRecord.__table__),
+        cast(Table, CharacterEmotionalState.__table__),
         cast(Table, AgentCalendarEntry.__table__),
         cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
@@ -514,6 +581,51 @@ def _seed_agent(
         )
         session.commit()
     return agent_id
+
+
+def _seed_speaker_secrets(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    first_agent_id: uuid.UUID,
+    second_agent_id: uuid.UUID,
+) -> uuid.UUID:
+    with Session(engine) as session:
+        worldline = ensure_primary_worldline(session, world_id)
+        session.add_all(
+            [
+                SecretRecord(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline.id,
+                    secret_key="first-secret",
+                    title="First Secret",
+                    content="first-only cipher",
+                    holder_agent_ids=[str(first_agent_id)],
+                    reveal_conditions={},
+                    consequence_metadata={},
+                    visibility="holders",
+                    status="hidden",
+                    metadata_json={},
+                ),
+                SecretRecord(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline.id,
+                    secret_key="second-secret",
+                    title="Second Secret",
+                    content="second-only cipher",
+                    holder_agent_ids=[str(second_agent_id)],
+                    reveal_conditions={},
+                    consequence_metadata={},
+                    visibility="holders",
+                    status="hidden",
+                    metadata_json={},
+                ),
+            ],
+        )
+        session.commit()
+        return worldline.id
 
 
 def _seed_fork_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:

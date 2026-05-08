@@ -68,6 +68,7 @@ from noveland.narrative import (
     NarrativeArtifactRecord,
     NarrativeArtifactService,
     NarrativeArtifactWithPublication,
+    NarrativePublicationBlockedError,
     NarrativePublicationNotFoundError,
     NarrativePublicationRecord,
 )
@@ -1090,6 +1091,7 @@ class NarrativeArtifactCreateRequest(_RequestModel):
 class NarrativePublicationRequest(_RequestModel):
     reader_visible: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
+    override_style_warning: bool = False
 
 
 class ClockTransitionRequest(_RequestModel):
@@ -2395,6 +2397,7 @@ class NarrativePublicationResponse(BaseModel):
     published_by_user_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    publication_gate: dict[str, Any] | None = None
 
 
 class WorldClockResponse(BaseModel):
@@ -7472,12 +7475,25 @@ def publish_narrative_artifact(
             artifact_id,
             actor_user_id=context.subject.user_id,
             reader_visible=publication_request.reader_visible,
-            metadata=publication_request.metadata,
+            metadata={
+                **publication_request.metadata,
+                "override_style_warning": publication_request.override_style_warning,
+            },
         )
     except NarrativeArtifactNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Narrative artifact not found",
+        ) from exc
+    except NarrativePublicationBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "message": str(exc),
+                "review_id": str(exc.review_id),
+                "review_status": exc.review_status,
+                "issues": exc.issues,
+            },
         ) from exc
     return _narrative_publication_response(publication)
 
@@ -9514,6 +9530,7 @@ def _narrative_publication_response(
         published_by_user_id=publication.published_by_user_id,
         created_at=publication.created_at,
         updated_at=publication.updated_at,
+        publication_gate=publication.metadata.get("publication_gate"),
     )
 
 
