@@ -251,6 +251,15 @@ test("publication blockers are surfaced and blocked drafts stay out of the reade
   ).toBeVisible();
   await expect(blockerDraft.getByText(/world_summary - world - draft/)).toBeVisible();
 
+  const initialDraft = page
+    .locator("article")
+    .filter({ has: page.getByRole("heading", { name: "Initial artifact" }) });
+  await initialDraft.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByText("Narrative artifact published.")).toBeVisible();
+  await expect(initialDraft.getByText("Publication gate: pass (0 issues)")).toBeVisible();
+  await initialDraft.getByRole("button", { name: "Unpublish" }).click();
+  await expect(page.getByText("Narrative artifact unpublished.")).toBeVisible();
+
   await page.getByRole("button", { name: "Log out" }).click();
   await signIn(page, "member@example.test");
   await page.goto(`/worlds/${worldOneId}/reader?q=Publication%20blocker`);
@@ -288,6 +297,112 @@ test("release gate blockers are enforced by the workspace backend contract", asy
   const releaseForm = page
     .locator("form")
     .filter({ has: page.getByRole("heading", { name: "Release profile" }) });
+
+  await releaseForm.locator('select[name="status"]').selectOption("ready");
+  await releaseForm.locator('textarea[name="checklist"]').fill(
+    JSON.stringify({
+      worldline_id: "11000000-0000-4000-8000-000000000002",
+      evidence_refs: [],
+      warning_decisions: { style: "accepted" },
+    }),
+  );
+  await releaseForm.getByRole("button", { name: "Save release profile" }).click();
+  await expect(page.getByText(/missing_beta_checklist: Run a beta checklist/)).toBeVisible();
+  await expect(page.getByText(/missing_long_run_eval: Run a long-run eval/)).toBeVisible();
+
+  await releaseForm.locator('textarea[name="checklist"]').fill(
+    JSON.stringify({
+      worldline_id: "11000000-0000-4000-8000-000000000001",
+      evidence_refs: [
+        {
+          kind: "snapshot",
+          id: "00000000-0000-4000-8000-000000000000",
+          label: "stale snapshot",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "worldline",
+          id: "11000000-0000-4000-8000-000000000001",
+          label: "primary worldline",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "publication",
+          id: "73500000-0000-4000-8000-000000000001",
+          label: "seed publication",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "continuity_review",
+          id: "84300000-0000-4000-8000-000000000001",
+          label: "seed continuity review",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "beta_checklist",
+          id: "84100000-0000-4000-8000-000000000001",
+          label: "seed checklist",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "long_run_eval",
+          id: "83800000-0000-4000-8000-000000000001",
+          label: "seed long-run eval",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+      ],
+      warning_decisions: { style: "accepted" },
+    }),
+  );
+  await releaseForm.getByRole("button", { name: "Save release profile" }).click();
+  await expect(page.getByText(/unresolved_required_evidence_refs/)).toBeVisible();
+
+  await releaseForm.locator('textarea[name="checklist"]').fill(
+    JSON.stringify({
+      worldline_id: "11000000-0000-4000-8000-000000000001",
+      evidence_refs: [
+        {
+          kind: "snapshot",
+          id: "74500000-0000-4000-8000-000000000001",
+          label: "seed snapshot",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "worldline",
+          id: "11000000-0000-4000-8000-000000000001",
+          label: "primary worldline",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "publication",
+          id: "73500000-0000-4000-8000-000000000001",
+          label: "seed publication",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "continuity_review",
+          id: "84300000-0000-4000-8000-000000000001",
+          label: "seed continuity review",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "beta_checklist",
+          id: "84100000-0000-4000-8000-000000000001",
+          label: "seed checklist",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+        {
+          kind: "long_run_eval",
+          id: "83800000-0000-4000-8000-000000000001",
+          label: "seed long-run eval",
+          worldline_id: "11000000-0000-4000-8000-000000000001",
+        },
+      ],
+    }),
+  );
+  await releaseForm.getByRole("button", { name: "Save release profile" }).click();
+  await expect(page.getByText(/Gate ready - allowed - blockers 0 - warnings 1/)).toBeVisible();
+
   await releaseForm.locator('select[name="status"]').selectOption("released");
   await releaseForm.getByRole("button", { name: "Save release profile" }).click();
 

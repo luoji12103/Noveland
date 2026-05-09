@@ -3033,9 +3033,10 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                   rows={3}
                   defaultValue={JSON.stringify(data.releaseProfile?.checklist ?? {}, null, 2)}
                 />
-                <input
+                <textarea
                   className="text-input"
                   name="metadata"
+                  rows={3}
                   defaultValue={JSON.stringify(data.releaseProfile?.metadata ?? {}, null, 2)}
                 />
                 <button className="secondary-button" type="submit" disabled={isBusy}>

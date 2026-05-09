@@ -43,6 +43,7 @@ const seedEvidenceRefs = [
     kind: "publication",
     id: seedPublicationId,
     label: "seed publication",
+    worldline_id: primaryWorldlineId,
     api_path: `/worlds/${worldOneId}/reader`,
   },
   {
@@ -106,6 +107,21 @@ const worldlines = [
     status: "active",
     created_by_actor_ref: "system:runtime",
     metadata: { primary: true },
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+  {
+    id: "11000000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    worldline_key: "empty-fork",
+    name: "Empty Fork",
+    description: "Branch without release evidence.",
+    parent_worldline_id: primaryWorldlineId,
+    forked_from_snapshot_id: null,
+    fork_event_sequence: null,
+    status: "active",
+    created_by_actor_ref: "user:seed",
+    metadata: {},
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
   },
@@ -351,9 +367,9 @@ const gmProposals = [
     affected_agents: ["guide"],
     affected_organizations: ["student-council"],
     source_context: {},
-    status: "proposed",
-    review_note: null,
-    resolved_event_id: null,
+    status: "resolved",
+    review_note: "Accepted for seed beta evidence.",
+    resolved_event_id: "76000000-0000-4000-8000-000000000002",
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
   },
@@ -521,6 +537,13 @@ const seedWorldEventRef = {
   kind: "world_event",
   id: "76000000-0000-4000-8000-000000000001",
   label: "world.clock_advanced",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/events`,
+};
+const seedGMEventRef = {
+  kind: "world_event",
+  id: "76000000-0000-4000-8000-000000000002",
+  label: "gm.route_pressure",
   worldline_id: primaryWorldlineId,
   api_path: `/worlds/${worldOneId}/events`,
 };
@@ -692,6 +715,7 @@ const longRunEvals = [
         snapshot_ref_count: 1,
         refs: [
           seedWorldEventRef,
+          seedGMEventRef,
           seedEvidenceRefs[0],
           seedRelationshipRef,
           seedFactionTrackRef,
@@ -786,7 +810,41 @@ const betaChecklistRuns = [
     evidence: {
       refs: seedEvidenceRefs,
       items: {
-        "seven-day-simulation": { days: 7, refs: [seedWorldEventRef, seedEvidenceRefs[0]] },
+        seven_day_simulation: {
+          events: 2,
+          daily_candidates: 7,
+          refs: [seedWorldEventRef, seedGMEventRef],
+        },
+        branch_saves: {
+          worldlines: 1,
+          snapshots: 1,
+          refs: [seedEvidenceRefs[1], seedEvidenceRefs[0]],
+        },
+        relationship_changes: { relationships: 1, refs: [seedRelationshipRef] },
+        faction_progress: { faction_tracks: 1, refs: [seedFactionTrackRef] },
+        gm_event_loop: {
+          gm_agendas: 1,
+          gm_proposals: 1,
+          resolved_gm_proposals: 1,
+          executed_macro_items: 0,
+          committed_gm_events: 1,
+          refs: [seedGMProposalRef, seedGMEventRef],
+        },
+        player_interventions: {
+          player_choices: 1,
+          player_interventions: 1,
+          refs: [seedChoiceRef],
+        },
+        journal_notifications: {
+          journal_entries: 1,
+          notifications: 1,
+          refs: [seedJournalRef, seedNotificationRef],
+        },
+        narrative_output: {
+          narrative_artifacts: 1,
+          publications: 1,
+          refs: [seedEvidenceRefs[2]],
+        },
       },
       worldline_id: primaryWorldlineId,
     },
@@ -801,12 +859,45 @@ const betaChecklistItems = [
   {
     id: "84200000-0000-4000-8000-000000000001",
     run_id: "84100000-0000-4000-8000-000000000001",
-    item_key: "seven-day-simulation",
+    item_key: "seven_day_simulation",
     title: "7-day simulation",
     status: "passed",
     evidence: {
       eval_run_id: seedEvalId,
       refs: [seedWorldEventRef, seedEvidenceRefs[0], seedEvidenceRefs[5]],
+    },
+    recommendation: null,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+  {
+    id: "84200000-0000-4000-8000-000000000002",
+    run_id: seedChecklistRunId,
+    item_key: "gm_event_loop",
+    title: "GM/event loop",
+    status: "passed",
+    evidence: {
+      gm_agendas: 1,
+      gm_proposals: 1,
+      resolved_gm_proposals: 1,
+      executed_macro_items: 0,
+      committed_gm_events: 1,
+      refs: [seedGMProposalRef, seedGMEventRef],
+    },
+    recommendation: null,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+  {
+    id: "84200000-0000-4000-8000-000000000003",
+    run_id: seedChecklistRunId,
+    item_key: "narrative_output",
+    title: "Narrative output",
+    status: "passed",
+    evidence: {
+      narrative_artifacts: 1,
+      publications: 1,
+      refs: [seedEvidenceRefs[2]],
     },
     recommendation: null,
     created_at: "2026-04-17T00:00:00.000Z",
@@ -1250,7 +1341,21 @@ const narrativeArtifacts = [
       source_draft_id: "73000000-0000-4000-8000-000000000002",
       status: "published",
       reader_visible: true,
-      metadata: { channel: "reader" },
+      metadata: {
+        channel: "reader",
+        publication_gate: {
+          review_id: seedContinuityReviewId,
+          status: "pass",
+          override_style_warning: false,
+          issue_count: 0,
+        },
+      },
+      publication_gate: {
+        review_id: seedContinuityReviewId,
+        status: "pass",
+        override_style_warning: false,
+        issue_count: 0,
+      },
       published_at: "2026-04-17T00:03:03.000Z",
       unpublished_at: null,
       published_by_user_id: adminUserId,
@@ -1276,7 +1381,21 @@ const narrativeArtifacts = [
       source_draft_id: "73000000-0000-4000-8000-000000000005",
       status: "published",
       reader_visible: true,
-      metadata: { channel: "reader" },
+      metadata: {
+        channel: "reader",
+        publication_gate: {
+          review_id: seedContinuityReviewId,
+          status: "pass",
+          override_style_warning: false,
+          issue_count: 0,
+        },
+      },
+      publication_gate: {
+        review_id: seedContinuityReviewId,
+        status: "pass",
+        override_style_warning: false,
+        issue_count: 0,
+      },
       published_at: "2026-04-17T00:04:00.000Z",
       unpublished_at: null,
       published_by_user_id: adminUserId,
@@ -1359,6 +1478,24 @@ const worldEvents = new Map([
         causation_event_id: null,
         correlation_id: null,
         created_at: "2026-04-17T00:02:00.000Z",
+      },
+      {
+        id: "76000000-0000-4000-8000-000000000002",
+        world_id: worldOneId,
+        worldline_id: primaryWorldlineId,
+        sequence: 2,
+        event_name: "gm.route_pressure",
+        importance: "route",
+        payload: {
+          proposal_id: "81700000-0000-4000-8000-000000000001",
+          source: "gm_macro_planner",
+        },
+        wall_time: "2026-04-17T00:02:30.000Z",
+        world_time: "2030-01-01T00:30:00.000Z",
+        actor_ref: "gm:seed",
+        causation_event_id: null,
+        correlation_id: null,
+        created_at: "2026-04-17T00:02:30.000Z",
       },
     ],
   ],
@@ -1506,6 +1643,14 @@ const mockServer = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
   if (request.method === "GET" && url.pathname === "/auth/csrf") {
     sendJson(response, 200, { csrf_token: validCsrf }, [csrfCookie()]);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/__mock/health") {
+    sendJson(response, 200, {
+      service: "noveland-e2e-mock",
+      version: "v2-web-mock-evidence-parity",
+    });
     return;
   }
 
@@ -3012,43 +3157,88 @@ async function handleBetaChecklists(
     const body = await readJson(request);
     const worldlineId = body.worldline_id ?? primaryWorldlineId;
     const refs = evidenceRefsForWorldline(worldId, worldlineId);
+    const resolvedGmRefs = refs.filter((ref) => ref.kind === "gm_proposal");
+    const committedGmRefs = refs.filter(
+      (ref) => ref.kind === "world_event" && String(ref.label).startsWith("gm."),
+    );
+    const betaItems = [
+      {
+        item_key: "seven_day_simulation",
+        title: "7-day simulation",
+        status: longRunEvals.length === 0 ? "blocked" : "passed",
+        evidence: {
+          eval_runs: longRunEvals.length,
+          refs: refs.filter((ref) => ["world_event", "long_run_eval"].includes(ref.kind)),
+        },
+        recommendation:
+          longRunEvals.length === 0 ? "Run a seven-day eval before beta validation." : null,
+      },
+      {
+        item_key: "branch_saves",
+        title: "Branch saves",
+        status: refs.some((ref) => ref.kind === "snapshot") ? "passed" : "blocked",
+        evidence: {
+          refs: refs.filter((ref) => ["worldline", "snapshot"].includes(ref.kind)),
+        },
+        recommendation: "Create at least one forked worldline and snapshot evidence.",
+      },
+      {
+        item_key: "gm_event_loop",
+        title: "GM/event loop",
+        status: resolvedGmRefs.length > 0 || committedGmRefs.length > 0 ? "passed" : "warning",
+        evidence: {
+          gm_agendas: gmAgendas.filter((agenda) => agenda.worldline_id === worldlineId).length,
+          gm_proposals: gmProposals.filter((proposal) => proposal.worldline_id === worldlineId).length,
+          resolved_gm_proposals: resolvedGmRefs.length,
+          executed_macro_items: 0,
+          committed_gm_events: committedGmRefs.length,
+          refs: [...resolvedGmRefs, ...committedGmRefs],
+        },
+        recommendation: "Resolve a GM proposal or execute a traceable GM/offscreen event.",
+      },
+      {
+        item_key: "narrative_output",
+        title: "Narrative output",
+        status: refs.some((ref) => ref.kind === "publication") ? "passed" : "blocked",
+        evidence: {
+          refs: refs.filter((ref) => ref.kind === "publication"),
+        },
+        recommendation: "Publish at least one narrative artifact for reader validation.",
+      },
+    ];
+    const blockerCount = betaItems.filter((item) => item.status === "blocked").length;
+    const warningCount = betaItems.filter((item) => item.status === "warning").length;
     const run = {
       id: randomUUID(),
       world_id: worldId,
       worldline_id: worldlineId,
       run_key: body.run_key ?? "sample-world-beta",
-      status: longRunEvals.length === 0 ? "blocked" : "passed",
+      status: blockerCount > 0 ? "blocked" : warningCount > 0 ? "warning" : "passed",
       summary:
-        longRunEvals.length === 0
+        blockerCount > 0
           ? "Beta checklist is blocked until a long-run eval exists."
           : "Sample world beta has structured release evidence.",
       evidence: {
         refs,
-        items: { "seven-day-simulation": { eval_runs: longRunEvals.length, refs } },
+        items: Object.fromEntries(betaItems.map((item) => [item.item_key, item.evidence])),
         worldline_id: worldlineId,
       },
-      blocker_count: longRunEvals.length === 0 ? 1 : 0,
+      blocker_count: blockerCount,
       created_by_actor_ref: `user:${currentSubject.user_id}`,
       metadata: body.metadata ?? {},
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    const item = {
-      id: randomUUID(),
-      run_id: run.id,
-      item_key: "seven-day-simulation",
-      title: "7-day simulation",
-      status: run.blocker_count === 0 ? "passed" : "blocked",
-      evidence: { eval_runs: longRunEvals.length, refs },
-      recommendation:
-        run.blocker_count === 0
-          ? null
-          : "Run a seven-day eval before beta validation.",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
     betaChecklistRuns.unshift(run);
-    betaChecklistItems.push(item);
+    betaChecklistItems.push(
+      ...betaItems.map((item) => ({
+        id: randomUUID(),
+        run_id: run.id,
+        ...item,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })),
+    );
     sendJson(response, 201, run);
     return;
   }
@@ -6405,6 +6595,12 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     }
     const now = new Date().toISOString();
     const reviewId = randomUUID();
+    const publicationGate = {
+      review_id: reviewId,
+      status: "pass",
+      override_style_warning: Boolean(body.override_style_warning),
+      issue_count: 0,
+    };
     artifact.publication = {
       id: artifact.publication?.id ?? randomUUID(),
       world_id: worldId,
@@ -6414,13 +6610,9 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       reader_visible: body.reader_visible ?? true,
       metadata: {
         ...(body.metadata ?? artifact.publication?.metadata ?? {}),
-        publication_gate: {
-          review_id: reviewId,
-          status: "pass",
-          override_style_warning: Boolean(body.override_style_warning),
-          issue_count: 0,
-        },
+        publication_gate: publicationGate,
       },
+      publication_gate: publicationGate,
       published_at: now,
       unpublished_at: null,
       published_by_user_id: currentSubject.user_id,
@@ -6971,11 +7163,22 @@ function evidenceRefsForWorldline(worldId, worldlineId) {
   );
   refs.push(
     ...gmProposals
-      .filter((proposal) => proposal.world_id === worldId && proposal.worldline_id === worldlineId)
+      .filter(
+        (proposal) =>
+          proposal.world_id === worldId
+          && proposal.worldline_id === worldlineId
+          && proposal.status === "resolved",
+      )
       .slice(0, 2)
       .map((proposal) =>
         evidenceRef("gm_proposal", proposal.id, proposal.title, worldlineId, `/worlds/${worldId}/gm/proposals`),
       ),
+  );
+  refs.push(
+    ...(worldEvents.get(worldId) ?? [])
+      .filter((event) => event.worldline_id === worldlineId && isCommittedGmEvent(event))
+      .slice(0, 2)
+      .map((event) => eventEvidenceRef(worldId, event)),
   );
   refs.push(
     ...playerChoices
@@ -7003,13 +7206,15 @@ function evidenceRefsForWorldline(worldId, worldlineId) {
   );
   refs.push(
     ...narrativeArtifacts
-      .flatMap((artifact) => (artifact.publication === null ? [] : [artifact.publication]))
-      .filter((publication) => publication.world_id === worldId)
+      .filter((artifact) => artifact.world_id === worldId)
+      .filter((artifact) => artifactMatchesWorldline(artifact, worldlineId))
+      .filter((artifact) => publicationAllowsReleaseEvidence(artifact.publication))
       .slice(0, 2)
-      .map((publication) => ({
+      .map((artifact) => ({
         kind: "publication",
-        id: publication.id,
+        id: artifact.publication.id,
         label: "published narrative artifact",
+        worldline_id: worldlineId,
         api_path: `/worlds/${worldId}/reader`,
       })),
   );
@@ -7069,12 +7274,56 @@ function gateDecisionForRelease(worldId, status, body) {
       message: "Released status is blocked until a separate launch gate exists.",
     });
   }
-  if (status === "ready" && blockerKinds.length > 0) {
-    blockers.push({
-      code: "missing_required_evidence_refs",
-      message: `Ready status requires structured evidence refs for ${blockerKinds.join(", ")}.`,
-      missing_kinds: blockerKinds,
-    });
+  if (status === "ready") {
+    const latestChecklist = betaChecklistRuns.find(
+      (run) => run.world_id === worldId && run.worldline_id === worldlineId,
+    );
+    const latestEval = longRunEvals.find(
+      (run) => run.world_id === worldId && run.worldline_id === worldlineId,
+    );
+    if (latestChecklist === undefined) {
+      blockers.push({
+        code: "missing_beta_checklist",
+        message: "Run a beta checklist for the target worldline before ready.",
+      });
+    } else if (latestChecklist.status !== "passed") {
+      blockers.push({
+        code: "beta_checklist_not_passing",
+        message: "Latest beta checklist must be passed before ready.",
+        run_id: latestChecklist.id,
+        status: latestChecklist.status,
+      });
+    }
+    if (latestEval === undefined) {
+      blockers.push({
+        code: "missing_long_run_eval",
+        message: "Run a long-run eval for the target worldline before ready.",
+      });
+    } else if (latestEval.status !== "completed") {
+      blockers.push({
+        code: "long_run_eval_not_completed",
+        message: "Latest long-run eval must be completed before ready.",
+        eval_run_id: latestEval.id,
+        status: latestEval.status,
+      });
+    }
+    if (blockerKinds.length > 0) {
+      blockers.push({
+        code: "missing_required_evidence_refs",
+        message: `Ready status requires structured evidence refs for ${blockerKinds.join(", ")}.`,
+        missing_kinds: blockerKinds,
+      });
+    }
+    const unresolvedRefs = evidenceRefs.filter(
+      (ref) => requiredKinds.includes(ref.kind) && !evidenceRefExists(worldId, worldlineId, ref),
+    );
+    if (unresolvedRefs.length > 0) {
+      blockers.push({
+        code: "unresolved_required_evidence_refs",
+        message: "Ready status requires evidence refs that resolve in this worldline.",
+        refs: unresolvedRefs,
+      });
+    }
   }
   return {
     status,
@@ -7091,6 +7340,77 @@ function gateDecisionForRelease(worldId, status, body) {
     evidence_refs: evidenceRefs,
     worldline_id: worldlineId,
   };
+}
+
+function evidenceRefExists(worldId, worldlineId, ref) {
+  if (ref.worldline_id !== undefined && ref.worldline_id !== worldlineId) {
+    return false;
+  }
+  if (typeof ref.id !== "string" || ref.id.length === 0) {
+    return false;
+  }
+  if (ref.kind === "worldline") {
+    return worldlines.some((worldline) => worldline.id === ref.id && worldline.world_id === worldId);
+  }
+  if (ref.kind === "snapshot") {
+    const snapshot = snapshots.get(worldId);
+    return snapshot?.id === ref.id && snapshot.worldline_id === worldlineId;
+  }
+  if (ref.kind === "publication") {
+    const artifact = narrativeArtifacts.find(
+      (item) => item.world_id === worldId && item.publication?.id === ref.id,
+    );
+    return (
+      artifact !== undefined
+      && artifactMatchesWorldline(artifact, worldlineId)
+      && publicationAllowsReleaseEvidence(artifact.publication)
+    );
+  }
+  if (ref.kind === "continuity_review") {
+    return narrativeContinuityReviews.some(
+      (review) =>
+        review.id === ref.id && review.world_id === worldId && review.worldline_id === worldlineId,
+    );
+  }
+  if (ref.kind === "beta_checklist") {
+    return betaChecklistRuns.some(
+      (run) => run.id === ref.id && run.world_id === worldId && run.worldline_id === worldlineId,
+    );
+  }
+  if (ref.kind === "long_run_eval") {
+    return longRunEvals.some(
+      (run) => run.id === ref.id && run.world_id === worldId && run.worldline_id === worldlineId,
+    );
+  }
+  return true;
+}
+
+function artifactMatchesWorldline(artifact, worldlineId) {
+  return (artifact.metadata?.worldline_id ?? primaryWorldlineId) === worldlineId;
+}
+
+function publicationAllowsReleaseEvidence(publication) {
+  if (
+    publication === null
+    || publication.status !== "published"
+    || publication.reader_visible !== true
+  ) {
+    return false;
+  }
+  const gate = publication.publication_gate ?? publication.metadata?.publication_gate ?? {};
+  if (gate.status === "pass") {
+    return true;
+  }
+  return gate.status === "warning" && gate.override_style_warning === true;
+}
+
+function isCommittedGmEvent(event) {
+  return (
+    event.actor_ref.startsWith("gm:")
+    || event.event_name.startsWith("gm.")
+    || event.event_name.startsWith("living_world.offscreen")
+    || ["gm_macro_planner", "offscreen_resolution"].includes(String(event.payload?.source ?? ""))
+  );
 }
 
 function snapshotIntegrityForWorld(worldId) {
