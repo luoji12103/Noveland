@@ -903,14 +903,13 @@ class LivingWorldBetaService:
                 GMStyleReview.status == "warning",
             )
         )
-        publication_gate_warnings = self._count(
-            select(func.count(NarrativePublication.id)).where(
-                NarrativePublication.world_id == world_id,
-                NarrativePublication.published_metadata["publication_gate"]["status"].as_string()
-                == "warning",
-            )
-        )
         traceability_refs = self._traceability_refs(world_id, worldline_id)
+        publication_refs = _refs_by_kind(traceability_refs, "publication")
+        publication_gate_warnings = sum(
+            1
+            for publication in self._reader_visible_publications(world_id, worldline_id)
+            if _publication_gate_status(publication) == "warning"
+        )
         snapshot_refs = self._entity_refs(
             WorldSnapshotModel,
             world_id=world_id,
@@ -966,8 +965,8 @@ class LivingWorldBetaService:
             ),
             "journal_entries": self._count_worldline(PlayerJournalEntry, world_id, worldline_id),
             "notifications": self._count_worldline(InWorldNotification, world_id, worldline_id),
-            "narrative_artifacts": self._count_world(NarrativeArtifact, world_id),
-            "publications": self._count_world(NarrativePublication, world_id),
+            "narrative_artifacts": self._count_narrative_artifacts(world_id, worldline_id),
+            "publications": len(publication_refs),
             "diagnostics": self._count_world(RuntimeDiagnosticEvent, world_id),
             "distribution": {
                 "events_by_importance": dict(sorted(events_by_importance.items())),
@@ -1200,7 +1199,7 @@ class LivingWorldBetaService:
                 limit=2,
             )
         )
-        refs.extend(self._publication_refs(world_id, limit=2))
+        refs.extend(self._publication_refs(world_id, worldline_id, limit=2))
         return refs
 
     def _entity_refs(
@@ -1231,25 +1230,91 @@ class LivingWorldBetaService:
             for row in rows
         ]
 
-    def _publication_refs(self, world_id: uuid.UUID, *, limit: int) -> list[dict[str, Any]]:
-        rows = self._session.scalars(
-            select(NarrativePublication)
-            .where(
-                NarrativePublication.world_id == world_id,
-                NarrativePublication.status == "published",
-            )
-            .order_by(NarrativePublication.created_at.desc())
-            .limit(limit)
-        ).all()
+    def _publication_refs(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        *,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = self._reader_visible_publications(world_id, worldline_id)[:limit]
         return [
             _evidence_ref(
                 "publication",
                 row.id,
                 "published narrative artifact",
+                worldline_id=worldline_id,
                 api_path=f"/worlds/{world_id}/reader",
             )
             for row in rows
         ]
+
+    def _reader_visible_publications(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> list[NarrativePublication]:
+        rows = self._session.scalars(
+            select(NarrativePublication)
+            .where(
+                NarrativePublication.world_id == world_id,
+                NarrativePublication.status == "published",
+                NarrativePublication.reader_visible.is_(True),
+            )
+            .order_by(NarrativePublication.created_at.desc())
+        ).all()
+        return [
+            row
+            for row in rows
+            if self._publication_matches_worldline(row, world_id, worldline_id)
+            and self._publication_gate_allows_ready(row)
+        ]
+
+    def _count_narrative_artifacts(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> int:
+        rows = self._session.scalars(
+            select(NarrativeArtifact).where(NarrativeArtifact.world_id == world_id)
+        ).all()
+        return sum(
+            1
+            for row in rows
+            if self._artifact_matches_worldline(row, world_id, worldline_id)
+        )
+
+    def _publication_matches_worldline(
+        self,
+        publication: NarrativePublication,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> bool:
+        artifact = self._session.get(NarrativeArtifact, publication.artifact_id)
+        if artifact is None or artifact.world_id != world_id:
+            return False
+        return self._artifact_matches_worldline(artifact, world_id, worldline_id)
+
+    def _artifact_matches_worldline(
+        self,
+        artifact: NarrativeArtifact,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> bool:
+        raw_worldline_id = (artifact.artifact_metadata or {}).get("worldline_id")
+        if raw_worldline_id is None:
+            return self.worldline_or_404(world_id, None).id == worldline_id
+        artifact_worldline_id = _uuid_or_none(raw_worldline_id)
+        return artifact_worldline_id == worldline_id
+
+    def _publication_gate_allows_ready(self, publication: NarrativePublication) -> bool:
+        gate = _dict((publication.published_metadata or {}).get("publication_gate"))
+        status = str(gate.get("status") or "")
+        if status == "pass":
+            return True
+        if status == "warning":
+            return bool(gate.get("override_style_warning"))
+        return False
 
     def _evidence_ref_exists(
         self,
@@ -1287,14 +1352,14 @@ class LivingWorldBetaService:
                 is not None
             )
         if kind == "publication":
+            publication = self._session.get(NarrativePublication, ref_id)
             return (
-                self._session.scalars(
-                    select(NarrativePublication.id).where(
-                        NarrativePublication.id == ref_id,
-                        NarrativePublication.world_id == world_id,
-                    )
-                ).first()
-                is not None
+                publication is not None
+                and publication.world_id == world_id
+                and publication.status == "published"
+                and publication.reader_visible
+                and self._publication_matches_worldline(publication, world_id, worldline_id)
+                and self._publication_gate_allows_ready(publication)
             )
         if kind == "continuity_review":
             return (
@@ -1740,6 +1805,11 @@ def _check(
         "evidence": evidence,
         "recommendation": None if status == "passed" else recommendation,
     }
+
+
+def _publication_gate_status(publication: NarrativePublication) -> str:
+    gate = _dict((publication.published_metadata or {}).get("publication_gate"))
+    return str(gate.get("status") or "")
 
 
 def _beta_summary(status: str, blocker_count: int, warning_count: int) -> str:

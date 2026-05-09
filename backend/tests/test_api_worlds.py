@@ -2084,8 +2084,54 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
         "Beta chapter",
         "A published beta chapter.",
         artifact_kind="chapter_draft",
+        artifact_metadata={"worldline_id": primary["id"]},
     )
     _publish_narrative_artifact(engine, world_id, artifact_id, owner_id)
+    unpublished_artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Draft beta chapter",
+        "A draft beta chapter.",
+        artifact_kind="chapter_draft",
+        artifact_metadata={"worldline_id": primary["id"]},
+    )
+    unpublished_publication_id = _publish_narrative_artifact(
+        engine,
+        world_id,
+        unpublished_artifact_id,
+        owner_id,
+        status="unpublished",
+    )
+    invisible_artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Invisible beta chapter",
+        "An invisible beta chapter.",
+        artifact_kind="chapter_draft",
+        artifact_metadata={"worldline_id": primary["id"]},
+    )
+    invisible_publication_id = _publish_narrative_artifact(
+        engine,
+        world_id,
+        invisible_artifact_id,
+        owner_id,
+        reader_visible=False,
+    )
+    warning_artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Warning beta chapter",
+        "A warning beta chapter.",
+        artifact_kind="chapter_draft",
+        artifact_metadata={"worldline_id": primary["id"]},
+    )
+    warning_publication_id = _publish_narrative_artifact(
+        engine,
+        world_id,
+        warning_artifact_id,
+        owner_id,
+        publication_gate={"status": "warning", "override_style_warning": False},
+    )
     for minute in range(1, 8):
         _seed_world_event(
             engine,
@@ -2099,6 +2145,20 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     fork = client.post(
         f"/worlds/{world_id}/worldlines/fork",
         json={"worldline_key": "beta-alt", "name": "Beta Alt"},
+    )
+    fork_artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Fork beta chapter",
+        "A fork-only beta chapter.",
+        artifact_kind="chapter_draft",
+        artifact_metadata={"worldline_id": fork.json()["id"]},
+    )
+    fork_publication_id = _publish_narrative_artifact(
+        engine,
+        world_id,
+        fork_artifact_id,
+        owner_id,
     )
     snapshot = client.post(f"/worlds/{world_id}/snapshots")
     continuity_review = client.post(
@@ -2249,6 +2309,107 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
             },
         },
     )
+    unpublished_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": [
+                    {
+                        **ref,
+                        "id": str(unpublished_publication_id),
+                    }
+                    if ref["kind"] == "publication"
+                    else ref
+                    for ref in evidence_refs
+                ],
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
+    )
+    invisible_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": [
+                    {
+                        **ref,
+                        "id": str(invisible_publication_id),
+                    }
+                    if ref["kind"] == "publication"
+                    else ref
+                    for ref in evidence_refs
+                ],
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
+    )
+    warning_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": [
+                    {
+                        **ref,
+                        "id": str(warning_publication_id),
+                    }
+                    if ref["kind"] == "publication"
+                    else ref
+                    for ref in evidence_refs
+                ],
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
+    )
+    cross_worldline_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": [
+                    {
+                        **ref,
+                        "id": str(fork_publication_id),
+                        "worldline_id": primary["id"],
+                    }
+                    if ref["kind"] == "publication"
+                    else ref
+                    for ref in evidence_refs
+                ],
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
+    )
     release_profile = client.put(
         f"/worlds/{world_id}/release-profile",
         json={
@@ -2385,6 +2546,14 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     )
     assert unresolved_release_profile.status_code == 422
     assert "unresolved_required_evidence_refs" in unresolved_release_profile.text
+    assert unpublished_release_profile.status_code == 422
+    assert "unresolved_required_evidence_refs" in unpublished_release_profile.text
+    assert invisible_release_profile.status_code == 422
+    assert "unresolved_required_evidence_refs" in invisible_release_profile.text
+    assert warning_release_profile.status_code == 422
+    assert "unresolved_required_evidence_refs" in warning_release_profile.text
+    assert cross_worldline_release_profile.status_code == 422
+    assert "unresolved_required_evidence_refs" in cross_worldline_release_profile.text
     assert release_profile.status_code == 200
     assert release_profile.json()["status"] == "ready"
     assert release_profile.json()["metadata"]["gate_decision"]["allowed"] is True
@@ -4087,6 +4256,7 @@ def _seed_narrative_artifact(
     *,
     artifact_kind: str,
     source_conversation_id: uuid.UUID | None = None,
+    artifact_metadata: dict[str, object] | None = None,
 ) -> uuid.UUID:
     artifact_id = uuid.uuid4()
     with Session(engine) as session:
@@ -4100,7 +4270,7 @@ def _seed_narrative_artifact(
                 title=title,
                 content=content,
                 artifact_kind=artifact_kind,
-                artifact_metadata={},
+                artifact_metadata=artifact_metadata or {},
             ),
         )
         session.commit()
@@ -4112,6 +4282,10 @@ def _publish_narrative_artifact(
     world_id: uuid.UUID,
     artifact_id: uuid.UUID,
     published_by_user_id: uuid.UUID,
+    *,
+    status: str = "published",
+    reader_visible: bool = True,
+    publication_gate: dict[str, object] | None = None,
 ) -> uuid.UUID:
     publication_id = uuid.uuid4()
     now = datetime.now(UTC)
@@ -4122,11 +4296,14 @@ def _publish_narrative_artifact(
                 world_id=world_id,
                 artifact_id=artifact_id,
                 source_draft_id=artifact_id,
-                status="published",
-                reader_visible=True,
-                published_metadata={},
-                published_at=now,
-                unpublished_at=None,
+                status=status,
+                reader_visible=reader_visible,
+                published_metadata={
+                    "publication_gate": publication_gate
+                    or {"status": "pass", "override_style_warning": False},
+                },
+                published_at=now if status == "published" else None,
+                unpublished_at=None if status == "published" else now,
                 published_by_user_id=published_by_user_id,
             ),
         )
