@@ -190,6 +190,12 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260503_0019_observation_traceability.py`
 - `backend/migrations/versions/20260504_0020_narrative_publications.py`
 - `backend/migrations/versions/20260505_0023_living_world_character_foundation.py`
+- `backend/migrations/versions/20260505_0024_living_world_autonomous_systems.py`
+- `backend/migrations/versions/20260505_0025_living_world_gm_choices_worldlines.py`
+- `backend/migrations/versions/20260506_0026_living_world_plot_route_rumor_flow.py`
+- `backend/migrations/versions/20260507_0027_living_world_knowledge_player_guardrails.py`
+- `backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`
+- `backend/migrations/versions/20260507_0029_runtime_worldline_memory_isolation.py`
 - `backend/tests/`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`

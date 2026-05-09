@@ -26,7 +26,7 @@ Noveland already has:
 - Long-term memory profiles, async write jobs, evals, backfill, and operator surfaces behind `MemoryService`.
 - Provider profiles, plugin contracts, diagnostics, metrics, recovery docs, and scale-readiness reporting.
 
-The main V2 gaps are:
+At roadmap creation, the main V2 gaps were:
 
 - No first-class organizations/factions.
 - No durable relationship graph.
@@ -35,6 +35,11 @@ The main V2 gaps are:
 - No structured player choice/consequence model.
 - No promise, foreshadowing, route, secret, or information-flow systems.
 - No galgame-oriented world-state dashboard or player-facing story journal.
+
+Implementation and remediation status now lives in `change-journal.md`,
+`debug-journal.md`, `task-board.md`, and the active handoff. Treat the list
+above as the historical baseline that motivated the V2 roadmap, not as the
+current implementation state.
 
 ## Planning Rules
 

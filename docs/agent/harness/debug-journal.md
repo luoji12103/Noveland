@@ -90,3 +90,29 @@ No debug entries yet.
   - Phases 46-50: route/ending planning, long-run eval, authoring templates, release profiles, and beta checklists capture readiness evidence; they do not constitute a public production launch or guarantee narrative quality.
   - Persistent databases must apply migrations `20260507_0027` and `20260507_0028` before using the final V2 data surfaces.
   - The 50-phase V2 roadmap has no remaining phase-number work. Future work should come from beta evidence, operator feedback, and targeted hardening rather than new phase-number branches.
+
+## 2026-05-09 V2 post-remediation acceptance contract hardening report
+
+- Date: 2026-05-09
+- Branch: main
+- Issue: After the four V2 remediation bundles landed, acceptance review found that Web mock parity, reader query coverage, publication/release blockers, beta form payload tests, and worldline selector expectations needed a separate hardening record. `task-board.md` treats this debug journal as the source of record for acceptance reports, so the completed hardening needed to be recorded here before further post-remediation work.
+- Reproduction: Review the completed local `main` commit `ac42acd fix(v2): harden acceptance contract coverage` and the final gate it passed:
+  - `cd backend && uv run ruff check .`
+  - `cd backend && uv run mypy .`
+  - `cd backend && uv run pytest`
+  - `cd web && npm run lint`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run test`
+  - `cd web && npm run build`
+  - `cd web && npm run check:next-env`
+  - `cd web && npm run test:e2e`
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
+- Root cause: The first remediation sequence hardened core runtime, prompt, GM, and beta gate semantics, but the post-remediation acceptance contract still had edge cases where mocks, reader filters, and UI tests could drift from backend behavior.
+- Fix: Acceptance contract hardening aligned Playwright mock publication and release blockers, expanded reader mock/query coverage for source kind/status/search/ordering, added world overview payload tests for beta/release/worldline forms, and confirmed omitted `worldline_id` as the primary-worldline API contract.
+- Regression test: The full final gate listed above passed on `ac42acd`. `web/next-env.d.ts` remained clean after build/e2e and `npm run check:next-env`.
+- Remaining risk:
+  - Release evidence gates still need stricter worldline and publication-state validation for published, reader-visible artifacts and explicit warning overrides.
+  - Beta checklist GM/event loop evidence still needs stronger proof than agenda and unresolved proposal presence.
+  - Web mock/e2e parity should continue tracking the stricter backend release/beta evidence semantics as they land.
+  - Mem0 OSS worldline isolation has implementation support but needs explicit filter-capture contract tests.

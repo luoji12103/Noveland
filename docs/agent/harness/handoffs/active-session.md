@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-09T00:00:00Z
-- Branch: fix/v2-acceptance-contract-hardening
-- Objective: Harden the post-V2 acceptance contract checks that were identified after the four remediation bundles, especially Web mock parity, publication/release blocker behavior, reader query coverage, beta form payload tests, and worldline selector expectations.
-- Status: Implementation and checks are complete on the feature branch. Fast-forward merge back to local `main` remains. The completed V2 phases 1-50 and four remediation bundles remain closed; this branch is targeted hardening from fresh acceptance review evidence, not a new roadmap phase.
+- Branch: main
+- Objective: Keep the V2 post-remediation source of record current before starting the next evidence-hardening sequence.
+- Status: Local `main` already contains V2 phases 1-50, the four remediation bundles, and `ac42acd fix(v2): harden acceptance contract coverage`. Local `main` is ahead of `origin/main` and has no active implementation branch. Next work should start from clean `main` on feature/result-named branches.
 
 ## Completed Before This Branch
 
@@ -15,11 +15,8 @@
 
 ## Current Work Items
 
-- Playwright mock behavior now matches real API publication blockers and release profile gate blockers.
-- Reader mock/query coverage now covers search, source kind, publication status, and published ordering.
-- World overview tests cover beta/release/worldline form payload contracts.
-- Omitted `worldline_id` was confirmed as a supported primary-worldline API contract, so no selector change was needed.
-- `web/next-env.d.ts` is unchanged after build/e2e and `npm run check:next-env` passed.
+- Source-of-record cleanup is next: refresh this active handoff, add the post-remediation hardening report to `debug-journal.md`, convert the V2 roadmap gap list into historical baseline wording, and update migration inventory/index coverage for `20260507_0029`.
+- After that cleanup lands, continue with focused hardening branches for release evidence worldline gates, beta GM/event loop evidence, Web mock/e2e parity, and Mem0 worldline isolation contracts.
 
 ## Checks Passed
 
@@ -37,4 +34,4 @@
 
 ## Remaining Closeout
 
-- Fast-forward merge back into local `main` only if checks pass and the merge is clean. Do not push.
+- Do not push unless explicitly requested.
