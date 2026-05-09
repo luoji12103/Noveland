@@ -294,6 +294,85 @@ def test_mem0_oss_backend_translates_sdk_payloads() -> None:
     assert search_result.items[0].metadata["tag"] == "mem0"
 
 
+def test_mem0_oss_backend_isolates_worldline_filters() -> None:
+    with Session(_engine()) as session:
+        profile = MemoryBackendProfileService(session).create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="mem0-worldlines",
+                name="Mem0 Worldlines",
+                backend_kind=MemoryBackendKind.MEM0_OSS,
+            )
+        )
+        session.commit()
+    backend = Mem0OssMemoryBackend(profile, AppSettings())
+    fake_client = _FakeMem0Client()
+    backend._client = fake_client
+    world_id = uuid.uuid4()
+    primary_id = uuid.uuid4()
+    fork_id = uuid.uuid4()
+    agent_id = uuid.uuid4()
+
+    backend.record_turn(
+        MemoryTurn(
+            world_id=world_id,
+            worldline_id=primary_id,
+            agent_id=agent_id,
+            messages=[MemoryMessage(role="assistant", content="primary green tea")],
+            dedupe_key="mem0-primary",
+        )
+    )
+    backend.record_turn(
+        MemoryTurn(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            messages=[MemoryMessage(role="assistant", content="fork red tea")],
+            dedupe_key="mem0-fork",
+        )
+    )
+
+    primary_search = backend.search(
+        MemorySearchRequest(
+            world_id=world_id,
+            worldline_id=primary_id,
+            agent_id=agent_id,
+            query_text="tea",
+        )
+    )
+    fork_search = backend.search(
+        MemorySearchRequest(
+            world_id=world_id,
+            worldline_id=fork_id,
+            agent_id=agent_id,
+            query_text="tea",
+        )
+    )
+    fork_list = backend.list_memories(world_id, agent_id, fork_id)
+    delete_result = backend.delete_scope(
+        MemoryDeleteScope(world_id=world_id, worldline_id=fork_id, agent_id=agent_id),
+    )
+    after_delete_primary = backend.list_memories(world_id, agent_id, primary_id)
+    after_delete_fork = backend.list_memories(world_id, agent_id, fork_id)
+
+    assert [item.content for item in primary_search.items] == ["primary green tea"]
+    assert [item.content for item in fork_search.items] == ["fork red tea"]
+    assert [item.content for item in fork_list] == ["fork red tea"]
+    assert delete_result.deleted_count == 1
+    assert [item.content for item in after_delete_primary] == ["primary green tea"]
+    assert after_delete_fork == []
+    first_add_metadata = cast(dict[str, object], fake_client.add_calls[0]["metadata"])
+    second_add_metadata = cast(dict[str, object], fake_client.add_calls[1]["metadata"])
+    primary_search_filters = cast(dict[str, object], fake_client.search_calls[0]["filters"])
+    fork_search_filters = cast(dict[str, object], fake_client.search_calls[1]["filters"])
+    fork_list_filters = cast(dict[str, object], fake_client.get_all_calls[0]["filters"])
+    assert first_add_metadata["worldline_id"] == str(primary_id)
+    assert second_add_metadata["worldline_id"] == str(fork_id)
+    assert primary_search_filters["worldline_id"] == str(primary_id)
+    assert fork_search_filters["worldline_id"] == str(fork_id)
+    assert fork_list_filters["worldline_id"] == str(fork_id)
+    assert fake_client.delete_all_calls[0]["worldline_id"] == str(fork_id)
+
+
 def test_run_memory_eval_cases_reports_hits_and_context_sizes() -> None:
     world_id = uuid.uuid4()
     agent_id = uuid.uuid4()
@@ -1178,14 +1257,21 @@ def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uu
 class _FakeMem0Client:
     def __init__(self) -> None:
         self._items: list[dict[str, object]] = []
+        self.add_calls: list[dict[str, object]] = []
+        self.search_calls: list[dict[str, object]] = []
+        self.get_all_calls: list[dict[str, object]] = []
+        self.delete_all_calls: list[dict[str, object]] = []
 
     def add(
         self,
         *,
         messages: list[dict[str, str]],
         metadata: dict[str, object],
-        **_: object,
+        **kwargs: object,
     ) -> dict[str, object]:
+        self.add_calls.append(
+            {"messages": messages, "metadata": metadata, "kwargs": kwargs},
+        )
         item_id = str(uuid.uuid4())
         content = messages[0]["content"]
         self._items.insert(
@@ -1194,22 +1280,54 @@ class _FakeMem0Client:
                 "id": item_id,
                 "memory": content,
                 "metadata": {**metadata, "tag": "mem0"},
+                "app_id": kwargs.get("app_id"),
+                "agent_id": kwargs.get("agent_id"),
+                "user_id": kwargs.get("user_id"),
+                "run_id": kwargs.get("run_id"),
                 "created_at": datetime.now(UTC).isoformat(),
             },
         )
         return {"id": item_id}
 
-    def search(self, query: str, **_: object) -> list[dict[str, object]]:
+    def search(self, query: str, **kwargs: object) -> list[dict[str, object]]:
+        self.search_calls.append({"query": query, **kwargs})
+        filters = cast(dict[str, object], kwargs.get("filters") or {})
         return [
             {**item, "score": 0.9}
             for item in self._items
             if query.lower() in str(item["memory"]).lower()
+            and self._matches_filters(item, filters)
         ]
 
-    def get_all(self, **_: object) -> list[dict[str, object]]:
-        return list(self._items)
+    def get_all(self, **kwargs: object) -> list[dict[str, object]]:
+        self.get_all_calls.append(kwargs)
+        filters = cast(dict[str, object], kwargs.get("filters") or kwargs)
+        return [item for item in self._items if self._matches_filters(item, filters)]
 
-    def delete_all(self, **_: object) -> dict[str, int]:
-        deleted_count = len(self._items)
-        self._items = []
+    def delete_all(self, **kwargs: object) -> dict[str, int]:
+        self.delete_all_calls.append(kwargs)
+        filters = {key: value for key, value in kwargs.items() if key != "run_id"}
+        run_id = kwargs.get("run_id")
+        before = len(self._items)
+        self._items = [
+            item
+            for item in self._items
+            if not self._matches_filters(item, filters)
+            or (run_id is not None and item.get("run_id") != run_id)
+        ]
+        deleted_count = before - len(self._items)
         return {"deleted_count": deleted_count}
+
+    def _matches_filters(
+        self,
+        item: dict[str, object],
+        filters: dict[str, object],
+    ) -> bool:
+        metadata = cast(dict[str, object], item.get("metadata") or {})
+        for key, value in filters.items():
+            if key in {"app_id", "agent_id", "user_id", "run_id"}:
+                if item.get(key) != value:
+                    return False
+            elif metadata.get(key) != value:
+                return False
+        return True
