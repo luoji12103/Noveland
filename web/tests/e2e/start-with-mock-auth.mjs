@@ -1437,6 +1437,9 @@ const snapshots = new Map([
     },
   ],
 ]);
+const snapshotHistory = new Map([
+  [worldOneId, [snapshots.get(worldOneId)]],
+]);
 const clockTransitions = new Map([
   [
     worldOneId,
@@ -6336,6 +6339,7 @@ async function handleSnapshots(request, response, currentSubject, worldId, actio
       created_at: new Date().toISOString(),
     };
     snapshots.set(worldId, snapshot);
+    snapshotHistory.set(worldId, [...(snapshotHistory.get(worldId) ?? []), snapshot]);
     replaySequences.set(worldId, replay.source_sequence + 1);
     appendWorldEvent(worldId, {
       event_name: "world.snapshot_created",
@@ -7353,8 +7357,9 @@ function evidenceRefExists(worldId, worldlineId, ref) {
     return worldlines.some((worldline) => worldline.id === ref.id && worldline.world_id === worldId);
   }
   if (ref.kind === "snapshot") {
-    const snapshot = snapshots.get(worldId);
-    return snapshot?.id === ref.id && snapshot.worldline_id === worldlineId;
+    return (snapshotHistory.get(worldId) ?? []).some(
+      (snapshot) => snapshot.id === ref.id && snapshot.worldline_id === worldlineId,
+    );
   }
   if (ref.kind === "publication") {
     const artifact = narrativeArtifacts.find(

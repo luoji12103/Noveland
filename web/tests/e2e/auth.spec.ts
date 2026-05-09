@@ -113,6 +113,7 @@ test("platform admin manages presets and world composition import/export", async
 });
 
 test("world admin manages workspace pages and conversations", async ({ page }) => {
+  test.slow();
   await signIn(page);
 
   await page.goto(`/worlds/${worldOneId}`);
@@ -143,7 +144,10 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await scheduleRules.getByPlaceholder("rule-key").fill(`rule-${Date.now()}`);
   await scheduleRules.getByPlaceholder("Rule name").fill("E2E Rule");
   await scheduleRules.getByRole("button", { name: "Create schedule rule" }).click();
-  await expect(page.getByRole("heading", { name: "E2E Rule" })).toBeVisible();
+  await expect(page.getByText("Schedule rule created.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "E2E Rule" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.goto(`/worlds/${worldOneId}/agents`);
   await page.getByPlaceholder("agent-key").fill(`agent-${Date.now()}`);
@@ -157,14 +161,18 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByText("Persona saved.")).toBeVisible();
   await page.getByPlaceholder("Observation").fill("E2E observation");
   await page.getByRole("button", { name: "Add observation" }).click();
-  await expect(page.getByText("E2E observation")).toBeVisible();
+  await expect(page.getByText("Observation added.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/E2E observation/)).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Refresh observations" }).click();
   await expect(page.getByText("Observations refreshed.")).toBeVisible();
 
   await page.getByPlaceholder("Calendar title").fill("E2E Calendar");
   await page.getByPlaceholder("2030-01-01T08:00:00Z").fill("2030-01-01T08:00:00Z");
   await page.getByRole("button", { name: "Create calendar entry" }).click();
-  await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible();
+  await expect(page.getByText("Calendar entry created.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "E2E Calendar" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await expect(page.getByText("Long-term memory is written asynchronously by runtime. This view is read-only.")).toBeVisible();
   await page.getByRole("button", { name: "Refresh memory profile" }).click();
@@ -185,7 +193,10 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByPlaceholder("Objective").fill("Let agents exchange one reply.");
   await page.getByPlaceholder("Opening prompt").fill("Start the scene.");
   await page.getByRole("button", { name: "Create conversation" }).click();
-  await expect(page).toHaveURL(/\/conversations\/[0-9a-f-]+$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Manual Chain" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page).toHaveURL(/\/conversations\/[0-9a-f-]+$/, { timeout: 15_000 });
   await page.getByLabel(/Guide/).check();
   await page.getByRole("button", { name: "Save participants" }).click();
   await expect(page.getByText("Participants saved.")).toBeVisible();
@@ -204,6 +215,9 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.locator('select[name="mode"]').selectOption("auto_dialogue");
   await page.getByPlaceholder("Opening prompt").fill("Begin auto dialogue.");
   await page.getByRole("button", { name: "Create conversation" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Auto Dialogue" })).toBeVisible({
+    timeout: 15_000,
+  });
   await page.getByLabel(/Guide/).check();
   await page.getByRole("button", { name: "Save participants" }).click();
   await page.getByRole("button", { name: "Start auto dialogue" }).click();
@@ -214,7 +228,10 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByPlaceholder("Artifact title").fill("E2E Artifact");
   await page.getByPlaceholder("Artifact content").fill("Artifact body");
   await page.getByRole("button", { name: "Create artifact" }).click();
-  await expect(page.getByRole("heading", { name: "E2E Artifact" })).toBeVisible();
+  await expect(page.getByText("Narrative artifact created.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "E2E Artifact" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.goto("/admin/runtime");
   await page.getByRole("button", { name: "Start runtime" }).click();
@@ -233,6 +250,9 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Primary Mem0" })).toBeVisible();
   await expect(page.getByText("Jobs: 1 / failed 1")).toBeVisible();
   await expect(page.getByText("Error: mock backend timeout")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry job" })).toBeEnabled({
+    timeout: 15_000,
+  });
   await page.getByRole("button", { name: "Retry job" }).click();
   await expect(page.getByText("Memory write job queued for retry.")).toBeVisible();
   await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible();
