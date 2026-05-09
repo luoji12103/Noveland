@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 const worldOneId = "10000000-0000-4000-8000-000000000001";
 
 test.describe.configure({ timeout: 60000 });
+test.describe.configure({ mode: "serial" });
 
 test("redirects unauthenticated visitors to login", async ({ page }) => {
   await page.goto("/");
@@ -235,6 +236,64 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Retry job" }).click();
   await expect(page.getByText("Memory write job queued for retry.")).toBeVisible();
   await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible();
+});
+
+test("publication blockers are surfaced and blocked drafts stay out of the reader", async ({ page }) => {
+  await signIn(page);
+
+  await page.goto(`/worlds/${worldOneId}/narrative`);
+  const blockerDraft = page
+    .locator("article")
+    .filter({ has: page.getByRole("heading", { name: "Publication blocker draft" }) });
+  await blockerDraft.getByRole("button", { name: "Publish" }).click();
+  await expect(
+    page.getByText("Narrative publication blocked by continuity review (fail)"),
+  ).toBeVisible();
+  await expect(blockerDraft.getByText(/world_summary - world - draft/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Log out" }).click();
+  await signIn(page, "member@example.test");
+  await page.goto(`/worlds/${worldOneId}/reader?q=Publication%20blocker`);
+  await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No readable artifacts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Publication blocker draft" })).toHaveCount(0);
+});
+
+test("reader honors search, source, status, and published ordering filters", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/reader?order_by=published_at`);
+  await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
+  const links = page.locator('section[aria-labelledby="reader-list-title"] article h3 a');
+  await expect(links.first()).toHaveText("Published agent field note");
+  await expect(links.nth(1)).toHaveText("Seed conversation summary");
+
+  await page.goto(`/worlds/${worldOneId}/reader?q=summary&source_kind=conversation&order_by=published_at`);
+  await expect(page.getByRole("link", { name: "Seed conversation summary" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Published agent field note" })).toHaveCount(0);
+
+  await page.goto(`/worlds/${worldOneId}/reader?source_kind=agent&order_by=published_at`);
+  await expect(page.getByRole("link", { name: "Published agent field note" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Seed conversation summary" })).toHaveCount(0);
+
+  await page.goto(`/worlds/${worldOneId}/reader?publication_status=draft&q=Publication%20blocker`);
+  await expect(page.getByRole("heading", { name: "No readable artifacts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Publication blocker draft" })).toHaveCount(0);
+});
+
+test("release gate blockers are enforced by the workspace backend contract", async ({ page }) => {
+  await signIn(page);
+
+  await page.goto(`/worlds/${worldOneId}`);
+  const releaseForm = page
+    .locator("form")
+    .filter({ has: page.getByRole("heading", { name: "Release profile" }) });
+  await releaseForm.locator('select[name="status"]').selectOption("released");
+  await releaseForm.getByRole("button", { name: "Save release profile" }).click();
+
+  await expect(
+    page.getByText(/release_launch_gate_missing: Released status is blocked/),
+  ).toBeVisible();
 });
 
 test("world member sees read-only workspace pages", async ({ page }) => {

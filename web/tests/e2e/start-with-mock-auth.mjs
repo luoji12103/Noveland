@@ -1220,6 +1220,19 @@ const narrativeArtifacts = [
     publication: null,
   },
   {
+    id: "73000000-0000-4000-8000-000000000004",
+    world_id: worldOneId,
+    agent_id: null,
+    source_run_id: null,
+    source_conversation_id: null,
+    title: "Publication blocker draft",
+    content: "Hidden secret leak exposes the route key before the reveal.",
+    artifact_kind: "world_summary",
+    metadata: {},
+    created_at: "2026-04-17T00:03:02.500Z",
+    publication: null,
+  },
+  {
     id: "73000000-0000-4000-8000-000000000002",
     world_id: worldOneId,
     agent_id: null,
@@ -1243,6 +1256,32 @@ const narrativeArtifacts = [
       published_by_user_id: adminUserId,
       created_at: "2026-04-17T00:03:03.000Z",
       updated_at: "2026-04-17T00:03:03.000Z",
+    },
+  },
+  {
+    id: "73000000-0000-4000-8000-000000000005",
+    world_id: worldOneId,
+    agent_id: agentGuideId,
+    source_run_id: null,
+    source_conversation_id: null,
+    title: "Published agent field note",
+    content: "Agent note visible in the reader.",
+    artifact_kind: "agent_note",
+    metadata: {},
+    created_at: "2026-04-17T00:03:01.500Z",
+    publication: {
+      id: "73500000-0000-4000-8000-000000000005",
+      world_id: worldOneId,
+      artifact_id: "73000000-0000-4000-8000-000000000005",
+      source_draft_id: "73000000-0000-4000-8000-000000000005",
+      status: "published",
+      reader_visible: true,
+      metadata: { channel: "reader" },
+      published_at: "2026-04-17T00:04:00.000Z",
+      unpublished_at: null,
+      published_by_user_id: adminUserId,
+      created_at: "2026-04-17T00:04:00.000Z",
+      updated_at: "2026-04-17T00:04:00.000Z",
     },
   },
   {
@@ -2905,6 +2944,17 @@ async function handleReleaseProfile(request, response, currentSubject, worldId) 
     const body = await readJson(request);
     const existing = releaseProfiles.get(worldId);
     const gateDecision = gateDecisionForRelease(worldId, body.status ?? existing?.status ?? "draft", body);
+    if (!gateDecision.allowed) {
+      const detail = gateDecision.blockers
+        .map((blocker) =>
+          blocker.code && blocker.message
+            ? `${blocker.code}: ${blocker.message}`
+            : String(blocker.message ?? blocker.code),
+        )
+        .join(", ");
+      sendJson(response, 422, { detail: detail || "release gate blocked status change" });
+      return;
+    }
     const profile = {
       id: existing?.id ?? randomUUID(),
       world_id: worldId,
@@ -4043,9 +4093,7 @@ async function handleNarrativeContinuityReviews(request, response, currentSubjec
     return;
   }
   const body = await readJson(request);
-  const issues = body.reviewed_text.includes("Everyone knows")
-    ? [{ code: "knowledge_leak_risk", severity: "warning" }]
-    : [];
+  const issues = continuityIssuesForText(body.reviewed_text);
   const review = {
     id: randomUUID(),
     world_id: worldId,
@@ -6294,10 +6342,14 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
   if (request.method === "GET") {
     const artifactKind = url.searchParams.get("artifact_kind");
     const sourceConversationId = url.searchParams.get("source_conversation_id");
+    const query = url.searchParams.get("q");
+    const sourceKind = url.searchParams.get("source_kind");
+    const publicationStatus = url.searchParams.get("publication_status");
+    const orderBy = url.searchParams.get("order_by") ?? "created_at";
     const limitValue = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     let items = narrativeArtifacts
       .filter((artifact) => artifact.world_id === worldId)
-      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+      .sort((left, right) => compareNarrativeArtifacts(left, right, orderBy));
     if (!canManageWorld(currentSubject, worldId)) {
       items = items.filter(isReaderVisibleArtifact);
     }
@@ -6306,6 +6358,22 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
     }
     if (sourceConversationId !== null && sourceConversationId !== "") {
       items = items.filter((artifact) => artifact.source_conversation_id === sourceConversationId);
+    }
+    if (query !== null && query !== "") {
+      const needle = query.toLowerCase();
+      items = items.filter(
+        (artifact) =>
+          artifact.title.toLowerCase().includes(needle)
+          || artifact.content.toLowerCase().includes(needle),
+      );
+    }
+    if (sourceKind !== null && sourceKind !== "") {
+      items = items.filter((artifact) => sourceKindForNarrativeArtifact(artifact) === sourceKind);
+    }
+    if (canManageWorld(currentSubject, worldId) && publicationStatus !== null && publicationStatus !== "") {
+      items = items.filter((artifact) =>
+        publicationStatus === "published" ? isReaderVisibleArtifact(artifact) : !isReaderVisibleArtifact(artifact),
+      );
     }
     if (Number.isFinite(limitValue) && limitValue > 0) {
       items = items.slice(0, limitValue);
@@ -6330,7 +6398,13 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       return;
     }
     const body = await readJson(request);
+    const publicationBlocker = publicationBlockerForArtifact(worldId, artifact, body);
+    if (publicationBlocker !== null) {
+      sendJson(response, 422, { detail: publicationBlocker });
+      return;
+    }
     const now = new Date().toISOString();
+    const reviewId = randomUUID();
     artifact.publication = {
       id: artifact.publication?.id ?? randomUUID(),
       world_id: worldId,
@@ -6338,7 +6412,15 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
       source_draft_id: artifact.id,
       status: "published",
       reader_visible: body.reader_visible ?? true,
-      metadata: body.metadata ?? artifact.publication?.metadata ?? {},
+      metadata: {
+        ...(body.metadata ?? artifact.publication?.metadata ?? {}),
+        publication_gate: {
+          review_id: reviewId,
+          status: "pass",
+          override_style_warning: Boolean(body.override_style_warning),
+          issue_count: 0,
+        },
+      },
       published_at: now,
       unpublished_at: null,
       published_by_user_id: currentSubject.user_id,
@@ -7141,6 +7223,78 @@ function canManageWorld(currentSubject, worldId) {
 
 function isReaderVisibleArtifact(artifact) {
   return artifact.publication?.status === "published" && artifact.publication.reader_visible;
+}
+
+function compareNarrativeArtifacts(left, right, orderBy) {
+  const leftValue = orderBy === "published_at" ? timelineDateForNarrativeArtifact(left) : left.created_at;
+  const rightValue = orderBy === "published_at" ? timelineDateForNarrativeArtifact(right) : right.created_at;
+  return rightValue.localeCompare(leftValue);
+}
+
+function timelineDateForNarrativeArtifact(artifact) {
+  return artifact.publication?.published_at ?? artifact.created_at;
+}
+
+function sourceKindForNarrativeArtifact(artifact) {
+  if (artifact.source_conversation_id !== null) {
+    return "conversation";
+  }
+  if (artifact.source_run_id !== null) {
+    return "agent_run";
+  }
+  if (artifact.agent_id !== null) {
+    return "agent";
+  }
+  return "world";
+}
+
+function publicationBlockerForArtifact(worldId, artifact, body) {
+  const issues = continuityIssuesForText(artifact.content);
+  const hasError = issues.some((issue) => issue.severity === "error");
+  const overrideStyleWarning = Boolean(body.override_style_warning);
+  if (issues.length === 0 || (!hasError && overrideStyleWarning)) {
+    return null;
+  }
+  return {
+    message: "Narrative publication blocked by continuity review",
+    review_id: randomUUID(),
+    review_status: hasError ? "fail" : "warning",
+    issues: issues.map((issue) => ({ ...issue, world_id: worldId })),
+  };
+}
+
+function continuityIssuesForText(text) {
+  const lowered = text.toLowerCase();
+  const issues = [];
+  if (lowered.includes("out of character") || lowered.includes("ooc")) {
+    issues.push({
+      severity: "warning",
+      code: "ooc_marker",
+      message: "Text contains an OOC marker.",
+    });
+  }
+  if (lowered.includes("everyone knows") || lowered.includes("all characters know")) {
+    issues.push({
+      severity: "warning",
+      code: "knowledge_leak_risk",
+      message: "Text may leak knowledge globally.",
+    });
+  }
+  if (lowered.includes("time paradox") || lowered.includes("same time")) {
+    issues.push({
+      severity: "warning",
+      code: "time_contradiction_risk",
+      message: "Text may contain a time contradiction.",
+    });
+  }
+  if (lowered.includes("hidden secret leak")) {
+    issues.push({
+      severity: "error",
+      code: "hidden_secret_leak",
+      message: "Text appears to expose a hidden secret outside its visibility boundary.",
+    });
+  }
+  return issues;
 }
 
 function segmentsForArtifactAction(url) {

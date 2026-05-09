@@ -18,16 +18,29 @@ vi.mock("@/lib/worlds/client", async () => {
     getCalendarConflicts: vi.fn(),
     getDailyLifePreview: vi.fn(),
     generateDailyLifeCandidates: vi.fn(),
+    compareWorldlines: vi.fn(),
+    createBetaChecklist: vi.fn(),
+    createEndingCandidate: vi.fn(),
+    createLongRunEval: vi.fn(),
+    createRouteMilestone: vi.fn(),
+    forkWorldline: vi.fn(),
     listOffscreenEvents: vi.fn(),
     listWorldEvents: vi.fn(),
     previewScheduleRule: vi.fn(),
     resolveOffscreenEvents: vi.fn(),
+    upsertReleaseProfile: vi.fn(),
     validateWorldComposition: vi.fn(),
   };
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
 import {
+  compareWorldlines,
+  createBetaChecklist,
+  createEndingCandidate,
+  createLongRunEval,
+  createRouteMilestone,
+  forkWorldline,
   getCalendarConflicts,
   getDailyLifePreview,
   generateDailyLifeCandidates,
@@ -35,6 +48,7 @@ import {
   listWorldEvents,
   previewScheduleRule,
   resolveOffscreenEvents,
+  upsertReleaseProfile,
   validateWorldComposition,
 } from "@/lib/worlds/client";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
@@ -306,7 +320,292 @@ describe("WorldOverview", () => {
       }),
     );
   }, 40000);
+
+  it("submits V2 beta, release, route, ending, and worldline form contracts", async () => {
+    vi.mocked(forkWorldline).mockResolvedValue(undefined as never);
+    vi.mocked(compareWorldlines).mockResolvedValue({
+      base_worldline_id: "worldline-1",
+      compare_worldline_id: "worldline-1",
+      fork_event_sequence: null,
+      divergent_event_count: 0,
+      relationship_delta_count: 0,
+      faction_delta_count: 0,
+      choice_delta_count: 0,
+    });
+    vi.mocked(createRouteMilestone).mockResolvedValue(undefined as never);
+    vi.mocked(createEndingCandidate).mockResolvedValue(undefined as never);
+    vi.mocked(createLongRunEval).mockResolvedValue(undefined as never);
+    vi.mocked(upsertReleaseProfile).mockResolvedValue(undefined as never);
+    vi.mocked(createBetaChecklist).mockResolvedValue(undefined as never);
+
+    render(<WorldOverview data={workspaceData} />);
+
+    const forkForm = formForHeading("Worldline fork");
+    setFormValue(forkForm, "source_worldline_id", "worldline-1");
+    setFormValue(forkForm, "worldline_key", "beta-branch");
+    setFormValue(forkForm, "name", "Beta Branch");
+    setFormValue(forkForm, "description", "Branch for beta readiness.");
+    setFormValue(forkForm, "fork_event_sequence", "42");
+    setFormValue(forkForm, "metadata", JSON.stringify({ reason: "beta_compare", gate: "ready" }));
+    fireEvent.submit(forkForm);
+
+    await waitFor(() => {
+      expect(forkWorldline).toHaveBeenCalledWith("world-1", {
+        source_worldline_id: "worldline-1",
+        worldline_key: "beta-branch",
+        name: "Beta Branch",
+        description: "Branch for beta readiness.",
+        fork_event_sequence: 42,
+        metadata: { reason: "beta_compare", gate: "ready" },
+      });
+    });
+
+    const compareForm = screen.getByRole("button", { name: "Compare worldlines" }).closest("form");
+    expect(compareForm).not.toBeNull();
+    setFormValue(compareForm as HTMLFormElement, "base_worldline_id", "worldline-1");
+    setFormValue(compareForm as HTMLFormElement, "compare_worldline_id", "worldline-1");
+    fireEvent.submit(compareForm as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(compareWorldlines).toHaveBeenCalledWith("world-1", "worldline-1", "worldline-1");
+    });
+
+    const milestoneForm = formForHeading("Route milestone");
+    setFormValue(milestoneForm, "worldline_id", "worldline-1");
+    setFormValue(milestoneForm, "milestone_key", "festival-ready");
+    setFormValue(milestoneForm, "title", "Festival Ready");
+    setFormValue(milestoneForm, "description", "All beta evidence is present.");
+    setFormValue(milestoneForm, "stage", "4");
+    setFormValue(milestoneForm, "status", "active");
+    setFormValue(milestoneForm, "route_affinity_id", "route-1");
+    setFormValue(milestoneForm, "plot_thread_id", "thread-1");
+    setFormValue(
+      milestoneForm,
+      "conditions",
+      JSON.stringify({ gate_decision: { status: "ready", allowed: true, blocker_count: 0 } }),
+    );
+    setFormValue(
+      milestoneForm,
+      "evidence_metadata",
+      JSON.stringify({
+        evidence_refs: [{ kind: "beta_checklist", id: "checklist-1", label: "sample-world-beta" }],
+        gate_decision: { status: "ready", allowed: true },
+      }),
+    );
+    setFormValue(milestoneForm, "metadata", JSON.stringify({ source: "v2-beta-contract" }));
+    fireEvent.submit(milestoneForm);
+
+    await waitFor(() => {
+      expect(createRouteMilestone).toHaveBeenCalledWith("world-1", {
+        worldline_id: "worldline-1",
+        milestone_key: "festival-ready",
+        title: "Festival Ready",
+        description: "All beta evidence is present.",
+        stage: 4,
+        status: "active",
+        route_affinity_id: "route-1",
+        plot_thread_id: "thread-1",
+        agent_id: null,
+        conditions: { gate_decision: { status: "ready", allowed: true, blocker_count: 0 } },
+        evidence_metadata: {
+          evidence_refs: [{ kind: "beta_checklist", id: "checklist-1", label: "sample-world-beta" }],
+          gate_decision: { status: "ready", allowed: true },
+        },
+        metadata: { source: "v2-beta-contract" },
+      });
+    });
+
+    const endingForm = formForHeading("Ending candidate");
+    setFormValue(endingForm, "worldline_id", "worldline-1");
+    setFormValue(endingForm, "ending_key", "festival-release");
+    setFormValue(endingForm, "title", "Festival Release Ending");
+    setFormValue(endingForm, "ending_type", "epilogue");
+    setFormValue(endingForm, "status", "available");
+    setFormValue(endingForm, "route_affinity_id", "route-1");
+    setFormValue(endingForm, "plot_thread_id", "thread-1");
+    setFormValue(
+      endingForm,
+      "requirements",
+      JSON.stringify({ gate_decision: { status: "ready", allowed: true }, min_route_stage: 4 }),
+    );
+    setFormValue(endingForm, "outcome_summary", "Beta can release after the festival route.");
+    setFormValue(
+      endingForm,
+      "evidence_metadata",
+      JSON.stringify({ evidence_refs: [{ kind: "route_milestone", id: "milestone-1" }] }),
+    );
+    setFormValue(endingForm, "metadata", JSON.stringify({ decision: "ready" }));
+    fireEvent.submit(endingForm);
+
+    await waitFor(() => {
+      expect(createEndingCandidate).toHaveBeenCalledWith("world-1", {
+        worldline_id: "worldline-1",
+        ending_key: "festival-release",
+        title: "Festival Release Ending",
+        ending_type: "epilogue",
+        status: "available",
+        route_affinity_id: "route-1",
+        plot_thread_id: "thread-1",
+        agent_id: null,
+        requirements: { gate_decision: { status: "ready", allowed: true }, min_route_stage: 4 },
+        outcome_summary: "Beta can release after the festival route.",
+        evidence_metadata: { evidence_refs: [{ kind: "route_milestone", id: "milestone-1" }] },
+        metadata: { decision: "ready" },
+      });
+    });
+
+    const evalForm = formForHeading("Long-run eval");
+    setFormValue(evalForm, "worldline_id", "worldline-1");
+    setFormValue(evalForm, "eval_key", "seven-day-release-gate");
+    setFormValue(evalForm, "horizon_days", "14");
+    setFormValue(
+      evalForm,
+      "metadata",
+      JSON.stringify({
+        gate_decision: {
+          status: "blocked",
+          allowed: false,
+          blockers: [{ code: "route_gap", severity: "blocking" }],
+          evidence_refs: [{ kind: "snapshot", id: "snapshot-1" }],
+        },
+      }),
+    );
+    fireEvent.submit(evalForm);
+
+    await waitFor(() => {
+      expect(createLongRunEval).toHaveBeenCalledWith("world-1", {
+        worldline_id: "worldline-1",
+        eval_key: "seven-day-release-gate",
+        horizon_days: 14,
+        metadata: {
+          gate_decision: {
+            status: "blocked",
+            allowed: false,
+            blockers: [{ code: "route_gap", severity: "blocking" }],
+            evidence_refs: [{ kind: "snapshot", id: "snapshot-1" }],
+          },
+        },
+      });
+    });
+
+    const releaseForm = formForHeading("Release profile");
+    setFormValue(releaseForm, "profile_key", "living-world-v2-release");
+    setFormValue(releaseForm, "status", "ready");
+    setFormValue(releaseForm, "branch_policy", JSON.stringify({ branch_review: true, required_worldline_id: "worldline-1" }));
+    setFormValue(releaseForm, "backup_policy", JSON.stringify({ snapshot_before_release: true }));
+    setFormValue(releaseForm, "content_review_policy", JSON.stringify({ continuity_review_required: true }));
+    setFormValue(releaseForm, "player_permission_policy", JSON.stringify({ beta_players: "invited" }));
+    setFormValue(releaseForm, "worldline_policy", JSON.stringify({ forks_allowed: true, compare_before_release: true }));
+    setFormValue(
+      releaseForm,
+      "checklist",
+      JSON.stringify({
+        gate_decision: {
+          status: "ready",
+          allowed: true,
+          blockers: [],
+          warnings: [{ code: "density_low", severity: "warning" }],
+          evidence_refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day-beta-eval" }],
+        },
+      }),
+    );
+    setFormValue(
+      releaseForm,
+      "metadata",
+      JSON.stringify({
+        gate_decision: {
+          status: "ready",
+          allowed: true,
+          blockers: [],
+          warnings: [],
+          evidence_refs: [{ kind: "beta_checklist", id: "checklist-1", label: "sample-world-beta" }],
+        },
+      }),
+    );
+    fireEvent.submit(releaseForm);
+
+    await waitFor(() => {
+      expect(upsertReleaseProfile).toHaveBeenCalledWith("world-1", {
+        profile_key: "living-world-v2-release",
+        status: "ready",
+        branch_policy: { branch_review: true, required_worldline_id: "worldline-1" },
+        backup_policy: { snapshot_before_release: true },
+        content_review_policy: { continuity_review_required: true },
+        player_permission_policy: { beta_players: "invited" },
+        worldline_policy: { forks_allowed: true, compare_before_release: true },
+        checklist: {
+          gate_decision: {
+            status: "ready",
+            allowed: true,
+            blockers: [],
+            warnings: [{ code: "density_low", severity: "warning" }],
+            evidence_refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day-beta-eval" }],
+          },
+        },
+        metadata: {
+          gate_decision: {
+            status: "ready",
+            allowed: true,
+            blockers: [],
+            warnings: [],
+            evidence_refs: [{ kind: "beta_checklist", id: "checklist-1", label: "sample-world-beta" }],
+          },
+        },
+      });
+    });
+
+    const checklistForm = formForHeading("Beta checklist");
+    setFormValue(checklistForm, "worldline_id", "worldline-1");
+    setFormValue(checklistForm, "run_key", "v2-release-checklist");
+    setFormValue(
+      checklistForm,
+      "metadata",
+      JSON.stringify({
+        gate_decision: {
+          status: "blocked",
+          allowed: false,
+          blockers: [{ code: "missing_release_profile", severity: "blocking" }],
+          evidence_refs: [{ kind: "worldline_compare", id: "worldline-1" }],
+        },
+      }),
+    );
+    fireEvent.submit(checklistForm);
+
+    await waitFor(() => {
+      expect(createBetaChecklist).toHaveBeenCalledWith("world-1", {
+        worldline_id: "worldline-1",
+        run_key: "v2-release-checklist",
+        metadata: {
+          gate_decision: {
+            status: "blocked",
+            allowed: false,
+            blockers: [{ code: "missing_release_profile", severity: "blocking" }],
+            evidence_refs: [{ kind: "worldline_compare", id: "worldline-1" }],
+          },
+        },
+      });
+    });
+  }, 40000);
 });
+
+function formForHeading(name: string): HTMLFormElement {
+  const form = screen
+    .getAllByRole("heading", { name })
+    .map((heading) => heading.closest("form"))
+    .find((candidate): candidate is HTMLFormElement => candidate instanceof HTMLFormElement);
+  if (form === undefined) {
+    throw new Error(`Form for heading ${name} was not found.`);
+  }
+  return form;
+}
+
+function setFormValue(form: HTMLFormElement, name: string, value: string) {
+  const field = form.elements.namedItem(name);
+  expect(field).not.toBeNull();
+  fireEvent.change(field as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, {
+    target: { value },
+  });
+}
 
 const compositionExport = {
   world: {

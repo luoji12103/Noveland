@@ -1,37 +1,40 @@
 # Active Session Handoff
 
-- Date: 2026-05-08T14:55:00Z
-- Branch: feat/v2-beta-acceptance-gating-hardening
-- Objective: Complete V2 acceptance remediation bundle 4 for beta release gate hardening, long-run eval evidence metrics, structured checklist evidence refs, route/ending validation, and authoring import audit refs.
-- Status: Implementation and targeted backend/Web checks are complete on the feature branch. Full final gate and fast-forward merge to local `main` remain.
+- Date: 2026-05-09T00:00:00Z
+- Branch: fix/v2-acceptance-contract-hardening
+- Objective: Harden the post-V2 acceptance contract checks that were identified after the four remediation bundles, especially Web mock parity, publication/release blocker behavior, reader query coverage, beta form payload tests, and worldline selector expectations.
+- Status: Implementation and checks are complete on the feature branch. Fast-forward merge back to local `main` remains. The completed V2 phases 1-50 and four remediation bundles remain closed; this branch is targeted hardening from fresh acceptance review evidence, not a new roadmap phase.
 
-## Completed Before This Bundle
+## Completed Before This Branch
 
-- Bundle 1 `fix/v2-runtime-worldline-memory-isolation` added first-class worldline scope to runtime, conversations, memory snapshots, backfill, forget/delete, and player-choice audit semantics.
-- Bundle 2 `feat/v2-prompt-leak-publish-guardrails` added leak-safe prompt context selection, speaker-scoped prompts, narrative leak review, and publish blockers.
-- Bundle 3 `feat/v2-runtime-gm-narrative-execution` added runtime/narrative context packs, group interaction execution, expanded deterministic condition evaluation, GM macro planning, and low-risk proposal draft conversion.
+- V2 phases 1-50 are implemented and recorded in `change-journal.md`.
+- Remediation bundle 1 `fix/v2-runtime-worldline-memory-isolation` added first-class worldline scope to runtime, conversations, memory snapshots, backfill, forget/delete, and player-choice audit semantics.
+- Remediation bundle 2 `feat/v2-prompt-leak-publish-guardrails` added leak-safe prompt context selection, speaker-scoped prompts, narrative leak review, and publish blockers.
+- Remediation bundle 3 `feat/v2-runtime-gm-narrative-execution` added runtime/narrative context packs, group interaction execution, expanded deterministic condition evaluation, GM macro planning, and low-risk proposal draft conversion.
+- Remediation bundle 4 `feat/v2-beta-acceptance-gating-hardening` hardened release gates, long-run eval evidence, checklist evidence refs, route/ending validation, and authoring import audit semantics, then merged back to `main`.
 
-## Bundle 4 Implementation Notes
+## Current Work Items
 
-- Hardened release profile status changes with a server-side gate: `ready` now requires the latest passing beta checklist, latest completed long-run eval, resolvable structured evidence refs for snapshot/worldline/publication/continuity review/checklist/eval, and explicit warning decisions; `released` remains blocked until a separate launch gate exists.
-- Expanded long-run eval metrics with deterministic distribution, traceability, snapshot/event refs, GM proposal resolution counts, and continuity/style/publication warning counts.
-- Added structured evidence refs to beta checklist runs and items so each checklist result can point back to concrete worldline artifacts.
-- Hardened route/ending requirements with contradictory range/flag validation and forbidden flag dry-run checks.
-- Hardened authoring preview/apply with target worldline, duplicate policy, preview diff, audit metadata, applied refs, and an `authoring.template_applied` world event.
-- Updated Web beta-readiness panels, client request mappings, overview tests, and Playwright mock backend data/handlers for the new gate/evidence/audit shapes.
+- Playwright mock behavior now matches real API publication blockers and release profile gate blockers.
+- Reader mock/query coverage now covers search, source kind, publication status, and published ordering.
+- World overview tests cover beta/release/worldline form payload contracts.
+- Omitted `worldline_id` was confirmed as a supported primary-worldline API contract, so no selector change was needed.
+- `web/next-env.d.ts` is unchanged after build/e2e and `npm run check:next-env` passed.
 
-## Bundle 4 Targeted Checks Passed
+## Checks Passed
 
-- `cd backend && uv run ruff check packages/worlds/src/noveland/worlds/beta.py services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py`
-- `cd backend && uv run mypy packages/worlds/src/noveland/worlds/beta.py services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py`
-- `cd backend && uv run pytest tests/test_api_worlds.py tests/test_schema_metadata.py tests/test_alembic_config.py -q`
-- `node --check web/tests/e2e/start-with-mock-auth.mjs`
+- `cd backend && uv run ruff check .`
+- `cd backend && uv run mypy .`
+- `cd backend && uv run pytest`
 - `cd web && npm run lint`
 - `cd web && npm run typecheck`
-- `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts`
+- `cd web && npm run test`
+- `cd web && npm run build`
+- `cd web && npm run check:next-env`
+- `cd web && npm run test:e2e`
+- `docker compose -f infra/compose.yaml config`
+- `git diff --check`
 
 ## Remaining Closeout
 
-- Run the full backend/Web final gate.
-- Restore `web/next-env.d.ts` if build/e2e churns it, then rerun `npm run check:next-env`.
-- Commit the branch and fast-forward merge back into local `main` if the final gate remains clean.
+- Fast-forward merge back into local `main` only if checks pass and the merge is clean. Do not push.

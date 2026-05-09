@@ -582,3 +582,14 @@
 - Tests added/updated: backend API coverage for blocked/allowed release profile gates, long-run eval evidence metrics, structured checklist refs, invalid/cross-worldline ending requirements, and authoring preview/apply audit refs; Web client body mapping tests; Web overview rendering tests for gate/evidence/audit summaries; Playwright mock backend alignment.
 - Docs updated: task board, change journal, and active handoff. No new structural files were introduced, so `file-inventory.md` did not need a path update.
 - Follow-up notes: This closes the planned four-bundle V2 acceptance remediation sequence locally. Future hardening should be driven by fresh acceptance reports, beta evidence, operator feedback, and production-readiness decisions rather than roadmap phase numbers.
+
+## V2 acceptance contract hardening entry
+
+- Date: 2026-05-09
+- Branch: fix/v2-acceptance-contract-hardening
+- Scope: Fresh post-remediation acceptance hardening for Web mock/backend contract parity, reader query coverage, beta/release form payload tests, release gate blocker enforcement, and stale handoff cleanup.
+- Summary: Refreshed the active handoff after the completed remediation sequence; aligned the Playwright mock backend with real API behavior for narrative publication blockers and release profile gate blockers; expanded narrative artifact listing filters for search, source kind, publication status, published ordering, and limit; added e2e coverage for blocked publication visibility, reader filtering/ordering, and release gate enforcement; and added component coverage for V2 beta, release, route, ending, and worldline form payloads. Confirmed that omitted/null `worldline_id` is an intentional primary-worldline contract, so no selector code change was needed.
+- Files changed: `/docs/agent/harness/{task-board.md,change-journal.md,handoffs/active-session.md}`, `/web/features/worlds/world-overview.test.tsx`, `/web/tests/e2e/{auth.spec.ts,start-with-mock-auth.mjs}`
+- Tests added/updated: Web world overview form contract tests; Playwright coverage for publication blockers, reader query filters, published ordering, and release gate blockers; mock syntax and diff whitespace checks.
+- Docs updated: task board, change journal, and active handoff.
+- Follow-up notes: The auth e2e spec now runs serially because the mock backend uses shared mutable in-memory state. Future e2e additions should either keep shared-state tests serial or isolate mock state per test.

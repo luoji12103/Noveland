@@ -66,6 +66,7 @@
 - V2 Prompt Boundary + Publish Guardrails Remediation
 - V2 Runtime GM + Narrative Execution Depth Remediation
 - V2 Beta Acceptance Gating Hardening Remediation
+- V2 Acceptance Contract Hardening
 
 ## Upcoming Mainline
 - V2 phases 1-50 and the four recorded remediation bundles are implemented locally.
