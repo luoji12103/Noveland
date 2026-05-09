@@ -27,6 +27,7 @@ from noveland.worlds.models import (
     LivingWorldReleaseProfile,
     LongRunEvalRun,
     NarrativeContinuityReview,
+    OffscreenEventQueueItem,
     PlayerChoiceRecord,
     PlayerInterventionRecord,
     PlayerJournalEntry,
@@ -883,6 +884,23 @@ class LivingWorldBetaService:
                 GMEventProposal.status == "resolved",
             )
         )
+        executed_macro_items = self._count(
+            select(func.count(GMEventProposal.id)).where(
+                GMEventProposal.world_id == world_id,
+                GMEventProposal.worldline_id == worldline_id,
+                GMEventProposal.source_context["source"].as_string() == "gm_macro_planner",
+            )
+        ) + self._count(
+            select(func.count(OffscreenEventQueueItem.id)).where(
+                OffscreenEventQueueItem.world_id == world_id,
+                OffscreenEventQueueItem.worldline_id == worldline_id,
+                OffscreenEventQueueItem.payload_json["source"].as_string()
+                == "gm_macro_planner",
+            )
+        )
+        committed_gm_events = sum(
+            1 for event in event_rows if _is_committed_gm_event(event)
+        )
         failed_reviews = self._count(
             select(func.count(NarrativeContinuityReview.id)).where(
                 NarrativeContinuityReview.world_id == world_id,
@@ -937,6 +955,8 @@ class LivingWorldBetaService:
             "gm_agendas": self._count_worldline(GMAgenda, world_id, worldline_id),
             "gm_proposals": self._count_worldline(GMEventProposal, world_id, worldline_id),
             "resolved_gm_proposals": resolved_proposals,
+            "executed_macro_items": executed_macro_items,
+            "committed_gm_events": committed_gm_events,
             "daily_candidates": self._count_worldline(
                 DailyLifeEventCandidate,
                 world_id,
@@ -1147,6 +1167,14 @@ class LivingWorldBetaService:
                 kind="gm_proposal",
                 label_attr="title",
                 limit=2,
+                status_filter=("resolved",),
+            )
+        )
+        refs.extend(
+            self._gm_event_refs(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                limit=2,
             )
         )
         refs.extend(
@@ -1211,13 +1239,15 @@ class LivingWorldBetaService:
         kind: str,
         label_attr: str,
         limit: int,
+        status_filter: tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
-        statement = (
-            select(model)
-            .where(model.world_id == world_id, model.worldline_id == worldline_id)
-            .order_by(model.created_at.desc())
-            .limit(limit)
+        statement = select(model).where(
+            model.world_id == world_id,
+            model.worldline_id == worldline_id,
         )
+        if status_filter is not None:
+            statement = statement.where(model.status.in_(status_filter))
+        statement = statement.order_by(model.created_at.desc()).limit(limit)
         rows = self._session.scalars(statement).all()
         return [
             _evidence_ref(
@@ -1228,6 +1258,37 @@ class LivingWorldBetaService:
                 api_path=f"/worlds/{world_id}",
             )
             for row in rows
+        ]
+
+    def _gm_event_refs(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        rows = self._session.scalars(
+            select(WorldEventModel)
+            .where(
+                WorldEventModel.world_id == world_id,
+                WorldEventModel.worldline_id == worldline_id,
+            )
+            .order_by(WorldEventModel.created_at.desc())
+        ).all()
+        committed_rows = [
+            row
+            for row in rows
+            if _is_committed_gm_event(row)
+        ][:limit]
+        return [
+            _evidence_ref(
+                "world_event",
+                row.id,
+                row.event_name,
+                worldline_id=worldline_id,
+                api_path=f"/worlds/{world_id}/events",
+            )
+            for row in committed_rows
         ]
 
     def _publication_refs(
@@ -1672,6 +1733,12 @@ class LivingWorldBetaService:
         relationship_refs = _refs_by_kind(traceability_refs, "relationship")
         faction_refs = _refs_by_kind(traceability_refs, "faction_track")
         gm_refs = _refs_by_kind(traceability_refs, "gm_proposal")
+        gm_committed_refs = [
+            ref
+            for ref in _refs_by_kind(traceability_refs, "gm_proposal", "world_event")
+            if ref in gm_refs
+            or str(ref.get("label") or "").startswith(("gm.", "living_world.offscreen"))
+        ]
         player_refs = _refs_by_kind(traceability_refs, "player_choice", "intervention")
         journal_refs = _refs_by_kind(traceability_refs, "journal_entry", "notification")
         narrative_refs = _refs_by_kind(traceability_refs, "publication")
@@ -1719,15 +1786,19 @@ class LivingWorldBetaService:
             _check(
                 "gm_event_loop",
                 "GM/event loop",
-                metrics["gm_agendas"] > 0 and metrics["gm_proposals"] > 0,
+                metrics["resolved_gm_proposals"] > 0
+                or metrics["executed_macro_items"] > 0
+                or metrics["committed_gm_events"] > 0,
                 metrics["gm_agendas"] > 0 or metrics["gm_proposals"] > 0,
                 {
                     "gm_agendas": metrics["gm_agendas"],
                     "gm_proposals": metrics["gm_proposals"],
                     "resolved_gm_proposals": metrics["resolved_gm_proposals"],
-                    "refs": gm_refs,
+                    "executed_macro_items": metrics["executed_macro_items"],
+                    "committed_gm_events": metrics["committed_gm_events"],
+                    "refs": gm_committed_refs,
                 },
-                "Create at least one GM agenda and proposal.",
+                "Resolve a GM proposal or execute a traceable GM/offscreen event.",
             ),
             _check(
                 "player_interventions",
@@ -1810,6 +1881,16 @@ def _check(
 def _publication_gate_status(publication: NarrativePublication) -> str:
     gate = _dict((publication.published_metadata or {}).get("publication_gate"))
     return str(gate.get("status") or "")
+
+
+def _is_committed_gm_event(event: WorldEventModel) -> bool:
+    return (
+        event.actor_ref.startswith("gm:")
+        or event.event_name.startswith("gm.")
+        or event.event_name.startswith("living_world.offscreen")
+        or str((event.payload or {}).get("source"))
+        in {"gm_macro_planner", "offscreen_resolution"}
+    )
 
 
 def _beta_summary(status: str, blocker_count: int, warning_count: int) -> str:

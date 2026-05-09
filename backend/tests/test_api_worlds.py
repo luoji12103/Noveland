@@ -2033,6 +2033,14 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
             "importance": "route",
         },
     )
+    unresolved_checklist = client.post(
+        f"/worlds/{world_id}/beta-checklists",
+        json={"run_key": "beta-readiness-unresolved-gm"},
+    )
+    resolved_proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals/{proposal.json()['id']}/review",
+        json={"status": "resolved", "review_note": "Accepted for beta checklist."},
+    )
     actor = client.put(
         f"/worlds/{world_id}/player-actors",
         json={"display_name": "Player", "current_scene_id": str(scene_id)},
@@ -2490,6 +2498,13 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert ending_dry_run.json()["matched"] is True
     assert agenda.status_code == 201
     assert proposal.status_code == 201
+    assert unresolved_checklist.status_code == 201
+    assert unresolved_checklist.json()["status"] in {"blocked", "warning"}
+    unresolved_gm_item = unresolved_checklist.json()["evidence"]["items"]["gm_event_loop"]
+    assert unresolved_gm_item["resolved_gm_proposals"] == 0
+    assert unresolved_gm_item["committed_gm_events"] == 0
+    assert resolved_proposal.status_code == 200
+    assert resolved_proposal.json()["status"] == "resolved"
     assert choice.status_code == 201
     assert intervention.status_code == 201
     assert journal.status_code == 201
@@ -2535,6 +2550,10 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert invalid_apply.json()["applied_refs"] == {}
     assert checklist.status_code == 201
     assert checklist.json()["status"] == "passed"
+    gm_item = checklist.json()["evidence"]["items"]["gm_event_loop"]
+    assert gm_item["resolved_gm_proposals"] == 1
+    assert gm_item["committed_gm_events"] == 1
+    assert any(ref["kind"] in {"gm_proposal", "world_event"} for ref in gm_item["refs"])
     assert checklist.json()["evidence"]["worldline_id"] == primary["id"]
     assert any(ref["kind"] == "snapshot" for ref in checklist.json()["evidence"]["refs"])
     assert checklist_items.status_code == 200
@@ -2590,7 +2609,7 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
         "templates": 2,
         "jobs": 4,
         "profiles": 1,
-        "checklists": 1,
+        "checklists": 2,
     }
 
 
