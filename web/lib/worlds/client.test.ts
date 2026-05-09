@@ -845,10 +845,23 @@ describe("world client", () => {
       template_kind: "world_bundle",
       name: "Hero source",
     });
-    await previewAuthoringTemplate("world-1", "template-2");
-    await applyAuthoringTemplate("world-1", "template-2", { metadata: { operator: "test" } });
+    await previewAuthoringTemplate("world-1", "template-2", {
+      target_worldline_id: "worldline-1",
+    });
+    await applyAuthoringTemplate("world-1", "template-2", {
+      target_worldline_id: "worldline-1",
+      duplicate_policy: "skip",
+      metadata: { operator: "test" },
+    });
     await getReleaseProfile("world-1");
-    await upsertReleaseProfile("world-1", { profile_key: "beta", status: "ready" });
+    await upsertReleaseProfile("world-1", {
+      profile_key: "beta",
+      status: "ready",
+      checklist: {
+        evidence_refs: [{ kind: "long_run_eval", id: "eval-2", label: "seven day" }],
+      },
+      metadata: { operator: "test" },
+    });
     await listBetaChecklists("world-1", { worldline_id: "worldline-1" });
     await createBetaChecklist("world-1", { run_key: "beta-readiness" });
     await listBetaChecklistItems("world-1", "checklist-2");
@@ -871,6 +884,26 @@ describe("world client", () => {
       "/api/worlds/world-1/beta-checklists",
       "/api/worlds/world-1/beta-checklists/checklist-2/items",
     ]);
+    expect(fetchMock.mock.calls[9][1].body).toBe(
+      JSON.stringify({ target_worldline_id: "worldline-1" }),
+    );
+    expect(fetchMock.mock.calls[10][1].body).toBe(
+      JSON.stringify({
+        target_worldline_id: "worldline-1",
+        duplicate_policy: "skip",
+        metadata: { operator: "test" },
+      }),
+    );
+    expect(fetchMock.mock.calls[12][1].body).toBe(
+      JSON.stringify({
+        profile_key: "beta",
+        status: "ready",
+        checklist: {
+          evidence_refs: [{ kind: "long_run_eval", id: "eval-2", label: "seven day" }],
+        },
+        metadata: { operator: "test" },
+      }),
+    );
   });
 
   it("maps replay and snapshot requests", async () => {

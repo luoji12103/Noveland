@@ -2686,6 +2686,8 @@ export type AuthoringTemplateCreateInput = {
 };
 
 export type AuthoringTemplateApplyInput = {
+  target_worldline_id?: string | null;
+  duplicate_policy?: "upsert" | "skip" | "fail";
   metadata?: Record<string, unknown>;
 };
 

@@ -962,6 +962,8 @@ class AuthoringTemplateCreateRequest(_RequestModel):
 
 
 class AuthoringTemplateApplyRequest(_RequestModel):
+    target_worldline_id: uuid.UUID | None = None
+    duplicate_policy: Literal["upsert", "skip", "fail"] = "upsert"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -5478,6 +5480,7 @@ def preview_authoring_template(
         job = LivingWorldBetaService(db_session).preview_authoring_template(
             world_id=context.world_id,
             template=template,
+            target_worldline_id=preview_create.target_worldline_id,
             metadata=preview_create.metadata,
         )
     except ValueError as exc:
@@ -5502,6 +5505,8 @@ def apply_authoring_template(
         job = LivingWorldBetaService(db_session).apply_authoring_template(
             world_id=context.world_id,
             template=template,
+            target_worldline_id=apply_create.target_worldline_id,
+            duplicate_policy=apply_create.duplicate_policy,
             metadata=apply_create.metadata,
         )
     except ValueError as exc:
@@ -5528,18 +5533,24 @@ def upsert_release_profile(
 ) -> ReleaseProfileResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
-    profile = LivingWorldBetaService(db_session).upsert_release_profile(
-        world_id=context.world_id,
-        profile_key=profile_upsert.profile_key,
-        status=profile_upsert.status,
-        branch_policy=profile_upsert.branch_policy,
-        backup_policy=profile_upsert.backup_policy,
-        content_review_policy=profile_upsert.content_review_policy,
-        player_permission_policy=profile_upsert.player_permission_policy,
-        worldline_policy=profile_upsert.worldline_policy,
-        checklist=profile_upsert.checklist,
-        metadata=profile_upsert.metadata,
-    )
+    try:
+        profile = LivingWorldBetaService(db_session).upsert_release_profile(
+            world_id=context.world_id,
+            profile_key=profile_upsert.profile_key,
+            status=profile_upsert.status,
+            branch_policy=profile_upsert.branch_policy,
+            backup_policy=profile_upsert.backup_policy,
+            content_review_policy=profile_upsert.content_review_policy,
+            player_permission_policy=profile_upsert.player_permission_policy,
+            worldline_policy=profile_upsert.worldline_policy,
+            checklist=profile_upsert.checklist,
+            metadata=profile_upsert.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return _release_profile_response(profile)
 
 

@@ -65,10 +65,10 @@
 - V2 Runtime Worldline + Memory Isolation Remediation
 - V2 Prompt Boundary + Publish Guardrails Remediation
 - V2 Runtime GM + Narrative Execution Depth Remediation
+- V2 Beta Acceptance Gating Hardening Remediation
 
 ## Upcoming Mainline
-- Next remediation bundle is `feat/v2-beta-acceptance-gating-hardening`.
-- V2 phases 1-50 are implemented in local roadmap bundles; remaining work should come
-  from acceptance reports, beta evidence, operator feedback, and targeted hardening rather
-  than a new phase-number branch.
+- V2 phases 1-50 and the four recorded remediation bundles are implemented locally.
+- Remaining work should come from fresh acceptance reports, beta evidence, operator
+  feedback, and targeted hardening rather than a new phase-number branch.
 - Use `docs/agent/harness/debug-journal.md` acceptance reports for phases 1-35 and 36-50 as the source of record when selecting future hardening work.

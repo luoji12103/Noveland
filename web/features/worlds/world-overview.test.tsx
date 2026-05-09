@@ -209,8 +209,12 @@ describe("WorldOverview", () => {
     expect(screen.getByText("Guide normal ending")).toBeInTheDocument();
     expect(screen.getByText("seven-day-beta-eval")).toBeInTheDocument();
     expect(screen.getByText("Sequel world bundle")).toBeInTheDocument();
+    expect(screen.getByText(/Gate ready - allowed - blockers 0 - warnings 0 - evidence refs 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Preview diff characters 1, events 1, routes 1/)).toBeInTheDocument();
+    expect(screen.getByText(/day coverage 7 - trace refs 2 - snapshot refs 1/)).toBeInTheDocument();
     expect(screen.getByText("sample-world-beta")).toBeInTheDocument();
     expect(screen.getByText("7-day simulation")).toBeInTheDocument();
+    expect(screen.getAllByText("Evidence refs 1").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Gap 0")).toBeInTheDocument();
     expect(screen.getByText(/agent.run_succeeded/)).toBeInTheDocument();
     expect(screen.getByText('{"output":"ok"}')).toBeInTheDocument();
@@ -822,7 +826,19 @@ const workspaceData: WorldWorkspaceData = {
       status: "warning",
       started_at: "2026-05-07T12:00:00.000Z",
       finished_at: "2026-05-07T12:00:01.000Z",
-      metrics: { event_density: 4, route_activity: 1 },
+      metrics: {
+        event_density: 4,
+        route_activity: 1,
+        distribution: { day_coverage: 7 },
+        traceability: {
+          snapshot_ref_count: 1,
+          refs: [
+            { kind: "world_event", id: "event-1", label: "agent.run_succeeded" },
+            { kind: "snapshot", id: "snapshot-1", label: "world_state.v1" },
+          ],
+        },
+        review_warnings: { continuity_or_style_warning_count: 1 },
+      },
       recommendations: [{ action: "add_daily_episode", reason: "low daily density" }],
       blockers: [],
       metadata: {},
@@ -846,7 +862,27 @@ const workspaceData: WorldWorkspaceData = {
       updated_at: "2026-05-07T12:00:00.000Z",
     },
   ],
-  authoringImportJobs: [],
+  authoringImportJobs: [
+    {
+      id: "authoring-job-1",
+      world_id: "world-1",
+      template_id: "template-1",
+      status: "applied",
+      preview_summary: {
+        schema_version: "living-world-template/v2",
+        validation_issue_count: 0,
+        diff: { characters: ["guide"], events: ["festival"], routes: ["guide-route"] },
+        audit: { action: "apply" },
+      },
+      applied_refs: {
+        refs: [{ kind: "agent", id: "agent-1", label: "Guide" }],
+      },
+      validation_issues: [],
+      metadata: { audit: { action: "apply" } },
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:00:00.000Z",
+    },
+  ],
   releaseProfile: {
     id: "release-profile-1",
     world_id: "world-1",
@@ -857,8 +893,25 @@ const workspaceData: WorldWorkspaceData = {
     content_review_policy: { continuity_review_required: true },
     player_permission_policy: { invite_only: true },
     worldline_policy: { forks_allowed: true },
-    checklist: { sample_world_required: true },
-    metadata: {},
+    checklist: {
+      sample_world_required: true,
+      gate_decision: {
+        status: "ready",
+        allowed: true,
+        blockers: [],
+        warnings: [],
+        evidence_refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day" }],
+      },
+    },
+    metadata: {
+      gate_decision: {
+        status: "ready",
+        allowed: true,
+        blockers: [],
+        warnings: [],
+        evidence_refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day" }],
+      },
+    },
     created_at: "2026-05-07T12:00:00.000Z",
     updated_at: "2026-05-07T12:00:00.000Z",
   },
@@ -870,7 +923,10 @@ const workspaceData: WorldWorkspaceData = {
       run_key: "sample-world-beta",
       status: "warning",
       summary: "Sample world beta has non-blocking recommendations.",
-      evidence: { days: 7 },
+      evidence: {
+        days: 7,
+        refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day" }],
+      },
       blocker_count: 0,
       created_by_actor_ref: "user:user-1",
       metadata: {},
@@ -885,7 +941,10 @@ const workspaceData: WorldWorkspaceData = {
       item_key: "seven-day-simulation",
       title: "7-day simulation",
       status: "warning",
-      evidence: { eval_run_id: "eval-1" },
+      evidence: {
+        eval_run_id: "eval-1",
+        refs: [{ kind: "long_run_eval", id: "eval-1", label: "seven-day" }],
+      },
       recommendation: "Increase daily episode density before public beta.",
       created_at: "2026-05-07T12:00:00.000Z",
       updated_at: "2026-05-07T12:00:00.000Z",

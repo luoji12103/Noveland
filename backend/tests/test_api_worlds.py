@@ -2100,9 +2100,33 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
         f"/worlds/{world_id}/worldlines/fork",
         json={"worldline_key": "beta-alt", "name": "Beta Alt"},
     )
+    snapshot = client.post(f"/worlds/{world_id}/snapshots")
+    continuity_review = client.post(
+        f"/worlds/{world_id}/narrative-continuity-reviews",
+        json={
+            "artifact_id": str(artifact_id),
+            "source_kind": "artifact",
+            "source_ref": str(artifact_id),
+            "reviewed_text": "A route scene keeps continuity and avoids secret leaks.",
+            "metadata": {"canon": "checked"},
+        },
+    )
     eval_run = client.post(
         f"/worlds/{world_id}/long-run-evals",
         json={"eval_key": "seven-day", "horizon_days": 7},
+    )
+    incomplete_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {"worldline_id": primary["id"], "evidence_refs": []},
+        },
     )
     template = client.post(
         f"/worlds/{world_id}/authoring-templates",
@@ -2132,11 +2156,98 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     )
     preview = client.post(
         f"/worlds/{world_id}/authoring-templates/{template.json()['id']}/preview",
-        json={},
+        json={"target_worldline_id": primary["id"]},
     )
     apply = client.post(
         f"/worlds/{world_id}/authoring-templates/{template.json()['id']}/apply",
-        json={"metadata": {"operator": "test"}},
+        json={
+            "target_worldline_id": primary["id"],
+            "duplicate_policy": "upsert",
+            "metadata": {"operator": "test"},
+        },
+    )
+    invalid_template = client.post(
+        f"/worlds/{world_id}/authoring-templates",
+        json={
+            "template_key": "invalid-character-source",
+            "template_kind": "character",
+            "name": "Invalid character source",
+            "content": {"characters": [{"agent_key": "missing-display"}]},
+        },
+    )
+    invalid_preview = client.post(
+        f"/worlds/{world_id}/authoring-templates/{invalid_template.json()['id']}/preview",
+        json={"target_worldline_id": primary["id"]},
+    )
+    invalid_apply = client.post(
+        f"/worlds/{world_id}/authoring-templates/{invalid_template.json()['id']}/apply",
+        json={"target_worldline_id": primary["id"]},
+    )
+    checklist = client.post(
+        f"/worlds/{world_id}/beta-checklists",
+        json={"run_key": "beta-readiness"},
+    )
+    checklist_items = client.get(
+        f"/worlds/{world_id}/beta-checklists/{checklist.json()['id']}/items",
+    )
+    evidence_refs = [
+        {
+            "kind": "snapshot",
+            "id": snapshot.json()["id"],
+            "label": "beta snapshot",
+            "worldline_id": primary["id"],
+        },
+        {
+            "kind": "worldline",
+            "id": primary["id"],
+            "label": "primary worldline",
+            "worldline_id": primary["id"],
+        },
+        {
+            "kind": "publication",
+            "id": str(_publication_id(engine, artifact_id)),
+            "label": "published beta chapter",
+        },
+        {
+            "kind": "continuity_review",
+            "id": continuity_review.json()["id"],
+            "label": "continuity review",
+            "worldline_id": primary["id"],
+        },
+        {
+            "kind": "beta_checklist",
+            "id": checklist.json()["id"],
+            "label": "beta checklist",
+            "worldline_id": primary["id"],
+        },
+        {
+            "kind": "long_run_eval",
+            "id": eval_run.json()["id"],
+            "label": "seven day eval",
+            "worldline_id": primary["id"],
+        },
+    ]
+    unresolved_release_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "ready",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": [
+                    {**ref, "id": str(uuid.uuid4())}
+                    if ref["kind"] == "long_run_eval"
+                    else ref
+                    for ref in evidence_refs
+                ],
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
     )
     release_profile = client.put(
         f"/worlds/{world_id}/release-profile",
@@ -2148,16 +2259,48 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
             "content_review_policy": {"continuity_review": "warning"},
             "player_permission_policy": {"players": "members"},
             "worldline_policy": {"default": primary["id"]},
-            "checklist": {"beta": "required"},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": evidence_refs,
+                "warning_decisions": {"style": "accepted"},
+            },
+        },
+    )
+    released_profile = client.put(
+        f"/worlds/{world_id}/release-profile",
+        json={
+            "profile_key": "beta-release",
+            "status": "released",
+            "branch_policy": {"forks": "enabled"},
+            "backup_policy": {"required": True},
+            "content_review_policy": {"continuity_review": "warning"},
+            "player_permission_policy": {"players": "members"},
+            "worldline_policy": {"default": primary["id"]},
+            "checklist": {
+                "worldline_id": primary["id"],
+                "evidence_refs": evidence_refs,
+                "warning_decisions": {"style": "accepted"},
+            },
         },
     )
     release_profile_read = client.get(f"/worlds/{world_id}/release-profile")
-    checklist = client.post(
-        f"/worlds/{world_id}/beta-checklists",
-        json={"run_key": "beta-readiness"},
+    invalid_ending = client.post(
+        f"/worlds/{world_id}/ending-candidates",
+        json={
+            "ending_key": "invalid-flags",
+            "title": "Invalid flags",
+            "ending_type": "bad",
+            "requirements": {
+                "min_route_affinity": 80,
+                "max_route_affinity": 20,
+                "required_flags": ["locked"],
+                "forbidden_flags": ["locked"],
+            },
+        },
     )
-    checklist_items = client.get(
-        f"/worlds/{world_id}/beta-checklists/{checklist.json()['id']}/items",
+    ending_cross_worldline = client.post(
+        f"/worlds/{world_id}/ending-candidates/{ending.json()['id']}/dry-run",
+        params={"worldline_id": fork.json()["id"]},
     )
     listed_milestones = client.get(f"/worlds/{world_id}/route-milestones")
     listed_endings = client.get(f"/worlds/{world_id}/ending-candidates")
@@ -2191,23 +2334,67 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert journal.status_code == 201
     assert notification.status_code == 201
     assert fork.status_code == 201
+    assert snapshot.status_code == 201
+    assert continuity_review.status_code == 201
     assert eval_run.status_code == 201
     assert eval_run.json()["metrics"]["horizon_days"] == 7
     assert eval_run.json()["metrics"]["events"] >= 7
+    assert eval_run.json()["metrics"]["distribution"]["day_coverage"] >= 1
+    assert eval_run.json()["metrics"]["traceability"]["snapshot_ref_count"] >= 1
+    assert any(
+        ref["kind"] == "world_event" for ref in eval_run.json()["metrics"]["traceability"]["refs"]
+    )
+    assert "review_warnings" in eval_run.json()["metrics"]
     assert isinstance(eval_run.json()["recommendations"], list)
+    assert incomplete_release_profile.status_code == 422
+    assert "missing_required_evidence_refs" in incomplete_release_profile.text
     assert template.status_code == 201
     assert preview.status_code == 200
     assert preview.json()["status"] == "preview"
     assert preview.json()["preview_summary"]["character_count"] == 1
+    assert preview.json()["preview_summary"]["target_worldline_id"] == primary["id"]
+    assert "diff" in preview.json()["preview_summary"]
+    assert preview.json()["metadata"]["audit"]["action"] == "preview"
     assert apply.status_code == 200
     assert apply.json()["status"] == "applied"
     assert "world_bible_id" in apply.json()["applied_refs"]
+    assert apply.json()["applied_refs"]["target_worldline_id"] == primary["id"]
+    assert any(ref["kind"] == "agent" for ref in apply.json()["applied_refs"]["refs"])
+    assert apply.json()["metadata"]["audit"]["action"] == "apply"
+    assert invalid_template.status_code == 201
+    assert any(
+        issue["code"] == "character_identity_missing"
+        for issue in invalid_template.json()["validation_issues"]
+    )
+    assert invalid_preview.status_code == 200
+    assert invalid_preview.json()["status"] == "preview"
+    assert invalid_preview.json()["preview_summary"]["validation_issue_count"] > 0
+    assert invalid_apply.status_code == 200
+    assert invalid_apply.json()["status"] == "failed"
+    assert invalid_apply.json()["applied_refs"] == {}
+    assert checklist.status_code == 201
+    assert checklist.json()["status"] == "passed"
+    assert checklist.json()["evidence"]["worldline_id"] == primary["id"]
+    assert any(ref["kind"] == "snapshot" for ref in checklist.json()["evidence"]["refs"])
+    assert checklist_items.status_code == 200
+    assert all(isinstance(item["evidence"].get("refs"), list) for item in checklist_items.json())
+    assert any(
+        ref["kind"] == "publication"
+        for item in checklist_items.json()
+        for ref in item["evidence"]["refs"]
+    )
+    assert unresolved_release_profile.status_code == 422
+    assert "unresolved_required_evidence_refs" in unresolved_release_profile.text
     assert release_profile.status_code == 200
     assert release_profile.json()["status"] == "ready"
+    assert release_profile.json()["metadata"]["gate_decision"]["allowed"] is True
+    assert release_profile.json()["metadata"]["gate_decision"]["evidence_refs"] == evidence_refs
+    assert released_profile.status_code == 422
+    assert "release_launch_gate_missing" in released_profile.text
     assert release_profile_read.json()["branch_policy"] == {"forks": "enabled"}
-    assert checklist.status_code == 201
-    assert checklist.json()["status"] in {"passed", "warning"}
-    assert checklist_items.status_code == 200
+    assert invalid_ending.status_code == 422
+    assert "min_route_affinity cannot exceed max_route_affinity" in invalid_ending.text
+    assert ending_cross_worldline.status_code == 404
     assert {item["item_key"] for item in checklist_items.json()} == {
         "seven_day_simulation",
         "branch_saves",
@@ -2222,14 +2409,17 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert listed_milestones.json()[0]["milestone_key"] == "festival-promise"
     assert listed_endings.json()[0]["ending_key"] == "hero-normal"
     assert listed_evals.json()[0]["eval_key"] == "seven-day"
-    assert listed_templates.json()[0]["template_key"] == "hero-source"
+    assert {item["template_key"] for item in listed_templates.json()} == {
+        "hero-source",
+        "invalid-character-source",
+    }
     assert listed_checklists.json()[0]["run_key"] == "beta-readiness"
     assert persisted_counts == {
         "milestones": 1,
         "endings": 1,
         "evals": 1,
-        "templates": 1,
-        "jobs": 2,
+        "templates": 2,
+        "jobs": 4,
         "profiles": 1,
         "checklists": 1,
     }
@@ -3942,6 +4132,15 @@ def _publish_narrative_artifact(
         )
         session.commit()
     return publication_id
+
+
+def _publication_id(engine: Engine, artifact_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        return session.scalars(
+            select(NarrativePublication.id).where(
+                NarrativePublication.artifact_id == artifact_id,
+            ),
+        ).one()
 
 
 def _seed_secret_record(

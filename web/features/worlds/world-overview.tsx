@@ -163,7 +163,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
   const [ruleDryRun, setRuleDryRun] = useState<ResolutionRuleDryRun | null>(null);
   const [triggerDryRun, setTriggerDryRun] = useState<TriggerConditionDryRun | null>(null);
   const [endingDryRun, setEndingDryRun] = useState<EndingDryRun | null>(null);
-  const [authoringJob, setAuthoringJob] = useState<AuthoringImportJob | null>(null);
+  const [authoringJob, setAuthoringJob] = useState<AuthoringImportJob | null>(
+    data.authoringImportJobs[0] ?? null,
+  );
   const [choicePreview, setChoicePreview] = useState<ChoiceConsequencePreview | null>(null);
   const [worldlineComparison, setWorldlineComparison] = useState<WorldlineComparison | null>(null);
   const [exportedComposition, setExportedComposition] = useState("");
@@ -4306,20 +4308,50 @@ function BetaReleaseReadinessView({
   onPreviewTemplate: (templateId: string) => Promise<void>;
   onApplyTemplate: (templateId: string) => Promise<void>;
 }) {
+  const gateDecision = recordField(
+    releaseProfile?.metadata.gate_decision ?? releaseProfile?.checklist.gate_decision,
+  );
+  const gateEvidenceRefs = listField(gateDecision?.evidence_refs);
+  const authoringDiff = recordField(latestAuthoringJob?.preview_summary.diff);
+  const authoringAudit = recordField(
+    latestAuthoringJob?.metadata.audit ?? latestAuthoringJob?.preview_summary.audit,
+  );
+  const appliedRefs = listField(latestAuthoringJob?.applied_refs.refs);
   return (
     <>
       {releaseProfile !== null ? (
-        <p className="status-detail">
-          Release profile {releaseProfile.profile_key}: {releaseProfile.status}.
-        </p>
+        <div className="status-detail">
+          <p>
+            Release profile {releaseProfile.profile_key}: {releaseProfile.status}.
+          </p>
+          {gateDecision !== null ? (
+            <p>
+              Gate {String(gateDecision.status ?? "unknown")} -{" "}
+              {gateDecision.allowed === true ? "allowed" : "blocked"} - blockers{" "}
+              {listField(gateDecision.blockers).length} - warnings{" "}
+              {listField(gateDecision.warnings).length} - evidence refs{" "}
+              {gateEvidenceRefs.length}.
+            </p>
+          ) : null}
+        </div>
       ) : (
         <p className="status-detail">No release profile recorded.</p>
       )}
       {latestAuthoringJob !== null ? (
-        <p className="status-detail">
-          Latest authoring job {latestAuthoringJob.status}:{" "}
-          {JSON.stringify(latestAuthoringJob.preview_summary)}
-        </p>
+        <div className="status-detail">
+          <p>
+            Latest authoring job {latestAuthoringJob.status}: schema{" "}
+            {String(latestAuthoringJob.preview_summary.schema_version ?? "unknown")} -
+            validation issues{" "}
+            {String(latestAuthoringJob.preview_summary.validation_issue_count ?? 0)}.
+          </p>
+          <p>
+            Preview diff characters {listField(authoringDiff?.characters).length}, events{" "}
+            {listField(authoringDiff?.events).length}, routes{" "}
+            {listField(authoringDiff?.routes).length}. Audit{" "}
+            {String(authoringAudit?.action ?? "none")} refs {appliedRefs.length}.
+          </p>
+        </div>
       ) : null}
       <div className="management-columns">
         <section aria-labelledby="route-ending-list-title">
@@ -4393,6 +4425,7 @@ function BetaReleaseReadinessView({
                     recommendations {evalRun.recommendations.length} - metrics{" "}
                     {Object.keys(evalRun.metrics).length}
                   </p>
+                  <p>{longRunMetricSummary(evalRun.metrics)}</p>
                 </div>
               </article>
             ))}
@@ -4464,6 +4497,7 @@ function BetaReleaseReadinessView({
                     {checklist.status} - blockers {checklist.blocker_count}
                   </p>
                   <p>{checklist.summary}</p>
+                  <p>Evidence refs {listField(checklist.evidence.refs).length}</p>
                 </div>
               </article>
             ))}
@@ -4475,6 +4509,7 @@ function BetaReleaseReadinessView({
                     {item.item_key} - {item.status}
                   </p>
                   <p>{item.recommendation ?? "No recommendation."}</p>
+                  <p>Evidence refs {listField(item.evidence.refs).length}</p>
                 </div>
               </article>
             ))}
@@ -4483,6 +4518,29 @@ function BetaReleaseReadinessView({
       </div>
     </>
   );
+}
+
+function recordField(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function listField(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function longRunMetricSummary(metrics: Record<string, unknown>): string {
+  const distribution = recordField(metrics.distribution);
+  const traceability = recordField(metrics.traceability);
+  const reviews = recordField(metrics.review_warnings);
+  return [
+    `day coverage ${String(distribution?.day_coverage ?? 0)}`,
+    `trace refs ${listField(traceability?.refs).length}`,
+    `snapshot refs ${String(traceability?.snapshot_ref_count ?? 0)}`,
+    `review warnings ${String(reviews?.continuity_or_style_warning_count ?? 0)}`,
+  ].join(" - ");
 }
 
 function GMWorldlineView({

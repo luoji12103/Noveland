@@ -19,6 +19,54 @@ const membershipMemberId = "40000000-0000-4000-8000-000000000002";
 const providerOpenAiId = "71000000-0000-4000-8000-000000000001";
 const memoryProfilePrimaryId = "71500000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
+const seedSnapshotId = "74500000-0000-4000-8000-000000000001";
+const seedEvalId = "83800000-0000-4000-8000-000000000001";
+const seedPublicationId = "73500000-0000-4000-8000-000000000001";
+const seedContinuityReviewId = "84300000-0000-4000-8000-000000000001";
+const seedChecklistRunId = "84100000-0000-4000-8000-000000000001";
+const seedEvidenceRefs = [
+  {
+    kind: "snapshot",
+    id: seedSnapshotId,
+    label: "seed snapshot",
+    worldline_id: primaryWorldlineId,
+    api_path: `/worlds/${worldOneId}/snapshots/latest`,
+  },
+  {
+    kind: "worldline",
+    id: primaryWorldlineId,
+    label: "primary worldline",
+    worldline_id: primaryWorldlineId,
+    api_path: `/worlds/${worldOneId}/worldlines`,
+  },
+  {
+    kind: "publication",
+    id: seedPublicationId,
+    label: "seed publication",
+    api_path: `/worlds/${worldOneId}/reader`,
+  },
+  {
+    kind: "continuity_review",
+    id: seedContinuityReviewId,
+    label: "seed continuity review",
+    worldline_id: primaryWorldlineId,
+    api_path: `/worlds/${worldOneId}/narrative-continuity-reviews`,
+  },
+  {
+    kind: "beta_checklist",
+    id: seedChecklistRunId,
+    label: "seed checklist",
+    worldline_id: primaryWorldlineId,
+    api_path: `/worlds/${worldOneId}/beta-checklists`,
+  },
+  {
+    kind: "long_run_eval",
+    id: seedEvalId,
+    label: "seed long-run eval",
+    worldline_id: primaryWorldlineId,
+    api_path: `/worlds/${worldOneId}/long-run-evals`,
+  },
+];
 
 const users = [
   user(adminUserId, "admin@example.test", "Admin"),
@@ -340,7 +388,6 @@ const playerActors = [
     updated_at: "2026-04-17T00:00:00.000Z",
   },
 ];
-const playerChoices = [];
 const knowledgeFacts = [
   {
     id: "83200000-0000-4000-8000-000000000001",
@@ -399,7 +446,42 @@ const emotionalStates = [
   },
 ];
 const relationshipRepairs = [];
-const playerJournal = [];
+const playerChoices = [
+  {
+    id: "83500000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: adminUserId,
+    player_actor_id: "81900000-0000-4000-8000-000000000001",
+    choice_key: "help-festival",
+    choice_kind: "route",
+    prompt: "Help with festival preparations?",
+    selected_option: "Stay after school.",
+    context: {},
+    consequence_preview: {},
+    applied_event_id: "76000000-0000-4000-8000-000000000001",
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const playerJournal = [
+  {
+    id: "83300000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: adminUserId,
+    player_actor_id: "81900000-0000-4000-8000-000000000001",
+    entry_kind: "choice",
+    title: "Festival prep",
+    body: "The player helped with festival preparations.",
+    source_event_id: "76000000-0000-4000-8000-000000000001",
+    source_ref: "83500000-0000-4000-8000-000000000001",
+    visibility: "player_private",
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
 const notifications = [
   {
     id: "83500000-0000-4000-8000-000000000001",
@@ -419,7 +501,71 @@ const notifications = [
 ];
 const interventions = [];
 const gmStyleReviews = [];
-const narrativeContinuityReviews = [];
+const narrativeContinuityReviews = [
+  {
+    id: seedContinuityReviewId,
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    artifact_id: "73000000-0000-4000-8000-000000000002",
+    source_kind: "artifact",
+    source_ref: "73000000-0000-4000-8000-000000000002",
+    reviewed_text: "Seed continuity review",
+    status: "warning",
+    issues: [{ code: "manual_warning", severity: "warning" }],
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
+const seedWorldEventRef = {
+  kind: "world_event",
+  id: "76000000-0000-4000-8000-000000000001",
+  label: "world.clock_advanced",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/events`,
+};
+const seedRelationshipRef = {
+  kind: "relationship",
+  id: "30500000-0000-4000-8000-000000000001",
+  label: "friendship",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/agents/${agentGuideId}`,
+};
+const seedFactionTrackRef = {
+  kind: "faction_track",
+  id: "81200000-0000-4000-8000-000000000001",
+  label: "festival-plan",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/organizations`,
+};
+const seedGMProposalRef = {
+  kind: "gm_proposal",
+  id: "81700000-0000-4000-8000-000000000001",
+  label: "Festival route check",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/gm/proposals`,
+};
+const seedChoiceRef = {
+  kind: "player_choice",
+  id: "83500000-0000-4000-8000-000000000001",
+  label: "help-festival",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/player-choices`,
+};
+const seedJournalRef = {
+  kind: "journal_entry",
+  id: "83300000-0000-4000-8000-000000000001",
+  label: "Festival prep",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/player-journal`,
+};
+const seedNotificationRef = {
+  kind: "notification",
+  id: "83500000-0000-4000-8000-000000000001",
+  label: "Festival invite",
+  worldline_id: primaryWorldlineId,
+  api_path: `/worlds/${worldOneId}/notifications`,
+};
 const storyHooks = [
   {
     id: "82100000-0000-4000-8000-000000000001",
@@ -521,16 +667,49 @@ const endingCandidates = [
 ];
 const longRunEvals = [
   {
-    id: "83800000-0000-4000-8000-000000000001",
+    id: seedEvalId,
     world_id: worldOneId,
     worldline_id: primaryWorldlineId,
     eval_key: "seven-day-beta-eval",
     horizon_days: 7,
-    status: "warning",
+    status: "completed",
     started_at: "2026-04-17T00:00:00.000Z",
     finished_at: "2026-04-17T00:00:01.000Z",
-    metrics: { event_count: 1, route_count: 1 },
-    recommendations: [{ action: "add_daily_episode", reason: "low daily density" }],
+    metrics: {
+      horizon_days: 7,
+      events: 1,
+      snapshots: 1,
+      route_count: 1,
+      distribution: {
+        events_by_importance: { system: 1 },
+        events_by_day: { "2030-01-01": 1 },
+        events_by_actor: { system: 1 },
+        day_coverage: 1,
+      },
+      traceability: {
+        choice_event_count: 1,
+        event_ref_count: 1,
+        snapshot_ref_count: 1,
+        refs: [
+          seedWorldEventRef,
+          seedEvidenceRefs[0],
+          seedRelationshipRef,
+          seedFactionTrackRef,
+          seedGMProposalRef,
+          seedChoiceRef,
+          seedJournalRef,
+          seedNotificationRef,
+          seedEvidenceRefs[2],
+          seedEvidenceRefs[3],
+        ],
+      },
+      review_warnings: {
+        continuity_or_style_warning_count: 1,
+        continuity_fail_count: 0,
+        publication_gate_warning_count: 0,
+      },
+    },
+    recommendations: [],
     blockers: [],
     metadata: {},
     created_at: "2026-04-17T00:00:00.000Z",
@@ -567,8 +746,30 @@ const releaseProfiles = new Map([
       content_review_policy: { continuity_review_required: true },
       player_permission_policy: { invite_only: true },
       worldline_policy: { forks_allowed: true },
-      checklist: { sample_world_required: true },
-      metadata: {},
+      checklist: {
+        sample_world_required: true,
+        worldline_id: primaryWorldlineId,
+        evidence_refs: seedEvidenceRefs,
+        warning_decisions: { style: "accepted" },
+        gate_decision: {
+          status: "ready",
+          allowed: true,
+          blockers: [],
+          warnings: [],
+          evidence_refs: seedEvidenceRefs,
+          worldline_id: primaryWorldlineId,
+        },
+      },
+      metadata: {
+        gate_decision: {
+          status: "ready",
+          allowed: true,
+          blockers: [],
+          warnings: [],
+          evidence_refs: seedEvidenceRefs,
+          worldline_id: primaryWorldlineId,
+        },
+      },
       created_at: "2026-04-17T00:00:00.000Z",
       updated_at: "2026-04-17T00:00:00.000Z",
     },
@@ -576,13 +777,19 @@ const releaseProfiles = new Map([
 ]);
 const betaChecklistRuns = [
   {
-    id: "84100000-0000-4000-8000-000000000001",
+    id: seedChecklistRunId,
     world_id: worldOneId,
     worldline_id: primaryWorldlineId,
     run_key: "sample-world-beta",
-    status: "warning",
-    summary: "Sample world beta has non-blocking recommendations.",
-    evidence: { days: 7 },
+    status: "passed",
+    summary: "Sample world beta has structured release evidence.",
+    evidence: {
+      refs: seedEvidenceRefs,
+      items: {
+        "seven-day-simulation": { days: 7, refs: [seedWorldEventRef, seedEvidenceRefs[0]] },
+      },
+      worldline_id: primaryWorldlineId,
+    },
     blocker_count: 0,
     created_by_actor_ref: `user:${adminUserId}`,
     metadata: {},
@@ -596,9 +803,12 @@ const betaChecklistItems = [
     run_id: "84100000-0000-4000-8000-000000000001",
     item_key: "seven-day-simulation",
     title: "7-day simulation",
-    status: "warning",
-    evidence: { eval_run_id: "83800000-0000-4000-8000-000000000001" },
-    recommendation: "Increase daily episode density before public beta.",
+    status: "passed",
+    evidence: {
+      eval_run_id: seedEvalId,
+      refs: [seedWorldEventRef, seedEvidenceRefs[0], seedEvidenceRefs[5]],
+    },
+    recommendation: null,
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
   },
@@ -1050,7 +1260,25 @@ const narrativeArtifacts = [
   },
 ];
 const replaySequences = new Map([[worldOneId, 1]]);
-const snapshots = new Map();
+const snapshots = new Map([
+  [
+    worldOneId,
+    {
+      id: seedSnapshotId,
+      world_id: worldOneId,
+      worldline_id: primaryWorldlineId,
+      covers_event_sequence: 1,
+      schema_version: "world_state.v1",
+      status: "complete",
+      payload: { clock: { revision: 1 }, agents: [] },
+      payload_uri: `object://worlds/${worldOneId}/worldlines/${primaryWorldlineId}/snapshots/1.json`,
+      metadata: {},
+      created_by_event_id: "76000000-0000-4000-8000-000000000001",
+      created_at: "2026-04-17T00:03:05.000Z",
+      updated_at: "2026-04-17T00:03:05.000Z",
+    },
+  ],
+]);
 const clockTransitions = new Map([
   [
     worldOneId,
@@ -2466,6 +2694,19 @@ async function handleLongRunEvals(request, response, currentSubject, worldId, ur
     const eventCount = (worldEvents.get(worldId) ?? []).filter(
       (event) => event.worldline_id === worldlineId,
     ).length;
+    const refs = evidenceRefsForWorldline(worldId, worldlineId);
+    const eventsByImportance = {};
+    const eventsByDay = {};
+    const eventsByActor = {};
+    for (const event of (worldEvents.get(worldId) ?? []).filter(
+      (item) => item.worldline_id === worldlineId,
+    )) {
+      eventsByImportance[event.importance] = (eventsByImportance[event.importance] ?? 0) + 1;
+      const day = event.world_time?.slice(0, 10) ?? "wall-time-only";
+      eventsByDay[day] = (eventsByDay[day] ?? 0) + 1;
+      const actorGroup = event.actor_ref.split(":", 1)[0];
+      eventsByActor[actorGroup] = (eventsByActor[actorGroup] ?? 0) + 1;
+    }
     const run = {
       id: randomUUID(),
       world_id: worldId,
@@ -2475,7 +2716,33 @@ async function handleLongRunEvals(request, response, currentSubject, worldId, ur
       status: eventCount === 0 ? "warning" : "completed",
       started_at: new Date().toISOString(),
       finished_at: new Date().toISOString(),
-      metrics: { event_count: eventCount, route_count: routeAffinities.length },
+      metrics: {
+        horizon_days: body.horizon_days ?? 7,
+        events: eventCount,
+        snapshots: refs.filter((ref) => ref.kind === "snapshot").length,
+        route_count: routeAffinities.length,
+        distribution: {
+          events_by_importance: eventsByImportance,
+          events_by_day: eventsByDay,
+          events_by_actor: eventsByActor,
+          day_coverage: Object.keys(eventsByDay).length,
+        },
+        traceability: {
+          choice_event_count: refs.filter((ref) => ref.kind === "player_choice").length,
+          event_ref_count: refs.filter((ref) => ref.kind === "world_event").length,
+          snapshot_ref_count: refs.filter((ref) => ref.kind === "snapshot").length,
+          refs,
+        },
+        review_warnings: {
+          continuity_or_style_warning_count: narrativeContinuityReviews.filter(
+            (review) => review.worldline_id === worldlineId && review.status === "warning",
+          ).length,
+          continuity_fail_count: narrativeContinuityReviews.filter(
+            (review) => review.worldline_id === worldlineId && review.status === "fail",
+          ).length,
+          publication_gate_warning_count: 0,
+        },
+      },
       recommendations:
         eventCount === 0
           ? [{ action: "seed_world_events", reason: "no event activity in eval window" }]
@@ -2549,23 +2816,68 @@ async function handleAuthoringTemplates(
   }
   if (request.method === "POST" && (action === "preview" || action === "apply")) {
     const body = await readJson(request);
+    const targetWorldlineId = body.target_worldline_id ?? primaryWorldlineId;
+    const schemaVersion = template.content.schema_version ?? "living-world-template/v2";
+    const characters = Array.isArray(template.content.characters) ? template.content.characters : [];
+    const events = Array.isArray(template.content.events) ? template.content.events : [];
+    const routes = Array.isArray(template.content.routes) ? template.content.routes : [];
+    const appliedRefs =
+      action === "apply"
+        ? {
+            template_id: template.id,
+            target_worldline_id: targetWorldlineId,
+            refs: [
+              {
+                kind: "authoring_template",
+                id: template.id,
+                label: template.template_key,
+                worldline_id: targetWorldlineId,
+                action: "applied",
+              },
+            ],
+          }
+        : {};
     const job = {
       id: randomUUID(),
       world_id: worldId,
       template_id: template.id,
       status: action === "apply" ? "applied" : "preview",
       preview_summary: {
+        schema_version: schemaVersion,
         template_key: template.template_key,
+        template_kind: template.template_kind,
         source_notes: Array.isArray(template.content.source_notes)
           ? template.content.source_notes.length
           : 0,
-        characters: Array.isArray(template.content.characters) ? template.content.characters.length : 0,
-        events: Array.isArray(template.content.events) ? template.content.events.length : 0,
-        routes: Array.isArray(template.content.routes) ? template.content.routes.length : 0,
+        character_count: characters.length,
+        event_template_count: events.length,
+        route_template_count: routes.length,
+        validation_issue_count: template.validation_issues.length,
+        target_worldline_id: targetWorldlineId,
+        diff: {
+          characters: characters.map((item) => item.agent_key ?? ""),
+          events: events.map((item) => item.event_key ?? item.event_name ?? ""),
+          routes: routes.map((item) => item.route_key ?? ""),
+        },
+        audit: {
+          template_id: template.id,
+          template_key: template.template_key,
+          schema_version: schemaVersion,
+        },
       },
-      applied_refs: action === "apply" ? { template_id: template.id } : {},
+      applied_refs: appliedRefs,
       validation_issues: template.validation_issues,
-      metadata: body.metadata ?? {},
+      metadata: {
+        ...(body.metadata ?? {}),
+        target_worldline_id: targetWorldlineId,
+        duplicate_policy: body.duplicate_policy ?? "upsert",
+        audit: {
+          action,
+          schema_version: schemaVersion,
+          template_id: template.id,
+          target_worldline_id: targetWorldlineId,
+        },
+      },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -2592,6 +2904,7 @@ async function handleReleaseProfile(request, response, currentSubject, worldId) 
   if (request.method === "PUT") {
     const body = await readJson(request);
     const existing = releaseProfiles.get(worldId);
+    const gateDecision = gateDecisionForRelease(worldId, body.status ?? existing?.status ?? "draft", body);
     const profile = {
       id: existing?.id ?? randomUUID(),
       world_id: worldId,
@@ -2604,8 +2917,8 @@ async function handleReleaseProfile(request, response, currentSubject, worldId) 
       player_permission_policy:
         body.player_permission_policy ?? existing?.player_permission_policy ?? {},
       worldline_policy: body.worldline_policy ?? existing?.worldline_policy ?? {},
-      checklist: body.checklist ?? existing?.checklist ?? {},
-      metadata: body.metadata ?? existing?.metadata ?? {},
+      checklist: { ...(body.checklist ?? existing?.checklist ?? {}), gate_decision: gateDecision },
+      metadata: { ...(body.metadata ?? existing?.metadata ?? {}), gate_decision: gateDecision },
       created_at: existing?.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -2648,17 +2961,22 @@ async function handleBetaChecklists(
   if (request.method === "POST" && runId === undefined) {
     const body = await readJson(request);
     const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    const refs = evidenceRefsForWorldline(worldId, worldlineId);
     const run = {
       id: randomUUID(),
       world_id: worldId,
       worldline_id: worldlineId,
       run_key: body.run_key ?? "sample-world-beta",
-      status: longRunEvals.length === 0 ? "blocked" : "warning",
+      status: longRunEvals.length === 0 ? "blocked" : "passed",
       summary:
         longRunEvals.length === 0
           ? "Beta checklist is blocked until a long-run eval exists."
-          : "Sample world beta has non-blocking recommendations.",
-      evidence: { eval_runs: longRunEvals.length, worldlines: worldlines.length },
+          : "Sample world beta has structured release evidence.",
+      evidence: {
+        refs,
+        items: { "seven-day-simulation": { eval_runs: longRunEvals.length, refs } },
+        worldline_id: worldlineId,
+      },
       blocker_count: longRunEvals.length === 0 ? 1 : 0,
       created_by_actor_ref: `user:${currentSubject.user_id}`,
       metadata: body.metadata ?? {},
@@ -2670,11 +2988,11 @@ async function handleBetaChecklists(
       run_id: run.id,
       item_key: "seven-day-simulation",
       title: "7-day simulation",
-      status: run.blocker_count === 0 ? "warning" : "blocked",
-      evidence: { eval_runs: longRunEvals.length },
+      status: run.blocker_count === 0 ? "passed" : "blocked",
+      evidence: { eval_runs: longRunEvals.length, refs },
       recommendation:
         run.blocker_count === 0
-          ? "Review daily density before public beta."
+          ? null
           : "Run a seven-day eval before beta validation.",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -6498,6 +6816,199 @@ function appendWorldEvent(worldId, input) {
   events.push(event);
   worldEvents.set(worldId, events);
   return event;
+}
+
+function evidenceRef(kind, id, label, worldlineId, apiPath) {
+  return {
+    kind,
+    id,
+    label,
+    worldline_id: worldlineId,
+    api_path: apiPath,
+  };
+}
+
+function eventEvidenceRef(worldId, event) {
+  return evidenceRef(
+    "world_event",
+    event.id,
+    event.event_name,
+    event.worldline_id,
+    `/worlds/${worldId}/events`,
+  );
+}
+
+function evidenceRefsForWorldline(worldId, worldlineId) {
+  const refs = [];
+  refs.push(
+    ...worldlines
+      .filter((worldline) => worldline.world_id === worldId && worldline.id === worldlineId)
+      .map((worldline) =>
+        evidenceRef("worldline", worldline.id, worldline.name, worldlineId, `/worlds/${worldId}/worldlines`),
+      ),
+  );
+  refs.push(
+    ...(worldEvents.get(worldId) ?? [])
+      .filter((event) => event.worldline_id === worldlineId)
+      .slice(0, 3)
+      .map((event) => eventEvidenceRef(worldId, event)),
+  );
+  const snapshot = snapshots.get(worldId);
+  if (snapshot !== undefined && snapshot.worldline_id === worldlineId) {
+    refs.push(
+      evidenceRef(
+        "snapshot",
+        snapshot.id,
+        snapshot.schema_version,
+        worldlineId,
+        `/worlds/${worldId}/snapshots/latest`,
+      ),
+    );
+  }
+  refs.push(
+    ...agentRelationships
+      .filter((relationship) => relationship.world_id === worldId && relationship.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((relationship) =>
+        evidenceRef(
+          "relationship",
+          relationship.id,
+          relationship.relationship_type,
+          worldlineId,
+          `/worlds/${worldId}/agents/${relationship.source_agent_id}`,
+        ),
+      ),
+  );
+  refs.push(
+    ...factionTracks
+      .filter((track) => track.world_id === worldId && track.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((track) =>
+        evidenceRef("faction_track", track.id, track.track_key, worldlineId, `/worlds/${worldId}/organizations`),
+      ),
+  );
+  refs.push(
+    ...gmProposals
+      .filter((proposal) => proposal.world_id === worldId && proposal.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((proposal) =>
+        evidenceRef("gm_proposal", proposal.id, proposal.title, worldlineId, `/worlds/${worldId}/gm/proposals`),
+      ),
+  );
+  refs.push(
+    ...playerChoices
+      .filter((choice) => choice.world_id === worldId && choice.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((choice) =>
+        evidenceRef("player_choice", choice.id, choice.choice_key, worldlineId, `/worlds/${worldId}/player-choices`),
+      ),
+  );
+  refs.push(
+    ...playerJournal
+      .filter((entry) => entry.world_id === worldId && entry.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((entry) =>
+        evidenceRef("journal_entry", entry.id, entry.title, worldlineId, `/worlds/${worldId}/player-journal`),
+      ),
+  );
+  refs.push(
+    ...notifications
+      .filter((notification) => notification.world_id === worldId && notification.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((notification) =>
+        evidenceRef("notification", notification.id, notification.title, worldlineId, `/worlds/${worldId}/notifications`),
+      ),
+  );
+  refs.push(
+    ...narrativeArtifacts
+      .flatMap((artifact) => (artifact.publication === null ? [] : [artifact.publication]))
+      .filter((publication) => publication.world_id === worldId)
+      .slice(0, 2)
+      .map((publication) => ({
+        kind: "publication",
+        id: publication.id,
+        label: "published narrative artifact",
+        api_path: `/worlds/${worldId}/reader`,
+      })),
+  );
+  refs.push(
+    ...narrativeContinuityReviews
+      .filter((review) => review.world_id === worldId && review.worldline_id === worldlineId)
+      .slice(0, 2)
+      .map((review) =>
+        evidenceRef(
+          "continuity_review",
+          review.id,
+          review.status,
+          worldlineId,
+          `/worlds/${worldId}/narrative-continuity-reviews`,
+        ),
+      ),
+  );
+  refs.push(
+    ...betaChecklistRuns
+      .filter((run) => run.world_id === worldId && run.worldline_id === worldlineId)
+      .slice(0, 1)
+      .map((run) =>
+        evidenceRef("beta_checklist", run.id, run.run_key, worldlineId, `/worlds/${worldId}/beta-checklists`),
+      ),
+  );
+  refs.push(
+    ...longRunEvals
+      .filter((run) => run.world_id === worldId && run.worldline_id === worldlineId)
+      .slice(0, 1)
+      .map((run) =>
+        evidenceRef("long_run_eval", run.id, run.eval_key, worldlineId, `/worlds/${worldId}/long-run-evals`),
+      ),
+  );
+  return refs;
+}
+
+function gateDecisionForRelease(worldId, status, body) {
+  const worldlineId = body.checklist?.worldline_id ?? body.metadata?.worldline_id ?? primaryWorldlineId;
+  const evidenceRefs = Array.isArray(body.checklist?.evidence_refs)
+    ? body.checklist.evidence_refs
+    : [];
+  const requiredKinds = [
+    "snapshot",
+    "worldline",
+    "publication",
+    "continuity_review",
+    "beta_checklist",
+    "long_run_eval",
+  ];
+  const blockerKinds = requiredKinds.filter(
+    (kind) => !evidenceRefs.some((ref) => ref.kind === kind),
+  );
+  const blockers = [];
+  if (status === "released") {
+    blockers.push({
+      code: "release_launch_gate_missing",
+      message: "Released status is blocked until a separate launch gate exists.",
+    });
+  }
+  if (status === "ready" && blockerKinds.length > 0) {
+    blockers.push({
+      code: "missing_required_evidence_refs",
+      message: `Ready status requires structured evidence refs for ${blockerKinds.join(", ")}.`,
+      missing_kinds: blockerKinds,
+    });
+  }
+  return {
+    status,
+    allowed: blockers.length === 0,
+    blockers,
+    warnings: body.checklist?.warning_decisions
+      ? []
+      : [
+          {
+            code: "warning_decisions_not_recorded",
+            message: "Record explicit warning decisions before operator release.",
+          },
+        ],
+    evidence_refs: evidenceRefs,
+    worldline_id: worldlineId,
+  };
 }
 
 function snapshotIntegrityForWorld(worldId) {
