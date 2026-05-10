@@ -116,3 +116,26 @@ No debug entries yet.
   - Beta checklist GM/event loop evidence still needs stronger proof than agenda and unresolved proposal presence.
   - Web mock/e2e parity should continue tracking the stricter backend release/beta evidence semantics as they land.
   - Mem0 OSS worldline isolation has implementation support but needs explicit filter-capture contract tests.
+
+## 2026-05-10 V2 post-remediation follow-up closure report
+
+- Date: 2026-05-10
+- Branch: docs/v2-post-remediation-source-of-record
+- Issue: The 2026-05-09 acceptance contract hardening report still listed release evidence gates, beta GM loop evidence, Web mock/e2e parity, and Mem0 OSS worldline isolation tests as remaining risks even though follow-up branches subsequently landed on `main`.
+- Reproduction: Review local `main` history:
+  - `6dabe1a fix(v2): harden release evidence worldline gates`
+  - `e5c76f1 fix(v2): harden beta gm loop evidence`
+  - `984ebf0 test(v2): align web mock evidence parity`
+  - `08cc116 test(v2): assert mem0 worldline isolation contracts`
+  - `51dae49 test(v2): stabilize release evidence e2e`
+- Root cause: The debug journal is intentionally append-only for acceptance reports. After the follow-up branches landed, the earlier report needed a closure entry rather than retroactive edits that would obscure the review trail.
+- Fix: Treat the 2026-05-09 remaining-risk bullets as closed by the follow-up commits above. Keep future hardening driven by fresh acceptance reports, beta evidence, operator feedback, and test credibility issues rather than the closed V2 roadmap phase list.
+- Regression test:
+  - `cd backend && uv run pytest`
+  - `cd web && npm run test:e2e`
+  - `cd web && npm run check:next-env`
+  - `docker compose -f infra/compose.yaml config`
+  - `git diff --check`
+- Remaining risk:
+  - Web e2e mock coverage still has test-credibility gaps that are separate from the closed acceptance contract items: runtime/world SSE mock parity, runtime tool-policy/scale-readiness mock responses, and explicit state-isolation policy for future e2e files.
+  - Current V2 implementation remains deterministic/local. A future production launch gate, provider-backed narrative generation, and public deployment posture are out of scope until explicitly planned.

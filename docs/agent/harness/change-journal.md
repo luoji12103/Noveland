@@ -593,3 +593,14 @@
 - Tests added/updated: Web world overview form contract tests; Playwright coverage for publication blockers, reader query filters, published ordering, and release gate blockers; mock syntax and diff whitespace checks.
 - Docs updated: task board, change journal, and active handoff.
 - Follow-up notes: The auth e2e spec now runs serially because the mock backend uses shared mutable in-memory state. Future e2e additions should either keep shared-state tests serial or isolate mock state per test.
+
+## V2 post-remediation source-of-record refresh entry
+
+- Date: 2026-05-10
+- Branch: docs/v2-post-remediation-source-of-record
+- Scope: Documentation refresh after the follow-up release evidence, beta GM loop, Web mock parity, Mem0 isolation, and release-evidence e2e stabilization commits landed on local `main`.
+- Summary: Updated the active handoff and task board so they no longer describe closed post-remediation risks as upcoming work. Added a debug-journal closure report that maps the 2026-05-09 remaining-risk bullets to the follow-up commits that closed them.
+- Files changed: `/docs/agent/harness/{task-board.md,debug-journal.md,change-journal.md,handoffs/active-session.md}`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: task board, debug journal, change journal, and active handoff.
+- Follow-up notes: Next preparation hardening should focus on Web runtime/SSE mock parity and Playwright mock state isolation before starting the next feature bundle.

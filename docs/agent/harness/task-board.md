@@ -67,9 +67,21 @@
 - V2 Runtime GM + Narrative Execution Depth Remediation
 - V2 Beta Acceptance Gating Hardening Remediation
 - V2 Acceptance Contract Hardening
+- V2 Release Evidence Worldline Gate Hardening
+- V2 Beta GM Loop Evidence Hardening
+- V2 Web Mock Evidence Parity
+- V2 Mem0 Worldline Isolation Contracts
+- V2 Release Evidence E2E Stabilization
 
 ## Upcoming Mainline
-- V2 phases 1-50 and the four recorded remediation bundles are implemented locally.
+- V2 phases 1-50, the four recorded remediation bundles, acceptance contract
+  hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
+  implemented locally.
 - Remaining work should come from fresh acceptance reports, beta evidence, operator
   feedback, and targeted hardening rather than a new phase-number branch.
-- Use `docs/agent/harness/debug-journal.md` acceptance reports for phases 1-35 and 36-50 as the source of record when selecting future hardening work.
+- Use `docs/agent/harness/debug-journal.md` as the source of record. The
+  2026-05-10 closure entry supersedes the 2026-05-09 remaining-risk bullets for
+  release evidence gates, beta GM loop evidence, Web mock evidence parity, and
+  Mem0 worldline isolation contracts.
+- Immediate preparation before new feature work: finish Web runtime/SSE mock parity
+  and make the Playwright mock state-isolation policy explicit.
