@@ -218,6 +218,9 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/operations/sandbox-options.md`
 - `docs/agent/harness/roadmap.md`
 - `docs/agent/harness/roadmap-v2-living-world.md`
+- `docs/agent/harness/current-system-architecture-review.md`
+- `docs/agent/harness/feature-updates/`
+- `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`
 
 ## Update rule
 

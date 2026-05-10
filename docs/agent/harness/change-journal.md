@@ -604,3 +604,25 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: task board, debug journal, change journal, and active handoff.
 - Follow-up notes: Next preparation hardening should focus on Web runtime/SSE mock parity and Playwright mock state isolation before starting the next feature bundle.
+
+## Current system architecture review entry
+
+- Date: 2026-05-10
+- Branch: main
+- Scope: Architecture review documentation for planning the next framework update with an external architecture reviewer.
+- Summary: Added `docs/agent/harness/current-system-architecture-review.md`, a current-state overview covering product direction, source-of-record files, stack, backend/Web architecture, core data model families, V2 living-world capabilities, major runtime flows, Web surfaces, tests, operations, known constraints, and recommended next framework work.
+- Files changed: `/docs/agent/harness/current-system-architecture-review.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Use the architecture review together with the V2 roadmap and debug journal when deciding whether the next implementation should prioritize service decomposition, command/event/evidence framework consolidation, provider-backed generation boundaries, or Web surface modularization.
+
+## Media Kernel Phase 1 plan entry
+
+- Date: 2026-05-10
+- Branch: main
+- Scope: Final feature implementation plan for Media Kernel Phase 1.
+- Summary: Added the version-prefixed feature update plan for backend-only Media Kernel Foundation work. The plan fixes the Phase 1 boundaries around narrative artifact context rejection, asset status semantics, generated storage URIs, no provider profile FK on media jobs, no media-created world events, and no public download/file-serving API.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/media-kernel-foundation` after this docs-only work is committed on `main`.

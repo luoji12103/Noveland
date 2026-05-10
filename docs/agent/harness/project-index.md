@@ -8,6 +8,9 @@ Fast orientation for a new coding session.
 
 - `docs/agent/harness/roadmap.md` — completed V1 long-term roadmap and candidate mainline bundles; not the active task board.
 - `docs/agent/harness/roadmap-v2-living-world.md` — V2 living-world roadmap for the galgame sequel simulation direction; not the active task board.
+- `docs/agent/harness/current-system-architecture-review.md` — current architecture and implementation review for framework-design discussions.
+- `docs/agent/harness/feature-updates/` — version-prefixed final feature implementation plans recorded before implementation starts.
+- `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` — final Media Kernel Phase 1 implementation plan.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.

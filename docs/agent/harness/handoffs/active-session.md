@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-10T00:00:00Z
-- Branch: docs/v2-post-remediation-source-of-record
-- Objective: Refresh the V2 post-remediation source of record, then prepare targeted Web/runtime mock parity and e2e state-isolation hardening before the next feature bundle.
-- Status: Local `main` contains V2 phases 1-50, the four remediation bundles, acceptance contract hardening, follow-up release/beta/Web/Mem0 hardening, and final release-evidence e2e stabilization through `51dae49 test(v2): stabilize release evidence e2e`. Current work is a documentation-only source-of-record refresh branch.
+- Branch: main
+- Objective: Commit current architecture review docs and record the final Media Kernel Phase 1 implementation plan before starting `feat/media-kernel-foundation`.
+- Status: Added `docs/agent/harness/current-system-architecture-review.md`, registered it in harness source-of-record files, and recorded `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` as the final implementation plan. Local work is documentation-only and unpushed.
 
 ## Completed Before This Branch
 
@@ -21,23 +21,11 @@
 
 ## Current Work Items
 
-- Refresh source-of-record docs so `debug-journal.md`, `task-board.md`, `change-journal.md`, and this active handoff no longer describe already-closed post-remediation risks as upcoming work.
-- Next planned hardening after this docs branch:
-  - `test/v2-e2e-mock-runtime-parity`: cover runtime/world SSE mock routes and runtime tool-policy/scale-readiness mock data.
-  - `test/v2-e2e-state-isolation`: make the Playwright mock state policy explicit before adding new e2e files.
+- Use `docs/agent/harness/current-system-architecture-review.md` as the review packet for the next framework-design discussion.
+- Implement Media Kernel Phase 1 from `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` on `feat/media-kernel-foundation`.
 
 ## Checks Passed
 
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest`
-- `cd web && npm run lint`
-- `cd web && npm run typecheck`
-- `cd web && npm run test`
-- `cd web && npm run build`
-- `cd web && npm run check:next-env`
-- `cd web && npm run test:e2e`
-- `docker compose -f infra/compose.yaml config`
 - `git diff --check`
 
 ## Remaining Closeout
