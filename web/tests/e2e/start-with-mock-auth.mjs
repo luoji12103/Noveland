@@ -1652,7 +1652,13 @@ const mockServer = createServer(async (request, response) => {
   if (request.method === "GET" && url.pathname === "/__mock/health") {
     sendJson(response, 200, {
       service: "noveland-e2e-mock",
-      version: "v2-web-mock-evidence-parity",
+      version: "v2-e2e-state-isolation",
+      state_isolation: {
+        mode: "single_worker_serial",
+        reset_endpoint: null,
+        reason:
+          "The mock backend stores mutable test state in process memory; Playwright runs one worker and the auth spec is serial.",
+      },
     });
     return;
   }

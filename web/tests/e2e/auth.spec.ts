@@ -5,6 +5,13 @@ const worldOneId = "10000000-0000-4000-8000-000000000001";
 test.describe.configure({ timeout: 60000 });
 test.describe.configure({ mode: "serial" });
 
+test.beforeAll(async ({ request }) => {
+  const response = await request.get("http://127.0.0.1:3207/__mock/health");
+  expect(response.ok()).toBe(true);
+  const health = await response.json();
+  expect(health.state_isolation?.mode).toBe("single_worker_serial");
+});
+
 test("redirects unauthenticated visitors to login", async ({ page }) => {
   await page.goto("/");
 
