@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noveland-media"
+version = "0.1.0"
+description = "Media asset, job, and local binary storage package for Noveland."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "noveland-core",
+  "noveland-agents",
+  "noveland-conversations",
+  "noveland-events",
+  "noveland-narrative",
+  "noveland-worlds",
+  "pydantic>=2.13,<3",
+  "sqlalchemy>=2.0,<3",
+]
+
+[tool.uv.sources]
+noveland-core = { workspace = true }
+noveland-agents = { workspace = true }
+noveland-conversations = { workspace = true }
+noveland-events = { workspace = true }
+noveland-narrative = { workspace = true }
+noveland-worlds = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noveland"]

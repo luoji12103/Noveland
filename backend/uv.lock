@@ -12,6 +12,7 @@ members = [
     "noveland-conversations",
     "noveland-core",
     "noveland-events",
+    "noveland-media",
     "noveland-memory",
     "noveland-narrative",
     "noveland-observability",
@@ -563,6 +564,7 @@ dependencies = [
     { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-events" },
+    { name = "noveland-media" },
     { name = "noveland-memory" },
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
@@ -593,6 +595,7 @@ requires-dist = [
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
+    { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },
@@ -690,6 +693,33 @@ dependencies = [
 requires-dist = [
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-storage", editable = "packages/storage" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
+name = "noveland-media"
+version = "0.1.0"
+source = { editable = "packages/media" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-conversations" },
+    { name = "noveland-core" },
+    { name = "noveland-events" },
+    { name = "noveland-narrative" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-events", editable = "packages/events" },
+    { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
@@ -795,6 +825,7 @@ dependencies = [
     { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-events" },
+    { name = "noveland-media" },
     { name = "noveland-memory" },
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
@@ -817,6 +848,7 @@ requires-dist = [
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-events", editable = "packages/events" },
+    { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },

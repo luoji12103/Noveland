@@ -14,3 +14,4 @@ Current sequence:
 - `20260419_0011` through `20260422_0015`: conversation workspace, conversation policies, narrative writer, composition presets, and plugin runtime wiring.
 - `20260423_0016` through `20260423_0018`: Mem0 OSS memory foundation, memory context integration, and memory profile forget/eval ops.
 - `20260503_0019` through `20260507_0029`: observation traceability, narrative publications, agent preset versioning, plugin diagnostics, living-world character foundation, autonomous systems, GM/choice/worldline state, plot/route/rumor-flow state, knowledge/player/guardrail state, beta release-readiness state, and runtime worldline memory isolation hardening.
+- `20260510_0030`: Media Kernel Phase 1 foundation tables for worldline-scoped media assets, media jobs, media asset contexts, and media input/output lineage.

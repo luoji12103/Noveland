@@ -72,6 +72,7 @@
 - V2 Web Mock Evidence Parity
 - V2 Mem0 Worldline Isolation Contracts
 - V2 Release Evidence E2E Stabilization
+- Media Kernel Foundation v0.3.1.1
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
@@ -83,5 +84,6 @@
   2026-05-10 closure entry supersedes the 2026-05-09 remaining-risk bullets for
   release evidence gates, beta GM loop evidence, Web mock evidence parity, and
   Mem0 worldline isolation contracts.
-- Immediate preparation before new feature work: finish Web runtime/SSE mock parity
-  and make the Playwright mock state-isolation policy explicit.
+- Media Kernel Phase 1 is backend-only. Later media work should add asset
+  catalog/search, invocation ledger, performance annotations, provider
+  integrations, and Web surfaces in separate feature-named branches.

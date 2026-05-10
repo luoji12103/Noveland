@@ -77,6 +77,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/conversations.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
+- `backend/services/api/src/noveland/services/api/media.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
@@ -152,6 +153,12 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/memory/src/noveland/memory/service.py`
 - `backend/packages/memory/src/noveland/memory/utils.py`
 - `backend/packages/memory/src/noveland/memory/vector_type.py`
+- `backend/packages/media/`
+- `backend/packages/media/src/noveland/media/contracts.py`
+- `backend/packages/media/src/noveland/media/errors.py`
+- `backend/packages/media/src/noveland/media/models.py`
+- `backend/packages/media/src/noveland/media/service.py`
+- `backend/packages/media/src/noveland/media/storage.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
 - `backend/packages/plugins/src/noveland/plugins/constants.py`
@@ -196,7 +203,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260507_0027_living_world_knowledge_player_guardrails.py`
 - `backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`
 - `backend/migrations/versions/20260507_0029_runtime_worldline_memory_isolation.py`
+- `backend/migrations/versions/20260510_0030_media_kernel_foundation.py`
 - `backend/tests/`
+- `backend/tests/test_api_media.py`
+- `backend/tests/test_media_service.py`
+- `backend/tests/test_media_storage.py`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`

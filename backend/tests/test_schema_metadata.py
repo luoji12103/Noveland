@@ -76,6 +76,10 @@ def test_core_schema_tables_are_registered() -> None:
         "living_world_release_profiles",
         "long_run_eval_runs",
         "memory_backend_profiles",
+        "media_asset_contexts",
+        "media_asset_inputs",
+        "media_assets",
+        "media_jobs",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
@@ -157,6 +161,70 @@ def test_living_world_character_foundation_columns_are_registered() -> None:
         "debt",
         "metadata",
     } <= column_names("agent_relationship_edges")
+
+
+def test_media_kernel_foundation_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "asset_kind",
+        "asset_role",
+        "source_kind",
+        "status",
+        "visibility",
+        "storage_uri",
+        "preview_uri",
+        "thumbnail_uri",
+        "mime_type",
+        "size_bytes",
+        "checksum_sha256",
+        "source_job_id",
+        "source_event_id",
+        "metadata",
+    } <= column_names("media_assets")
+    assert {
+        "world_id",
+        "worldline_id",
+        "conversation_id",
+        "turn_id",
+        "agent_id",
+        "job_kind",
+        "provider_kind",
+        "status",
+        "request_json",
+        "result_json",
+    } <= column_names("media_jobs")
+    assert {
+        "world_id",
+        "worldline_id",
+        "asset_id",
+        "conversation_id",
+        "turn_id",
+        "agent_id",
+        "world_event_id",
+        "narrative_artifact_id",
+        "context_role",
+        "metadata",
+    } <= column_names("media_asset_contexts")
+    assert {
+        "world_id",
+        "worldline_id",
+        "output_asset_id",
+        "input_asset_id",
+        "source_job_id",
+        "input_role",
+        "display_order",
+    } <= column_names("media_asset_inputs")
+    assert {
+        "ix_media_assets_worldline_created",
+        "ix_media_assets_worldline_kind_role",
+        "ix_media_assets_worldline_status",
+    } <= index_names("media_assets")
+    assert {
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_assets")
+    assert "provider_profiles.id" not in foreign_key_targets("media_jobs")
 
 
 def test_living_world_autonomous_system_columns_are_registered() -> None:

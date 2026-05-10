@@ -2,8 +2,8 @@
 
 - Date: 2026-05-10T00:00:00Z
 - Branch: main
-- Objective: Commit current architecture review docs and record the final Media Kernel Phase 1 implementation plan before starting `feat/media-kernel-foundation`.
-- Status: Added `docs/agent/harness/current-system-architecture-review.md`, registered it in harness source-of-record files, and recorded `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` as the final implementation plan. Local work is documentation-only and unpushed.
+- Objective: Implement backend-only Media Kernel Phase 1 from `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`.
+- Status: Media Kernel Phase 1 is complete locally and ready as the current mainline state after fast-forward merge. No push has been performed.
 
 ## Completed Before This Branch
 
@@ -21,12 +21,22 @@
 
 ## Current Work Items
 
-- Use `docs/agent/harness/current-system-architecture-review.md` as the review packet for the next framework-design discussion.
-- Implement Media Kernel Phase 1 from `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` on `feat/media-kernel-foundation`.
+- None active.
 
 ## Checks Passed
 
 - `git diff --check`
+- `cd backend && uv run pytest tests/test_media_storage.py tests/test_media_service.py tests/test_api_media.py tests/test_schema_metadata.py tests/test_alembic_config.py tests/test_workspace_imports.py`
+- `cd backend && uv run ruff check .`
+- `cd backend && uv run mypy .`
+- `cd backend && uv run pytest`
+- `cd web && npm run lint`
+- `cd web && npm run typecheck`
+- `cd web && npm run test`
+- `cd web && npm run build`
+- `cd web && npm run check:next-env`
+- `cd web && npm run test:e2e`
+- `docker compose -f infra/compose.yaml config`
 
 ## Remaining Closeout
 

@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+
+class MediaAsset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_assets"
+    __table_args__ = (
+        CheckConstraint("asset_kind IN ('image', 'audio')", name="asset_kind"),
+        CheckConstraint(
+            "asset_role IN ("
+            "'original_image', 'reference_image', 'mask_image', 'transparent_png', "
+            "'composite_image', 'scene_background', 'character_sprite', "
+            "'character_expression', 'character_pose', 'event_cg', 'speech_audio', "
+            "'voice_file', 'voice_sample', 'transcript_audio'"
+            ")",
+            name="asset_role",
+        ),
+        CheckConstraint(
+            "source_kind IN ("
+            "'provider_generated', 'manual_upload', 'imported_original', "
+            "'composed', 'background_removed'"
+            ")",
+            name="source_kind",
+        ),
+        CheckConstraint(
+            "status IN ('registered', 'available', 'failed', 'deleted')",
+            name="status",
+        ),
+        CheckConstraint(
+            "visibility IN ("
+            "'private', 'world_admin', 'world_member', 'player_visible', "
+            "'reader_visible', 'developer_only', 'hidden'"
+            ")",
+            name="visibility",
+        ),
+        CheckConstraint("size_bytes IS NULL OR size_bytes >= 0", name="size_bytes_nonnegative"),
+        CheckConstraint("width IS NULL OR width >= 0", name="width_nonnegative"),
+        CheckConstraint("height IS NULL OR height >= 0", name="height_nonnegative"),
+        CheckConstraint("duration_ms IS NULL OR duration_ms >= 0", name="duration_ms_nonnegative"),
+        CheckConstraint(
+            "sample_rate_hz IS NULL OR sample_rate_hz >= 0",
+            name="sample_rate_hz_nonnegative",
+        ),
+        CheckConstraint(
+            "audio_channels IS NULL OR audio_channels >= 0",
+            name="audio_channels_nonnegative",
+        ),
+        Index("ix_media_assets_worldline_created", "world_id", "worldline_id", "created_at"),
+        Index(
+            "ix_media_assets_worldline_kind_role",
+            "world_id",
+            "worldline_id",
+            "asset_kind",
+            "asset_role",
+        ),
+        Index("ix_media_assets_worldline_status", "world_id", "worldline_id", "status"),
+        Index("ix_media_assets_source_job_id", "source_job_id"),
+        Index("ix_media_assets_source_event_id", "source_event_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    asset_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    asset_role: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'registered'"),
+        default="registered",
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'private'"),
+        default="private",
+    )
+    storage_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    preview_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    thumbnail_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    file_ext: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    checksum_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sample_rate_hz: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    audio_channels: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    has_alpha: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    color_mode: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    provider_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class MediaJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "job_kind IN ("
+            "'image_generation', 'image_edit', 'speech_generation', "
+            "'speech_transcription', 'background_removal', 'composition', "
+            "'upload_import', 'vision_analysis'"
+            ")",
+            name="job_kind",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
+            name="status",
+        ),
+        CheckConstraint("priority >= 0", name="priority_nonnegative"),
+        Index("ix_media_jobs_worldline_created", "world_id", "worldline_id", "created_at"),
+        Index("ix_media_jobs_worldline_status", "world_id", "worldline_id", "status"),
+        Index("ix_media_jobs_context", "world_id", "worldline_id", "conversation_id", "turn_id"),
+        Index("ix_media_jobs_agent_id", "agent_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversation_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    turn_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversation_turns.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    job_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'queued'"),
+        default="queued",
+    )
+    priority: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    cancel_policy: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    deadline_hint: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    invalidation_key: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    request_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    result_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MediaAssetContext(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_asset_contexts"
+    __table_args__ = (
+        CheckConstraint(
+            "context_role IN ('source', 'attachment', 'preview', 'output', "
+            "'evidence', 'reference')",
+            name="context_role",
+        ),
+        CheckConstraint(
+            "conversation_id IS NOT NULL OR turn_id IS NOT NULL OR agent_id IS NOT NULL OR "
+            "world_event_id IS NOT NULL OR narrative_artifact_id IS NOT NULL",
+            name="context_ref_present",
+        ),
+        Index(
+            "ix_media_asset_contexts_worldline_created",
+            "world_id",
+            "worldline_id",
+            "created_at",
+        ),
+        Index("ix_media_asset_contexts_asset_id", "asset_id"),
+        Index("ix_media_asset_contexts_conversation_id", "conversation_id"),
+        Index("ix_media_asset_contexts_turn_id", "turn_id"),
+        Index("ix_media_asset_contexts_agent_id", "agent_id"),
+        Index("ix_media_asset_contexts_world_event_id", "world_event_id"),
+        Index("ix_media_asset_contexts_narrative_artifact_id", "narrative_artifact_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversation_sessions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    turn_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversation_turns.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    world_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("world_events.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    narrative_artifact_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("narrative_artifacts.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    context_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class MediaAssetInput(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_asset_inputs"
+    __table_args__ = (
+        UniqueConstraint(
+            "output_asset_id",
+            "input_asset_id",
+            "input_role",
+            "display_order",
+            name="uq_media_asset_inputs_output_input_role_order",
+        ),
+        CheckConstraint(
+            "input_role IN ('source', 'reference', 'mask', 'background', 'layer', 'audio_source')",
+            name="input_role",
+        ),
+        CheckConstraint("display_order >= 0", name="display_order_nonnegative"),
+        CheckConstraint("output_asset_id <> input_asset_id", name="distinct_assets"),
+        Index("ix_media_asset_inputs_worldline_created", "world_id", "worldline_id", "created_at"),
+        Index("ix_media_asset_inputs_output_asset_id", "output_asset_id"),
+        Index("ix_media_asset_inputs_input_asset_id", "input_asset_id"),
+        Index("ix_media_asset_inputs_source_job_id", "source_job_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    output_asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    input_asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    input_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    display_order: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )

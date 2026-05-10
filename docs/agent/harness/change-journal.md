@@ -626,3 +626,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/media-kernel-foundation` after this docs-only work is committed on `main`.
+
+## Media Kernel Foundation implementation entry
+
+- Date: 2026-05-10
+- Branch: feat/media-kernel-foundation
+- Scope: Backend-only Media Kernel Phase 1 foundation.
+- Summary: Added `noveland-media`, worldline-scoped media asset/job/context/input tables, binary local media storage with opaque `media://` URIs, media services, an independent `/worlds/{world_id}/media/*` API router, and backend coverage for schema, storage, service, API, ACL, and worldline isolation. Phase 1 records media jobs only; it does not execute providers, add upload/download routes, add Web UI, or create world events from media operations.
+- Files changed: `/backend/packages/media/**`, `/backend/services/api/src/noveland/services/api/{app,media}.py`, `/backend/migrations/versions/20260510_0030_media_kernel_foundation.py`, `/backend/tests/{test_api_media.py,test_media_service.py,test_media_storage.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Media storage tests, MediaService tests, Media API tests, schema metadata registration, Alembic head, workspace import coverage, plus backend lint/type/test gates.
+- Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Narrative artifact media contexts remain schema-reserved but rejected by service/API until `narrative_artifacts` gains first-class `worldline_id`. Later media phases should add asset catalog/search, invocation ledger, performance annotation, provider integrations, binary upload/download policy, and Web media surfaces.
