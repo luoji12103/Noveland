@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 CHECKSUM_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp"}
 AUDIO_MIME_TYPES = {"audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"}
+CONTAINS_TEXT_MAX_LENGTH = 120
 
 
 class MediaAssetKind(StrEnum):
@@ -96,6 +97,19 @@ class MediaInputRole(StrEnum):
     BACKGROUND = "background"
     LAYER = "layer"
     AUDIO_SOURCE = "audio_source"
+
+
+class MediaTagSourceKind(StrEnum):
+    MANUAL = "manual"
+    IMPORTED = "imported"
+    SYSTEM = "system"
+    PROVIDER = "provider"
+    DERIVED = "derived"
+
+
+class MediaCollectionStatus(StrEnum):
+    ACTIVE = "active"
+    DELETED = "deleted"
 
 
 class _FrozenContract(BaseModel):
@@ -214,6 +228,276 @@ class MediaAssetListFilters(_FrozenContract):
     limit: int = Field(default=100, ge=1, le=500)
 
 
+class MediaAssetTagFilter(_FrozenContract):
+    tag_type: str = Field(min_length=1, max_length=40)
+    tag_key: str = Field(min_length=1, max_length=80)
+    tag_value: str = Field(min_length=1, max_length=220)
+
+    @field_validator("tag_type", "tag_key", mode="after")
+    @classmethod
+    def normalize_type_key(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("tag_type and tag_key must not be empty")
+        if ":" in normalized:
+            raise ValueError("tag_type and tag_key must not contain ':'")
+        return normalized
+
+    @field_validator("tag_value", mode="after")
+    @classmethod
+    def normalize_value(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("tag_value must not be empty")
+        return normalized
+
+    @classmethod
+    def parse(cls, encoded: str) -> MediaAssetTagFilter:
+        pieces = encoded.split(":", 2)
+        if len(pieces) != 3:
+            raise ValueError("tag filter must use tag_type:tag_key:tag_value")
+        return cls(tag_type=pieces[0], tag_key=pieces[1], tag_value=pieces[2])
+
+
+class MediaAssetTagCreate(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    tag_type: str = Field(min_length=1, max_length=40)
+    tag_key: str = Field(min_length=1, max_length=80)
+    tag_value: str = Field(min_length=1, max_length=220)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_kind: MediaTagSourceKind = MediaTagSourceKind.MANUAL
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("tag_type", "tag_key", mode="after")
+    @classmethod
+    def normalize_type_key(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("tag_type and tag_key must not be empty")
+        if ":" in normalized:
+            raise ValueError("tag_type and tag_key must not contain ':'")
+        return normalized
+
+    @field_validator("tag_value", mode="after")
+    @classmethod
+    def normalize_value(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("tag_value must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetTagUpdate(_FrozenContract):
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    visibility: MediaVisibility | None = None
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetTagRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    asset_id: uuid.UUID
+    tag_type: str
+    tag_key: str
+    tag_value: str
+    confidence: float
+    source_kind: MediaTagSourceKind
+    visibility: MediaVisibility
+    created_by_actor_ref: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class MediaAssetCollectionCreate(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    collection_kind: str = Field(min_length=1, max_length=60)
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    owner_agent_id: uuid.UUID | None = None
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("collection_kind", mode="after")
+    @classmethod
+    def normalize_collection_kind(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("collection_kind must not be empty")
+        return normalized
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("title must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetCollectionUpdate(_FrozenContract):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    visibility: MediaVisibility | None = None
+    status: MediaCollectionStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def normalize_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("title must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetCollectionRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    collection_kind: str
+    title: str
+    description: str | None = None
+    owner_agent_id: uuid.UUID | None = None
+    visibility: MediaVisibility
+    status: MediaCollectionStatus
+    created_by_actor_ref: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class MediaAssetCollectionItemCreate(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    asset_id: uuid.UUID
+    role: str = Field(default="member", min_length=1, max_length=40)
+    display_order: int = Field(default=0, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("role", mode="after")
+    @classmethod
+    def normalize_role(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("role must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetCollectionItemUpdate(_FrozenContract):
+    display_order: int | None = Field(default=None, ge=0)
+    metadata: dict[str, Any] | None = None
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetCollectionItemRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    collection_id: uuid.UUID
+    asset_id: uuid.UUID
+    role: str
+    display_order: int
+    metadata: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class MediaAssetSearchFilters(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    asset_kind: MediaAssetKind | None = None
+    asset_role: MediaAssetRole | None = None
+    source_kind: MediaSourceKind | None = None
+    status: MediaAssetStatus | None = None
+    visibility: MediaVisibility | None = None
+    has_alpha: bool | None = None
+    mime_type: str | None = Field(default=None, min_length=1, max_length=120)
+    provider_kind: str | None = Field(default=None, min_length=1, max_length=64)
+    used_by_agent_id: uuid.UUID | None = None
+    used_in_conversation_id: uuid.UUID | None = None
+    used_in_turn_id: uuid.UUID | None = None
+    used_in_world_event_id: uuid.UUID | None = None
+    collection_id: uuid.UUID | None = None
+    contains_text: str | None = Field(default=None, max_length=CONTAINS_TEXT_MAX_LENGTH)
+    tags: tuple[MediaAssetTagFilter, ...] = ()
+    limit: int = Field(default=100, ge=1, le=500)
+
+    @field_validator("contains_text", mode="after")
+    @classmethod
+    def normalize_contains_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("contains_text must not be empty")
+        if len(normalized) > CONTAINS_TEXT_MAX_LENGTH:
+            raise ValueError("contains_text is too long")
+        return normalized
+
+
+class MediaAssetSearchResult(_FrozenContract):
+    assets: list[MediaAssetRecord]
+
+
 class MediaContextCreate(_FrozenContract):
     world_id: uuid.UUID
     worldline_id: uuid.UUID | None = None
@@ -291,14 +575,19 @@ class MediaAssetInputRecord(MediaAssetInputCreate):
 class MediaAssetReferences(_FrozenContract):
     asset_id: uuid.UUID
     contexts: list[MediaContextRecord]
+    tags: list[MediaAssetTagRecord] = Field(default_factory=list)
+    collections: list[MediaAssetCollectionRecord] = Field(default_factory=list)
     input_count: int
     output_count: int
+    tag_count: int = 0
+    collection_count: int = 0
 
 
 class MediaAssetLineage(_FrozenContract):
     asset_id: uuid.UUID
     inputs: list[MediaAssetInputRecord]
     outputs: list[MediaAssetInputRecord]
+    related_assets: list[MediaAssetRecord] = Field(default_factory=list)
 
 
 class MediaJobCreate(_FrozenContract):

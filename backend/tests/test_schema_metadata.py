@@ -76,8 +76,11 @@ def test_core_schema_tables_are_registered() -> None:
         "living_world_release_profiles",
         "long_run_eval_runs",
         "memory_backend_profiles",
+        "media_asset_collection_items",
+        "media_asset_collections",
         "media_asset_contexts",
         "media_asset_inputs",
+        "media_asset_tags",
         "media_assets",
         "media_jobs",
         "memory_retrieval_logs",
@@ -225,6 +228,81 @@ def test_media_kernel_foundation_tables_are_registered() -> None:
         "worlds.id",
     } <= foreign_key_targets("media_assets")
     assert "provider_profiles.id" not in foreign_key_targets("media_jobs")
+
+
+def test_media_asset_catalog_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "asset_id",
+        "tag_type",
+        "tag_key",
+        "tag_value",
+        "confidence",
+        "source_kind",
+        "visibility",
+        "created_by_actor_ref",
+        "metadata",
+    } <= column_names("media_asset_tags")
+    assert {
+        "world_id",
+        "worldline_id",
+        "collection_kind",
+        "title",
+        "description",
+        "owner_agent_id",
+        "visibility",
+        "status",
+        "created_by_actor_ref",
+        "metadata",
+    } <= column_names("media_asset_collections")
+    assert {
+        "world_id",
+        "worldline_id",
+        "collection_id",
+        "asset_id",
+        "role",
+        "display_order",
+        "metadata",
+    } <= column_names("media_asset_collection_items")
+    assert {
+        "ix_media_asset_tags_worldline_tag",
+        "ix_media_asset_tags_worldline_visibility",
+        "ix_media_asset_tags_asset_id",
+    } <= index_names("media_asset_tags")
+    assert {
+        "ix_media_asset_collections_worldline_kind",
+        "ix_media_asset_collections_worldline_visibility",
+        "ix_media_asset_collections_worldline_status_created",
+        "ix_media_asset_collections_owner_agent_id",
+    } <= index_names("media_asset_collections")
+    assert {
+        "ix_media_asset_collection_items_collection_order",
+        "ix_media_asset_collection_items_asset_id",
+        "ix_media_asset_collection_items_worldline_asset",
+    } <= index_names("media_asset_collection_items")
+    assert "uq_media_asset_tags_identity" in constraint_names(
+        "media_asset_tags", UniqueConstraint
+    )
+    assert "uq_media_asset_collection_items_collection_asset_role" in constraint_names(
+        "media_asset_collection_items", UniqueConstraint
+    )
+    assert {
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_asset_tags")
+    assert {
+        "agents.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_asset_collections")
+    assert {
+        "media_asset_collections.id",
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_asset_collection_items")
 
 
 def test_living_world_autonomous_system_columns_are_registered() -> None:

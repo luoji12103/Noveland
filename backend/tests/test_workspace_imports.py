@@ -40,6 +40,7 @@ PACKAGES = [
     "noveland.memory.models",
     "noveland.memory.vector_type",
     "noveland.media",
+    "noveland.media.catalog",
     "noveland.media.contracts",
     "noveland.media.errors",
     "noveland.media.models",

@@ -154,6 +154,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/memory/src/noveland/memory/utils.py`
 - `backend/packages/memory/src/noveland/memory/vector_type.py`
 - `backend/packages/media/`
+- `backend/packages/media/src/noveland/media/catalog.py`
 - `backend/packages/media/src/noveland/media/contracts.py`
 - `backend/packages/media/src/noveland/media/errors.py`
 - `backend/packages/media/src/noveland/media/models.py`
@@ -204,8 +205,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260507_0028_living_world_beta_release_readiness.py`
 - `backend/migrations/versions/20260507_0029_runtime_worldline_memory_isolation.py`
 - `backend/migrations/versions/20260510_0030_media_kernel_foundation.py`
+- `backend/migrations/versions/20260510_0031_media_asset_catalog.py`
 - `backend/tests/`
 - `backend/tests/test_api_media.py`
+- `backend/tests/test_api_media_catalog.py`
+- `backend/tests/test_media_catalog_service.py`
 - `backend/tests/test_media_service.py`
 - `backend/tests/test_media_storage.py`
 - `backend/tests/test_api_realtime.py`

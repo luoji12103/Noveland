@@ -24,7 +24,15 @@ from noveland.media.contracts import (
     MediaVisibility,
 )
 from noveland.media.errors import MediaValidationError
-from noveland.media.models import MediaAsset, MediaAssetContext, MediaAssetInput, MediaJob
+from noveland.media.models import (
+    MediaAsset,
+    MediaAssetCollection,
+    MediaAssetCollectionItem,
+    MediaAssetContext,
+    MediaAssetInput,
+    MediaAssetTag,
+    MediaJob,
+)
 from noveland.media.service import MediaJobService, MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.narrative.models import NarrativeArtifact
@@ -213,6 +221,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, MediaAssetContext.__table__),
         cast(Table, MediaAssetInput.__table__),
+        cast(Table, MediaAssetTag.__table__),
+        cast(Table, MediaAssetCollection.__table__),
+        cast(Table, MediaAssetCollectionItem.__table__),
     ):
         table.create(engine)
 

@@ -14,7 +14,15 @@ from noveland.auth.services import hash_session_token
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.events import WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel
-from noveland.media.models import MediaAsset, MediaAssetContext, MediaAssetInput, MediaJob
+from noveland.media.models import (
+    MediaAsset,
+    MediaAssetCollection,
+    MediaAssetCollectionItem,
+    MediaAssetContext,
+    MediaAssetInput,
+    MediaAssetTag,
+    MediaJob,
+)
 from noveland.narrative.models import NarrativeArtifact
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -274,6 +282,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, MediaAssetContext.__table__),
         cast(Table, MediaAssetInput.__table__),
+        cast(Table, MediaAssetTag.__table__),
+        cast(Table, MediaAssetCollection.__table__),
+        cast(Table, MediaAssetCollectionItem.__table__),
     ):
         table.create(engine)
 

@@ -73,6 +73,7 @@
 - V2 Mem0 Worldline Isolation Contracts
 - V2 Release Evidence E2E Stabilization
 - Media Kernel Foundation v0.3.1.1
+- Media Asset Catalog v0.3.1.2
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
@@ -84,6 +85,7 @@
   2026-05-10 closure entry supersedes the 2026-05-09 remaining-risk bullets for
   release evidence gates, beta GM loop evidence, Web mock evidence parity, and
   Mem0 worldline isolation contracts.
-- Media Kernel Phase 1 is backend-only. Later media work should add asset
-  catalog/search, invocation ledger, performance annotations, provider
-  integrations, and Web surfaces in separate feature-named branches.
+- Media Kernel Phases 1-2 are backend-only. Later media work should add
+  invocation ledger, performance annotations, provider integrations,
+  upload/download policy, asset embeddings/similarity search, and Web surfaces
+  in separate feature-named branches.

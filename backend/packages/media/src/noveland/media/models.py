@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -322,6 +323,211 @@ class MediaAssetInput(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     input_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    display_order: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+        default=0,
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class MediaAssetTag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_asset_tags"
+    __table_args__ = (
+        UniqueConstraint(
+            "world_id",
+            "worldline_id",
+            "asset_id",
+            "tag_type",
+            "tag_key",
+            "tag_value",
+            name="uq_media_asset_tags_identity",
+        ),
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="confidence_range"),
+        CheckConstraint(
+            "source_kind IN ('manual', 'imported', 'system', 'provider', 'derived')",
+            name="source_kind",
+        ),
+        CheckConstraint(
+            "visibility IN ("
+            "'private', 'world_admin', 'world_member', 'player_visible', "
+            "'reader_visible', 'developer_only', 'hidden'"
+            ")",
+            name="visibility",
+        ),
+        Index(
+            "ix_media_asset_tags_worldline_tag",
+            "world_id",
+            "worldline_id",
+            "tag_type",
+            "tag_key",
+            "tag_value",
+        ),
+        Index("ix_media_asset_tags_worldline_visibility", "world_id", "worldline_id", "visibility"),
+        Index("ix_media_asset_tags_asset_id", "asset_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tag_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    tag_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    tag_value: Mapped[str] = mapped_column(String(220), nullable=False)
+    confidence: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("1.0"),
+        default=1.0,
+    )
+    source_kind: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        server_default=text("'manual'"),
+        default="manual",
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'world_admin'"),
+        default="world_admin",
+    )
+    created_by_actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class MediaAssetCollection(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_asset_collections"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'deleted')",
+            name="status",
+        ),
+        CheckConstraint(
+            "visibility IN ("
+            "'private', 'world_admin', 'world_member', 'player_visible', "
+            "'reader_visible', 'developer_only', 'hidden'"
+            ")",
+            name="visibility",
+        ),
+        Index(
+            "ix_media_asset_collections_worldline_kind",
+            "world_id",
+            "worldline_id",
+            "collection_kind",
+        ),
+        Index(
+            "ix_media_asset_collections_worldline_visibility",
+            "world_id",
+            "worldline_id",
+            "visibility",
+        ),
+        Index(
+            "ix_media_asset_collections_worldline_status_created",
+            "world_id",
+            "worldline_id",
+            "status",
+            "created_at",
+        ),
+        Index("ix_media_asset_collections_owner_agent_id", "owner_agent_id"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    collection_kind: Mapped[str] = mapped_column(String(60), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'world_admin'"),
+        default="world_admin",
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default=text("'active'"),
+        default="active",
+    )
+    created_by_actor_ref: Mapped[str] = mapped_column(String(120), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+
+
+class MediaAssetCollectionItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "media_asset_collection_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "collection_id",
+            "asset_id",
+            "role",
+            name="uq_media_asset_collection_items_collection_asset_role",
+        ),
+        CheckConstraint("display_order >= 0", name="display_order_nonnegative"),
+        Index(
+            "ix_media_asset_collection_items_collection_order",
+            "collection_id",
+            "display_order",
+        ),
+        Index("ix_media_asset_collection_items_asset_id", "asset_id"),
+        Index(
+            "ix_media_asset_collection_items_worldline_asset",
+            "world_id",
+            "worldline_id",
+            "asset_id",
+        ),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_asset_collections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    asset_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(40), nullable=False)
     display_order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

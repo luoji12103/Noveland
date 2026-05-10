@@ -6,7 +6,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from noveland.auth import AuthenticatedSubject
+from noveland.media.catalog import (
+    MediaCatalogService,
+    MediaCollectionService,
+    MediaLineageService,
+)
 from noveland.media.contracts import (
+    MediaAssetCollectionCreate,
+    MediaAssetCollectionItemCreate,
+    MediaAssetCollectionItemRecord,
+    MediaAssetCollectionItemUpdate,
+    MediaAssetCollectionRecord,
+    MediaAssetCollectionUpdate,
     MediaAssetCreate,
     MediaAssetInputCreate,
     MediaAssetInputRecord,
@@ -16,8 +27,15 @@ from noveland.media.contracts import (
     MediaAssetRecord,
     MediaAssetReferences,
     MediaAssetRole,
+    MediaAssetSearchFilters,
+    MediaAssetSearchResult,
     MediaAssetStatus,
+    MediaAssetTagCreate,
+    MediaAssetTagFilter,
+    MediaAssetTagRecord,
+    MediaAssetTagUpdate,
     MediaAssetUpdate,
+    MediaCollectionStatus,
     MediaContextCreate,
     MediaContextRecord,
     MediaContextRole,
@@ -27,6 +45,7 @@ from noveland.media.contracts import (
     MediaJobRecord,
     MediaJobStatus,
     MediaSourceKind,
+    MediaTagSourceKind,
     MediaVisibility,
 )
 from noveland.media.errors import MediaConflictError, MediaNotFoundError, MediaValidationError
@@ -114,6 +133,54 @@ class MediaJobCreateRequest(BaseModel):
     request_json: dict[str, object] = Field(default_factory=dict)
 
 
+class MediaAssetTagCreateRequest(BaseModel):
+    worldline_id: uuid.UUID | None = None
+    tag_type: str = Field(min_length=1, max_length=40)
+    tag_key: str = Field(min_length=1, max_length=80)
+    tag_value: str = Field(min_length=1, max_length=220)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    source_kind: MediaTagSourceKind = MediaTagSourceKind.MANUAL
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class MediaAssetTagUpdateRequest(BaseModel):
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    visibility: MediaVisibility | None = None
+    metadata: dict[str, object] | None = None
+
+
+class MediaAssetCollectionCreateRequest(BaseModel):
+    worldline_id: uuid.UUID | None = None
+    collection_kind: str = Field(min_length=1, max_length=60)
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    owner_agent_id: uuid.UUID | None = None
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class MediaAssetCollectionUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    visibility: MediaVisibility | None = None
+    status: MediaCollectionStatus | None = None
+    metadata: dict[str, object] | None = None
+
+
+class MediaAssetCollectionItemCreateRequest(BaseModel):
+    worldline_id: uuid.UUID | None = None
+    asset_id: uuid.UUID
+    role: str = Field(default="member", min_length=1, max_length=40)
+    display_order: int = Field(default=0, ge=0)
+    metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class MediaAssetCollectionItemUpdateRequest(BaseModel):
+    display_order: int | None = Field(default=None, ge=0)
+    metadata: dict[str, object] | None = None
+
+
 @router.get("/assets", response_model=list[MediaAssetRecord])
 def list_media_assets(
     world_id: uuid.UUID,
@@ -138,6 +205,59 @@ def list_media_assets(
         ),
         member_visible_only=not _context.is_platform_admin and _context.role != "world_admin",
     )
+
+
+@router.get("/assets/search", response_model=MediaAssetSearchResult)
+def search_media_assets(
+    world_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+    asset_kind: Annotated[MediaAssetKind | None, Query()] = None,
+    asset_role: Annotated[MediaAssetRole | None, Query()] = None,
+    source_kind: Annotated[MediaSourceKind | None, Query()] = None,
+    status_filter: Annotated[MediaAssetStatus | None, Query(alias="status")] = None,
+    visibility: Annotated[MediaVisibility | None, Query()] = None,
+    has_alpha: Annotated[bool | None, Query()] = None,
+    mime_type: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    provider_kind: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
+    used_by_agent_id: Annotated[uuid.UUID | None, Query()] = None,
+    used_in_conversation_id: Annotated[uuid.UUID | None, Query()] = None,
+    used_in_turn_id: Annotated[uuid.UUID | None, Query()] = None,
+    used_in_world_event_id: Annotated[uuid.UUID | None, Query()] = None,
+    collection_id: Annotated[uuid.UUID | None, Query()] = None,
+    contains_text: Annotated[str | None, Query(max_length=120)] = None,
+    tag: Annotated[list[str] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> MediaAssetSearchResult:
+    try:
+        return MediaCatalogService(db_session).search_assets(
+            world_id,
+            MediaAssetSearchFilters(
+                worldline_id=worldline_id,
+                asset_kind=asset_kind,
+                asset_role=asset_role,
+                source_kind=source_kind,
+                status=status_filter,
+                visibility=visibility,
+                has_alpha=has_alpha,
+                mime_type=mime_type,
+                provider_kind=provider_kind,
+                used_by_agent_id=used_by_agent_id,
+                used_in_conversation_id=used_in_conversation_id,
+                used_in_turn_id=used_in_turn_id,
+                used_in_world_event_id=used_in_world_event_id,
+                collection_id=collection_id,
+                contains_text=contains_text,
+                tags=tuple(_parse_tag_filters([] if tag is None else tag)),
+                limit=limit,
+            ),
+            member_visible_only=_member_visible_only(context),
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except MediaValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.post(
@@ -205,6 +325,109 @@ def get_media_asset(
     if record is None:
         raise _not_found()
     return record
+
+
+@router.get("/assets/{asset_id}/tags", response_model=list[MediaAssetTagRecord])
+def list_media_asset_tags(
+    world_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[MediaAssetTagRecord]:
+    try:
+        service = MediaService(db_session)
+        _require_visible_asset(service, world_id, asset_id, context)
+        return MediaCatalogService(db_session).list_tags(
+            world_id,
+            asset_id,
+            member_visible_only=_member_visible_only(context),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.post(
+    "/assets/{asset_id}/tags",
+    response_model=MediaAssetTagRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def create_media_asset_tag(
+    world_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    request: MediaAssetTagCreateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetTagRecord:
+    try:
+        return MediaCatalogService(db_session).create_tag(
+            world_id,
+            asset_id,
+            MediaAssetTagCreate(
+                world_id=world_id,
+                worldline_id=request.worldline_id,
+                tag_type=request.tag_type,
+                tag_key=request.tag_key,
+                tag_value=request.tag_value,
+                confidence=request.confidence,
+                source_kind=request.source_kind,
+                visibility=request.visibility,
+                metadata=dict(request.metadata),
+            ),
+            actor_ref=f"user:{subject.user_id}",
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+    except (MediaValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.patch(
+    "/assets/{asset_id}/tags/{tag_id}",
+    response_model=MediaAssetTagRecord,
+    dependencies=[Depends(require_csrf)],
+)
+def update_media_asset_tag(
+    world_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    tag_id: uuid.UUID,
+    request: MediaAssetTagUpdateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetTagRecord:
+    try:
+        return MediaCatalogService(db_session).update_tag(
+            world_id,
+            asset_id,
+            tag_id,
+            MediaAssetTagUpdate(
+                confidence=request.confidence,
+                visibility=request.visibility,
+                metadata=None if request.metadata is None else dict(request.metadata),
+            ),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.delete(
+    "/assets/{asset_id}/tags/{tag_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+def delete_media_asset_tag(
+    world_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    tag_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> Response:
+    try:
+        MediaCatalogService(db_session).delete_tag(world_id, asset_id, tag_id)
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch(
@@ -382,7 +605,11 @@ def media_asset_references(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return service.references(world_id, asset_id)
+        return MediaLineageService(db_session).references(
+            world_id,
+            asset_id,
+            member_visible_only=_member_visible_only(context),
+        )
     except MediaNotFoundError as exc:
         raise _not_found() from exc
 
@@ -397,9 +624,226 @@ def media_asset_lineage(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return service.lineage(world_id, asset_id)
+        return MediaLineageService(db_session).lineage(
+            world_id,
+            asset_id,
+            member_visible_only=_member_visible_only(context),
+        )
     except MediaNotFoundError as exc:
         raise _not_found() from exc
+
+
+@router.get("/collections", response_model=list[MediaAssetCollectionRecord])
+def list_media_asset_collections(
+    world_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+    collection_kind: Annotated[str | None, Query(min_length=1, max_length=60)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[MediaAssetCollectionRecord]:
+    try:
+        return MediaCollectionService(db_session).list_collections(
+            world_id,
+            worldline_id=worldline_id,
+            collection_kind=None if collection_kind is None else collection_kind.strip().lower(),
+            member_visible_only=_member_visible_only(context),
+            limit=limit,
+        )
+    except MediaValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/collections",
+    response_model=MediaAssetCollectionRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def create_media_asset_collection(
+    world_id: uuid.UUID,
+    request: MediaAssetCollectionCreateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetCollectionRecord:
+    try:
+        return MediaCollectionService(db_session).create_collection(
+            MediaAssetCollectionCreate(
+                world_id=world_id,
+                worldline_id=request.worldline_id,
+                collection_kind=request.collection_kind,
+                title=request.title,
+                description=request.description,
+                owner_agent_id=request.owner_agent_id,
+                visibility=request.visibility,
+                metadata=dict(request.metadata),
+            ),
+            actor_ref=f"user:{subject.user_id}",
+        )
+    except (MediaValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.get("/collections/{collection_id}", response_model=MediaAssetCollectionRecord)
+def get_media_asset_collection(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetCollectionRecord:
+    record = MediaCollectionService(db_session).get_collection(
+        world_id,
+        collection_id,
+        member_visible_only=_member_visible_only(context),
+    )
+    if record is None:
+        raise _not_found()
+    return record
+
+
+@router.patch(
+    "/collections/{collection_id}",
+    response_model=MediaAssetCollectionRecord,
+    dependencies=[Depends(require_csrf)],
+)
+def update_media_asset_collection(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    request: MediaAssetCollectionUpdateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetCollectionRecord:
+    try:
+        return MediaCollectionService(db_session).update_collection(
+            world_id,
+            collection_id,
+            MediaAssetCollectionUpdate(
+                title=request.title,
+                description=request.description,
+                visibility=request.visibility,
+                status=request.status,
+                metadata=None if request.metadata is None else dict(request.metadata),
+            ),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.delete(
+    "/collections/{collection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+def delete_media_asset_collection(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> Response:
+    try:
+        MediaCollectionService(db_session).delete_collection(world_id, collection_id)
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/collections/{collection_id}/items",
+    response_model=list[MediaAssetCollectionItemRecord],
+)
+def list_media_asset_collection_items(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[MediaAssetCollectionItemRecord]:
+    try:
+        return MediaCollectionService(db_session).list_items(
+            world_id,
+            collection_id,
+            member_visible_only=_member_visible_only(context),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.post(
+    "/collections/{collection_id}/items",
+    response_model=MediaAssetCollectionItemRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def add_media_asset_collection_item(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    request: MediaAssetCollectionItemCreateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetCollectionItemRecord:
+    try:
+        return MediaCollectionService(db_session).add_item(
+            world_id,
+            collection_id,
+            MediaAssetCollectionItemCreate(
+                world_id=world_id,
+                worldline_id=request.worldline_id,
+                asset_id=request.asset_id,
+                role=request.role,
+                display_order=request.display_order,
+                metadata=dict(request.metadata),
+            ),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+    except (MediaValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.patch(
+    "/collections/{collection_id}/items/{item_id}",
+    response_model=MediaAssetCollectionItemRecord,
+    dependencies=[Depends(require_csrf)],
+)
+def update_media_asset_collection_item(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    item_id: uuid.UUID,
+    request: MediaAssetCollectionItemUpdateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MediaAssetCollectionItemRecord:
+    try:
+        return MediaCollectionService(db_session).update_item(
+            world_id,
+            collection_id,
+            item_id,
+            MediaAssetCollectionItemUpdate(
+                display_order=request.display_order,
+                metadata=None if request.metadata is None else dict(request.metadata),
+            ),
+        )
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.delete(
+    "/collections/{collection_id}/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+def remove_media_asset_collection_item(
+    world_id: uuid.UUID,
+    collection_id: uuid.UUID,
+    item_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> Response:
+    try:
+        MediaCollectionService(db_session).remove_item(world_id, collection_id, item_id)
+    except MediaNotFoundError as exc:
+        raise _not_found() from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -544,3 +988,14 @@ def _require_visible_asset(
     )
     if record is None:
         raise MediaNotFoundError("media asset not found")
+
+
+def _member_visible_only(context: WorldAccessContext) -> bool:
+    return not context.is_platform_admin and context.role != "world_admin"
+
+
+def _parse_tag_filters(encoded_filters: list[str]) -> list[MediaAssetTagFilter]:
+    filters: list[MediaAssetTagFilter] = []
+    for encoded in encoded_filters:
+        filters.append(MediaAssetTagFilter.parse(encoded))
+    return filters

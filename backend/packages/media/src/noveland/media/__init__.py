@@ -6,9 +6,16 @@ PACKAGE_NAME = "media"
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "LocalMediaObjectStorage": ("noveland.media.storage", "LocalMediaObjectStorage"),
+    "MediaCatalogService": ("noveland.media.catalog", "MediaCatalogService"),
+    "MediaCollectionService": ("noveland.media.catalog", "MediaCollectionService"),
+    "MediaLineageService": ("noveland.media.catalog", "MediaLineageService"),
     "MediaAssetCreate": ("noveland.media.contracts", "MediaAssetCreate"),
+    "MediaAssetCollectionCreate": ("noveland.media.contracts", "MediaAssetCollectionCreate"),
+    "MediaAssetCollectionRecord": ("noveland.media.contracts", "MediaAssetCollectionRecord"),
     "MediaAssetInputCreate": ("noveland.media.contracts", "MediaAssetInputCreate"),
     "MediaAssetRecord": ("noveland.media.contracts", "MediaAssetRecord"),
+    "MediaAssetTagCreate": ("noveland.media.contracts", "MediaAssetTagCreate"),
+    "MediaAssetTagRecord": ("noveland.media.contracts", "MediaAssetTagRecord"),
     "MediaAssetUpdate": ("noveland.media.contracts", "MediaAssetUpdate"),
     "MediaContextCreate": ("noveland.media.contracts", "MediaContextCreate"),
     "MediaJobCreate": ("noveland.media.contracts", "MediaJobCreate"),

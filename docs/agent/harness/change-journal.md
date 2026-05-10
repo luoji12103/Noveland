@@ -648,3 +648,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/media-asset-catalog` after this docs-only work is committed on `main`.
+
+## Media Asset Catalog Phase 2 implementation entry
+
+- Date: 2026-05-10
+- Branch: feat/media-asset-catalog
+- Scope: Backend-only Media Asset Catalog / Tag Index Phase 2.
+- Summary: Added worldline-scoped media asset tags, collections, collection items, asset search, and visibility-safe reference/lineage enrichment. Search supports bounded title/description text filtering, repeatable AND tag filters with colon-safe value parsing, context filters, collection filters, and member-safe visibility rules across assets, tags, and collections. Phase 2 does not add providers, upload/download APIs, Web UI, invocation ledger, performance annotations, or pgvector search.
+- Files changed: `/backend/packages/media/src/noveland/media/{catalog,contracts,models,__init__}.py`, `/backend/services/api/src/noveland/services/api/media.py`, `/backend/migrations/versions/20260510_0031_media_asset_catalog.py`, `/backend/tests/{test_media_catalog_service.py,test_api_media_catalog.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py,test_api_media.py,test_media_service.py}`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Media catalog service tests, Media catalog API tests, schema metadata registration, Alembic head coverage, workspace import coverage, and existing media API/service table setup coverage.
+- Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Later media phases should add provider integrations, upload/download policy, invocation ledger, performance annotations, asset embeddings/similarity search, and Web media surfaces in separate feature-named branches.
