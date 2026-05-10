@@ -1657,6 +1657,11 @@ const mockServer = createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/runtime/stream") {
+    sendSseEnvelope(response, runtimeStreamPayload());
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/auth/login") {
     const body = await readJson(request);
     if (body.email === "admin@example.test" && body.password === "correct-password") {
@@ -1713,6 +1718,16 @@ const mockServer = createServer(async (request, response) => {
 
   if (url.pathname === "/runtime/status") {
     handleRuntimeStatus(response);
+    return;
+  }
+
+  if (url.pathname === "/runtime/tool-policy") {
+    sendJson(response, 200, runtimeToolPolicyPayload());
+    return;
+  }
+
+  if (url.pathname === "/runtime/scale-readiness") {
+    sendJson(response, 200, runtimeScaleReadinessPayload());
     return;
   }
 
@@ -1899,6 +1914,11 @@ async function handleWorldResource(request, response, url) {
   const world = worlds.find((item) => item.id === worldId);
   if (world === undefined || !canReadWorld(currentSubject, worldId)) {
     sendJson(response, 404, { detail: "World not found" });
+    return;
+  }
+
+  if (request.method === "GET" && segments[2] === "stream") {
+    sendSseEnvelope(response, worldStreamPayload(worldId));
     return;
   }
 
@@ -5042,7 +5062,11 @@ async function handleRuntimeControl(request, response) {
 }
 
 function handleRuntimeStatus(response) {
-  sendJson(response, 200, {
+  sendJson(response, 200, runtimeStatusPayload());
+}
+
+function runtimeStatusPayload() {
+  return {
     ...runtimeControl,
     runtime_loop_interval_seconds: 5,
     runtime_batch_limit: 20,
@@ -5071,7 +5095,123 @@ function handleRuntimeStatus(response) {
       recent_error_count: runtimeDiagnostics.filter((item) => item.severity === "error").length,
       heartbeat_age_seconds: runtimeControl.last_heartbeat_at === null ? null : 1,
     },
-  });
+  };
+}
+
+function runtimeToolPolicyPayload() {
+  return {
+    policy_mode: "policy_only",
+    execution_enabled: false,
+    runtime_execution_enabled: false,
+    supported_permission_modes: [
+      "disabled",
+      "allowlist_required",
+      "denylist_block",
+      "manual_approval_required",
+    ],
+    default_permission_mode: "disabled",
+    deny_reasons: [
+      "external_tool_execution_disabled",
+      "tool_not_allowlisted",
+      "missing_world_or_actor_context",
+      "secret_exposure_risk",
+      "network_or_process_sandbox_unavailable",
+    ],
+    audit_fields: [
+      "world_id",
+      "agent_id",
+      "actor_ref",
+      "tool_identifier",
+      "permission_mode",
+      "decision",
+      "deny_reason",
+      "correlation_id",
+    ],
+    secret_handling: [
+      "Secret values must never be persisted in tool policy responses.",
+      "Future tool credentials must be referenced by secret ref only.",
+      "Diagnostics must redact token, key, password, and authorization-like fields.",
+    ],
+    data_exposure_rules: [
+      "Policy inputs must include world and runtime actor context.",
+      "Future tool outputs must be bounded and attributable before entering memory or events.",
+      "No subprocess, network, or filesystem tool execution is enabled in v1.",
+    ],
+    operator_message:
+      "External tool policy is defined for audit and future integration only; runtime tool execution is disabled.",
+  };
+}
+
+function runtimeScaleReadinessPayload() {
+  return {
+    status: "ok",
+    section_count: 2,
+    blocker_count: 0,
+    generated_at: new Date().toISOString(),
+    sections: [
+      {
+        area: "database_indexes",
+        status: "ok",
+        summary: "Core operational tables are available for derived scale review.",
+        metrics: {
+          world_count: worlds.length,
+          event_count: (worldEvents.get(worldOneId) ?? []).length,
+          agent_runtime_run_count: agentRuns.length,
+        },
+        blockers: [],
+        recommendations: [
+          "Review query plans before multi-world fanout or high-volume event replay.",
+          "Keep Alembic migration safety checks in the release gate.",
+        ],
+      },
+      {
+        area: "realtime_fanout",
+        status: "ok",
+        summary: "Realtime remains single transport via existing SSE/proxy infrastructure.",
+        metrics: {
+          world_count: worlds.length,
+          active_world_count: worlds.filter((world) => world.is_active).length,
+        },
+        blockers: [],
+        recommendations: [
+          "Keep SSE fanout scoped by world/runtime stream before adding many concurrent readers.",
+        ],
+      },
+    ],
+  };
+}
+
+function runtimeStreamPayload() {
+  return {
+    cursor: "mock-runtime-stream-1",
+    event_type: "runtime.delta",
+    occurred_at: new Date().toISOString(),
+    world_id: null,
+    conversation_id: null,
+    payload: {
+      runtime_control: runtimeControl,
+      runtime_status: runtimeStatusPayload(),
+      diagnostics: [],
+      provider_profiles: [],
+    },
+  };
+}
+
+function worldStreamPayload(worldId) {
+  return {
+    cursor: `mock-world-stream-${worldId}-1`,
+    event_type: "world.delta",
+    occurred_at: new Date().toISOString(),
+    world_id: worldId,
+    conversation_id: null,
+    payload: {
+      clock: clocks.get(worldId) ?? null,
+      diagnostics: runtimeDiagnostics.filter((item) => item.world_id === worldId),
+      agent_runs: agentRuns.filter((item) => item.world_id === worldId),
+      narrative_artifacts: narrativeArtifacts.filter((item) => item.world_id === worldId),
+      conversations: conversations.filter((item) => item.world_id === worldId),
+    },
+  };
 }
 
 function handleRuntimeDiagnostics(request, response) {
@@ -7829,6 +7969,16 @@ function sendJson(response, status, body, setCookie = []) {
     ...(setCookie.length > 0 ? { "set-cookie": setCookie } : {}),
   });
   response.end(JSON.stringify(body));
+}
+
+function sendSseEnvelope(response, envelope) {
+  response.writeHead(200, {
+    "content-type": "text/event-stream",
+    "cache-control": "no-store",
+    connection: "keep-alive",
+    "x-accel-buffering": "no",
+  });
+  response.end(`data: ${JSON.stringify(envelope)}\n\n`);
 }
 
 function hasCookie(request, name, expectedValue) {

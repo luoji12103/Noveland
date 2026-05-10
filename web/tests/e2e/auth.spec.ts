@@ -234,6 +234,12 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   });
 
   await page.goto("/admin/runtime");
+  await expect(page.getByRole("heading", { name: "External tool policy" })).toBeVisible();
+  await expect(page.getByText("policy_only")).toBeVisible();
+  await expect(page.getByText("External tool policy is defined for audit")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scale readiness" })).toBeVisible();
+  await expect(page.getByText("database_indexes - ok")).toBeVisible();
+  await expect(page.getByText("realtime_fanout - ok")).toBeVisible();
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(page.getByText("Runtime start requested.")).toBeVisible();
 
