@@ -32,14 +32,17 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
         const publishedArtifacts = envelope.payload.narrative_artifacts.filter(
           (artifact) =>
             artifact.publication?.status === "published" &&
-            artifact.publication.reader_visible,
+            artifact.publication.reader_visible &&
+            matchesReaderFilters(artifact, data),
         );
         if (publishedArtifacts.length > 0) {
-          setStreamedArtifacts((current) => mergeTimelineArtifacts(current, publishedArtifacts));
+          setStreamedArtifacts((current) =>
+            mergeTimelineArtifacts(current, publishedArtifacts, data.selectedOrderBy),
+          );
         }
       },
     );
-  }, [worldId]);
+  }, [data, worldId]);
 
   if (data.selectedWorld === null) {
     return (
@@ -50,7 +53,14 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
   }
 
   const conversationsById = new Map(data.conversations.map((conversation) => [conversation.id, conversation]));
-  const narrativeArtifacts = mergeTimelineArtifacts(data.narrativeArtifacts, streamedArtifacts);
+  const filteredStreamedArtifacts = streamedArtifacts.filter((artifact) =>
+    matchesReaderFilters(artifact, data),
+  );
+  const narrativeArtifacts = mergeTimelineArtifacts(
+    data.narrativeArtifacts,
+    filteredStreamedArtifacts,
+    data.selectedOrderBy,
+  );
 
   return (
     <section className="management-section">
@@ -163,13 +173,57 @@ function timelineLabel(artifact: NarrativeReaderListData["narrativeArtifacts"][n
   return `drafted ${formatDateTime(artifact.created_at)}`;
 }
 
+function matchesReaderFilters(
+  artifact: NarrativeReaderListData["narrativeArtifacts"][number],
+  data: NarrativeReaderListData,
+): boolean {
+  if (data.selectedArtifactKind !== "" && artifact.artifact_kind !== data.selectedArtifactKind) {
+    return false;
+  }
+  if (
+    data.selectedConversationId !== "" &&
+    artifact.source_conversation_id !== data.selectedConversationId
+  ) {
+    return false;
+  }
+  if (data.selectedSourceKind !== "" && sourceKindForArtifact(artifact) !== data.selectedSourceKind) {
+    return false;
+  }
+  if (data.selectedSearch !== "") {
+    const needle = data.selectedSearch.toLowerCase();
+    return (
+      artifact.title.toLowerCase().includes(needle) ||
+      artifact.content.toLowerCase().includes(needle)
+    );
+  }
+  return true;
+}
+
+function sourceKindForArtifact(
+  artifact: NarrativeReaderListData["narrativeArtifacts"][number],
+): string {
+  if (artifact.source_conversation_id !== null) {
+    return "conversation";
+  }
+  if (artifact.source_run_id !== null) {
+    return "agent_run";
+  }
+  if (artifact.agent_id !== null) {
+    return "agent";
+  }
+  return "world";
+}
+
 function mergeTimelineArtifacts(
   current: NarrativeReaderListData["narrativeArtifacts"],
   incoming: NarrativeReaderListData["narrativeArtifacts"],
+  orderBy: string,
 ): NarrativeReaderListData["narrativeArtifacts"] {
-  return mergeById(current, incoming).sort((left, right) =>
-    timelineDate(right).localeCompare(timelineDate(left)),
-  );
+  return mergeById(current, incoming).sort((left, right) => {
+    const leftDate = orderBy === "created_at" ? left.created_at : timelineDate(left);
+    const rightDate = orderBy === "created_at" ? right.created_at : timelineDate(right);
+    return rightDate.localeCompare(leftDate);
+  });
 }
 
 function timelineDate(artifact: NarrativeReaderListData["narrativeArtifacts"][number]): string {
