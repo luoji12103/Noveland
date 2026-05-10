@@ -637,3 +637,14 @@
 - Tests added/updated: Media storage tests, MediaService tests, Media API tests, schema metadata registration, Alembic head, workspace import coverage, plus backend lint/type/test gates.
 - Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Narrative artifact media contexts remain schema-reserved but rejected by service/API until `narrative_artifacts` gains first-class `worldline_id`. Later media phases should add asset catalog/search, invocation ledger, performance annotation, provider integrations, binary upload/download policy, and Web media surfaces.
+
+## Media Asset Catalog Phase 2 plan entry
+
+- Date: 2026-05-10
+- Branch: main
+- Scope: Final feature implementation plan for Media Asset Catalog Phase 2.
+- Summary: Added the version-prefixed Phase 2 plan for media asset tags, collections, collection items, asset search, and visibility-safe references/lineage enrichment. The plan fixes tag query parsing, `contains_text` bounds, asset/tag/collection visibility rules, member-safe counts, route ordering, and explicit non-goals around providers, upload/download, Web UI, invocation ledger, performance annotations, and pgvector search.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/media-asset-catalog` after this docs-only work is committed on `main`.

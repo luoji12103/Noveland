@@ -232,6 +232,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/current-system-architecture-review.md`
 - `docs/agent/harness/feature-updates/`
 - `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md`
 
 ## Update rule
 

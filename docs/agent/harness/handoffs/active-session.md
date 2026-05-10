@@ -2,8 +2,8 @@
 
 - Date: 2026-05-10T00:00:00Z
 - Branch: main
-- Objective: Implement backend-only Media Kernel Phase 1 from `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`.
-- Status: Media Kernel Phase 1 is complete locally and ready as the current mainline state after fast-forward merge. No push has been performed.
+- Objective: Record the final Media Asset Catalog Phase 2 implementation plan before starting `feat/media-asset-catalog`.
+- Status: Added `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md` and registered it in the harness source-of-record files. Local work is documentation-only and unpushed.
 
 ## Completed Before This Branch
 
@@ -21,7 +21,7 @@
 
 ## Current Work Items
 
-- None active.
+- Implement Media Asset Catalog Phase 2 from `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md` on `feat/media-asset-catalog`.
 
 ## Checks Passed
 
