@@ -747,3 +747,14 @@
 - Tests added/updated: Image service/API tests, OpenAI image adapter mocked HTTP tests, ComfyUI adapter mocked/dry-run tests, deterministic composer tests, and workspace import coverage.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: No schema migration was needed for Phase 6. Public reader delivery, Web image management UI, complex image editing, rembg/SAM2/IP-Adapter/ControlNet integrations, predictive background scheduling, and ComfyUI installation/model management remain deferred.
+
+## Speech Provider & Voice Profile Pipeline Phase 7 plan entry
+
+- Date: 2026-05-11
+- Branch: main
+- Scope: Final feature implementation plan for Speech Provider & Voice Profile Pipeline Phase 7.
+- Summary: Added the version-prefixed Phase 7 plan for voice profiles, agent voice bindings, speech transcripts, style mappings, TTS/STT service orchestration, OpenAI speech adapters, MiMo TTS/ASR configurable HTTP contracts, OmniVoice/GPT-SoVITS configurable HTTP contracts, media writeback, invocation ledger integration, and conversation-turn media attachment via references.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.7-speech-provider-voice-profile-pipeline-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/speech-provider-voice-profile-pipeline` after this docs-only work is committed on `main`.
