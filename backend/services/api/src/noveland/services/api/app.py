@@ -5,6 +5,7 @@ from noveland.services.api.conversations import router as conversations_router
 from noveland.services.api.invocations import router as invocations_router
 from noveland.services.api.media import router as media_router
 from noveland.services.api.media import turn_media_router
+from noveland.services.api.providers import router as providers_router
 from noveland.services.api.realtime import router as realtime_router
 from noveland.services.api.runtime import router as runtime_router
 from noveland.services.api.worlds import root_router as worlds_root_router
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     api.include_router(media_router)
     api.include_router(turn_media_router)
     api.include_router(invocations_router)
+    api.include_router(providers_router)
     api.include_router(conversations_router)
     api.include_router(realtime_router)
 

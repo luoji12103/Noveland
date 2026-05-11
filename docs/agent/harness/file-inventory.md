@@ -79,6 +79,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/dependencies.py`
 - `backend/services/api/src/noveland/services/api/invocations.py`
 - `backend/services/api/src/noveland/services/api/media.py`
+- `backend/services/api/src/noveland/services/api/providers.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
@@ -169,6 +170,16 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/invocations/src/noveland/invocations/redaction.py`
 - `backend/packages/invocations/src/noveland/invocations/search.py`
 - `backend/packages/invocations/src/noveland/invocations/service.py`
+- `backend/packages/providers/`
+- `backend/packages/providers/pyproject.toml`
+- `backend/packages/providers/src/noveland/providers/__init__.py`
+- `backend/packages/providers/src/noveland/providers/contracts.py`
+- `backend/packages/providers/src/noveland/providers/fake.py`
+- `backend/packages/providers/src/noveland/providers/health.py`
+- `backend/packages/providers/src/noveland/providers/models.py`
+- `backend/packages/providers/src/noveland/providers/registry.py`
+- `backend/packages/providers/src/noveland/providers/routing.py`
+- `backend/packages/providers/src/noveland/providers/service.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
 - `backend/packages/plugins/src/noveland/plugins/constants.py`
@@ -217,7 +228,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260510_0031_media_asset_catalog.py`
 - `backend/migrations/versions/20260511_0032_model_invocation_ledger.py`
 - `backend/migrations/versions/20260512_0033_media_kernel.py`
+- `backend/migrations/versions/20260512_0034_provider_execution_kernel.py`
 - `backend/tests/`
+- `backend/tests/test_api_providers.py`
 - `backend/tests/test_api_media.py`
 - `backend/tests/test_api_media_catalog.py`
 - `backend/tests/test_api_invocations.py`
@@ -225,6 +238,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_media_catalog_service.py`
 - `backend/tests/test_media_service.py`
 - `backend/tests/test_media_storage.py`
+- `backend/tests/test_provider_execution_service.py`
+- `backend/tests/test_provider_registry_service.py`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`

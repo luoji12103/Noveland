@@ -81,6 +81,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
+  - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -147,6 +148,14 @@ Fast orientation for a new coding session.
   - `noveland.invocations.service` — invocation ledger, prompt snapshot/template, tag, redaction, worldline validation, search, and runtime-run link services
   - `noveland.invocations.redaction` — checksum and redaction mode helpers for prompt/output persistence
   - `noveland.invocations.search` — repeatable tag filter parsing helpers shared by API search
+- `backend/packages/providers/`
+  - `noveland.providers.contracts` — provider integration, capability, health, execution request, and execution result DTOs
+  - `noveland.providers.models` — provider integration, capability, and health-check ORM models
+  - `noveland.providers.registry` — provider CRUD, capability update/list, visibility filtering, and world-over-global resolution service
+  - `noveland.providers.health` — provider health-check recording and fake health dispatch service
+  - `noveland.providers.service` — provider execution service with invocation ledger writes and fake media/text/speech execution
+  - `noveland.providers.fake` — deterministic fake adapter for text, image, STT, and TTS provider execution tests
+  - `noveland.providers.routing` — provider-kind/adapter-kind compatibility and mapping helpers
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -169,7 +178,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, and the Model Invocation Ledger migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, and Provider Execution Kernel migration
 
 ## Update rule
 

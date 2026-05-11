@@ -31,6 +31,7 @@ MODEL_MODULES = (
     "noveland.events.models",
     "noveland.narrative.models",
     "noveland.observability.models",
+    "noveland.providers.models",
 )
 
 

@@ -18,6 +18,7 @@ members = [
     "noveland-narrative",
     "noveland-observability",
     "noveland-plugins",
+    "noveland-providers",
     "noveland-service-api",
     "noveland-service-runtime",
     "noveland-storage",
@@ -571,6 +572,7 @@ dependencies = [
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
+    { name = "noveland-providers" },
     { name = "noveland-service-api" },
     { name = "noveland-service-runtime" },
     { name = "noveland-storage" },
@@ -604,6 +606,7 @@ requires-dist = [
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
+    { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-service-api", editable = "services/api" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-storage", editable = "packages/storage" },
@@ -849,6 +852,29 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-providers"
+version = "0.1.0"
+source = { editable = "packages/providers" }
+dependencies = [
+    { name = "noveland-core" },
+    { name = "noveland-invocations" },
+    { name = "noveland-media" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-invocations", editable = "packages/invocations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-service-api"
 version = "0.1.0"
 source = { editable = "services/api" }
@@ -867,6 +893,7 @@ dependencies = [
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
+    { name = "noveland-providers" },
     { name = "noveland-service-runtime" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
@@ -892,6 +919,7 @@ requires-dist = [
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
+    { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },

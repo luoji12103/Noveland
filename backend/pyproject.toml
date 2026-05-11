@@ -18,6 +18,7 @@ dependencies = [
   "noveland-narrative",
   "noveland-observability",
   "noveland-plugins",
+  "noveland-providers",
   "noveland-service-api",
   "noveland-service-runtime",
   "noveland-storage",
@@ -53,6 +54,7 @@ members = [
   "packages/narrative",
   "packages/observability",
   "packages/plugins",
+  "packages/providers",
   "packages/storage",
   "packages/worlds",
   "services/api",
@@ -73,6 +75,7 @@ noveland-media = { workspace = true }
 noveland-narrative = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-plugins = { workspace = true }
+noveland-providers = { workspace = true }
 noveland-service-api = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-storage = { workspace = true }
@@ -110,6 +113,7 @@ mypy_path = [
   "packages/narrative/src",
   "packages/observability/src",
   "packages/plugins/src",
+  "packages/providers/src",
   "packages/storage/src",
   "packages/worlds/src",
   "services/api/src",

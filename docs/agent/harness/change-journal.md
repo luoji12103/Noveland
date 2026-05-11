@@ -714,3 +714,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/provider-execution-kernel` after this docs-only work is committed on `main`.
+
+## Provider Execution Kernel Phase 5 implementation entry
+
+- Date: 2026-05-11
+- Branch: feat/provider-execution-kernel
+- Scope: Backend-only Provider Execution Kernel Phase 5.
+- Summary: Added `noveland-providers`, provider integration/capability/health tables, explicit `adapter_kind` routing, world-over-global provider resolution, fake text/image/STT/TTS execution, Phase 3 invocation and prompt snapshot writes, Phase 4 media job/asset/object writes for fake image/audio, and an independent `/worlds/{world_id}/providers` API router. The implementation leaves legacy `provider_profiles` unchanged and does not add real external provider adapters.
+- Files changed: `/backend/packages/providers/**`, `/backend/services/api/src/noveland/services/api/{app,providers}.py`, `/backend/migrations/versions/20260512_0034_provider_execution_kernel.py`, `/backend/tests/{test_provider_registry_service.py,test_provider_execution_service.py,test_api_providers.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Provider registry service tests, provider execution service tests, provider API tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type/targeted gates.
+- Docs updated: migration README, project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Real OpenAI image/speech, OpenAI-compatible image, ComfyUI, MiMo, OmniVoice, GPT-SoVITS, streaming, retry/load balancing, Web provider UI, and provider-profile refactors remain deferred to later phases.

@@ -103,6 +103,9 @@ def test_core_schema_tables_are_registered() -> None:
         "platform_role_assignments",
         "prompt_snapshots",
         "prompt_templates",
+        "provider_capabilities",
+        "provider_health_checks",
+        "provider_integrations",
         "provider_profiles",
         "relationship_repair_records",
         "relationship_event_suggestions",
@@ -297,6 +300,59 @@ def test_media_kernel_foundation_tables_are_registered() -> None:
         "worldlines.id",
         "worlds.id",
     } <= foreign_key_targets("media_references")
+
+
+def test_provider_execution_kernel_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "scope_kind",
+        "scope_key",
+        "provider_kind",
+        "adapter_kind",
+        "provider_key",
+        "display_name",
+        "base_url",
+        "auth_ref",
+        "config_json",
+        "default_params_json",
+        "status",
+        "visibility",
+    } <= column_names("provider_integrations")
+    assert {
+        "provider_integration_id",
+        "capability_key",
+        "capability_json",
+    } <= column_names("provider_capabilities")
+    assert {
+        "provider_integration_id",
+        "status",
+        "latency_ms",
+        "checked_at",
+        "error_text",
+        "metadata",
+    } <= column_names("provider_health_checks")
+    assert {
+        "ix_provider_integrations_scope_status",
+        "ix_provider_integrations_world_kind",
+        "ix_provider_integrations_adapter",
+    } <= index_names("provider_integrations")
+    assert {
+        "ix_provider_capabilities_provider",
+        "ix_provider_capabilities_key",
+    } <= index_names("provider_capabilities")
+    assert {
+        "ix_provider_health_checks_provider_checked",
+        "ix_provider_health_checks_status",
+    } <= index_names("provider_health_checks")
+    assert "uq_provider_integrations_key" in constraint_names(
+        "provider_integrations", UniqueConstraint
+    )
+    assert "uq_provider_capabilities_key" in constraint_names(
+        "provider_capabilities", UniqueConstraint
+    )
+    assert foreign_key_targets("provider_integrations") == {"worlds.id"}
+    assert foreign_key_targets("provider_capabilities") == {"provider_integrations.id"}
+    assert foreign_key_targets("provider_health_checks") == {"provider_integrations.id"}
 
 
 def test_media_asset_catalog_tables_are_registered() -> None:
@@ -1652,6 +1708,9 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "worlds.id",
     }
     assert foreign_key_targets("provider_profiles") == set()
+    assert foreign_key_targets("provider_integrations") == {"worlds.id"}
+    assert foreign_key_targets("provider_capabilities") == {"provider_integrations.id"}
+    assert foreign_key_targets("provider_health_checks") == {"provider_integrations.id"}
     assert foreign_key_targets("runtime_control_states") == set()
     assert foreign_key_targets("agent_runtime_runs") == {
         "agent_calendar_entries.id",

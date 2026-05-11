@@ -1,0 +1,330 @@
+from __future__ import annotations
+
+import uuid
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from noveland.auth import AuthenticatedSubject
+from noveland.core.settings import load_settings
+from noveland.media.storage import LocalMediaObjectStorage
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderCapabilityCreate,
+    ProviderCapabilityRead,
+    ProviderExecutionRequest,
+    ProviderHealthCheckRead,
+    ProviderIntegrationCreate,
+    ProviderIntegrationListFilters,
+    ProviderIntegrationRead,
+    ProviderIntegrationStatus,
+    ProviderIntegrationUpdate,
+    ProviderKind,
+    ProviderScopeKind,
+    ProviderTestInvocationRequest,
+    ProviderTestInvocationResult,
+    ProviderVisibility,
+)
+from noveland.providers.health import ProviderHealthService
+from noveland.providers.registry import (
+    ProviderNotFoundError,
+    ProviderRegistryService,
+    ProviderValidationError,
+)
+from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
+from noveland.services.api.authorization import is_platform_admin
+from noveland.services.api.csrf import require_csrf
+from noveland.services.api.dependencies import (
+    WorldAccessContext,
+    get_current_subject,
+    get_db_session,
+    get_world_admin_context,
+)
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+router = APIRouter(prefix="/worlds/{world_id}/providers", tags=["providers"])
+
+
+def _media_storage() -> LocalMediaObjectStorage:
+    return LocalMediaObjectStorage(load_settings().object_storage_root / "media")
+
+
+class ProviderCapabilityCreateRequest(BaseModel):
+    capability_key: str = Field(min_length=1, max_length=120)
+    capability_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderIntegrationCreateRequest(BaseModel):
+    scope_kind: ProviderScopeKind = ProviderScopeKind.WORLD
+    provider_kind: ProviderKind
+    adapter_kind: ProviderAdapterKind
+    provider_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=200)
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    auth_ref: str | None = Field(default=None, min_length=1, max_length=200)
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    default_params_json: dict[str, Any] = Field(default_factory=dict)
+    status: ProviderIntegrationStatus = ProviderIntegrationStatus.ACTIVE
+    visibility: ProviderVisibility = ProviderVisibility.WORLD_ADMIN
+    capabilities: list[ProviderCapabilityCreateRequest] = Field(default_factory=list)
+
+
+class ProviderIntegrationUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    auth_ref: str | None = Field(default=None, min_length=1, max_length=200)
+    config_json: dict[str, Any] | None = None
+    default_params_json: dict[str, Any] | None = None
+    status: ProviderIntegrationStatus | None = None
+    visibility: ProviderVisibility | None = None
+    capabilities: list[ProviderCapabilityCreateRequest] | None = None
+
+
+@router.get("", response_model=list[ProviderIntegrationRead])
+def list_providers(
+    world_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    scope_kind: Annotated[ProviderScopeKind | None, Query()] = None,
+    provider_kind: Annotated[ProviderKind | None, Query()] = None,
+    adapter_kind: Annotated[ProviderAdapterKind | None, Query()] = None,
+    status_filter: Annotated[ProviderIntegrationStatus | None, Query(alias="status")] = None,
+    visibility: Annotated[ProviderVisibility | None, Query()] = None,
+    capability_key: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+    include_global: Annotated[bool, Query()] = True,
+    include_hidden: Annotated[bool, Query()] = False,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[ProviderIntegrationRead]:
+    return ProviderRegistryService(db_session).list_providers(
+        world_id,
+        ProviderIntegrationListFilters(
+            scope_kind=scope_kind,
+            provider_kind=provider_kind,
+            adapter_kind=adapter_kind,
+            status=status_filter,
+            visibility=visibility,
+            capability_key=capability_key,
+            include_global=include_global,
+            include_hidden=include_hidden,
+            limit=limit,
+        ),
+        platform_admin=context.is_platform_admin,
+    )
+
+
+@router.post(
+    "",
+    response_model=ProviderIntegrationRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def create_provider(
+    world_id: uuid.UUID,
+    request: ProviderIntegrationCreateRequest,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderIntegrationRead:
+    if request.scope_kind == ProviderScopeKind.GLOBAL and not context.is_platform_admin:
+        raise _forbidden()
+    try:
+        return ProviderRegistryService(db_session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=None if request.scope_kind == ProviderScopeKind.GLOBAL else world_id,
+                scope_kind=request.scope_kind,
+                provider_kind=request.provider_kind,
+                adapter_kind=request.adapter_kind,
+                provider_key=request.provider_key,
+                display_name=request.display_name,
+                base_url=request.base_url,
+                auth_ref=request.auth_ref,
+                config_json=dict(request.config_json),
+                default_params_json=dict(request.default_params_json),
+                status=request.status,
+                visibility=request.visibility,
+                capabilities=tuple(_capability_create(item) for item in request.capabilities),
+            )
+        )
+    except (ProviderValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.get("/{provider_id}", response_model=ProviderIntegrationRead)
+def get_provider(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    include_hidden: Annotated[bool, Query()] = False,
+) -> ProviderIntegrationRead:
+    record = ProviderRegistryService(db_session).get_provider(
+        world_id,
+        provider_id,
+        include_hidden=include_hidden,
+        platform_admin=context.is_platform_admin,
+    )
+    if record is None:
+        raise _not_found()
+    return record
+
+
+@router.patch(
+    "/{provider_id}",
+    response_model=ProviderIntegrationRead,
+    dependencies=[Depends(require_csrf)],
+)
+def update_provider(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    request: ProviderIntegrationUpdateRequest,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderIntegrationRead:
+    try:
+        return ProviderRegistryService(db_session).update_provider(
+            world_id,
+            provider_id,
+            ProviderIntegrationUpdate(
+                display_name=request.display_name,
+                base_url=request.base_url,
+                auth_ref=request.auth_ref,
+                config_json=None if request.config_json is None else dict(request.config_json),
+                default_params_json=(
+                    None
+                    if request.default_params_json is None
+                    else dict(request.default_params_json)
+                ),
+                status=request.status,
+                visibility=request.visibility,
+                capabilities=(
+                    None
+                    if request.capabilities is None
+                    else tuple(_capability_create(item) for item in request.capabilities)
+                ),
+            ),
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except (ProviderValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.delete(
+    "/{provider_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+def delete_provider(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> Response:
+    try:
+        ProviderRegistryService(db_session).delete_provider(
+            world_id,
+            provider_id,
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{provider_id}/capabilities", response_model=list[ProviderCapabilityRead])
+def list_provider_capabilities(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> list[ProviderCapabilityRead]:
+    try:
+        return ProviderRegistryService(db_session).list_capabilities(
+            world_id,
+            provider_id,
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.post(
+    "/{provider_id}/health-check",
+    response_model=ProviderHealthCheckRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def run_provider_health_check(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderHealthCheckRead:
+    try:
+        return ProviderHealthService(db_session).run_health_check(
+            world_id,
+            provider_id,
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.post(
+    "/test-invocation",
+    response_model=ProviderTestInvocationResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def run_provider_test_invocation(
+    world_id: uuid.UUID,
+    request: ProviderTestInvocationRequest,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderTestInvocationResult:
+    try:
+        result = ProviderExecutionService(db_session, _media_storage()).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=request.worldline_id,
+                provider_id=request.provider_id,
+                provider_kind=request.provider_kind,
+                capability_key=request.capability_key,
+                input_text=request.input_text,
+                input_json=dict(request.input_json),
+                request_json=dict(request.request_json),
+                model_name=request.model_name,
+                media_job_id=request.media_job_id,
+                media_asset_id=request.media_asset_id,
+                actor_ref=(
+                    "platform_admin"
+                    if is_platform_admin(subject)
+                    else f"world_admin:{subject.user_id}"
+                ),
+            )
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except (ProviderValidationError, ProviderExecutionError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+    return ProviderTestInvocationResult(**result.model_dump())
+
+
+def _capability_create(request: ProviderCapabilityCreateRequest) -> ProviderCapabilityCreate:
+    return ProviderCapabilityCreate(
+        capability_key=request.capability_key,
+        capability_json=dict(request.capability_json),
+    )
+
+
+def _not_found() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+
+def _forbidden() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _unprocessable(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
