@@ -15,6 +15,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md` — final Model Invocation Ledger Phase 3 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.4-media-kernel-phase-4-plan.md` — final Media Kernel Phase 4 additive extension implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.5-provider-execution-kernel-plan.md` — final Provider Execution Kernel Phase 5 implementation plan.
+- `docs/agent/harness/feature-updates/v0.3.1.6-image-provider-visual-pipeline-plan.md` — final Image Provider & Visual Asset Pipeline Phase 6 implementation plan.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.

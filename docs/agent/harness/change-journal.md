@@ -725,3 +725,14 @@
 - Tests added/updated: Provider registry service tests, provider execution service tests, provider API tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type/targeted gates.
 - Docs updated: migration README, project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Real OpenAI image/speech, OpenAI-compatible image, ComfyUI, MiMo, OmniVoice, GPT-SoVITS, streaming, retry/load balancing, Web provider UI, and provider-profile refactors remain deferred to later phases.
+
+## Image Provider & Visual Asset Pipeline Phase 6 plan entry
+
+- Date: 2026-05-11
+- Branch: main
+- Scope: Final feature implementation plan for Image Provider & Visual Asset Pipeline Phase 6.
+- Summary: Added the version-prefixed Phase 6 plan for image generation/edit/compose routes, media image services, deterministic composition, OpenAI/OpenAI-compatible image adapters, ComfyUI workflow adapter mapping, provider execution integration, and visual asset writeback through Phase 3 and Phase 4 foundations.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.6-image-provider-visual-pipeline-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/image-provider-visual-pipeline` after this docs-only work is committed on `main`.
