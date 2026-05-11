@@ -681,3 +681,14 @@
 - Tests added/updated: Invocation ledger service tests, invocation API tests, runtime ledger integration assertions, schema metadata registration, Alembic head coverage, workspace import coverage, and legacy API fixture table coverage for runtime/conversation paths.
 - Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Provider adapter refactors, external tracing exporters, Web invocation browser, pgvector/similarity search, retention purge jobs, historical `AgentRuntimeRun` backfill, and provider-integration-specific invocation enrichment remain deferred.
+
+## Media Kernel Phase 4 plan entry
+
+- Date: 2026-05-11
+- Branch: main
+- Scope: Final feature implementation plan for Media Kernel Phase 4 additive extension.
+- Summary: Added the version-prefixed Phase 4 plan to extend the existing Media Phase 1/2 foundation with media objects, generic media references, upload/download routes, richer media job updates, and Phase 3 invocation links without replacing existing media tables or APIs.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.4-media-kernel-phase-4-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/media-kernel` after this docs-only work is committed on `main`.

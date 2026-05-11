@@ -1,38 +1,31 @@
 # Active Session Handoff
 
 - Date: 2026-05-11T00:00:00Z
-- Branch: feat/model-invocation-ledger
-- Objective: Implement Model Invocation Ledger Phase 3 from `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md`.
-- Status: Backend implementation complete locally; no push performed.
+- Branch: main
+- Objective: Prepare Media Kernel Phase 4 additive extension from `docs/agent/harness/feature-updates/v0.3.1.4-media-kernel-phase-4-plan.md`.
+- Status: Planning checkpoint in progress; implementation should start on `feat/media-kernel` after the docs-only planning commit.
 
-## Completed In This Branch
+## Current Context
 
-- Added `backend/packages/invocations` as `noveland-invocations`.
-- Added migration `20260511_0032_model_invocation_ledger.py`, revising `20260510_0031`.
-- Added `model_invocations`, `prompt_templates`, `prompt_snapshots`, `agent_runtime_run_model_invocations`, and `model_invocation_tags`.
-- Registered `noveland.invocations.models` in SQLAlchemy metadata imports and workspace imports.
-- Added independent API router `noveland.services.api.invocations` under `/worlds/{world_id}/model-invocations` and `/worlds/{world_id}/prompt-templates`.
-- Integrated new `AgentRuntimeRun` provider calls with ledger records, prompt snapshots, status updates, and runtime-run join rows.
-- Preserved Phase 3 boundaries: no provider adapter refactor, no Web UI, no external tracing exporter, no pgvector search, no historical backfill, no `conversation_turns` schema change, and no raw prompt/output in `world_events.payload`.
-- Updated migration README, project index, file inventory, task board, change journal, and this handoff.
+- Current `main` already includes Media Phase 1 foundation, Media Asset Catalog Phase 2, and Model Invocation Ledger Phase 3.
+- Phase 4 must be additive over existing media tables and APIs.
+- Do not normalize or replace `media_assets`, `media_jobs`, `media_asset_contexts`, `media_asset_inputs`, tags, collections, or existing media routes.
+- Do not add routes to `worlds.py`.
+- Do not write storage URIs, filesystem paths, base64, or bytes to `world_events.payload`.
 
-## Checks Passed
+## Planned Implementation
 
-- `cd backend && uv run pytest tests/test_invocation_ledger_service.py tests/test_api_invocations.py tests/test_runtime_daemon.py tests/test_schema_metadata.py tests/test_alembic_config.py tests/test_workspace_imports.py`
-- `cd backend && uv run ruff check .`
-- `cd backend && uv run mypy .`
-- `cd backend && uv run pytest`
+- Add migration `20260512_0033_media_kernel.py` revising `20260511_0032`.
+- Add `media_objects` and `media_references`.
+- Add media-side `source_invocation_id` links and safe media job extension columns.
+- Extend `noveland.media` contracts, models, services, storage helpers, and existing `media.py` API router.
+- Add world-admin/platform-admin upload, object download, generic reference, job update, and turn media routes.
+- Update media service/API/schema/Alembic/workspace tests.
 
-## Remaining Closeout
+## Required Closeout
 
-- Run the Web/infra portion of the final gate if not already run in the current terminal session:
-  - `cd web && npm run lint`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run test`
-  - `cd web && npm run build`
-  - `cd web && npm run check:next-env`
-  - `cd web && npm run test:e2e`
-  - `docker compose -f infra/compose.yaml config`
-  - `git diff --check`
-- Commit implementation on `feat/model-invocation-ledger`, then fast-forward merge to local `main` if clean.
+- Commit docs-only planning update on `main`.
+- Create `feat/media-kernel`.
+- Run targeted backend tests, then full local gate.
+- Fast-forward merge locally back to `main`.
 - Do not push unless explicitly requested.
