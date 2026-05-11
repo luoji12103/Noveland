@@ -252,6 +252,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.4-media-kernel-phase-4-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.5-provider-execution-kernel-plan.md`
 
 ## Update rule
 

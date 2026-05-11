@@ -703,3 +703,14 @@
 - Tests added/updated: Media service coverage for upload/object variants/references/turn media/job updates/source invocation and memory job validation; Media API coverage for upload/download ACL, generic refs, turn media, job patch/cancel, malformed upload metadata, and cross-worldline rejection; schema metadata and Alembic head coverage.
 - Docs updated: migration README, file inventory, change journal, and active handoff.
 - Follow-up notes: Provider-specific image/audio/video adapters, public reader media serving, S3/GCS storage, media embeddings/search, Web media management UI, and background media job execution remain deferred.
+
+## Provider Execution Kernel Phase 5 plan entry
+
+- Date: 2026-05-11
+- Branch: main
+- Scope: Final feature implementation plan for Provider Execution Kernel Phase 5.
+- Summary: Added the version-prefixed Phase 5 plan for a new `noveland-providers` package, provider integration/capability/health tables, explicit `adapter_kind` execution dispatch, fake provider execution, model invocation ledger writes, media job/asset linkage, and an independent `/worlds/{world_id}/providers` API router.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.5-provider-execution-kernel-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/provider-execution-kernel` after this docs-only work is committed on `main`.
