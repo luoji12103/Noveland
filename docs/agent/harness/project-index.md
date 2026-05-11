@@ -12,6 +12,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/` — version-prefixed final feature implementation plans recorded before implementation starts.
 - `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md` — final Media Kernel Phase 1 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md` — final Media Asset Catalog Phase 2 implementation plan.
+- `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md` — final Model Invocation Ledger Phase 3 implementation plan.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
@@ -77,6 +78,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
+  - `noveland.services.api.invocations` — planned world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -137,6 +139,7 @@ Fast orientation for a new coding session.
   - `noveland.media.models` — worldline-scoped media asset, job, context, input, tag, collection, and collection item ORM models
   - `noveland.media.service` — media asset/context/lineage service and queued media job service
   - `noveland.media.storage` — binary local media object storage facade with opaque `media://` URIs
+- `backend/packages/invocations/` — planned Phase 3 package for worldline-scoped model invocation ledger, prompt templates, prompt snapshots, tags, redaction, retention, and search
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry

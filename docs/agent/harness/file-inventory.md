@@ -77,6 +77,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/conversations.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
+- `backend/services/api/src/noveland/services/api/invocations.py`
 - `backend/services/api/src/noveland/services/api/media.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
@@ -160,6 +161,12 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/media/src/noveland/media/models.py`
 - `backend/packages/media/src/noveland/media/service.py`
 - `backend/packages/media/src/noveland/media/storage.py`
+- `backend/packages/invocations/`
+- `backend/packages/invocations/src/noveland/invocations/contracts.py`
+- `backend/packages/invocations/src/noveland/invocations/models.py`
+- `backend/packages/invocations/src/noveland/invocations/redaction.py`
+- `backend/packages/invocations/src/noveland/invocations/search.py`
+- `backend/packages/invocations/src/noveland/invocations/service.py`
 - `backend/packages/plugins/`
 - `backend/packages/plugins/src/noveland/plugins/categories.py`
 - `backend/packages/plugins/src/noveland/plugins/constants.py`
@@ -206,6 +213,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260507_0029_runtime_worldline_memory_isolation.py`
 - `backend/migrations/versions/20260510_0030_media_kernel_foundation.py`
 - `backend/migrations/versions/20260510_0031_media_asset_catalog.py`
+- `backend/migrations/versions/20260511_0032_model_invocation_ledger.py`
 - `backend/tests/`
 - `backend/tests/test_api_media.py`
 - `backend/tests/test_api_media_catalog.py`
@@ -237,6 +245,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/`
 - `docs/agent/harness/feature-updates/v0.3.1.1-media-kernel-phase-1-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md`
 
 ## Update rule
 

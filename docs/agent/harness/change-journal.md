@@ -659,3 +659,14 @@
 - Tests added/updated: Media catalog service tests, Media catalog API tests, schema metadata registration, Alembic head coverage, workspace import coverage, and existing media API/service table setup coverage.
 - Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: Later media phases should add provider integrations, upload/download policy, invocation ledger, performance annotations, asset embeddings/similarity search, and Web media surfaces in separate feature-named branches.
+
+## Model Invocation Ledger Phase 3 plan entry
+
+- Date: 2026-05-11
+- Branch: main
+- Scope: Final feature implementation plan for Model Invocation Ledger Phase 3.
+- Summary: Added the version-prefixed Phase 3 plan for a new `noveland-invocations` package, worldline-scoped `model_invocations`, prompt templates, prompt snapshots, invocation tags, runtime-run join table, redaction/retention/visibility policy, independent `/worlds/{world_id}/model-invocations` API router, and new-runtime integration. The plan explicitly excludes provider adapter refactors, Web UI, external tracing exporters, pgvector search, legacy backfill, `conversation_turns` schema changes, and raw prompt/output writes to world events.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/model-invocation-ledger` after this docs-only work is committed on `main`.

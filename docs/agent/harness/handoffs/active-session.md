@@ -2,8 +2,8 @@
 
 - Date: 2026-05-10T00:00:00Z
 - Branch: main
-- Objective: Implement backend-only Media Asset Catalog Phase 2 from `docs/agent/harness/feature-updates/v0.3.1.2-media-asset-catalog-phase-2-plan.md`.
-- Status: Media asset tags, collections, collection items, asset search, visibility-safe references/lineage, tests, and docs are implemented locally and ready for the post-implementation mainline handoff. Final backend, Web, e2e, compose, and diff gates passed. No push has been performed.
+- Objective: Record the final Model Invocation Ledger Phase 3 implementation plan before starting `feat/model-invocation-ledger`.
+- Status: Added `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md` and registered the planned package, router, migration, tests, and source-of-record updates. Local work is documentation-only and unpushed.
 
 ## Completed Before This Branch
 
@@ -21,8 +21,7 @@
 
 ## Current Work Items
 
-- Media Kernel Phases 1-2 are complete on local main after the `feat/media-asset-catalog` fast-forward merge.
-- Next media work should be planned as separate feature-named branches for upload/download policy, provider integrations, model invocation ledger, performance annotations, asset embeddings/similarity search, and Web media surfaces.
+- Implement Model Invocation Ledger Phase 3 from `docs/agent/harness/feature-updates/v0.3.1.3-model-invocation-ledger-phase-3-plan.md` on `feat/model-invocation-ledger`.
 
 ## Checks Passed
 
