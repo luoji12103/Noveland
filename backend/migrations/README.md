@@ -16,3 +16,4 @@ Current sequence:
 - `20260503_0019` through `20260507_0029`: observation traceability, narrative publications, agent preset versioning, plugin diagnostics, living-world character foundation, autonomous systems, GM/choice/worldline state, plot/route/rumor-flow state, knowledge/player/guardrail state, beta release-readiness state, and runtime worldline memory isolation hardening.
 - `20260510_0030`: Media Kernel Phase 1 foundation tables for worldline-scoped media assets, media jobs, media asset contexts, and media input/output lineage.
 - `20260510_0031`: Media Asset Catalog Phase 2 tables for worldline-scoped asset tags, collections, and collection items.
+- `20260511_0032`: Model Invocation Ledger Phase 3 tables for model invocations, prompt templates, prompt snapshots, runtime-run invocation links, and invocation tags.

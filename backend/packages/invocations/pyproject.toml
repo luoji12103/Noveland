@@ -3,42 +3,32 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "noveland-service-runtime"
+name = "noveland-invocations"
 version = "0.1.0"
-description = "Long-running runtime host for Noveland."
+description = "Model invocation ledger package for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "noveland-adapters",
   "noveland-agents",
-  "noveland-calendar",
   "noveland-conversations",
   "noveland-core",
   "noveland-events",
-  "noveland-invocations",
+  "noveland-media",
   "noveland-memory",
-  "noveland-narrative",
-  "noveland-observability",
-  "noveland-plugins",
   "noveland-worlds",
-  "nats-py>=2,<3",
+  "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
-
-[project.scripts]
-noveland-runtime = "noveland.services.runtime.main:main"
 
 [tool.uv.sources]
 noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
-noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
-noveland-invocations = { workspace = true }
+noveland-media = { workspace = true }
 noveland-memory = { workspace = true }
-noveland-narrative = { workspace = true }
-noveland-observability = { workspace = true }
-noveland-plugins = { workspace = true }
 noveland-worlds = { workspace = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/noveland"]

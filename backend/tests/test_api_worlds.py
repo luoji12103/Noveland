@@ -34,6 +34,13 @@ from noveland.events import (
     WorldEventStore,
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
 from noveland.memory.models import (
     AgentMemoryItem,
     AgentProfileSnapshotModel,
@@ -4004,6 +4011,11 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, ProviderProfile.__table__),
         cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),

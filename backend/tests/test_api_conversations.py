@@ -27,6 +27,13 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
 from noveland.memory.models import (
     AgentMemoryItem,
     AgentProfileSnapshotModel,
@@ -505,6 +512,11 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, MemoryRetrievalLog.__table__),
         cast(Table, AgentProfileSnapshotModel.__table__),
         cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, RuntimeDiagnosticEvent.__table__),
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),

@@ -25,6 +25,7 @@ MODEL_MODULES = (
     "noveland.adapters.models",
     "noveland.calendar.models",
     "noveland.conversations.models",
+    "noveland.invocations.models",
     "noveland.memory.models",
     "noveland.media.models",
     "noveland.events.models",

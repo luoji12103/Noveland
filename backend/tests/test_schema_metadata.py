@@ -83,6 +83,8 @@ def test_core_schema_tables_are_registered() -> None:
         "media_asset_tags",
         "media_assets",
         "media_jobs",
+        "model_invocation_tags",
+        "model_invocations",
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
@@ -97,6 +99,8 @@ def test_core_schema_tables_are_registered() -> None:
         "platform_settings",
         "plot_threads",
         "platform_role_assignments",
+        "prompt_snapshots",
+        "prompt_templates",
         "provider_profiles",
         "relationship_repair_records",
         "relationship_event_suggestions",
@@ -303,6 +307,161 @@ def test_media_asset_catalog_tables_are_registered() -> None:
         "worldlines.id",
         "worlds.id",
     } <= foreign_key_targets("media_asset_collection_items")
+
+
+def test_model_invocation_ledger_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "trace_id",
+        "parent_invocation_id",
+        "invocation_kind",
+        "actor_kind",
+        "actor_ref",
+        "agent_id",
+        "conversation_id",
+        "turn_id",
+        "world_event_id",
+        "media_job_id",
+        "media_asset_id",
+        "memory_write_job_id",
+        "provider_kind",
+        "provider_profile_id",
+        "model_name",
+        "prompt_template_key",
+        "input_text",
+        "output_text",
+        "request_params_json",
+        "response_metadata_json",
+        "usage_json",
+        "latency_ms",
+        "estimated_cost",
+        "status",
+        "visibility",
+        "redaction_status",
+        "retention_policy",
+        "contains_sensitive_context",
+        "purge_after",
+    } <= column_names("model_invocations")
+    assert {
+        "scope_kind",
+        "world_id",
+        "scope_key",
+        "template_key",
+        "version",
+        "invocation_kind",
+        "title",
+        "content",
+        "input_schema_json",
+        "output_schema_json",
+        "metadata",
+        "status",
+    } <= column_names("prompt_templates")
+    assert {
+        "invocation_id",
+        "template_id",
+        "raw_prompt_text",
+        "raw_messages_json",
+        "raw_request_json",
+        "raw_response_json",
+        "raw_output_text",
+        "normalized_output_json",
+        "prompt_context_snapshot_json",
+        "tool_definitions_json",
+        "context_pack_refs_json",
+        "input_asset_refs_json",
+        "prompt_checksum_sha256",
+        "request_checksum_sha256",
+        "response_checksum_sha256",
+        "output_checksum_sha256",
+        "visibility",
+        "redaction_status",
+        "contains_sensitive_context",
+    } <= column_names("prompt_snapshots")
+    assert {
+        "world_id",
+        "worldline_id",
+        "agent_runtime_run_id",
+        "model_invocation_id",
+        "invocation_role",
+        "sequence_index",
+    } <= column_names("agent_runtime_run_model_invocations")
+    assert {
+        "world_id",
+        "worldline_id",
+        "invocation_id",
+        "tag_type",
+        "tag_key",
+        "tag_value",
+    } <= column_names("model_invocation_tags")
+    assert {
+        "ix_model_invocations_worldline_created",
+        "ix_model_invocations_worldline_kind",
+        "ix_model_invocations_worldline_status",
+        "ix_model_invocations_trace",
+        "ix_model_invocations_parent",
+        "ix_model_invocations_provider_model",
+        "ix_model_invocations_agent",
+        "ix_model_invocations_conversation_turn",
+        "ix_model_invocations_media",
+        "ix_model_invocations_memory_job",
+    } <= index_names("model_invocations")
+    assert {
+        "ix_prompt_templates_scope_status",
+        "ix_prompt_templates_key_status",
+    } <= index_names("prompt_templates")
+    assert "ix_prompt_snapshots_template_id" in index_names("prompt_snapshots")
+    assert {
+        "ix_agent_run_invocations_run",
+        "ix_agent_run_invocations_invocation",
+        "ix_agent_run_invocations_worldline",
+    } <= index_names("agent_runtime_run_model_invocations")
+    assert {
+        "ix_model_invocation_tags_lookup",
+        "ix_model_invocation_tags_invocation",
+    } <= index_names("model_invocation_tags")
+    assert "uq_prompt_templates_key" in constraint_names("prompt_templates", UniqueConstraint)
+    assert "uq_prompt_snapshots_invocation_id" in constraint_names(
+        "prompt_snapshots", UniqueConstraint
+    )
+    assert "uq_agent_run_invocations_run_invocation" in constraint_names(
+        "agent_runtime_run_model_invocations", UniqueConstraint
+    )
+    assert "uq_agent_run_invocations_run_sequence" in constraint_names(
+        "agent_runtime_run_model_invocations", UniqueConstraint
+    )
+    assert "uq_model_invocation_tags_identity" in constraint_names(
+        "model_invocation_tags", UniqueConstraint
+    )
+    assert {
+        "agents.id",
+        "conversation_sessions.id",
+        "conversation_turns.id",
+        "media_assets.id",
+        "media_jobs.id",
+        "memory_write_jobs.id",
+        "model_invocations.id",
+        "provider_profiles.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("model_invocations")
+    assert foreign_key_targets("prompt_templates") == {"worlds.id"}
+    assert {
+        "model_invocations.id",
+        "prompt_templates.id",
+    } <= foreign_key_targets("prompt_snapshots")
+    assert {
+        "agent_runtime_runs.id",
+        "model_invocations.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("agent_runtime_run_model_invocations")
+    assert {
+        "model_invocations.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("model_invocation_tags")
 
 
 def test_living_world_autonomous_system_columns_are_registered() -> None:
@@ -1436,6 +1595,35 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "world_events.id",
         "worldlines.id",
         "world_schedule_rules.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("model_invocations") == {
+        "agents.id",
+        "conversation_sessions.id",
+        "conversation_turns.id",
+        "media_assets.id",
+        "media_jobs.id",
+        "memory_write_jobs.id",
+        "model_invocations.id",
+        "provider_profiles.id",
+        "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("prompt_templates") == {"worlds.id"}
+    assert foreign_key_targets("prompt_snapshots") == {
+        "model_invocations.id",
+        "prompt_templates.id",
+    }
+    assert foreign_key_targets("agent_runtime_run_model_invocations") == {
+        "agent_runtime_runs.id",
+        "model_invocations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("model_invocation_tags") == {
+        "model_invocations.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("narrative_artifacts") == {

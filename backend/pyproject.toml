@@ -12,6 +12,7 @@ dependencies = [
   "noveland-conversations",
   "noveland-core",
   "noveland-events",
+  "noveland-invocations",
   "noveland-memory",
   "noveland-media",
   "noveland-narrative",
@@ -45,6 +46,7 @@ members = [
   "packages/conversations",
   "packages/core",
   "packages/events",
+  "packages/invocations",
   "packages/memory",
   "packages/media",
   "packages/narrative",
@@ -64,6 +66,7 @@ noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
+noveland-invocations = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
 noveland-narrative = { workspace = true }
@@ -100,6 +103,7 @@ mypy_path = [
   "packages/conversations/src",
   "packages/core/src",
   "packages/events/src",
+  "packages/invocations/src",
   "packages/memory/src",
   "packages/media/src",
   "packages/narrative/src",

@@ -78,11 +78,11 @@ Fast orientation for a new coding session.
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
-  - `noveland.services.api.invocations` — planned world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
+  - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
-  - `noveland.services.runtime.agent_loop` — provider-backed agent execution, memory context retrieval, async memory job enqueue, and narrative artifact creation
+  - `noveland.services.runtime.agent_loop` — provider-backed agent execution with model invocation ledger/snapshot recording, memory context retrieval, async memory job enqueue, and narrative artifact creation
   - `noveland.services.runtime.conversation_loop` — deterministic round-robin conversation turn advancement for manual chains and auto dialogue, including conversation memory configuration and optional completed-session narrative auto-generation
   - `noveland.services.runtime.daemon` — database-backed runtime control state, daemon loop orchestration, and due memory job processing status
   - `noveland.services.runtime.identity` — shared runtime actor ref used by runtime-created events and service paths
@@ -139,7 +139,12 @@ Fast orientation for a new coding session.
   - `noveland.media.models` — worldline-scoped media asset, job, context, input, tag, collection, and collection item ORM models
   - `noveland.media.service` — media asset/context/lineage service and queued media job service
   - `noveland.media.storage` — binary local media object storage facade with opaque `media://` URIs
-- `backend/packages/invocations/` — planned Phase 3 package for worldline-scoped model invocation ledger, prompt templates, prompt snapshots, tags, redaction, retention, and search
+- `backend/packages/invocations/`
+  - `noveland.invocations.contracts` — invocation, prompt template, prompt snapshot, tag, search, redaction, retention, and runtime-run link DTOs
+  - `noveland.invocations.models` — worldline-scoped model invocation, prompt template, prompt snapshot, runtime-run join, and invocation tag ORM models
+  - `noveland.invocations.service` — invocation ledger, prompt snapshot/template, tag, redaction, worldline validation, search, and runtime-run link services
+  - `noveland.invocations.redaction` — checksum and redaction mode helpers for prompt/output persistence
+  - `noveland.invocations.search` — repeatable tag filter parsing helpers shared by API search
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -162,7 +167,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, and Media Kernel/Catalog migrations
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, and the Model Invocation Ledger migration
 
 ## Update rule
 

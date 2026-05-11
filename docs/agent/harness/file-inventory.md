@@ -162,6 +162,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/media/src/noveland/media/service.py`
 - `backend/packages/media/src/noveland/media/storage.py`
 - `backend/packages/invocations/`
+- `backend/packages/invocations/pyproject.toml`
+- `backend/packages/invocations/src/noveland/invocations/__init__.py`
 - `backend/packages/invocations/src/noveland/invocations/contracts.py`
 - `backend/packages/invocations/src/noveland/invocations/models.py`
 - `backend/packages/invocations/src/noveland/invocations/redaction.py`
@@ -217,6 +219,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/`
 - `backend/tests/test_api_media.py`
 - `backend/tests/test_api_media_catalog.py`
+- `backend/tests/test_api_invocations.py`
+- `backend/tests/test_invocation_ledger_service.py`
 - `backend/tests/test_media_catalog_service.py`
 - `backend/tests/test_media_service.py`
 - `backend/tests/test_media_storage.py`

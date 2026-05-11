@@ -26,6 +26,13 @@ from noveland.core.models import RuntimeControlState
 from noveland.core.settings import AppSettings
 from noveland.events import InMemoryWorldEventPublisher
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
 from noveland.memory.models import (
     AgentMemoryItem,
     AgentProfileSnapshotModel,
@@ -125,6 +132,9 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     with Session(engine) as session:
         control = session.scalars(select(RuntimeControlState)).one()
         runs = session.scalars(select(AgentRuntimeRun)).all()
+        invocations = session.scalars(select(ModelInvocation)).all()
+        snapshots = session.scalars(select(PromptSnapshot)).all()
+        invocation_links = session.scalars(select(AgentRuntimeRunModelInvocation)).all()
         memories = session.scalars(select(AgentMemoryItem)).all()
         artifacts = session.scalars(select(NarrativeArtifact)).all()
         observations = session.scalars(select(AgentObservation)).all()
@@ -140,6 +150,22 @@ def test_runtime_daemon_runs_due_agent_and_records_outputs(
     assert len(runs) == 1
     assert runs[0].status == "succeeded"
     assert runs[0].response_text is not None
+    assert runs[0].prompt_text != snapshots[0].raw_prompt_text
+    assert len(invocations) == 1
+    assert invocations[0].status == "succeeded"
+    assert invocations[0].agent_id == runs[0].agent_id
+    assert invocations[0].provider_profile_id == runs[0].provider_profile_id
+    assert invocations[0].output_text is not None
+    assert len(snapshots) == 1
+    assert snapshots[0].invocation_id == invocations[0].id
+    assert snapshots[0].raw_prompt_text is not None
+    assert "Respond with one concise operational update." in snapshots[0].raw_prompt_text
+    assert snapshots[0].raw_response_json == {"ok": True}
+    assert len(invocation_links) == 1
+    assert invocation_links[0].agent_runtime_run_id == runs[0].id
+    assert invocation_links[0].model_invocation_id == invocations[0].id
+    assert invocation_links[0].invocation_role == "primary"
+    assert invocation_links[0].sequence_index == 0
     assert len(memories) == 1
     assert memories[0].content.startswith("Runtime response for:")
     assert len(artifacts) == 1
@@ -212,6 +238,9 @@ def test_run_agent_scopes_run_events_and_memory_jobs_to_fork_worldline(
             create_narrative_artifact=False,
         )
         run_model = session.get(AgentRuntimeRun, run.run_id)
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        invocation_link = session.scalars(select(AgentRuntimeRunModelInvocation)).one()
         events = session.scalars(
             select(WorldEventModel).order_by(WorldEventModel.sequence.asc()),
         ).all()
@@ -222,10 +251,15 @@ def test_run_agent_scopes_run_events_and_memory_jobs_to_fork_worldline(
         event_names = {event.event_name for event in events}
         event_worldline_ids = {event.worldline_id for event in events}
         job_worldline_id = job.worldline_id
+        invocation_worldline_id = invocation.worldline_id
+        snapshot_invocation_id = snapshot.invocation_id
+        linked_invocation_id = invocation_link.model_invocation_id
         session.commit()
 
     assert run.worldline_id == fork_id
     assert run_model_worldline_id == fork_id
+    assert invocation_worldline_id == fork_id
+    assert snapshot_invocation_id == linked_invocation_id
     assert event_names == {
         "agent.run_started",
         "agent.run_completed",
@@ -397,6 +431,8 @@ def test_runtime_daemon_advances_running_auto_conversation(
             select(ConversationTurn).order_by(ConversationTurn.turn_index.asc()),
         ).all()
         run_model = session.scalars(select(AgentRuntimeRun)).one()
+        invocation = session.scalars(select(ModelInvocation)).one()
+        invocation_link = session.scalars(select(AgentRuntimeRunModelInvocation)).one()
         memories = session.scalars(select(AgentMemoryItem)).all()
         events = session.scalars(
             select(WorldEventModel).order_by(WorldEventModel.sequence),
@@ -412,6 +448,8 @@ def test_runtime_daemon_advances_running_auto_conversation(
     assert {event.actor_ref for event in events} == {"system:runtime"}
     assert turns[0].run_id is not None
     assert run_model.worldline_id == fork_id
+    assert invocation.worldline_id == fork_id
+    assert invocation_link.agent_runtime_run_id == run_model.id
     assert {memory.worldline_id for memory in memories} == {fork_id}
     assert {event.worldline_id for event in events} == {fork_id}
 
@@ -454,6 +492,11 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, DailyLifeEventCandidate.__table__),
         cast(Table, OffscreenEventQueueItem.__table__),
         cast(Table, AgentRuntimeRun.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, MemoryWriteJob.__table__),
         cast(Table, MemoryWriteLog.__table__),

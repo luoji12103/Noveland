@@ -24,7 +24,7 @@ def test_migration_versions_are_linear_and_ordered() -> None:
     assert revision_matches_filename == [True] * len(migration_files)
     assert down_revisions[0] is None
     assert down_revisions[1:] == revisions[:-1]
-    assert revisions[-1] == "20260510_0031"
+    assert revisions[-1] == "20260511_0032"
 
 
 def test_every_migration_exposes_upgrade_and_downgrade() -> None:

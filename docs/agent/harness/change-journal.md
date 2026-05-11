@@ -670,3 +670,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/model-invocation-ledger` after this docs-only work is committed on `main`.
+
+## Model Invocation Ledger Phase 3 implementation entry
+
+- Date: 2026-05-11
+- Branch: feat/model-invocation-ledger
+- Scope: Backend-only Model Invocation Ledger Phase 3.
+- Summary: Added `noveland-invocations`, worldline-scoped invocation ledger tables, prompt templates, prompt snapshots, runtime-run join table, invocation tags, bounded search, redaction/retention/visibility controls, an independent `/worlds/{world_id}/model-invocations` API router, and new `AgentRuntimeRun` provider-call recording. Existing runtime runs remain source records for agent execution; canonical raw prompt/output for new calls is stored in invocation/snapshot records, not in `world_events.payload`.
+- Files changed: `/backend/packages/invocations/**`, `/backend/services/api/src/noveland/services/api/{app,invocations}.py`, `/backend/services/runtime/src/noveland/services/runtime/agent_loop.py`, `/backend/migrations/versions/20260511_0032_model_invocation_ledger.py`, `/backend/tests/{test_invocation_ledger_service.py,test_api_invocations.py,test_runtime_daemon.py,test_api_conversations.py,test_api_worlds.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/{api,runtime}/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Invocation ledger service tests, invocation API tests, runtime ledger integration assertions, schema metadata registration, Alembic head coverage, workspace import coverage, and legacy API fixture table coverage for runtime/conversation paths.
+- Docs updated: migration README, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: Provider adapter refactors, external tracing exporters, Web invocation browser, pgvector/similarity search, retention purge jobs, historical `AgentRuntimeRun` backfill, and provider-integration-specific invocation enrichment remain deferred.

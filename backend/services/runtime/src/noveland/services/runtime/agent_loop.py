@@ -21,6 +21,25 @@ from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.calendar import CalendarEntryRecord, CalendarService, ScheduleRuleRecord
 from noveland.core.settings import AppSettings
 from noveland.events import WorldEventAppend, WorldEventStore
+from noveland.invocations import (
+    AgentRuntimeRunInvocationLinkCreate,
+    InvocationLedgerService,
+    InvocationRecordCreate,
+    InvocationStatusUpdate,
+    PromptSnapshotCreate,
+    PromptSnapshotService,
+)
+from noveland.invocations.contracts import (
+    InvocationActorKind,
+    InvocationKind,
+    InvocationProviderKind,
+    InvocationRedactionStatus,
+    InvocationRetentionPolicy,
+    InvocationRole,
+    InvocationStatus,
+    InvocationVisibility,
+    PromptSnapshotUpdate,
+)
 from noveland.memory import MemoryContext, MemoryMessage, MemoryService, MemoryTurn
 from noveland.narrative import (
     NarrativeArtifactCreate,
@@ -212,7 +231,7 @@ class AgentRuntimeOrchestrator:
             source_schedule_rule_id=source_schedule_rule_id,
             status="running",
             trigger_source=trigger_source,
-            prompt_text=provider_prompt,
+            prompt_text=_runtime_prompt_summary(prompt_text),
             diagnostics={},
             started_at=started_at,
         )
@@ -233,18 +252,93 @@ class AgentRuntimeOrchestrator:
 
         provider_profile = self._resolve_profile(agent, provider_profile_id)
         run_model.provider_profile_id = None if provider_profile is None else provider_profile.id
+        invocation = InvocationLedgerService(self._session).record(
+            InvocationRecordCreate(
+                world_id=world_id,
+                worldline_id=resolved_worldline_id,
+                trace_id=uuid.uuid4(),
+                invocation_kind=InvocationKind.AGENT_RUNTIME,
+                actor_kind=InvocationActorKind.RUNTIME,
+                actor_ref=RUNTIME_ACTOR_REF,
+                agent_id=agent_id,
+                provider_kind=_invocation_provider_kind(provider_profile),
+                provider_profile_id=None if provider_profile is None else provider_profile.id,
+                model_name=None if provider_profile is None else provider_profile.model_name,
+                input_text=_runtime_prompt_summary(prompt_text),
+                request_params_json={
+                    "trigger_source": trigger_source,
+                    "retrieve_memory": retrieve_memory,
+                    "max_context_items": max_context_items,
+                    "create_memory": create_memory,
+                    "create_narrative_artifact": create_narrative_artifact,
+                },
+                status=InvocationStatus.RUNNING,
+                visibility=InvocationVisibility.WORLD_ADMIN,
+                redaction_status=InvocationRedactionStatus.RAW,
+                retention_policy=InvocationRetentionPolicy.LOCAL_DEBUG,
+                contains_sensitive_context=_contains_sensitive_context(prompt_context),
+                prompt_snapshot=PromptSnapshotCreate(
+                    raw_prompt_text=provider_prompt,
+                    raw_request_json={
+                        "provider_profile_id": None
+                        if provider_profile is None
+                        else str(provider_profile.id),
+                        "provider_type": None
+                        if provider_profile is None
+                        else provider_profile.provider_type.value,
+                        "model_name": None
+                        if provider_profile is None
+                        else provider_profile.model_name,
+                    },
+                    prompt_context_snapshot_json=prompt_context,
+                    visibility=InvocationVisibility.WORLD_ADMIN,
+                    redaction_status=InvocationRedactionStatus.RAW,
+                    contains_sensitive_context=_contains_sensitive_context(prompt_context),
+                ),
+            )
+        )
+        InvocationLedgerService(self._session).link_runtime_run(
+            AgentRuntimeRunInvocationLinkCreate(
+                world_id=world_id,
+                worldline_id=resolved_worldline_id,
+                agent_runtime_run_id=run_model.id,
+                model_invocation_id=invocation.id,
+                invocation_role=InvocationRole.PRIMARY,
+                sequence_index=0,
+            )
+        )
 
         try:
             if provider_profile is None:
                 raise ProviderConfigurationError("No enabled provider profile is available")
+            provider_started_at = datetime.now(UTC)
             completion = self._profile_service.invoke_profile(provider_profile, provider_prompt)
+            latency_ms = _latency_ms(provider_started_at)
             run_model.status = "succeeded"
             run_model.response_text = completion.text
             run_model.finished_at = datetime.now(UTC)
+            InvocationLedgerService(self._session).update_status(
+                world_id,
+                invocation.id,
+                InvocationStatusUpdate(
+                    status=InvocationStatus.SUCCEEDED,
+                    output_text=completion.text,
+                    response_metadata_json=completion.raw_response,
+                    latency_ms=latency_ms,
+                ),
+            )
+            PromptSnapshotService(self._session).update_snapshot_for_invocation(
+                invocation.id,
+                PromptSnapshotUpdate(
+                    raw_response_json=completion.raw_response,
+                    raw_output_text=completion.text,
+                ),
+            )
             run_model.diagnostics = {
                 "provider_profile_id": str(provider_profile.id),
                 "provider_type": provider_profile.provider_type.value,
                 "profile_key": provider_profile.profile_key,
+                "model_invocation_id": str(invocation.id),
                 **prompt_context,
             }
             self._record_diagnostic(
@@ -361,11 +455,21 @@ class AgentRuntimeOrchestrator:
         except Exception as exc:
             run_model.status = "failed"
             run_model.finished_at = datetime.now(UTC)
+            InvocationLedgerService(self._session).update_status(
+                world_id,
+                invocation.id,
+                InvocationStatusUpdate(
+                    status=InvocationStatus.FAILED,
+                    error_text=str(exc),
+                    latency_ms=_latency_ms(started_at),
+                ),
+            )
             run_model.diagnostics = {
                 "error": str(exc),
                 "provider_profile_id": None
                 if provider_profile is None
                 else str(provider_profile.id),
+                "model_invocation_id": str(invocation.id),
                 **prompt_context,
             }
             self._record_diagnostic(
@@ -704,6 +808,44 @@ def _run_record(model: AgentRuntimeRun) -> AgentRunExecution:
         started_at=model.started_at,
         finished_at=model.finished_at,
     )
+
+
+def _invocation_provider_kind(
+    provider_profile: ProviderProfileRecord | None,
+) -> InvocationProviderKind:
+    if provider_profile is None:
+        return InvocationProviderKind.OTHER
+    try:
+        return InvocationProviderKind(provider_profile.provider_type.value)
+    except ValueError:
+        return InvocationProviderKind.OTHER
+
+
+def _runtime_prompt_summary(prompt_text: str) -> str:
+    normalized = " ".join(prompt_text.split())
+    if len(normalized) <= 220:
+        return normalized
+    return f"{normalized[:217]}..."
+
+
+def _contains_sensitive_context(prompt_context: dict[str, Any]) -> bool:
+    living_context = prompt_context.get("living_context")
+    living_context_pack = prompt_context.get("living_context_pack")
+    return _has_positive_count(living_context, "visible_secret_count") or _has_positive_count(
+        living_context_pack,
+        "visible_secret_count",
+    )
+
+
+def _has_positive_count(value: object, key: str) -> bool:
+    if not isinstance(value, dict):
+        return False
+    count = value.get(key)
+    return isinstance(count, int) and count > 0
+
+
+def _latency_ms(started_at: datetime) -> int:
+    return max(0, int((datetime.now(UTC) - started_at).total_seconds() * 1000))
 
 
 def _due_prompt(

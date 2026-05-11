@@ -16,6 +16,7 @@ dependencies = [
   "noveland-conversations",
   "noveland-core",
   "noveland-events",
+  "noveland-invocations",
   "noveland-memory",
   "noveland-media",
   "noveland-narrative",
@@ -40,6 +41,7 @@ noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-events = { workspace = true }
+noveland-invocations = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
 noveland-narrative = { workspace = true }
