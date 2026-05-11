@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,7 +33,11 @@ class FakeProviderAdapter:
                 output_json={"text": output},
                 raw_response_json={"provider": "fake", "output": output},
             )
-        if provider_kind == ProviderKind.IMAGE_GENERATION:
+        if provider_kind in {
+            ProviderKind.IMAGE_GENERATION,
+            ProviderKind.IMAGE_EDITING,
+            ProviderKind.IMAGE_COMPOSITION,
+        }:
             data = _fake_png_bytes()
             return FakeProviderResult(
                 output_text="fake image generated",
@@ -67,14 +72,9 @@ class FakeProviderAdapter:
 
 
 def _fake_png_bytes() -> bytes:
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        b"\x00\x00\x00\rIHDR"
-        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
-        b"\x1f\x15\xc4\x89"
-        b"\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe"
-        b"\xdc\xccY\xe7"
-        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA"
+        "DUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
     )
 
 

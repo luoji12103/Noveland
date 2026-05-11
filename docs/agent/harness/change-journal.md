@@ -736,3 +736,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/image-provider-visual-pipeline` after this docs-only work is committed on `main`.
+
+## Image Provider & Visual Asset Pipeline Phase 6 implementation entry
+
+- Date: 2026-05-11
+- Branch: feat/image-provider-visual-pipeline
+- Scope: Backend-only Image Provider & Visual Asset Pipeline Phase 6.
+- Summary: Added image generation/edit/compose contracts and services, an independent `/worlds/{world_id}/images` router, Pillow-backed deterministic PNG composition, OpenAI/OpenAI-compatible image adapters, a ComfyUI remote workflow adapter with dry-run support, and provider execution dispatch for image adapters. Provider-backed image calls reuse media jobs, write model invocations and prompt snapshots, and store outputs through media assets/objects without writing prompts, bytes, paths, base64, or storage URIs to world events.
+- Files changed: `/backend/packages/media/src/noveland/media/{image_contracts,image_service,composer,__init__}.py`, `/backend/packages/providers/src/noveland/providers/{service,fake}.py`, `/backend/packages/providers/src/noveland/providers/adapters/**`, `/backend/services/api/src/noveland/services/api/{app,images}.py`, `/backend/tests/{test_image_service.py,test_api_images.py,test_openai_image_adapter.py,test_comfyui_adapter.py,test_image_composer.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/packages/{media,providers}/pyproject.toml`, `/docs/agent/harness/**`
+- Tests added/updated: Image service/API tests, OpenAI image adapter mocked HTTP tests, ComfyUI adapter mocked/dry-run tests, deterministic composer tests, and workspace import coverage.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: No schema migration was needed for Phase 6. Public reader delivery, Web image management UI, complex image editing, rembg/SAM2/IP-Adapter/ControlNet integrations, predictive background scheduling, and ComfyUI installation/model management remain deferred.

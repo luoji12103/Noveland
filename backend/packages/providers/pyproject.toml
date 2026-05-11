@@ -12,6 +12,7 @@ dependencies = [
   "noveland-invocations",
   "noveland-media",
   "noveland-worlds",
+  "httpx>=0.28,<0.29",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]

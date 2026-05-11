@@ -25,6 +25,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "MediaObjectRecord": ("noveland.media.contracts", "MediaObjectRecord"),
     "MediaReferenceCreate": ("noveland.media.contracts", "MediaReferenceCreate"),
     "MediaReferenceRecord": ("noveland.media.contracts", "MediaReferenceRecord"),
+    "ImageService": ("noveland.media.image_service", "ImageService"),
     "MediaJobService": ("noveland.media.service", "MediaJobService"),
     "MediaReferenceService": ("noveland.media.service", "MediaReferenceService"),
     "MediaService": ("noveland.media.service", "MediaService"),

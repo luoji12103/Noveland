@@ -81,6 +81,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
+  - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
@@ -139,7 +140,10 @@ Fast orientation for a new coding session.
   - `noveland.memory.vector_type` — shared embedding dimension and SQLAlchemy vector type adapter
 - `backend/packages/media/`
   - `noveland.media.catalog` — media asset tag, collection, search, reference, and visibility-safe lineage services
+  - `noveland.media.composer` — deterministic Pillow-backed PNG alpha composition helper
   - `noveland.media.contracts` — Media Kernel enums and DTOs for assets, jobs, contexts, inputs, tags, collections, references, search, and lineage
+  - `noveland.media.image_contracts` — image generation, edit, compose, layer, transparent-background, and image result DTOs
+  - `noveland.media.image_service` — provider-backed image generation/edit orchestration and local composition writeback service
   - `noveland.media.models` — worldline-scoped media asset, job, context, input, tag, collection, and collection item ORM models
   - `noveland.media.service` — media asset/context/lineage service and queued media job service
   - `noveland.media.storage` — binary local media object storage facade with opaque `media://` URIs
@@ -154,9 +158,12 @@ Fast orientation for a new coding session.
   - `noveland.providers.models` — provider integration, capability, and health-check ORM models
   - `noveland.providers.registry` — provider CRUD, capability update/list, visibility filtering, and world-over-global resolution service
   - `noveland.providers.health` — provider health-check recording and fake health dispatch service
-  - `noveland.providers.service` — provider execution service with invocation ledger writes and fake media/text/speech execution
+  - `noveland.providers.service` — provider execution service with invocation ledger writes, fake media/text/speech execution, image adapter dispatch, and media writeback
   - `noveland.providers.fake` — deterministic fake adapter for text, image, STT, and TTS provider execution tests
   - `noveland.providers.routing` — provider-kind/adapter-kind compatibility and mapping helpers
+  - `noveland.providers.adapters.openai_image` — OpenAI image generation/edit request mapper and `b64_json` image response decoder
+  - `noveland.providers.adapters.openai_compatible_image` — OpenAI-compatible image adapter wrapper
+  - `noveland.providers.adapters.comfyui` — remote ComfyUI workflow submission/template mapping adapter with dry-run support
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry

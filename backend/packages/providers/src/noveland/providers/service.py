@@ -22,6 +22,7 @@ from noveland.media.contracts import (
     MediaAssetCreate,
     MediaAssetKind,
     MediaAssetRecord,
+    MediaAssetRole,
     MediaAssetStatus,
     MediaJobCreate,
     MediaJobRecord,
@@ -37,6 +38,9 @@ from noveland.media.errors import MediaValidationError
 from noveland.media.models import MediaAsset, MediaJob
 from noveland.media.service import MediaJobService, MediaService
 from noveland.media.storage import MediaObjectStorage
+from noveland.providers.adapters.comfyui import ComfyUIAdapter
+from noveland.providers.adapters.openai_compatible_image import OpenAICompatibleImageAdapter
+from noveland.providers.adapters.openai_image import ImageAdapterInput, OpenAIImageAdapter
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderExecutionRequest,
@@ -82,6 +86,9 @@ class ProviderExecutionService:
         self._session = session
         self._storage = storage
         self._fake = FakeProviderAdapter()
+        self._openai_image = OpenAIImageAdapter()
+        self._openai_compatible_image = OpenAICompatibleImageAdapter()
+        self._comfyui = ComfyUIAdapter()
 
     def execute(self, request: ProviderExecutionRequest) -> ProviderExecutionResult:
         worldline_id = self._worldline_id(request.world_id, request.worldline_id)
@@ -137,7 +144,7 @@ class ProviderExecutionService:
         )
 
         try:
-            result = self.execute_fake(provider, request, worldline_id)
+            result = self._execute_provider(provider, model, request, worldline_id)
             InvocationLedgerService(self._session).update_status(
                 request.world_id,
                 invocation.id,
@@ -210,7 +217,7 @@ class ProviderExecutionService:
         output_asset: MediaAssetRecord | None = None
         output_objects: list[MediaObjectRecord] = []
         if fake.media_bytes is not None:
-            media_job, output_asset, output_objects = self._write_fake_media(
+            media_job, output_asset, output_objects = self._write_provider_media(
                 provider,
                 request,
                 worldline_id,
@@ -226,7 +233,67 @@ class ProviderExecutionService:
             output_objects=output_objects,
         )
 
-    def _write_fake_media(
+    def _execute_provider(
+        self,
+        provider: ProviderIntegrationRead,
+        model: ProviderIntegration,
+        request: ProviderExecutionRequest,
+        worldline_id: uuid.UUID,
+    ) -> _ExecutionOutcome:
+        if provider.adapter_kind in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
+            return self.execute_fake(provider, request, worldline_id)
+        if provider.adapter_kind in {
+            ProviderAdapterKind.OPENAI,
+            ProviderAdapterKind.OPENAI_COMPATIBLE,
+            ProviderAdapterKind.COMFYUI,
+        }:
+            adapter = self._adapter_for(provider.adapter_kind)
+            adapter_result = adapter.execute(
+                base_url=model.base_url,
+                auth_ref=model.auth_ref,
+                config_json=model.config_json,
+                default_params_json=model.default_params_json,
+                input_text=request.input_text,
+                input_json=request.input_json,
+                request_json=request.request_json,
+                media_inputs=self._media_inputs_for_request(request),
+            )
+            media_job: MediaJobRecord | None = None
+            output_asset: MediaAssetRecord | None = None
+            output_objects: list[MediaObjectRecord] = []
+            if adapter_result.media_bytes is not None:
+                media_job, output_asset, output_objects = self._write_provider_media(
+                    provider,
+                    request,
+                    worldline_id,
+                    data=adapter_result.media_bytes,
+                    mime_type=adapter_result.media_mime_type or "application/octet-stream",
+                    filename=adapter_result.media_filename,
+                )
+            return _ExecutionOutcome(
+                output_text=adapter_result.output_text,
+                output_json=adapter_result.output_json,
+                media_job=media_job,
+                output_asset=output_asset,
+                output_objects=output_objects,
+            )
+        raise ProviderExecutionError(
+            f"adapter_kind={provider.adapter_kind.value} is not implemented"
+        )
+
+    def _adapter_for(
+        self,
+        adapter_kind: ProviderAdapterKind,
+    ) -> OpenAIImageAdapter | OpenAICompatibleImageAdapter | ComfyUIAdapter:
+        if adapter_kind == ProviderAdapterKind.OPENAI:
+            return self._openai_image
+        if adapter_kind == ProviderAdapterKind.OPENAI_COMPATIBLE:
+            return self._openai_compatible_image
+        if adapter_kind == ProviderAdapterKind.COMFYUI:
+            return self._comfyui
+        raise ProviderExecutionError(f"adapter_kind={adapter_kind.value} is not implemented")
+
+    def _write_provider_media(
         self,
         provider: ProviderIntegrationRead,
         request: ProviderExecutionRequest,
@@ -241,22 +308,45 @@ class ProviderExecutionService:
         job_kind = media_job_kind_for_provider(provider.provider_kind)
         if job_kind is None:
             raise ProviderValidationError("provider kind does not produce media jobs")
-        job = MediaJobService(self._session).create_job(
-            MediaJobCreate(
-                world_id=request.world_id,
+        job_service = MediaJobService(self._session)
+        if request.media_job_id is None:
+            job = job_service.create_job(
+                MediaJobCreate(
+                    world_id=request.world_id,
+                    worldline_id=worldline_id,
+                    job_kind=job_kind,
+                    provider_kind=provider.provider_kind.value,
+                    source_invocation_id=None,
+                    provider_config_json={"provider_id": str(provider.id)},
+                    request_json=request.request_json,
+                ),
+                actor_ref=request.actor_ref or "service:provider-execution",
+            )
+        else:
+            existing_job = job_service.get_job(
+                request.world_id,
+                request.media_job_id,
                 worldline_id=worldline_id,
-                job_kind=job_kind,
-                provider_kind=provider.provider_kind.value,
-                source_invocation_id=None,
-                provider_config_json={"provider_id": str(provider.id)},
-                request_json=request.request_json,
-            ),
-            actor_ref=request.actor_ref or "service:provider-execution",
-        )
-        asset_kind, asset_role = output_asset_shape_for_provider(provider.provider_kind)
+            )
+            if existing_job is None:
+                raise ProviderValidationError(
+                    "media job must belong to provider execution worldline"
+                )
+            job = job_service.update_job(
+                request.world_id,
+                request.media_job_id,
+                MediaJobUpdate(
+                    status=MediaJobStatus.RUNNING,
+                    started_at=datetime.now(UTC),
+                    provider_kind=provider.provider_kind.value,
+                    provider_config_json={"provider_id": str(provider.id)},
+                ),
+            )
+        asset_kind, default_asset_role = output_asset_shape_for_provider(provider.provider_kind)
+        asset_role = _output_asset_role(request, default_asset_role)
         asset_id = uuid.uuid4()
         checksum = hashlib.sha256(data).hexdigest()
-        ext = ".png" if asset_kind == MediaAssetKind.IMAGE else ".wav"
+        ext = _extension_for_mime(asset_kind, mime_type)
         key = (
             f"worlds/{request.world_id}/worldlines/{worldline_id}/assets/{asset_id}/"
             f"original-{checksum}{ext}"
@@ -279,7 +369,11 @@ class ProviderExecutionService:
                 provider_kind=provider.provider_kind.value,
                 source_job_id=job.id,
                 title=filename,
-                metadata={"provider_id": str(provider.id), "fake": True},
+                metadata={
+                    "provider_id": str(provider.id),
+                    "adapter_kind": provider.adapter_kind.value,
+                    "request_metadata": request.request_json.get("metadata", {}),
+                },
             ),
             actor_ref=request.actor_ref or "service:provider-execution",
         )
@@ -295,7 +389,10 @@ class ProviderExecutionService:
                 mime_type=mime_type,
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
-                metadata={"provider_id": str(provider.id), "fake": True},
+                metadata={
+                    "provider_id": str(provider.id),
+                    "adapter_kind": provider.adapter_kind.value,
+                },
             ),
         )
         job = MediaJobService(self._session).update_job(
@@ -372,8 +469,84 @@ class ProviderExecutionService:
         if asset is None or asset.world_id != world_id or asset.worldline_id != worldline_id:
             raise MediaValidationError("media asset must belong to provider execution worldline")
 
+    def _media_inputs_for_request(
+        self,
+        request: ProviderExecutionRequest,
+    ) -> list[ImageAdapterInput]:
+        if self._storage is None:
+            return []
+        raw_ids = request.request_json.get("input_asset_ids")
+        asset_ids = [str(item) for item in raw_ids] if isinstance(raw_ids, list) else []
+        inputs: list[ImageAdapterInput] = []
+        for raw_asset_id in asset_ids:
+            asset_id = uuid.UUID(raw_asset_id)
+            inputs.append(
+                self._media_input_for_asset(request.world_id, asset_id, field_name="image")
+            )
+        raw_mask_id = request.request_json.get("mask_asset_id")
+        if isinstance(raw_mask_id, str):
+            inputs.append(
+                self._media_input_for_asset(
+                    request.world_id,
+                    uuid.UUID(raw_mask_id),
+                    field_name="mask",
+                )
+            )
+        return inputs
+
+    def _media_input_for_asset(
+        self,
+        world_id: uuid.UUID,
+        asset_id: uuid.UUID,
+        *,
+        field_name: str,
+    ) -> ImageAdapterInput:
+        media = MediaService(self._session, self._storage)
+        objects = media.list_objects(world_id, asset_id)
+        if not objects:
+            raise MediaValidationError("media input asset has no object")
+        selected = objects[0]
+        record, data = media.read_object_bytes(world_id, selected.id)
+        return ImageAdapterInput(
+            filename=record.filename or f"{field_name}.png",
+            data=data,
+            mime_type=record.mime_type,
+            field_name=field_name,
+        )
+
     def _worldline_id(self, world_id: uuid.UUID, worldline_id: uuid.UUID | None) -> uuid.UUID:
         try:
             return worldline_or_404(self._session, world_id, worldline_id).id
         except ValueError as exc:
             raise ProviderValidationError("worldline not found") from exc
+
+
+def _output_asset_role(
+    request: ProviderExecutionRequest,
+    default_asset_role: MediaAssetRole,
+) -> MediaAssetRole:
+    raw_role = request.request_json.get("output_asset_role") or request.request_json.get(
+        "asset_role"
+    )
+    if not isinstance(raw_role, str):
+        return default_asset_role
+    try:
+        return MediaAssetRole(raw_role)
+    except ValueError:
+        return default_asset_role
+
+
+def _extension_for_mime(asset_kind: MediaAssetKind, mime_type: str) -> str:
+    if asset_kind == MediaAssetKind.AUDIO:
+        if mime_type == "audio/mpeg":
+            return ".mp3"
+        if mime_type == "audio/ogg":
+            return ".ogg"
+        if mime_type == "audio/webm":
+            return ".webm"
+        return ".wav"
+    if mime_type == "image/jpeg":
+        return ".jpg"
+    if mime_type == "image/webp":
+        return ".webp"
+    return ".png"
