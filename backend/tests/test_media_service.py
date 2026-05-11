@@ -11,19 +11,44 @@ from noveland.auth.models import User
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.events import WorldEventAppend, WorldEventStore
 from noveland.events.models import WorldEventModel
+from noveland.invocations.contracts import (
+    InvocationActorKind,
+    InvocationKind,
+    InvocationProviderKind,
+    InvocationRecordCreate,
+    InvocationStatus,
+)
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
+from noveland.invocations.service import InvocationLedgerService
 from noveland.media.contracts import (
+    ConversationTurnMediaAttachmentCreate,
     MediaAssetCreate,
     MediaAssetInputCreate,
     MediaAssetKind,
     MediaAssetRole,
     MediaAssetStatus,
+    MediaAssetUploadRequest,
     MediaContextCreate,
     MediaJobCreate,
     MediaJobKind,
+    MediaJobStatus,
+    MediaJobUpdate,
+    MediaObjectCreate,
+    MediaObjectRole,
+    MediaReferenceCreate,
+    MediaReferenceKind,
+    MediaReferenceListFilters,
+    MediaReferenceRole,
     MediaSourceKind,
     MediaVisibility,
 )
-from noveland.media.errors import MediaValidationError
+from noveland.media.errors import MediaConflictError, MediaStorageError, MediaValidationError
 from noveland.media.models import (
     MediaAsset,
     MediaAssetCollection,
@@ -32,9 +57,12 @@ from noveland.media.models import (
     MediaAssetInput,
     MediaAssetTag,
     MediaJob,
+    MediaObject,
+    MediaReference,
 )
-from noveland.media.service import MediaJobService, MediaService
+from noveland.media.service import MediaJobService, MediaReferenceService, MediaService
 from noveland.media.storage import LocalMediaObjectStorage
+from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.narrative.models import NarrativeArtifact
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
@@ -197,6 +225,319 @@ def test_available_asset_requires_verified_storage(tmp_path: Path) -> None:
             )
 
 
+def test_media_service_upload_adds_object_and_downloads_bytes(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, primary_id, _fork_id, _agent_id, _conversation_id, _turn_id = _seed_world_graph(
+        engine
+    )
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        upload = MediaService(session, storage).upload_asset(
+            MediaAssetUploadRequest(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                visibility=MediaVisibility.WORLD_ADMIN,
+                title="Reference",
+                metadata={"kind": "upload"},
+            ),
+            data=b"image-bytes",
+            filename="../unsafe.png",
+            mime_type="image/png",
+            actor_ref="user:test",
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        service = MediaService(session, storage)
+        objects = service.list_objects(world_id, upload.asset.id)
+        media_object, data = service.read_object_bytes(world_id, upload.object.id)
+
+    assert upload.asset.status == MediaAssetStatus.AVAILABLE
+    assert upload.asset.storage_uri == upload.object.storage_uri
+    assert upload.object.size_bytes == len(b"image-bytes")
+    assert upload.object.checksum_sha256 == upload.asset.checksum_sha256
+    assert objects[0].id == upload.object.id
+    assert media_object.mime_type == "image/png"
+    assert data == b"image-bytes"
+    assert ".." not in upload.object.storage_uri
+
+
+def test_media_service_adds_object_variant_and_rejects_path_traversal(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, primary_id, _fork_id, _agent_id, _conversation_id, _turn_id = _seed_world_graph(
+        engine
+    )
+    storage = LocalMediaObjectStorage(tmp_path)
+    stored = storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{primary_id}/assets/asset/preview.png",
+        b"preview",
+        content_type="image/png",
+    )
+
+    with pytest.raises(MediaStorageError, match="safe relative path"):
+        storage.write_bytes("../escape.png", b"bad", content_type="image/png")
+
+    with Session(engine) as session:
+        service = MediaService(session, storage)
+        asset = service.create_asset(
+            MediaAssetCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                source_kind=MediaSourceKind.MANUAL_UPLOAD,
+                visibility=MediaVisibility.WORLD_ADMIN,
+            ),
+            actor_ref="user:test",
+        )
+        variant = service.add_object(
+            world_id,
+            asset.id,
+            MediaObjectCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                object_role=MediaObjectRole.PREVIEW,
+                storage_uri=stored.uri,
+                filename="preview.png",
+                mime_type="image/png",
+                size_bytes=stored.size_bytes,
+                checksum_sha256=stored.checksum_sha256,
+                metadata={"variant": "preview"},
+            ),
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        objects = MediaService(session, storage).list_objects(world_id, asset.id)
+
+    assert variant.object_role == MediaObjectRole.PREVIEW
+    assert [item.id for item in objects] == [variant.id]
+
+
+def test_media_reference_service_creates_refs_and_rejects_cross_worldline() -> None:
+    engine = _engine()
+    world_id, primary_id, fork_id, _agent_id, conversation_id, turn_id = _seed_world_graph(engine)
+    event_id = _seed_event(engine, world_id)
+    artifact_id = _seed_artifact(engine, world_id, worldline_id=primary_id)
+
+    with Session(engine) as session:
+        asset = MediaService(session).create_asset(
+            MediaAssetCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                source_kind=MediaSourceKind.MANUAL_UPLOAD,
+            ),
+            actor_ref="user:test",
+        )
+        reference_service = MediaReferenceService(session)
+        turn_ref = reference_service.create_reference(
+            MediaReferenceCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_id=asset.id,
+                ref_kind=MediaReferenceKind.CONVERSATION_TURN,
+                ref_id=turn_id,
+                ref_role=MediaReferenceRole.ATTACHMENT,
+            )
+        )
+        event_ref = reference_service.create_reference(
+            MediaReferenceCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_id=asset.id,
+                ref_kind=MediaReferenceKind.WORLD_EVENT,
+                ref_id=event_id,
+                ref_role=MediaReferenceRole.EVIDENCE,
+            )
+        )
+        artifact_ref = reference_service.create_reference(
+            MediaReferenceCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_id=asset.id,
+                ref_kind=MediaReferenceKind.NARRATIVE_ARTIFACT,
+                ref_id=artifact_id,
+                ref_role=MediaReferenceRole.PREVIEW,
+            )
+        )
+        listed = reference_service.list_references(
+            world_id,
+            MediaReferenceListFilters(
+                worldline_id=primary_id,
+                ref_kind=MediaReferenceKind.WORLD_EVENT,
+            ),
+        )
+        with pytest.raises(MediaValidationError, match="asset must belong"):
+            reference_service.create_reference(
+                MediaReferenceCreate(
+                    world_id=world_id,
+                    worldline_id=fork_id,
+                    asset_id=asset.id,
+                    ref_kind=MediaReferenceKind.CONVERSATION_SESSION,
+                    ref_id=conversation_id,
+                )
+            )
+        session.commit()
+
+    assert turn_ref.ref_id == turn_id
+    assert event_ref.ref_role == MediaReferenceRole.EVIDENCE
+    assert artifact_ref.ref_kind == MediaReferenceKind.NARRATIVE_ARTIFACT
+    assert [item.id for item in listed] == [event_ref.id]
+
+
+def test_turn_media_reads_new_references_and_legacy_contexts() -> None:
+    engine = _engine()
+    world_id, primary_id, _fork_id, _agent_id, conversation_id, turn_id = _seed_world_graph(engine)
+
+    with Session(engine) as session:
+        service = MediaService(session)
+        new_asset = service.create_asset(
+            MediaAssetCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                source_kind=MediaSourceKind.MANUAL_UPLOAD,
+            ),
+            actor_ref="user:test",
+        )
+        legacy_asset = service.create_asset(
+            MediaAssetCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.ORIGINAL_IMAGE,
+                source_kind=MediaSourceKind.MANUAL_UPLOAD,
+            ),
+            actor_ref="user:test",
+        )
+        service.attach_context(
+            world_id,
+            legacy_asset.id,
+            MediaContextCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            ),
+        )
+        reference_service = MediaReferenceService(session)
+        reference_service.create_turn_media(
+            world_id,
+            conversation_id,
+            turn_id,
+            ConversationTurnMediaAttachmentCreate(
+                worldline_id=primary_id,
+                asset_id=new_asset.id,
+                attachment_role=MediaReferenceRole.ATTACHMENT,
+            ),
+        )
+        records = reference_service.list_turn_media(world_id, conversation_id, turn_id)
+        session.commit()
+
+    assert {record.asset.id for record in records} == {new_asset.id, legacy_asset.id}
+    assert sum(record.reference is not None for record in records) == 1
+    assert sum(record.legacy_context is not None for record in records) == 1
+
+
+def test_media_job_update_cancel_and_terminal_cancel_rejection() -> None:
+    engine = _engine()
+    world_id, primary_id, _fork_id, _agent_id, _conversation_id, _turn_id = _seed_world_graph(
+        engine
+    )
+
+    with Session(engine) as session:
+        service = MediaJobService(session)
+        job = service.create_job(
+            MediaJobCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                job_kind=MediaJobKind.THUMBNAIL,
+                provider_config_json={"preset": "small"},
+                request_json={"asset": "pending"},
+            ),
+            actor_ref="user:test",
+        )
+        updated = service.update_job(
+            world_id,
+            job.id,
+            MediaJobUpdate(
+                status=MediaJobStatus.RUNNING,
+                priority=10,
+                result_json={"started": True},
+            ),
+        )
+        cancelled = service.cancel_job(world_id, job.id)
+        with pytest.raises(MediaConflictError, match="queued or running"):
+            service.cancel_job(world_id, job.id)
+        session.commit()
+
+    assert updated.status == MediaJobStatus.RUNNING
+    assert updated.priority == 10
+    assert cancelled.status == MediaJobStatus.CANCELLED
+
+
+def test_media_source_invocation_and_memory_reference_validation() -> None:
+    engine = _engine()
+    world_id, primary_id, fork_id, agent_id, _conversation_id, _turn_id = _seed_world_graph(engine)
+    invocation_id = _seed_invocation(engine, world_id, primary_id)
+    memory_job_id = _seed_memory_write_job(engine, world_id, primary_id, agent_id)
+
+    with Session(engine) as session:
+        service = MediaService(session)
+        asset = service.create_asset(
+            MediaAssetCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_kind=MediaAssetKind.IMAGE,
+                asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                source_kind=MediaSourceKind.PROVIDER_GENERATED,
+                source_invocation_id=invocation_id,
+            ),
+            actor_ref="user:test",
+        )
+        job = MediaJobService(session).create_job(
+            MediaJobCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                job_kind=MediaJobKind.IMAGE_GENERATION,
+                source_invocation_id=invocation_id,
+            ),
+            actor_ref="user:test",
+        )
+        memory_ref = MediaReferenceService(session).create_reference(
+            MediaReferenceCreate(
+                world_id=world_id,
+                worldline_id=primary_id,
+                asset_id=asset.id,
+                ref_kind=MediaReferenceKind.MEMORY_WRITE_JOB,
+                ref_id=memory_job_id,
+            )
+        )
+        with pytest.raises(MediaValidationError, match="source invocation"):
+            service.create_asset(
+                MediaAssetCreate(
+                    world_id=world_id,
+                    worldline_id=fork_id,
+                    asset_kind=MediaAssetKind.IMAGE,
+                    asset_role=MediaAssetRole.REFERENCE_IMAGE,
+                    source_kind=MediaSourceKind.PROVIDER_GENERATED,
+                    source_invocation_id=invocation_id,
+                ),
+                actor_ref="user:test",
+            )
+        session.commit()
+
+    assert asset.source_invocation_id == invocation_id
+    assert job.source_invocation_id == invocation_id
+    assert memory_ref.ref_id == memory_job_id
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -216,8 +557,17 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
+        cast(Table, MediaReference.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, MediaAssetContext.__table__),
         cast(Table, MediaAssetInput.__table__),
@@ -314,7 +664,12 @@ def _seed_event(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
         return event.id
 
 
-def _seed_artifact(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+def _seed_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    worldline_id: uuid.UUID | None = None,
+) -> uuid.UUID:
     artifact_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
@@ -324,8 +679,74 @@ def _seed_artifact(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
                 title="Artifact",
                 content="Text",
                 artifact_kind="agent_note",
-                artifact_metadata={},
+                artifact_metadata=(
+                    {} if worldline_id is None else {"worldline_id": str(worldline_id)}
+                ),
             ),
         )
         session.commit()
     return artifact_id
+
+
+def _seed_invocation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> uuid.UUID:
+    with Session(engine) as session:
+        invocation = InvocationLedgerService(session).record(
+            InvocationRecordCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                invocation_kind=InvocationKind.IMAGE_GENERATION,
+                actor_kind=InvocationActorKind.SERVICE,
+                provider_kind=InvocationProviderKind.LOCAL_STUB,
+                status=InvocationStatus.SUCCEEDED,
+                input_text="input",
+                output_text="output",
+            )
+        )
+        session.commit()
+        return invocation.id
+
+
+def _seed_memory_write_job(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+) -> uuid.UUID:
+    backend_id = uuid.uuid4()
+    job_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MemoryBackendProfile(
+                id=backend_id,
+                profile_key=f"profile-{backend_id.hex[:8]}",
+                name="Local",
+                backend_kind="local_pgvector",
+                is_enabled=True,
+                vector_store_config={},
+                llm_config={},
+                embedder_config={},
+                reranker_config={},
+                secret_refs={},
+            )
+        )
+        session.add(
+            MemoryWriteJob(
+                id=job_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                backend_profile_id=backend_id,
+                source_kind="world_event",
+                source_id=uuid.uuid4(),
+                payload_json={},
+                dedupe_key=f"dedupe-{job_id.hex}",
+                status="pending",
+                attempt_count=0,
+            )
+        )
+        session.commit()
+    return job_id

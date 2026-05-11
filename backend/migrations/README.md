@@ -17,3 +17,4 @@ Current sequence:
 - `20260510_0030`: Media Kernel Phase 1 foundation tables for worldline-scoped media assets, media jobs, media asset contexts, and media input/output lineage.
 - `20260510_0031`: Media Asset Catalog Phase 2 tables for worldline-scoped asset tags, collections, and collection items.
 - `20260511_0032`: Model Invocation Ledger Phase 3 tables for model invocations, prompt templates, prompt snapshots, runtime-run invocation links, and invocation tags.
+- `20260512_0033`: Media Kernel Phase 4 additive extension for media object variants, generic media references, media-side invocation links, and richer media job source/config fields.

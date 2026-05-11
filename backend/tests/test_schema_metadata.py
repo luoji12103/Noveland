@@ -83,6 +83,8 @@ def test_core_schema_tables_are_registered() -> None:
         "media_asset_tags",
         "media_assets",
         "media_jobs",
+        "media_objects",
+        "media_references",
         "model_invocation_tags",
         "model_invocations",
         "memory_retrieval_logs",
@@ -187,6 +189,7 @@ def test_media_kernel_foundation_tables_are_registered() -> None:
         "checksum_sha256",
         "source_job_id",
         "source_event_id",
+        "source_invocation_id",
         "metadata",
     } <= column_names("media_assets")
     assert {
@@ -197,6 +200,9 @@ def test_media_kernel_foundation_tables_are_registered() -> None:
         "agent_id",
         "job_kind",
         "provider_kind",
+        "source_event_id",
+        "source_invocation_id",
+        "provider_config_json",
         "status",
         "request_json",
         "result_json",
@@ -226,12 +232,71 @@ def test_media_kernel_foundation_tables_are_registered() -> None:
         "ix_media_assets_worldline_created",
         "ix_media_assets_worldline_kind_role",
         "ix_media_assets_worldline_status",
+        "ix_media_assets_source_invocation_id",
     } <= index_names("media_assets")
     assert {
+        "media_jobs.id",
+        "model_invocations.id",
+        "world_events.id",
         "worldlines.id",
         "worlds.id",
     } <= foreign_key_targets("media_assets")
     assert "provider_profiles.id" not in foreign_key_targets("media_jobs")
+    assert "model_invocations.id" in foreign_key_targets("media_jobs")
+    assert {
+        "asset_id",
+        "world_id",
+        "worldline_id",
+        "object_role",
+        "storage_uri",
+        "filename",
+        "mime_type",
+        "size_bytes",
+        "checksum_sha256",
+        "width",
+        "height",
+        "duration_ms",
+        "sample_rate_hz",
+        "audio_channels",
+        "frame_rate",
+        "metadata",
+    } <= column_names("media_objects")
+    assert {
+        "world_id",
+        "worldline_id",
+        "asset_id",
+        "ref_kind",
+        "ref_id",
+        "ref_role",
+        "display_order",
+        "metadata",
+    } <= column_names("media_references")
+    assert {
+        "ix_media_objects_worldline_created",
+        "ix_media_objects_asset_role",
+        "ix_media_objects_checksum",
+    } <= index_names("media_objects")
+    assert {
+        "ix_media_references_worldline_created",
+        "ix_media_references_asset_id",
+        "ix_media_references_target",
+    } <= index_names("media_references")
+    assert "uq_media_objects_storage_uri" in constraint_names(
+        "media_objects", UniqueConstraint
+    )
+    assert "uq_media_references_identity" in constraint_names(
+        "media_references", UniqueConstraint
+    )
+    assert {
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_objects")
+    assert {
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("media_references")
 
 
 def test_media_asset_catalog_tables_are_registered() -> None:
@@ -1607,6 +1672,16 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "model_invocations.id",
         "provider_profiles.id",
         "world_events.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("media_objects") == {
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("media_references") == {
+        "media_assets.id",
         "worldlines.id",
         "worlds.id",
     }

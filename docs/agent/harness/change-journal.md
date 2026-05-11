@@ -692,3 +692,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/media-kernel` after this docs-only work is committed on `main`.
+
+## Media Kernel Phase 4 implementation entry
+
+- Date: 2026-05-11
+- Branch: feat/media-kernel
+- Scope: Backend-only Media Kernel Phase 4 additive extension.
+- Summary: Extended the existing `noveland-media` foundation with multi-object asset records, generic media references, upload/download support, richer media job list/update/cancel flows, turn media attachment routes backed by `media_references`, and media-side Phase 3 invocation links. The implementation preserves existing media tables and route behavior, keeps storage URIs and bytes out of world events, and does not add provider adapters, Web UI, public reader routes, or background media job execution.
+- Files changed: `/backend/packages/media/src/noveland/media/{contracts,models,service,storage,__init__}.py`, `/backend/services/api/src/noveland/services/api/{app,media}.py`, `/backend/migrations/versions/20260512_0033_media_kernel.py`, `/backend/tests/{test_media_service.py,test_api_media.py,test_schema_metadata.py,test_alembic_config.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Media service coverage for upload/object variants/references/turn media/job updates/source invocation and memory job validation; Media API coverage for upload/download ACL, generic refs, turn media, job patch/cancel, malformed upload metadata, and cross-worldline rejection; schema metadata and Alembic head coverage.
+- Docs updated: migration README, file inventory, change journal, and active handoff.
+- Follow-up notes: Provider-specific image/audio/video adapters, public reader media serving, S3/GCS storage, media embeddings/search, Web media management UI, and background media job execution remain deferred.

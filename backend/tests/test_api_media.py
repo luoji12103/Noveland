@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import cast
 
 from fastapi.testclient import TestClient
@@ -22,11 +24,15 @@ from noveland.media.models import (
     MediaAssetInput,
     MediaAssetTag,
     MediaJob,
+    MediaObject,
+    MediaReference,
 )
+from noveland.media.storage import LocalMediaObjectStorage
 from noveland.narrative.models import NarrativeArtifact
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
+from noveland.services.api.media import _media_storage
 from noveland.worlds.models import World, Worldline, WorldMembership
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -243,7 +249,213 @@ def test_media_api_member_can_read_visible_fork_asset_references() -> None:
     assert references.json()["input_count"] == 1
 
 
-def _client_with_database() -> tuple[TestClient, Engine]:
+def test_media_api_upload_download_objects_and_restricted_visibility() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    platform_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+
+    _authenticate(client, owner_token)
+    uploaded = client.post(
+        f"/worlds/{world_id}/media/assets/upload",
+        data={
+            "worldline_id": str(primary_id),
+            "asset_kind": "image",
+            "asset_role": "reference_image",
+            "visibility": "world_admin",
+            "title": "Upload",
+            "metadata_json": '{"source":"api"}',
+        },
+        files={"file": ("../unsafe.png", b"image-bytes", "image/png")},
+    )
+    asset_id = uploaded.json()["asset"]["id"]
+    object_id = uploaded.json()["object"]["id"]
+    objects = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/objects")
+    download = client.get(f"/worlds/{world_id}/media/objects/{object_id}/download")
+    hidden_asset_id = _seed_asset(engine, world_id, primary_id, visibility="hidden")
+    hidden_object_id = _seed_object(
+        engine,
+        client.media_storage,
+        world_id,
+        primary_id,
+        hidden_asset_id,
+    )
+    owner_hidden_download = client.get(
+        f"/worlds/{world_id}/media/objects/{hidden_object_id}/download"
+    )
+
+    _authenticate(client, member_token)
+    member_download = client.get(f"/worlds/{world_id}/media/objects/{object_id}/download")
+
+    _authenticate(client, platform_token)
+    platform_hidden_download = client.get(
+        f"/worlds/{world_id}/media/objects/{hidden_object_id}/download"
+    )
+
+    assert platform_id
+    assert uploaded.status_code == 201
+    assert uploaded.json()["asset"]["status"] == "available"
+    assert uploaded.json()["asset"]["storage_uri"] == uploaded.json()["object"]["storage_uri"]
+    assert uploaded.json()["asset"]["metadata"] == {"source": "api"}
+    assert uploaded.json()["object"]["size_bytes"] == len(b"image-bytes")
+    assert ".." not in uploaded.json()["object"]["storage_uri"]
+    assert objects.status_code == 200
+    assert [item["id"] for item in objects.json()] == [object_id]
+    assert download.status_code == 200
+    assert download.content == b"image-bytes"
+    assert download.headers["content-type"].startswith("image/png")
+    assert member_download.status_code == 403
+    assert owner_hidden_download.status_code == 404
+    assert platform_hidden_download.status_code == 200
+    assert platform_hidden_download.content == b"hidden-bytes"
+
+
+def test_media_api_generic_references_turn_media_and_job_patch() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, turn_id = _seed_conversation(engine, world_id, primary_id)
+    event_id = _seed_event(engine, world_id)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_admin")
+    legacy_asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_admin")
+    _seed_context(engine, world_id, primary_id, legacy_asset_id, conversation_id, turn_id)
+
+    _authenticate(client, owner_token)
+    reference = client.post(
+        f"/worlds/{world_id}/media/references",
+        json={
+            "worldline_id": str(primary_id),
+            "asset_id": str(asset_id),
+            "ref_kind": "world_event",
+            "ref_id": str(event_id),
+            "ref_role": "evidence",
+        },
+    )
+    reference_id = reference.json()["id"]
+    listed_refs = client.get(
+        f"/worlds/{world_id}/media/references",
+        params={"worldline_id": str(primary_id), "ref_kind": "world_event"},
+    )
+    turn_ref = client.post(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/media",
+        json={
+            "worldline_id": str(primary_id),
+            "asset_id": str(asset_id),
+            "attachment_role": "attachment",
+        },
+    )
+    turn_media = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/media"
+    )
+    job = client.post(
+        f"/worlds/{world_id}/media/jobs",
+        json={
+            "worldline_id": str(primary_id),
+            "job_kind": "thumbnail",
+            "priority": 120,
+            "provider_kind": "local",
+            "provider_config_json": {"preset": "small"},
+            "request_json": {"asset_id": str(asset_id)},
+        },
+    )
+    patched = client.patch(
+        f"/worlds/{world_id}/media/jobs/{job.json()['id']}",
+        json={
+            "status": "running",
+            "priority": 10,
+            "result_json": {"started": True},
+        },
+    )
+    filtered_jobs = client.get(
+        f"/worlds/{world_id}/media/jobs",
+        params={
+            "worldline_id": str(primary_id),
+            "job_kind": "thumbnail",
+            "priority_max": 10,
+        },
+    )
+    cancelled = client.post(f"/worlds/{world_id}/media/jobs/{job.json()['id']}/cancel")
+    cancel_again = client.post(f"/worlds/{world_id}/media/jobs/{job.json()['id']}/cancel")
+    deleted_ref = client.delete(f"/worlds/{world_id}/media/references/{reference_id}")
+    listed_after_delete = client.get(
+        f"/worlds/{world_id}/media/references",
+        params={"worldline_id": str(primary_id), "ref_kind": "world_event"},
+    )
+
+    assert reference.status_code == 201
+    assert reference.json()["ref_role"] == "evidence"
+    assert listed_refs.status_code == 200
+    assert [item["id"] for item in listed_refs.json()] == [reference_id]
+    assert turn_ref.status_code == 201
+    assert turn_media.status_code == 200
+    assert {item["asset"]["id"] for item in turn_media.json()} == {
+        str(asset_id),
+        str(legacy_asset_id),
+    }
+    assert job.status_code == 201
+    assert patched.status_code == 200
+    assert patched.json()["status"] == "running"
+    assert patched.json()["priority"] == 10
+    assert filtered_jobs.status_code == 200
+    assert [item["id"] for item in filtered_jobs.json()] == [job.json()["id"]]
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    assert cancel_again.status_code == 409
+    assert deleted_ref.status_code == 204
+    assert listed_after_delete.json() == []
+
+
+def test_media_api_rejects_cross_worldline_references_and_bad_upload_metadata() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    primary_id, fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, _turn_id = _seed_conversation(engine, world_id, primary_id)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_admin")
+
+    _authenticate(client, owner_token)
+    bad_metadata = client.post(
+        f"/worlds/{world_id}/media/assets/upload",
+        data={
+            "worldline_id": str(primary_id),
+            "asset_kind": "image",
+            "asset_role": "reference_image",
+            "metadata_json": "[1, 2, 3]",
+        },
+        files={"file": ("image.png", b"image-bytes", "image/png")},
+    )
+    cross_worldline_reference = client.post(
+        f"/worlds/{world_id}/media/references",
+        json={
+            "worldline_id": str(fork_id),
+            "asset_id": str(asset_id),
+            "ref_kind": "conversation_session",
+            "ref_id": str(conversation_id),
+        },
+    )
+
+    assert bad_metadata.status_code == 422
+    assert "metadata_json" in bad_metadata.json()["detail"]
+    assert cross_worldline_reference.status_code == 422
+    assert "asset must belong" in cross_worldline_reference.json()["detail"]
+
+
+class _MediaApiClient(TestClient):
+    media_storage: LocalMediaObjectStorage
+
+
+def _client_with_database() -> tuple[_MediaApiClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -262,7 +474,13 @@ def _client_with_database() -> tuple[TestClient, Engine]:
                 raise
 
     app.dependency_overrides[get_db_session] = override_get_db_session
-    return TestClient(app), engine
+    storage_tmp = TemporaryDirectory()
+    storage = LocalMediaObjectStorage(Path(storage_tmp.name))
+    app.dependency_overrides[_media_storage] = lambda: storage
+    app.state._media_storage_tmp = storage_tmp
+    client = _MediaApiClient(app)
+    client.media_storage = storage
+    return client, engine
 
 
 def _create_tables(engine: Engine) -> None:
@@ -279,6 +497,8 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
+        cast(Table, MediaReference.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, MediaAssetContext.__table__),
         cast(Table, MediaAssetInput.__table__),
@@ -466,6 +686,65 @@ def _seed_asset(
         )
         session.commit()
     return asset_id
+
+
+def _seed_object(
+    engine: Engine,
+    storage: LocalMediaObjectStorage,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    asset_id: uuid.UUID,
+) -> uuid.UUID:
+    object_id = uuid.uuid4()
+    stored = storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/original-hidden",
+        b"hidden-bytes",
+        content_type="application/octet-stream",
+    )
+    with Session(engine) as session:
+        session.add(
+            MediaObject(
+                id=object_id,
+                asset_id=asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                object_role="original",
+                storage_uri=stored.uri,
+                filename="hidden.bin",
+                mime_type="application/octet-stream",
+                size_bytes=stored.size_bytes,
+                checksum_sha256=stored.checksum_sha256,
+                metadata_json={},
+            ),
+        )
+        session.commit()
+    return object_id
+
+
+def _seed_context(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+) -> uuid.UUID:
+    context_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaAssetContext(
+                id=context_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_id=asset_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                context_role="attachment",
+                metadata_json={},
+            )
+        )
+        session.commit()
+    return context_id
 
 
 def _seed_artifact(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:

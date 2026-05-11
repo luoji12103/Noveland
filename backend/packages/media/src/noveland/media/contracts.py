@@ -18,6 +18,9 @@ CONTAINS_TEXT_MAX_LENGTH = 120
 class MediaAssetKind(StrEnum):
     IMAGE = "image"
     AUDIO = "audio"
+    VIDEO = "video"
+    DOCUMENT = "document"
+    OTHER = "other"
 
 
 class MediaAssetRole(StrEnum):
@@ -35,6 +38,10 @@ class MediaAssetRole(StrEnum):
     VOICE_FILE = "voice_file"
     VOICE_SAMPLE = "voice_sample"
     TRANSCRIPT_AUDIO = "transcript_audio"
+    VIDEO_CLIP = "video_clip"
+    DOCUMENT = "document"
+    THUMBNAIL = "thumbnail"
+    OTHER = "other"
 
 
 class MediaSourceKind(StrEnum):
@@ -43,6 +50,11 @@ class MediaSourceKind(StrEnum):
     IMPORTED_ORIGINAL = "imported_original"
     COMPOSED = "composed"
     BACKGROUND_REMOVED = "background_removed"
+    CROPPED = "cropped"
+    CONVERTED = "converted"
+    SYSTEM_GENERATED = "system_generated"
+    TEST_FIXTURE = "test_fixture"
+    OTHER = "other"
 
 
 class MediaAssetStatus(StrEnum):
@@ -71,6 +83,10 @@ class MediaJobKind(StrEnum):
     COMPOSITION = "composition"
     UPLOAD_IMPORT = "upload_import"
     VISION_ANALYSIS = "vision_analysis"
+    TRANSCODE = "transcode"
+    THUMBNAIL = "thumbnail"
+    IMPORT = "import"
+    OTHER = "other"
 
 
 class MediaJobStatus(StrEnum):
@@ -112,6 +128,51 @@ class MediaCollectionStatus(StrEnum):
     DELETED = "deleted"
 
 
+class MediaObjectRole(StrEnum):
+    ORIGINAL = "original"
+    PRIMARY = "primary"
+    THUMBNAIL = "thumbnail"
+    PREVIEW = "preview"
+    MASK = "mask"
+    ALPHA = "alpha"
+    TRANSPARENT = "transparent"
+    COMPOSED = "composed"
+    WAVEFORM = "waveform"
+    TRANSCRIPT_SOURCE = "transcript_source"
+    DERIVED = "derived"
+    OTHER = "other"
+
+
+class MediaReferenceKind(StrEnum):
+    CONVERSATION_TURN = "conversation_turn"
+    CONVERSATION_SESSION = "conversation_session"
+    WORLD_EVENT = "world_event"
+    NARRATIVE_ARTIFACT = "narrative_artifact"
+    AGENT = "agent"
+    SCENE = "scene"
+    WORLD = "world"
+    MODEL_INVOCATION = "model_invocation"
+    MEDIA_JOB = "media_job"
+    MEMORY_WRITE_JOB = "memory_write_job"
+    OTHER = "other"
+
+
+class MediaReferenceRole(StrEnum):
+    ATTACHMENT = "attachment"
+    INPUT = "input"
+    OUTPUT = "output"
+    EVIDENCE = "evidence"
+    PREVIEW = "preview"
+    THUMBNAIL = "thumbnail"
+    BACKGROUND = "background"
+    FOREGROUND = "foreground"
+    CHARACTER_SPRITE = "character_sprite"
+    VOICE_REFERENCE = "voice_reference"
+    SOURCE = "source"
+    DERIVED_FROM = "derived_from"
+    OTHER = "other"
+
+
 class _FrozenContract(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -142,6 +203,7 @@ class MediaAssetCreate(_FrozenContract):
     provider_kind: str | None = Field(default=None, min_length=1, max_length=64)
     source_job_id: uuid.UUID | None = None
     source_event_id: uuid.UUID | None = None
+    source_invocation_id: uuid.UUID | None = None
     title: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -206,6 +268,7 @@ class MediaAssetRecord(_FrozenContract):
     provider_kind: str | None = None
     source_job_id: uuid.UUID | None = None
     source_event_id: uuid.UUID | None = None
+    source_invocation_id: uuid.UUID | None = None
     title: str | None = None
     description: str | None = None
     created_by_actor_ref: str
@@ -223,9 +286,32 @@ class MediaAssetListFilters(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     asset_kind: MediaAssetKind | None = None
     asset_role: MediaAssetRole | None = None
+    source_kind: MediaSourceKind | None = None
     status: MediaAssetStatus | None = None
     visibility: MediaVisibility | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+    source_event_id: uuid.UUID | None = None
+    source_invocation_id: uuid.UUID | None = None
+    ref_kind: MediaReferenceKind | None = None
+    ref_id: uuid.UUID | None = None
+    contains_text: str | None = Field(default=None, max_length=CONTAINS_TEXT_MAX_LENGTH)
     limit: int = Field(default=100, ge=1, le=500)
+
+    @field_validator("created_after", "created_before", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime | None) -> datetime | None:
+        return None if value is None else _utc(value)
+
+    @field_validator("contains_text", mode="after")
+    @classmethod
+    def normalize_contains_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("contains_text must not be empty")
+        return normalized
 
 
 class MediaAssetTagFilter(_FrozenContract):
@@ -543,6 +629,149 @@ class MediaContextRecord(MediaContextCreate):
         return _utc(value)
 
 
+class MediaObjectCreate(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    object_role: MediaObjectRole = MediaObjectRole.ORIGINAL
+    storage_uri: str = Field(min_length=1, max_length=500)
+    filename: str | None = Field(default=None, min_length=1, max_length=220)
+    mime_type: str = Field(min_length=1, max_length=120)
+    size_bytes: int = Field(ge=0)
+    checksum_sha256: str = Field(min_length=64, max_length=64)
+    width: int | None = Field(default=None, ge=0)
+    height: int | None = Field(default=None, ge=0)
+    duration_ms: int | None = Field(default=None, ge=0)
+    sample_rate_hz: int | None = Field(default=None, ge=0)
+    audio_channels: int | None = Field(default=None, ge=0)
+    frame_rate: float | None = Field(default=None, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("checksum_sha256", mode="after")
+    @classmethod
+    def validate_checksum(cls, value: str) -> str:
+        if CHECKSUM_PATTERN.fullmatch(value) is None:
+            raise ValueError("checksum_sha256 must be a lowercase 64-character SHA-256 hex digest")
+        return value
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaObjectRecord(_FrozenContract):
+    id: uuid.UUID
+    asset_id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    object_role: MediaObjectRole
+    storage_uri: str
+    filename: str | None = None
+    mime_type: str
+    size_bytes: int
+    checksum_sha256: str
+    width: int | None = None
+    height: int | None = None
+    duration_ms: int | None = None
+    sample_rate_hz: int | None = None
+    audio_channels: int | None = None
+    frame_rate: float | None = None
+    metadata: dict[str, Any]
+    created_at: datetime
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class MediaAssetUploadRequest(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    asset_kind: MediaAssetKind
+    asset_role: MediaAssetRole
+    visibility: MediaVisibility = MediaVisibility.PRIVATE
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaAssetUploadResponse(_FrozenContract):
+    asset: MediaAssetRecord
+    object: MediaObjectRecord
+
+
+class MediaReferenceCreate(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    asset_id: uuid.UUID
+    ref_kind: MediaReferenceKind
+    ref_id: uuid.UUID
+    ref_role: MediaReferenceRole = MediaReferenceRole.ATTACHMENT
+    display_order: int = Field(default=0, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MediaReferenceRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    asset_id: uuid.UUID
+    ref_kind: MediaReferenceKind
+    ref_id: uuid.UUID
+    ref_role: MediaReferenceRole
+    display_order: int
+    metadata: dict[str, Any]
+    created_at: datetime
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class MediaReferenceListFilters(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    asset_id: uuid.UUID | None = None
+    ref_kind: MediaReferenceKind | None = None
+    ref_id: uuid.UUID | None = None
+    ref_role: MediaReferenceRole | None = None
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class ConversationTurnMediaAttachmentCreate(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    asset_id: uuid.UUID
+    attachment_role: MediaReferenceRole = MediaReferenceRole.ATTACHMENT
+    display_order: int = Field(default=0, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class ConversationTurnMediaAttachmentRecord(_FrozenContract):
+    asset: MediaAssetRecord
+    reference: MediaReferenceRecord | None = None
+    legacy_context: MediaContextRecord | None = None
+
+
 class MediaAssetInputCreate(_FrozenContract):
     world_id: uuid.UUID
     worldline_id: uuid.UUID | None = None
@@ -603,6 +832,9 @@ class MediaJobCreate(_FrozenContract):
     deadline_hint: datetime | None = None
     dedupe_key: str | None = Field(default=None, min_length=1, max_length=160)
     invalidation_key: str | None = Field(default=None, min_length=1, max_length=160)
+    source_event_id: uuid.UUID | None = None
+    source_invocation_id: uuid.UUID | None = None
+    provider_config_json: dict[str, Any] = Field(default_factory=dict)
     request_json: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("deadline_hint", mode="after")
@@ -612,11 +844,60 @@ class MediaJobCreate(_FrozenContract):
             return None
         return _utc(value)
 
-    @field_validator("request_json", mode="after")
+    @field_validator("provider_config_json", "request_json", mode="after")
     @classmethod
     def validate_request_json(cls, value: dict[str, Any]) -> dict[str, Any]:
-        _assert_json_serializable(value, "request_json")
+        _assert_json_serializable(value, "media job JSON")
         return value
+
+
+class MediaJobUpdate(_FrozenContract):
+    status: MediaJobStatus | None = None
+    priority: int | None = Field(default=None, ge=0)
+    cancel_policy: str | None = Field(default=None, min_length=1, max_length=40)
+    deadline_hint: datetime | None = None
+    provider_kind: str | None = Field(default=None, min_length=1, max_length=64)
+    provider_config_json: dict[str, Any] | None = None
+    request_json: dict[str, Any] | None = None
+    result_json: dict[str, Any] | None = None
+    error_text: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    @field_validator("deadline_hint", "started_at", "finished_at", mode="after")
+    @classmethod
+    def normalize_datetimes(cls, value: datetime | None) -> datetime | None:
+        return None if value is None else _utc(value)
+
+    @field_validator("provider_config_json", "request_json", "result_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _assert_json_serializable(value, "media job update JSON")
+        return value
+
+
+class MediaJobListFilters(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    job_kind: MediaJobKind | None = None
+    status: MediaJobStatus | None = None
+    priority_min: int | None = Field(default=None, ge=0)
+    priority_max: int | None = Field(default=None, ge=0)
+    agent_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    turn_id: uuid.UUID | None = None
+    source_event_id: uuid.UUID | None = None
+    source_invocation_id: uuid.UUID | None = None
+    provider_kind: str | None = Field(default=None, min_length=1, max_length=64)
+    invalidation_key: str | None = Field(default=None, min_length=1, max_length=160)
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+    limit: int = Field(default=100, ge=1, le=500)
+
+    @field_validator("created_after", "created_before", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime | None) -> datetime | None:
+        return None if value is None else _utc(value)
 
 
 class MediaJobRecord(MediaJobCreate):
@@ -645,8 +926,13 @@ def _validate_asset_metadata(
     has_alpha: bool | None,
 ) -> None:
     if mime_type is not None:
-        allowed = IMAGE_MIME_TYPES if asset_kind == MediaAssetKind.IMAGE else AUDIO_MIME_TYPES
-        if mime_type not in allowed:
+        if asset_kind == MediaAssetKind.IMAGE:
+            allowed: set[str] | None = IMAGE_MIME_TYPES
+        elif asset_kind == MediaAssetKind.AUDIO:
+            allowed = AUDIO_MIME_TYPES
+        else:
+            allowed = None
+        if allowed is not None and mime_type not in allowed:
             raise ValueError(f"mime_type is not allowed for {asset_kind.value} assets")
     if has_alpha is not None and asset_kind != MediaAssetKind.IMAGE:
         raise ValueError("has_alpha is only valid for image assets")

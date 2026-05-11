@@ -23,6 +23,7 @@ dependencies = [
   "noveland-storage",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
+  "python-multipart>=0.0.20,<0.1",
   "sqlalchemy>=2.0,<3",
 ]
 

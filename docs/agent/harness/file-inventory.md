@@ -216,6 +216,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260510_0030_media_kernel_foundation.py`
 - `backend/migrations/versions/20260510_0031_media_asset_catalog.py`
 - `backend/migrations/versions/20260511_0032_model_invocation_ledger.py`
+- `backend/migrations/versions/20260512_0033_media_kernel.py`
 - `backend/tests/`
 - `backend/tests/test_api_media.py`
 - `backend/tests/test_api_media_catalog.py`

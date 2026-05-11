@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 from noveland.media.errors import MediaStorageError
 
@@ -23,13 +23,19 @@ class MediaObjectRecord:
 class MediaObjectStorage(Protocol):
     def write_bytes(self, key: str, data: bytes, *, content_type: str) -> MediaObjectRecord: ...
 
+    def put_bytes(self, key: str, data: bytes, content_type: str) -> str: ...
+
     def read_bytes(self, uri: str) -> bytes: ...
+
+    def open_read(self, uri: str) -> BinaryIO: ...
 
     def exists(self, uri: str) -> bool: ...
 
     def delete(self, uri: str) -> None: ...
 
     def uri_for_key(self, key: str) -> str: ...
+
+    def normalize_key(self, key: str) -> str: ...
 
 
 class LocalMediaObjectStorage:
@@ -51,12 +57,24 @@ class LocalMediaObjectStorage:
             content_type=content_type,
         )
 
+    def put_bytes(self, key: str, data: bytes, content_type: str) -> str:
+        return self.write_bytes(key, data, content_type=content_type).uri
+
     def read_bytes(self, uri: str) -> bytes:
         object_path = self._path_for_uri(uri)
         if not object_path.is_file():
             raise MediaStorageError(f"media object not found: {uri}")
         try:
             return object_path.read_bytes()
+        except OSError as exc:
+            raise MediaStorageError(f"media object is not readable: {uri}") from exc
+
+    def open_read(self, uri: str) -> BinaryIO:
+        object_path = self._path_for_uri(uri)
+        if not object_path.is_file():
+            raise MediaStorageError(f"media object not found: {uri}")
+        try:
+            return object_path.open("rb")
         except OSError as exc:
             raise MediaStorageError(f"media object is not readable: {uri}") from exc
 
@@ -72,6 +90,9 @@ class LocalMediaObjectStorage:
 
     def uri_for_key(self, key: str) -> str:
         return f"{self.scheme}://{self._safe_key(key)}"
+
+    def normalize_key(self, key: str) -> str:
+        return self._safe_key(key)
 
     def _path_for_uri(self, uri: str) -> Path:
         prefix = f"{self.scheme}://"
