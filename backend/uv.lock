@@ -16,6 +16,7 @@ members = [
     "noveland-invocations",
     "noveland-media",
     "noveland-memory",
+    "noveland-multimodal-eval",
     "noveland-narrative",
     "noveland-observability",
     "noveland-plugins",
@@ -604,6 +605,7 @@ dependencies = [
     { name = "noveland-invocations" },
     { name = "noveland-media" },
     { name = "noveland-memory" },
+    { name = "noveland-multimodal-eval" },
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
@@ -641,6 +643,7 @@ requires-dist = [
     { name = "noveland-invocations", editable = "packages/invocations" },
     { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-memory", editable = "packages/memory" },
+    { name = "noveland-multimodal-eval", editable = "packages/multimodal_eval" },
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
@@ -829,6 +832,41 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-multimodal-eval"
+version = "0.1.0"
+source = { editable = "packages/multimodal_eval" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-conversations" },
+    { name = "noveland-events" },
+    { name = "noveland-invocations" },
+    { name = "noveland-media" },
+    { name = "noveland-memory" },
+    { name = "noveland-providers" },
+    { name = "noveland-speech" },
+    { name = "noveland-visual" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-events", editable = "packages/events" },
+    { name = "noveland-invocations", editable = "packages/invocations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-memory", editable = "packages/memory" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-speech", editable = "packages/speech" },
+    { name = "noveland-visual", editable = "packages/visual" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-narrative"
 version = "0.1.0"
 source = { editable = "packages/narrative" }
@@ -935,6 +973,7 @@ dependencies = [
     { name = "noveland-invocations" },
     { name = "noveland-media" },
     { name = "noveland-memory" },
+    { name = "noveland-multimodal-eval" },
     { name = "noveland-narrative" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
@@ -964,6 +1003,7 @@ requires-dist = [
     { name = "noveland-invocations", editable = "packages/invocations" },
     { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-memory", editable = "packages/memory" },
+    { name = "noveland-multimodal-eval", editable = "packages/multimodal_eval" },
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
