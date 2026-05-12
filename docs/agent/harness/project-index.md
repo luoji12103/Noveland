@@ -85,6 +85,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
+  - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -165,6 +166,18 @@ Fast orientation for a new coding session.
   - `noveland.providers.adapters.openai_image` — OpenAI image generation/edit request mapper and `b64_json` image response decoder
   - `noveland.providers.adapters.openai_compatible_image` — OpenAI-compatible image adapter wrapper
   - `noveland.providers.adapters.comfyui` — remote ComfyUI workflow submission/template mapping adapter with dry-run support
+  - `noveland.providers.adapters.openai_speech` — OpenAI `/audio/speech` and `/audio/transcriptions` request mapper for TTS/STT
+  - `noveland.providers.adapters.mimo_tts` — configurable MiMo TTS HTTP mapper with style/emotion fields and dry-run support
+  - `noveland.providers.adapters.mimo_asr` — configurable MiMo ASR HTTP mapper for audio transcription inputs
+  - `noveland.providers.adapters.omnivoice` — configurable OmniVoice HTTP contract adapter wrapper
+  - `noveland.providers.adapters.gpt_sovits` — configurable GPT-SoVITS HTTP contract adapter wrapper
+- `backend/packages/speech/`
+  - `noveland.speech.contracts` — voice profile, agent binding, TTS/STT, transcript, and style mapping DTOs
+  - `noveland.speech.models` — voice profile, agent voice binding, speech transcript, and speech style mapping ORM models
+  - `noveland.speech.voice_profiles` — voice profile CRUD, reference validation, binding, and default resolution service
+  - `noveland.speech.style_mapping` — provider/emotion style mapping CRUD and deterministic fallback lookup
+  - `noveland.speech.transcripts` — transcript persistence and same-worldline reference validation service
+  - `noveland.speech.service` — TTS/STT orchestration through provider execution, invocation ledger, media writeback, turn references, and transcript writeback
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -187,7 +200,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, and Provider Execution Kernel migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, and Speech Voice Pipeline migration
 
 ## Update rule
 

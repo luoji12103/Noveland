@@ -32,6 +32,7 @@ MODEL_MODULES = (
     "noveland.narrative.models",
     "noveland.observability.models",
     "noveland.providers.models",
+    "noveland.speech.models",
 )
 
 

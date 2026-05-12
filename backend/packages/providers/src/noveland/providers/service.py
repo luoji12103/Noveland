@@ -39,13 +39,20 @@ from noveland.media.models import MediaAsset, MediaJob
 from noveland.media.service import MediaJobService, MediaService
 from noveland.media.storage import MediaObjectStorage
 from noveland.providers.adapters.comfyui import ComfyUIAdapter
+from noveland.providers.adapters.gpt_sovits import GPTSoVITSAdapter
+from noveland.providers.adapters.mimo_asr import MiMOASRAdapter
+from noveland.providers.adapters.mimo_tts import MiMOTTSAdapter
+from noveland.providers.adapters.omnivoice import OmniVoiceAdapter
 from noveland.providers.adapters.openai_compatible_image import OpenAICompatibleImageAdapter
 from noveland.providers.adapters.openai_image import ImageAdapterInput, OpenAIImageAdapter
+from noveland.providers.adapters.openai_speech import OpenAISpeechAdapter
+from noveland.providers.adapters.speech_common import SpeechAdapterInput
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderExecutionRequest,
     ProviderExecutionResult,
     ProviderIntegrationRead,
+    ProviderKind,
 )
 from noveland.providers.fake import FakeProviderAdapter
 from noveland.providers.models import ProviderIntegration
@@ -89,6 +96,11 @@ class ProviderExecutionService:
         self._openai_image = OpenAIImageAdapter()
         self._openai_compatible_image = OpenAICompatibleImageAdapter()
         self._comfyui = ComfyUIAdapter()
+        self._openai_speech = OpenAISpeechAdapter()
+        self._mimo_tts = MiMOTTSAdapter()
+        self._mimo_asr = MiMOASRAdapter()
+        self._omnivoice = OmniVoiceAdapter()
+        self._gpt_sovits = GPTSoVITSAdapter()
 
     def execute(self, request: ProviderExecutionRequest) -> ProviderExecutionResult:
         worldline_id = self._worldline_id(request.world_id, request.worldline_id)
@@ -168,7 +180,7 @@ class ProviderExecutionService:
                     normalized_output_json=result.output_json,
                 ),
             )
-            self._attach_invocation_links(invocation.id, result)
+            self._attach_invocation_links(invocation.id, result, request=request)
             refreshed = InvocationLedgerService(self._session).get(
                 request.world_id,
                 invocation.id,
@@ -242,12 +254,8 @@ class ProviderExecutionService:
     ) -> _ExecutionOutcome:
         if provider.adapter_kind in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
             return self.execute_fake(provider, request, worldline_id)
-        if provider.adapter_kind in {
-            ProviderAdapterKind.OPENAI,
-            ProviderAdapterKind.OPENAI_COMPATIBLE,
-            ProviderAdapterKind.COMFYUI,
-        }:
-            adapter = self._adapter_for(provider.adapter_kind)
+        if _adapter_is_implemented(provider.adapter_kind):
+            adapter = self._adapter_for(provider.adapter_kind, provider.provider_kind)
             adapter_result = adapter.execute(
                 base_url=model.base_url,
                 auth_ref=model.auth_ref,
@@ -256,7 +264,7 @@ class ProviderExecutionService:
                 input_text=request.input_text,
                 input_json=request.input_json,
                 request_json=request.request_json,
-                media_inputs=self._media_inputs_for_request(request),
+                media_inputs=self._adapter_inputs_for_request(request),
             )
             media_job: MediaJobRecord | None = None
             output_asset: MediaAssetRecord | None = None
@@ -284,13 +292,33 @@ class ProviderExecutionService:
     def _adapter_for(
         self,
         adapter_kind: ProviderAdapterKind,
-    ) -> OpenAIImageAdapter | OpenAICompatibleImageAdapter | ComfyUIAdapter:
+        provider_kind: object,
+    ) -> (
+        OpenAIImageAdapter
+        | OpenAICompatibleImageAdapter
+        | ComfyUIAdapter
+        | OpenAISpeechAdapter
+        | MiMOTTSAdapter
+        | MiMOASRAdapter
+        | OmniVoiceAdapter
+        | GPTSoVITSAdapter
+    ):
         if adapter_kind == ProviderAdapterKind.OPENAI:
+            if provider_kind in {ProviderKind.SPEECH_TO_TEXT, ProviderKind.TEXT_TO_SPEECH}:
+                return self._openai_speech
             return self._openai_image
         if adapter_kind == ProviderAdapterKind.OPENAI_COMPATIBLE:
             return self._openai_compatible_image
         if adapter_kind == ProviderAdapterKind.COMFYUI:
             return self._comfyui
+        if adapter_kind == ProviderAdapterKind.MIMO_TTS:
+            return self._mimo_tts
+        if adapter_kind == ProviderAdapterKind.MIMO_ASR:
+            return self._mimo_asr
+        if adapter_kind == ProviderAdapterKind.OMNIVOICE:
+            return self._omnivoice
+        if adapter_kind == ProviderAdapterKind.GPT_SOVITS:
+            return self._gpt_sovits
         raise ProviderExecutionError(f"adapter_kind={adapter_kind.value} is not implemented")
 
     def _write_provider_media(
@@ -410,6 +438,8 @@ class ProviderExecutionService:
         self,
         invocation_id: uuid.UUID,
         result: _ExecutionOutcome,
+        *,
+        request: ProviderExecutionRequest,
     ) -> None:
         model = self._session.get(ModelInvocation, invocation_id)
         if model is None:
@@ -417,6 +447,10 @@ class ProviderExecutionService:
         if result.media_job is not None:
             model.media_job_id = result.media_job.id
             job = self._session.get(MediaJob, result.media_job.id)
+            if job is not None:
+                job.source_invocation_id = invocation_id
+        elif request.media_job_id is not None:
+            job = self._session.get(MediaJob, request.media_job_id)
             if job is not None:
                 job.source_invocation_id = invocation_id
         if result.output_asset is not None:
@@ -469,39 +503,62 @@ class ProviderExecutionService:
         if asset is None or asset.world_id != world_id or asset.worldline_id != worldline_id:
             raise MediaValidationError("media asset must belong to provider execution worldline")
 
-    def _media_inputs_for_request(
+    def _adapter_inputs_for_request(
         self,
         request: ProviderExecutionRequest,
-    ) -> list[ImageAdapterInput]:
+    ) -> list[ImageAdapterInput] | list[SpeechAdapterInput]:
         if self._storage is None:
             return []
         raw_ids = request.request_json.get("input_asset_ids")
         asset_ids = [str(item) for item in raw_ids] if isinstance(raw_ids, list) else []
-        inputs: list[ImageAdapterInput] = []
+        inputs: list[ImageAdapterInput | SpeechAdapterInput] = []
         for raw_asset_id in asset_ids:
             asset_id = uuid.UUID(raw_asset_id)
             inputs.append(
-                self._media_input_for_asset(request.world_id, asset_id, field_name="image")
+                self._media_input_for_asset(request, asset_id, field_name="image")
             )
         raw_mask_id = request.request_json.get("mask_asset_id")
         if isinstance(raw_mask_id, str):
             inputs.append(
                 self._media_input_for_asset(
-                    request.world_id,
+                    request,
                     uuid.UUID(raw_mask_id),
                     field_name="mask",
                 )
             )
-        return inputs
+        if request.request_json.get("operation") == "stt":
+            return [
+                SpeechAdapterInput(
+                    filename=item.filename,
+                    data=item.data,
+                    mime_type=item.mime_type,
+                    field_name="file",
+                )
+                for item in inputs
+            ]
+        return [
+            ImageAdapterInput(
+                filename=item.filename,
+                data=item.data,
+                mime_type=item.mime_type,
+                field_name=item.field_name,
+            )
+            for item in inputs
+        ]
 
     def _media_input_for_asset(
         self,
-        world_id: uuid.UUID,
+        request: ProviderExecutionRequest,
         asset_id: uuid.UUID,
         *,
         field_name: str,
     ) -> ImageAdapterInput:
+        world_id = request.world_id
         media = MediaService(self._session, self._storage)
+        requested_worldline_id = self._worldline_id(world_id, request.worldline_id)
+        asset = media.get_asset_by_id(world_id, asset_id, include_deleted=False)
+        if asset is None or asset.worldline_id != requested_worldline_id:
+            raise MediaValidationError("media input asset must belong to provider worldline")
         objects = media.list_objects(world_id, asset_id)
         if not objects:
             raise MediaValidationError("media input asset has no object")
@@ -538,10 +595,16 @@ def _output_asset_role(
 
 def _extension_for_mime(asset_kind: MediaAssetKind, mime_type: str) -> str:
     if asset_kind == MediaAssetKind.AUDIO:
+        if mime_type == "audio/aac":
+            return ".aac"
+        if mime_type == "audio/flac":
+            return ".flac"
         if mime_type == "audio/mpeg":
             return ".mp3"
         if mime_type == "audio/ogg":
             return ".ogg"
+        if mime_type == "audio/pcm":
+            return ".pcm"
         if mime_type == "audio/webm":
             return ".webm"
         return ".wav"
@@ -550,3 +613,15 @@ def _extension_for_mime(asset_kind: MediaAssetKind, mime_type: str) -> str:
     if mime_type == "image/webp":
         return ".webp"
     return ".png"
+
+
+def _adapter_is_implemented(adapter_kind: ProviderAdapterKind) -> bool:
+    return adapter_kind in {
+        ProviderAdapterKind.OPENAI,
+        ProviderAdapterKind.OPENAI_COMPATIBLE,
+        ProviderAdapterKind.COMFYUI,
+        ProviderAdapterKind.MIMO_TTS,
+        ProviderAdapterKind.MIMO_ASR,
+        ProviderAdapterKind.OMNIVOICE,
+        ProviderAdapterKind.GPT_SOVITS,
+    }

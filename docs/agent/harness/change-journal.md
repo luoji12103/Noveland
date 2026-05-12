@@ -758,3 +758,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/speech-provider-voice-profile-pipeline` after this docs-only work is committed on `main`.
+
+## Speech Provider & Voice Profile Pipeline Phase 7 implementation entry
+
+- Date: 2026-05-12
+- Branch: feat/speech-provider-voice-profile-pipeline
+- Scope: Backend-only Speech Provider & Voice Profile Pipeline Phase 7.
+- Summary: Added `noveland-speech`, voice profile and agent voice binding services, speech transcripts, style mappings, an independent `/worlds/{world_id}/speech` API router, OpenAI speech adapter mapping, configurable MiMo TTS/ASR and OmniVoice/GPT-SoVITS HTTP contract adapters, and provider execution dispatch for speech adapters. TTS/STT flows write model invocations and prompt snapshots, media jobs/assets/objects/references, and transcripts without mutating conversation turn text, auto-enqueueing memory writes, or writing audio bytes, paths, storage URIs, raw prompts, or raw outputs to world events.
+- Files changed: `/backend/packages/speech/**`, `/backend/packages/providers/src/noveland/providers/{service,adapters/**}`, `/backend/services/api/src/noveland/services/api/{app,speech}.py`, `/backend/migrations/versions/20260512_0036_speech_voice_pipeline.py`, `/backend/tests/{test_speech_service.py,test_api_speech.py,test_openai_speech_adapter.py,test_mimo_speech_adapters.py,test_voice_profiles.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`, `/backend/migrations/README.md`, `/docs/agent/harness/**`
+- Tests added/updated: Voice profile tests, speech service tests, speech API tests, OpenAI speech adapter mocked HTTP tests, MiMo/OmniVoice/GPT-SoVITS adapter contract tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type/full pytest gates.
+- Docs updated: migration README, project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Streaming speech, real-time calls, local MiMo/OmniVoice/GPT-SoVITS deployment, voice clone training, public reader audio delivery, Web recording/player UI, speaker identity/authentication, and memory auto-write remain deferred.

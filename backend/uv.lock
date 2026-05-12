@@ -21,6 +21,7 @@ members = [
     "noveland-providers",
     "noveland-service-api",
     "noveland-service-runtime",
+    "noveland-speech",
     "noveland-storage",
     "noveland-worlds",
 ]
@@ -575,6 +576,7 @@ dependencies = [
     { name = "noveland-providers" },
     { name = "noveland-service-api" },
     { name = "noveland-service-runtime" },
+    { name = "noveland-speech" },
     { name = "noveland-storage" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
@@ -609,6 +611,7 @@ requires-dist = [
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-service-api", editable = "services/api" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
+    { name = "noveland-speech", editable = "packages/speech" },
     { name = "noveland-storage", editable = "packages/storage" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
@@ -899,6 +902,7 @@ dependencies = [
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
     { name = "noveland-service-runtime" },
+    { name = "noveland-speech" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -925,6 +929,7 @@ requires-dist = [
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
+    { name = "noveland-speech", editable = "packages/speech" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.13,<3" },
@@ -969,6 +974,35 @@ requires-dist = [
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
+name = "noveland-speech"
+version = "0.1.0"
+source = { editable = "packages/speech" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-conversations" },
+    { name = "noveland-core" },
+    { name = "noveland-invocations" },
+    { name = "noveland-media" },
+    { name = "noveland-providers" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-invocations", editable = "packages/invocations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
 

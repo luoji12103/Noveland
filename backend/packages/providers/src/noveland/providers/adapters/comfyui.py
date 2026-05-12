@@ -3,24 +3,15 @@ from __future__ import annotations
 import base64
 import copy
 import uuid
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from noveland.providers.adapters.openai_image import ImageAdapterInput, ImageAdapterResult
+from noveland.providers.adapters.speech_common import SpeechAdapterInput
 
 
 class ComfyUIAdapterError(RuntimeError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class ComfyUIAdapterResult:
-    output_text: str | None
-    output_json: dict[str, Any]
-    raw_response_json: dict[str, Any]
-    media_bytes: bytes | None
-    media_mime_type: str | None
-    media_filename: str | None
 
 
 class ComfyUIAdapter:
@@ -34,8 +25,8 @@ class ComfyUIAdapter:
         input_text: str | None,
         input_json: dict[str, Any],
         request_json: dict[str, Any],
-        media_inputs: object | None = None,
-    ) -> ComfyUIAdapterResult:
+        media_inputs: list[ImageAdapterInput] | list[SpeechAdapterInput] | None = None,
+    ) -> ImageAdapterResult:
         if bool(config_json.get("dry_run", False)):
             return self._dry_run(input_text, input_json, request_json)
         if base_url is None:
@@ -78,7 +69,7 @@ class ComfyUIAdapter:
                 params={"filename": filename},
             )
             view_response.raise_for_status()
-        return ComfyUIAdapterResult(
+        return ImageAdapterResult(
             output_text="comfyui image generated",
             output_json={"media": "image", "prompt_id": prompt_id},
             raw_response_json={"prompt": submitted, "history": history},
@@ -92,7 +83,7 @@ class ComfyUIAdapter:
         input_text: str | None,
         input_json: dict[str, Any],
         request_json: dict[str, Any],
-    ) -> ComfyUIAdapterResult:
+    ) -> ImageAdapterResult:
         workflow = {
             "prompt": input_text or request_json.get("prompt") or input_json.get("prompt"),
             "request": request_json,
@@ -101,7 +92,7 @@ class ComfyUIAdapter:
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA"
             "DUlEQVR4nGP4z8DwHwAFgwJ/lq9S9wAAAABJRU5ErkJggg=="
         )
-        return ComfyUIAdapterResult(
+        return ImageAdapterResult(
             output_text="comfyui dry-run image generated",
             output_json={"media": "image", "dry_run": True},
             raw_response_json={"dry_run": True, "workflow": workflow},

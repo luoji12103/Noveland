@@ -107,6 +107,7 @@ def test_core_schema_tables_are_registered() -> None:
         "provider_health_checks",
         "provider_integrations",
         "provider_profiles",
+        "agent_voice_profile_bindings",
         "relationship_repair_records",
         "relationship_event_suggestions",
         "runtime_control_states",
@@ -122,8 +123,11 @@ def test_core_schema_tables_are_registered() -> None:
         "scene_location_edges",
         "secret_records",
         "story_hooks",
+        "speech_style_mappings",
+        "speech_transcripts",
         "user_credentials",
         "users",
+        "voice_profiles",
         "world_events",
         "world_clock_states",
         "world_clock_transitions",
@@ -353,6 +357,113 @@ def test_provider_execution_kernel_tables_are_registered() -> None:
     assert foreign_key_targets("provider_integrations") == {"worlds.id"}
     assert foreign_key_targets("provider_capabilities") == {"provider_integrations.id"}
     assert foreign_key_targets("provider_health_checks") == {"provider_integrations.id"}
+
+
+def test_speech_voice_pipeline_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "profile_key",
+        "display_name",
+        "status",
+        "visibility",
+        "owner_kind",
+        "owner_agent_id",
+        "provider_integration_id",
+        "provider_voice_id",
+        "default_language",
+        "supported_languages",
+        "voice_kind",
+        "reference_asset_id",
+        "consent_status",
+        "usage_policy",
+        "metadata",
+    } <= column_names("voice_profiles")
+    assert {
+        "world_id",
+        "worldline_id",
+        "agent_id",
+        "voice_profile_id",
+        "binding_role",
+        "priority",
+        "is_default",
+        "style_overrides",
+    } <= column_names("agent_voice_profile_bindings")
+    assert {
+        "world_id",
+        "worldline_id",
+        "source_asset_id",
+        "media_job_id",
+        "model_invocation_id",
+        "conversation_id",
+        "turn_id",
+        "speaker_actor_ref",
+        "language",
+        "transcript_text",
+        "segments",
+        "confidence",
+        "status",
+        "visibility",
+    } <= column_names("speech_transcripts")
+    assert {
+        "world_id",
+        "mapping_key",
+        "provider_kind",
+        "emotion_key",
+        "style",
+    } <= column_names("speech_style_mappings")
+    assert {
+        "ix_voice_profiles_worldline_status",
+        "ix_voice_profiles_owner_agent",
+        "ix_voice_profiles_provider",
+        "ix_voice_profiles_reference_asset",
+    } <= index_names("voice_profiles")
+    assert {
+        "ix_agent_voice_profile_bindings_agent",
+        "ix_agent_voice_profile_bindings_profile",
+    } <= index_names("agent_voice_profile_bindings")
+    assert {
+        "ix_speech_transcripts_worldline_created",
+        "ix_speech_transcripts_source_asset",
+        "ix_speech_transcripts_media_job",
+        "ix_speech_transcripts_invocation",
+        "ix_speech_transcripts_turn",
+    } <= index_names("speech_transcripts")
+    assert "ix_speech_style_mappings_world_provider" in index_names(
+        "speech_style_mappings"
+    )
+    assert "uq_voice_profiles_key" in constraint_names("voice_profiles", UniqueConstraint)
+    assert "uq_agent_voice_profile_bindings_role" in constraint_names(
+        "agent_voice_profile_bindings",
+        UniqueConstraint,
+    )
+    assert "uq_speech_style_mappings_key" in constraint_names(
+        "speech_style_mappings",
+        UniqueConstraint,
+    )
+    assert foreign_key_targets("voice_profiles") == {
+        "agents.id",
+        "media_assets.id",
+        "provider_integrations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("agent_voice_profile_bindings") == {
+        "agents.id",
+        "voice_profiles.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("speech_transcripts") == {
+        "conversation_sessions.id",
+        "conversation_turns.id",
+        "media_assets.id",
+        "media_jobs.id",
+        "model_invocations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("speech_style_mappings") == {"worlds.id"}
 
 
 def test_media_asset_catalog_tables_are_registered() -> None:

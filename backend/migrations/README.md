@@ -19,3 +19,4 @@ Current sequence:
 - `20260511_0032`: Model Invocation Ledger Phase 3 tables for model invocations, prompt templates, prompt snapshots, runtime-run invocation links, and invocation tags.
 - `20260512_0033`: Media Kernel Phase 4 additive extension for media object variants, generic media references, media-side invocation links, and richer media job source/config fields.
 - `20260512_0034`: Provider Execution Kernel Phase 5 tables for provider integrations, capabilities, and health checks.
+- `20260512_0036`: Speech Provider & Voice Profile Pipeline Phase 7 tables for voice profiles, agent voice bindings, speech transcripts, and speech style mappings.

@@ -9,6 +9,14 @@ _EXPORTS = {
         "OpenAICompatibleImageAdapter",
     ),
     "ComfyUIAdapter": ("noveland.providers.adapters.comfyui", "ComfyUIAdapter"),
+    "OpenAISpeechAdapter": (
+        "noveland.providers.adapters.openai_speech",
+        "OpenAISpeechAdapter",
+    ),
+    "MiMOTTSAdapter": ("noveland.providers.adapters.mimo_tts", "MiMOTTSAdapter"),
+    "MiMOASRAdapter": ("noveland.providers.adapters.mimo_asr", "MiMOASRAdapter"),
+    "OmniVoiceAdapter": ("noveland.providers.adapters.omnivoice", "OmniVoiceAdapter"),
+    "GPTSoVITSAdapter": ("noveland.providers.adapters.gpt_sovits", "GPTSoVITSAdapter"),
 }
 
 

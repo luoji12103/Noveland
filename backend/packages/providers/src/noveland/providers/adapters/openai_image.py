@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from noveland.providers.adapters.speech_common import SpeechAdapterInput
 
 OPENAI_API_BASE_URL = "https://api.openai.com/v1"
 
@@ -42,7 +43,7 @@ class OpenAIImageAdapter:
         input_text: str | None,
         input_json: dict[str, Any],
         request_json: dict[str, Any],
-        media_inputs: list[ImageAdapterInput] | None = None,
+        media_inputs: list[ImageAdapterInput] | list[SpeechAdapterInput] | None = None,
     ) -> ImageAdapterResult:
         api_key = _api_key(auth_ref, config_json)
         is_edit = request_json.get("operation") == "edit" or bool(media_inputs)
@@ -53,7 +54,7 @@ class OpenAIImageAdapter:
                     endpoint,
                     headers={"Authorization": f"Bearer {api_key}"},
                     data=self._payload(default_params_json, input_text, input_json, request_json),
-                    files=_files(media_inputs or []),
+                    files=_files(_image_inputs(media_inputs)),
                 )
             else:
                 response = client.post(
@@ -128,6 +129,14 @@ def _api_key(auth_ref: str | None, config_json: dict[str, Any]) -> str:
             "OpenAI image adapter requires auth_ref or config_json.api_key"
         )
     return api_key
+
+
+def _image_inputs(
+    value: list[ImageAdapterInput] | list[SpeechAdapterInput] | None,
+) -> list[ImageAdapterInput]:
+    if value is None:
+        return []
+    return [item for item in value if isinstance(item, ImageAdapterInput)]
 
 
 def _files(media_inputs: list[ImageAdapterInput]) -> list[tuple[str, tuple[str, bytes, str]]]:

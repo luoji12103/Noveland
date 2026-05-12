@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-11T00:00:00Z
-- Branch: main
-- Objective: Start Phase 7 Speech Provider & Voice Profile Pipeline after completed Phase 6 Image Provider & Visual Asset Pipeline.
-- Status: Phase 7 planning checkpoint prepared; implementation should start on `feat/speech-provider-voice-profile-pipeline` after the docs-only commit.
+- Date: 2026-05-12T00:00:00Z
+- Branch: feat/speech-provider-voice-profile-pipeline
+- Objective: Complete Phase 7 Speech Provider & Voice Profile Pipeline and merge locally back to `main`.
+- Status: Phase 7 implementation is complete on the feature branch. Targeted Phase 7 tests and the full local gate have passed. Remaining steps are commit, fast-forward merge to `main`, and final status reporting.
 
 ## Current Context
 
@@ -11,17 +11,23 @@
 - Phase 4 Media Kernel is complete with media objects, generic references, upload/download flows, media job updates, and invocation links.
 - Phase 5 Provider Execution Kernel is complete with `noveland-providers`, provider integrations, capabilities, health checks, fake execution, invocation ledger writes, and media writeback.
 - Phase 6 Image Provider & Visual Asset Pipeline is complete with image generation/edit/compose services, OpenAI/OpenAI-compatible image adapters, ComfyUI adapter contract, deterministic composition, and an independent `/worlds/{world_id}/images` API router.
-- The next phase must add speech contracts/services, voice profile persistence, speech provider adapters, transcript writeback, and an independent `/worlds/{world_id}/speech` API router.
+- Phase 7 adds speech contracts/services, voice profile persistence, speech provider adapters, transcript writeback, and an independent `/worlds/{world_id}/speech` API router.
 - `provider_profiles` remains the legacy LLM provider profile table and must not become the universal provider registry.
 - `provider_integrations.adapter_kind` is required from the first Phase 5 migration so execution routing does not depend on `provider_key` naming or hidden `config_json` conventions.
-- Provider-backed image calls must write Phase 3 invocation ledger records and Phase 4 media records.
+- Provider-backed image and speech calls must write Phase 3 invocation ledger records and Phase 4 media records.
 - Storage URIs, file paths, bytes, base64, raw prompts, and raw outputs must stay out of `world_events.payload`.
 
 ## Required Next Steps
 
-- Commit the Phase 7 docs-only planning checkpoint on `main`.
-- Create `feat/speech-provider-voice-profile-pipeline`.
-- Implement speech contracts/models/services, provider speech adapters, speech API router, workspace dependencies, docs updates, and tests.
-- Run targeted Phase 7 tests plus the full local gate.
+- Commit Phase 7 implementation on `feat/speech-provider-voice-profile-pipeline`.
 - Fast-forward merge locally back to `main`.
 - Do not push unless explicitly requested.
+
+## Verification Completed
+
+- Targeted Phase 7 backend tests passed.
+- Backend `ruff`, `mypy`, and full `pytest` passed.
+- Web lint, typecheck, test, build, `check:next-env`, and e2e passed.
+- `docker compose -f infra/compose.yaml config` passed.
+- `git diff --check` passed.
+- Note: `tests/e2e/auth.spec.ts` release gate blocker test failed once during the interrupted run, then passed both as a single-test rerun and in the full e2e run.

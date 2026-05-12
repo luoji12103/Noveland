@@ -11,7 +11,15 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 CHECKSUM_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp"}
-AUDIO_MIME_TYPES = {"audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"}
+AUDIO_MIME_TYPES = {
+    "audio/aac",
+    "audio/flac",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/pcm",
+    "audio/wav",
+    "audio/webm",
+}
 CONTAINS_TEXT_MAX_LENGTH = 120
 
 
