@@ -21,6 +21,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md` — final Character Sprite / Scene Asset System Phase 9 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.10-multimodal-conversation-turn-integration-plan.md` — final Multimodal Conversation Turn Integration Phase 10 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md` — final Background Asset Generation Orchestrator Phase 11 implementation plan.
+- `docs/agent/harness/feature-updates/v0.3.1.12-multimodal-eval-diagnostics-plan.md` — final Multimodal Evaluation And Diagnostics Phase 12 implementation plan.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
@@ -92,6 +93,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
   - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
+  - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -191,6 +193,10 @@ Fast orientation for a new coding session.
   - `noveland.visual.service` — visual CRUD and same-world/same-worldline media asset validation service
   - `noveland.visual.resolver` — deterministic sprite/background resolver with exact, neutral/default fallback, and restricted asset suppression
   - `noveland.visual.composition` — compose-scene wrapper that reuses `ImageService.compose_image()`
+- `backend/packages/asset_generation/`
+  - `noveland.asset_generation.contracts` — strict-worldline asset generation policy, preview, proposal, apply, reprioritize, and cancel DTOs
+  - `noveland.asset_generation.models` — asset generation policy, run, and proposal ORM models
+  - `noveland.asset_generation.service` — admin-reviewed preview/apply service that creates proposals and queued media jobs without provider execution
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -213,7 +219,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, and Conversation Turn Presentation migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, Conversation Turn Presentation migration, and Asset Generation Orchestrator migration
 
 ## Update rule
 

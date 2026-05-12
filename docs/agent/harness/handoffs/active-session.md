@@ -2,8 +2,8 @@
 
 - Date: 2026-05-12T00:00:00Z
 - Branch: main
-- Objective: Begin Phase 11 Background Asset Generation Orchestrator.
-- Status: Phase 11 planning checkpoint is being recorded on `main`; implementation should continue on `feat/asset-generation-orchestrator` after the docs-only commit.
+- Objective: Begin Phase 12 Multimodal Evaluation And Diagnostics.
+- Status: Phase 11 is complete and fast-forward merged to local `main`; Phase 12 planning checkpoint is being recorded on `main`; implementation should continue on `feat/multimodal-eval-diagnostics` after the docs-only commit.
 
 ## Current Context
 
@@ -20,13 +20,14 @@
 - Phase 9 decision: visual binding records are strict-worldline-only. Sprite/background records must have non-null `worldline_id`; media bytes may be shared through media assets, but visual binding state must not use nullable worldline defaults.
 - Phase 10 decision: conversation turn presentation is backend/API-only, one canonical record per turn, and must reuse visual/image/speech/media services without mutating turn text or auto-writing STT transcripts to memory.
 - Phase 11 decision: asset generation is proposal plus admin apply only. Preview/apply must not call providers, must not hook a daemon, and must create only queued `media_jobs` for explicit later execution.
+- Phase 12 decision: multimodal evaluation reuses existing `long_run_eval_runs` and release/eval evidence patterns. Do not create a duplicate release framework or a new eval table unless implementation proves the existing table insufficient.
 
 ## Required Next Steps
 
-- Commit Phase 11 docs-only plan on `main`.
-- Create `feat/asset-generation-orchestrator`.
-- Implement strict-worldline asset generation policies, runs, proposals, preview/apply service, API router, and media job utility routes.
-- Run targeted Phase 11 tests and the full local gate before fast-forward merging back to `main`.
+- Commit Phase 12 docs-only plan on `main`.
+- Create `feat/multimodal-eval-diagnostics`.
+- Implement backend-only multimodal diagnostics and `multimodal-smoke` eval APIs using existing `long_run_eval_runs`.
+- Run targeted Phase 12 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed
@@ -44,3 +45,5 @@
 - Phase 9 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, `git diff --check`, and clean next-env check.
 - Phase 10 targeted tests passed: 30 passed.
 - Phase 10 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, and `git diff --check`.
+- Phase 11 targeted tests passed: 32 passed.
+- Phase 11 full local gate passed: backend ruff, backend mypy, backend pytest (`284 passed, 7 skipped`), web lint, web typecheck, web tests (`63 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.

@@ -846,3 +846,25 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/asset-generation-orchestrator` after this docs-only work is committed on `main`.
+
+## Background Asset Generation Orchestrator Phase 11 implementation entry
+
+- Date: 2026-05-12
+- Branch: feat/asset-generation-orchestrator
+- Scope: Backend-only admin-reviewed asset generation proposal orchestrator.
+- Summary: Added `noveland-asset-generation`, strict-worldline asset generation policies/runs/proposals, preview analysis for missing visual/speech assets, explicit admin apply into queued `media_jobs`, and media job reprioritize/cancel-superseded helpers. Preview/apply do not execute providers, do not hook a daemon, and do not write to `world_events.payload`.
+- Files changed: `/backend/packages/asset_generation/**`, `/backend/services/api/src/noveland/services/api/{app,asset_generation}.py`, `/backend/migrations/versions/20260512_0039_asset_generation_orchestrator.py`, `/backend/tests/{test_asset_generation_service.py,test_api_asset_generation.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`
+- Tests added/updated: Asset generation service tests, asset generation API tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus full local gate.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: No Web UI, runtime daemon hook, automatic provider execution, streaming, public reader delivery, or hidden background spend was added.
+
+## Multimodal Evaluation And Diagnostics Phase 12 plan entry
+
+- Date: 2026-05-12
+- Branch: main
+- Scope: Final feature implementation plan for Multimodal Evaluation And Diagnostics Phase 12.
+- Summary: Added the version-prefixed Phase 12 plan for backend-only multimodal safety/cost/quality diagnostics, `multimodal-smoke` eval runs stored in existing `long_run_eval_runs`, diagnostics APIs, provider/media/invocation/visual/speech leak checks, and sample-world regression coverage without creating a duplicate release framework.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.12-multimodal-eval-diagnostics-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/multimodal-eval-diagnostics` after this docs-only work is committed on `main`.

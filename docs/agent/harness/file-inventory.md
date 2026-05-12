@@ -73,6 +73,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
 - `backend/services/api/src/noveland/services/api/authorization.py`
+- `backend/services/api/src/noveland/services/api/asset_generation.py`
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`
 - `backend/services/api/src/noveland/services/api/conversation_presentations.py`
@@ -178,6 +179,12 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/visual/src/noveland/visual/models.py`
 - `backend/packages/visual/src/noveland/visual/resolver.py`
 - `backend/packages/visual/src/noveland/visual/service.py`
+- `backend/packages/asset_generation/`
+- `backend/packages/asset_generation/pyproject.toml`
+- `backend/packages/asset_generation/src/noveland/asset_generation/__init__.py`
+- `backend/packages/asset_generation/src/noveland/asset_generation/contracts.py`
+- `backend/packages/asset_generation/src/noveland/asset_generation/models.py`
+- `backend/packages/asset_generation/src/noveland/asset_generation/service.py`
 - `backend/packages/invocations/`
 - `backend/packages/invocations/pyproject.toml`
 - `backend/packages/invocations/src/noveland/invocations/__init__.py`
@@ -269,6 +276,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260512_0036_speech_voice_pipeline.py`
 - `backend/migrations/versions/20260512_0037_visual_asset_system.py`
 - `backend/migrations/versions/20260512_0038_conversation_turn_presentations.py`
+- `backend/migrations/versions/20260512_0039_asset_generation_orchestrator.py`
 - `backend/tests/`
 - `backend/tests/test_api_conversation_presentations.py`
 - `backend/tests/test_api_visual.py`
@@ -295,6 +303,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_voice_profiles.py`
 - `backend/tests/test_visual_service.py`
 - `backend/tests/test_api_realtime.py`
+- `backend/tests/test_api_asset_generation.py`
+- `backend/tests/test_asset_generation_service.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`
@@ -328,6 +338,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.10-multimodal-conversation-turn-integration-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.12-multimodal-eval-diagnostics-plan.md`
 
 ## Update rule
 
