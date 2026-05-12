@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-12T00:00:00Z
-- Branch: feat/speech-provider-voice-profile-pipeline
-- Objective: Complete Phase 7 Speech Provider & Voice Profile Pipeline and merge locally back to `main`.
-- Status: Phase 7 implementation is complete on the feature branch. Targeted Phase 7 tests and the full local gate have passed. Remaining steps are commit, fast-forward merge to `main`, and final status reporting.
+- Branch: main
+- Objective: Begin Phase 8 Real Provider Configuration & Smoke Validation.
+- Status: Phase 8 planning checkpoint is being recorded on `main`; implementation should continue on `feat/real-provider-smoke-validation` after the docs-only commit.
 
 ## Current Context
 
@@ -16,11 +16,14 @@
 - `provider_integrations.adapter_kind` is required from the first Phase 5 migration so execution routing does not depend on `provider_key` naming or hidden `config_json` conventions.
 - Provider-backed image and speech calls must write Phase 3 invocation ledger records and Phase 4 media records.
 - Storage URIs, file paths, bytes, base64, raw prompts, and raw outputs must stay out of `world_events.payload`.
+- Phase 8 decision: `provider_integrations.auth_ref` is an opaque secret reference, not a secret value. Provider config/default params must reject secret-like keys and execution must resolve real secrets only in memory from environment/settings.
 
 ## Required Next Steps
 
-- Commit Phase 7 implementation on `feat/speech-provider-voice-profile-pipeline`.
-- Fast-forward merge locally back to `main`.
+- Commit Phase 8 docs-only plan on `main`.
+- Create `feat/real-provider-smoke-validation`.
+- Implement provider secret resolver, recursive secret-key rejection/sanitization, safe provider health/smoke-test APIs, and ledger snapshot sanitization.
+- Run targeted Phase 8 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed

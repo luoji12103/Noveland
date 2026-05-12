@@ -769,3 +769,14 @@
 - Tests added/updated: Voice profile tests, speech service tests, speech API tests, OpenAI speech adapter mocked HTTP tests, MiMo/OmniVoice/GPT-SoVITS adapter contract tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type/full pytest gates.
 - Docs updated: migration README, project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Streaming speech, real-time calls, local MiMo/OmniVoice/GPT-SoVITS deployment, voice clone training, public reader audio delivery, Web recording/player UI, speaker identity/authentication, and memory auto-write remain deferred.
+
+## Real Provider Configuration & Smoke Validation Phase 8 plan entry
+
+- Date: 2026-05-12
+- Branch: main
+- Scope: Final feature implementation plan for Real Provider Configuration & Smoke Validation Phase 8.
+- Summary: Added the version-prefixed Phase 8 plan for treating provider `auth_ref` as an opaque secret reference, resolving provider secrets from environment/settings at execution time, rejecting secret-like provider config fields, sanitizing provider API/health/ledger payloads, and adding safe provider smoke-test and health-check listing APIs without adding a vault, Web UI, provider marketplace, streaming, fallback routing, or new media product features.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.8-real-provider-smoke-validation-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/real-provider-smoke-validation` after this docs-only work is committed on `main`.
