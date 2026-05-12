@@ -791,3 +791,14 @@
 - Tests added/updated: Provider registry secret rejection/resolver tests, provider execution auth-missing/secret-leak tests, provider API smoke/health/ACL tests, OpenAI speech adapter in-memory secret mapping update, and workspace import coverage for `noveland.providers.secrets`.
 - Docs updated: change journal and active handoff.
 - Follow-up notes: No schema migration was needed for Phase 8. Full vault/KMS, encrypted DB secret storage, provider marketplace/UI, streaming, fallback/load balancing, and live provider tests beyond env-gated smoke coverage remain deferred.
+
+## Character Sprite / Scene Asset System Phase 9 plan entry
+
+- Date: 2026-05-12
+- Branch: main
+- Scope: Final feature implementation plan for Character Sprite / Scene Asset System Phase 9.
+- Summary: Added the version-prefixed Phase 9 plan for strict-worldline visual binding records, character sprite sets/variants, scene background profiles, deterministic sprite/background resolution, and scene composition through the existing Phase 6 image composer without adding Web UI, provider generation, public reader delivery, or `worlds.py` route growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/visual-asset-system` after this docs-only work is committed on `main`.

@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-12T00:00:00Z
-- Branch: feat/real-provider-smoke-validation
-- Objective: Complete Phase 8 Real Provider Configuration & Smoke Validation.
-- Status: Phase 8 implementation is complete on the feature branch and ready to commit, then fast-forward merge back to local `main`.
+- Branch: main
+- Objective: Begin Phase 9 Character Sprite / Scene Asset System.
+- Status: Phase 9 planning checkpoint is being recorded on `main`; implementation should continue on `feat/visual-asset-system` after the docs-only commit.
 
 ## Current Context
 
@@ -17,11 +17,14 @@
 - Provider-backed image and speech calls must write Phase 3 invocation ledger records and Phase 4 media records.
 - Storage URIs, file paths, bytes, base64, raw prompts, and raw outputs must stay out of `world_events.payload`.
 - Phase 8 decision: `provider_integrations.auth_ref` is an opaque secret reference, not a secret value. Provider config/default params must reject secret-like keys and execution must resolve real secrets only in memory from environment/settings.
+- Phase 9 decision: visual binding records are strict-worldline-only. Sprite/background records must have non-null `worldline_id`; media bytes may be shared through media assets, but visual binding state must not use nullable worldline defaults.
 
 ## Required Next Steps
 
-- Commit Phase 8 implementation on `feat/real-provider-smoke-validation`.
-- Fast-forward merge Phase 8 back to local `main`.
+- Commit Phase 9 docs-only plan on `main`.
+- Create `feat/visual-asset-system`.
+- Implement `noveland-visual`, migration `20260512_0037`, independent visual API router, sprite/background resolvers, and scene composition through `ImageService.compose_image()`.
+- Run targeted Phase 9 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed

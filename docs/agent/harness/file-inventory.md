@@ -308,6 +308,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.3.1.6-image-provider-visual-pipeline-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.7-speech-provider-voice-profile-pipeline-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.8-real-provider-smoke-validation-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md`
 
 ## Update rule
 
