@@ -824,3 +824,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/multimodal-turn-presentation` after this docs-only work is committed on `main`.
+
+## Multimodal Conversation Turn Integration Phase 10 implementation entry
+
+- Date: 2026-05-12
+- Branch: feat/multimodal-turn-presentation
+- Scope: Backend-only canonical turn presentation and render orchestration.
+- Summary: Added `conversation_turn_presentations`, conversation presentation contracts/service, and an independent API router for presentation CRUD plus visual, speech, and transcription render actions. Visual rendering reuses Phase 9 `VisualResolver` and Phase 6 deterministic composition through `VisualCompositionService`; speech rendering and transcription reuse Phase 7 `SpeechService`; rendered assets attach through Phase 4 `media_references` without mutating turn text or auto-writing STT transcripts to memory.
+- Files changed: `/backend/packages/conversations/src/noveland/conversations/{contracts,models,presentation,__init__}.py`, `/backend/services/api/src/noveland/services/api/{app,conversation_presentations}.py`, `/backend/migrations/versions/20260512_0038_conversation_turn_presentations.py`, `/backend/tests/{test_conversation_presentation_service.py,test_api_conversation_presentations.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/docs/agent/harness/**`
+- Tests added/updated: Presentation service tests, presentation API render orchestration tests, schema metadata registration, Alembic head coverage, and workspace import coverage.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: No Web preview/playback UI, public reader delivery, streaming, runtime daemon orchestration, second composer, or memory auto-write was added.

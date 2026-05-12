@@ -7,6 +7,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -180,3 +181,101 @@ class ConversationTurn(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=True,
     )
     error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ConversationTurnPresentation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "conversation_turn_presentations"
+    __table_args__ = (
+        UniqueConstraint("turn_id", name="uq_conversation_turn_presentations_turn"),
+        CheckConstraint(
+            "emotion_intensity IS NULL OR emotion_intensity >= 0",
+            name="emotion_intensity_nonnegative",
+        ),
+        CheckConstraint(
+            "emotion_intensity IS NULL OR emotion_intensity <= 2",
+            name="emotion_intensity_max",
+        ),
+        CheckConstraint(
+            "render_state IN ("
+            "'draft', 'visual_rendered', 'speech_rendered', 'transcribed', 'failed'"
+            ")",
+            name="render_state",
+        ),
+        Index(
+            "ix_conversation_turn_presentations_worldline_turn",
+            "world_id",
+            "worldline_id",
+            "turn_id",
+        ),
+        Index(
+            "ix_conversation_turn_presentations_conversation",
+            "conversation_id",
+        ),
+        Index(
+            "ix_conversation_turn_presentations_speaker",
+            "speaker_agent_id",
+        ),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversation_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    turn_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("conversation_turns.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    speaker_agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    emotion_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    emotion_intensity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sprite_set_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("character_sprite_sets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    sprite_variant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("character_sprite_variants.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    voice_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("voice_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    tts_media_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    background_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    composite_scene_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("media_assets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    transcript_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("speech_transcripts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    presentation_json: Mapped[dict[str, object]] = mapped_column(
+        "presentation",
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=dict,
+    )
+    render_state: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'draft'"),
+        default="draft",
+    )

@@ -91,6 +91,7 @@ PACKAGES = [
     "noveland.services.api",
     "noveland.services.api.authorization",
     "noveland.services.api.auth",
+    "noveland.services.api.conversation_presentations",
     "noveland.services.api.conversations",
     "noveland.services.api.csrf",
     "noveland.services.api.dependencies",

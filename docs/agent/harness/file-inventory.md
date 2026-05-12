@@ -75,6 +75,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/authorization.py`
 - `backend/services/api/src/noveland/services/api/auth.py`
 - `backend/services/api/src/noveland/services/api/csrf.py`
+- `backend/services/api/src/noveland/services/api/conversation_presentations.py`
 - `backend/services/api/src/noveland/services/api/conversations.py`
 - `backend/services/api/src/noveland/services/api/dependencies.py`
 - `backend/services/api/src/noveland/services/api/images.py`
@@ -136,6 +137,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/conversations/src/noveland/conversations/contracts.py`
 - `backend/packages/conversations/src/noveland/conversations/errors.py`
 - `backend/packages/conversations/src/noveland/conversations/models.py`
+- `backend/packages/conversations/src/noveland/conversations/presentation.py`
 - `backend/packages/conversations/src/noveland/conversations/services.py`
 - `backend/packages/narrative/`
 - `backend/packages/narrative/src/noveland/narrative/contracts.py`
@@ -266,7 +268,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260512_0034_provider_execution_kernel.py`
 - `backend/migrations/versions/20260512_0036_speech_voice_pipeline.py`
 - `backend/migrations/versions/20260512_0037_visual_asset_system.py`
+- `backend/migrations/versions/20260512_0038_conversation_turn_presentations.py`
 - `backend/tests/`
+- `backend/tests/test_api_conversation_presentations.py`
 - `backend/tests/test_api_visual.py`
 - `backend/tests/test_api_speech.py`
 - `backend/tests/test_api_providers.py`
@@ -283,6 +287,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_provider_execution_service.py`
 - `backend/tests/test_provider_registry_service.py`
 - `backend/tests/test_comfyui_adapter.py`
+- `backend/tests/test_conversation_presentation_service.py`
 - `backend/tests/test_openai_image_adapter.py`
 - `backend/tests/test_openai_speech_adapter.py`
 - `backend/tests/test_mimo_speech_adapters.py`

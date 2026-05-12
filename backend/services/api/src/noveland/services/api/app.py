@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from noveland.core.version import PROJECT_VERSION
 from noveland.services.api.auth import router as auth_router
+from noveland.services.api.conversation_presentations import (
+    router as conversation_presentations_router,
+)
 from noveland.services.api.conversations import router as conversations_router
 from noveland.services.api.images import router as images_router
 from noveland.services.api.invocations import router as invocations_router
@@ -38,6 +41,7 @@ def create_app() -> FastAPI:
     api.include_router(invocations_router)
     api.include_router(providers_router)
     api.include_router(conversations_router)
+    api.include_router(conversation_presentations_router)
     api.include_router(realtime_router)
 
     @api.get("/health", response_model=HealthResponse)

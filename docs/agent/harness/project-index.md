@@ -84,6 +84,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.runtime` — platform-admin runtime control, supervision, external tool policy, scale readiness, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
+  - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
@@ -117,8 +118,9 @@ Fast orientation for a new coding session.
   - `noveland.calendar.models` — agent calendar and world schedule rule ORM models
   - `noveland.calendar.services` — calendar CRUD and due-resolution service
 - `backend/packages/conversations/`
-  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, stop-condition, writer-config, and memory-config DTOs
-  - `noveland.conversations.models` — conversation session, participant, and turn ORM models
+  - `noveland.conversations.contracts` — conversation session, participant, turn, policy, stop-condition, writer-config, memory-config, and turn presentation DTOs
+  - `noveland.conversations.models` — conversation session, participant, turn, and canonical turn presentation ORM models
+  - `noveland.conversations.presentation` — same-worldline presentation CRUD and validation service
   - `noveland.conversations.services` — deterministic round-robin conversation service, stop-condition handling, diagnostics recording, transcript persistence, writer-config mapping, and memory-config mapping
 - `backend/packages/narrative/`
   - `noveland.narrative.contracts` — narrative artifact contracts plus conversation narrative generation inputs
@@ -210,7 +212,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, and Visual Asset System migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, and Conversation Turn Presentation migration
 
 ## Update rule
 

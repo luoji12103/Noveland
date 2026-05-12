@@ -3,9 +3,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
 from noveland.plugins.constants import BUILTIN_DEFAULT_NARRATIVE_WRITER
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SESSION_KEY_PATTERN = r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$"
 
@@ -37,6 +38,14 @@ class ConversationSpeakerKind(StrEnum):
 class ConversationTurnStatus(StrEnum):
     SUCCEEDED = "succeeded"
     SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+class ConversationPresentationRenderState(StrEnum):
+    DRAFT = "draft"
+    VISUAL_RENDERED = "visual_rendered"
+    SPEECH_RENDERED = "speech_rendered"
+    TRANSCRIBED = "transcribed"
     FAILED = "failed"
 
 
@@ -203,6 +212,73 @@ class ConversationTurnRecord(_FrozenContract):
     updated_at: datetime
 
 
+class ConversationTurnPresentationUpsert(_FrozenContract):
+    speaker_agent_id: uuid.UUID | None = None
+    emotion_key: str | None = Field(default=None, min_length=1, max_length=80)
+    emotion_intensity: float | None = Field(default=None, ge=0.0, le=2.0)
+    sprite_set_id: uuid.UUID | None = None
+    sprite_variant_id: uuid.UUID | None = None
+    voice_profile_id: uuid.UUID | None = None
+    tts_media_asset_id: uuid.UUID | None = None
+    background_asset_id: uuid.UUID | None = None
+    composite_scene_asset_id: uuid.UUID | None = None
+    transcript_id: uuid.UUID | None = None
+    presentation_json: dict[str, Any] = Field(default_factory=dict)
+    render_state: ConversationPresentationRenderState = (
+        ConversationPresentationRenderState.DRAFT
+    )
+
+    @field_validator("presentation_json", mode="after")
+    @classmethod
+    def validate_presentation_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _reject_leaky_presentation_json(value)
+        return value
+
+
+class ConversationTurnPresentationPatch(_FrozenContract):
+    speaker_agent_id: uuid.UUID | None = None
+    emotion_key: str | None = Field(default=None, min_length=1, max_length=80)
+    emotion_intensity: float | None = Field(default=None, ge=0.0, le=2.0)
+    sprite_set_id: uuid.UUID | None = None
+    sprite_variant_id: uuid.UUID | None = None
+    voice_profile_id: uuid.UUID | None = None
+    tts_media_asset_id: uuid.UUID | None = None
+    background_asset_id: uuid.UUID | None = None
+    composite_scene_asset_id: uuid.UUID | None = None
+    transcript_id: uuid.UUID | None = None
+    presentation_json: dict[str, Any] | None = None
+    render_state: ConversationPresentationRenderState | None = None
+
+    @field_validator("presentation_json", mode="after")
+    @classmethod
+    def validate_presentation_json(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _reject_leaky_presentation_json(value)
+        return value
+
+
+class ConversationTurnPresentationRecord(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID
+    turn_id: uuid.UUID
+    speaker_agent_id: uuid.UUID | None
+    emotion_key: str | None
+    emotion_intensity: float | None
+    sprite_set_id: uuid.UUID | None
+    sprite_variant_id: uuid.UUID | None
+    voice_profile_id: uuid.UUID | None
+    tts_media_asset_id: uuid.UUID | None
+    background_asset_id: uuid.UUID | None
+    composite_scene_asset_id: uuid.UUID | None
+    transcript_id: uuid.UUID | None
+    presentation_json: dict[str, Any]
+    render_state: ConversationPresentationRenderState
+    created_at: datetime
+    updated_at: datetime
+
+
 class ConversationSpeakerCandidate(_FrozenContract):
     agent_id: uuid.UUID
     display_name: str
@@ -240,3 +316,27 @@ def normalize_datetime(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("datetime must be timezone-aware")
     return value.astimezone(UTC)
+
+
+_PRESENTATION_FORBIDDEN_KEYS = {
+    "storage_uri",
+    "bytes",
+    "base64",
+    "file_path",
+    "filepath",
+    "path",
+    "raw_prompt",
+    "raw_output",
+}
+
+
+def _reject_leaky_presentation_json(value: object) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = str(key).strip().lower()
+            if normalized_key in _PRESENTATION_FORBIDDEN_KEYS:
+                raise ValueError(f"presentation_json must not contain {normalized_key}")
+            _reject_leaky_presentation_json(item)
+    elif isinstance(value, list):
+        for item in value:
+            _reject_leaky_presentation_json(item)

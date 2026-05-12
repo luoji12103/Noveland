@@ -59,6 +59,7 @@ def test_core_schema_tables_are_registered() -> None:
         "beta_checklist_runs",
         "conversation_participants",
         "conversation_sessions",
+        "conversation_turn_presentations",
         "conversation_turns",
         "character_emotional_states",
         "character_knowledge_facts",
@@ -549,6 +550,52 @@ def test_visual_asset_system_tables_are_registered() -> None:
     assert foreign_key_targets("scene_background_profiles") == {
         "media_assets.id",
         "scenes.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+
+
+def test_conversation_turn_presentation_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "conversation_id",
+        "turn_id",
+        "speaker_agent_id",
+        "emotion_key",
+        "emotion_intensity",
+        "sprite_set_id",
+        "sprite_variant_id",
+        "voice_profile_id",
+        "tts_media_asset_id",
+        "background_asset_id",
+        "composite_scene_asset_id",
+        "transcript_id",
+        "presentation",
+        "render_state",
+    } <= column_names("conversation_turn_presentations")
+    assert (
+        Base.metadata.tables["conversation_turn_presentations"].c.worldline_id.nullable
+        is False
+    )
+    assert {
+        "ix_conversation_turn_presentations_worldline_turn",
+        "ix_conversation_turn_presentations_conversation",
+        "ix_conversation_turn_presentations_speaker",
+    } <= index_names("conversation_turn_presentations")
+    assert "uq_conversation_turn_presentations_turn" in constraint_names(
+        "conversation_turn_presentations",
+        UniqueConstraint,
+    )
+    assert foreign_key_targets("conversation_turn_presentations") == {
+        "agents.id",
+        "character_sprite_sets.id",
+        "character_sprite_variants.id",
+        "conversation_sessions.id",
+        "conversation_turns.id",
+        "media_assets.id",
+        "speech_transcripts.id",
+        "voice_profiles.id",
         "worldlines.id",
         "worlds.id",
     }
