@@ -76,6 +76,7 @@ PACKAGES = [
     "noveland.providers.models",
     "noveland.providers.registry",
     "noveland.providers.routing",
+    "noveland.providers.secrets",
     "noveland.providers.service",
     "noveland.providers.adapters",
     "noveland.providers.adapters.comfyui",

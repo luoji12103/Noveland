@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+import pytest
 from noveland.agents.models import Agent
 from noveland.auth.models import User
 from noveland.conversations.models import ConversationSession, ConversationTurn
@@ -39,6 +40,7 @@ from noveland.providers.contracts import (
 )
 from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
+from noveland.providers.secrets import ProviderSecretResolver
 from noveland.providers.service import ProviderExecutionService
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
@@ -145,6 +147,87 @@ def test_fake_stt_execution_returns_transcript_without_media(tmp_path: Path) -> 
     assert result.output_text == "recognized words"
     assert result.media_job is None
     assert result.output_asset is None
+
+
+def test_missing_real_provider_secret_writes_safe_failed_invocation() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.IMAGE_GENERATION,
+                adapter_kind=ProviderAdapterKind.OPENAI,
+                provider_key="openai-image",
+                display_name="OpenAI Image",
+                auth_ref="env:MISSING_OPENAI_API_KEY",
+            )
+        )
+        try:
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider.id,
+                    input_text="draw",
+                )
+            )
+        except Exception as exc:
+            assert "auth_missing" in str(exc)
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert invocation.error_text == "provider auth_missing"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["auth_ref_present"] is True
+        assert invocation.request_params_json["auth_resolved"] is False
+        assert invocation.request_params_json["auth_failed"] is True
+        assert "MISSING_OPENAI_API_KEY" not in str(invocation.request_params_json)
+        assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
+
+
+def test_resolved_secret_is_not_written_to_ledger(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-super-secret")
+
+    with Session(engine) as session:
+        provider = _seed_provider(session, world_id, ProviderKind.IMAGE_GENERATION)
+        model = session.get(ProviderIntegration, provider)
+        assert model is not None
+        model.adapter_kind = ProviderAdapterKind.FAKE.value
+        model.auth_ref = "env:OPENAI_API_KEY"
+        result = ProviderExecutionService(
+            session,
+            LocalMediaObjectStorage(tmp_path),
+            secret_resolver=ProviderSecretResolver(),
+        ).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider,
+                input_text="draw",
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.get(ModelInvocation, result.invocation.id)
+        snapshot = session.scalars(
+            select(PromptSnapshot).where(PromptSnapshot.invocation_id == result.invocation.id)
+        ).one()
+        assert invocation is not None
+        assert "sk-super-secret" not in str(invocation.request_params_json)
+        assert "sk-super-secret" not in str(invocation.response_metadata_json)
+        assert "sk-super-secret" not in str(snapshot.raw_request_json)
 
 
 def _engine() -> Engine:

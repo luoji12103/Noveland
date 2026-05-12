@@ -20,6 +20,12 @@ from noveland.providers.routing import (
     ProviderRoutingError,
     validate_provider_adapter_compatibility,
 )
+from noveland.providers.secrets import (
+    ProviderSecretValidationError,
+    reject_sensitive_config,
+    sanitize_for_persistence,
+    validate_auth_ref_reference,
+)
 from noveland.worlds.models import World
 from sqlalchemy import Select, select
 from sqlalchemy.exc import IntegrityError
@@ -49,6 +55,12 @@ class ProviderRegistryService:
     def create_provider(self, create: ProviderIntegrationCreate) -> ProviderIntegrationRead:
         self._validate_world(create.world_id)
         self._validate_compatibility(create.provider_kind, create.adapter_kind)
+        self._reject_sensitive_config(create.config_json, field_name="config_json")
+        self._reject_sensitive_config(
+            create.default_params_json,
+            field_name="default_params_json",
+        )
+        auth_ref = self._validate_auth_ref(create.auth_ref)
         model = ProviderIntegration(
             id=uuid.uuid4(),
             world_id=create.world_id,
@@ -59,7 +71,7 @@ class ProviderRegistryService:
             provider_key=create.provider_key,
             display_name=create.display_name,
             base_url=create.base_url,
-            auth_ref=create.auth_ref,
+            auth_ref=auth_ref,
             config_json=create.config_json,
             default_params_json=create.default_params_json,
             status=create.status.value,
@@ -88,10 +100,15 @@ class ProviderRegistryService:
         if "base_url" in update.model_fields_set:
             model.base_url = update.base_url
         if "auth_ref" in update.model_fields_set:
-            model.auth_ref = update.auth_ref
+            model.auth_ref = self._validate_auth_ref(update.auth_ref)
         if update.config_json is not None:
+            self._reject_sensitive_config(update.config_json, field_name="config_json")
             model.config_json = update.config_json
         if update.default_params_json is not None:
+            self._reject_sensitive_config(
+                update.default_params_json,
+                field_name="default_params_json",
+            )
             model.default_params_json = update.default_params_json
         if update.status is not None:
             model.status = update.status.value
@@ -313,6 +330,18 @@ class ProviderRegistryService:
         except ProviderRoutingError as exc:
             raise ProviderValidationError(str(exc)) from exc
 
+    def _reject_sensitive_config(self, value: object, *, field_name: str) -> None:
+        try:
+            reject_sensitive_config(value, field_name=field_name)
+        except ProviderSecretValidationError as exc:
+            raise ProviderValidationError(str(exc)) from exc
+
+    def _validate_auth_ref(self, auth_ref: str | None) -> str | None:
+        try:
+            return validate_auth_ref_reference(auth_ref)
+        except ProviderSecretValidationError as exc:
+            raise ProviderValidationError(str(exc)) from exc
+
 
 def _scope_key(scope_kind: ProviderScopeKind, world_id: uuid.UUID | None) -> str:
     if scope_kind == ProviderScopeKind.GLOBAL:
@@ -351,9 +380,10 @@ def _integration_record(model: ProviderIntegration) -> ProviderIntegrationRead:
         provider_key=model.provider_key,
         display_name=model.display_name,
         base_url=model.base_url,
+        auth_ref=model.auth_ref,
         auth_ref_configured=model.auth_ref is not None,
-        config_json=model.config_json,
-        default_params_json=model.default_params_json,
+        config_json=sanitize_for_persistence(model.config_json),
+        default_params_json=sanitize_for_persistence(model.default_params_json),
         status=ProviderIntegrationStatus(model.status),
         visibility=ProviderVisibility(model.visibility),
         created_at=model.created_at,

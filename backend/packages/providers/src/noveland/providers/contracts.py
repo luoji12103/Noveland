@@ -172,6 +172,7 @@ class ProviderIntegrationRead(_FrozenContract):
     provider_key: str
     display_name: str
     base_url: str | None
+    auth_ref: str | None = None
     auth_ref_configured: bool
     config_json: dict[str, Any]
     default_params_json: dict[str, Any]
@@ -271,6 +272,26 @@ class ProviderTestInvocationRequest(_FrozenContract):
 
 class ProviderTestInvocationResult(ProviderExecutionResult):
     pass
+
+
+class ProviderSmokeTestRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    input_text: str | None = None
+    input_json: dict[str, Any] = Field(default_factory=dict)
+    request_json: dict[str, Any] = Field(default_factory=dict)
+    model_name: str | None = Field(default=None, min_length=1, max_length=200)
+    media_job_id: uuid.UUID | None = None
+    media_asset_id: uuid.UUID | None = None
+
+    @field_validator("input_json", "request_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider smoke test JSON")
+        return value
+
+
+class ProviderSmokeTestResult(ProviderExecutionResult):
+    smoke_status: str
 
 
 def _assert_json_serializable(value: dict[str, Any], field_name: str) -> None:

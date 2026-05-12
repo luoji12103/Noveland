@@ -60,8 +60,8 @@ def test_openai_speech_adapter_maps_stt_request(monkeypatch: pytest.MonkeyPatch)
 
     result = OpenAISpeechAdapter().execute(
         base_url="https://api.example.test/v1",
-        auth_ref=None,
-        config_json={"api_key": "sk-from-config"},
+        auth_ref="sk-test",
+        config_json={},
         default_params_json={"model": "gpt-4o-transcribe"},
         input_text=None,
         input_json={},

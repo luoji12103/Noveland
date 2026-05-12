@@ -123,10 +123,11 @@ def _endpoint(base_url: str | None, path: str) -> str:
 
 
 def _api_key(auth_ref: str | None, config_json: dict[str, Any]) -> str:
-    api_key = config_json.get("api_key") or auth_ref
+    del config_json
+    api_key = auth_ref
     if not isinstance(api_key, str) or api_key.strip() == "":
         raise OpenAIImageAdapterError(
-            "OpenAI image adapter requires auth_ref or config_json.api_key"
+            "OpenAI image adapter requires resolved auth_ref"
         )
     return api_key
 

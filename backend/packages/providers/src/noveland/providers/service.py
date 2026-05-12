@@ -67,6 +67,15 @@ from noveland.providers.routing import (
     media_job_kind_for_provider,
     output_asset_shape_for_provider,
 )
+from noveland.providers.secrets import (
+    ProviderSecretMissingError,
+    ProviderSecretResolver,
+    adapter_requires_auth,
+    failed_auth_metadata,
+    reject_sensitive_config,
+    safe_auth_metadata,
+    sanitize_for_persistence,
+)
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy.orm import Session
 
@@ -89,9 +98,11 @@ class ProviderExecutionService:
         self,
         session: Session,
         storage: MediaObjectStorage | None = None,
+        secret_resolver: ProviderSecretResolver | None = None,
     ) -> None:
         self._session = session
         self._storage = storage
+        self._secret_resolver = secret_resolver or ProviderSecretResolver()
         self._fake = FakeProviderAdapter()
         self._openai_image = OpenAIImageAdapter()
         self._openai_compatible_image = OpenAICompatibleImageAdapter()
@@ -112,6 +123,24 @@ class ProviderExecutionService:
             self._validate_media_job(request.world_id, worldline_id, request.media_job_id)
         if request.media_asset_id is not None:
             self._validate_media_asset(request.world_id, worldline_id, request.media_asset_id)
+        reject_sensitive_config(request.input_json, field_name="input_json")
+        reject_sensitive_config(request.request_json, field_name="request_json")
+
+        auth_metadata: dict[str, bool]
+        requires_auth = adapter_requires_auth(provider.adapter_kind, model.config_json)
+        if not requires_auth:
+            try:
+                resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
+            except ProviderSecretMissingError:
+                resolved_secret = None
+            auth_metadata = safe_auth_metadata(model.auth_ref, resolved_secret)
+        else:
+            try:
+                resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
+                auth_metadata = safe_auth_metadata(model.auth_ref, resolved_secret)
+            except ProviderSecretMissingError:
+                resolved_secret = None
+                auth_metadata = failed_auth_metadata(model.auth_ref)
 
         invocation = InvocationLedgerService(self._session).record(
             InvocationRecordCreate(
@@ -134,7 +163,8 @@ class ProviderExecutionService:
                     "provider_key": provider.provider_key,
                     "provider_kind": provider.provider_kind.value,
                     "adapter_kind": provider.adapter_kind.value,
-                    "request": request.request_json,
+                    **auth_metadata,
+                    "request": sanitize_for_persistence(request.request_json),
                 },
                 status=InvocationStatus.RUNNING,
                 visibility=InvocationVisibility.WORLD_ADMIN,
@@ -147,8 +177,9 @@ class ProviderExecutionService:
                         "provider_key": provider.provider_key,
                         "provider_kind": provider.provider_kind.value,
                         "adapter_kind": provider.adapter_kind.value,
-                        "input_json": request.input_json,
-                        "request_json": request.request_json,
+                        **auth_metadata,
+                        "input_json": sanitize_for_persistence(request.input_json),
+                        "request_json": sanitize_for_persistence(request.request_json),
                     },
                     prompt_context_snapshot_json={"worldline_id": str(worldline_id)},
                 ),
@@ -156,7 +187,9 @@ class ProviderExecutionService:
         )
 
         try:
-            result = self._execute_provider(provider, model, request, worldline_id)
+            if auth_metadata["auth_failed"]:
+                raise ProviderExecutionError("provider auth_missing")
+            result = self._execute_provider(provider, model, request, worldline_id, resolved_secret)
             InvocationLedgerService(self._session).update_status(
                 request.world_id,
                 invocation.id,
@@ -168,6 +201,7 @@ class ProviderExecutionService:
                         "provider_id": str(provider.id),
                         "provider_key": provider.provider_key,
                         "adapter_kind": provider.adapter_kind.value,
+                        **auth_metadata,
                     },
                     latency_ms=0,
                 ),
@@ -201,11 +235,27 @@ class ProviderExecutionService:
             InvocationLedgerService(self._session).update_status(
                 request.world_id,
                 invocation.id,
-                InvocationStatusUpdate(status=InvocationStatus.FAILED, error_text=str(exc)),
+                InvocationStatusUpdate(
+                    status=InvocationStatus.FAILED,
+                    error_text=_safe_error_text(exc),
+                    response_metadata_json={
+                        "provider_id": str(provider.id),
+                        "provider_key": provider.provider_key,
+                        "adapter_kind": provider.adapter_kind.value,
+                        **(
+                            failed_auth_metadata(model.auth_ref)
+                            if auth_metadata["auth_failed"]
+                            else auth_metadata
+                        ),
+                    },
+                ),
             )
             PromptSnapshotService(self._session).update_snapshot_for_invocation(
                 invocation.id,
-                PromptSnapshotUpdate(raw_response_json={"error": str(exc)}, raw_output_text=None),
+                PromptSnapshotUpdate(
+                    raw_response_json={"error": _safe_error_text(exc)},
+                    raw_output_text=None,
+                ),
             )
             raise
 
@@ -251,6 +301,7 @@ class ProviderExecutionService:
         model: ProviderIntegration,
         request: ProviderExecutionRequest,
         worldline_id: uuid.UUID,
+        resolved_secret: object | None,
     ) -> _ExecutionOutcome:
         if provider.adapter_kind in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
             return self.execute_fake(provider, request, worldline_id)
@@ -258,7 +309,7 @@ class ProviderExecutionService:
             adapter = self._adapter_for(provider.adapter_kind, provider.provider_kind)
             adapter_result = adapter.execute(
                 base_url=model.base_url,
-                auth_ref=model.auth_ref,
+                auth_ref=_resolved_secret_value(resolved_secret),
                 config_json=model.config_json,
                 default_params_json=model.default_params_json,
                 input_text=request.input_text,
@@ -625,3 +676,12 @@ def _adapter_is_implemented(adapter_kind: ProviderAdapterKind) -> bool:
         ProviderAdapterKind.OMNIVOICE,
         ProviderAdapterKind.GPT_SOVITS,
     }
+
+
+def _resolved_secret_value(resolved_secret: object | None) -> str | None:
+    value = getattr(resolved_secret, "value", None)
+    return value if isinstance(value, str) else None
+
+
+def _safe_error_text(exc: Exception) -> str:
+    return str(sanitize_for_persistence({"error": str(exc)})["error"])

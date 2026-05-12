@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-12T00:00:00Z
-- Branch: main
-- Objective: Begin Phase 8 Real Provider Configuration & Smoke Validation.
-- Status: Phase 8 planning checkpoint is being recorded on `main`; implementation should continue on `feat/real-provider-smoke-validation` after the docs-only commit.
+- Branch: feat/real-provider-smoke-validation
+- Objective: Complete Phase 8 Real Provider Configuration & Smoke Validation.
+- Status: Phase 8 implementation is complete on the feature branch and ready to commit, then fast-forward merge back to local `main`.
 
 ## Current Context
 
@@ -20,10 +20,8 @@
 
 ## Required Next Steps
 
-- Commit Phase 8 docs-only plan on `main`.
-- Create `feat/real-provider-smoke-validation`.
-- Implement provider secret resolver, recursive secret-key rejection/sanitization, safe provider health/smoke-test APIs, and ledger snapshot sanitization.
-- Run targeted Phase 8 tests and the full local gate before fast-forward merging back to `main`.
+- Commit Phase 8 implementation on `feat/real-provider-smoke-validation`.
+- Fast-forward merge Phase 8 back to local `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed
@@ -34,3 +32,6 @@
 - `docker compose -f infra/compose.yaml config` passed.
 - `git diff --check` passed.
 - Note: `tests/e2e/auth.spec.ts` release gate blocker test failed once during the interrupted run, then passed both as a single-test rerun and in the full e2e run.
+- Phase 8 targeted tests passed: 53 passed.
+- Phase 8 final backend full pytest passed: 266 passed, 7 skipped.
+- Phase 8 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, and `git diff --check`.

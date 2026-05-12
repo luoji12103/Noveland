@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import cast
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
@@ -88,7 +90,7 @@ def test_providers_api_crud_health_and_fake_invocation() -> None:
 
     assert created.status_code == 201
     assert created.json()["auth_ref_configured"] is True
-    assert "auth_ref" not in created.json()
+    assert created.json()["auth_ref"] == "secret:fake"
     assert listed.status_code == 200
     assert [item["id"] for item in listed.json()] == [provider_id]
     assert capabilities.status_code == 200
@@ -159,6 +161,232 @@ def test_providers_api_acl_and_global_platform_admin() -> None:
     assert member_create.status_code == 403
     assert admin_global.status_code == 403
     assert platform_global.status_code == 201
+
+
+def test_provider_api_restricts_developer_only_visibility_to_platform_admin() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    platform_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, admin_id)
+    _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, platform_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, admin_token)
+    admin_create = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_generation",
+            "adapter_kind": "fake",
+            "provider_key": "hidden-fake",
+            "display_name": "Hidden Fake",
+            "visibility": "developer_only",
+        },
+    )
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_generation",
+            "adapter_kind": "fake",
+            "provider_key": "safe-fake",
+            "display_name": "Safe Fake",
+        },
+    )
+    admin_update = client.patch(
+        f"/worlds/{world_id}/providers/{created.json()['id']}",
+        json={"visibility": "hidden"},
+    )
+
+    _authenticate(client, platform_token)
+    platform_update = client.patch(
+        f"/worlds/{world_id}/providers/{created.json()['id']}",
+        json={"visibility": "developer_only"},
+    )
+
+    assert admin_create.status_code == 403
+    assert created.status_code == 201
+    assert admin_update.status_code == 403
+    assert platform_update.status_code == 200
+    assert platform_update.json()["visibility"] == "developer_only"
+
+
+def test_provider_api_rejects_secret_config_and_exposes_auth_ref_only() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+
+    rejected = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "fake",
+            "provider_key": "bad",
+            "display_name": "Bad",
+            "config_json": {"api_key": "sk-secret"},
+        },
+    )
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "fake",
+            "provider_key": "safe",
+            "display_name": "Safe",
+            "auth_ref": "env:OPENAI_API_KEY",
+        },
+    )
+
+    assert rejected.status_code == 422
+    assert "sensitive key" in rejected.text
+    assert created.status_code == 201
+    assert created.json()["auth_ref"] == "env:OPENAI_API_KEY"
+    assert "sk-secret" not in created.text
+
+
+def test_provider_smoke_missing_auth_writes_safe_health_and_invocation() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "openai",
+            "provider_key": "openai-image",
+            "display_name": "OpenAI Image",
+            "auth_ref": "env:MISSING_OPENAI_API_KEY",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={"worldline_id": str(worldline_id), "input_text": "draw"},
+    )
+    health = client.get(f"/worlds/{world_id}/providers/{provider_id}/health-checks")
+
+    assert smoke.status_code == 201
+    assert smoke.json()["smoke_status"] == "failed"
+    assert "auth_missing" in smoke.text
+    assert health.status_code == 200
+    assert health.json()[0]["metadata_json"] == {"smoke_test": True, "status": "failed"}
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert "MISSING_OPENAI_API_KEY" not in str(invocation.request_params_json)
+        assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
+
+
+def test_provider_smoke_openai_image_uses_env_secret_without_persisting_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-phase8-secret")
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["authorization"] = request.headers["authorization"]
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "b64_json": (
+                            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA"
+                            "DUlEQVR4nGP4z8DwHwAFgwJ/lq9S9wAAAABJRU5ErkJggg=="
+                        )
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(httpx, "Client", _httpx_client_factory(handler))
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "openai",
+            "provider_key": "openai-image",
+            "display_name": "OpenAI Image",
+            "auth_ref": "env:OPENAI_API_KEY",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={
+            "worldline_id": str(worldline_id),
+            "input_text": "draw",
+            "request_json": {"output_format": "png"},
+        },
+    )
+    health = client.get(f"/worlds/{world_id}/providers/{provider_id}/health-checks")
+
+    assert smoke.status_code == 201
+    assert smoke.json()["smoke_status"] == "succeeded"
+    assert smoke.json()["output_asset"] is not None
+    assert captured["authorization"] == "Bearer sk-phase8-secret"
+    assert health.status_code == 200
+    assert health.json()[0]["metadata_json"] == {"smoke_test": True, "status": "succeeded"}
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "succeeded"
+        assert invocation.media_asset_id is not None
+        assert "sk-phase8-secret" not in str(invocation.request_params_json)
+        assert "sk-phase8-secret" not in str(invocation.response_metadata_json)
+        assert "sk-phase8-secret" not in str(snapshot.raw_request_json)
+        assert "sk-phase8-secret" not in str(snapshot.raw_response_json)
+
+
+def test_provider_health_check_records_safe_auth_status() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_to_speech",
+            "adapter_kind": "openai",
+            "provider_key": "openai-speech",
+            "display_name": "OpenAI Speech",
+            "auth_ref": "env:MISSING_OPENAI_API_KEY",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    health = client.post(f"/worlds/{world_id}/providers/{provider_id}/health-check")
+
+    assert health.status_code == 201
+    assert health.json()["status"] == "unhealthy"
+    assert health.json()["metadata_json"]["auth_missing"] is True
 
 
 class _ProviderApiClient(TestClient):
@@ -302,3 +530,14 @@ def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.set(SESSION_COOKIE_NAME, token)
     client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
     client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _httpx_client_factory(
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> Callable[..., httpx.Client]:
+    original_client = httpx.Client
+
+    def create_client(**_: object) -> httpx.Client:
+        return original_client(transport=httpx.MockTransport(handler))
+
+    return create_client

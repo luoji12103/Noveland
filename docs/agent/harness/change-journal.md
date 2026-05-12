@@ -780,3 +780,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/real-provider-smoke-validation` after this docs-only work is committed on `main`.
+
+## Real Provider Configuration & Smoke Validation Phase 8 implementation entry
+
+- Date: 2026-05-12
+- Branch: feat/real-provider-smoke-validation
+- Scope: Backend-only provider secret boundary and smoke validation hardening.
+- Summary: Added provider secret reference resolution, recursive sensitive-key rejection for provider config/default params and execution payloads, sanitized provider API/health/ledger responses, health-check history listing, and safe provider smoke-test execution. Real OpenAI/OpenAI-compatible/MiMo/OmniVoice/GPT-SoVITS adapter execution now receives resolved secrets only in memory and treats missing required credentials as safe `auth_missing` failures with failed invocation records. Provider `auth_ref` remains an opaque reference string, restricted provider visibility is platform-admin-only, and OpenAI image/speech adapters no longer read `config_json.api_key`.
+- Files changed: `/backend/packages/providers/src/noveland/providers/{secrets,contracts,health,registry,service}.py`, `/backend/packages/providers/src/noveland/providers/adapters/{openai_image,openai_speech}.py`, `/backend/services/api/src/noveland/services/api/providers.py`, `/backend/tests/{test_api_providers.py,test_provider_execution_service.py,test_provider_registry_service.py,test_openai_speech_adapter.py,test_workspace_imports.py}`, `/docs/agent/harness/**`
+- Tests added/updated: Provider registry secret rejection/resolver tests, provider execution auth-missing/secret-leak tests, provider API smoke/health/ACL tests, OpenAI speech adapter in-memory secret mapping update, and workspace import coverage for `noveland.providers.secrets`.
+- Docs updated: change journal and active handoff.
+- Follow-up notes: No schema migration was needed for Phase 8. Full vault/KMS, encrypted DB secret storage, provider marketplace/UI, streaming, fallback/load balancing, and live provider tests beyond env-gated smoke coverage remain deferred.
