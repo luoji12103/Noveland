@@ -33,6 +33,7 @@ MODEL_MODULES = (
     "noveland.observability.models",
     "noveland.providers.models",
     "noveland.speech.models",
+    "noveland.visual.models",
 )
 
 

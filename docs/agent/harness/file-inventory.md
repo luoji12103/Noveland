@@ -84,6 +84,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/speech.py`
+- `backend/services/api/src/noveland/services/api/visual.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
 - `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
@@ -167,6 +168,14 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/media/src/noveland/media/models.py`
 - `backend/packages/media/src/noveland/media/service.py`
 - `backend/packages/media/src/noveland/media/storage.py`
+- `backend/packages/visual/`
+- `backend/packages/visual/pyproject.toml`
+- `backend/packages/visual/src/noveland/visual/__init__.py`
+- `backend/packages/visual/src/noveland/visual/composition.py`
+- `backend/packages/visual/src/noveland/visual/contracts.py`
+- `backend/packages/visual/src/noveland/visual/models.py`
+- `backend/packages/visual/src/noveland/visual/resolver.py`
+- `backend/packages/visual/src/noveland/visual/service.py`
 - `backend/packages/invocations/`
 - `backend/packages/invocations/pyproject.toml`
 - `backend/packages/invocations/src/noveland/invocations/__init__.py`
@@ -256,7 +265,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260512_0033_media_kernel.py`
 - `backend/migrations/versions/20260512_0034_provider_execution_kernel.py`
 - `backend/migrations/versions/20260512_0036_speech_voice_pipeline.py`
+- `backend/migrations/versions/20260512_0037_visual_asset_system.py`
 - `backend/tests/`
+- `backend/tests/test_api_visual.py`
 - `backend/tests/test_api_speech.py`
 - `backend/tests/test_api_providers.py`
 - `backend/tests/test_api_images.py`
@@ -277,6 +288,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_mimo_speech_adapters.py`
 - `backend/tests/test_speech_service.py`
 - `backend/tests/test_voice_profiles.py`
+- `backend/tests/test_visual_service.py`
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`

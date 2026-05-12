@@ -62,6 +62,8 @@ def test_core_schema_tables_are_registered() -> None:
         "conversation_turns",
         "character_emotional_states",
         "character_knowledge_facts",
+        "character_sprite_sets",
+        "character_sprite_variants",
         "daily_episode_drafts",
         "daily_life_event_candidates",
         "ending_candidates",
@@ -120,6 +122,7 @@ def test_core_schema_tables_are_registered() -> None:
         "rumor_records",
         "scenes",
         "scene_beat_drafts",
+        "scene_background_profiles",
         "scene_location_edges",
         "secret_records",
         "story_hooks",
@@ -464,6 +467,91 @@ def test_speech_voice_pipeline_tables_are_registered() -> None:
         "worlds.id",
     }
     assert foreign_key_targets("speech_style_mappings") == {"worlds.id"}
+
+
+def test_visual_asset_system_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "agent_id",
+        "style_key",
+        "display_name",
+        "default_variant_id",
+        "status",
+        "visibility",
+        "metadata",
+    } <= column_names("character_sprite_sets")
+    assert {
+        "world_id",
+        "worldline_id",
+        "sprite_set_id",
+        "asset_id",
+        "expression_key",
+        "pose_key",
+        "outfit_key",
+        "mood_tags",
+        "priority",
+        "is_default",
+        "status",
+        "visibility",
+        "metadata",
+    } <= column_names("character_sprite_variants")
+    assert {
+        "world_id",
+        "worldline_id",
+        "scene_id",
+        "location_key",
+        "time_of_day",
+        "weather_key",
+        "asset_id",
+        "priority",
+        "is_default",
+        "status",
+        "visibility",
+        "metadata",
+    } <= column_names("scene_background_profiles")
+    assert Base.metadata.tables["character_sprite_sets"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["character_sprite_variants"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["scene_background_profiles"].c.worldline_id.nullable is False
+    assert {
+        "ix_character_sprite_sets_worldline_agent",
+        "ix_character_sprite_sets_worldline_status",
+    } <= index_names("character_sprite_sets")
+    assert {
+        "ix_character_sprite_variants_set",
+        "ix_character_sprite_variants_worldline_expr",
+        "ix_character_sprite_variants_asset",
+    } <= index_names("character_sprite_variants")
+    assert {
+        "ix_scene_background_profiles_worldline_scene",
+        "ix_scene_background_profiles_worldline_location",
+        "ix_scene_background_profiles_asset",
+    } <= index_names("scene_background_profiles")
+    assert "uq_character_sprite_sets_agent_style" in constraint_names(
+        "character_sprite_sets",
+        UniqueConstraint,
+    )
+    assert "uq_character_sprite_variants_asset_keys" in constraint_names(
+        "character_sprite_variants",
+        UniqueConstraint,
+    )
+    assert foreign_key_targets("character_sprite_sets") == {
+        "agents.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("character_sprite_variants") == {
+        "character_sprite_sets.id",
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("scene_background_profiles") == {
+        "media_assets.id",
+        "scenes.id",
+        "worldlines.id",
+        "worlds.id",
+    }
 
 
 def test_media_asset_catalog_tables_are_registered() -> None:

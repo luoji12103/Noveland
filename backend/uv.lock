@@ -23,6 +23,7 @@ members = [
     "noveland-service-runtime",
     "noveland-speech",
     "noveland-storage",
+    "noveland-visual",
     "noveland-worlds",
 ]
 
@@ -578,6 +579,7 @@ dependencies = [
     { name = "noveland-service-runtime" },
     { name = "noveland-speech" },
     { name = "noveland-storage" },
+    { name = "noveland-visual" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-multipart" },
@@ -613,6 +615,7 @@ requires-dist = [
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-speech", editable = "packages/speech" },
     { name = "noveland-storage", editable = "packages/storage" },
+    { name = "noveland-visual", editable = "packages/visual" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "python-multipart", specifier = ">=0.0.20,<0.1" },
@@ -903,6 +906,7 @@ dependencies = [
     { name = "noveland-providers" },
     { name = "noveland-service-runtime" },
     { name = "noveland-speech" },
+    { name = "noveland-visual" },
     { name = "noveland-worlds" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -930,6 +934,7 @@ requires-dist = [
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-speech", editable = "packages/speech" },
+    { name = "noveland-visual", editable = "packages/visual" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.13,<3" },
@@ -1018,6 +1023,29 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "noveland-core", editable = "packages/core" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
+name = "noveland-visual"
+version = "0.1.0"
+source = { editable = "packages/visual" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-core" },
+    { name = "noveland-media" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
 

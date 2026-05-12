@@ -11,6 +11,7 @@ from noveland.services.api.realtime import router as realtime_router
 from noveland.services.api.runtime import router as runtime_router
 from noveland.services.api.speech import agent_voice_router
 from noveland.services.api.speech import router as speech_router
+from noveland.services.api.visual import router as visual_router
 from noveland.services.api.worlds import root_router as worlds_root_router
 from noveland.services.api.worlds import router as worlds_router
 from pydantic import BaseModel
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     api.include_router(images_router)
     api.include_router(speech_router)
     api.include_router(agent_voice_router)
+    api.include_router(visual_router)
     api.include_router(invocations_router)
     api.include_router(providers_router)
     api.include_router(conversations_router)

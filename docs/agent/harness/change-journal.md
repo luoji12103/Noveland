@@ -802,3 +802,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/visual-asset-system` after this docs-only work is committed on `main`.
+
+## Character Sprite / Scene Asset System Phase 9 implementation entry
+
+- Date: 2026-05-12
+- Branch: feat/visual-asset-system
+- Scope: Backend-only strict-worldline visual asset binding and resolver foundation.
+- Summary: Added `noveland-visual`, strict-worldline character sprite sets/variants, scene background profiles, deterministic sprite/background resolution, a safe visual API router, and compose-scene orchestration through the existing Phase 6 `ImageService.compose_image()` path. Visual API responses use safe asset/object references that omit storage URIs while records continue to point at existing `media_assets` and `media_objects`.
+- Files changed: `/backend/packages/visual/**`, `/backend/services/api/src/noveland/services/api/{app,visual}.py`, `/backend/migrations/versions/20260512_0037_visual_asset_system.py`, `/backend/tests/{test_visual_service.py,test_api_visual.py,test_schema_metadata.py,test_alembic_config.py,test_workspace_imports.py}`, `/backend/{pyproject.toml,uv.lock}`, `/backend/services/api/pyproject.toml`, `/backend/packages/core/src/noveland/core/database.py`, `/docs/agent/harness/**`
+- Tests added/updated: Visual service tests, visual API tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type targeted checks.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: No Web UI, background generation, public reader delivery, nullable worldline defaults, second media framework, or second composer was added.

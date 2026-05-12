@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-12T00:00:00Z
-- Branch: main
-- Objective: Begin Phase 9 Character Sprite / Scene Asset System.
-- Status: Phase 9 planning checkpoint is being recorded on `main`; implementation should continue on `feat/visual-asset-system` after the docs-only commit.
+- Branch: feat/visual-asset-system
+- Objective: Complete Phase 9 Character Sprite / Scene Asset System.
+- Status: Phase 9 implementation full local gate passed and is ready for fast-forward merge to `main`.
 
 ## Current Context
 
@@ -21,10 +21,9 @@
 
 ## Required Next Steps
 
-- Commit Phase 9 docs-only plan on `main`.
-- Create `feat/visual-asset-system`.
-- Implement `noveland-visual`, migration `20260512_0037`, independent visual API router, sprite/background resolvers, and scene composition through `ImageService.compose_image()`.
-- Run targeted Phase 9 tests and the full local gate before fast-forward merging back to `main`.
+- Commit the Phase 9 implementation on `feat/visual-asset-system`.
+- Fast-forward merge Phase 9 back to local `main`.
+- Start Phase 10 only after `main` is clean and the full local gate has passed.
 - Do not push unless explicitly requested.
 
 ## Verification Completed
@@ -38,3 +37,5 @@
 - Phase 8 targeted tests passed: 53 passed.
 - Phase 8 final backend full pytest passed: 266 passed, 7 skipped.
 - Phase 8 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, and `git diff --check`.
+- Phase 9 targeted tests passed: 34 passed.
+- Phase 9 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, `git diff --check`, and clean next-env check.

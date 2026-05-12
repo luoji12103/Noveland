@@ -88,6 +88,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
   - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
+  - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -180,6 +181,12 @@ Fast orientation for a new coding session.
   - `noveland.speech.style_mapping` — provider/emotion style mapping CRUD and deterministic fallback lookup
   - `noveland.speech.transcripts` — transcript persistence and same-worldline reference validation service
   - `noveland.speech.service` — TTS/STT orchestration through provider execution, invocation ledger, media writeback, turn references, and transcript writeback
+- `backend/packages/visual/`
+  - `noveland.visual.contracts` — strict-worldline sprite set, sprite variant, background resolver, compose-scene, and safe visual asset reference DTOs
+  - `noveland.visual.models` — character sprite set, character sprite variant, and scene background profile ORM models
+  - `noveland.visual.service` — visual CRUD and same-world/same-worldline media asset validation service
+  - `noveland.visual.resolver` — deterministic sprite/background resolver with exact, neutral/default fallback, and restricted asset suppression
+  - `noveland.visual.composition` — compose-scene wrapper that reuses `ImageService.compose_image()`
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -202,7 +209,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, and Speech Voice Pipeline migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, and Visual Asset System migration
 
 ## Update rule
 
