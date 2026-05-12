@@ -22,6 +22,7 @@ MODEL_MODULES = (
     "noveland.auth.models",
     "noveland.worlds.models",
     "noveland.agents.models",
+    "noveland.asset_generation.models",
     "noveland.adapters.models",
     "noveland.calendar.models",
     "noveland.conversations.models",

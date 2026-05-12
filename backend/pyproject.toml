@@ -7,6 +7,7 @@ dependencies = [
   "alembic>=1.18,<2",
   "noveland-adapters",
   "noveland-agents",
+  "noveland-asset-generation",
   "noveland-auth",
   "noveland-calendar",
   "noveland-conversations",
@@ -45,6 +46,7 @@ package = false
 members = [
   "packages/adapters",
   "packages/agents",
+  "packages/asset_generation",
   "packages/auth",
   "packages/calendar",
   "packages/conversations",
@@ -68,6 +70,7 @@ members = [
 [tool.uv.sources]
 noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
+noveland-asset-generation = { workspace = true }
 noveland-auth = { workspace = true }
 noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
@@ -108,6 +111,7 @@ exclude = ["migrations/versions/"]
 mypy_path = [
   "packages/adapters/src",
   "packages/agents/src",
+  "packages/asset_generation/src",
   "packages/auth/src",
   "packages/calendar/src",
   "packages/conversations/src",
