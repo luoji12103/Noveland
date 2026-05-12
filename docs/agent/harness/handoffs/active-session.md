@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-12T00:00:00Z
-- Branch: feat/visual-asset-system
-- Objective: Complete Phase 9 Character Sprite / Scene Asset System.
-- Status: Phase 9 implementation full local gate passed and is ready for fast-forward merge to `main`.
+- Branch: main
+- Objective: Begin Phase 10 Multimodal Conversation Turn Integration.
+- Status: Phase 10 planning checkpoint is being recorded on `main`; implementation should continue on `feat/multimodal-turn-presentation` after the docs-only commit.
 
 ## Current Context
 
@@ -18,12 +18,14 @@
 - Storage URIs, file paths, bytes, base64, raw prompts, and raw outputs must stay out of `world_events.payload`.
 - Phase 8 decision: `provider_integrations.auth_ref` is an opaque secret reference, not a secret value. Provider config/default params must reject secret-like keys and execution must resolve real secrets only in memory from environment/settings.
 - Phase 9 decision: visual binding records are strict-worldline-only. Sprite/background records must have non-null `worldline_id`; media bytes may be shared through media assets, but visual binding state must not use nullable worldline defaults.
+- Phase 10 decision: conversation turn presentation is backend/API-only, one canonical record per turn, and must reuse visual/image/speech/media services without mutating turn text or auto-writing STT transcripts to memory.
 
 ## Required Next Steps
 
-- Commit the Phase 9 implementation on `feat/visual-asset-system`.
-- Fast-forward merge Phase 9 back to local `main`.
-- Start Phase 10 only after `main` is clean and the full local gate has passed.
+- Commit Phase 10 docs-only plan on `main`.
+- Create `feat/multimodal-turn-presentation`.
+- Implement `conversation_turn_presentations`, presentation service, independent conversation subroutes, and render orchestration through existing visual/image/speech/media services.
+- Run targeted Phase 10 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed

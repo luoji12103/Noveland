@@ -813,3 +813,14 @@
 - Tests added/updated: Visual service tests, visual API tests, schema metadata registration, Alembic head coverage, workspace import coverage, plus backend lint/type targeted checks.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: No Web UI, background generation, public reader delivery, nullable worldline defaults, second media framework, or second composer was added.
+
+## Multimodal Conversation Turn Integration Phase 10 plan entry
+
+- Date: 2026-05-12
+- Branch: main
+- Scope: Final feature implementation plan for Multimodal Conversation Turn Integration Phase 10.
+- Summary: Added the version-prefixed Phase 10 plan for canonical conversation turn presentation state, visual render orchestration through Phase 9/Phase 6 services, speech render/transcription orchestration through Phase 7 services, media reference attachment, and same-worldline validation without adding Web preview/playback UI, public reader delivery, streaming, runtime daemon orchestration, or memory auto-write.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.10-multimodal-conversation-turn-integration-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/multimodal-turn-presentation` after this docs-only work is committed on `main`.
