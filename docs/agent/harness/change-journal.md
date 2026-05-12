@@ -835,3 +835,14 @@
 - Tests added/updated: Presentation service tests, presentation API render orchestration tests, schema metadata registration, Alembic head coverage, and workspace import coverage.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: No Web preview/playback UI, public reader delivery, streaming, runtime daemon orchestration, second composer, or memory auto-write was added.
+
+## Background Asset Generation Orchestrator Phase 11 plan entry
+
+- Date: 2026-05-12
+- Branch: main
+- Scope: Final feature implementation plan for Background Asset Generation Orchestrator Phase 11.
+- Summary: Added the version-prefixed Phase 11 plan for admin-reviewed asset generation policies, preview runs, persisted proposals, explicit apply into queued media jobs, and media job reprioritize/cancel-superseded helpers. The plan explicitly reuses existing media jobs, visual/speech/presentation/provider capability records and excludes daemon hooks, automatic provider execution, Web UI, streaming, and public reader delivery.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/asset-generation-orchestrator` after this docs-only work is committed on `main`.

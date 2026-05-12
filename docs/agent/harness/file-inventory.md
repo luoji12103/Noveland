@@ -327,6 +327,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.3.1.8-real-provider-smoke-validation-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.10-multimodal-conversation-turn-integration-plan.md`
+- `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md`
 
 ## Update rule
 

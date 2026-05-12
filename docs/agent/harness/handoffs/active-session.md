@@ -2,8 +2,8 @@
 
 - Date: 2026-05-12T00:00:00Z
 - Branch: main
-- Objective: Complete Phase 10 Multimodal Conversation Turn Integration and continue Phase 11.
-- Status: Phase 10 implementation is in progress on `feat/multimodal-turn-presentation`; targeted Phase 10 tests have passed and full local gate is next before fast-forward merge to `main`.
+- Objective: Begin Phase 11 Background Asset Generation Orchestrator.
+- Status: Phase 11 planning checkpoint is being recorded on `main`; implementation should continue on `feat/asset-generation-orchestrator` after the docs-only commit.
 
 ## Current Context
 
@@ -19,12 +19,14 @@
 - Phase 8 decision: `provider_integrations.auth_ref` is an opaque secret reference, not a secret value. Provider config/default params must reject secret-like keys and execution must resolve real secrets only in memory from environment/settings.
 - Phase 9 decision: visual binding records are strict-worldline-only. Sprite/background records must have non-null `worldline_id`; media bytes may be shared through media assets, but visual binding state must not use nullable worldline defaults.
 - Phase 10 decision: conversation turn presentation is backend/API-only, one canonical record per turn, and must reuse visual/image/speech/media services without mutating turn text or auto-writing STT transcripts to memory.
+- Phase 11 decision: asset generation is proposal plus admin apply only. Preview/apply must not call providers, must not hook a daemon, and must create only queued `media_jobs` for explicit later execution.
 
 ## Required Next Steps
 
-- Run full local gate for Phase 10.
-- Fast-forward merge `feat/multimodal-turn-presentation` back to `main` if the gate passes.
-- Start Phase 11 from clean `main` with docs-only planning commit and then implementation branch.
+- Commit Phase 11 docs-only plan on `main`.
+- Create `feat/asset-generation-orchestrator`.
+- Implement strict-worldline asset generation policies, runs, proposals, preview/apply service, API router, and media job utility routes.
+- Run targeted Phase 11 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed
@@ -41,3 +43,4 @@
 - Phase 9 targeted tests passed: 34 passed.
 - Phase 9 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, `git diff --check`, and clean next-env check.
 - Phase 10 targeted tests passed: 30 passed.
+- Phase 10 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, and `git diff --check`.

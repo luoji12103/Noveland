@@ -20,6 +20,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.3.1.8-real-provider-smoke-validation-plan.md` — final Real Provider Configuration & Smoke Validation Phase 8 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.9-character-sprite-scene-asset-system-plan.md` — final Character Sprite / Scene Asset System Phase 9 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.10-multimodal-conversation-turn-integration-plan.md` — final Multimodal Conversation Turn Integration Phase 10 implementation plan.
+- `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md` — final Background Asset Generation Orchestrator Phase 11 implementation plan.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
