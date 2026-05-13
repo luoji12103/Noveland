@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-12T00:00:00Z
+- Date: 2026-05-13T00:00:00Z
 - Branch: main
-- Objective: Begin Phase 12 Multimodal Evaluation And Diagnostics.
-- Status: Phase 11 is complete and fast-forward merged to local `main`; Phase 12 planning checkpoint is being recorded on `main`; implementation should continue on `feat/multimodal-eval-diagnostics` after the docs-only commit.
+- Objective: Begin Phase 13 Architecture Freeze & Regression Fixture.
+- Status: Phase 8-12 are complete and fast-forward merged to `main`; Phase 13 planning checkpoint is being recorded on `main`; implementation should continue on `feat/architecture-freeze-regression-fixture` after the docs-only commit.
 
 ## Current Context
 
@@ -21,13 +21,14 @@
 - Phase 10 decision: conversation turn presentation is backend/API-only, one canonical record per turn, and must reuse visual/image/speech/media services without mutating turn text or auto-writing STT transcripts to memory.
 - Phase 11 decision: asset generation is proposal plus admin apply only. Preview/apply must not call providers, must not hook a daemon, and must create only queued `media_jobs` for explicit later execution.
 - Phase 12 decision: multimodal evaluation reuses existing `long_run_eval_runs` and release/eval evidence patterns. Do not create a duplicate release framework or a new eval table unless implementation proves the existing table insufficient.
+- Phase 13 is a freeze/regression phase only. Do not add new product features, providers, Web UI, public reader media delivery, runtime daemon execution, streaming, release gate semantic changes, schema normalization, historical backfill, or `worlds.py` refactors.
 
 ## Required Next Steps
 
-- Commit Phase 12 docs-only plan on `main`.
-- Create `feat/multimodal-eval-diagnostics`.
-- Implement backend-only multimodal diagnostics and `multimodal-smoke` eval APIs using existing `long_run_eval_runs`.
-- Run targeted Phase 12 tests and the full local gate before fast-forward merging back to `main`.
+- Commit Phase 13 docs-only plan on `main`.
+- Create `feat/architecture-freeze-regression-fixture`.
+- Add architecture contract docs, API/data inventories, ADRs, fixture docs, a deterministic multimodal sample-world test fixture, and a regression test entrypoint.
+- Run targeted Phase 13 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 
 ## Verification Completed
@@ -47,3 +48,5 @@
 - Phase 10 full local gate passed: backend ruff, backend mypy, backend pytest, web lint, web typecheck, web tests, web build, web `check:next-env`, web e2e, docker compose config, and `git diff --check`.
 - Phase 11 targeted tests passed: 32 passed.
 - Phase 11 full local gate passed: backend ruff, backend mypy, backend pytest (`284 passed, 7 skipped`), web lint, web typecheck, web tests (`63 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Phase 12 targeted tests passed: 31 passed.
+- Phase 12 full local gate passed: backend ruff, backend mypy, backend pytest (`288 passed, 7 skipped`), web lint, web typecheck, web tests (`63 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.

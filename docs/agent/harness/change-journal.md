@@ -868,3 +868,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/multimodal-eval-diagnostics` after this docs-only work is committed on `main`.
+
+## Architecture Freeze & Regression Fixture Phase 13 plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final feature implementation plan for Architecture Freeze & Regression Fixture Phase 13.
+- Summary: Added the version-prefixed Phase 13 plan for freezing Phase 3-12 architecture boundaries, adding architecture/API/data model inventories, concise ADRs, a multimodal sample-world fixture, and a regression test entrypoint without adding new product features, providers, Web UI, daemon execution, streaming, schema normalization, or release gate semantic changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.3.1.13-architecture-freeze-regression-fixture-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: Implementation should start on `feat/architecture-freeze-regression-fixture` after this docs-only work is committed on `main`.
