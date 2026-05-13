@@ -945,3 +945,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 2 full local gate.
 - Docs updated: OpenSpec tasks, change journal, and active handoff.
 - Follow-up notes: Start Phase 3 from clean local `main`; do not push unless explicitly requested.
+
+## v0.4 Media Asset Admin Console plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 3.
+- Summary: Added the v0.4.3 plan for a world-scoped media asset admin console at `/worlds/{worldId}/media`. The plan covers asset list/detail, object list/download actions, job list/status, reference browser, upload flow, visibility/status filters, safe metadata summaries, and reuse of existing media APIs without backend media kernel changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.3-media-admin-console-plan.md`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/media-admin-console` after this docs-only work is committed on `main`.

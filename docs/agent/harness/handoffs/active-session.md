@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 2 Provider Admin Console.
-- Status: Phase 2 Provider Admin Console is fast-forward merged to local `main`; Phase 3 Media Asset Admin Console planning is next.
+- Status: Phase 3 Media Asset Admin Console planning checkpoint is in progress on local `main`.
 
 ## Current Context
 
@@ -30,7 +30,7 @@
 
 ## Required Next Steps
 
-- Write the Phase 3 Media Asset Admin Console docs-only planning checkpoint on clean local `main`.
+- Commit the Phase 3 Media Asset Admin Console docs-only planning checkpoint on clean local `main`.
 - Create `feat/media-admin-console` after the planning commit.
 - Implement only the Phase 3 media admin console scope from `openspec/changes/v0-4-operator-admin-ux/specs/media-admin-console/spec.md`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.

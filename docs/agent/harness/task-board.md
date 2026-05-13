@@ -77,6 +77,8 @@
 - Model Invocation Ledger v0.3.1.3
 - v0.4 Operator/Admin UX planning baseline
 - v0.4 Operator/Admin UX Phase 1: Admin UX Foundation
+- v0.4 Operator/Admin UX Phase 2: Provider Admin Console
+- v0.4 Operator/Admin UX Phase 3: Media Asset Admin Console planning
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
