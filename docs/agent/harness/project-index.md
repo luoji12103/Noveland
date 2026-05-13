@@ -23,6 +23,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md` — final Background Asset Generation Orchestrator Phase 11 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.12-multimodal-eval-diagnostics-plan.md` — final Multimodal Evaluation And Diagnostics Phase 12 implementation plan.
 - `docs/agent/harness/feature-updates/v0.3.1.13-architecture-freeze-regression-fixture-plan.md` — final Architecture Freeze & Regression Fixture Phase 13 implementation plan.
+- `docs/agent/harness/feature-updates/v0.4.1-admin-ux-foundation-plan.md` — final v0.4 Operator/Admin UX Phase 1 implementation plan.
+- `openspec/` — OpenSpec current specs and proposed roadmap changes, including `v0-4-operator-admin-ux`.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.

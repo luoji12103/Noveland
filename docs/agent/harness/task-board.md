@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- v0.4 Operator/Admin UX Phase 1: Admin UX Foundation
 
 ## Blocked
 - None
@@ -75,6 +75,7 @@
 - Media Kernel Foundation v0.3.1.1
 - Media Asset Catalog v0.3.1.2
 - Model Invocation Ledger v0.3.1.3
+- v0.4 Operator/Admin UX planning baseline
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract

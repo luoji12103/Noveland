@@ -890,3 +890,14 @@
 - Tests added/updated: `test_multimodal_sample_world_regression.py` plus targeted Phase 13 regression command.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: No new provider capability, business feature, Web UI, daemon execution, streaming, release gate semantic change, schema migration, or `worlds.py` refactor should be introduced in this phase.
+
+## v0.4 Admin UX Foundation plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 1.
+- Summary: Added the v0.4.1 plan for shared admin shell conventions, route guards, loading/error/empty states, admin API client conventions, and table/detail/action patterns. The phase explicitly avoids backend behavior changes, schema migrations, concrete provider/media/visual/speech business consoles, public reader UI, and daemon or streaming behavior.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.1-admin-ux-foundation-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/admin-ux-foundation` after this docs-only work is committed on `main`.
