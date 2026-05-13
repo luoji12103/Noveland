@@ -1,0 +1,22 @@
+schema: spec-driven
+
+context: |
+  Noveland is a Python/FastAPI backend plus Next.js Web app for a persistent
+  galgame-style living world system. Current main includes invocation ledger,
+  media kernel, provider execution, image/speech pipelines, visual bindings,
+  conversation presentations, asset generation proposals, multimodal evals,
+  and architecture regression fixtures.
+
+  Current specs describe implemented behavior only. Future roadmap work belongs
+  under openspec/changes. Preserve worldline isolation, provider execution,
+  secret, invocation ledger, media, and event payload boundaries.
+
+rules:
+  proposal:
+    - Keep roadmap proposals concise and scoped to future behavior.
+    - Do not describe current implementation as future work.
+  specs:
+    - Main specs must include Purpose, Requirements, and Non-goals.
+    - Change specs must use OpenSpec delta headers and Given/When/Then scenarios.
+  tasks:
+    - Keep roadmap tasks planning-level until implementation is explicitly requested.
