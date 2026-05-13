@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Begin Phase 13 Architecture Freeze & Regression Fixture.
-- Status: Phase 8-12 are complete and fast-forward merged to `main`; Phase 13 planning checkpoint is being recorded on `main`; implementation should continue on `feat/architecture-freeze-regression-fixture` after the docs-only commit.
+- Status: Phase 13 docs-only planning commit is complete on `main`; implementation is in progress on `feat/architecture-freeze-regression-fixture`.
 
 ## Current Context
 
@@ -25,9 +25,7 @@
 
 ## Required Next Steps
 
-- Commit Phase 13 docs-only plan on `main`.
-- Create `feat/architecture-freeze-regression-fixture`.
-- Add architecture contract docs, API/data inventories, ADRs, fixture docs, a deterministic multimodal sample-world test fixture, and a regression test entrypoint.
+- Finish architecture contract docs, API/data inventories, ADRs, fixture docs, deterministic multimodal sample-world test fixture, and regression test entrypoint.
 - Run targeted Phase 13 tests and the full local gate before fast-forward merging back to `main`.
 - Do not push unless explicitly requested.
 

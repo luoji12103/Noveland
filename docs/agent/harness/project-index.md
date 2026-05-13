@@ -36,6 +36,11 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/scale-readiness.md` — derived scale-readiness report interpretation.
 - `docs/agent/operations/living-world-release-profile.md` — living-world release profile and beta checklist operator workflow.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
+- `docs/agent/architecture/current-system-contracts.md` — frozen Phase 3-12 architecture boundary contracts for provider, invocation, media, visual, speech, presentation, asset generation, and eval layers.
+- `docs/agent/architecture/api-contract-inventory.md` — stable backend API/router, DTO, service, ACL, worldline, side-effect, and test inventory for multimodal layers.
+- `docs/agent/architecture/data-model-inventory.md` — Phase 3-12 data model ownership, worldline behavior, reference, prohibited-storage, and migration inventory.
+- `docs/agent/architecture/adr/0001-worldline-first-multimodal-state.md` through `0009-multimodal-evals-reuse-release-framework.md` — concise accepted ADRs for Phase 3-12 multimodal architecture decisions.
+- `docs/agent/fixtures/multimodal-sample-world.md` — deterministic sample-world regression fixture description and test entrypoint.
 
 ## Current entrypoints
 
@@ -198,6 +203,9 @@ Fast orientation for a new coding session.
   - `noveland.asset_generation.contracts` — strict-worldline asset generation policy, preview, proposal, apply, reprioritize, and cancel DTOs
   - `noveland.asset_generation.models` — asset generation policy, run, and proposal ORM models
   - `noveland.asset_generation.service` — admin-reviewed preview/apply service that creates proposals and queued media jobs without provider execution
+- `backend/packages/multimodal_eval/`
+  - `noveland.multimodal_eval.contracts` — multimodal diagnostic finding/result and eval-run DTOs
+  - `noveland.multimodal_eval.service` — provider/media/invocation/visual/speech/event diagnostics and `long_run_eval_runs` writeback service
 - `backend/packages/plugins/`
   - `noveland.plugins` — plugin registry, manifest, config validation, typed errors, and lazy public exports
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
@@ -221,6 +229,10 @@ Fast orientation for a new coding session.
 
 ### Database
 - `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, Conversation Turn Presentation migration, and Asset Generation Orchestrator migration
+
+### Regression fixtures
+- `backend/tests/fixtures/multimodal_sample_world.py` — deterministic Phase 13 multimodal sample-world fixture helper for backend regression tests
+- `backend/tests/test_multimodal_sample_world_regression.py` — Phase 13 sample-world architecture regression entrypoint
 
 ## Update rule
 

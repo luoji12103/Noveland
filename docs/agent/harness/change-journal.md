@@ -879,3 +879,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, and active handoff.
 - Follow-up notes: Implementation should start on `feat/architecture-freeze-regression-fixture` after this docs-only work is committed on `main`.
+
+## Architecture Freeze & Regression Fixture Phase 13 implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/architecture-freeze-regression-fixture
+- Scope: Architecture freeze docs, ADRs, sample-world fixture, and regression entrypoint.
+- Summary: Added Phase 3-12 architecture contract documentation, API and data model inventories, concise accepted ADRs, sample-world fixture documentation, a deterministic backend fixture helper, and a regression test that verifies worldline isolation, media integrity, resolver behavior, provider secret hygiene, access control, event payload hygiene, asset-generation admin control, and multimodal diagnostics.
+- Files changed: `/docs/agent/architecture/{current-system-contracts.md,api-contract-inventory.md,data-model-inventory.md,adr/*.md}`, `/docs/agent/fixtures/multimodal-sample-world.md`, `/backend/tests/fixtures/multimodal_sample_world.py`, `/backend/tests/test_multimodal_sample_world_regression.py`, `/docs/agent/harness/**`
+- Tests added/updated: `test_multimodal_sample_world_regression.py` plus targeted Phase 13 regression command.
+- Docs updated: project index, file inventory, change journal, and active handoff.
+- Follow-up notes: No new provider capability, business feature, Web UI, daemon execution, streaming, release gate semantic change, schema migration, or `worlds.py` refactor should be introduced in this phase.

@@ -305,6 +305,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_api_realtime.py`
 - `backend/tests/test_api_asset_generation.py`
 - `backend/tests/test_asset_generation_service.py`
+- `backend/tests/fixtures/`
+- `backend/tests/__init__.py`
+- `backend/tests/fixtures/__init__.py`
+- `backend/tests/fixtures/multimodal_sample_world.py`
+- `backend/tests/test_multimodal_sample_world_regression.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`
@@ -340,6 +345,20 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.3.1.11-background-asset-generation-orchestrator-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.12-multimodal-eval-diagnostics-plan.md`
 - `docs/agent/harness/feature-updates/v0.3.1.13-architecture-freeze-regression-fixture-plan.md`
+- `docs/agent/architecture/current-system-contracts.md`
+- `docs/agent/architecture/api-contract-inventory.md`
+- `docs/agent/architecture/data-model-inventory.md`
+- `docs/agent/architecture/adr/0001-worldline-first-multimodal-state.md`
+- `docs/agent/architecture/adr/0002-provider-secrets-as-opaque-auth-ref.md`
+- `docs/agent/architecture/adr/0003-model-invocation-ledger-as-call-audit-source.md`
+- `docs/agent/architecture/adr/0004-media-assets-not-narrative-artifacts.md`
+- `docs/agent/architecture/adr/0005-comfyui-as-optional-provider-not-core-dependency.md`
+- `docs/agent/architecture/adr/0006-strict-worldline-visual-bindings.md`
+- `docs/agent/architecture/adr/0007-conversation-turn-presentation-api-only-first.md`
+- `docs/agent/architecture/adr/0008-asset-generation-admin-apply-only.md`
+- `docs/agent/architecture/adr/0009-multimodal-evals-reuse-release-framework.md`
+- `docs/agent/fixtures/`
+- `docs/agent/fixtures/multimodal-sample-world.md`
 
 ## Update rule
 
