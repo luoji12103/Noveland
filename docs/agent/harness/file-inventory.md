@@ -17,6 +17,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/agents/[agentId]/`
 - `web/app/worlds/[worldId]/conversations/`
 - `web/app/worlds/[worldId]/conversations/[conversationId]/`
+- `web/app/worlds/[worldId]/providers/`
 - `web/app/worlds/[worldId]/narrative/`
 - `web/app/worlds/[worldId]/reader/`
 - `web/app/worlds/[worldId]/reader/[artifactId]/`
@@ -47,6 +48,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/admin-foundation.tsx`
 - `web/features/admin/admin-route-guard.ts`
 - `web/features/admin/memory-backend-admin.tsx`
+- `web/features/admin/provider-integration-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
 - `web/features/admin/preset-admin.tsx`
 - `web/features/plugins/`
@@ -74,6 +76,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/realtime.ts`
 - `web/lib/runtime/`
 - `web/lib/worlds/`
+- `web/lib/worlds/provider-integrations.ts`
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
 - `backend/services/api/src/noveland/services/api/authorization.py`

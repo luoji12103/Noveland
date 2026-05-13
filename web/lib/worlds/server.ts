@@ -88,6 +88,11 @@ import type {
   WorldOrganization,
   Worldline,
 } from "@/lib/worlds/types";
+import type {
+  ProviderCapability,
+  ProviderHealthCheck,
+  ProviderIntegration,
+} from "@/lib/worlds/provider-integrations";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -253,6 +258,18 @@ export type ProviderAdminData = {
   modelProviderPlugins: PluginCatalogEntry[];
   pluginBindings: PluginBinding[];
   pluginDiagnostics: RuntimeDiagnostic[];
+  loadError: string | null;
+};
+
+export type ProviderIntegrationAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  providers: ProviderIntegration[];
+  capabilitiesByProviderId: Record<string, ProviderCapability[]>;
+  healthChecksByProviderId: Record<string, ProviderHealthCheck[]>;
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
   loadError: string | null;
 };
 
@@ -1064,6 +1081,79 @@ export async function getProviderAdminData(): Promise<ProviderAdminData> {
   }
 }
 
+export async function getProviderIntegrationAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<ProviderIntegrationAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyProviderIntegrationAdminData(
+        worlds,
+        null,
+        isPlatformAdmin,
+        "Unable to load selected world.",
+      );
+    }
+    const [memberships, providers] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<ProviderIntegration[]>(
+        `/worlds/${worldId}/providers?include_global=true&include_hidden=${String(
+          isPlatformAdmin,
+        )}`,
+        cookies,
+      ),
+    ]);
+    const [capabilityEntries, healthEntries] = await Promise.all([
+      Promise.all(
+        providers.map(async (provider) => [
+          provider.id,
+          await apiFetchOptional<ProviderCapability[]>(
+            `/worlds/${worldId}/providers/${provider.id}/capabilities`,
+            cookies,
+          ),
+        ] as const),
+      ),
+      Promise.all(
+        providers.map(async (provider) => [
+          provider.id,
+          await apiFetchOptional<ProviderHealthCheck[]>(
+            `/worlds/${worldId}/providers/${provider.id}/health-checks?limit=10`,
+            cookies,
+          ),
+        ] as const),
+      ),
+    ]);
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      providers,
+      capabilitiesByProviderId: Object.fromEntries(
+        capabilityEntries.map(([providerId, capabilities]) => [providerId, capabilities ?? []]),
+      ),
+      healthChecksByProviderId: Object.fromEntries(
+        healthEntries.map(([providerId, healthChecks]) => [providerId, healthChecks ?? []]),
+      ),
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyProviderIntegrationAdminData(
+      [],
+      null,
+      isPlatformAdmin,
+      "Unable to load provider integrations.",
+    );
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1300,6 +1390,25 @@ function emptyNarrativeReaderDetailData(
     selectedWorld: null,
     conversations: [],
     artifact: null,
+    loadError,
+  };
+}
+
+function emptyProviderIntegrationAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): ProviderIntegrationAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    providers: [],
+    capabilitiesByProviderId: {},
+    healthChecksByProviderId: {},
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
     loadError,
   };
 }

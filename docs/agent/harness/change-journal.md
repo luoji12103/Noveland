@@ -923,3 +923,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/provider-admin-console` after this docs-only work is committed on `main`.
+
+## v0.4 Provider Admin Console implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/provider-admin-console
+- Scope: World-scoped Web admin console for Phase 5+ provider integrations.
+- Summary: Added `/worlds/{worldId}/providers`, provider integration client helpers, server-side provider admin data loader, and a provider integration admin component for list/detail, create/update/delete, capabilities, health-check history/action, smoke-test action, auth_ref reference display, and restricted visibility notices. The legacy `/admin/providers` provider-profile page remains unchanged.
+- Files changed: `/web/app/worlds/[worldId]/providers/page.tsx`, `/web/features/admin/provider-integration-admin.tsx`, `/web/lib/worlds/provider-integrations.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Provider integration client tests and provider integration admin component tests.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Follow-up notes: No backend provider kernel changes, migrations, new provider adapters, resolved secret display, public reader provider exposure, or provider execution boundary changes were added.

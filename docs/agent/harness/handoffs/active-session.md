@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 1 Admin UX Foundation.
-- Status: Phase 1 implementation is fast-forward merged to local `main`. Phase 2 Provider Admin Console planning checkpoint is in progress on `main`.
+- Status: Phase 2 Provider Admin Console implementation is in progress on `feat/provider-admin-console`; targeted tests have passed and full local gate is next.
 
 ## Current Context
 
@@ -14,6 +14,7 @@
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - Phase 1 added reusable admin foundation components, platform-admin route guard helper, and CSRF-aware admin request helper. Later phases should reuse these patterns instead of inventing page-local equivalents.
 - Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
+- Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -28,9 +29,8 @@
 
 ## Required Next Steps
 
-- Commit the v0.4.2 docs-only planning checkpoint on `main`.
-- Create `feat/provider-admin-console`.
-- Implement the world-scoped provider integration console only.
+- Run Phase 2 full local gate.
+- If it passes, commit `feat/provider-admin-console`, fast-forward merge to `main`, mark the merge checkbox, and continue to Phase 3.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
@@ -40,3 +40,4 @@
 - Product design context was committed in `PRODUCT.md`.
 - v0.4 Phase 1 targeted tests passed: `npm run test -- admin-foundation admin-route-guard api-client provider-admin runtime-admin` (5 files, 13 tests).
 - v0.4 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`73 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.4 Phase 2 targeted tests passed: `npm run test -- provider-integrations provider-integration-admin workspace-shell` (2 files, 7 tests), plus web lint/typecheck and `git diff --check`.
