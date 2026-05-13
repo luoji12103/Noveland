@@ -934,3 +934,14 @@
 - Tests added/updated: Provider integration client tests and provider integration admin component tests.
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Follow-up notes: No backend provider kernel changes, migrations, new provider adapters, resolved secret display, public reader provider exposure, or provider execution boundary changes were added.
+
+## v0.4 Provider Admin Console merge entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Fast-forward merge completion for v0.4 Operator/Admin UX Phase 2.
+- Summary: Fast-forward merged `feat/provider-admin-console` into local `main` after the full local gate passed. OpenSpec Phase 2 tasks now mark full gate and merge complete, and the active handoff points to Phase 3 Media Asset Admin Console.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 2 full local gate.
+- Docs updated: OpenSpec tasks, change journal, and active handoff.
+- Follow-up notes: Start Phase 3 from clean local `main`; do not push unless explicitly requested.

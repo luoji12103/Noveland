@@ -2,8 +2,8 @@
 
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
-- Objective: Continue v0.4 Operator/Admin UX after Phase 1 Admin UX Foundation.
-- Status: Phase 2 Provider Admin Console implementation is in progress on `feat/provider-admin-console`; targeted tests have passed and full local gate is next.
+- Objective: Continue v0.4 Operator/Admin UX after Phase 2 Provider Admin Console.
+- Status: Phase 2 Provider Admin Console is fast-forward merged to local `main`; Phase 3 Media Asset Admin Console planning is next.
 
 ## Current Context
 
@@ -15,6 +15,7 @@
 - Phase 1 added reusable admin foundation components, platform-admin route guard helper, and CSRF-aware admin request helper. Later phases should reuse these patterns instead of inventing page-local equivalents.
 - Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
+- Phase 3 should add a media asset admin console using existing media APIs and admin foundation patterns. Do not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes unless the Phase 3 plan explicitly requires them.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -29,8 +30,9 @@
 
 ## Required Next Steps
 
-- Run Phase 2 full local gate.
-- If it passes, commit `feat/provider-admin-console`, fast-forward merge to `main`, mark the merge checkbox, and continue to Phase 3.
+- Write the Phase 3 Media Asset Admin Console docs-only planning checkpoint on clean local `main`.
+- Create `feat/media-admin-console` after the planning commit.
+- Implement only the Phase 3 media admin console scope from `openspec/changes/v0-4-operator-admin-ux/specs/media-admin-console/spec.md`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
@@ -41,3 +43,4 @@
 - v0.4 Phase 1 targeted tests passed: `npm run test -- admin-foundation admin-route-guard api-client provider-admin runtime-admin` (5 files, 13 tests).
 - v0.4 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`73 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 Phase 2 targeted tests passed: `npm run test -- provider-integrations provider-integration-admin workspace-shell` (2 files, 7 tests), plus web lint/typecheck and `git diff --check`.
+- v0.4 Phase 2 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`80 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
