@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 1 Admin UX Foundation.
-- Status: Phase 1 implementation is fast-forward merged to local `main`. Phase 2 Provider Admin Console is next.
+- Status: Phase 1 implementation is fast-forward merged to local `main`. Phase 2 Provider Admin Console planning checkpoint is in progress on `main`.
 
 ## Current Context
 
@@ -13,6 +13,7 @@
 - v0.4 phases must run in order: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, Multimodal Diagnostics Dashboard.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - Phase 1 added reusable admin foundation components, platform-admin route guard helper, and CSRF-aware admin request helper. Later phases should reuse these patterns instead of inventing page-local equivalents.
+- Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -27,8 +28,9 @@
 
 ## Required Next Steps
 
-- Confirm `main` is clean.
-- Start v0.4 Phase 2 Provider Admin Console from clean local `main` only if no blocker appears.
+- Commit the v0.4.2 docs-only planning checkpoint on `main`.
+- Create `feat/provider-admin-console`.
+- Implement the world-scoped provider integration console only.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

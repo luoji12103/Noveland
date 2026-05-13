@@ -912,3 +912,14 @@
 - Tests added/updated: `admin-foundation`, `admin-route-guard`, and `admin/api-client` Web tests; targeted admin tests; full local gate.
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Follow-up notes: Phase 2 should build the provider admin console on top of these shared admin patterns. No backend behavior, migrations, provider adapters, Web reader UI, daemon behavior, streaming, or public media delivery was added.
+
+## v0.4 Provider Admin Console plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 2.
+- Summary: Added the v0.4.2 plan for a world-scoped provider integration admin console at `/worlds/{worldId}/providers`, while leaving the legacy `/admin/providers` provider-profile page unchanged. The plan covers provider integration CRUD, capabilities, health-check history/action, smoke-test action, auth_ref reference display, and restricted visibility handling without backend kernel changes, migrations, resolved secret display, new adapters, public reader provider exposure, or provider boundary changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.2-provider-admin-console-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/provider-admin-console` after this docs-only work is committed on `main`.
