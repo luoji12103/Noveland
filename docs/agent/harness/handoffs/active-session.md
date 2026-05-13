@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 1 Admin UX Foundation.
-- Status: Phase 1 implementation has passed targeted tests and the full local gate on `feat/admin-ux-foundation`; fast-forward merge to `main` is next.
+- Status: Phase 1 implementation is fast-forward merged to local `main`. Phase 2 Provider Admin Console is next.
 
 ## Current Context
 
@@ -27,7 +27,6 @@
 
 ## Required Next Steps
 
-- Fast-forward merge `feat/admin-ux-foundation` to local `main`.
 - Confirm `main` is clean.
 - Start v0.4 Phase 2 Provider Admin Console from clean local `main` only if no blocker appears.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
