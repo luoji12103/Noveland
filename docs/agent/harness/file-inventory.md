@@ -44,6 +44,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/`
 - `web/features/`
 - `web/features/admin/`
+- `web/features/admin/admin-foundation.tsx`
+- `web/features/admin/admin-route-guard.ts`
 - `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
 - `web/features/admin/preset-admin.tsx`
@@ -64,6 +66,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/worlds/narrative-reader.tsx`
 - `web/components/`
 - `web/lib/`
+- `web/lib/admin/`
+- `web/lib/admin/api-client.ts`
 - `web/lib/api-proxy.ts`
 - `web/lib/auth/`
 - `web/lib/realtime/`

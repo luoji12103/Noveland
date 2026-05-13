@@ -901,3 +901,14 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/admin-ux-foundation` after this docs-only work is committed on `main`.
+
+## v0.4 Admin UX Foundation implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/admin-ux-foundation
+- Scope: Shared Web admin foundation for v0.4 Operator/Admin UX.
+- Summary: Added reusable admin notice, state, section, metric, table, description-list, action-bar components; added a platform-admin route guard helper; added a small admin request helper that preserves CSRF and same-origin fetch conventions; and wired existing platform admin pages through the shared guard without changing backend behavior or adding new business consoles.
+- Files changed: `/web/features/admin/admin-foundation.tsx`, `/web/features/admin/admin-route-guard.ts`, `/web/lib/admin/api-client.ts`, `/web/app/admin/**/page.tsx`, `/web/app/globals.css`, `/web/features/admin/*.test.tsx`, `/web/lib/admin/api-client.test.ts`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: `admin-foundation`, `admin-route-guard`, and `admin/api-client` Web tests; targeted admin tests; full local gate.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Follow-up notes: Phase 2 should build the provider admin console on top of these shared admin patterns. No backend behavior, migrations, provider adapters, Web reader UI, daemon behavior, streaming, or public media delivery was added.

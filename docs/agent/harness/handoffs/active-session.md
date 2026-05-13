@@ -2,8 +2,8 @@
 
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
-- Objective: Implement v0.4 Operator/Admin UX, starting with Phase 1 Admin UX Foundation.
-- Status: Phase 13 is complete. OpenSpec baseline and v0.4-v0.8 roadmap skeleton are committed. v0.4 Phase 1 planning checkpoint is in progress on `main`.
+- Objective: Continue v0.4 Operator/Admin UX after Phase 1 Admin UX Foundation.
+- Status: Phase 1 implementation has passed targeted tests and the full local gate on `feat/admin-ux-foundation`; fast-forward merge to `main` is next.
 
 ## Current Context
 
@@ -12,6 +12,7 @@
 - v0.4 implementation source of truth is `openspec/changes/v0-4-operator-admin-ux/`.
 - v0.4 phases must run in order: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, Multimodal Diagnostics Dashboard.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
+- Phase 1 added reusable admin foundation components, platform-admin route guard helper, and CSRF-aware admin request helper. Later phases should reuse these patterns instead of inventing page-local equivalents.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -26,14 +27,15 @@
 
 ## Required Next Steps
 
-- Commit the v0.4.1 docs-only planning checkpoint on `main`.
-- Create `feat/admin-ux-foundation`.
-- Implement shared admin UI foundation only.
-- Run targeted Web tests and the full local gate.
-- Fast-forward merge to local `main`, update OpenSpec tasks and harness docs, then continue to v0.4 Phase 2 only if all gates pass.
+- Fast-forward merge `feat/admin-ux-foundation` to local `main`.
+- Confirm `main` is clean.
+- Start v0.4 Phase 2 Provider Admin Console from clean local `main` only if no blocker appears.
+- Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
 
 - Phase 13 targeted regression and full local gate passed before v0.4 planning began.
 - OpenSpec baseline and v0.4-v0.8 roadmap docs were committed.
 - Product design context was committed in `PRODUCT.md`.
+- v0.4 Phase 1 targeted tests passed: `npm run test -- admin-foundation admin-route-guard api-client provider-admin runtime-admin` (5 files, 13 tests).
+- v0.4 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`73 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.

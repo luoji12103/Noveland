@@ -69,6 +69,8 @@ Fast orientation for a new coding session.
 - `web/features/` — feature-oriented UI logic
   - `web/features/auth/` — login form and logout control
   - `web/features/admin/` — platform-level preset, provider, runtime, and memory backend management pages
+  - `web/features/admin/admin-foundation.tsx` — shared v0.4 admin notice, state, section, metric, table, detail, and action primitives
+  - `web/features/admin/admin-route-guard.ts` — shared platform-admin guard helper for admin route entrypoints
   - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
@@ -78,6 +80,7 @@ Fast orientation for a new coding session.
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only
   - `web/lib/auth/` — auth types, client helpers, server subject lookup, and proxy helpers
+  - `web/lib/admin/` — Web admin client helpers for CSRF-aware same-origin requests
   - `web/lib/api-proxy.ts` — shared same-origin proxy helper for preset and composition routes
   - `web/lib/realtime/` — same-origin streaming proxy helper
   - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
