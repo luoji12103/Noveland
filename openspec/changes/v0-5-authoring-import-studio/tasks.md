@@ -4,7 +4,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 1 — Authoring Import Core
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement dedicated `backend/packages/authoring/` package and `authoring.py` router boundary.
 - [ ] Implement `authoring-source-registry` and `import-preview-apply-workflow` foundation scope only.
 - [ ] Preserve Phase 13 architecture guardrails.

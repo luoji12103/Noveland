@@ -30,6 +30,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md` — final v0.4 Operator/Admin UX Phase 5 implementation plan.
 - `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md` — final v0.4 Operator/Admin UX Phase 6 implementation plan.
 - `docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md` — final v0.4 Operator/Admin UX Phase 7 implementation plan.
+- `docs/agent/harness/feature-updates/v0.5.1-authoring-import-core-plan.md` — final v0.5 Authoring & Import Studio Phase 1 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4 Operator/Admin UX change, and proposed roadmap changes for v0.5+.
 - `docs/agent/harness/task-board.md` — current execution state only.

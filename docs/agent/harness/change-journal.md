@@ -1137,3 +1137,14 @@
 - Tests added/updated: Documentation/spec-only change; validate with OpenSpec validation and `git diff --check`.
 - Docs updated: v0.5 OpenSpec proposal, design, phase plan, tasks, capability specs, change journal, and active handoff.
 - Follow-up notes: Do not start v0.5 implementation until explicitly requested; Phase 1 should implement only Authoring Import Core.
+
+## v0.5 Authoring Import Core plan entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Final implementation plan for v0.5 Authoring & Import Studio Phase 1.
+- Summary: Added the v0.5.1 plan for a dedicated authoring package/router and source registry plus import run/proposal/review/source-traceability preview/apply foundation. The plan explicitly avoids provider-backed extraction, automatic memory writes, direct lore/world-bible apply, new media/provider/memory frameworks, Web UI, and new `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.5.1-authoring-import-core-plan.md`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
+- Follow-up notes: Implementation should start on `feat/authoring-import-core` after this docs-only checkpoint is committed.

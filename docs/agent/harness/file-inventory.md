@@ -383,6 +383,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md`
+- `docs/agent/harness/feature-updates/v0.5.1-authoring-import-core-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `openspec/`
