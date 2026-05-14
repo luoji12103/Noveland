@@ -15,6 +15,7 @@ from noveland.authoring.contracts import (
     AuthoringProposalStatus,
     AuthoringReviewDecisionCreate,
     AuthoringReviewDecisionKind,
+    AuthoringScriptParseRequest,
     AuthoringSourceAssetCreate,
     AuthoringSourceAssetKind,
     AuthoringSourceBatchCreate,
@@ -138,6 +139,85 @@ def test_source_registry_preview_review_and_apply_are_trace_only() -> None:
         assert len(session.scalars(select(AuthoringSourceTraceability)).all()) >= 4
         assert session.scalars(select(MediaJob)).all() == []
         assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_script_parser_creates_traceable_proposals_from_excerpt_text() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="script-1",
+                display_name="Script 1",
+                source_kind=AuthoringSourceAssetKind.SCRIPT,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.SCRIPT,
+                source_label="script.ks",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="scene-1",
+                fragment_kind=AuthoringSourceFragmentKind.SCENE,
+                sequence=1,
+                excerpt_text=(
+                    "Hero: hello\n"
+                    "「whispered line」\n"
+                    "[scene: schoolyard]\n"
+                    "choice: leave with him\n"
+                    "-> stay\n"
+                    "[route: branch_a]\n"
+                    "[event: encounter]\n"
+                ),
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.parse_script(
+            graph.world_id,
+            run.id,
+            AuthoringScriptParseRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(fragment.id,),
+            ),
+        )
+        trace_count = len(session.scalars(select(AuthoringSourceTraceability)).all())
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 7
+    assert result.dialogue_count == 2
+    assert result.scene_count == 1
+    assert result.choice_count == 2
+    assert result.route_count == 1
+    assert result.event_count == 1
+    assert result.unresolved_speaker_count == 1
+    assert result.run.summary_json["parser_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    assert all(
+        proposal.source_fragment_id == fragment.id for proposal in result.run.proposals
+    )
+    assert all(proposal.status == "proposed" for proposal in result.run.proposals)
+    assert trace_count == 7
 
 
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:

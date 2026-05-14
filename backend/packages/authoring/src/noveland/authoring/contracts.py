@@ -73,6 +73,10 @@ class AuthoringImportRunStatus(StrEnum):
     FAILED = "failed"
 
 
+class AuthoringScriptParserMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -396,6 +400,29 @@ class AuthoringPreviewRequest(_FrozenContract):
 
 class AuthoringPreviewResult(_FrozenContract):
     run: AuthoringImportRunRead
+
+
+class AuthoringScriptParseRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    source_fragment_ids: tuple[uuid.UUID, ...]
+    parser_mode: AuthoringScriptParserMode = AuthoringScriptParserMode.DETERMINISTIC
+
+    @model_validator(mode="after")
+    def validate_fragments(self) -> AuthoringScriptParseRequest:
+        if not self.source_fragment_ids:
+            raise ValueError("source_fragment_ids is required")
+        return self
+
+
+class AuthoringScriptParseResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    dialogue_count: int
+    scene_count: int
+    choice_count: int
+    route_count: int
+    event_count: int
+    unresolved_speaker_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

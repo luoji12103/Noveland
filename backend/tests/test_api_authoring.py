@@ -144,6 +144,84 @@ def test_authoring_api_source_preview_review_and_apply() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_script_parse_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "script-parse",
+            "display_name": "Script Parse",
+            "source_kind": "script",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "script",
+            "source_label": "script.ks",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "scene-1",
+            "fragment_kind": "scene",
+            "sequence": 1,
+            "excerpt_text": (
+                "Hero: hello\n"
+                "「whispered line」\n"
+                "[scene: schoolyard]\n"
+                "choice: leave with him\n"
+                "-> stay\n"
+                "[route: branch_a]\n"
+                "[event: encounter]\n"
+            ),
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    parsed = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/parse-script",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+        },
+    )
+
+    assert parsed.status_code == 201
+    assert parsed.json()["created_proposal_count"] == 7
+    assert parsed.json()["dialogue_count"] == 2
+    assert parsed.json()["scene_count"] == 1
+    assert parsed.json()["choice_count"] == 2
+    assert parsed.json()["route_count"] == 1
+    assert parsed.json()["event_count"] == 1
+    assert parsed.json()["unresolved_speaker_count"] == 1
+    assert parsed.json()["run"]["summary_json"]["provider_execution"] is False
+    assert all(
+        proposal["source_fragment_id"] == fragment.json()["id"]
+        for proposal in parsed.json()["run"]["proposals"]
+    )
+    assert "storage_uri" not in _json_text(parsed.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 7
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -250,3 +328,7 @@ def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.set(SESSION_COOKIE_NAME, token)
     client.cookies.set(CSRF_COOKIE_NAME, "csrf")
     client.headers.update({CSRF_HEADER_NAME: "csrf"})
+
+
+def _json_text(value: object) -> str:
+    return str(value).lower()

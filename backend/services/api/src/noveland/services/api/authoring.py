@@ -18,6 +18,8 @@ from noveland.authoring.contracts import (
     AuthoringProposalRead,
     AuthoringReviewDecisionCreate,
     AuthoringReviewDecisionRead,
+    AuthoringScriptParseRequest,
+    AuthoringScriptParseResult,
     AuthoringSourceAssetCreate,
     AuthoringSourceAssetKind,
     AuthoringSourceAssetRead,
@@ -284,6 +286,27 @@ def preview_authoring_import_run(
 ) -> AuthoringPreviewResult:
     try:
         return AuthoringService(db_session).preview(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/parse-script",
+    response_model=AuthoringScriptParseResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def parse_authoring_script(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringScriptParseRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringScriptParseResult:
+    try:
+        return AuthoringService(db_session).parse_script(world_id, run_id, request)
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

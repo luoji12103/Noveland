@@ -15,6 +15,7 @@ PACKAGES = [
     "noveland.authoring",
     "noveland.authoring.contracts",
     "noveland.authoring.models",
+    "noveland.authoring.parser",
     "noveland.authoring.service",
     "noveland.auth",
     "noveland.auth.contracts",

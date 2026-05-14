@@ -19,6 +19,8 @@ from noveland.authoring.contracts import (
     AuthoringReviewDecisionCreate,
     AuthoringReviewDecisionKind,
     AuthoringReviewDecisionRead,
+    AuthoringScriptParseRequest,
+    AuthoringScriptParseResult,
     AuthoringSourceAssetCreate,
     AuthoringSourceAssetKind,
     AuthoringSourceAssetRead,
@@ -40,6 +42,7 @@ from noveland.authoring.models import (
     AuthoringSourceFragment,
     AuthoringSourceTraceability,
 )
+from noveland.authoring.parser import ParsedScriptCandidate, parse_fragment
 from noveland.media.models import MediaAsset
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import select
@@ -301,6 +304,89 @@ class AuthoringService:
         }
         self._session.flush()
         return AuthoringPreviewResult(run=self.get_import_run(world_id, run.id))
+
+    def parse_script(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringScriptParseRequest,
+    ) -> AuthoringScriptParseResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError("parse run must belong to request worldline")
+
+        candidates: list[ParsedScriptCandidate] = []
+        for fragment_id in request.source_fragment_ids:
+            fragment = self._fragment_required(world_id, fragment_id)
+            if fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError("source fragment must belong to parse worldline")
+            candidates.extend(
+                parse_fragment(
+                    source_fragment_id=fragment.id,
+                    excerpt_text=fragment.excerpt_text,
+                    parser_mode=request.parser_mode.value,
+                )
+            )
+
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "parser_mode": request.parser_mode.value,
+            "provider_execution": False,
+            "created_proposal_count": len(created),
+            "dialogue_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "dialogue"
+            ),
+            "scene_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "scene"
+            ),
+            "choice_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "choice"
+            ),
+            "route_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "route"
+            ),
+            "event_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "event"
+            ),
+            "unresolved_speaker_count": sum(
+                1 for candidate in candidates if candidate.unresolved_speaker
+            ),
+        }
+        self._session.flush()
+        return AuthoringScriptParseResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=len(created),
+            dialogue_count=int(run.summary_json["dialogue_count"]),
+            scene_count=int(run.summary_json["scene_count"]),
+            choice_count=int(run.summary_json["choice_count"]),
+            route_count=int(run.summary_json["route_count"]),
+            event_count=int(run.summary_json["event_count"]),
+            unresolved_speaker_count=int(run.summary_json["unresolved_speaker_count"]),
+        )
 
     def review_proposal(
         self,

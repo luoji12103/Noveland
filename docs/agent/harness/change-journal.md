@@ -1182,3 +1182,15 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
 - Follow-up notes: Implementation should start on `feat/script-parser-dialogue-extractor` after this docs-only checkpoint is committed.
+
+## v0.5 Script Parser & Dialogue Extractor implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/script-parser-dialogue-extractor
+- Scope: Backend-only deterministic script parser and dialogue extractor for v0.5 Authoring & Import Studio Phase 2.
+- Summary: Added a deterministic authoring parser that converts existing source fragment excerpts into traceable Phase 1 authoring proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events. Added `parse-script` on the dedicated authoring router. The implementation does not call providers, does not add migrations, does not mutate canonical world state, does not write world events, and does not add Web UI or `worlds.py` routes.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/parser.py`, `/backend/packages/authoring/src/noveland/authoring/contracts.py`, `/backend/packages/authoring/src/noveland/authoring/service.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, `/backend/tests/test_workspace_imports.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Authoring service parser coverage, authoring API parser endpoint coverage, and workspace import coverage.
+- Docs updated: OpenSpec Phase 2 task status, change journal, task board, and file inventory.
+- Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_workspace_imports.py tests/test_alembic_config.py` (`10 passed`). Full local gate passed with backend ruff, backend mypy (`233 source files`), backend pytest (`300 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and `openspec validate v0-5-authoring-import-studio --strict --json`.
+- Follow-up notes: Fast-forward merge Phase 2 to local `main`, then update merge bookkeeping before starting Phase 3. Do not push unless explicitly requested.
