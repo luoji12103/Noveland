@@ -134,10 +134,14 @@
 - v0.5 Authoring & Import Studio Phase 7 full local gate
 - v0.5 Authoring & Import Studio Phase 7 fast-forward merge
 - v0.5 Authoring & Import Studio Phase 8 planning checkpoint
+- v0.5 Authoring & Import Studio Phase 8 implementation
+- v0.5 Authoring & Import Studio Phase 8 targeted tests
+- v0.5 Authoring & Import Studio Phase 8 full local gate
 
 ## Upcoming Mainline
-- v0.5 Phase 8 should implement Authoring Regression Fixture on
-  `feat/authoring-regression-fixture`.
+- v0.5 Phase 8 should fast-forward merge
+  `feat/authoring-regression-fixture` to local `main`, then complete v0.5
+  closeout reporting if no blocker remains.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

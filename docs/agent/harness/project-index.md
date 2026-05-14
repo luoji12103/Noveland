@@ -282,6 +282,8 @@ Fast orientation for a new coding session.
 ### Regression fixtures
 - `backend/tests/fixtures/multimodal_sample_world.py` — deterministic Phase 13 multimodal sample-world fixture helper for backend regression tests
 - `backend/tests/test_multimodal_sample_world_regression.py` — Phase 13 sample-world architecture regression entrypoint
+- `backend/tests/fixtures/authoring_sample_import.py` — deterministic v0.5 authoring sample import fixture helper for backend regression tests
+- `backend/tests/test_authoring_regression_fixture.py` — v0.5 authoring import pipeline regression entrypoint
 
 ## Update rule
 

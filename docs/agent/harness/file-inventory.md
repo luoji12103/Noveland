@@ -340,7 +340,9 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/__init__.py`
 - `backend/tests/fixtures/__init__.py`
 - `backend/tests/fixtures/multimodal_sample_world.py`
+- `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/test_multimodal_sample_world_regression.py`
+- `backend/tests/test_authoring_regression_fixture.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`
@@ -431,6 +433,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/test_authoring_service.py`
 - `backend/tests/test_api_authoring.py`
+- `backend/tests/test_authoring_regression_fixture.py`
 
 ## Update rule
 

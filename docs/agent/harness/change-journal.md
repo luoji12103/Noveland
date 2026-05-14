@@ -1384,3 +1384,14 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implementation should start on `feat/authoring-regression-fixture` after this docs-only checkpoint is committed.
+
+## v0.5 Authoring Regression Fixture implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/authoring-regression-fixture
+- Scope: Backend-only deterministic authoring regression fixture for v0.5 Authoring & Import Studio Phase 8.
+- Summary: Added an authoring sample import fixture and regression tests that exercise source registry, script parsing, character extraction, lore proposal extraction, conflict review, memory migration, asset matching, review decisions, and guarded apply behavior. The fixture validates deterministic signatures, strict worldline scope, no provider/media/memory/visual/speech side effects, no world events, and no storage/path/base64/raw prompt or output leaks.
+- Files changed: `/backend/tests/fixtures/authoring_sample_import.py`, `/backend/tests/test_authoring_regression_fixture.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Authoring sample import deterministic signature, worldline scope, pipeline coverage, guarded apply, side-effect, and leak regression tests.
+- Docs updated: OpenSpec tasks, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Phase 8 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then provide v0.5 closeout status.
