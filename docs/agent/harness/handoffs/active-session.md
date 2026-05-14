@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 5 Speech Admin Console.
-- Status: Phase 5 Speech Admin Console is implemented and fast-forward merged to local `main`; Phase 6 Invocation Ledger Browser planning is next.
+- Status: Phase 6 Invocation Ledger Browser planning checkpoint is being recorded on local `main`; implementation branch `feat/invocation-ledger-browser` is next after the docs-only commit.
 
 ## Current Context
 
@@ -18,6 +18,7 @@
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
 - Phase 4 adds a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. It does not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
 - Phase 5 adds a speech admin console using existing speech APIs, voice profile services, media references, and admin foundation patterns. It does not add realtime voice, streaming, local voice server deployment, backend speech behavior changes, schema changes, automatic STT memory writes, or public reader audio delivery.
+- Phase 6 should add an invocation ledger browser using existing model invocation, prompt snapshot, tag, redaction, visibility, and retention APIs. Do not add backend ledger behavior changes, schema changes, external tracing export, or reader/member raw prompt exposure unless the Phase 6 plan explicitly requires them.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -32,7 +33,7 @@
 
 ## Required Next Steps
 
-- Write the Phase 6 Invocation Ledger Browser planning checkpoint on clean local `main`, then implement `feat/invocation-ledger-browser` if no blocker appears.
+- Commit the Phase 6 Invocation Ledger Browser docs-only planning checkpoint, then start `feat/invocation-ledger-browser` from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

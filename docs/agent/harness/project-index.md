@@ -28,6 +28,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.4.3-media-admin-console-plan.md` — final v0.4 Operator/Admin UX Phase 3 implementation plan.
 - `docs/agent/harness/feature-updates/v0.4.4-visual-admin-console-plan.md` — final v0.4 Operator/Admin UX Phase 4 implementation plan.
 - `docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md` — final v0.4 Operator/Admin UX Phase 5 implementation plan.
+- `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md` — final v0.4 Operator/Admin UX Phase 6 implementation plan.
 - `openspec/` — OpenSpec current specs and proposed roadmap changes, including `v0-4-operator-admin-ux`.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.

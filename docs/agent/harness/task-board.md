@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser planning checkpoint
+- v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser implementation planning checkpoint
 
 ## Blocked
 - None

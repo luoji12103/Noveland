@@ -1047,3 +1047,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 5 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 6 from clean local `main`; do not push unless explicitly requested.
+
+## v0.4 Invocation Ledger Browser plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 6.
+- Summary: Added the v0.4.6 plan for a world-scoped invocation ledger browser at `/worlds/{worldId}/invocations`. The plan covers invocation list/detail, prompt snapshot evidence, tag management, redaction actions, visibility, and retention display using existing invocation APIs without backend ledger behavior changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/invocation-ledger-browser` after this docs-only work is committed on `main`.

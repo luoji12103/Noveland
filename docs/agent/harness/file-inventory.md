@@ -371,6 +371,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.4.3-media-admin-console-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.4-visual-admin-console-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md`
+- `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md`
 - `openspec/`
 - `docs/agent/architecture/current-system-contracts.md`
 - `docs/agent/architecture/api-contract-inventory.md`
