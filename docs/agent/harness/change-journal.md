@@ -1262,3 +1262,14 @@
 - Docs updated: OpenSpec Phase 4 task status, project index, change journal, and task board.
 - Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_workspace_imports.py tests/test_alembic_config.py` (`14 passed`). Full local gate passed with backend ruff, backend mypy (`235 source files`), backend pytest (`304 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and `openspec validate v0-5-authoring-import-studio --strict --json`.
 - Follow-up notes: Fast-forward merge Phase 4 to local `main`, then update merge bookkeeping before starting Phase 5. Do not push unless explicitly requested.
+
+## v0.5 World Bible & Lore Extractor merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.5 Authoring & Import Studio Phase 4.
+- Summary: Fast-forward merged `feat/world-bible-lore-extractor` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 4 tasks now mark implementation, targeted tests, full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 4 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 5 from clean local `main`; do not push unless explicitly requested.

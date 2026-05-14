@@ -117,10 +117,11 @@
 - v0.5 Authoring & Import Studio Phase 4 implementation
 - v0.5 Authoring & Import Studio Phase 4 targeted tests
 - v0.5 Authoring & Import Studio Phase 4 full local gate
+- v0.5 Authoring & Import Studio Phase 4 fast-forward merge
 
 ## Upcoming Mainline
-- v0.5 Phase 4 should fast-forward merge to clean local `main`, then update
-  OpenSpec and harness bookkeeping before starting Phase 5.
+- v0.5 Phase 5 should start from clean local `main` with a docs-only planning
+  checkpoint for Canon Conflict Review.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.
