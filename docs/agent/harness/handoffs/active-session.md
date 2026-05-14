@@ -2,8 +2,8 @@
 
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
-- Objective: Continue v0.4 Operator/Admin UX after Phase 6 Invocation Ledger Browser.
-- Status: Phase 6 Invocation Ledger Browser is implemented and fast-forward merged to local `main`; Phase 7 Multimodal Diagnostics Dashboard planning is next.
+- Objective: Continue v0.4 Operator/Admin UX Phase 7 Multimodal Diagnostics Dashboard.
+- Status: Phase 7 Multimodal Diagnostics Dashboard planning is complete on local `main`; implementation on `feat/multimodal-diagnostics-dashboard` is next.
 
 ## Current Context
 
@@ -18,7 +18,7 @@
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
 - Phase 4 adds a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. It does not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
 - Phase 5 adds a speech admin console using existing speech APIs, voice profile services, media references, and admin foundation patterns. It does not add realtime voice, streaming, local voice server deployment, backend speech behavior changes, schema changes, automatic STT memory writes, or public reader audio delivery.
-- Phase 6 should add an invocation ledger browser using existing model invocation, prompt snapshot, tag, redaction, visibility, and retention APIs. Do not add backend ledger behavior changes, schema changes, external tracing export, or reader/member raw prompt exposure unless the Phase 6 plan explicitly requires them.
+- Phase 7 should add a multimodal diagnostics dashboard using existing multimodal eval, provider, media, invocation, visual, speech, and long-run eval APIs. Do not add backend diagnostic rule changes, schema changes, public launch gate changes, duplicate release/eval framework, provider execution changes, daemon behavior, streaming, or reader/member evidence exposure unless the Phase 7 plan explicitly requires them.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -33,7 +33,7 @@
 
 ## Required Next Steps
 
-- Write the Phase 7 Multimodal Diagnostics Dashboard planning checkpoint on clean local `main`, then implement `feat/multimodal-diagnostics-dashboard` if no blocker appears.
+- Create `feat/multimodal-diagnostics-dashboard` from clean local `main`, implement the Phase 7 Web dashboard, run targeted tests, run the full local gate, and fast-forward merge back to `main` if no blocker appears.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

@@ -1081,3 +1081,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 6 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.
+
+## v0.4 Multimodal Diagnostics Dashboard plan entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 7.
+- Summary: Added the v0.4.7 plan for a world-scoped multimodal diagnostics dashboard at `/worlds/{worldId}/diagnostics`. The plan covers current diagnostics, blocker/warning summaries, safe evidence references, recent multimodal eval runs, cost/latency summaries, provider/media/invocation/visual/speech status summaries, and an explicit multimodal smoke eval action using existing backend APIs without backend diagnostic rule changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/multimodal-diagnostics-dashboard` after this docs-only work is committed on `main`.
