@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 4 Visual Asset Admin Console.
-- Status: Phase 4 Visual Asset Admin Console passed the full local gate and is fast-forward merged to local `main`; Phase 5 Speech Admin Console planning is next.
+- Status: Phase 5 Speech Admin Console planning checkpoint is being recorded on local `main`; implementation branch `feat/speech-admin-console` is next after the docs-only commit.
 
 ## Current Context
 
@@ -32,7 +32,7 @@
 
 ## Required Next Steps
 
-- Start the Phase 5 Speech Admin Console planning checkpoint from clean local `main`.
+- Commit the Phase 5 Speech Admin Console docs-only planning checkpoint, then start `feat/speech-admin-console` from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

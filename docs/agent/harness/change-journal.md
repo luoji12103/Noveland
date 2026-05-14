@@ -1013,3 +1013,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 4 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 5 from clean local `main`; do not push unless explicitly requested.
+
+## v0.4 Speech Admin Console plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 5.
+- Summary: Added the v0.4.5 plan for a world-scoped speech admin console at `/worlds/{worldId}/speech`. The plan covers voice profile CRUD, agent voice bindings, style mappings, transcript browsing, and explicit TTS/STT test actions using existing speech, provider, media, and invocation APIs without backend speech behavior changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/speech-admin-console` after this docs-only work is committed on `main`.
