@@ -3,7 +3,7 @@
 - Date: 2026-05-14T00:00:00Z
 - Branch: main
 - Objective: Continue v0.5 Authoring & Import Studio with Phase 6 Memory Migration Pipeline.
-- Status: v0.5 Phase 5 Canon Conflict Review is implemented, validated, and fast-forward merged locally.
+- Status: v0.5 Phase 6 Memory Migration Pipeline has a docs-only planning checkpoint and is ready for implementation.
 
 ## Current Context
 
@@ -19,7 +19,7 @@
 - v0.5 Phase 3 is complete: deterministic extractor creates traceable proposals for characters, aliases, factions, identities, relationships, and emotional baselines without provider calls or canonical mutation.
 - v0.5 Phase 4 is complete: deterministic lore extractor creates proposal-only lore, location, organization, world-rule, secret, and knowledge-boundary candidates without provider calls or canonical mutation.
 - v0.5 Phase 5 is complete: deterministic conflict review creates reviewable conflict report proposals without provider calls, automatic resolution, or canonical mutation.
-- v0.5 Phase 6 is next: Memory Migration Pipeline.
+- v0.5 Phase 6 is planned: deterministic memory migration should create reviewable memory proposals without provider calls, memory writes, or canonical mutation.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -37,7 +37,7 @@
 
 ## Required Next Steps
 
-- Start Phase 6 from clean local `main` with a docs-only planning checkpoint.
+- Start Phase 6 implementation from clean local `main` on `feat/memory-migration-pipeline`.
 - Phase 6 should implement only `memory-migration-pipeline` scope and reuse Phase 1 import proposals.
 - Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
 - Do not push unless explicitly requested.
@@ -60,3 +60,4 @@
 - v0.5 Phase 5 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
 - v0.5 Phase 5 targeted tests passed: `16 passed`.
 - v0.5 Phase 5 full local gate passed: backend ruff, backend mypy, backend pytest (`306 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
+- v0.5 Phase 6 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.

@@ -60,7 +60,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 6 — Memory Migration Pipeline
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `memory-migration-pipeline` scope only.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
