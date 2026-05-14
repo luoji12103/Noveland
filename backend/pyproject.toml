@@ -8,6 +8,7 @@ dependencies = [
   "noveland-adapters",
   "noveland-agents",
   "noveland-asset-generation",
+  "noveland-authoring",
   "noveland-auth",
   "noveland-calendar",
   "noveland-conversations",
@@ -48,6 +49,7 @@ members = [
   "packages/adapters",
   "packages/agents",
   "packages/asset_generation",
+  "packages/authoring",
   "packages/auth",
   "packages/calendar",
   "packages/conversations",
@@ -73,6 +75,7 @@ members = [
 noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
 noveland-asset-generation = { workspace = true }
+noveland-authoring = { workspace = true }
 noveland-auth = { workspace = true }
 noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
@@ -115,6 +118,7 @@ mypy_path = [
   "packages/adapters/src",
   "packages/agents/src",
   "packages/asset_generation/src",
+  "packages/authoring/src",
   "packages/auth/src",
   "packages/calendar/src",
   "packages/conversations/src",

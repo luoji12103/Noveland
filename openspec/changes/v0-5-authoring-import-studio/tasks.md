@@ -5,12 +5,12 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 1 — Authoring Import Core
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement dedicated `backend/packages/authoring/` package and `authoring.py` router boundary.
-- [ ] Implement `authoring-source-registry` and `import-preview-apply-workflow` foundation scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement dedicated `backend/packages/authoring/` package and `authoring.py` router boundary.
+- [x] Implement `authoring-source-registry` and `import-preview-apply-workflow` foundation scope only.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

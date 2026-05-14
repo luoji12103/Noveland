@@ -99,6 +99,9 @@
 - v0.4 Operator/Admin UX Phase 7: Multimodal Diagnostics Dashboard fast-forward merge
 - v0.4 Operator/Admin UX OpenSpec archive and release notes
 - v0.5 Authoring & Import Studio Phase 1 planning checkpoint
+- v0.5 Authoring & Import Studio Phase 1 implementation
+- v0.5 Authoring & Import Studio Phase 1 targeted tests
+- v0.5 Authoring & Import Studio Phase 1 full local gate
 
 ## Upcoming Mainline
 - v0.5 should begin with feasibility review only. Do not implement v0.5 until the

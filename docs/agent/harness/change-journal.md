@@ -1148,3 +1148,15 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
 - Follow-up notes: Implementation should start on `feat/authoring-import-core` after this docs-only checkpoint is committed.
+
+## v0.5 Authoring Import Core implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/authoring-import-core
+- Scope: Dedicated authoring package/router plus source registry and proposal/review/preview/apply foundation.
+- Summary: Added `backend/packages/authoring/`, the app-level `/worlds/{world_id}/authoring` router, migration `20260514_0040`, source batch/asset/fragment records, import run/proposal/review decision/source traceability records, safe JSON validation, media same-worldline validation, preview without provider execution, and explicit proposal-kind-gated trace-only apply. Unsupported kinds such as lore remain blocked in Phase 1.
+- Files changed: `/backend/packages/authoring/**`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/services/api/src/noveland/services/api/app.py`, `/backend/migrations/versions/20260514_0040_authoring_import_core.py`, backend workspace/config files, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, schema/import/Alembic tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring service/API tests, schema metadata registration, workspace imports, and Alembic latest-revision coverage.
+- Docs updated: OpenSpec Phase 1 task status, project index, file inventory, and change journal.
+- Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_schema_metadata.py tests/test_alembic_config.py tests/test_workspace_imports.py` (`32 passed`). Full local gate passed with backend ruff, backend mypy, backend pytest (`298 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No provider-backed extraction, direct lore/world-bible apply, automatic memory writes, new media/provider/memory framework, Web UI, daemon behavior, public reader delivery, streaming, or new `worlds.py` routes were added.

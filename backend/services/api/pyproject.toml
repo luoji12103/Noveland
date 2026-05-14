@@ -12,6 +12,7 @@ dependencies = [
   "noveland-adapters",
   "noveland-agents",
   "noveland-asset-generation",
+  "noveland-authoring",
   "noveland-auth",
   "noveland-calendar",
   "noveland-conversations",
@@ -43,6 +44,7 @@ noveland-api = "noveland.services.api.main:main"
 noveland-adapters = { workspace = true }
 noveland-agents = { workspace = true }
 noveland-asset-generation = { workspace = true }
+noveland-authoring = { workspace = true }
 noveland-auth = { workspace = true }
 noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }

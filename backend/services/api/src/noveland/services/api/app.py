@@ -3,6 +3,7 @@ from noveland.core.version import PROJECT_VERSION
 from noveland.services.api.asset_generation import media_jobs_router as asset_generation_jobs_router
 from noveland.services.api.asset_generation import router as asset_generation_router
 from noveland.services.api.auth import router as auth_router
+from noveland.services.api.authoring import router as authoring_router
 from noveland.services.api.conversation_presentations import (
     router as conversation_presentations_router,
 )
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     api.include_router(visual_router)
     api.include_router(asset_generation_router)
     api.include_router(asset_generation_jobs_router)
+    api.include_router(authoring_router)
     api.include_router(multimodal_evals_router)
     api.include_router(invocations_router)
     api.include_router(providers_router)

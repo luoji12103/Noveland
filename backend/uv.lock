@@ -8,6 +8,7 @@ members = [
     "noveland-agents",
     "noveland-asset-generation",
     "noveland-auth",
+    "noveland-authoring",
     "noveland-backend",
     "noveland-calendar",
     "noveland-conversations",
@@ -589,6 +590,27 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-authoring"
+version = "0.1.0"
+source = { editable = "packages/authoring" }
+dependencies = [
+    { name = "noveland-core" },
+    { name = "noveland-media" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-backend"
 version = "0.1.0"
 source = { virtual = "." }
@@ -598,6 +620,7 @@ dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-asset-generation" },
     { name = "noveland-auth" },
+    { name = "noveland-authoring" },
     { name = "noveland-calendar" },
     { name = "noveland-conversations" },
     { name = "noveland-core" },
@@ -636,6 +659,7 @@ requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-asset-generation", editable = "packages/asset_generation" },
     { name = "noveland-auth", editable = "packages/auth" },
+    { name = "noveland-authoring", editable = "packages/authoring" },
     { name = "noveland-calendar", editable = "packages/calendar" },
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
@@ -966,6 +990,7 @@ dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-asset-generation" },
     { name = "noveland-auth" },
+    { name = "noveland-authoring" },
     { name = "noveland-calendar" },
     { name = "noveland-conversations" },
     { name = "noveland-core" },
@@ -996,6 +1021,7 @@ requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-asset-generation", editable = "packages/asset_generation" },
     { name = "noveland-auth", editable = "packages/auth" },
+    { name = "noveland-authoring", editable = "packages/authoring" },
     { name = "noveland-calendar", editable = "packages/calendar" },
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },

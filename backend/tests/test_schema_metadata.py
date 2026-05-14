@@ -55,6 +55,13 @@ def test_core_schema_tables_are_registered() -> None:
         "agent_calendar_entries",
         "agent_memory_items",
         "agent_profile_snapshots",
+        "authoring_import_proposals",
+        "authoring_import_runs",
+        "authoring_review_decisions",
+        "authoring_source_assets",
+        "authoring_source_batches",
+        "authoring_source_fragments",
+        "authoring_source_traceability",
         "auth_sessions",
         "authoring_import_jobs",
         "authoring_templates",
@@ -599,6 +606,141 @@ def test_conversation_turn_presentation_tables_are_registered() -> None:
         "media_assets.id",
         "speech_transcripts.id",
         "voice_profiles.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+
+
+def test_authoring_import_core_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "batch_key",
+        "display_name",
+        "description",
+        "source_kind",
+        "status",
+        "visibility",
+        "metadata",
+        "created_by_actor_ref",
+    } <= column_names("authoring_source_batches")
+    assert {
+        "world_id",
+        "worldline_id",
+        "batch_id",
+        "media_asset_id",
+        "source_asset_kind",
+        "source_label",
+        "source_ref",
+        "status",
+        "metadata",
+    } <= column_names("authoring_source_assets")
+    assert {
+        "world_id",
+        "worldline_id",
+        "source_asset_id",
+        "fragment_key",
+        "fragment_kind",
+        "sequence",
+        "excerpt_text",
+        "locator",
+        "metadata",
+    } <= column_names("authoring_source_fragments")
+    assert {
+        "world_id",
+        "worldline_id",
+        "source_batch_id",
+        "run_kind",
+        "status",
+        "summary",
+        "created_by_actor_ref",
+    } <= column_names("authoring_import_runs")
+    assert {
+        "world_id",
+        "worldline_id",
+        "run_id",
+        "source_fragment_id",
+        "proposal_kind",
+        "target_ref_kind",
+        "target_ref_id",
+        "title",
+        "summary",
+        "proposed_payload",
+        "evidence",
+        "confidence",
+        "priority",
+        "status",
+        "applied_ref",
+    } <= column_names("authoring_import_proposals")
+    assert {
+        "world_id",
+        "worldline_id",
+        "proposal_id",
+        "decision",
+        "reason",
+        "decision_payload",
+        "decided_by_actor_ref",
+    } <= column_names("authoring_review_decisions")
+    assert {
+        "world_id",
+        "worldline_id",
+        "source_fragment_id",
+        "proposal_id",
+        "applied_ref_kind",
+        "applied_ref_id",
+        "trace_kind",
+        "metadata",
+    } <= column_names("authoring_source_traceability")
+    assert Base.metadata.tables["authoring_source_batches"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["authoring_source_assets"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["authoring_source_fragments"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["authoring_import_runs"].c.worldline_id.nullable is False
+    assert Base.metadata.tables["authoring_import_proposals"].c.worldline_id.nullable is False
+    assert {
+        "ix_authoring_source_batches_worldline_status",
+        "ix_authoring_source_batches_kind",
+    } <= index_names("authoring_source_batches")
+    assert {
+        "ix_authoring_source_assets_batch",
+        "ix_authoring_source_assets_worldline_status",
+        "ix_authoring_source_assets_media_asset",
+    } <= index_names("authoring_source_assets")
+    assert {
+        "ix_authoring_source_fragments_asset_sequence",
+        "ix_authoring_source_fragments_worldline_kind",
+    } <= index_names("authoring_source_fragments")
+    assert {
+        "ix_authoring_import_runs_worldline_created",
+        "ix_authoring_import_runs_source_batch",
+    } <= index_names("authoring_import_runs")
+    assert {
+        "ix_authoring_import_proposals_run_priority",
+        "ix_authoring_import_proposals_worldline_status",
+        "ix_authoring_import_proposals_fragment",
+    } <= index_names("authoring_import_proposals")
+    assert "uq_authoring_source_batches_key" in constraint_names(
+        "authoring_source_batches",
+        UniqueConstraint,
+    )
+    assert "uq_authoring_source_fragments_key" in constraint_names(
+        "authoring_source_fragments",
+        UniqueConstraint,
+    )
+    assert foreign_key_targets("authoring_source_assets") == {
+        "authoring_source_batches.id",
+        "media_assets.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("authoring_import_proposals") == {
+        "authoring_import_runs.id",
+        "authoring_source_fragments.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("authoring_source_traceability") == {
+        "authoring_import_proposals.id",
+        "authoring_source_fragments.id",
         "worldlines.id",
         "worlds.id",
     }

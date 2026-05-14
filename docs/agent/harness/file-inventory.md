@@ -408,6 +408,16 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/architecture/adr/0009-multimodal-evals-reuse-release-framework.md`
 - `docs/agent/fixtures/`
 - `docs/agent/fixtures/multimodal-sample-world.md`
+- `backend/packages/authoring/`
+- `backend/packages/authoring/pyproject.toml`
+- `backend/packages/authoring/src/noveland/authoring/__init__.py`
+- `backend/packages/authoring/src/noveland/authoring/contracts.py`
+- `backend/packages/authoring/src/noveland/authoring/models.py`
+- `backend/packages/authoring/src/noveland/authoring/service.py`
+- `backend/services/api/src/noveland/services/api/authoring.py`
+- `backend/migrations/versions/20260514_0040_authoring_import_core.py`
+- `backend/tests/test_authoring_service.py`
+- `backend/tests/test_api_authoring.py`
 
 ## Update rule
 

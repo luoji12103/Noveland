@@ -131,6 +131,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
   - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
+  - `noveland.services.api.authoring` — world-scoped authoring source registry, import run, proposal, review decision, preview, and selective trace-only apply router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -195,6 +196,10 @@ Fast orientation for a new coding session.
   - `noveland.media.models` — worldline-scoped media asset, job, context, input, tag, collection, and collection item ORM models
   - `noveland.media.service` — media asset/context/lineage service and queued media job service
   - `noveland.media.storage` — binary local media object storage facade with opaque `media://` URIs
+- `backend/packages/authoring/`
+  - `noveland.authoring.contracts` — v0.5 authoring source, import run, proposal, review, preview, apply, and safe JSON DTOs
+  - `noveland.authoring.models` — strict-worldline source batch, source asset, source fragment, import run, proposal, review decision, and source traceability ORM models
+  - `noveland.authoring.service` — authoring source registry plus proposal/review/trace-only apply service with media worldline validation and no provider execution
 - `backend/packages/invocations/`
   - `noveland.invocations.contracts` — invocation, prompt template, prompt snapshot, tag, search, redaction, retention, and runtime-run link DTOs
   - `noveland.invocations.models` — worldline-scoped model invocation, prompt template, prompt snapshot, runtime-run join, and invocation tag ORM models
