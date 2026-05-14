@@ -1115,3 +1115,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 7 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: No push was performed. Archive the OpenSpec v0.4 change only if explicitly requested.
+
+## v0.4 Operator/Admin UX archive entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: OpenSpec archive and release notes for the completed v0.4 Operator/Admin UX sequence.
+- Summary: Promoted the seven v0.4 admin capabilities into current OpenSpec specs, archived `v0-4-operator-admin-ux`, and added release notes summarizing the completed operator/admin Web surfaces and validation evidence.
+- Files changed: `/openspec/specs/admin-ux-foundation/spec.md`, `/openspec/specs/provider-admin-console/spec.md`, `/openspec/specs/media-admin-console/spec.md`, `/openspec/specs/visual-admin-console/spec.md`, `/openspec/specs/speech-admin-console/spec.md`, `/openspec/specs/invocation-ledger-browser/spec.md`, `/openspec/specs/multimodal-diagnostics-dashboard/spec.md`, `/openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/**`, `/docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`, `/docs/agent/harness/**`
+- Tests added/updated: Documentation/spec-only change; validate with OpenSpec validation and `git diff --check`.
+- Docs updated: current OpenSpec specs, release notes, project index, file inventory, task board, change journal, and active handoff.
+- Follow-up notes: v0.5 must begin with feasibility review only; no v0.5 implementation should start until its review is accepted.

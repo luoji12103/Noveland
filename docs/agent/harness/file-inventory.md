@@ -383,7 +383,16 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.4.5-speech-admin-console-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md`
+- `docs/agent/harness/release-notes/`
+- `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `openspec/`
+- `openspec/specs/admin-ux-foundation/spec.md`
+- `openspec/specs/provider-admin-console/spec.md`
+- `openspec/specs/media-admin-console/spec.md`
+- `openspec/specs/visual-admin-console/spec.md`
+- `openspec/specs/speech-admin-console/spec.md`
+- `openspec/specs/invocation-ledger-browser/spec.md`
+- `openspec/specs/multimodal-diagnostics-dashboard/spec.md`
 - `docs/agent/architecture/current-system-contracts.md`
 - `docs/agent/architecture/api-contract-inventory.md`
 - `docs/agent/architecture/data-model-inventory.md`

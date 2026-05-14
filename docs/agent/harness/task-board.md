@@ -97,8 +97,11 @@
 - v0.4 Operator/Admin UX Phase 7: Multimodal Diagnostics Dashboard targeted tests
 - v0.4 Operator/Admin UX Phase 7: Multimodal Diagnostics Dashboard full local gate
 - v0.4 Operator/Admin UX Phase 7: Multimodal Diagnostics Dashboard fast-forward merge
+- v0.4 Operator/Admin UX OpenSpec archive and release notes
 
 ## Upcoming Mainline
+- v0.5 should begin with feasibility review only. Do not implement v0.5 until the
+  review is accepted and a concrete phase plan is confirmed.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.
