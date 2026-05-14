@@ -52,6 +52,7 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
+- `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
 - `web/app/worlds/[worldId]/providers/` — world-scoped provider integration admin console
 - `web/app/admin/` — platform-admin pages for presets, provider profiles, and runtime control
 - `web/app/admin/memory-backends/` — platform-admin memory backend profile, health, log, job retry, and eval surface
@@ -74,6 +75,7 @@ Fast orientation for a new coding session.
   - `web/features/admin/` — platform-level preset, provider, runtime, and memory backend management pages
   - `web/features/admin/admin-foundation.tsx` — shared v0.4 admin notice, state, section, metric, table, detail, and action primitives
   - `web/features/admin/admin-route-guard.ts` — shared platform-admin guard helper for admin route entrypoints
+  - `web/features/admin/media-admin.tsx` — world-scoped media asset/object/job/reference admin console
   - `web/features/admin/provider-integration-admin.tsx` — world-scoped Phase 5+ provider integration admin console
   - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
@@ -89,6 +91,7 @@ Fast orientation for a new coding session.
   - `web/lib/realtime/` — same-origin streaming proxy helper
   - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
+  - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers
   - `web/lib/worlds/provider-integrations.ts` — provider integration client helpers for `/worlds/{world_id}/providers`
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
 - `web/package.json` — frontend scripts and dependency manifest

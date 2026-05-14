@@ -956,3 +956,15 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/media-admin-console` after this docs-only work is committed on `main`.
+
+## v0.4 Media Asset Admin Console implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/media-admin-console
+- Scope: World-scoped Web admin console for media assets, objects, jobs, references, uploads, and safe download actions.
+- Summary: Added `/worlds/{worldId}/media`, media client helpers, server-side media admin data loader, and a media admin component for asset list/detail, object list/download actions, job status/actions, reference browsing, upload flow, and filters. The UI summarizes metadata and request JSON without rendering internal object storage references, file paths, raw bytes, base64, raw prompts, or raw outputs.
+- Files changed: `/web/app/worlds/[worldId]/media/page.tsx`, `/web/features/admin/media-admin.tsx`, `/web/lib/worlds/media.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Media client tests, media admin component tests, and e2e stabilization for slow mock-server action/navigation waits.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Verification: Targeted tests passed; full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`88 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No backend media kernel behavior, migrations, storage backend, public reader media delivery, provider execution, asset generation, daemon behavior, or `worlds.py` change was added. Fast-forward merge to local `main` remains next.

@@ -113,21 +113,48 @@ test("platform admin manages presets and world composition import/export", async
   await page.getByPlaceholder("imported-world-slug").fill(importedSlug);
   await page.getByPlaceholder("Imported world name").fill("Imported World");
   await page.getByPlaceholder("Paste exported composition JSON").fill(exportedComposition);
-  await page.getByRole("button", { name: "Import as new world" }).click();
+  const [importResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/api/world-compositions/import"),
+    ),
+    page.getByRole("button", { name: "Import as new world" }).click(),
+  ]);
+  expect(importResponse.ok()).toBe(true);
+  await expect(importResponse.json()).resolves.toMatchObject({
+    name: "Imported World",
+    slug: importedSlug,
+  });
 
-  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible();
+  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("world admin manages workspace pages and conversations", async ({ page }) => {
-  test.slow();
+  test.setTimeout(300_000);
   await signIn(page);
 
   await page.goto(`/worlds/${worldOneId}`);
-  await page.getByPlaceholder("scene-key").fill(`scene-${Date.now()}`);
+  const sceneKey = `scene-${Date.now()}`;
+  await page.getByPlaceholder("scene-key").fill(sceneKey);
   await page.getByPlaceholder("Scene name").fill("E2E Scene");
-  await page.getByRole("button", { name: "Create scene" }).click();
-  await expect(page.getByRole("heading", { name: "E2E Scene" })).toBeVisible();
+  const [sceneResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/scenes`),
+    ),
+    page.getByRole("button", { name: "Create scene" }).click(),
+  ]);
+  expect(sceneResponse.ok()).toBe(true);
+  await expect(sceneResponse.json()).resolves.toMatchObject({
+    scene_key: sceneKey,
+    name: "E2E Scene",
+  });
+  await expect(page.getByText("Scene created.")).toBeVisible({ timeout: 15_000 });
 
   await page.getByPlaceholder("Search email or display name").fill("candidate");
   await page.getByRole("button", { name: "Search users" }).click();
@@ -136,16 +163,54 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByText("candidate@example.test - world_admin").first()).toBeVisible();
 
   await page.getByPlaceholder("Speed multiplier").fill("2");
-  await page.getByRole("button", { name: "Resume with multiplier" }).click();
-  await expect(page.getByText("Clock resumed.")).toBeVisible();
-  await page.getByRole("button", { name: "Pause clock" }).click();
-  await expect(page.getByText("Clock paused.")).toBeVisible();
+  const [resumeResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/clock/resume`),
+    ),
+    page.getByRole("button", { name: "Resume with multiplier" }).click(),
+  ]);
+  expect(resumeResponse.ok()).toBe(true);
+  await expect(resumeResponse.json()).resolves.toMatchObject({ status: "running" });
+  await expect(page.getByText("Clock resumed.")).toBeVisible({ timeout: 15_000 });
+  const [pauseResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/clock/pause`),
+    ),
+    page.getByRole("button", { name: "Pause clock" }).click(),
+  ]);
+  expect(pauseResponse.ok()).toBe(true);
+  await expect(pauseResponse.json()).resolves.toMatchObject({ status: "paused" });
+  await expect(page.getByText("Clock paused.")).toBeVisible({ timeout: 15_000 });
   await page.getByPlaceholder("2030-01-01T00:00:00Z").fill("2030-01-01T00:00:00Z");
-  await page.getByRole("button", { name: "Skip clock" }).click();
-  await expect(page.getByText("Clock skipped.")).toBeVisible();
+  const [skipResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/clock/skip`),
+    ),
+    page.getByRole("button", { name: "Skip clock" }).click(),
+  ]);
+  expect(skipResponse.ok()).toBe(true);
+  await expect(skipResponse.json()).resolves.toMatchObject({
+    current_world_time: "2030-01-01T00:00:00.000Z",
+  });
+  await expect(page.getByText("Clock skipped.")).toBeVisible({ timeout: 15_000 });
 
-  await page.getByRole("button", { name: "Create snapshot" }).click();
-  await expect(page.getByText("Snapshot created.")).toBeVisible();
+  const [snapshotResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/snapshots`),
+    ),
+    page.getByRole("button", { name: "Create snapshot" }).click(),
+  ]);
+  expect(snapshotResponse.ok()).toBe(true);
+  await expect(snapshotResponse.json()).resolves.toMatchObject({ world_id: worldOneId });
+  await expect(page.getByText("Snapshot created.")).toBeVisible({ timeout: 15_000 });
 
   const scheduleRules = page.getByRole("region", { name: "Schedule rules" });
   await scheduleRules.getByPlaceholder("rule-key").fill(`rule-${Date.now()}`);
@@ -159,13 +224,26 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.goto(`/worlds/${worldOneId}/agents`);
   await page.getByPlaceholder("agent-key").fill(`agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("E2E Agent");
-  await page.getByRole("button", { name: "Create agent" }).click();
-  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+\/agents\/[0-9a-f-]+$/);
+  await Promise.all([
+    page.waitForURL(/\/worlds\/[0-9a-f-]+\/agents\/[0-9a-f-]+$/, { timeout: 15_000 }),
+    page.getByRole("button", { name: "Create agent" }).click(),
+  ]);
   await expect(page.getByRole("heading", { name: "Agent builder" })).toBeVisible();
 
   await page.getByPlaceholder("Persona text").fill("E2E persona");
-  await page.getByRole("button", { name: "Save persona" }).click();
-  await expect(page.getByText("Persona saved.")).toBeVisible();
+  const [personaResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "PATCH" &&
+        response.url().includes(`/api/worlds/${worldOneId}/agents/`) &&
+        response.url().endsWith("/persona"),
+    ),
+    page.getByRole("button", { name: "Save persona" }).click(),
+  ]);
+  expect(personaResponse.ok()).toBe(true);
+  await expect(personaResponse.json()).resolves.toMatchObject({
+    persona_text: "E2E persona",
+  });
   await page.getByPlaceholder("Observation").fill("E2E observation");
   await page.getByRole("button", { name: "Add observation" }).click();
   await expect(page.getByText("Observation added.")).toBeVisible({ timeout: 15_000 });
@@ -199,37 +277,115 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByPlaceholder("Conversation title").fill("Manual Chain");
   await page.getByPlaceholder("Objective").fill("Let agents exchange one reply.");
   await page.getByPlaceholder("Opening prompt").fill("Start the scene.");
-  await page.getByRole("button", { name: "Create conversation" }).click();
+  const [manualConversationResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/conversations`),
+    ),
+    page.getByRole("button", { name: "Create conversation" }).click(),
+  ]);
+  expect(manualConversationResponse.ok()).toBe(true);
   await expect(page.getByRole("heading", { level: 1, name: "Manual Chain" })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page).toHaveURL(/\/conversations\/[0-9a-f-]+$/, { timeout: 15_000 });
   await page.getByLabel(/Guide/).check();
-  await page.getByRole("button", { name: "Save participants" }).click();
-  await expect(page.getByText("Participants saved.")).toBeVisible();
+  const [manualParticipantsResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        response.url().endsWith("/participants"),
+    ),
+    page.getByRole("button", { name: "Save participants" }).click(),
+  ]);
+  expect(manualParticipantsResponse.ok()).toBe(true);
+  await expect(manualParticipantsResponse.json()).resolves.toEqual(
+    expect.arrayContaining([expect.objectContaining({ is_enabled: true })]),
+  );
+  await expect(page.getByText("Participants saved.")).toBeVisible({ timeout: 15_000 });
   await page.getByPlaceholder("Seed text").fill("Operator starts.");
-  await page.getByRole("button", { name: "Seed conversation" }).click();
-  await expect(page.getByText("Operator starts.")).toBeVisible();
-  await page.getByRole("button", { name: "Advance one turn" }).click();
-  await expect(page.getByText(/replies to/)).toBeVisible();
-  await page.getByRole("button", { name: "Generate summary + chapter" }).click();
-  await expect(page.getByText("Conversation narrative generated.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Manual Chain summary/i })).toBeVisible();
+  const [seedResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" && response.url().endsWith("/seed"),
+    ),
+    page.getByRole("button", { name: "Seed conversation" }).click(),
+  ]);
+  expect(seedResponse.ok()).toBe(true);
+  await expect(seedResponse.json()).resolves.toMatchObject({
+    output_text: "Operator starts.",
+  });
+  await expect(page.getByText("Operator starts.")).toBeVisible({ timeout: 15_000 });
+  const [advanceResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" && response.url().endsWith("/advance"),
+    ),
+    page.getByRole("button", { name: "Advance one turn" }).click(),
+  ]);
+  expect(advanceResponse.ok()).toBe(true);
+  await expect(advanceResponse.json()).resolves.toMatchObject({
+    turn: expect.objectContaining({ output_text: expect.stringContaining("replies to") }),
+  });
+  await expect(page.getByText(/replies to/)).toBeVisible({ timeout: 15_000 });
+  const [narrativeResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/narrative/generate"),
+    ),
+    page.getByRole("button", { name: "Generate summary + chapter" }).click(),
+  ]);
+  expect(narrativeResponse.ok()).toBe(true);
+  await expect(narrativeResponse.json()).resolves.toEqual(
+    expect.arrayContaining([expect.objectContaining({ title: expect.stringMatching(/Manual Chain summary/i) })]),
+  );
+  await expect(page.getByText("Conversation narrative generated.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("heading", { name: /Manual Chain summary/i })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.goto(`/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`auto-${Date.now()}`);
   await page.getByPlaceholder("Conversation title").fill("Auto Dialogue");
   await page.locator('select[name="mode"]').selectOption("auto_dialogue");
   await page.getByPlaceholder("Opening prompt").fill("Begin auto dialogue.");
-  await page.getByRole("button", { name: "Create conversation" }).click();
+  const [autoConversationResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/api/worlds/${worldOneId}/conversations`),
+    ),
+    page.getByRole("button", { name: "Create conversation" }).click(),
+  ]);
+  expect(autoConversationResponse.ok()).toBe(true);
   await expect(page.getByRole("heading", { level: 1, name: "Auto Dialogue" })).toBeVisible({
     timeout: 15_000,
   });
   await page.getByLabel(/Guide/).check();
-  await page.getByRole("button", { name: "Save participants" }).click();
-  await page.getByRole("button", { name: "Start auto dialogue" }).click();
-  await expect(page.getByText("Conversation started.")).toBeVisible();
-  await expect(page.getByText(/replies to/)).toBeVisible();
+  const [autoParticipantsResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT" &&
+        response.url().endsWith("/participants"),
+    ),
+    page.getByRole("button", { name: "Save participants" }).click(),
+  ]);
+  expect(autoParticipantsResponse.ok()).toBe(true);
+  const [startResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" && response.url().endsWith("/start"),
+    ),
+    page.getByRole("button", { name: "Start auto dialogue" }).click(),
+  ]);
+  expect(startResponse.ok()).toBe(true);
+  await expect(startResponse.json()).resolves.toMatchObject({ status: "running" });
+  await expect(page.getByText("Conversation started.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/replies to/)).toBeVisible({ timeout: 15_000 });
 
   await page.goto(`/worlds/${worldOneId}/narrative`);
   await page.getByPlaceholder("Artifact title").fill("E2E Artifact");
@@ -266,9 +422,24 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByRole("button", { name: "Retry job" })).toBeEnabled({
     timeout: 15_000,
   });
-  await page.getByRole("button", { name: "Retry job" }).click();
-  await expect(page.getByText("Memory write job queued for retry.")).toBeVisible();
-  await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible();
+  const [retryResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().includes("/api/memory-write-jobs/") &&
+        response.url().endsWith("/retry"),
+    ),
+    page.getByRole("button", { name: "Retry job" }).click(),
+  ]);
+  expect(retryResponse.ok()).toBe(true);
+  await expect(retryResponse.json()).resolves.toMatchObject({
+    status: "pending",
+    last_error: null,
+  });
+  await expect(page.getByText("Memory write job queued for retry.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText("Jobs: 1 / failed 0")).toBeVisible({ timeout: 15_000 });
 });
 
 test("publication blockers are surfaced and blocked drafts stay out of the reader", async ({ page }) => {
@@ -291,9 +462,18 @@ test("publication blockers are surfaced and blocked drafts stay out of the reade
   await expect(page.getByText("Narrative artifact published.")).toBeVisible();
   await expect(initialDraft.getByText("Publication gate: pass (0 issues)")).toBeVisible();
   await initialDraft.getByRole("button", { name: "Unpublish" }).click();
-  await expect(page.getByText("Narrative artifact unpublished.")).toBeVisible();
+  await expect(page.getByText("Narrative artifact unpublished.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(initialDraft.getByText(/agent_note - Guide - draft/)).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(initialDraft.getByRole("button", { name: "Publish" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await Promise.all([
+    page.waitForURL(/\/login$/),
+    page.getByRole("button", { name: "Log out" }).click(),
+  ]);
   await signIn(page, "member@example.test");
   await page.goto(`/worlds/${worldOneId}/reader?q=Publication%20blocker`);
   await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();

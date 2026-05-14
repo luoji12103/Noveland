@@ -93,6 +93,13 @@ import type {
   ProviderHealthCheck,
   ProviderIntegration,
 } from "@/lib/worlds/provider-integrations";
+import type {
+  MediaAsset,
+  MediaAssetReferences,
+  MediaJob,
+  MediaObject,
+  MediaReference,
+} from "@/lib/worlds/media";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -268,6 +275,20 @@ export type ProviderIntegrationAdminData = {
   providers: ProviderIntegration[];
   capabilitiesByProviderId: Record<string, ProviderCapability[]>;
   healthChecksByProviderId: Record<string, ProviderHealthCheck[]>;
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
+  loadError: string | null;
+};
+
+export type MediaAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  assets: MediaAsset[];
+  objectsByAssetId: Record<string, MediaObject[]>;
+  referencesByAssetId: Record<string, MediaAssetReferences | null>;
+  references: MediaReference[];
+  jobs: MediaJob[];
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -1154,6 +1175,64 @@ export async function getProviderIntegrationAdminData(
   }
 }
 
+export async function getMediaAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<MediaAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyMediaAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
+    }
+    const [memberships, assets, jobs, references] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?limit=50`, cookies),
+      apiFetch<MediaJob[]>(`/worlds/${worldId}/media/jobs?limit=50`, cookies),
+      apiFetchOptional<MediaReference[]>(`/worlds/${worldId}/media/references?limit=100`, cookies),
+    ]);
+    const objectEntries = await Promise.all(
+      assets.slice(0, 25).map(async (asset) => [
+        asset.id,
+        await apiFetchOptional<MediaObject[]>(
+          `/worlds/${worldId}/media/assets/${asset.id}/objects`,
+          cookies,
+        ),
+      ] as const),
+    );
+    const referenceEntries = await Promise.all(
+      assets.slice(0, 25).map(async (asset) => [
+        asset.id,
+        await apiFetchOptional<MediaAssetReferences>(
+          `/worlds/${worldId}/media/assets/${asset.id}/references`,
+          cookies,
+        ),
+      ] as const),
+    );
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      assets,
+      objectsByAssetId: Object.fromEntries(
+        objectEntries.map(([assetId, objects]) => [assetId, objects ?? []]),
+      ),
+      referencesByAssetId: Object.fromEntries(referenceEntries),
+      references: references ?? [],
+      jobs,
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyMediaAdminData([], null, isPlatformAdmin, "Unable to load media records.");
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1407,6 +1486,27 @@ function emptyProviderIntegrationAdminData(
     providers: [],
     capabilitiesByProviderId: {},
     healthChecksByProviderId: {},
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
+    loadError,
+  };
+}
+
+function emptyMediaAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): MediaAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    assets: [],
+    objectsByAssetId: {},
+    referencesByAssetId: {},
+    references: [],
+    jobs: [],
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,
