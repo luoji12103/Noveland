@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: main
+- Branch: feat/speech-admin-console
 - Objective: Continue v0.4 Operator/Admin UX after Phase 4 Visual Asset Admin Console.
-- Status: Phase 5 Speech Admin Console planning checkpoint is being recorded on local `main`; implementation branch `feat/speech-admin-console` is next after the docs-only commit.
+- Status: Phase 5 Speech Admin Console implementation is complete on `feat/speech-admin-console`; targeted tests and full local gate passed. Implementation commit and fast-forward merge are next.
 
 ## Current Context
 
@@ -17,7 +17,7 @@
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
 - Phase 4 adds a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. It does not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
-- Phase 5 should add a speech admin console using existing speech APIs, voice profile services, media references, and admin foundation patterns. Do not add realtime voice, streaming, local voice server deployment, backend speech behavior changes, schema changes, automatic STT memory writes, or public reader audio delivery unless the Phase 5 plan explicitly requires them.
+- Phase 5 adds a speech admin console using existing speech APIs, voice profile services, media references, and admin foundation patterns. It does not add realtime voice, streaming, local voice server deployment, backend speech behavior changes, schema changes, automatic STT memory writes, or public reader audio delivery.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -32,7 +32,7 @@
 
 ## Required Next Steps
 
-- Commit the Phase 5 Speech Admin Console docs-only planning checkpoint, then start `feat/speech-admin-console` from clean local `main`.
+- Commit `feat/speech-admin-console`, fast-forward merge to local `main`, then record Phase 5 merge bookkeeping and continue to Phase 6 Invocation Ledger Browser planning from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
@@ -48,3 +48,5 @@
 - v0.4 Phase 3 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`88 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 Phase 4 targeted tests passed: `npm run test -- visual-admin visual workspace-shell` (3 files, 8 tests), plus web lint/typecheck and `git diff --check`.
 - v0.4 Phase 4 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`96 passed` after standalone rerun), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.4 Phase 5 targeted tests passed: `npm run test -- speech-admin speech workspace-shell` (3 files, 7 tests), plus web lint/typecheck and `git diff --check`.
+- v0.4 Phase 5 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`102 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.

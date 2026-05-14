@@ -105,6 +105,12 @@ import type {
   SpriteSet,
   SpriteVariant,
 } from "@/lib/worlds/visual";
+import type {
+  AgentVoiceProfileBinding,
+  SpeechStyleMapping,
+  SpeechTranscript,
+  VoiceProfile,
+} from "@/lib/worlds/speech";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -311,6 +317,24 @@ export type VisualAdminData = {
   spriteSets: SpriteSet[];
   variantsBySpriteSetId: Record<string, SpriteVariant[]>;
   backgrounds: SceneBackground[];
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
+  loadError: string | null;
+};
+
+export type SpeechAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  worldlines: Worldline[];
+  selectedWorldlineId: string | null;
+  agents: Agent[];
+  providers: ProviderIntegration[];
+  audioAssets: MediaAsset[];
+  voiceProfiles: VoiceProfile[];
+  bindingsByAgentId: Record<string, AgentVoiceProfileBinding[]>;
+  styleMappings: SpeechStyleMapping[];
+  transcripts: SpeechTranscript[];
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -1323,6 +1347,84 @@ export async function getVisualAdminData(
   }
 }
 
+export async function getSpeechAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<SpeechAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptySpeechAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
+    }
+    const [memberships, worldlines, agents, providers, audioAssets] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetch<ProviderIntegration[]>(
+        `/worlds/${worldId}/providers?include_global=true&include_hidden=${String(isPlatformAdmin)}`,
+        cookies,
+      ),
+      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?asset_kind=audio&limit=100`, cookies),
+    ]);
+    const selectedWorldlineId =
+      worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
+    const [voiceProfiles, styleMappings, transcripts] = await Promise.all([
+      apiFetch<VoiceProfile[]>(
+        `/worlds/${worldId}/speech/voice-profiles${
+          selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
+        }`,
+        cookies,
+      ),
+      apiFetch<SpeechStyleMapping[]>(`/worlds/${worldId}/speech/style-mappings`, cookies),
+      apiFetch<SpeechTranscript[]>(
+        `/worlds/${worldId}/speech/transcripts${
+          selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
+        }`,
+        cookies,
+      ),
+    ]);
+    const bindingEntries = await Promise.all(
+      agents.map(async (agent) => [
+        agent.id,
+        await apiFetchOptional<AgentVoiceProfileBinding[]>(
+          `/worlds/${worldId}/agents/${agent.id}/voice-profiles${
+            selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
+          }`,
+          cookies,
+        ),
+      ] as const),
+    );
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      worldlines,
+      selectedWorldlineId,
+      agents,
+      providers: providers.filter((provider) =>
+        ["text_to_speech", "speech_to_text", "voice_cloning"].includes(provider.provider_kind),
+      ),
+      audioAssets,
+      voiceProfiles,
+      bindingsByAgentId: Object.fromEntries(
+        bindingEntries.map(([agentId, bindings]) => [agentId, bindings ?? []]),
+      ),
+      styleMappings,
+      transcripts,
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptySpeechAdminData([], null, isPlatformAdmin, "Unable to load speech records.");
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1621,6 +1723,31 @@ function emptyVisualAdminData(
     spriteSets: [],
     variantsBySpriteSetId: {},
     backgrounds: [],
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
+    loadError,
+  };
+}
+
+function emptySpeechAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): SpeechAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    worldlines: [],
+    selectedWorldlineId: null,
+    agents: [],
+    providers: [],
+    audioAssets: [],
+    voiceProfiles: [],
+    bindingsByAgentId: {},
+    styleMappings: [],
+    transcripts: [],
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,

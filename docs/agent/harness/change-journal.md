@@ -1024,3 +1024,15 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/speech-admin-console` after this docs-only work is committed on `main`.
+
+## v0.4 Speech Admin Console implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/speech-admin-console
+- Scope: World-scoped Web admin console for voice profiles, agent voice bindings, speech style mappings, transcripts, and explicit TTS/STT test actions.
+- Summary: Added `/worlds/{worldId}/speech`, speech client helpers, server-side speech admin data loader, and a speech admin component for managing voice profiles, binding agents to voices, editing style mappings, browsing transcripts, and running explicit TTS/STT tests through existing speech APIs. The UI displays safe media job, media asset/object, transcript, and invocation IDs without rendering storage URIs, filesystem paths, raw bytes, base64 payloads, raw prompts, raw outputs, or resolved secrets.
+- Files changed: `/web/app/worlds/[worldId]/speech/page.tsx`, `/web/features/admin/speech-admin.tsx`, `/web/lib/worlds/speech.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Speech client tests, speech admin component tests, and workspace navigation test.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Verification: Targeted tests passed with `npm run test -- speech-admin speech workspace-shell` (3 files, 7 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`102 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No backend speech behavior, migrations, realtime voice, streaming, local voice server deployment, automatic STT memory writes, public reader audio delivery, provider adapter changes, daemon behavior, or `worlds.py` change was added.

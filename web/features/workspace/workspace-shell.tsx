@@ -63,6 +63,7 @@ export function WorkspaceShell({
             <Link href={`/worlds/${worldId}/providers`}>Providers</Link>
             <Link href={`/worlds/${worldId}/media`}>Media</Link>
             <Link href={`/worlds/${worldId}/visual`}>Visual</Link>
+            <Link href={`/worlds/${worldId}/speech`}>Speech</Link>
             <Link href={`/worlds/${worldId}/narrative`}>Narrative</Link>
             <Link href={`/worlds/${worldId}/reader`}>Reader</Link>
           </>

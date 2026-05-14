@@ -19,6 +19,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/conversations/[conversationId]/`
 - `web/app/worlds/[worldId]/media/`
 - `web/app/worlds/[worldId]/providers/`
+- `web/app/worlds/[worldId]/speech/`
 - `web/app/worlds/[worldId]/visual/`
 - `web/app/worlds/[worldId]/narrative/`
 - `web/app/worlds/[worldId]/reader/`
@@ -52,6 +53,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/media-admin.tsx`
 - `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/provider-integration-admin.tsx`
+- `web/features/admin/speech-admin.test.tsx`
+- `web/features/admin/speech-admin.tsx`
 - `web/features/admin/visual-admin.test.tsx`
 - `web/features/admin/visual-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
@@ -84,6 +87,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/worlds/`
 - `web/lib/worlds/media.ts`
 - `web/lib/worlds/provider-integrations.ts`
+- `web/lib/worlds/speech.test.ts`
+- `web/lib/worlds/speech.ts`
 - `web/lib/worlds/visual.test.ts`
 - `web/lib/worlds/visual.ts`
 - `web/tests/e2e/start-with-mock-auth.mjs`

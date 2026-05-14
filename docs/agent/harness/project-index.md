@@ -56,6 +56,7 @@ Fast orientation for a new coding session.
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
 - `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
 - `web/app/worlds/[worldId]/providers/` — world-scoped provider integration admin console
+- `web/app/worlds/[worldId]/speech/` — world-scoped speech and voice profile admin console
 - `web/app/worlds/[worldId]/visual/` — world-scoped visual asset admin console
 - `web/app/admin/` — platform-admin pages for presets, provider profiles, and runtime control
 - `web/app/admin/memory-backends/` — platform-admin memory backend profile, health, log, job retry, and eval surface
@@ -80,6 +81,7 @@ Fast orientation for a new coding session.
   - `web/features/admin/admin-route-guard.ts` — shared platform-admin guard helper for admin route entrypoints
   - `web/features/admin/media-admin.tsx` — world-scoped media asset/object/job/reference admin console
   - `web/features/admin/provider-integration-admin.tsx` — world-scoped Phase 5+ provider integration admin console
+  - `web/features/admin/speech-admin.tsx` — world-scoped voice profile, binding, transcript, and speech test console
   - `web/features/admin/visual-admin.tsx` — world-scoped strict-worldline sprite/background resolver and compose admin console
   - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
@@ -97,6 +99,7 @@ Fast orientation for a new coding session.
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
   - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers
   - `web/lib/worlds/provider-integrations.ts` — provider integration client helpers for `/worlds/{world_id}/providers`
+  - `web/lib/worlds/speech.ts` — speech voice profile, binding, style mapping, transcript, TTS, and STT client helpers
   - `web/lib/worlds/visual.ts` — visual sprite, variant, background, resolver, and compose-scene client helpers
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
 - `web/package.json` — frontend scripts and dependency manifest

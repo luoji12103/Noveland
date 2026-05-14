@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.4 Operator/Admin UX Phase 5: Speech Admin Console implementation planning checkpoint
+- v0.4 Operator/Admin UX Phase 5: Speech Admin Console fast-forward merge
 
 ## Blocked
 - None
@@ -84,6 +84,9 @@
 - v0.4 Operator/Admin UX Phase 4: Visual Asset Admin Console implementation
 - v0.4 Operator/Admin UX Phase 4: Visual Asset Admin Console full local gate
 - v0.4 Operator/Admin UX Phase 4: Visual Asset Admin Console fast-forward merge
+- v0.4 Operator/Admin UX Phase 5: Speech Admin Console planning checkpoint
+- v0.4 Operator/Admin UX Phase 5: Speech Admin Console implementation
+- v0.4 Operator/Admin UX Phase 5: Speech Admin Console full local gate
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
