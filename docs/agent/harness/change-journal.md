@@ -1104,3 +1104,14 @@
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Verification: Targeted tests passed with `npm run test -- multimodal-diagnostics diagnostics workspace-shell` (3 files, 6 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`112 passed` after standalone rerun; initial concurrent run with `next build` timed out), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: No backend diagnostic rule changes, migrations, duplicate release/eval framework, public launch gate changes, provider execution changes, daemon behavior, streaming, public reader delivery, or `worlds.py` change was added.
+
+## v0.4 Multimodal Diagnostics Dashboard merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.4 Operator/Admin UX Phase 7.
+- Summary: Fast-forward merged `feat/multimodal-diagnostics-dashboard` into local `main` after the targeted tests and full local gate passed. OpenSpec Phase 7 tasks now mark the full gate, fast-forward merge, and harness update complete, completing the v0.4 Operator/Admin UX implementation sequence locally.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 7 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: No push was performed. Archive the OpenSpec v0.4 change only if explicitly requested.
