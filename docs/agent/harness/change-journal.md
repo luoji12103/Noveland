@@ -1002,3 +1002,14 @@
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Verification: Targeted tests passed with `npm run test -- visual-admin visual workspace-shell` (3 files, 8 tests), plus web lint, web typecheck, and `git diff --check`. Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`96 passed` after standalone rerun), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: No backend visual behavior, migrations, automatic sprite/background generation, asset generation orchestration, nullable-worldline visual defaults, public reader delivery, provider execution, daemon behavior, streaming, or `worlds.py` change was added. `web npm run test` timed out once when run concurrently with backend pytest due to Vitest worker startup timeouts; the standalone rerun passed.
+
+## v0.4 Visual Asset Admin Console merge entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Fast-forward merge completion for v0.4 Operator/Admin UX Phase 4.
+- Summary: Fast-forward merged `feat/visual-admin-console` into local `main` after the targeted tests and full local gate passed. OpenSpec Phase 4 tasks now mark the fast-forward merge complete, and the active handoff points to Phase 5 Speech Admin Console planning.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 4 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 5 from clean local `main`; do not push unless explicitly requested.

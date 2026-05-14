@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: feat/visual-admin-console
-- Objective: Continue v0.4 Operator/Admin UX after Phase 3 Media Asset Admin Console.
-- Status: Phase 4 Visual Asset Admin Console implementation is complete on `feat/visual-admin-console`; targeted tests and full local gate passed. Commit and fast-forward merge to local `main` are next.
+- Branch: main
+- Objective: Continue v0.4 Operator/Admin UX after Phase 4 Visual Asset Admin Console.
+- Status: Phase 4 Visual Asset Admin Console passed the full local gate and is fast-forward merged to local `main`; Phase 5 Speech Admin Console planning is next.
 
 ## Current Context
 
@@ -17,6 +17,7 @@
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
 - Phase 4 adds a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. It does not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
+- Phase 5 should add a speech admin console using existing speech APIs, voice profile services, media references, and admin foundation patterns. Do not add realtime voice, streaming, local voice server deployment, backend speech behavior changes, schema changes, automatic STT memory writes, or public reader audio delivery unless the Phase 5 plan explicitly requires them.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -31,7 +32,7 @@
 
 ## Required Next Steps
 
-- Commit `feat/visual-admin-console`, fast-forward merge to local `main`, mark the merge checkbox, and continue to Phase 5 Speech Admin Console.
+- Start the Phase 5 Speech Admin Console planning checkpoint from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
