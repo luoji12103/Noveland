@@ -12,6 +12,7 @@ from noveland.authoring.contracts import (
     AuthoringConflictReviewRequest,
     AuthoringImportRunCreate,
     AuthoringLoreExtractRequest,
+    AuthoringMemoryMigrateRequest,
     AuthoringPreviewRequest,
     AuthoringProposalDraft,
     AuthoringProposalKind,
@@ -568,6 +569,133 @@ def test_conflict_review_creates_trace_only_conflict_reports() -> None:
     ]
     assert len(reports) == 5
     assert all(proposal.proposal_kind == AuthoringProposalKind.OTHER for proposal in reports)
+    assert "storage_uri" not in str(result.run.model_dump()).lower()
+
+
+def test_memory_migration_creates_proposal_only_memory_candidates() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="memory",
+                display_name="Memory",
+                source_kind=AuthoringSourceAssetKind.LORE,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.LORE,
+                source_label="memory.md",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="memory",
+                fragment_kind=AuthoringSourceFragmentKind.MEMORY,
+                sequence=1,
+                excerpt_text=(
+                    "fact: Magic exists\n"
+                    "episode: Alice met Bob at the gate\n"
+                    "relationship memory: Alice -> Bob: trusts him\n"
+                    "preference: Alice = tea\n"
+                    "style: Alice = terse\n"
+                ),
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        service.preview(
+            graph.world_id,
+            run.id,
+            AuthoringPreviewRequest(
+                worldline_id=graph.worldline_id,
+                proposals=(
+                    _draft(
+                        fragment.id,
+                        "lore_candidate",
+                        {"candidate_kind": "lore", "lore_text": "The bell rings"},
+                        proposal_kind=AuthoringProposalKind.LORE,
+                    ),
+                    _draft(
+                        fragment.id,
+                        "relationship_candidate",
+                        {
+                            "candidate_kind": "relationship",
+                            "source_character_label": "Alice",
+                            "target_character_label": "Bob",
+                            "relationship_label": "trusts",
+                        },
+                        proposal_kind=AuthoringProposalKind.RELATIONSHIP,
+                    ),
+                    _draft(
+                        fragment.id,
+                        "dialogue_candidate",
+                        {"candidate_kind": "dialogue", "speaker_label": "Alice"},
+                        proposal_kind=AuthoringProposalKind.DIALOGUE,
+                    ),
+                ),
+            ),
+        )
+        result = service.migrate_memory(
+            graph.world_id,
+            run.id,
+            AuthoringMemoryMigrateRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(fragment.id,),
+            ),
+        )
+        first_memory = [
+            proposal
+            for proposal in result.run.proposals
+            if proposal.target_ref_kind == "memory_candidate"
+        ][0]
+        service.review_proposal(
+            graph.world_id,
+            first_memory.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        apply_result = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=(first_memory.id,),
+            ),
+        )
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 8
+    assert result.fact_count == 2
+    assert result.episodic_count == 1
+    assert result.relationship_count == 2
+    assert result.preference_count == 1
+    assert result.style_count == 2
+    assert result.run.summary_json["memory_migration_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    assert apply_result.applied_proposals == []
+    assert apply_result.blocked_proposals[0].applied_ref_json["blocked_reason"] == (
+        "unsupported_proposal_kind"
+    )
     assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 

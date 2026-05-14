@@ -209,6 +209,7 @@ Fast orientation for a new coding session.
   - `noveland.authoring.character_extractor` — deterministic source fragment and dialogue-proposal extractor for character, alias, faction, identity, relationship, and emotional-baseline proposal candidates
   - `noveland.authoring.lore_extractor` — deterministic proposal-only source fragment extractor for lore, location, organization, world-rule, secret, and knowledge-boundary candidates
   - `noveland.authoring.conflict_review` — deterministic import-run proposal analyzer for duplicate, contradiction, uncertain-canon, and OOC-risk conflict report candidates
+  - `noveland.authoring.memory_migration` — deterministic source-fragment and proposal analyzer for fact, episodic, relationship, preference, and style memory proposal candidates without memory writes
 - `backend/packages/invocations/`
   - `noveland.invocations.contracts` — invocation, prompt template, prompt snapshot, tag, search, redaction, retention, and runtime-run link DTOs
   - `noveland.invocations.models` — worldline-scoped model invocation, prompt template, prompt snapshot, runtime-run join, and invocation tag ORM models

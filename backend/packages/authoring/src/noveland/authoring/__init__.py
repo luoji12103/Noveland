@@ -67,6 +67,18 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringLoreExtractorMode",
     ),
+    "AuthoringMemoryMigrateRequest": (
+        "noveland.authoring.contracts",
+        "AuthoringMemoryMigrateRequest",
+    ),
+    "AuthoringMemoryMigrateResult": (
+        "noveland.authoring.contracts",
+        "AuthoringMemoryMigrateResult",
+    ),
+    "AuthoringMemoryMigrationMode": (
+        "noveland.authoring.contracts",
+        "AuthoringMemoryMigrationMode",
+    ),
     "AuthoringScriptParseRequest": (
         "noveland.authoring.contracts",
         "AuthoringScriptParseRequest",

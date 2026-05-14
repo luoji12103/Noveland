@@ -475,6 +475,79 @@ def test_authoring_api_conflict_review_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_memory_migration_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "memory",
+            "display_name": "Memory",
+            "source_kind": "lore",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "lore",
+            "source_label": "memory.md",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "memory",
+            "fragment_kind": "memory",
+            "sequence": 1,
+            "excerpt_text": (
+                "fact: Magic exists\n"
+                "episodic: Alice met Bob\n"
+                "Alice likes tea\n"
+            ),
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    migrated = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/migrate-memory",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+        },
+    )
+
+    assert migrated.status_code == 201
+    assert migrated.json()["created_proposal_count"] == 3
+    assert migrated.json()["fact_count"] == 1
+    assert migrated.json()["episodic_count"] == 1
+    assert migrated.json()["relationship_count"] == 0
+    assert migrated.json()["preference_count"] == 1
+    assert migrated.json()["style_count"] == 0
+    assert migrated.json()["run"]["summary_json"]["provider_execution"] is False
+    assert all(
+        proposal["source_fragment_id"] == fragment.json()["id"]
+        for proposal in migrated.json()["run"]["proposals"]
+    )
+    assert "storage_uri" not in _json_text(migrated.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 3
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

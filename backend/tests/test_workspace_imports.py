@@ -17,6 +17,7 @@ PACKAGES = [
     "noveland.authoring.conflict_review",
     "noveland.authoring.contracts",
     "noveland.authoring.lore_extractor",
+    "noveland.authoring.memory_migration",
     "noveland.authoring.models",
     "noveland.authoring.parser",
     "noveland.authoring.service",

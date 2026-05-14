@@ -28,6 +28,8 @@ from noveland.authoring.contracts import (
     AuthoringImportRunStatus,
     AuthoringLoreExtractRequest,
     AuthoringLoreExtractResult,
+    AuthoringMemoryMigrateRequest,
+    AuthoringMemoryMigrateResult,
     AuthoringPreviewRequest,
     AuthoringPreviewResult,
     AuthoringProposalCreate,
@@ -59,6 +61,14 @@ from noveland.authoring.lore_extractor import (
 )
 from noveland.authoring.lore_extractor import (
     extract_fragment as extract_lore_fragment,
+)
+from noveland.authoring.memory_migration import (
+    MemoryMigrationCandidate,
+    migrate_fragment,
+    migrate_proposal,
+)
+from noveland.authoring.memory_migration import (
+    dedupe_candidates as dedupe_memory_candidates,
 )
 from noveland.authoring.models import (
     AuthoringImportProposal,
@@ -713,6 +723,103 @@ class AuthoringService:
             ooc_risk_count=summary_counts["ooc_risk_count"],
         )
 
+    def migrate_memory(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringMemoryMigrateRequest,
+    ) -> AuthoringMemoryMigrateResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "memory migration run must belong to request worldline"
+            )
+
+        candidates: list[MemoryMigrationCandidate] = []
+        for fragment_id in request.source_fragment_ids:
+            fragment = self._fragment_required(world_id, fragment_id)
+            if fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source fragment must belong to memory migration worldline"
+                )
+            candidates.extend(
+                migrate_fragment(
+                    source_fragment_id=fragment.id,
+                    excerpt_text=fragment.excerpt_text,
+                    migration_mode=request.migration_mode.value,
+                )
+            )
+
+        if request.include_proposals:
+            candidates.extend(
+                self._memory_candidates_from_proposals(
+                    run.id,
+                    migration_mode=request.migration_mode.value,
+                    priority_offset=len(candidates) + 1,
+                )
+            )
+
+        candidates = dedupe_memory_candidates(candidates)
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "fact_count": sum(
+                1 for candidate in candidates if candidate.memory_kind == "fact"
+            ),
+            "episodic_count": sum(
+                1 for candidate in candidates if candidate.memory_kind == "episodic"
+            ),
+            "relationship_count": sum(
+                1 for candidate in candidates if candidate.memory_kind == "relationship"
+            ),
+            "preference_count": sum(
+                1 for candidate in candidates if candidate.memory_kind == "preference"
+            ),
+            "style_count": sum(
+                1 for candidate in candidates if candidate.memory_kind == "style"
+            ),
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "memory_migration_mode": request.migration_mode.value,
+            "include_proposals": request.include_proposals,
+            "provider_execution": False,
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringMemoryMigrateResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=summary_counts["created_proposal_count"],
+            fact_count=summary_counts["fact_count"],
+            episodic_count=summary_counts["episodic_count"],
+            relationship_count=summary_counts["relationship_count"],
+            preference_count=summary_counts["preference_count"],
+            style_count=summary_counts["style_count"],
+        )
+
     def review_proposal(
         self,
         world_id: uuid.UUID,
@@ -893,6 +1000,41 @@ class AuthoringService:
             raise AuthoringValidationError("one or more proposals were not found")
         order = {proposal_id: index for index, proposal_id in enumerate(proposal_ids)}
         return sorted(proposals, key=lambda proposal: order[proposal.id])
+
+    def _memory_candidates_from_proposals(
+        self,
+        run_id: uuid.UUID,
+        *,
+        migration_mode: str,
+        priority_offset: int,
+    ) -> list[MemoryMigrationCandidate]:
+        proposals = self._session.scalars(
+            select(AuthoringImportProposal)
+            .where(
+                AuthoringImportProposal.run_id == run_id,
+                AuthoringImportProposal.proposal_kind.in_(
+                    (
+                        AuthoringProposalKind.DIALOGUE.value,
+                        AuthoringProposalKind.RELATIONSHIP.value,
+                        AuthoringProposalKind.LORE.value,
+                    )
+                ),
+                AuthoringImportProposal.target_ref_kind != "memory_candidate",
+            )
+            .order_by(AuthoringImportProposal.priority, AuthoringImportProposal.created_at)
+        ).all()
+        candidates: list[MemoryMigrationCandidate] = []
+        for index, proposal in enumerate(proposals):
+            candidate = migrate_proposal(
+                source_fragment_id=proposal.source_fragment_id,
+                target_ref_kind=proposal.target_ref_kind,
+                proposed_payload_json=proposal.proposed_payload_json,
+                migration_mode=migration_mode,
+                priority=priority_offset + index,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+        return candidates
 
     def _dialogue_speaker_candidates(
         self,

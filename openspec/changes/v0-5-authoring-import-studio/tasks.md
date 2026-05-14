@@ -61,11 +61,11 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 6 — Memory Migration Pipeline
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `memory-migration-pipeline` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `memory-migration-pipeline` scope only.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

@@ -89,6 +89,10 @@ class AuthoringConflictReviewMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringMemoryMigrationMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -510,6 +514,29 @@ class AuthoringConflictReviewResult(_FrozenContract):
     contradiction_count: int
     uncertain_count: int
     ooc_risk_count: int
+
+
+class AuthoringMemoryMigrateRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    source_fragment_ids: tuple[uuid.UUID, ...]
+    migration_mode: AuthoringMemoryMigrationMode = AuthoringMemoryMigrationMode.DETERMINISTIC
+    include_proposals: bool = True
+
+    @model_validator(mode="after")
+    def validate_fragments(self) -> AuthoringMemoryMigrateRequest:
+        if not self.source_fragment_ids:
+            raise ValueError("source_fragment_ids is required")
+        return self
+
+
+class AuthoringMemoryMigrateResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    fact_count: int
+    episodic_count: int
+    relationship_count: int
+    preference_count: int
+    style_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

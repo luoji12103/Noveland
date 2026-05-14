@@ -17,6 +17,8 @@ from noveland.authoring.contracts import (
     AuthoringImportRunRead,
     AuthoringLoreExtractRequest,
     AuthoringLoreExtractResult,
+    AuthoringMemoryMigrateRequest,
+    AuthoringMemoryMigrateResult,
     AuthoringPreviewRequest,
     AuthoringPreviewResult,
     AuthoringProposalCreate,
@@ -376,6 +378,27 @@ def review_authoring_conflicts(
 ) -> AuthoringConflictReviewResult:
     try:
         return AuthoringService(db_session).review_conflicts(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/migrate-memory",
+    response_model=AuthoringMemoryMigrateResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def migrate_authoring_memory(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringMemoryMigrateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringMemoryMigrateResult:
+    try:
+        return AuthoringService(db_session).migrate_memory(world_id, run_id, request)
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

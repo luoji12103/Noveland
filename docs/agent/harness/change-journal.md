@@ -1318,3 +1318,14 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
 - Follow-up notes: Implementation should start on `feat/memory-migration-pipeline` after this docs-only checkpoint is committed.
+
+## v0.5 Memory Migration Pipeline implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/memory-migration-pipeline
+- Scope: Backend-only deterministic memory migration proposal generation for v0.5 Authoring & Import Studio Phase 6.
+- Summary: Added a deterministic memory migration analyzer that converts source fragments and existing import-run proposals into reviewable fact, episodic, relationship, preference, and style memory proposals. The implementation reuses Phase 1 authoring runs/proposals, blocks direct memory proposal apply, avoids provider execution, avoids memory backend writes, and does not emit world events.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/{__init__,contracts,memory_migration,service}.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, `/backend/tests/test_workspace_imports.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Authoring service memory migration coverage, authoring API memory migration endpoint coverage, direct memory apply guardrail coverage, and workspace import coverage.
+- Docs updated: OpenSpec tasks, project index, task board, active handoff, and change journal.
+- Follow-up notes: Phase 6 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then continue with Phase 7 Asset Import & Matching.
