@@ -390,6 +390,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.5.5-canon-conflict-review-plan.md`
 - `docs/agent/harness/feature-updates/v0.5.6-memory-migration-pipeline-plan.md`
 - `docs/agent/harness/feature-updates/v0.5.7-asset-import-matching-plan.md`
+- `docs/agent/harness/feature-updates/v0.5.8-authoring-regression-fixture-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `openspec/`
