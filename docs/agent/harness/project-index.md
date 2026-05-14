@@ -34,6 +34,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.5.2-script-parser-dialogue-extractor-plan.md` — final v0.5 Authoring & Import Studio Phase 2 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.3-character-relationship-extractor-plan.md` — final v0.5 Authoring & Import Studio Phase 3 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.4-world-bible-lore-extractor-plan.md` — final v0.5 Authoring & Import Studio Phase 4 implementation plan.
+- `docs/agent/harness/feature-updates/v0.5.5-canon-conflict-review-plan.md` — final v0.5 Authoring & Import Studio Phase 5 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4 Operator/Admin UX change, and proposed roadmap changes for v0.5+.
 - `docs/agent/harness/task-board.md` — current execution state only.
