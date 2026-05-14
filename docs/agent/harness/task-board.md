@@ -102,10 +102,11 @@
 - v0.5 Authoring & Import Studio Phase 1 implementation
 - v0.5 Authoring & Import Studio Phase 1 targeted tests
 - v0.5 Authoring & Import Studio Phase 1 full local gate
+- v0.5 Authoring & Import Studio Phase 1 fast-forward merge
 
 ## Upcoming Mainline
-- v0.5 should begin with feasibility review only. Do not implement v0.5 until the
-  review is accepted and a concrete phase plan is confirmed.
+- v0.5 Phase 2 should start from clean local `main` with a docs-only planning
+  checkpoint for Script Parser & Dialogue Extractor.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

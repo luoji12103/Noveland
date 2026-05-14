@@ -2,19 +2,20 @@
 
 - Date: 2026-05-14T00:00:00Z
 - Branch: main
-- Objective: Preserve v0.4 archive state and prepare v0.5 Authoring & Import Studio for implementation planning.
-- Status: v0.4 Operator/Admin UX implementation is complete, pushed by the user, archived in OpenSpec, and represented in current specs. v0.5 OpenSpec docs now reflect the dedicated authoring package/router decision.
+- Objective: Continue v0.5 Authoring & Import Studio with Phase 2 Script Parser & Dialogue Extractor.
+- Status: v0.5 Phase 1 Authoring Import Core is implemented, validated, and fast-forward merged locally.
 
 ## Current Context
 
-- `main` is aligned with `origin/main` before the v0.4 archive/release-notes docs-only commit.
+- `main` is ahead of `origin/main` locally; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
 - Current implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
-- v0.5 Phase 1 is Authoring Import Core: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
+- v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
+- v0.5 Phase 2 is next: Script Parser & Dialogue Extractor.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -32,13 +33,15 @@
 
 ## Required Next Steps
 
-- Perform v0.5 feasibility review only; do not implement v0.5 yet.
-- Start v0.5 implementation only after the user explicitly requests it.
-- First implementation phase should be Phase 1 Authoring Import Core from `openspec/changes/v0-5-authoring-import-studio/phase-plan.md`.
-- Do not add new v0.5 routes to `worlds.py`; register the independent authoring router at app level.
+- Start Phase 2 from clean local `main` with a docs-only planning checkpoint.
+- Phase 2 should implement only `script-parser-dialogue-extractor` scope and reuse Phase 1 import proposals.
+- Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
+- Do not push unless explicitly requested.
 
 ## Latest Verification
 
 - v0.4 Phase 7 full local gate passed before archive: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after standalone rerun; initial concurrent run with `next build` timed out), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 archive/release-notes work is docs-only and should be validated with OpenSpec validation plus `git diff --check`.
 - v0.5 architecture decision docs are docs-only and should be validated with OpenSpec validation plus `git diff --check`.
+- v0.5 Phase 1 targeted tests passed: `32 passed`.
+- v0.5 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`298 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
