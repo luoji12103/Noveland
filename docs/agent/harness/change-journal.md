@@ -1058,3 +1058,15 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/invocation-ledger-browser` after this docs-only work is committed on `main`.
+
+## v0.4 Invocation Ledger Browser implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/invocation-ledger-browser
+- Scope: World-scoped Web admin console for model invocation ledger records, prompt snapshots, tags, redaction actions, visibility, and retention state.
+- Summary: Added `/worlds/{worldId}/invocations`, invocation ledger client helpers, server-side invocation admin data loader, and an invocation ledger browser component for filtering invocations, inspecting selected records, viewing prompt snapshot checksums/evidence, creating/deleting tags, and running explicit redaction actions through existing invocation APIs. The UI recursively redacts secret-like keys, storage URI/path values, and base64-like payloads before rendering evidence summaries.
+- Files changed: `/web/app/worlds/[worldId]/invocations/page.tsx`, `/web/features/admin/invocation-ledger-admin.tsx`, `/web/lib/worlds/invocations.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/web/app/globals.css`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Invocation ledger client tests, invocation ledger admin component tests, and workspace navigation test.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Verification: Targeted tests passed with `npm run test -- invocation-ledger invocation workspace-shell` (3 files, 6 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`107 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No backend invocation behavior, migrations, external tracing export, reader/member raw prompt exposure, provider execution changes, daemon behavior, or `worlds.py` change was added.

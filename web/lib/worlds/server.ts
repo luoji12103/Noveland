@@ -111,6 +111,11 @@ import type {
   SpeechTranscript,
   VoiceProfile,
 } from "@/lib/worlds/speech";
+import type {
+  InvocationRecord,
+  InvocationTag,
+  PromptSnapshot,
+} from "@/lib/worlds/invocations";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -335,6 +340,20 @@ export type SpeechAdminData = {
   bindingsByAgentId: Record<string, AgentVoiceProfileBinding[]>;
   styleMappings: SpeechStyleMapping[];
   transcripts: SpeechTranscript[];
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
+  loadError: string | null;
+};
+
+export type InvocationLedgerAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  worldlines: Worldline[];
+  invocations: InvocationRecord[];
+  selectedInvocation: InvocationRecord | null;
+  tagsByInvocationId: Record<string, InvocationTag[]>;
+  promptSnapshot: PromptSnapshot | null;
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -1425,6 +1444,77 @@ export async function getSpeechAdminData(
   }
 }
 
+export async function getInvocationLedgerAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<InvocationLedgerAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyInvocationLedgerAdminData(
+        worlds,
+        null,
+        isPlatformAdmin,
+        "Unable to load selected world.",
+      );
+    }
+    const [memberships, worldlines, result] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetch<{ invocations: InvocationRecord[] }>(
+        `/worlds/${worldId}/model-invocations?limit=50&include_hidden=${String(isPlatformAdmin)}`,
+        cookies,
+      ),
+    ]);
+    const invocations = result.invocations;
+    const selectedInvocation = invocations[0] ?? null;
+    const [tagEntries, promptSnapshot] = await Promise.all([
+      Promise.all(
+        invocations.slice(0, 25).map(async (invocation) => [
+          invocation.id,
+          await apiFetchOptional<InvocationTag[]>(
+            `/worlds/${worldId}/model-invocations/${invocation.id}/tags`,
+            cookies,
+          ),
+        ] as const),
+      ),
+      selectedInvocation === null
+        ? Promise.resolve(null)
+        : apiFetchOptional<PromptSnapshot>(
+            `/worlds/${worldId}/model-invocations/${selectedInvocation.id}/prompt-snapshot`,
+            cookies,
+          ),
+    ]);
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      worldlines,
+      invocations,
+      selectedInvocation,
+      tagsByInvocationId: Object.fromEntries(
+        tagEntries.map(([invocationId, tags]) => [invocationId, tags ?? []]),
+      ),
+      promptSnapshot,
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyInvocationLedgerAdminData(
+      [],
+      null,
+      isPlatformAdmin,
+      "Unable to load invocation ledger records.",
+    );
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1748,6 +1838,27 @@ function emptySpeechAdminData(
     bindingsByAgentId: {},
     styleMappings: [],
     transcripts: [],
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
+    loadError,
+  };
+}
+
+function emptyInvocationLedgerAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): InvocationLedgerAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    worldlines: [],
+    invocations: [],
+    selectedInvocation: null,
+    tagsByInvocationId: {},
+    promptSnapshot: null,
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,

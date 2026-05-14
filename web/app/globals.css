@@ -285,6 +285,29 @@ a {
   align-items: center;
 }
 
+.evidence-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.code-block {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .admin-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -612,6 +635,7 @@ a {
 @media (max-width: 900px) {
   .top-band-inner,
   .dashboard-grid,
+  .evidence-grid,
   .management-columns,
   .clock-actions,
   .clock-grid,

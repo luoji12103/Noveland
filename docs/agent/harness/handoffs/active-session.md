@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: main
+- Branch: feat/invocation-ledger-browser
 - Objective: Continue v0.4 Operator/Admin UX after Phase 5 Speech Admin Console.
-- Status: Phase 6 Invocation Ledger Browser planning checkpoint is being recorded on local `main`; implementation branch `feat/invocation-ledger-browser` is next after the docs-only commit.
+- Status: Phase 6 Invocation Ledger Browser implementation is complete on `feat/invocation-ledger-browser`; targeted tests and full local gate passed. Implementation commit and fast-forward merge are next.
 
 ## Current Context
 
@@ -33,7 +33,7 @@
 
 ## Required Next Steps
 
-- Commit the Phase 6 Invocation Ledger Browser docs-only planning checkpoint, then start `feat/invocation-ledger-browser` from clean local `main`.
+- Commit `feat/invocation-ledger-browser`, fast-forward merge to local `main`, then record Phase 6 merge bookkeeping and continue to Phase 7 Multimodal Diagnostics Dashboard planning from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
@@ -51,3 +51,5 @@
 - v0.4 Phase 4 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`96 passed` after standalone rerun), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 Phase 5 targeted tests passed: `npm run test -- speech-admin speech workspace-shell` (3 files, 7 tests), plus web lint/typecheck and `git diff --check`.
 - v0.4 Phase 5 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`102 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.4 Phase 6 targeted tests passed: `npm run test -- invocation-ledger invocation workspace-shell` (3 files, 6 tests), plus web lint/typecheck and `git diff --check`.
+- v0.4 Phase 6 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`107 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.

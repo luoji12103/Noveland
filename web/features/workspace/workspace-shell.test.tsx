@@ -49,5 +49,9 @@ describe("WorkspaceShell", () => {
       "href",
       "/worlds/world-1/speech",
     );
+    expect(screen.getByRole("link", { name: "Invocations" })).toHaveAttribute(
+      "href",
+      "/worlds/world-1/invocations",
+    );
   });
 });
