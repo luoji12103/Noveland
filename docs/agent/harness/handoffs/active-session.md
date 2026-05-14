@@ -3,7 +3,7 @@
 - Date: 2026-05-14T00:00:00Z
 - Branch: main
 - Objective: Continue v0.5 Authoring & Import Studio with Phase 7 Asset Import & Matching.
-- Status: v0.5 Phase 6 Memory Migration Pipeline is implemented, full-gate validated, and fast-forward merged to local `main`.
+- Status: v0.5 Phase 7 Asset Import & Matching has a docs-only planning checkpoint and is ready for implementation.
 
 ## Current Context
 
@@ -37,7 +37,7 @@
 
 ## Required Next Steps
 
-- Start Phase 7 with a docs-only planning checkpoint for Asset Import & Matching from clean local `main`.
+- Start Phase 7 implementation from clean local `main` on `feat/asset-import-matching`.
 - Phase 7 should implement only `asset-import-matching` scope and reuse Phase 1 import proposals plus media/visual/speech records.
 - Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
 - Do not push unless explicitly requested.
@@ -64,3 +64,4 @@
 - v0.5 Phase 6 targeted tests passed: `18 passed`.
 - v0.5 Phase 6 full local gate passed: backend ruff, backend mypy, backend pytest (`308 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; initial attempt timed out at the conversations e2e scene), docker compose config, `git diff --check`, and OpenSpec strict validate.
 - v0.5 Phase 6 fast-forward merge to local `main` completed.
+- v0.5 Phase 7 planning checkpoint is docs-only and should be validated with OpenSpec strict validate plus `git diff --check`.

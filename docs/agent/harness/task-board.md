@@ -128,10 +128,11 @@
 - v0.5 Authoring & Import Studio Phase 6 targeted tests
 - v0.5 Authoring & Import Studio Phase 6 full local gate
 - v0.5 Authoring & Import Studio Phase 6 fast-forward merge
+- v0.5 Authoring & Import Studio Phase 7 planning checkpoint
 
 ## Upcoming Mainline
-- v0.5 Phase 7 should start with a docs-only planning checkpoint for Asset
-  Import & Matching from clean local `main`.
+- v0.5 Phase 7 should implement Asset Import & Matching on
+  `feat/asset-import-matching`.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

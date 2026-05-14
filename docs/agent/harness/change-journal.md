@@ -1340,3 +1340,14 @@
 - Tests added/updated: N/A.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.
+
+## v0.5 Asset Import & Matching plan entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Final implementation plan for v0.5 Authoring & Import Studio Phase 7.
+- Summary: Added the v0.5.7 plan for deterministic asset matching proposals that connect imported media-backed source assets to sprite, background, CG, and voice-reference candidates. The plan explicitly avoids provider-backed matching, migrations unless required, Web UI, new upload/media delivery paths, automatic visual/speech binding apply, direct canonical mutation, world events, and new `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.5.7-asset-import-matching-plan.md`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implementation should start on `feat/asset-import-matching` after this docs-only checkpoint is committed.
