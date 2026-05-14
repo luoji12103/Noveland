@@ -1216,3 +1216,15 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
 - Follow-up notes: Implementation should start on `feat/character-relationship-extractor` after this docs-only checkpoint is committed.
+
+## v0.5 Character & Relationship Extractor implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/character-relationship-extractor
+- Scope: Backend-only deterministic character and relationship extractor for v0.5 Authoring & Import Studio Phase 3.
+- Summary: Added a deterministic authoring extractor that converts existing source fragment excerpts and optional Phase 2 dialogue speaker proposals into traceable Phase 1 authoring proposals for characters, aliases, factions, identities, relationships, and emotional baselines. Added `extract-characters` on the dedicated authoring router. The implementation does not call providers, does not add migrations, does not mutate canonical agents/relationships/memory/world-bible records, does not write world events, and does not add Web UI or `worlds.py` routes.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/character_extractor.py`, `/backend/packages/authoring/src/noveland/authoring/contracts.py`, `/backend/packages/authoring/src/noveland/authoring/service.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, `/backend/tests/test_workspace_imports.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Authoring service extractor coverage, authoring API extractor endpoint coverage, and workspace import coverage.
+- Docs updated: OpenSpec Phase 3 task status, project index, change journal, and task board.
+- Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_workspace_imports.py tests/test_alembic_config.py` (`12 passed`). Full local gate passed with backend ruff, backend mypy (`234 source files`), backend pytest (`302 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and `openspec validate v0-5-authoring-import-studio --strict --json`.
+- Follow-up notes: Fast-forward merge Phase 3 to local `main`, then update merge bookkeeping before starting Phase 4. Do not push unless explicitly requested.

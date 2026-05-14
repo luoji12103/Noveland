@@ -77,6 +77,10 @@ class AuthoringScriptParserMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringCharacterExtractorMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -423,6 +427,32 @@ class AuthoringScriptParseResult(_FrozenContract):
     route_count: int
     event_count: int
     unresolved_speaker_count: int
+
+
+class AuthoringCharacterExtractRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    source_fragment_ids: tuple[uuid.UUID, ...]
+    extractor_mode: AuthoringCharacterExtractorMode = (
+        AuthoringCharacterExtractorMode.DETERMINISTIC
+    )
+    include_dialogue_proposals: bool = True
+
+    @model_validator(mode="after")
+    def validate_fragments(self) -> AuthoringCharacterExtractRequest:
+        if not self.source_fragment_ids:
+            raise ValueError("source_fragment_ids is required")
+        return self
+
+
+class AuthoringCharacterExtractResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    character_count: int
+    relationship_count: int
+    alias_count: int
+    faction_count: int
+    identity_count: int
+    emotional_baseline_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

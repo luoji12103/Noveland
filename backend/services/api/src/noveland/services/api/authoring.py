@@ -8,6 +8,8 @@ from noveland.auth import AuthenticatedSubject
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringApplyResult,
+    AuthoringCharacterExtractRequest,
+    AuthoringCharacterExtractResult,
     AuthoringImportRunCreate,
     AuthoringImportRunKind,
     AuthoringImportRunRead,
@@ -307,6 +309,27 @@ def parse_authoring_script(
 ) -> AuthoringScriptParseResult:
     try:
         return AuthoringService(db_session).parse_script(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/extract-characters",
+    response_model=AuthoringCharacterExtractResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def extract_authoring_characters(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringCharacterExtractRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringCharacterExtractResult:
+    try:
+        return AuthoringService(db_session).extract_characters(world_id, run_id, request)
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

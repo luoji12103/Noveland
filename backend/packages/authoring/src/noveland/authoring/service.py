@@ -3,9 +3,19 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from noveland.authoring.character_extractor import (
+    ExtractedCharacterCandidate,
+    dedupe_candidates,
+    extract_dialogue_speaker_candidate,
+)
+from noveland.authoring.character_extractor import (
+    extract_fragment as extract_character_fragment,
+)
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringApplyResult,
+    AuthoringCharacterExtractRequest,
+    AuthoringCharacterExtractResult,
     AuthoringImportRunCreate,
     AuthoringImportRunKind,
     AuthoringImportRunRead,
@@ -388,6 +398,109 @@ class AuthoringService:
             unresolved_speaker_count=int(run.summary_json["unresolved_speaker_count"]),
         )
 
+    def extract_characters(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringCharacterExtractRequest,
+    ) -> AuthoringCharacterExtractResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "character extraction run must belong to request worldline"
+            )
+
+        candidates: list[ExtractedCharacterCandidate] = []
+        for fragment_id in request.source_fragment_ids:
+            fragment = self._fragment_required(world_id, fragment_id)
+            if fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source fragment must belong to extraction worldline"
+                )
+            candidates.extend(
+                extract_character_fragment(
+                    source_fragment_id=fragment.id,
+                    excerpt_text=fragment.excerpt_text,
+                    extractor_mode=request.extractor_mode.value,
+                )
+            )
+
+        if request.include_dialogue_proposals:
+            candidates.extend(
+                self._dialogue_speaker_candidates(
+                    run.id,
+                    extractor_mode=request.extractor_mode.value,
+                    priority_offset=len(candidates) + 1,
+                )
+            )
+
+        candidates = dedupe_candidates(candidates)
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "character_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "character"
+            ),
+            "relationship_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "relationship"
+            ),
+            "alias_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "alias"
+            ),
+            "faction_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "faction"
+            ),
+            "identity_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "identity"
+            ),
+            "emotional_baseline_count": sum(
+                1
+                for candidate in candidates
+                if candidate.candidate_kind == "emotional_baseline"
+            ),
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "character_extractor_mode": request.extractor_mode.value,
+            "include_dialogue_proposals": request.include_dialogue_proposals,
+            "provider_execution": False,
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringCharacterExtractResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=summary_counts["created_proposal_count"],
+            character_count=summary_counts["character_count"],
+            relationship_count=summary_counts["relationship_count"],
+            alias_count=summary_counts["alias_count"],
+            faction_count=summary_counts["faction_count"],
+            identity_count=summary_counts["identity_count"],
+            emotional_baseline_count=summary_counts["emotional_baseline_count"],
+        )
+
     def review_proposal(
         self,
         world_id: uuid.UUID,
@@ -568,6 +681,37 @@ class AuthoringService:
             raise AuthoringValidationError("one or more proposals were not found")
         order = {proposal_id: index for index, proposal_id in enumerate(proposal_ids)}
         return sorted(proposals, key=lambda proposal: order[proposal.id])
+
+    def _dialogue_speaker_candidates(
+        self,
+        run_id: uuid.UUID,
+        *,
+        extractor_mode: str,
+        priority_offset: int,
+    ) -> list[ExtractedCharacterCandidate]:
+        proposals = self._session.scalars(
+            select(AuthoringImportProposal)
+            .where(
+                AuthoringImportProposal.run_id == run_id,
+                AuthoringImportProposal.proposal_kind == AuthoringProposalKind.DIALOGUE.value,
+                AuthoringImportProposal.target_ref_kind == "dialogue_candidate",
+            )
+            .order_by(AuthoringImportProposal.priority, AuthoringImportProposal.created_at)
+        ).all()
+        candidates: list[ExtractedCharacterCandidate] = []
+        for index, proposal in enumerate(proposals):
+            speaker_label = proposal.proposed_payload_json.get("speaker_label")
+            if not isinstance(speaker_label, str) or not speaker_label.strip():
+                continue
+            candidates.append(
+                extract_dialogue_speaker_candidate(
+                    source_fragment_id=proposal.source_fragment_id,
+                    speaker_label=speaker_label,
+                    extractor_mode=extractor_mode,
+                    priority=priority_offset + index,
+                )
+            )
+        return candidates
 
     def _add_trace(
         self,

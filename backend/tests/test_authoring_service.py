@@ -8,6 +8,7 @@ from noveland.auth.models import User
 from noveland.authoring import AuthoringService
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
+    AuthoringCharacterExtractRequest,
     AuthoringImportRunCreate,
     AuthoringPreviewRequest,
     AuthoringProposalDraft,
@@ -218,6 +219,114 @@ def test_script_parser_creates_traceable_proposals_from_excerpt_text() -> None:
     )
     assert all(proposal.status == "proposed" for proposal in result.run.proposals)
     assert trace_count == 7
+
+
+def test_character_extractor_creates_traceable_character_relationship_proposals() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="character-sheet",
+                display_name="Character Sheet",
+                source_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+                source_label="characters.md",
+            )
+        )
+        character_fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="characters",
+                fragment_kind=AuthoringSourceFragmentKind.CHARACTER,
+                sequence=1,
+                excerpt_text=(
+                    "character: Alice\n"
+                    "character: Alice\n"
+                    "alias: Alice -> Al\n"
+                    "Alice trusts Bob\n"
+                    "faction: Student Council\n"
+                    "identity: Alice = prefect\n"
+                    "emotion: Alice = guarded\n"
+                ),
+            )
+        )
+        dialogue_fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="dialogue",
+                fragment_kind=AuthoringSourceFragmentKind.DIALOGUE,
+                sequence=2,
+                excerpt_text="Hero: hello",
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        service.parse_script(
+            graph.world_id,
+            run.id,
+            AuthoringScriptParseRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(dialogue_fragment.id,),
+            ),
+        )
+        result = service.extract_characters(
+            graph.world_id,
+            run.id,
+            AuthoringCharacterExtractRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(character_fragment.id,),
+                include_dialogue_proposals=True,
+            ),
+        )
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 7
+    assert result.character_count == 2
+    assert result.relationship_count == 1
+    assert result.alias_count == 1
+    assert result.faction_count == 1
+    assert result.identity_count == 1
+    assert result.emotional_baseline_count == 1
+    assert result.run.summary_json["character_extractor_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    character_proposals = [
+        proposal
+        for proposal in result.run.proposals
+        if proposal.target_ref_kind == "character_candidate"
+    ]
+    character_labels = {
+        proposal.proposed_payload_json["character_label"] for proposal in character_proposals
+    }
+    assert character_labels == {
+        "Alice",
+        "hero",
+    }
+    assert all(proposal.status == "proposed" for proposal in result.run.proposals)
+    assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:

@@ -222,6 +222,83 @@ def test_authoring_api_script_parse_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_character_extract_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "characters",
+            "display_name": "Characters",
+            "source_kind": "character_sheet",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "character_sheet",
+            "source_label": "characters.md",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "characters",
+            "fragment_kind": "character",
+            "sequence": 1,
+            "excerpt_text": (
+                "character: Alice\n"
+                "alias: Alice -> Al\n"
+                "Alice trusts Bob\n"
+                "faction: Student Council\n"
+                "identity: Alice = prefect\n"
+                "emotion: Alice = guarded\n"
+            ),
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    extracted = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/extract-characters",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+        },
+    )
+
+    assert extracted.status_code == 201
+    assert extracted.json()["created_proposal_count"] == 6
+    assert extracted.json()["character_count"] == 1
+    assert extracted.json()["relationship_count"] == 1
+    assert extracted.json()["alias_count"] == 1
+    assert extracted.json()["faction_count"] == 1
+    assert extracted.json()["identity_count"] == 1
+    assert extracted.json()["emotional_baseline_count"] == 1
+    assert extracted.json()["run"]["summary_json"]["provider_execution"] is False
+    assert all(
+        proposal["source_fragment_id"] == fragment.json()["id"]
+        for proposal in extracted.json()["run"]["proposals"]
+    )
+    assert "storage_uri" not in _json_text(extracted.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 6
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
