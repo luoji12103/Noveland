@@ -1036,3 +1036,14 @@
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Verification: Targeted tests passed with `npm run test -- speech-admin speech workspace-shell` (3 files, 7 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`102 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: No backend speech behavior, migrations, realtime voice, streaming, local voice server deployment, automatic STT memory writes, public reader audio delivery, provider adapter changes, daemon behavior, or `worlds.py` change was added.
+
+## v0.4 Speech Admin Console merge entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.4 Operator/Admin UX Phase 5.
+- Summary: Fast-forward merged `feat/speech-admin-console` into local `main` after the targeted tests and full local gate passed. OpenSpec Phase 5 tasks now mark the full gate, fast-forward merge, and harness update complete, and the active handoff points to Phase 6 Invocation Ledger Browser planning.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 5 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 6 from clean local `main`; do not push unless explicitly requested.

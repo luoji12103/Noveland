@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: feat/speech-admin-console
-- Objective: Continue v0.4 Operator/Admin UX after Phase 4 Visual Asset Admin Console.
-- Status: Phase 5 Speech Admin Console implementation is complete on `feat/speech-admin-console`; targeted tests and full local gate passed. Implementation commit and fast-forward merge are next.
+- Branch: main
+- Objective: Continue v0.4 Operator/Admin UX after Phase 5 Speech Admin Console.
+- Status: Phase 5 Speech Admin Console is implemented and fast-forward merged to local `main`; Phase 6 Invocation Ledger Browser planning is next.
 
 ## Current Context
 
@@ -32,7 +32,7 @@
 
 ## Required Next Steps
 
-- Commit `feat/speech-admin-console`, fast-forward merge to local `main`, then record Phase 5 merge bookkeeping and continue to Phase 6 Invocation Ledger Browser planning from clean local `main`.
+- Write the Phase 6 Invocation Ledger Browser planning checkpoint on clean local `main`, then implement `feat/invocation-ledger-browser` if no blocker appears.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
