@@ -65,8 +65,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 - [x] Add or update focused tests.
 - [x] Run targeted tests.
 - [x] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Fast-forward merge to local main.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 7 — Multimodal Diagnostics Dashboard
 

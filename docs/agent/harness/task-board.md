@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser fast-forward merge
+- v0.4 Operator/Admin UX Phase 7: Multimodal Diagnostics Dashboard planning checkpoint
 
 ## Blocked
 - None
@@ -91,6 +91,7 @@
 - v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser planning checkpoint
 - v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser implementation
 - v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser full local gate
+- v0.4 Operator/Admin UX Phase 6: Invocation Ledger Browser fast-forward merge
 
 ## Upcoming Mainline
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract

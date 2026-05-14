@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: feat/invocation-ledger-browser
-- Objective: Continue v0.4 Operator/Admin UX after Phase 5 Speech Admin Console.
-- Status: Phase 6 Invocation Ledger Browser implementation is complete on `feat/invocation-ledger-browser`; targeted tests and full local gate passed. Implementation commit and fast-forward merge are next.
+- Branch: main
+- Objective: Continue v0.4 Operator/Admin UX after Phase 6 Invocation Ledger Browser.
+- Status: Phase 6 Invocation Ledger Browser is implemented and fast-forward merged to local `main`; Phase 7 Multimodal Diagnostics Dashboard planning is next.
 
 ## Current Context
 
@@ -33,7 +33,7 @@
 
 ## Required Next Steps
 
-- Commit `feat/invocation-ledger-browser`, fast-forward merge to local `main`, then record Phase 6 merge bookkeeping and continue to Phase 7 Multimodal Diagnostics Dashboard planning from clean local `main`.
+- Write the Phase 7 Multimodal Diagnostics Dashboard planning checkpoint on clean local `main`, then implement `feat/multimodal-diagnostics-dashboard` if no blocker appears.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

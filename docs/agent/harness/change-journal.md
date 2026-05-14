@@ -1070,3 +1070,14 @@
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Verification: Targeted tests passed with `npm run test -- invocation-ledger invocation workspace-shell` (3 files, 6 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`107 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: No backend invocation behavior, migrations, external tracing export, reader/member raw prompt exposure, provider execution changes, daemon behavior, or `worlds.py` change was added.
+
+## v0.4 Invocation Ledger Browser merge entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.4 Operator/Admin UX Phase 6.
+- Summary: Fast-forward merged `feat/invocation-ledger-browser` into local `main` after the targeted tests and full local gate passed. OpenSpec Phase 6 tasks now mark the full gate, fast-forward merge, and harness update complete, and the active handoff points to Phase 7 Multimodal Diagnostics Dashboard planning.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 6 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.
