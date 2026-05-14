@@ -81,6 +81,10 @@ class AuthoringCharacterExtractorMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringLoreExtractorMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -453,6 +457,30 @@ class AuthoringCharacterExtractResult(_FrozenContract):
     faction_count: int
     identity_count: int
     emotional_baseline_count: int
+
+
+class AuthoringLoreExtractRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    source_fragment_ids: tuple[uuid.UUID, ...]
+    extractor_mode: AuthoringLoreExtractorMode = AuthoringLoreExtractorMode.DETERMINISTIC
+
+    @model_validator(mode="after")
+    def validate_fragments(self) -> AuthoringLoreExtractRequest:
+        if not self.source_fragment_ids:
+            raise ValueError("source_fragment_ids is required")
+        return self
+
+
+class AuthoringLoreExtractResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    lore_count: int
+    location_count: int
+    organization_count: int
+    world_rule_count: int
+    secret_count: int
+    knowledge_boundary_count: int
+    uncertain_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

@@ -43,6 +43,18 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringCharacterExtractorMode",
     ),
+    "AuthoringLoreExtractRequest": (
+        "noveland.authoring.contracts",
+        "AuthoringLoreExtractRequest",
+    ),
+    "AuthoringLoreExtractResult": (
+        "noveland.authoring.contracts",
+        "AuthoringLoreExtractResult",
+    ),
+    "AuthoringLoreExtractorMode": (
+        "noveland.authoring.contracts",
+        "AuthoringLoreExtractorMode",
+    ),
     "AuthoringScriptParseRequest": (
         "noveland.authoring.contracts",
         "AuthoringScriptParseRequest",

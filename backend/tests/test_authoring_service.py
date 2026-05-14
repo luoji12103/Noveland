@@ -10,6 +10,7 @@ from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringCharacterExtractRequest,
     AuthoringImportRunCreate,
+    AuthoringLoreExtractRequest,
     AuthoringPreviewRequest,
     AuthoringProposalDraft,
     AuthoringProposalKind,
@@ -326,6 +327,104 @@ def test_character_extractor_creates_traceable_character_relationship_proposals(
         "hero",
     }
     assert all(proposal.status == "proposed" for proposal in result.run.proposals)
+    assert "storage_uri" not in str(result.run.model_dump()).lower()
+
+
+def test_lore_extractor_creates_proposal_only_lore_candidates() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="lore",
+                display_name="Lore",
+                source_kind=AuthoringSourceAssetKind.LORE,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.LORE,
+                source_label="lore.md",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="lore",
+                fragment_kind=AuthoringSourceFragmentKind.LORE,
+                sequence=1,
+                excerpt_text=(
+                    "lore: Magic exists\n"
+                    "canon: The city sleeps at noon\n"
+                    "inferred: Alice distrusts the council\n"
+                    "uncertain: The old gate may be alive\n"
+                    "location: Old Gate\n"
+                    "organization: Student Council\n"
+                    "world rule: Wishes require payment\n"
+                    "secret: Alice is heir\n"
+                    "knowledge: Alice -> Alice is heir\n"
+                    "hidden from: Bob -> Alice is heir\n"
+                ),
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.extract_lore(
+            graph.world_id,
+            run.id,
+            AuthoringLoreExtractRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(fragment.id,),
+            ),
+        )
+        first_lore = result.run.proposals[0]
+        service.review_proposal(
+            graph.world_id,
+            first_lore.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        apply_result = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=(first_lore.id,),
+            ),
+        )
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 10
+    assert result.lore_count == 4
+    assert result.location_count == 1
+    assert result.organization_count == 1
+    assert result.world_rule_count == 1
+    assert result.secret_count == 1
+    assert result.knowledge_boundary_count == 2
+    assert result.uncertain_count == 1
+    assert result.run.summary_json["lore_extractor_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    assert apply_result.applied_proposals == []
+    assert apply_result.blocked_proposals[0].applied_ref_json["blocked_reason"] == (
+        "unsupported_proposal_kind"
+    )
     assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 

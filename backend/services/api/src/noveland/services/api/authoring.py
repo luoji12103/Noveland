@@ -13,6 +13,8 @@ from noveland.authoring.contracts import (
     AuthoringImportRunCreate,
     AuthoringImportRunKind,
     AuthoringImportRunRead,
+    AuthoringLoreExtractRequest,
+    AuthoringLoreExtractResult,
     AuthoringPreviewRequest,
     AuthoringPreviewResult,
     AuthoringProposalCreate,
@@ -330,6 +332,27 @@ def extract_authoring_characters(
 ) -> AuthoringCharacterExtractResult:
     try:
         return AuthoringService(db_session).extract_characters(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/extract-lore",
+    response_model=AuthoringLoreExtractResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def extract_authoring_lore(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringLoreExtractRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringLoreExtractResult:
+    try:
+        return AuthoringService(db_session).extract_lore(world_id, run_id, request)
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

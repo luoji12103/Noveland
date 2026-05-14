@@ -20,6 +20,8 @@ from noveland.authoring.contracts import (
     AuthoringImportRunKind,
     AuthoringImportRunRead,
     AuthoringImportRunStatus,
+    AuthoringLoreExtractRequest,
+    AuthoringLoreExtractResult,
     AuthoringPreviewRequest,
     AuthoringPreviewResult,
     AuthoringProposalCreate,
@@ -42,6 +44,15 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
     AuthoringTraceKind,
+)
+from noveland.authoring.lore_extractor import (
+    ExtractedLoreCandidate,
+)
+from noveland.authoring.lore_extractor import (
+    dedupe_candidates as dedupe_lore_candidates,
+)
+from noveland.authoring.lore_extractor import (
+    extract_fragment as extract_lore_fragment,
 )
 from noveland.authoring.models import (
     AuthoringImportProposal,
@@ -499,6 +510,105 @@ class AuthoringService:
             faction_count=summary_counts["faction_count"],
             identity_count=summary_counts["identity_count"],
             emotional_baseline_count=summary_counts["emotional_baseline_count"],
+        )
+
+    def extract_lore(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringLoreExtractRequest,
+    ) -> AuthoringLoreExtractResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "lore extraction run must belong to request worldline"
+            )
+
+        candidates: list[ExtractedLoreCandidate] = []
+        for fragment_id in request.source_fragment_ids:
+            fragment = self._fragment_required(world_id, fragment_id)
+            if fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source fragment must belong to extraction worldline"
+                )
+            candidates.extend(
+                extract_lore_fragment(
+                    source_fragment_id=fragment.id,
+                    excerpt_text=fragment.excerpt_text,
+                    extractor_mode=request.extractor_mode.value,
+                )
+            )
+
+        candidates = dedupe_lore_candidates(candidates)
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "lore_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "lore"
+            ),
+            "location_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "location"
+            ),
+            "organization_count": sum(
+                1
+                for candidate in candidates
+                if candidate.candidate_kind == "organization"
+            ),
+            "world_rule_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "world_rule"
+            ),
+            "secret_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "secret"
+            ),
+            "knowledge_boundary_count": sum(
+                1
+                for candidate in candidates
+                if candidate.candidate_kind == "knowledge_boundary"
+            ),
+            "uncertain_count": sum(
+                1 for candidate in candidates if candidate.classification == "uncertain"
+            ),
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "lore_extractor_mode": request.extractor_mode.value,
+            "provider_execution": False,
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringLoreExtractResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=summary_counts["created_proposal_count"],
+            lore_count=summary_counts["lore_count"],
+            location_count=summary_counts["location_count"],
+            organization_count=summary_counts["organization_count"],
+            world_rule_count=summary_counts["world_rule_count"],
+            secret_count=summary_counts["secret_count"],
+            knowledge_boundary_count=summary_counts["knowledge_boundary_count"],
+            uncertain_count=summary_counts["uncertain_count"],
         )
 
     def review_proposal(

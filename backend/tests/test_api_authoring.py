@@ -299,6 +299,85 @@ def test_authoring_api_character_extract_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_lore_extract_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "lore",
+            "display_name": "Lore",
+            "source_kind": "lore",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "lore",
+            "source_label": "lore.md",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "lore",
+            "fragment_kind": "lore",
+            "sequence": 1,
+            "excerpt_text": (
+                "canon: The city sleeps at noon\n"
+                "uncertain: The gate may be alive\n"
+                "location: Old Gate\n"
+                "organization: Student Council\n"
+                "rule: Wishes require payment\n"
+                "secret: Alice is heir\n"
+                "knowledge: Alice -> Alice is heir\n"
+            ),
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    extracted = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/extract-lore",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+        },
+    )
+
+    assert extracted.status_code == 201
+    assert extracted.json()["created_proposal_count"] == 7
+    assert extracted.json()["lore_count"] == 2
+    assert extracted.json()["location_count"] == 1
+    assert extracted.json()["organization_count"] == 1
+    assert extracted.json()["world_rule_count"] == 1
+    assert extracted.json()["secret_count"] == 1
+    assert extracted.json()["knowledge_boundary_count"] == 1
+    assert extracted.json()["uncertain_count"] == 1
+    assert extracted.json()["run"]["summary_json"]["provider_execution"] is False
+    assert all(
+        proposal["source_fragment_id"] == fragment.json()["id"]
+        for proposal in extracted.json()["run"]["proposals"]
+    )
+    assert "storage_uri" not in _json_text(extracted.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 7
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
