@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-14T00:00:00Z
-- Branch: feat/asset-import-matching
-- Objective: Complete v0.5 Authoring & Import Studio Phase 7 merge bookkeeping, then continue to Phase 8 Authoring Regression Fixture from clean local main.
-- Status: v0.5 Phase 7 Asset Import & Matching implementation and full local gate are complete on the feature branch.
+- Branch: main
+- Objective: Continue v0.5 Authoring & Import Studio with Phase 8 Authoring Regression Fixture.
+- Status: v0.5 Phase 7 Asset Import & Matching is implemented, full-gate validated, and fast-forward merged to local `main`.
 
 ## Current Context
 
@@ -20,7 +20,7 @@
 - v0.5 Phase 4 is complete: deterministic lore extractor creates proposal-only lore, location, organization, world-rule, secret, and knowledge-boundary candidates without provider calls or canonical mutation.
 - v0.5 Phase 5 is complete: deterministic conflict review creates reviewable conflict report proposals without provider calls, automatic resolution, or canonical mutation.
 - v0.5 Phase 6 is complete: deterministic memory migration creates reviewable fact, episodic, relationship, preference, and style memory proposals without provider calls, memory writes, or canonical mutation.
-- v0.5 Phase 7 is implemented on `feat/asset-import-matching`: deterministic asset matching creates reviewable sprite, background, CG, and voice-reference proposals without provider calls, media jobs, visual/speech binding writes, or canonical mutation.
+- v0.5 Phase 7 is complete: deterministic asset matching creates reviewable sprite, background, CG, and voice-reference proposals without provider calls, media jobs, visual/speech binding writes, or canonical mutation.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -38,8 +38,8 @@
 
 ## Required Next Steps
 
-- Fast-forward merge `feat/asset-import-matching` to local `main` after committing the feature branch.
-- Record Phase 7 merge bookkeeping, then start Phase 8 Authoring Regression Fixture from clean local `main` if no blocker remains.
+- Start Phase 8 with a docs-only planning checkpoint for Authoring Regression Fixture from clean local `main`.
+- Phase 8 should implement only `authoring-regression-fixture` scope and reuse existing test fixture patterns plus Phase 1-7 authoring flows.
 - Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
 - Do not push unless explicitly requested.
 
@@ -68,3 +68,4 @@
 - v0.5 Phase 7 planning checkpoint is docs-only and should be validated with OpenSpec strict validate plus `git diff --check`.
 - v0.5 Phase 7 targeted tests passed: `21 passed`.
 - v0.5 Phase 7 full local gate passed: backend ruff, backend mypy, backend pytest (`311 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
+- v0.5 Phase 7 fast-forward merge to local `main` completed.

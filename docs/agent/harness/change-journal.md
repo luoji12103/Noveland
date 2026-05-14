@@ -1362,3 +1362,14 @@
 - Tests added/updated: Authoring service asset matching coverage, cross-worldline rejection coverage, hidden-media suppression coverage, authoring API asset matching endpoint coverage, and workspace import coverage.
 - Docs updated: OpenSpec tasks, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Phase 7 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then continue with Phase 8 Authoring Regression Fixture.
+
+## v0.5 Asset Import & Matching merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.5 Authoring & Import Studio Phase 7.
+- Summary: Fast-forward merged `feat/asset-import-matching` into local `main`, marked Phase 7 complete in OpenSpec tasks, and moved harness handoff state to Phase 8 Authoring Regression Fixture.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 8 from clean local `main`; do not push unless explicitly requested.
