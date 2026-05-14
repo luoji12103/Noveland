@@ -116,6 +116,10 @@ import type {
   InvocationTag,
   PromptSnapshot,
 } from "@/lib/worlds/invocations";
+import type {
+  MultimodalDiagnosticsResult,
+  MultimodalEvalRun,
+} from "@/lib/worlds/diagnostics";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -354,6 +358,19 @@ export type InvocationLedgerAdminData = {
   selectedInvocation: InvocationRecord | null;
   tagsByInvocationId: Record<string, InvocationTag[]>;
   promptSnapshot: PromptSnapshot | null;
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
+  loadError: string | null;
+};
+
+export type MultimodalDiagnosticsAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  worldlines: Worldline[];
+  selectedWorldlineId: string | null;
+  diagnostics: MultimodalDiagnosticsResult | null;
+  evalRuns: MultimodalEvalRun[];
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -1515,6 +1532,72 @@ export async function getInvocationLedgerAdminData(
   }
 }
 
+export async function getMultimodalDiagnosticsAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<MultimodalDiagnosticsAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyMultimodalDiagnosticsAdminData(
+        worlds,
+        null,
+        isPlatformAdmin,
+        "Unable to load selected world.",
+      );
+    }
+    const [memberships, worldlines] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+    ]);
+    const selectedWorldlineId =
+      worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
+    const worldlineQuery =
+      selectedWorldlineId === null ? "" : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}`;
+    const runQuery =
+      selectedWorldlineId === null
+        ? "?limit=20"
+        : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}&limit=20`;
+    const [diagnostics, evalRuns] =
+      selectedWorldlineId === null
+        ? [null, []]
+        : await Promise.all([
+            apiFetchOptional<MultimodalDiagnosticsResult>(
+              `/worlds/${worldId}/diagnostics/multimodal${worldlineQuery}`,
+              cookies,
+            ),
+            apiFetchOptional<MultimodalEvalRun[]>(
+              `/worlds/${worldId}/multimodal-evals${runQuery}`,
+              cookies,
+            ),
+          ]);
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      worldlines,
+      selectedWorldlineId,
+      diagnostics,
+      evalRuns: evalRuns ?? [],
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyMultimodalDiagnosticsAdminData(
+      [],
+      null,
+      isPlatformAdmin,
+      "Unable to load multimodal diagnostics.",
+    );
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1859,6 +1942,26 @@ function emptyInvocationLedgerAdminData(
     selectedInvocation: null,
     tagsByInvocationId: {},
     promptSnapshot: null,
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
+    loadError,
+  };
+}
+
+function emptyMultimodalDiagnosticsAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): MultimodalDiagnosticsAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    worldlines: [],
+    selectedWorldlineId: null,
+    diagnostics: null,
+    evalRuns: [],
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,

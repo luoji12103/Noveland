@@ -56,6 +56,7 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
+- `web/app/worlds/[worldId]/diagnostics/` — world-scoped multimodal diagnostics dashboard
 - `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
 - `web/app/worlds/[worldId]/invocations/` — world-scoped invocation ledger browser
 - `web/app/worlds/[worldId]/providers/` — world-scoped provider integration admin console
@@ -84,6 +85,7 @@ Fast orientation for a new coding session.
   - `web/features/admin/admin-route-guard.ts` — shared platform-admin guard helper for admin route entrypoints
   - `web/features/admin/invocation-ledger-admin.tsx` — world-scoped model invocation ledger, prompt snapshot, tag, redaction, visibility, and retention browser
   - `web/features/admin/media-admin.tsx` — world-scoped media asset/object/job/reference admin console
+  - `web/features/admin/multimodal-diagnostics-admin.tsx` — world-scoped multimodal diagnostic finding, safe evidence-ref, metric, and eval-run dashboard
   - `web/features/admin/provider-integration-admin.tsx` — world-scoped Phase 5+ provider integration admin console
   - `web/features/admin/speech-admin.tsx` — world-scoped voice profile, binding, transcript, and speech test console
   - `web/features/admin/visual-admin.tsx` — world-scoped strict-worldline sprite/background resolver and compose admin console
@@ -101,6 +103,7 @@ Fast orientation for a new coding session.
   - `web/lib/realtime/` — same-origin streaming proxy helper
   - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
+  - `web/lib/worlds/diagnostics.ts` — multimodal diagnostics and eval-run client helpers
   - `web/lib/worlds/invocations.ts` — model invocation ledger, prompt snapshot, tag, and redaction client helpers
   - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers
   - `web/lib/worlds/provider-integrations.ts` — provider integration client helpers for `/worlds/{world_id}/providers`

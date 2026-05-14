@@ -71,10 +71,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 7 — Multimodal Diagnostics Dashboard
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `multimodal-diagnostics-dashboard` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `multimodal-diagnostics-dashboard` scope only.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

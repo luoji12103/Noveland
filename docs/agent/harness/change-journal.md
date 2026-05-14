@@ -1092,3 +1092,15 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/multimodal-diagnostics-dashboard` after this docs-only work is committed on `main`.
+
+## v0.4 Multimodal Diagnostics Dashboard implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/multimodal-diagnostics-dashboard
+- Scope: World-scoped Web admin dashboard for Phase 12 multimodal diagnostics, findings, safe evidence references, metrics, and eval runs.
+- Summary: Added `/worlds/{worldId}/diagnostics`, multimodal diagnostics client helpers, server-side diagnostics admin data loader, and a dashboard component for current diagnostic status, blocker/warning tables, recommendations, provider/media/invocation/visual/speech/event summaries, and explicit multimodal smoke eval runs through existing backend APIs.
+- Files changed: `/web/app/worlds/[worldId]/diagnostics/page.tsx`, `/web/features/admin/multimodal-diagnostics-admin.tsx`, `/web/lib/worlds/diagnostics.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Multimodal diagnostics client tests, multimodal diagnostics admin component tests, and workspace navigation test.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Verification: Targeted tests passed with `npm run test -- multimodal-diagnostics diagnostics workspace-shell` (3 files, 6 tests). Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`112 passed` after standalone rerun; initial concurrent run with `next build` timed out), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No backend diagnostic rule changes, migrations, duplicate release/eval framework, public launch gate changes, provider execution changes, daemon behavior, streaming, public reader delivery, or `worlds.py` change was added.

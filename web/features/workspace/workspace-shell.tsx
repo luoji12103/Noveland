@@ -65,6 +65,7 @@ export function WorkspaceShell({
             <Link href={`/worlds/${worldId}/visual`}>Visual</Link>
             <Link href={`/worlds/${worldId}/speech`}>Speech</Link>
             <Link href={`/worlds/${worldId}/invocations`}>Invocations</Link>
+            <Link href={`/worlds/${worldId}/diagnostics`}>Diagnostics</Link>
             <Link href={`/worlds/${worldId}/narrative`}>Narrative</Link>
             <Link href={`/worlds/${worldId}/reader`}>Reader</Link>
           </>

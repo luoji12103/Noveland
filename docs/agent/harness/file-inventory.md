@@ -17,6 +17,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/agents/[agentId]/`
 - `web/app/worlds/[worldId]/conversations/`
 - `web/app/worlds/[worldId]/conversations/[conversationId]/`
+- `web/app/worlds/[worldId]/diagnostics/`
 - `web/app/worlds/[worldId]/invocations/`
 - `web/app/worlds/[worldId]/media/`
 - `web/app/worlds/[worldId]/providers/`
@@ -54,6 +55,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/invocation-ledger-admin.test.tsx`
 - `web/features/admin/invocation-ledger-admin.tsx`
 - `web/features/admin/media-admin.tsx`
+- `web/features/admin/multimodal-diagnostics-admin.test.tsx`
+- `web/features/admin/multimodal-diagnostics-admin.tsx`
 - `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/provider-integration-admin.tsx`
 - `web/features/admin/speech-admin.test.tsx`
@@ -88,6 +91,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/realtime.ts`
 - `web/lib/runtime/`
 - `web/lib/worlds/`
+- `web/lib/worlds/diagnostics.test.ts`
+- `web/lib/worlds/diagnostics.ts`
 - `web/lib/worlds/invocations.test.ts`
 - `web/lib/worlds/invocations.ts`
 - `web/lib/worlds/media.ts`
