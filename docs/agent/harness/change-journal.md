@@ -1228,3 +1228,14 @@
 - Docs updated: OpenSpec Phase 3 task status, project index, change journal, and task board.
 - Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_workspace_imports.py tests/test_alembic_config.py` (`12 passed`). Full local gate passed with backend ruff, backend mypy (`234 source files`), backend pytest (`302 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and `openspec validate v0-5-authoring-import-studio --strict --json`.
 - Follow-up notes: Fast-forward merge Phase 3 to local `main`, then update merge bookkeeping before starting Phase 4. Do not push unless explicitly requested.
+
+## v0.5 Character & Relationship Extractor merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.5 Authoring & Import Studio Phase 3.
+- Summary: Fast-forward merged `feat/character-relationship-extractor` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 3 tasks now mark implementation, targeted tests, full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 3 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 4 from clean local `main`; do not push unless explicitly requested.

@@ -112,10 +112,11 @@
 - v0.5 Authoring & Import Studio Phase 3 implementation
 - v0.5 Authoring & Import Studio Phase 3 targeted tests
 - v0.5 Authoring & Import Studio Phase 3 full local gate
+- v0.5 Authoring & Import Studio Phase 3 fast-forward merge
 
 ## Upcoming Mainline
-- v0.5 Phase 3 should fast-forward merge to clean local `main`, then update
-  OpenSpec and harness bookkeeping before starting Phase 4.
+- v0.5 Phase 4 should start from clean local `main` with a docs-only planning
+  checkpoint for World Bible & Lore Extractor.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.
