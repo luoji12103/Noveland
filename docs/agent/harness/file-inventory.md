@@ -420,6 +420,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/contracts.py`
 - `backend/packages/authoring/src/noveland/authoring/models.py`
 - `backend/packages/authoring/src/noveland/authoring/service.py`
+- `backend/packages/authoring/src/noveland/authoring/asset_matching.py`
 - `backend/packages/authoring/src/noveland/authoring/parser.py`
 - `backend/packages/authoring/src/noveland/authoring/character_extractor.py`
 - `backend/packages/authoring/src/noveland/authoring/lore_extractor.py`

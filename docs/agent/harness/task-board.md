@@ -129,10 +129,14 @@
 - v0.5 Authoring & Import Studio Phase 6 full local gate
 - v0.5 Authoring & Import Studio Phase 6 fast-forward merge
 - v0.5 Authoring & Import Studio Phase 7 planning checkpoint
+- v0.5 Authoring & Import Studio Phase 7 implementation
+- v0.5 Authoring & Import Studio Phase 7 targeted tests
+- v0.5 Authoring & Import Studio Phase 7 full local gate
 
 ## Upcoming Mainline
-- v0.5 Phase 7 should implement Asset Import & Matching on
-  `feat/asset-import-matching`.
+- v0.5 Phase 7 should fast-forward merge `feat/asset-import-matching`
+  to local `main`, then start Phase 8 Authoring Regression Fixture from clean
+  `main` if no blocker remains.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

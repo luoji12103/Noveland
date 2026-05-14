@@ -93,6 +93,10 @@ class AuthoringMemoryMigrationMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringAssetMatchingMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -537,6 +541,32 @@ class AuthoringMemoryMigrateResult(_FrozenContract):
     relationship_count: int
     preference_count: int
     style_count: int
+
+
+class AuthoringAssetMatchRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    source_asset_ids: tuple[uuid.UUID, ...] = ()
+    source_fragment_ids: tuple[uuid.UUID, ...] = ()
+    matching_mode: AuthoringAssetMatchingMode = AuthoringAssetMatchingMode.DETERMINISTIC
+    include_visual_matches: bool = True
+    include_voice_matches: bool = True
+    include_cg_matches: bool = True
+
+    @model_validator(mode="after")
+    def validate_sources(self) -> AuthoringAssetMatchRequest:
+        if not self.source_asset_ids and not self.source_fragment_ids:
+            raise ValueError("source_asset_ids or source_fragment_ids is required")
+        return self
+
+
+class AuthoringAssetMatchResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    sprite_match_count: int
+    background_match_count: int
+    cg_match_count: int
+    voice_match_count: int
+    blocked_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

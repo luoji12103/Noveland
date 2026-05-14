@@ -31,6 +31,18 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringApplyRequest",
     ),
+    "AuthoringAssetMatchRequest": (
+        "noveland.authoring.contracts",
+        "AuthoringAssetMatchRequest",
+    ),
+    "AuthoringAssetMatchResult": (
+        "noveland.authoring.contracts",
+        "AuthoringAssetMatchResult",
+    ),
+    "AuthoringAssetMatchingMode": (
+        "noveland.authoring.contracts",
+        "AuthoringAssetMatchingMode",
+    ),
     "AuthoringCharacterExtractRequest": (
         "noveland.authoring.contracts",
         "AuthoringCharacterExtractRequest",

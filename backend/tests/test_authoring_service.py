@@ -8,6 +8,7 @@ from noveland.auth.models import User
 from noveland.authoring import AuthoringService
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
+    AuthoringAssetMatchRequest,
     AuthoringCharacterExtractRequest,
     AuthoringConflictReviewRequest,
     AuthoringImportRunCreate,
@@ -699,6 +700,247 @@ def test_memory_migration_creates_proposal_only_memory_candidates() -> None:
     assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 
+def test_asset_matching_creates_proposal_only_media_candidates() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    sprite_media_id = graph.media_asset_id
+    background_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="image",
+        asset_role="scene_background",
+    )
+    cg_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="image",
+        asset_role="event_cg",
+    )
+    voice_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+    hidden_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+        visibility="hidden",
+    )
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="assets",
+                display_name="Assets",
+                source_kind=AuthoringSourceAssetKind.IMAGE,
+            ),
+            actor_ref="test",
+        )
+        sprite_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=sprite_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.IMAGE,
+                source_label="alice-happy",
+                metadata_json={
+                    "character_label": "Alice",
+                    "expression_key": "happy",
+                    "pose_key": "standing",
+                    "outfit_key": "uniform",
+                },
+            )
+        )
+        background_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=background_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.IMAGE,
+                source_label="schoolyard-day",
+                metadata_json={
+                    "location_key": "schoolyard",
+                    "time_of_day": "day",
+                    "weather_key": "clear",
+                },
+            )
+        )
+        cg_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=cg_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.IMAGE,
+                source_label="opening-cg",
+                metadata_json={"cg_key": "opening", "route_key": "common"},
+            )
+        )
+        voice_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=voice_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.AUDIO,
+                source_label="alice-voice",
+                metadata_json={
+                    "speaker_label": "Alice",
+                    "voice_label": "alice-default",
+                    "style_key": "soft",
+                },
+            )
+        )
+        hidden_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=hidden_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.IMAGE,
+                source_label="hidden",
+                metadata_json={"character_label": "Hidden"},
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.match_assets(
+            graph.world_id,
+            run.id,
+            AuthoringAssetMatchRequest(
+                worldline_id=graph.worldline_id,
+                source_asset_ids=(
+                    sprite_asset.id,
+                    background_asset.id,
+                    cg_asset.id,
+                    voice_asset.id,
+                    hidden_asset.id,
+                ),
+            ),
+        )
+        first_asset_match = [
+            proposal
+            for proposal in result.run.proposals
+            if proposal.target_ref_kind == "sprite_asset_match"
+        ][0]
+        service.review_proposal(
+            graph.world_id,
+            first_asset_match.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        apply_result = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=(first_asset_match.id,),
+            ),
+        )
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 4
+    assert result.sprite_match_count == 1
+    assert result.background_match_count == 1
+    assert result.cg_match_count == 1
+    assert result.voice_match_count == 1
+    assert result.blocked_count == 1
+    assert result.run.summary_json["asset_matching_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    target_ref_kinds = {proposal.target_ref_kind for proposal in result.run.proposals}
+    assert {
+        "sprite_asset_match",
+        "background_asset_match",
+        "cg_asset_match",
+        "voice_asset_match",
+    }.issubset(target_ref_kinds)
+    assert apply_result.applied_proposals == []
+    assert apply_result.blocked_proposals[0].applied_ref_json["blocked_reason"] == (
+        "unsupported_proposal_kind"
+    )
+    assert "storage_uri" not in str(result.run.model_dump()).lower()
+
+
+def test_asset_matching_rejects_cross_worldline_source_asset() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    fork_id = _seed_fork(engine, graph.world_id, graph.worldline_id)
+    fork_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        fork_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        main_batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="main-assets",
+                display_name="Main Assets",
+            ),
+            actor_ref="test",
+        )
+        fork_batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=fork_id,
+                batch_key="fork-assets",
+                display_name="Fork Assets",
+            ),
+            actor_ref="test",
+        )
+        fork_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=fork_id,
+                batch_id=fork_batch.id,
+                media_asset_id=fork_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.IMAGE,
+                source_label="fork-sprite",
+                metadata_json={"character_label": "Fork"},
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=main_batch.id,
+            ),
+            actor_ref="test",
+        )
+        with pytest.raises(AuthoringValidationError, match="worldline"):
+            service.match_assets(
+                graph.world_id,
+                run.id,
+                AuthoringAssetMatchRequest(
+                    worldline_id=graph.worldline_id,
+                    source_asset_ids=(fork_asset.id,),
+                ),
+            )
+
+
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
@@ -849,26 +1091,49 @@ def _seed_fork(engine: Engine, world_id: uuid.UUID, parent_worldline_id: uuid.UU
     return fork_id
 
 
-def _seed_media_asset(engine: Engine, world_id: uuid.UUID, worldline_id: uuid.UUID) -> uuid.UUID:
+def _seed_media_asset(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    asset_kind: str = "document",
+    asset_role: str = "document",
+    visibility: str = "world_admin",
+) -> uuid.UUID:
     with Session(engine) as session:
-        media_asset_id = _add_media_asset(session, world_id, worldline_id)
+        media_asset_id = _add_media_asset(
+            session,
+            world_id,
+            worldline_id,
+            asset_kind=asset_kind,
+            asset_role=asset_role,
+            visibility=visibility,
+        )
         session.commit()
         return media_asset_id
 
 
-def _add_media_asset(session: Session, world_id: uuid.UUID, worldline_id: uuid.UUID) -> uuid.UUID:
+def _add_media_asset(
+    session: Session,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    asset_kind: str = "image",
+    asset_role: str = "character_sprite",
+    visibility: str = "world_admin",
+) -> uuid.UUID:
     media_asset_id = uuid.uuid4()
     session.add(
         MediaAsset(
             id=media_asset_id,
             world_id=world_id,
             worldline_id=worldline_id,
-            asset_kind="document",
-            asset_role="document",
+            asset_kind=asset_kind,
+            asset_role=asset_role,
             source_kind="manual_upload",
             status="available",
-            visibility="world_admin",
-            mime_type="text/plain",
+            visibility=visibility,
+            mime_type="image/png" if asset_kind == "image" else "audio/wav",
             checksum_sha256="a" * 64,
             created_by_actor_ref="test",
             metadata_json={},

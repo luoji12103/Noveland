@@ -20,7 +20,7 @@ from noveland.authoring.models import (
     AuthoringSourceTraceability,
 )
 from noveland.events.models import WorldEventModel
-from noveland.media.models import MediaJob
+from noveland.media.models import MediaAsset, MediaJob
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -548,6 +548,93 @@ def test_authoring_api_memory_migration_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_asset_matching_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    sprite_media_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    voice_media_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "assets",
+            "display_name": "Assets",
+            "source_kind": "image",
+        },
+    )
+    sprite_asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "media_asset_id": str(sprite_media_id),
+            "source_asset_kind": "image",
+            "source_label": "alice-happy",
+            "metadata_json": {
+                "character_label": "Alice",
+                "expression_key": "happy",
+                "pose_key": "standing",
+            },
+        },
+    )
+    voice_asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "media_asset_id": str(voice_media_id),
+            "source_asset_kind": "audio",
+            "source_label": "alice-voice",
+            "metadata_json": {"speaker_label": "Alice", "voice_label": "alice"},
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    matched = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/match-assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_ids": [sprite_asset.json()["id"], voice_asset.json()["id"]],
+        },
+    )
+
+    assert matched.status_code == 201
+    assert matched.json()["created_proposal_count"] == 2
+    assert matched.json()["sprite_match_count"] == 1
+    assert matched.json()["voice_match_count"] == 1
+    assert matched.json()["blocked_count"] == 0
+    assert matched.json()["run"]["summary_json"]["provider_execution"] is False
+    target_ref_kinds = {
+        proposal["target_ref_kind"] for proposal in matched.json()["run"]["proposals"]
+    }
+    assert {"sprite_asset_match", "voice_asset_match"}.issubset(target_ref_kinds)
+    assert "storage_uri" not in _json_text(matched.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 0
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -580,6 +667,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldMembership.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
+        cast(Table, MediaAsset.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -648,6 +736,36 @@ def _add_membership(
             )
         )
         session.commit()
+
+
+def _add_media_asset(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    asset_kind: str,
+    asset_role: str,
+) -> uuid.UUID:
+    media_asset_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaAsset(
+                id=media_asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind=asset_kind,
+                asset_role=asset_role,
+                source_kind="manual_upload",
+                status="available",
+                visibility="world_admin",
+                mime_type="image/png" if asset_kind == "image" else "audio/wav",
+                checksum_sha256="a" * 64,
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+    return media_asset_id
 
 
 def _authenticate(client: TestClient, token: str) -> None:

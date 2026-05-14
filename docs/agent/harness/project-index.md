@@ -206,6 +206,7 @@ Fast orientation for a new coding session.
   - `noveland.authoring.contracts` — v0.5 authoring source, import run, proposal, review, preview, apply, and safe JSON DTOs
   - `noveland.authoring.models` — strict-worldline source batch, source asset, source fragment, import run, proposal, review decision, and source traceability ORM models
   - `noveland.authoring.service` — authoring source registry plus proposal/review/trace-only apply service with media worldline validation and no provider execution
+  - `noveland.authoring.asset_matching` — deterministic imported media asset matcher for sprite, background, CG, and voice-reference proposal candidates
   - `noveland.authoring.parser` — deterministic script fragment parser for dialogue, scene, choice, route, and event proposal candidates
   - `noveland.authoring.character_extractor` — deterministic source fragment and dialogue-proposal extractor for character, alias, faction, identity, relationship, and emotional-baseline proposal candidates
   - `noveland.authoring.lore_extractor` — deterministic proposal-only source fragment extractor for lore, location, organization, world-rule, secret, and knowledge-boundary candidates

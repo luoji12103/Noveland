@@ -1351,3 +1351,14 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implementation should start on `feat/asset-import-matching` after this docs-only checkpoint is committed.
+
+## v0.5 Asset Import & Matching implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/asset-import-matching
+- Scope: Backend-only deterministic asset matching proposal generation for v0.5 Authoring & Import Studio Phase 7.
+- Summary: Added a deterministic asset matcher that turns imported media-backed source assets into reviewable sprite, background, CG, and voice-reference proposals. The implementation reuses Phase 1 authoring runs/proposals, validates same-worldline media assets, suppresses hidden/developer-only media, blocks unsupported canonical apply, avoids provider execution, avoids media job creation, and does not emit world events.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/{__init__,asset_matching,contracts,service}.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, `/backend/tests/test_workspace_imports.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Authoring service asset matching coverage, cross-worldline rejection coverage, hidden-media suppression coverage, authoring API asset matching endpoint coverage, and workspace import coverage.
+- Docs updated: OpenSpec tasks, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Phase 7 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then continue with Phase 8 Authoring Regression Fixture.

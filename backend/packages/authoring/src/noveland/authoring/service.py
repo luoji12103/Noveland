@@ -3,6 +3,14 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from noveland.authoring.asset_matching import (
+    AssetMatchCandidate,
+    AssetMatchInput,
+    match_asset,
+)
+from noveland.authoring.asset_matching import (
+    dedupe_candidates as dedupe_asset_match_candidates,
+)
 from noveland.authoring.character_extractor import (
     ExtractedCharacterCandidate,
     dedupe_candidates,
@@ -18,6 +26,8 @@ from noveland.authoring.conflict_review import (
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringApplyResult,
+    AuthoringAssetMatchRequest,
+    AuthoringAssetMatchResult,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterExtractResult,
     AuthoringConflictReviewRequest,
@@ -96,6 +106,7 @@ class AuthoringNotFoundError(LookupError):
 
 
 SUPPORTED_TRACE_ONLY_APPLY_KINDS = {AuthoringProposalKind.OTHER.value}
+RESTRICTED_MEDIA_VISIBILITIES = {"developer_only", "hidden"}
 
 
 class AuthoringService:
@@ -820,6 +831,94 @@ class AuthoringService:
             style_count=summary_counts["style_count"],
         )
 
+    def match_assets(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringAssetMatchRequest,
+    ) -> AuthoringAssetMatchResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError("asset match run must belong to request worldline")
+
+        match_inputs, blocked_count = self._asset_match_inputs(
+            world_id,
+            worldline_id,
+            request,
+        )
+        candidates: list[AssetMatchCandidate] = []
+        for match_input in match_inputs:
+            candidates.extend(
+                match_asset(
+                    match_input,
+                    matching_mode=request.matching_mode.value,
+                    include_visual_matches=request.include_visual_matches,
+                    include_voice_matches=request.include_voice_matches,
+                    include_cg_matches=request.include_cg_matches,
+                )
+            )
+
+        candidates = dedupe_asset_match_candidates(candidates)
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "sprite_match_count": sum(
+                1 for candidate in candidates if candidate.match_kind == "sprite"
+            ),
+            "background_match_count": sum(
+                1 for candidate in candidates if candidate.match_kind == "background"
+            ),
+            "cg_match_count": sum(
+                1 for candidate in candidates if candidate.match_kind == "cg"
+            ),
+            "voice_match_count": sum(
+                1 for candidate in candidates if candidate.match_kind == "voice"
+            ),
+            "blocked_count": blocked_count,
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "asset_matching_mode": request.matching_mode.value,
+            "include_visual_matches": request.include_visual_matches,
+            "include_voice_matches": request.include_voice_matches,
+            "include_cg_matches": request.include_cg_matches,
+            "provider_execution": False,
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringAssetMatchResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=summary_counts["created_proposal_count"],
+            sprite_match_count=summary_counts["sprite_match_count"],
+            background_match_count=summary_counts["background_match_count"],
+            cg_match_count=summary_counts["cg_match_count"],
+            voice_match_count=summary_counts["voice_match_count"],
+            blocked_count=summary_counts["blocked_count"],
+        )
+
     def review_proposal(
         self,
         world_id: uuid.UUID,
@@ -1035,6 +1134,94 @@ class AuthoringService:
             if candidate is not None:
                 candidates.append(candidate)
         return candidates
+
+    def _asset_match_inputs(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        request: AuthoringAssetMatchRequest,
+    ) -> tuple[list[AssetMatchInput], int]:
+        match_inputs: list[AssetMatchInput] = []
+        blocked_count = 0
+
+        def append_asset(
+            source_asset: AuthoringSourceAsset,
+            source_fragment: AuthoringSourceFragment | None,
+        ) -> None:
+            nonlocal blocked_count
+            if source_asset.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source asset must belong to asset matching worldline"
+                )
+            if source_asset.status != AuthoringSourceBatchStatus.ACTIVE.value:
+                blocked_count += 1
+                return
+            media_asset = self._media_asset_for_match(
+                world_id,
+                worldline_id,
+                source_asset.media_asset_id,
+            )
+            if media_asset is None:
+                blocked_count += 1
+                return
+            if (
+                media_asset.status != "available"
+                or media_asset.visibility in RESTRICTED_MEDIA_VISIBILITIES
+                or media_asset.asset_kind not in {"image", "audio"}
+            ):
+                blocked_count += 1
+                return
+            match_inputs.append(
+                AssetMatchInput(
+                    source_asset_id=source_asset.id,
+                    source_fragment_id=None if source_fragment is None else source_fragment.id,
+                    media_asset_id=media_asset.id,
+                    source_asset_kind=source_asset.source_asset_kind,
+                    source_label=source_asset.source_label,
+                    source_metadata_json=source_asset.metadata_json,
+                    fragment_kind=None
+                    if source_fragment is None
+                    else source_fragment.fragment_kind,
+                    fragment_metadata_json={}
+                    if source_fragment is None
+                    else source_fragment.metadata_json,
+                    media_asset_kind=media_asset.asset_kind,
+                    media_asset_role=media_asset.asset_role,
+                    media_visibility=media_asset.visibility,
+                    priority=len(match_inputs) + 1,
+                )
+            )
+
+        for source_asset_id in request.source_asset_ids:
+            append_asset(self._asset_required(world_id, source_asset_id), None)
+        for source_fragment_id in request.source_fragment_ids:
+            source_fragment = self._fragment_required(world_id, source_fragment_id)
+            if source_fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source fragment must belong to asset matching worldline"
+                )
+            source_asset = self._asset_required(world_id, source_fragment.source_asset_id)
+            append_asset(source_asset, source_fragment)
+        return match_inputs, blocked_count
+
+    def _media_asset_for_match(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_asset_id: uuid.UUID | None,
+    ) -> MediaAsset | None:
+        if media_asset_id is None:
+            return None
+        media_asset = self._session.get(MediaAsset, media_asset_id)
+        if media_asset is None:
+            return None
+        if media_asset.world_id != world_id:
+            raise AuthoringValidationError("source media asset must belong to world")
+        if media_asset.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "source media asset must belong to asset matching worldline"
+            )
+        return media_asset
 
     def _dialogue_speaker_candidates(
         self,
