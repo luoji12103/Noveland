@@ -1284,3 +1284,15 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
 - Follow-up notes: Implementation should start on `feat/canon-conflict-review` after this docs-only checkpoint is committed.
+
+## v0.5 Canon Conflict Review implementation entry
+
+- Date: 2026-05-14
+- Branch: feat/canon-conflict-review
+- Scope: Backend-only deterministic canon conflict review for v0.5 Authoring & Import Studio Phase 5.
+- Summary: Added deterministic conflict review over existing import-run proposals, producing traceable `other` conflict report proposals for duplicate characters/lore/locations/organizations, relationship and identity/baseline contradictions, uncertain canon, and OOC risk. Added `review-conflicts` on the dedicated authoring router. The implementation does not call providers, does not add migrations, does not automatically resolve conflicts, does not mutate canonical records, does not write world events, and does not add Web UI or `worlds.py` routes.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/conflict_review.py`, `/backend/packages/authoring/src/noveland/authoring/contracts.py`, `/backend/packages/authoring/src/noveland/authoring/service.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, `/backend/tests/test_workspace_imports.py`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Authoring service conflict report coverage, authoring API conflict review endpoint coverage, and workspace import coverage.
+- Docs updated: OpenSpec Phase 5 task status, project index, change journal, and task board.
+- Verification: Targeted tests passed with `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_workspace_imports.py tests/test_alembic_config.py` (`16 passed`). Full local gate passed with backend ruff, backend mypy (`236 source files`), backend pytest (`306 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and `openspec validate v0-5-authoring-import-studio --strict --json`.
+- Follow-up notes: Fast-forward merge Phase 5 to local `main`, then update merge bookkeeping before starting Phase 6. Do not push unless explicitly requested.

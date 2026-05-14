@@ -378,6 +378,103 @@ def test_authoring_api_lore_extract_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_conflict_review_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "conflicts",
+            "display_name": "Conflicts",
+            "source_kind": "character_sheet",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "character_sheet",
+            "source_label": "conflicts.md",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "conflicts",
+            "fragment_kind": "character",
+            "sequence": 1,
+            "excerpt_text": "conflict fixture",
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    preview = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/preview",
+        json={
+            "worldline_id": str(worldline_id),
+            "proposals": [
+                {
+                    "source_fragment_id": fragment.json()["id"],
+                    "proposal_kind": "character",
+                    "target_ref_kind": "character_candidate",
+                    "title": "Alice",
+                    "summary": "Alice candidate.",
+                    "proposed_payload_json": {
+                        "candidate_kind": "character",
+                        "character_label": "Alice",
+                    },
+                },
+                {
+                    "source_fragment_id": fragment.json()["id"],
+                    "proposal_kind": "character",
+                    "target_ref_kind": "character_candidate",
+                    "title": "Alice duplicate",
+                    "summary": "Alice duplicate candidate.",
+                    "proposed_payload_json": {
+                        "candidate_kind": "character",
+                        "character_label": "Alice",
+                    },
+                },
+            ],
+        },
+    )
+    reviewed = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/review-conflicts",
+        json={"worldline_id": str(worldline_id)},
+    )
+
+    assert preview.status_code == 201
+    assert reviewed.status_code == 201
+    assert reviewed.json()["created_proposal_count"] == 1
+    assert reviewed.json()["duplicate_count"] == 1
+    assert reviewed.json()["contradiction_count"] == 0
+    assert reviewed.json()["run"]["summary_json"]["provider_execution"] is False
+    reports = [
+        proposal
+        for proposal in reviewed.json()["run"]["proposals"]
+        if proposal["target_ref_kind"] == "canon_conflict_report"
+    ]
+    assert len(reports) == 1
+    assert reports[0]["proposal_kind"] == "other"
+    assert "storage_uri" not in _json_text(reviewed.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 3
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

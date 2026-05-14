@@ -14,6 +14,7 @@ PACKAGES = [
     "noveland.agents.services",
     "noveland.authoring",
     "noveland.authoring.character_extractor",
+    "noveland.authoring.conflict_review",
     "noveland.authoring.contracts",
     "noveland.authoring.lore_extractor",
     "noveland.authoring.models",

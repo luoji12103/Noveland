@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from noveland.auth.models import User
@@ -9,6 +9,7 @@ from noveland.authoring import AuthoringService
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringCharacterExtractRequest,
+    AuthoringConflictReviewRequest,
     AuthoringImportRunCreate,
     AuthoringLoreExtractRequest,
     AuthoringPreviewRequest,
@@ -428,6 +429,148 @@ def test_lore_extractor_creates_proposal_only_lore_candidates() -> None:
     assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 
+def test_conflict_review_creates_trace_only_conflict_reports() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="conflicts",
+                display_name="Conflicts",
+                source_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+                source_label="conflicts.md",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="conflicts",
+                fragment_kind=AuthoringSourceFragmentKind.CHARACTER,
+                sequence=1,
+                excerpt_text="conflict fixture",
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        service.preview(
+            graph.world_id,
+            run.id,
+            AuthoringPreviewRequest(
+                worldline_id=graph.worldline_id,
+                proposals=(
+                    _draft(
+                        fragment.id,
+                        "character_candidate",
+                        {"candidate_kind": "character", "character_label": "Alice"},
+                    ),
+                    _draft(
+                        fragment.id,
+                        "character_candidate",
+                        {"candidate_kind": "character", "character_label": "Alice"},
+                    ),
+                    _draft(
+                        fragment.id,
+                        "relationship_candidate",
+                        {
+                            "candidate_kind": "relationship",
+                            "source_character_label": "Alice",
+                            "target_character_label": "Bob",
+                            "relationship_label": "trusts",
+                        },
+                        proposal_kind=AuthoringProposalKind.RELATIONSHIP,
+                    ),
+                    _draft(
+                        fragment.id,
+                        "relationship_candidate",
+                        {
+                            "candidate_kind": "relationship",
+                            "source_character_label": "Alice",
+                            "target_character_label": "Bob",
+                            "relationship_label": "hates",
+                        },
+                        proposal_kind=AuthoringProposalKind.RELATIONSHIP,
+                    ),
+                    _draft(
+                        fragment.id,
+                        "identity_candidate",
+                        {
+                            "candidate_kind": "identity",
+                            "character_label": "Alice",
+                            "identity_value": "prefect",
+                        },
+                    ),
+                    _draft(
+                        fragment.id,
+                        "identity_candidate",
+                        {
+                            "candidate_kind": "identity",
+                            "character_label": "Alice",
+                            "identity_value": "spy",
+                        },
+                    ),
+                    _draft(
+                        fragment.id,
+                        "lore_candidate",
+                        {
+                            "candidate_kind": "lore",
+                            "classification": "uncertain",
+                            "lore_text": "maybe",
+                        },
+                    ),
+                    _draft(
+                        fragment.id,
+                        "dialogue_candidate",
+                        {"candidate_kind": "dialogue", "ooc_risk": True},
+                    ),
+                ),
+            ),
+        )
+        result = service.review_conflicts(
+            graph.world_id,
+            run.id,
+            AuthoringConflictReviewRequest(worldline_id=graph.worldline_id),
+        )
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 5
+    assert result.duplicate_count == 1
+    assert result.contradiction_count == 2
+    assert result.uncertain_count == 1
+    assert result.ooc_risk_count == 1
+    assert result.run.summary_json["conflict_review_mode"] == "deterministic"
+    assert result.run.summary_json["provider_execution"] is False
+    reports = [
+        proposal
+        for proposal in result.run.proposals
+        if proposal.target_ref_kind == "canon_conflict_report"
+    ]
+    assert len(reports) == 5
+    assert all(proposal.proposal_kind == AuthoringProposalKind.OTHER for proposal in reports)
+    assert "storage_uri" not in str(result.run.model_dump()).lower()
+
+
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
@@ -472,6 +615,23 @@ def test_authoring_json_rejects_leaky_values() -> None:
             summary="Bad",
             evidence_json={"image": "data:image/png;base64,abc"},
         )
+
+
+def _draft(
+    source_fragment_id: uuid.UUID,
+    target_ref_kind: str,
+    payload: dict[str, Any],
+    *,
+    proposal_kind: AuthoringProposalKind = AuthoringProposalKind.CHARACTER,
+) -> AuthoringProposalDraft:
+    return AuthoringProposalDraft(
+        source_fragment_id=source_fragment_id,
+        proposal_kind=proposal_kind,
+        target_ref_kind=target_ref_kind,
+        title=f"{target_ref_kind} draft",
+        summary="Draft for conflict review.",
+        proposed_payload_json=payload,
+    )
 
 
 class _Graph:

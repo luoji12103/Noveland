@@ -10,6 +10,8 @@ from noveland.authoring.contracts import (
     AuthoringApplyResult,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterExtractResult,
+    AuthoringConflictReviewRequest,
+    AuthoringConflictReviewResult,
     AuthoringImportRunCreate,
     AuthoringImportRunKind,
     AuthoringImportRunRead,
@@ -353,6 +355,27 @@ def extract_authoring_lore(
 ) -> AuthoringLoreExtractResult:
     try:
         return AuthoringService(db_session).extract_lore(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/review-conflicts",
+    response_model=AuthoringConflictReviewResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def review_authoring_conflicts(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringConflictReviewRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringConflictReviewResult:
+    try:
+        return AuthoringService(db_session).review_conflicts(world_id, run_id, request)
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

@@ -85,6 +85,10 @@ class AuthoringLoreExtractorMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringConflictReviewMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -481,6 +485,31 @@ class AuthoringLoreExtractResult(_FrozenContract):
     secret_count: int
     knowledge_boundary_count: int
     uncertain_count: int
+
+
+class AuthoringConflictReviewRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    review_mode: AuthoringConflictReviewMode = AuthoringConflictReviewMode.DETERMINISTIC
+    include_statuses: tuple[AuthoringProposalStatus, ...] = (
+        AuthoringProposalStatus.PROPOSED,
+        AuthoringProposalStatus.REVIEWED,
+        AuthoringProposalStatus.APPROVED,
+    )
+
+    @model_validator(mode="after")
+    def validate_statuses(self) -> AuthoringConflictReviewRequest:
+        if not self.include_statuses:
+            raise ValueError("include_statuses is required")
+        return self
+
+
+class AuthoringConflictReviewResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    duplicate_count: int
+    contradiction_count: int
+    uncertain_count: int
+    ooc_risk_count: int
 
 
 class AuthoringApplyRequest(_FrozenContract):

@@ -43,6 +43,18 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringCharacterExtractorMode",
     ),
+    "AuthoringConflictReviewRequest": (
+        "noveland.authoring.contracts",
+        "AuthoringConflictReviewRequest",
+    ),
+    "AuthoringConflictReviewResult": (
+        "noveland.authoring.contracts",
+        "AuthoringConflictReviewResult",
+    ),
+    "AuthoringConflictReviewMode": (
+        "noveland.authoring.contracts",
+        "AuthoringConflictReviewMode",
+    ),
     "AuthoringLoreExtractRequest": (
         "noveland.authoring.contracts",
         "AuthoringLoreExtractRequest",

@@ -11,11 +11,17 @@ from noveland.authoring.character_extractor import (
 from noveland.authoring.character_extractor import (
     extract_fragment as extract_character_fragment,
 )
+from noveland.authoring.conflict_review import (
+    ConflictReviewProposal,
+    review_proposals,
+)
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringApplyResult,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterExtractResult,
+    AuthoringConflictReviewRequest,
+    AuthoringConflictReviewResult,
     AuthoringImportRunCreate,
     AuthoringImportRunKind,
     AuthoringImportRunRead,
@@ -609,6 +615,102 @@ class AuthoringService:
             secret_count=summary_counts["secret_count"],
             knowledge_boundary_count=summary_counts["knowledge_boundary_count"],
             uncertain_count=summary_counts["uncertain_count"],
+        )
+
+    def review_conflicts(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringConflictReviewRequest,
+    ) -> AuthoringConflictReviewResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "conflict review run must belong to request worldline"
+            )
+
+        include_statuses = tuple(status.value for status in request.include_statuses)
+        proposal_models = self._session.scalars(
+            select(AuthoringImportProposal)
+            .where(
+                AuthoringImportProposal.run_id == run.id,
+                AuthoringImportProposal.world_id == world_id,
+                AuthoringImportProposal.worldline_id == worldline_id,
+                AuthoringImportProposal.status.in_(include_statuses),
+                AuthoringImportProposal.target_ref_kind != "canon_conflict_report",
+            )
+            .order_by(AuthoringImportProposal.priority, AuthoringImportProposal.created_at)
+        ).all()
+        review_inputs = [
+            ConflictReviewProposal(
+                id=proposal.id,
+                source_fragment_id=proposal.source_fragment_id,
+                target_ref_kind=proposal.target_ref_kind,
+                proposed_payload_json=proposal.proposed_payload_json,
+                evidence_json=proposal.evidence_json,
+            )
+            for proposal in proposal_models
+        ]
+        candidates = review_proposals(
+            review_inputs,
+            review_mode=request.review_mode.value,
+        )
+
+        created: list[AuthoringProposalRead] = []
+        for candidate in candidates:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=candidate.proposal_kind,
+                        target_ref_kind=candidate.target_ref_kind,
+                        target_ref_id=None,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=candidate.proposed_payload_json,
+                        evidence_json=candidate.evidence_json,
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "duplicate_count": sum(
+                1 for candidate in candidates if candidate.conflict_kind == "duplicate"
+            ),
+            "contradiction_count": sum(
+                1
+                for candidate in candidates
+                if candidate.conflict_kind == "contradiction"
+            ),
+            "uncertain_count": sum(
+                1 for candidate in candidates if candidate.conflict_kind == "uncertain"
+            ),
+            "ooc_risk_count": sum(
+                1 for candidate in candidates if candidate.conflict_kind == "ooc_risk"
+            ),
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "conflict_review_mode": request.review_mode.value,
+            "provider_execution": False,
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringConflictReviewResult(
+            run=self.get_import_run(world_id, run.id),
+            created_proposal_count=summary_counts["created_proposal_count"],
+            duplicate_count=summary_counts["duplicate_count"],
+            contradiction_count=summary_counts["contradiction_count"],
+            uncertain_count=summary_counts["uncertain_count"],
+            ooc_risk_count=summary_counts["ooc_risk_count"],
         )
 
     def review_proposal(
