@@ -968,3 +968,14 @@
 - Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
 - Verification: Targeted tests passed; full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`88 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: No backend media kernel behavior, migrations, storage backend, public reader media delivery, provider execution, asset generation, daemon behavior, or `worlds.py` change was added. Fast-forward merge to local `main` remains next.
+
+## v0.4 Media Asset Admin Console merge entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Fast-forward merge completion for v0.4 Operator/Admin UX Phase 3.
+- Summary: Fast-forward merged `feat/media-admin-console` into local `main` after the targeted tests and full local gate passed. OpenSpec Phase 3 tasks now mark the fast-forward merge complete, and the active handoff points to Phase 4 Visual Asset Admin Console planning.
+- Files changed: `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 3 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 4 from clean local `main`; do not push unless explicitly requested.

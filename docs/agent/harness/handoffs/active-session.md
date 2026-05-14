@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: feat/media-admin-console
-- Objective: Continue v0.4 Operator/Admin UX after Phase 2 Provider Admin Console.
-- Status: Phase 3 Media Asset Admin Console full local gate passed on `feat/media-admin-console`; implementation commit and fast-forward merge to local `main` are next.
+- Branch: main
+- Objective: Continue v0.4 Operator/Admin UX after Phase 3 Media Asset Admin Console.
+- Status: Phase 3 Media Asset Admin Console passed the full local gate and is fast-forward merged to local `main`; Phase 4 Visual Asset Admin Console planning is next.
 
 ## Current Context
 
@@ -15,7 +15,8 @@
 - Phase 1 added reusable admin foundation components, platform-admin route guard helper, and CSRF-aware admin request helper. Later phases should reuse these patterns instead of inventing page-local equivalents.
 - Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
-- Phase 3 should add a media asset admin console using existing media APIs and admin foundation patterns. Do not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes unless the Phase 3 plan explicitly requires them.
+- Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
+- Phase 4 should add a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. Do not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery unless the Phase 4 plan explicitly requires them.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -30,7 +31,7 @@
 
 ## Required Next Steps
 
-- Commit `feat/media-admin-console`, fast-forward merge to `main`, mark the merge checkbox, and continue to Phase 4.
+- Start the Phase 4 Visual Asset Admin Console planning checkpoint from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
