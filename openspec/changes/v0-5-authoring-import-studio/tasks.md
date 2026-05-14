@@ -38,7 +38,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 4 — World Bible & Lore Extractor
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `world-bible-lore-extractor` proposal-only scope.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.

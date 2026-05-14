@@ -1239,3 +1239,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 3 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 4 from clean local `main`; do not push unless explicitly requested.
+
+## v0.5 World Bible & Lore Extractor plan entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Final implementation plan for v0.5 Authoring & Import Studio Phase 4.
+- Summary: Added the v0.5.4 plan for deterministic proposal-only extraction of lore, location, organization, world-rule, secret, and knowledge-boundary candidates into reviewable Phase 1 authoring proposals. The plan explicitly avoids provider-backed extraction, migrations unless required, Web UI, direct `WorldBible` or global canon mutation, world events, and new `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.5.4-world-bible-lore-extractor-plan.md`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
+- Follow-up notes: Implementation should start on `feat/world-bible-lore-extractor` after this docs-only checkpoint is committed.
