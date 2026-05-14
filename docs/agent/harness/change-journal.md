@@ -1329,3 +1329,14 @@
 - Tests added/updated: Authoring service memory migration coverage, authoring API memory migration endpoint coverage, direct memory apply guardrail coverage, and workspace import coverage.
 - Docs updated: OpenSpec tasks, project index, task board, active handoff, and change journal.
 - Follow-up notes: Phase 6 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then continue with Phase 7 Asset Import & Matching.
+
+## v0.5 Memory Migration Pipeline merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.5 Authoring & Import Studio Phase 6.
+- Summary: Fast-forward merged `feat/memory-migration-pipeline` into local `main`, marked Phase 6 complete in OpenSpec tasks, and moved harness handoff state to Phase 7 Asset Import & Matching.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.

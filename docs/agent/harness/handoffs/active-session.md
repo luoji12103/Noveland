@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-14T00:00:00Z
-- Branch: feat/memory-migration-pipeline
-- Objective: Complete v0.5 Authoring & Import Studio Phase 6 merge bookkeeping, then continue to Phase 7 Asset Import & Matching from clean local main.
-- Status: v0.5 Phase 6 Memory Migration Pipeline implementation and full local gate are complete on the feature branch.
+- Branch: main
+- Objective: Continue v0.5 Authoring & Import Studio with Phase 7 Asset Import & Matching.
+- Status: v0.5 Phase 6 Memory Migration Pipeline is implemented, full-gate validated, and fast-forward merged to local `main`.
 
 ## Current Context
 
@@ -19,7 +19,7 @@
 - v0.5 Phase 3 is complete: deterministic extractor creates traceable proposals for characters, aliases, factions, identities, relationships, and emotional baselines without provider calls or canonical mutation.
 - v0.5 Phase 4 is complete: deterministic lore extractor creates proposal-only lore, location, organization, world-rule, secret, and knowledge-boundary candidates without provider calls or canonical mutation.
 - v0.5 Phase 5 is complete: deterministic conflict review creates reviewable conflict report proposals without provider calls, automatic resolution, or canonical mutation.
-- v0.5 Phase 6 is implemented on `feat/memory-migration-pipeline`: deterministic memory migration creates reviewable fact, episodic, relationship, preference, and style memory proposals without provider calls, memory writes, or canonical mutation.
+- v0.5 Phase 6 is complete: deterministic memory migration creates reviewable fact, episodic, relationship, preference, and style memory proposals without provider calls, memory writes, or canonical mutation.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -37,8 +37,8 @@
 
 ## Required Next Steps
 
-- Fast-forward merge `feat/memory-migration-pipeline` to local `main` after committing the feature branch.
-- Record Phase 6 merge bookkeeping, then start Phase 7 Asset Import & Matching from clean local `main` if no blocker remains.
+- Start Phase 7 with a docs-only planning checkpoint for Asset Import & Matching from clean local `main`.
+- Phase 7 should implement only `asset-import-matching` scope and reuse Phase 1 import proposals plus media/visual/speech records.
 - Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
 - Do not push unless explicitly requested.
 
@@ -63,3 +63,4 @@
 - v0.5 Phase 6 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
 - v0.5 Phase 6 targeted tests passed: `18 passed`.
 - v0.5 Phase 6 full local gate passed: backend ruff, backend mypy, backend pytest (`308 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; initial attempt timed out at the conversations e2e scene), docker compose config, `git diff --check`, and OpenSpec strict validate.
+- v0.5 Phase 6 fast-forward merge to local `main` completed.
