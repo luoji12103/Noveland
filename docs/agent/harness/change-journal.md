@@ -1395,3 +1395,14 @@
 - Tests added/updated: Authoring sample import deterministic signature, worldline scope, pipeline coverage, guarded apply, side-effect, and leak regression tests.
 - Docs updated: OpenSpec tasks, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Phase 8 full local gate passed; fast-forward merge to local `main`, record merge bookkeeping, then provide v0.5 closeout status.
+
+## v0.5 Authoring Regression Fixture merge entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Fast-forward merge bookkeeping and closeout for v0.5 Authoring & Import Studio Phase 8.
+- Summary: Fast-forward merged `feat/authoring-regression-fixture` into local `main`, marked Phase 8 and all v0.5 OpenSpec tasks complete, and updated harness state to v0.5 closeout.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: v0.5 is complete locally; OpenSpec archive and release notes remain optional docs-only follow-up if requested. Do not push unless explicitly requested.

@@ -137,11 +137,12 @@
 - v0.5 Authoring & Import Studio Phase 8 implementation
 - v0.5 Authoring & Import Studio Phase 8 targeted tests
 - v0.5 Authoring & Import Studio Phase 8 full local gate
+- v0.5 Authoring & Import Studio Phase 8 fast-forward merge
+- v0.5 Authoring & Import Studio implementation complete
 
 ## Upcoming Mainline
-- v0.5 Phase 8 should fast-forward merge
-  `feat/authoring-regression-fixture` to local `main`, then complete v0.5
-  closeout reporting if no blocker remains.
+- v0.5 OpenSpec archive and release-note work can be done as a separate
+  docs-only step if requested.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.
