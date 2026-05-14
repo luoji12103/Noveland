@@ -19,6 +19,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/conversations/[conversationId]/`
 - `web/app/worlds/[worldId]/media/`
 - `web/app/worlds/[worldId]/providers/`
+- `web/app/worlds/[worldId]/visual/`
 - `web/app/worlds/[worldId]/narrative/`
 - `web/app/worlds/[worldId]/reader/`
 - `web/app/worlds/[worldId]/reader/[artifactId]/`
@@ -51,6 +52,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/media-admin.tsx`
 - `web/features/admin/memory-backend-admin.tsx`
 - `web/features/admin/provider-integration-admin.tsx`
+- `web/features/admin/visual-admin.test.tsx`
+- `web/features/admin/visual-admin.tsx`
 - `web/features/admin/preset-admin.test.tsx`
 - `web/features/admin/preset-admin.tsx`
 - `web/features/plugins/`
@@ -63,6 +66,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/conversations/conversation-detail.test.tsx`
 - `web/features/dashboard/`
 - `web/features/workspace/`
+- `web/features/workspace/workspace-shell.test.tsx`
 - `web/features/worlds/`
 - `web/features/worlds/world-overview.test.tsx`
 - `web/features/worlds/world-overview.tsx`
@@ -80,6 +84,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/worlds/`
 - `web/lib/worlds/media.ts`
 - `web/lib/worlds/provider-integrations.ts`
+- `web/lib/worlds/visual.test.ts`
+- `web/lib/worlds/visual.ts`
 - `web/tests/e2e/start-with-mock-auth.mjs`
 - `backend/services/api/`
 - `backend/services/api/src/noveland/services/api/authorization.py`

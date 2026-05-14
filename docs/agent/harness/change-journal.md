@@ -990,3 +990,15 @@
 - Tests added/updated: Documentation-only change; verify with `git diff --check`.
 - Docs updated: project index, file inventory, change journal, task board, and active handoff.
 - Follow-up notes: Implementation should start on `feat/visual-admin-console` after this docs-only work is committed on `main`.
+
+## v0.4 Visual Asset Admin Console implementation entry
+
+- Date: 2026-05-13
+- Branch: feat/visual-admin-console
+- Scope: World-scoped Web admin console for strict-worldline sprite sets, sprite variants, scene backgrounds, resolver previews, and explicit compose-scene actions.
+- Summary: Added `/worlds/{worldId}/visual`, visual client helpers, server-side visual admin data loader, and a visual admin component for selecting a worldline, managing sprite/background records, running deterministic resolver previews, and explicitly composing scenes through the existing visual compose endpoint. The UI displays safe media identifiers, dimensions, checksums, statuses, visibility, and fallback reasons without rendering storage URIs, filesystem paths, raw bytes, base64 payloads, raw prompts, or raw outputs.
+- Files changed: `/web/app/worlds/[worldId]/visual/page.tsx`, `/web/features/admin/visual-admin.tsx`, `/web/lib/worlds/visual.ts`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, related Web tests, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: Visual client tests, visual admin component tests, and workspace navigation test.
+- Docs updated: OpenSpec tasks, change journal, file inventory, project index, task board, and active handoff.
+- Verification: Targeted tests passed with `npm run test -- visual-admin visual workspace-shell` (3 files, 8 tests), plus web lint, web typecheck, and `git diff --check`. Full local gate passed with backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`96 passed` after standalone rerun), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: No backend visual behavior, migrations, automatic sprite/background generation, asset generation orchestration, nullable-worldline visual defaults, public reader delivery, provider execution, daemon behavior, streaming, or `worlds.py` change was added. `web npm run test` timed out once when run concurrently with backend pytest due to Vitest worker startup timeouts; the standalone rerun passed.

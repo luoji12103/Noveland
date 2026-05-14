@@ -100,6 +100,11 @@ import type {
   MediaObject,
   MediaReference,
 } from "@/lib/worlds/media";
+import type {
+  SceneBackground,
+  SpriteSet,
+  SpriteVariant,
+} from "@/lib/worlds/visual";
 
 export type WorldWorkspaceData = {
   worlds: World[];
@@ -289,6 +294,23 @@ export type MediaAdminData = {
   referencesByAssetId: Record<string, MediaAssetReferences | null>;
   references: MediaReference[];
   jobs: MediaJob[];
+  canManageSelectedWorld: boolean;
+  isPlatformAdmin: boolean;
+  loadError: string | null;
+};
+
+export type VisualAdminData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  memberships: Membership[];
+  worldlines: Worldline[];
+  selectedWorldlineId: string | null;
+  agents: Agent[];
+  scenes: Scene[];
+  imageAssets: MediaAsset[];
+  spriteSets: SpriteSet[];
+  variantsBySpriteSetId: Record<string, SpriteVariant[]>;
+  backgrounds: SceneBackground[];
   canManageSelectedWorld: boolean;
   isPlatformAdmin: boolean;
   loadError: string | null;
@@ -1233,6 +1255,74 @@ export async function getMediaAdminData(
   }
 }
 
+export async function getVisualAdminData(
+  worldId: string,
+  isPlatformAdmin: boolean,
+): Promise<VisualAdminData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyVisualAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
+    }
+    const [memberships, worldlines, agents, scenes, imageAssets] = await Promise.all([
+      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
+      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?asset_kind=image&limit=100`, cookies),
+    ]);
+    const selectedWorldlineId =
+      worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
+    const [spriteSets, backgrounds] =
+      selectedWorldlineId === null
+        ? [[], []]
+        : await Promise.all([
+            apiFetch<SpriteSet[]>(
+              `/worlds/${worldId}/visual/sprite-sets?worldline_id=${selectedWorldlineId}`,
+              cookies,
+            ),
+            apiFetch<SceneBackground[]>(
+              `/worlds/${worldId}/visual/backgrounds?worldline_id=${selectedWorldlineId}`,
+              cookies,
+            ),
+          ]);
+    const variantEntries = await Promise.all(
+      spriteSets.map(async (spriteSet) => [
+        spriteSet.id,
+        await apiFetchOptional<SpriteVariant[]>(
+          `/worlds/${worldId}/visual/sprite-sets/${spriteSet.id}/variants`,
+          cookies,
+        ),
+      ] as const),
+    );
+    return {
+      worlds,
+      selectedWorld,
+      memberships: memberships ?? [],
+      worldlines,
+      selectedWorldlineId,
+      agents,
+      scenes,
+      imageAssets,
+      spriteSets,
+      variantsBySpriteSetId: Object.fromEntries(
+        variantEntries.map(([spriteSetId, variants]) => [spriteSetId, variants ?? []]),
+      ),
+      backgrounds,
+      canManageSelectedWorld: memberships !== null || isPlatformAdmin,
+      isPlatformAdmin,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyVisualAdminData([], null, isPlatformAdmin, "Unable to load visual records.");
+  }
+}
+
 export async function getRuntimeAdminData(): Promise<RuntimeAdminData> {
   const cookies = await cookieHeader();
   try {
@@ -1507,6 +1597,30 @@ function emptyMediaAdminData(
     referencesByAssetId: {},
     references: [],
     jobs: [],
+    canManageSelectedWorld: false,
+    isPlatformAdmin,
+    loadError,
+  };
+}
+
+function emptyVisualAdminData(
+  worlds: World[],
+  selectedWorld: World | null,
+  isPlatformAdmin: boolean,
+  loadError: string,
+): VisualAdminData {
+  return {
+    worlds,
+    selectedWorld,
+    memberships: [],
+    worldlines: [],
+    selectedWorldlineId: null,
+    agents: [],
+    scenes: [],
+    imageAssets: [],
+    spriteSets: [],
+    variantsBySpriteSetId: {},
+    backgrounds: [],
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,

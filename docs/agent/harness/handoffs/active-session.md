@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-13T00:00:00Z
-- Branch: main
+- Branch: feat/visual-admin-console
 - Objective: Continue v0.4 Operator/Admin UX after Phase 3 Media Asset Admin Console.
-- Status: Phase 4 Visual Asset Admin Console planning checkpoint is being recorded on local `main`; implementation branch `feat/visual-admin-console` is next after the docs-only commit.
+- Status: Phase 4 Visual Asset Admin Console implementation is complete on `feat/visual-admin-console`; targeted tests and full local gate passed. Commit and fast-forward merge to local `main` are next.
 
 ## Current Context
 
@@ -16,7 +16,7 @@
 - Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
-- Phase 4 should add a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. Do not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
+- Phase 4 adds a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. It does not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -31,7 +31,7 @@
 
 ## Required Next Steps
 
-- Commit the Phase 4 Visual Asset Admin Console docs-only planning checkpoint, then start `feat/visual-admin-console` from clean local `main`.
+- Commit `feat/visual-admin-console`, fast-forward merge to local `main`, mark the merge checkbox, and continue to Phase 5 Speech Admin Console.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification
@@ -45,3 +45,5 @@
 - v0.4 Phase 2 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`80 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 Phase 3 targeted tests passed: `npm run test -- media-admin media workspace-shell` (2 files, 8 tests), plus web lint/typecheck.
 - v0.4 Phase 3 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`88 passed`), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.4 Phase 4 targeted tests passed: `npm run test -- visual-admin visual workspace-shell` (3 files, 8 tests), plus web lint/typecheck and `git diff --check`.
+- v0.4 Phase 4 full local gate passed: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), web lint, web typecheck, web tests (`96 passed` after standalone rerun), web build, web `check:next-env`, web e2e (`13 passed`), docker compose config, and `git diff --check`.
