@@ -3,7 +3,7 @@
 - Date: 2026-05-14T00:00:00Z
 - Branch: main
 - Objective: Continue v0.5 Authoring & Import Studio with Phase 3 Character & Relationship Extractor.
-- Status: v0.5 Phase 2 Script Parser & Dialogue Extractor is implemented, validated, and fast-forward merged locally.
+- Status: v0.5 Phase 3 Character & Relationship Extractor has a docs-only planning checkpoint and is ready for implementation.
 
 ## Current Context
 
@@ -16,7 +16,7 @@
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
 - v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
 - v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
-- v0.5 Phase 3 is next: Character & Relationship Extractor.
+- v0.5 Phase 3 is planned: deterministic extractor should create traceable proposals for characters, aliases, factions, identities, relationships, and emotional baselines without provider calls or canonical mutation.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -34,7 +34,7 @@
 
 ## Required Next Steps
 
-- Start Phase 3 from clean local `main` with a docs-only planning checkpoint.
+- Start Phase 3 implementation from clean local `main` on `feat/character-relationship-extractor`.
 - Phase 3 should implement only `character-relationship-extractor` scope and reuse Phase 1 import proposals.
 - Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
 - Do not push unless explicitly requested.
@@ -48,3 +48,4 @@
 - v0.5 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`298 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.5 Phase 2 targeted tests passed: `10 passed`.
 - v0.5 Phase 2 full local gate passed: backend ruff, backend mypy, backend pytest (`300 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
+- v0.5 Phase 3 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.

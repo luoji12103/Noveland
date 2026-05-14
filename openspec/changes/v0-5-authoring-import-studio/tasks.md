@@ -27,7 +27,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 3 — Character & Relationship Extractor
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `character-relationship-extractor` scope only.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
