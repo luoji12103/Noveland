@@ -13,7 +13,7 @@ The system SHALL provide Asset Import & Matching capability for Asset matching c
 - **Given** an authorized actor is using Asset Import & Matching
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse MediaService, VisualAssetService, Speech voice references rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse MediaService, VisualAssetService, Speech voice references, and the Phase 1 import proposal workflow rather than creating a parallel subsystem.
 
 ### Requirement: Asset Import & Matching preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Asset Import & Matching, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.

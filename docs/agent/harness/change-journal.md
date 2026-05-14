@@ -1126,3 +1126,14 @@
 - Tests added/updated: Documentation/spec-only change; validate with OpenSpec validation and `git diff --check`.
 - Docs updated: current OpenSpec specs, release notes, project index, file inventory, task board, change journal, and active handoff.
 - Follow-up notes: v0.5 must begin with feasibility review only; no v0.5 implementation should start until its review is accepted.
+
+## v0.5 Authoring subsystem architecture decision entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: OpenSpec planning update for v0.5 Authoring & Import Studio.
+- Summary: Updated v0.5 OpenSpec docs to require a dedicated `backend/packages/authoring/` package and `authoring.py` API router, move import run/proposal/review/source-traceability preview/apply foundation into Phase 1, treat legacy authoring templates/jobs and world composition import as compatibility inputs/references, and keep lore/world-bible extraction proposal-only.
+- Files changed: `/openspec/changes/v0-5-authoring-import-studio/proposal.md`, `/openspec/changes/v0-5-authoring-import-studio/design.md`, `/openspec/changes/v0-5-authoring-import-studio/phase-plan.md`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/openspec/changes/v0-5-authoring-import-studio/specs/**`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation/spec-only change; validate with OpenSpec validation and `git diff --check`.
+- Docs updated: v0.5 OpenSpec proposal, design, phase plan, tasks, capability specs, change journal, and active handoff.
+- Follow-up notes: Do not start v0.5 implementation until explicitly requested; Phase 1 should implement only Authoring Import Core.

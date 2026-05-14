@@ -2,18 +2,27 @@
 
 ## Capability
 
-Extract locations, organizations, world rules, secrets, and knowledge boundaries. This capability belongs to v0.5 Authoring & Import Studio and is planned future work until implemented and archived.
+Extract locations, organizations, world rules, secrets, and knowledge boundaries as reviewable proposals only. This capability belongs to v0.5 Authoring & Import Studio and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
 ### Requirement: World Bible & Lore Extractor provides the planned workflow
-The system SHALL provide World Bible & Lore Extractor capability for World bible fragments, Lore candidates, Secret/knowledge boundary candidates, canon/inference/uncertain classification while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+The system SHALL provide World Bible & Lore Extractor capability for world bible fragments, lore candidates, secret/knowledge boundary candidates, and canon/inference/uncertain classification while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
 
 #### Scenario: Authorized workflow
 - **Given** an authorized actor is using World Bible & Lore Extractor
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse worlds/events docs, future world bible records, provider ledger if model-backed rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse the Phase 1 authoring proposal workflow, worlds/events context, and provider ledger if model-backed rather than creating a parallel subsystem.
+
+### Requirement: World Bible & Lore Extractor remains proposal-only
+The system SHALL NOT directly apply lore proposals to `WorldBible` or global canon tables until a later accepted architecture decision defines global-vs-worldline canon semantics.
+
+#### Scenario: Admin reviews lore candidate
+- **Given** a lore candidate has been extracted
+- **When** an admin reviews the proposal
+- **Then** the system SHALL allow proposal review decisions
+- **And** direct canonical apply SHALL remain blocked for this capability in v0.5.
 
 ### Requirement: World Bible & Lore Extractor preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for World Bible & Lore Extractor, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
@@ -36,3 +45,5 @@ The system SHALL provide focused validation for World Bible & Lore Extractor and
 ## Non-goals
 
 - Runtime context injection of full raw source
+- Direct apply to global `WorldBible`
+- Reader/member exposure of secret or developer-only lore candidates

@@ -2,10 +2,11 @@
 
 Use these tasks when implementation is explicitly requested. Do not mark items complete during roadmap-only work.
 
-## Phase 1 — Authoring Source Registry
+## Phase 1 — Authoring Import Core
 
 - [ ] Write phase planning checkpoint.
-- [ ] Implement `authoring-source-registry` scope only.
+- [ ] Implement dedicated `backend/packages/authoring/` package and `authoring.py` router boundary.
+- [ ] Implement `authoring-source-registry` and `import-preview-apply-workflow` foundation scope only.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -38,7 +39,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 4 — World Bible & Lore Extractor
 
 - [ ] Write phase planning checkpoint.
-- [ ] Implement `world-bible-lore-extractor` scope only.
+- [ ] Implement `world-bible-lore-extractor` proposal-only scope.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -79,18 +80,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 
-## Phase 8 — Import Preview/Apply Workflow
-
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `import-preview-apply-workflow` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
-
-## Phase 9 — Authoring Regression Fixture
+## Phase 8 — Authoring Regression Fixture
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `authoring-regression-fixture` scope only.

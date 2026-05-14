@@ -13,7 +13,7 @@ The system SHALL provide Canon Conflict Review capability for Conflict reports, 
 - **Given** an authorized actor is using Canon Conflict Review
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse import candidates, world events, agent/profile records, diagnostics patterns rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse Phase 1 proposals, source traceability, world events, agent/profile records, diagnostics patterns rather than creating a parallel subsystem.
 
 ### Requirement: Canon Conflict Review preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Canon Conflict Review, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.

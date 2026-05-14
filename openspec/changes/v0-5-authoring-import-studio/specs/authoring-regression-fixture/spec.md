@@ -13,7 +13,7 @@ The system SHALL provide Authoring Regression Fixture capability for Script fixt
 - **Given** an authorized actor is using Authoring Regression Fixture
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse test fixture patterns, multimodal sample-world regression rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse test fixture patterns, multimodal sample-world regression, and the Phase 1 authoring import core rather than creating a parallel subsystem.
 
 ### Requirement: Authoring Regression Fixture preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Authoring Regression Fixture, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.

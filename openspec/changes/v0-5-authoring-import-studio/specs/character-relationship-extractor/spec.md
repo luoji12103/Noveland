@@ -13,7 +13,7 @@ The system SHALL provide Character & Relationship Extractor capability for Chara
 - **Given** an authorized actor is using Character & Relationship Extractor
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse agents package, future relationship records, import preview/apply workflow rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse agents package, existing relationship records for explicit apply, and the Phase 1 import preview/apply workflow rather than creating a parallel subsystem.
 
 ### Requirement: Character & Relationship Extractor preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Character & Relationship Extractor, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.

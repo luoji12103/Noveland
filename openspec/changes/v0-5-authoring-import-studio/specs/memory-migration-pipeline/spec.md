@@ -13,7 +13,7 @@ The system SHALL provide Memory Migration Pipeline capability for Memory migrati
 - **Given** an authorized actor is using Memory Migration Pipeline
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse MemoryService, memory write jobs, import proposal workflow rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse MemoryService, memory write jobs, and the Phase 1 import proposal workflow rather than creating a parallel subsystem.
 
 ### Requirement: Memory Migration Pipeline preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Memory Migration Pipeline, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.

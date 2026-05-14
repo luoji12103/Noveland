@@ -2,8 +2,8 @@
 
 - Date: 2026-05-14T00:00:00Z
 - Branch: main
-- Objective: Archive v0.4 Operator/Admin UX, publish release notes, and prepare a v0.5 feasibility review.
-- Status: v0.4 Operator/Admin UX implementation is complete, pushed by the user, archived in OpenSpec, and represented in current specs.
+- Objective: Preserve v0.4 archive state and prepare v0.5 Authoring & Import Studio for implementation planning.
+- Status: v0.4 Operator/Admin UX implementation is complete, pushed by the user, archived in OpenSpec, and represented in current specs. v0.5 OpenSpec docs now reflect the dedicated authoring package/router decision.
 
 ## Current Context
 
@@ -13,6 +13,10 @@
 - Current implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
+- v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
+- v0.5 Phase 1 is Authoring Import Core: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
+- Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
+- v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -29,10 +33,12 @@
 ## Required Next Steps
 
 - Perform v0.5 feasibility review only; do not implement v0.5 yet.
-- Read `openspec/changes/v0-5-authoring-import-studio/` and current architecture/API/data inventory before recommending scope.
-- Report whether v0.5 should be split, merged, deferred, or sequenced differently, and identify migration/API/Web risks.
+- Start v0.5 implementation only after the user explicitly requests it.
+- First implementation phase should be Phase 1 Authoring Import Core from `openspec/changes/v0-5-authoring-import-studio/phase-plan.md`.
+- Do not add new v0.5 routes to `worlds.py`; register the independent authoring router at app level.
 
 ## Latest Verification
 
 - v0.4 Phase 7 full local gate passed before archive: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after standalone rerun; initial concurrent run with `next build` timed out), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.4 archive/release-notes work is docs-only and should be validated with OpenSpec validation plus `git diff --check`.
+- v0.5 architecture decision docs are docs-only and should be validated with OpenSpec validation plus `git diff --check`.
