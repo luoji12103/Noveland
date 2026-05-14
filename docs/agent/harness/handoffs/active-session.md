@@ -3,7 +3,7 @@
 - Date: 2026-05-13T00:00:00Z
 - Branch: main
 - Objective: Continue v0.4 Operator/Admin UX after Phase 3 Media Asset Admin Console.
-- Status: Phase 3 Media Asset Admin Console passed the full local gate and is fast-forward merged to local `main`; Phase 4 Visual Asset Admin Console planning is next.
+- Status: Phase 4 Visual Asset Admin Console planning checkpoint is being recorded on local `main`; implementation branch `feat/visual-admin-console` is next after the docs-only commit.
 
 ## Current Context
 
@@ -16,7 +16,7 @@
 - Phase 2 route decision: keep `/admin/providers` for legacy platform provider profiles and add `/worlds/{worldId}/providers` for Phase 5+ provider integrations.
 - Phase 2 implementation adds world-scoped provider integration UI only. It does not alter provider kernel behavior or expose resolved secrets.
 - Phase 3 added a media asset admin console using existing media APIs and admin foundation patterns. It did not add storage delivery, public reader media delivery, schema changes, or backend media kernel behavior changes.
-- Phase 4 should add a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. Do not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery unless the Phase 4 plan explicitly requires them.
+- Phase 4 should add a visual asset admin console using existing visual APIs, media references, and admin foundation patterns. Do not add automatic sprite/background generation, background orchestration, nullable worldline visual defaults, schema changes, backend visual behavior changes, or public reader delivery.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
 
@@ -31,7 +31,7 @@
 
 ## Required Next Steps
 
-- Start the Phase 4 Visual Asset Admin Console planning checkpoint from clean local `main`.
+- Commit the Phase 4 Visual Asset Admin Console docs-only planning checkpoint, then start `feat/visual-admin-console` from clean local `main`.
 - Continue to preserve Phase 13 guardrails and do not push unless explicitly requested.
 
 ## Latest Verification

@@ -979,3 +979,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 3 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 4 from clean local `main`; do not push unless explicitly requested.
+
+## v0.4 Visual Asset Admin Console plan entry
+
+- Date: 2026-05-13
+- Branch: main
+- Scope: Final implementation plan for v0.4 Operator/Admin UX Phase 4.
+- Summary: Added the v0.4.4 plan for a world-scoped visual asset admin console at `/worlds/{worldId}/visual`. The plan covers strict-worldline sprite sets, sprite variants, scene backgrounds, sprite/background resolver previews, and explicit compose-scene actions using existing visual and media APIs without backend visual behavior changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.4.4-visual-admin-console-plan.md`, `/openspec/changes/v0-4-operator-admin-ux/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only change; verify with `git diff --check`.
+- Docs updated: project index, file inventory, change journal, task board, and active handoff.
+- Follow-up notes: Implementation should start on `feat/visual-admin-console` after this docs-only work is committed on `main`.

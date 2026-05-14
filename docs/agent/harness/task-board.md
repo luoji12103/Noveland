@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.4 Operator/Admin UX Phase 4: Visual Asset Admin Console planning
+- v0.4 Operator/Admin UX Phase 4: Visual Asset Admin Console implementation planning checkpoint
 
 ## Blocked
 - None
