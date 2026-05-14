@@ -31,6 +31,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md` — final v0.4 Operator/Admin UX Phase 6 implementation plan.
 - `docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md` — final v0.4 Operator/Admin UX Phase 7 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.1-authoring-import-core-plan.md` — final v0.5 Authoring & Import Studio Phase 1 implementation plan.
+- `docs/agent/harness/feature-updates/v0.5.2-script-parser-dialogue-extractor-plan.md` — final v0.5 Authoring & Import Studio Phase 2 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4 Operator/Admin UX change, and proposed roadmap changes for v0.5+.
 - `docs/agent/harness/task-board.md` — current execution state only.
@@ -200,6 +201,7 @@ Fast orientation for a new coding session.
   - `noveland.authoring.contracts` — v0.5 authoring source, import run, proposal, review, preview, apply, and safe JSON DTOs
   - `noveland.authoring.models` — strict-worldline source batch, source asset, source fragment, import run, proposal, review decision, and source traceability ORM models
   - `noveland.authoring.service` — authoring source registry plus proposal/review/trace-only apply service with media worldline validation and no provider execution
+  - `noveland.authoring.parser` — deterministic script fragment parser for dialogue, scene, choice, route, and event proposal candidates
 - `backend/packages/invocations/`
   - `noveland.invocations.contracts` — invocation, prompt template, prompt snapshot, tag, search, redaction, retention, and runtime-run link DTOs
   - `noveland.invocations.models` — worldline-scoped model invocation, prompt template, prompt snapshot, runtime-run join, and invocation tag ORM models

@@ -1171,3 +1171,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 1 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 2 from clean local `main`; do not push unless explicitly requested.
+
+## v0.5 Script Parser & Dialogue Extractor plan entry
+
+- Date: 2026-05-14
+- Branch: main
+- Scope: Final implementation plan for v0.5 Authoring & Import Studio Phase 2.
+- Summary: Added the v0.5.2 plan for deterministic parsing of existing authoring source fragments into reviewable Phase 1 proposals. The plan explicitly avoids provider-backed parsing, new migrations unless required, Web UI, direct canonical mutation, raw full source persistence, world events, and new `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.5.2-script-parser-dialogue-extractor-plan.md`, `/openspec/changes/v0-5-authoring-import-studio/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, and change journal.
+- Follow-up notes: Implementation should start on `feat/script-parser-dialogue-extractor` after this docs-only checkpoint is committed.

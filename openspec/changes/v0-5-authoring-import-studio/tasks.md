@@ -16,7 +16,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 2 — Script Parser & Dialogue Extractor
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `script-parser-dialogue-extractor` scope only.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.

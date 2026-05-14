@@ -103,6 +103,7 @@
 - v0.5 Authoring & Import Studio Phase 1 targeted tests
 - v0.5 Authoring & Import Studio Phase 1 full local gate
 - v0.5 Authoring & Import Studio Phase 1 fast-forward merge
+- v0.5 Authoring & Import Studio Phase 2 planning checkpoint
 
 ## Upcoming Mainline
 - v0.5 Phase 2 should start from clean local `main` with a docs-only planning

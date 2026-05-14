@@ -384,6 +384,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.4.6-invocation-ledger-browser-plan.md`
 - `docs/agent/harness/feature-updates/v0.4.7-multimodal-diagnostics-dashboard-plan.md`
 - `docs/agent/harness/feature-updates/v0.5.1-authoring-import-core-plan.md`
+- `docs/agent/harness/feature-updates/v0.5.2-script-parser-dialogue-extractor-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `openspec/`
@@ -414,6 +415,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/contracts.py`
 - `backend/packages/authoring/src/noveland/authoring/models.py`
 - `backend/packages/authoring/src/noveland/authoring/service.py`
+- `backend/packages/authoring/src/noveland/authoring/parser.py`
+- `backend/tests/test_authoring_parser_service.py`
 - `backend/services/api/src/noveland/services/api/authoring.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/test_authoring_service.py`
