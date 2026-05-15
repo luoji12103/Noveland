@@ -2,37 +2,47 @@
 
 ## Capability
 
-Render image, sprite, background, voice, subtitles, and turn presentation playback. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
+Render published conversation or presentation playback using reader-safe media descriptors, turn presentation state, subtitles, and audio. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Conversation Playback UI provides the planned workflow
-The system SHALL provide Conversation Playback UI capability for Playback UI, Turn presentation rendering, Audio playback while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Playback consumes safe presentation data
+The system SHALL render playback from reader/member-safe conversation turn presentation DTOs and SHALL NOT fetch admin-only media, invocation, or prompt snapshot data.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Conversation Playback UI
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse conversation presentations, media delivery, speech assets rather than creating a parallel subsystem.
+#### Scenario: Playback renders a visible turn
+- **Given** a conversation turn has a reader-visible presentation, sprite, background, and TTS media
+- **When** a reader opens playback
+- **Then** the UI SHALL render the turn using safe presentation and media descriptors
+- **And** no admin evidence or storage internals SHALL appear in the page data.
 
-### Requirement: Conversation Playback UI preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Conversation Playback UI, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+### Requirement: Playback depends on Reader Media Delivery
+The system SHALL use the Reader Media Delivery capability for audio and image access.
 
-#### Scenario: Boundary enforcement
-- **Given** Conversation Playback UI reads or writes provider, media, invocation, visual, speech, event, or presentation data
-- **When** the capability returns API/UI data or persists records
-- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
-- **And** it SHALL validate world and worldline scope where applicable.
+#### Scenario: Audio respects media visibility
+- **Given** a TTS media asset is no longer reader-visible
+- **When** playback tries to render the turn
+- **Then** the UI SHALL show a safe missing-audio state
+- **And** the media delivery endpoint SHALL not serve the hidden object.
 
-### Requirement: Conversation Playback UI has explicit acceptance evidence
-The system SHALL provide focused validation for Conversation Playback UI and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+### Requirement: Playback is read-only for presentation state
+The reader playback UI SHALL NOT edit conversation turn presentation records.
+
+#### Scenario: Reader cannot edit presentation
+- **Given** a reader is viewing playback
+- **When** they interact with playback controls
+- **Then** the system SHALL only change local playback state
+- **And** it SHALL NOT mutate canonical presentation records.
+
+### Requirement: Playback has explicit acceptance evidence
+The implementation SHALL include component, safe-data, and e2e smoke tests.
 
 #### Scenario: Phase acceptance
-- **Given** implementation for Conversation Playback UI is complete
-- **When** targeted validation and the full local gate run
-- **Then** all expected validation checks SHALL pass
-- **And** the phase SHALL be merged only by fast-forward to clean local main.
+- **Given** Conversation Playback UI implementation is complete
+- **When** targeted tests and the full local gate run
+- **Then** all checks SHALL pass before fast-forward merge.
 
 ## Non-goals
 
-- Editing presentation state in reader UI
+- Editing presentation state in reader UI.
+- Exposing prompt snapshots or model invocation details.
+- Streaming playback.

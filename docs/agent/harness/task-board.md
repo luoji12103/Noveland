@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.7 Production Hardening Phase 6: Observability & Incident Diagnostics
+- None
 
 ## Blocked
 - None
@@ -219,9 +219,30 @@
 - v0.7 Production Hardening Phase 5 targeted tests
 - v0.7 Production Hardening Phase 5 full local gate
 - v0.7 Production Hardening Phase 5 fast-forward merge
+- v0.7 Production Hardening Phase 6 planning checkpoint
+- v0.7 Production Hardening Phase 6 implementation
+- v0.7 Production Hardening Phase 6 targeted tests
+- v0.7 Production Hardening Phase 6 full local gate
+- v0.7 Production Hardening Phase 6 fast-forward merge
+- v0.7 Production Hardening Phase 7 planning checkpoint
+- v0.7 Production Hardening Phase 7 implementation
+- v0.7 Production Hardening Phase 7 targeted tests
+- v0.7 Production Hardening Phase 7 full local gate
+- v0.7 Production Hardening Phase 7 fast-forward merge
+- v0.7 Production Hardening Phase 8 planning checkpoint
+- v0.7 Production Hardening Phase 8 implementation
+- v0.7 Production Hardening Phase 8 targeted tests
+- v0.7 Production Hardening Phase 8 full local gate
+- v0.7 Production Hardening Phase 8 fast-forward merge
+- v0.7 Production Hardening final acceptance review
+- v0.8 Public Experience & Ecosystem feasibility review
+- v0.8 Public Experience & Ecosystem OpenSpec plan adaptation
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
+- v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
+- v0.8 Public Experience & Ecosystem should start with Phase 1 Reader Media Delivery after the reader media auth/delivery model is accepted.
+- v0.8 implementation must use the adapted OpenSpec plan and a docs-only phase checkpoint before code changes.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.
 - v0.7 Phase 3 Cost & Rate Control is complete.
@@ -230,8 +251,7 @@
 - v0.7 Phase 6 Observability & Incident Diagnostics is complete.
 - v0.7 Phase 7 Security Regression Suite is complete.
 - v0.7 Phase 8 Production Readiness Gate is complete.
-- v0.7 Production Hardening is locally complete and ready for archive/release-note work if requested.
-- v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
+- v0.8 should keep reader/media/API contracts stable before playback, galgame, packaging, moderation, and launch-gate implementation.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

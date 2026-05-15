@@ -2,37 +2,46 @@
 
 ## Capability
 
-Support branch viewing, rollback/switch review, and worldline comparison. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
+Support authorized worldline branch viewing and read-only comparison while preserving branch isolation. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Worldline Browser provides the planned workflow
-The system SHALL provide Worldline Browser capability for Worldline tree/list, Branch compare, Switch/review UI while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Worldline browser is read-only first
+The system SHALL provide worldline list/tree and comparison views without executing rollback, merge, or branch switching in the first implementation scope.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Worldline Browser
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse worldline services, event snapshots, comparison APIs rather than creating a parallel subsystem.
+#### Scenario: Authorized branch comparison
+- **Given** an authorized actor can access two worldlines in the same world
+- **When** they compare the branches
+- **Then** the system SHALL return safe summaries of state differences
+- **And** it SHALL NOT mutate either worldline.
 
-### Requirement: Worldline Browser preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Worldline Browser, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+### Requirement: Browser enforces worldline visibility
+The system SHALL enforce ACL and worldline visibility for reader/member/player views.
 
-#### Scenario: Boundary enforcement
-- **Given** Worldline Browser reads or writes provider, media, invocation, visual, speech, event, or presentation data
-- **When** the capability returns API/UI data or persists records
-- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
-- **And** it SHALL validate world and worldline scope where applicable.
+#### Scenario: Reader lacks branch access
+- **Given** a reader is not allowed to view a private branch
+- **When** they request the worldline tree
+- **Then** the private branch SHALL be omitted or denied
+- **And** no branch-specific hidden media or presentation data SHALL leak.
 
-### Requirement: Worldline Browser has explicit acceptance evidence
-The system SHALL provide focused validation for Worldline Browser and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+### Requirement: Browser preserves strict-worldline media and presentation state
+The system SHALL keep visual bindings, presentation records, player records, and publications scoped to their original worldline in comparison output.
+
+#### Scenario: Branch-specific sprite state
+- **Given** two worldlines have different sprite variants for a character
+- **When** comparison output is generated
+- **Then** each variant SHALL remain attributed to its own worldline.
+
+### Requirement: Worldline browser has explicit acceptance evidence
+The implementation SHALL include read-only, ACL, comparison, and isolation tests.
 
 #### Scenario: Phase acceptance
-- **Given** implementation for Worldline Browser is complete
-- **When** targeted validation and the full local gate run
-- **Then** all expected validation checks SHALL pass
-- **And** the phase SHALL be merged only by fast-forward to clean local main.
+- **Given** Worldline Browser implementation is complete
+- **When** targeted tests and the full local gate run
+- **Then** all checks SHALL pass before fast-forward merge.
 
 ## Non-goals
 
-- Unsafe destructive rollback without confirmation
+- Unsafe destructive rollback.
+- Branch merge.
+- Switch execution without explicit later approval.

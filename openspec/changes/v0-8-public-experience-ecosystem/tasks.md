@@ -1,13 +1,21 @@
 # Tasks — v0.8 Public Experience & Ecosystem
 
-Use these tasks when implementation is explicitly requested. Do not mark items complete during roadmap-only work.
+Use these tasks when implementation is explicitly requested. Planning tasks may be marked complete during roadmap alignment; implementation tasks must only be marked complete after code, tests, local gate, fast-forward merge, and harness updates are done.
+
+## Planning / Preflight
+
+- [x] Confirm v0.7 Production Hardening local acceptance state.
+- [x] Review current repository capabilities against the original v0.8 roadmap.
+- [x] Add v0.8 feasibility/adaptation review to harness docs.
+- [x] Update v0.8 OpenSpec proposal/design/phase-plan/specs for the current baseline.
 
 ## Phase 1 — Reader Media Delivery
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `reader-media-delivery` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Decide first-cut reader media auth model and delivery mechanism.
+- [ ] Inventory current admin/member media download and narrative reader routes.
+- [ ] Implement reader-safe media descriptors and delivery policy only.
+- [ ] Add focused API, ACL, visibility, and leak tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -15,10 +23,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 2 — Conversation Playback UI
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `conversation-playback-ui` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Confirm Phase 1 reader media descriptors are stable.
+- [ ] Implement playback UI over safe presentation DTOs only.
+- [ ] Add component and e2e playback smoke tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -26,10 +34,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 3 — Player Interaction UI
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `player-interaction-ui` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Map UI workflows to existing player choice, journal, notification, and intervention records.
+- [ ] Implement player interaction UI without a new player record framework.
+- [ ] Add UI, API, ACL, and spoiler/leak tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -37,10 +45,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 4 — Worldline Browser
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `worldline-browser` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Define read-only worldline browser DTOs and ACL expectations.
+- [ ] Implement browsing/comparison without rollback execution.
+- [ ] Add worldline isolation, ACL, and UI tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -48,10 +56,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 5 — Scene View / Galgame View
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `scene-view-galgame-view` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Confirm Phase 1 and Phase 2 safe media/playback contracts are sufficient.
+- [ ] Implement scene view over presentation records and reader media descriptors.
+- [ ] Add responsive, accessibility, component, and e2e tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -59,10 +67,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 6 — Player Privacy & Data Controls
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `player-privacy-data-controls` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Decide export/delete request schema and shared-world safeguards.
+- [ ] Implement player data export/delete-request workflow only.
+- [ ] Add privacy, ACL, export-redaction, and request-review tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -70,10 +78,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 7 — World Packaging
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `world-packaging` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Define safe bundle and media manifest schemas.
+- [ ] Implement export, import preview, and reviewed apply.
+- [ ] Add manifest, import/export, compatibility, and leak tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -81,10 +89,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 8 — Plugin/Provider Package Contract
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `plugin-provider-package-contract` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Define package metadata, capability, config export, and safety review contracts.
+- [ ] Implement contract validation without marketplace or untrusted-code installation.
+- [ ] Add plugin/provider governance and secret-redaction tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -92,10 +100,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 9 — Sample World Release Package
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `sample-world-release-package` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Define sample content/media manifest and fixture linkage.
+- [ ] Implement deterministic sample package import/export support only.
+- [ ] Add sample package, fixture, rights/visibility, and leak tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -103,10 +111,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 10 — Moderation & Incident Workflow
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `moderation-incident-workflow` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Resolve schema/router ownership before implementation.
+- [ ] Implement report/review/disable workflow without automatic moderation.
+- [ ] Add moderation ACL, evidence-redaction, audit, and rollback-review tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
@@ -114,10 +122,10 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 11 — Public Launch Gate
 
-- [ ] Write phase planning checkpoint.
-- [ ] Implement `public-launch-gate` scope only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
+- [ ] Write docs-only phase planning checkpoint.
+- [ ] Define public readiness evidence inputs from v0.7 and v0.8 phases.
+- [ ] Implement public launch readiness aggregation without duplicate release framework.
+- [ ] Add readiness, blocker, ACL, signoff, and evidence-redaction tests.
 - [ ] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.

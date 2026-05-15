@@ -2,37 +2,47 @@
 
 ## Capability
 
-Define world bundle manifest, media bundle manifest, import, and export. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
+Define safe world bundle and media bundle manifests with import preview and reviewed apply. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: World Packaging provides the planned workflow
-The system SHALL provide World Packaging capability for World export, World import, Media manifest while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: World export uses safe manifests
+The system SHALL export world and media manifests that use portable references and exclude secrets, storage internals, raw prompts, and raw outputs.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using World Packaging
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse media assets/objects, world records, OpenSpec/current contracts rather than creating a parallel subsystem.
+#### Scenario: Export manifest generation
+- **Given** an admin exports a world package
+- **When** the manifest is generated
+- **Then** it SHALL include portable world, worldline, media, publication, and presentation references
+- **And** it SHALL NOT include `storage_uri`, filesystem paths, resolved secrets, raw prompt snapshots, or raw provider outputs.
 
-### Requirement: World Packaging preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for World Packaging, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+### Requirement: World import uses preview before apply
+The system SHALL validate imports in a preview step before mutating world state.
 
-#### Scenario: Boundary enforcement
-- **Given** World Packaging reads or writes provider, media, invocation, visual, speech, event, or presentation data
-- **When** the capability returns API/UI data or persists records
-- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
-- **And** it SHALL validate world and worldline scope where applicable.
+#### Scenario: Import preview detects incompatibility
+- **Given** a package references an unsupported capability
+- **When** import preview runs
+- **Then** it SHALL report a blocker
+- **And** it SHALL NOT create world, media, or provider records.
 
-### Requirement: World Packaging has explicit acceptance evidence
-The system SHALL provide focused validation for World Packaging and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+### Requirement: Media references remain portable
+The system SHALL map packaged media references through the existing media kernel during import apply.
+
+#### Scenario: Apply portable media manifest
+- **Given** a package has a valid media manifest
+- **When** an admin applies the import
+- **Then** media records SHALL be created or linked through existing media services
+- **And** no second media framework SHALL be introduced.
+
+### Requirement: World packaging has explicit acceptance evidence
+The implementation SHALL include manifest, preview/apply, compatibility, and leak tests.
 
 #### Scenario: Phase acceptance
-- **Given** implementation for World Packaging is complete
-- **When** targeted validation and the full local gate run
-- **Then** all expected validation checks SHALL pass
-- **And** the phase SHALL be merged only by fast-forward to clean local main.
+- **Given** World Packaging implementation is complete
+- **When** targeted tests and the full local gate run
+- **Then** all checks SHALL pass before fast-forward merge.
 
 ## Non-goals
 
-- Including secrets or internal storage URIs in bundles
+- Including secrets or internal storage URIs in bundles.
+- Marketplace distribution.
+- Bulk historical backfill.

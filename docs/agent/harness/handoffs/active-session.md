@@ -2,12 +2,12 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.7 Production Hardening Phase 8.
-- Status: v0.7 Production Hardening is locally complete and fast-forward merged to `main`.
+- Objective: v0.8 Public Experience & Ecosystem planning adaptation.
+- Status: v0.7 Production Hardening is locally complete and v0.8 OpenSpec has been adapted to the current repository baseline.
 
 ## Current Context
 
-- `main` is ahead of `origin/main` after local v0.6 work; do not push unless explicitly requested.
+- `main` is ahead of `origin/main`; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
 - Current Phase 3-13, v0.4, and v0.5 implemented behavior is represented under `openspec/specs/`.
@@ -27,8 +27,11 @@
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - v0.6 Runtime Narrative Quality is complete locally and ready to archive if requested; this session does not archive it.
-- v0.7 Production Hardening Phase 7 should consolidate secret, prompt/output, storage/path, ACL, and worldline isolation regressions without adding product runtime behavior.
-- v0.7 Phase 7 first implementation should be test-only unless a regression exposes a narrow bug that can be fixed without schema or router growth.
+- v0.7 Production Hardening is complete locally and ready to archive/release-note work if requested; this session does not archive it.
+- v0.8 Public Experience & Ecosystem feasibility review has been added at `docs/agent/harness/feature-updates/v0.8-public-experience-ecosystem-feasibility-review.md`.
+- v0.8 OpenSpec now requires Reader Media Delivery to start with public/read-only contract inventory, reader-safe media descriptors, explicit auth/delivery model, and no storage path leak before playback/galgame UI phases.
+- v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
+- v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -46,7 +49,9 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start v0.8 with a feasibility review before implementation if requested.
+- Start v0.8 implementation only after a docs-only Phase 1 Reader Media Delivery checkpoint.
+- Resolve the Phase 1 reader media auth/delivery model before implementation: authenticated-reader/member-only, public unauthenticated, or mixed by visibility policy.
+- Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
 
 ## Latest Verification
 
@@ -154,3 +159,4 @@
 - v0.7 Phase 8 targeted checks passed: backend ruff for observability readiness code/API/tests, backend mypy for the same files, and targeted pytest (`14 passed`).
 - v0.7 Phase 8 full local gate passed: backend ruff, backend mypy (`256 source files`), backend pytest (`415 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 8 fast-forward merge to local `main` completed.
+- v0.8 feasibility review and OpenSpec plan adaptation are docs-only. Validation target is OpenSpec strict validation plus `git diff --check`.

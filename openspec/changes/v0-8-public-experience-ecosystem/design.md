@@ -2,60 +2,67 @@
 
 ## Context
 
-Noveland should expose safe reader/player experiences, worldline navigation, media playback, world packaging, and plugin/provider packaging while preserving production/security boundaries.
+Noveland has completed the backend multimodal foundation, operator/admin UX, authoring/import studio, runtime narrative quality APIs, and production hardening locally. v0.6 and v0.7 remain active OpenSpec changes until archived, so their implemented behavior is represented by their active change docs, harness records, and current repository code.
 
-Current `openspec/specs/` files describe the implemented Phase 3-13 baseline. This change is proposed future work and must remain under `openspec/changes/` until implemented and archived.
+v0.8 is the first roadmap section that intentionally exposes reader/player and ecosystem-facing surfaces. The main risk is not implementation difficulty; it is accidentally reusing admin/member DTOs in public contexts and leaking storage paths, secrets, raw prompts, raw outputs, hidden media, or worldline-private state.
 
-## Goals / Non-Goals
+## Goals
 
-Goals:
+- Define a current-repo-aligned v0.8 implementation sequence.
+- Keep all reader/player/public surfaces behind explicit safe DTOs, visibility checks, and ACL rules.
+- Reuse existing media, provider, invocation, multimodal, player, plugin, diagnostic, and readiness systems.
+- Make the first implementation phase API/backend-first so UI phases depend on stable reader-safe contracts.
+- Preserve the completed Phase 13 and v0.7 architecture guardrails.
 
-- Define a roadmap-level architecture for v0.8 Public Experience & Ecosystem.
-- Split the version into 11 independently implementable, testable, mergeable phases.
-- Preserve the Phase 13 architecture freeze.
+## Non-Goals
 
-Non-goals:
+- Bypassing v0.7 internal production readiness.
+- Exposing hidden or `developer_only` media to readers.
+- Exposing resolved provider secrets.
+- Exposing `storage_uri`, filesystem paths, bytes, base64, raw prompts, or raw outputs.
+- Adding provider marketplace, streaming, runtime daemon execution, or automatic provider spend.
+- Adding broad new routes to `worlds.py`.
+- Replacing existing media/provider/eval/readiness frameworks.
 
-- Bypassing production readiness
-- Exposing developer_only/hidden media
-- Exposing raw invocation prompts/outputs
-- Exposing storage_uri/path
-- Plugins bypassing provider secret boundary
-- Unreviewed public world launch
+## Accepted Planning Decisions
 
-## Decisions
-
-- Reader/player delivery must use safe public DTOs and visibility checks.
-- World packaging must exclude secrets and internal storage references.
-- Plugin/provider packaging describes capabilities and safety review before installation.
-- Public launch gate builds on v0.7 internal readiness rather than replacing it.
+- v0.8 implementation must start with a feasibility and public/read-only contract checkpoint.
+- Reader Media Delivery is backend/API-first and must precede playback and galgame UI work.
+- The first reader media implementation should prefer application-controlled delivery or opaque short-lived tokens over external public storage URLs unless a later design explicitly accepts external delivery.
+- Conversation Playback UI and Scene View / Galgame View must consume reader-safe media descriptors and presentation DTOs; they must not read `MediaObjectRecord.storage_uri` or admin media DTOs.
+- Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord` semantics.
+- Worldline Browser starts as read-only browse/compare. Destructive rollback or switch execution requires explicit phase-level approval.
+- World Packaging uses preview/apply discipline and excludes secrets, internal paths, raw prompt/output evidence, and resolved provider config.
+- Plugin/Provider Package Contract builds on the plugin catalog, plugin binding validation, provider registry, provider capabilities, and `ProviderSecretResolver`.
+- Moderation & Incident Workflow needs an explicit schema/router decision before implementation.
+- Public Launch Gate builds on v0.7 `ProductionReadinessGateService` and must not replace internal production readiness.
 
 ## Architecture Guardrails
 
-- no storage_uri/path/base64/bytes in world_events.payload
-- no raw prompt/output in world_events.payload
-- no resolved provider secret exposure
-- strict worldline visual state
-- provider output does not directly mutate world state
-- media assets are not narrative artifacts
-- ComfyUI remains optional provider, not a core dependency
-- asset generation remains admin apply only unless a future accepted OpenSpec change changes it
-- conversation presentation remains API-only until a specific UI phase implements it
-- no runtime daemon auto-generation unless a future accepted OpenSpec change changes it
-- reader/player-facing routes do not expose admin/developer-only data
+- No `storage_uri`, filesystem path, bytes, base64, raw prompt, or raw output in `world_events.payload`.
+- No resolved provider secret in API responses, diagnostics, prompt snapshots, health metadata, logs, package manifests, or public exports.
+- Strict worldline isolation for visual bindings, conversation presentations, player records, narrative publications, package contents, and reader DTOs.
+- Provider outputs do not directly mutate public world state.
+- Media assets are not narrative artifacts.
+- ComfyUI remains optional provider, not a core dependency.
+- Asset generation remains admin apply only unless a later accepted OpenSpec change changes it.
+- Reader/player-facing routes do not expose admin/developer-only evidence.
 
-## Risks / Trade-offs
+## Risks / Trade-Offs
 
-- Public media delivery can leak internal paths: Use signed/safe delivery endpoints and visibility checks.
-- Plugins can bypass boundaries: Require package contracts and safety review.
-- Public launch can outpace moderation: Add moderation and incident workflow before launch gate acceptance.
+- Public media delivery can leak internal object paths if it reuses admin download responses. Mitigation: define reader-safe media descriptors and delivery policy first.
+- UI work can accidentally couple to unstable backend contracts. Mitigation: place Reader Media Delivery before playback and galgame UI.
+- Plugin packaging can blur into marketplace behavior. Mitigation: keep v0.8 to package metadata, validation, and safety review.
+- Moderation can become a large governance subsystem. Mitigation: require an architecture decision before adding schema or routes.
+- Public launch can outpace readiness evidence. Mitigation: aggregate v0.7 internal readiness and add public-specific blockers.
 
 ## Migration Plan
 
-This roadmap skeleton does not add migrations. Future implementation phases must explicitly propose migrations when schema changes are required and must stop if phase plans and migration needs conflict.
+This roadmap update adds no migrations. Future implementation phases must declare migration needs in their phase checkpoint. If a phase discovers a schema need not anticipated by the checkpoint, stop and update OpenSpec/harness docs before implementation continues.
 
-## Open Questions
+## Open Questions Before Implementation
 
-- Which phases can remain API-only and which require Web work when implementation begins?
-- Which phases require new schema versus reuse of existing media/provider/invocation/eval records?
-- Which phase should be selected first when the user asks to begin this version?
+- Is first-cut reader media delivery authenticated-reader/member-only, public unauthenticated, or mixed by visibility policy?
+- Should delivery use application streaming, opaque short-lived media tokens, or both?
+- Which existing media/publication visibility fields are authoritative for reader media access?
+- Should moderation records live in a dedicated package/router or extend observability?

@@ -2,38 +2,46 @@
 
 ## Capability
 
-Package a complete demonstrable sample world with content, media bundle, and regression fixture linkage. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
+Package a demonstrable sample world with content, media bundle, and Phase 13 regression fixture linkage. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Sample World Release Package provides the planned workflow
-The system SHALL provide Sample World Release Package capability for Sample world content, Media bundle, Regression fixture linkage while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Sample package links to regression fixture
+The system SHALL document and test how the release sample maps to the deterministic Phase 13 multimodal sample-world fixture.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Sample World Release Package
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse Phase 13 fixture, world packaging, media manifests rather than creating a parallel subsystem.
+#### Scenario: Fixture-linked package
+- **Given** a sample release package is created
+- **When** its manifest is inspected
+- **Then** it SHALL identify the fixture linkage and expected records
+- **And** it SHALL avoid real provider calls during deterministic validation.
 
-### Requirement: Sample World Release Package preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Sample World Release Package, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+### Requirement: Sample package has explicit content rights and visibility
+The system SHALL record rights, source, and visibility metadata for bundled content and media.
 
-#### Scenario: Boundary enforcement
-- **Given** Sample World Release Package reads or writes provider, media, invocation, visual, speech, event, or presentation data
-- **When** the capability returns API/UI data or persists records
-- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
-- **And** it SHALL validate world and worldline scope where applicable.
+#### Scenario: Sample media visibility
+- **Given** a sprite or background is included in the sample package
+- **When** the package manifest is generated
+- **Then** the asset visibility and rights metadata SHALL be explicit
+- **And** unlicensed third-party content SHALL be excluded.
 
-### Requirement: Sample World Release Package has explicit acceptance evidence
-The system SHALL provide focused validation for Sample World Release Package and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+### Requirement: Sample package imports deterministically
+The system SHALL support deterministic import of the sample package using world packaging and media manifests.
+
+#### Scenario: Deterministic sample import
+- **Given** a valid sample package
+- **When** import preview and apply run in a clean environment
+- **Then** the resulting records SHALL match the expected fixture contract.
+
+### Requirement: Sample package has explicit acceptance evidence
+The implementation SHALL include sample package, fixture, rights/visibility, and leak tests.
 
 #### Scenario: Phase acceptance
-- **Given** implementation for Sample World Release Package is complete
-- **When** targeted validation and the full local gate run
-- **Then** all expected validation checks SHALL pass
-- **And** the phase SHALL be merged only by fast-forward to clean local main.
+- **Given** Sample World Release Package implementation is complete
+- **When** targeted tests and the full local gate run
+- **Then** all checks SHALL pass before fast-forward merge.
 
 ## Non-goals
 
-- Production seed framework
-- Unlicensed third-party content
+- Production seed framework.
+- Unlicensed third-party content.
+- Real provider calls during sample import validation.

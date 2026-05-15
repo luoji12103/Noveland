@@ -2085,3 +2085,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: v0.7 is ready for archive/release notes if requested. Do not push unless explicitly requested.
+
+## v0.8 Public Experience & Ecosystem feasibility review entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.7 final acceptance confirmation and v0.8 OpenSpec plan adaptation
+- Summary: Confirmed the completed v0.7 Production Hardening local acceptance state, reviewed the proposed v0.8 roadmap against current main, and updated the v0.8 OpenSpec proposal, design, phase plan, tasks, and capability specs to require reader-safe API/media contracts before UI and public launch work.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8-public-experience-ecosystem-feasibility-review.md`, `/openspec/changes/v0-8-public-experience-ecosystem/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation and OpenSpec planning only.
+- Docs updated: v0.8 feasibility review, OpenSpec v0.8 change docs/specs, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Archive v0.7 and generate release notes only if requested. Start v0.8 implementation with Phase 1 Reader Media Delivery after resolving the reader media auth/delivery model.

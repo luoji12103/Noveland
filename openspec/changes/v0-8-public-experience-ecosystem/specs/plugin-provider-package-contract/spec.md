@@ -2,38 +2,46 @@
 
 ## Capability
 
-Define adapter packaging, capability schema, safety review, and config export without secrets. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
+Define plugin/provider package metadata, capability schema, safe config export, and safety review without exposing secrets. This capability belongs to v0.8 Public Experience & Ecosystem and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Plugin/Provider Package Contract provides the planned workflow
-The system SHALL provide Plugin/Provider Package Contract capability for Plugin package metadata, Provider adapter package contract, Safety review checklist while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Packages declare capabilities and boundaries
+The system SHALL represent package metadata with identifier, version, capability declarations, config schema, supported provider/media modes, and safety notes.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Plugin/Provider Package Contract
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse plugins package, provider registry, ProviderSecretResolver rather than creating a parallel subsystem.
+#### Scenario: Package metadata validation
+- **Given** a provider adapter package declares image and speech capabilities
+- **When** the package contract is validated
+- **Then** the validator SHALL check capability names and adapter boundaries
+- **And** it SHALL reject unknown secret-bearing config fields.
 
-### Requirement: Plugin/Provider Package Contract preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Plugin/Provider Package Contract, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+### Requirement: Package config export excludes secrets
+The system SHALL export only safe config templates and `auth_ref` references, never resolved provider credentials.
 
-#### Scenario: Boundary enforcement
-- **Given** Plugin/Provider Package Contract reads or writes provider, media, invocation, visual, speech, event, or presentation data
-- **When** the capability returns API/UI data or persists records
-- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
-- **And** it SHALL validate world and worldline scope where applicable.
+#### Scenario: Export provider package config
+- **Given** a provider integration has `auth_ref=env:OPENAI_API_KEY`
+- **When** config is exported for a package
+- **Then** the export MAY include the opaque auth reference
+- **And** it SHALL NOT include the resolved environment value.
 
-### Requirement: Plugin/Provider Package Contract has explicit acceptance evidence
-The system SHALL provide focused validation for Plugin/Provider Package Contract and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+### Requirement: Package contracts reuse plugin and provider systems
+The system SHALL reuse plugin catalog/binding validation, provider registry/capabilities, and `ProviderSecretResolver` rather than adding a provider marketplace or secret resolver.
+
+#### Scenario: Plugin binding compatibility check
+- **Given** a package declares a model-provider capability
+- **When** it is checked against existing plugin/provider registries
+- **Then** compatibility SHALL be reported through existing validation concepts where possible.
+
+### Requirement: Package contract has explicit acceptance evidence
+The implementation SHALL include package validation, provider governance, and secret-redaction tests.
 
 #### Scenario: Phase acceptance
-- **Given** implementation for Plugin/Provider Package Contract is complete
-- **When** targeted validation and the full local gate run
-- **Then** all expected validation checks SHALL pass
-- **And** the phase SHALL be merged only by fast-forward to clean local main.
+- **Given** Plugin/Provider Package Contract implementation is complete
+- **When** targeted tests and the full local gate run
+- **Then** all checks SHALL pass before fast-forward merge.
 
 ## Non-goals
 
-- Provider marketplace
-- Plugins resolving secrets directly
+- Provider marketplace.
+- Runtime installation of untrusted code.
+- Plugins resolving secrets directly.
