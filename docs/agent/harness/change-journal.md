@@ -66,6 +66,17 @@
 - Docs updated: project index, file inventory, change journal, task board, active handoff
 - Follow-up notes: Implement Phase 5 on `feat/narrative-writer-v2`; do not add Web UI, broad `worlds.py` routes, legacy provider profile expansion, automatic publication, or world event writes.
 
+## v0.6.5 Narrative Writer v2 implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/narrative-writer-v2
+- Scope: v0.6 Runtime Narrative Quality Phase 5 implementation
+- Summary: Added first-class nullable narrative artifact/publication worldline columns and an admin-only Narrative Writer v2 generation API that uses provider-kernel text execution to create strict-worldline draft artifacts.
+- Files changed: `/backend/packages/narrative/**`, `/backend/packages/narrative_quality/**`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/migrations/**`, `/backend/tests/**`, `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: narrative quality service/API tests for writer v2, narrative writer publication worldline assertion, schema metadata, Alembic head, provider execution regression
+- Docs updated: task board, active handoff, change journal, migrations README
+- Follow-up notes: Full local gate must pass before fast-forward merge. Phase 5 does not publish artifacts, write world events, expand legacy provider profiles, or add Web UI.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

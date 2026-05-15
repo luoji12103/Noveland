@@ -2155,11 +2155,13 @@ def test_core_schema_world_scoped_foreign_keys_are_present() -> None:
         "conversation_sessions.id",
         "agent_runtime_runs.id",
         "agents.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("narrative_publications") == {
         "narrative_artifacts.id",
         "users.id",
+        "worldlines.id",
         "worlds.id",
     }
     assert foreign_key_targets("runtime_diagnostic_events") == {
@@ -2374,11 +2376,15 @@ def test_core_schema_indexes_cover_world_boundaries() -> None:
     )
     assert "ix_agent_runtime_runs_provider_profile_id" in index_names("agent_runtime_runs")
     assert "ix_narrative_artifacts_world_created_at" in index_names("narrative_artifacts")
+    assert "ix_narrative_artifacts_worldline_created_at" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_agent" in index_names("narrative_artifacts")
     assert "ix_narrative_artifacts_world_conversation_created_at" in index_names(
         "narrative_artifacts",
     )
     assert "ix_narrative_publications_world_status_visible" in index_names(
+        "narrative_publications",
+    )
+    assert "ix_narrative_publications_worldline_status_visible" in index_names(
         "narrative_publications",
     )
     assert "ix_narrative_publications_world_published_at" in index_names(
@@ -2410,11 +2416,13 @@ def test_world_schema_includes_memory_backend_profile_column() -> None:
 
 
 def test_narrative_schema_includes_conversation_source_column() -> None:
-    assert {"source_conversation_id"} <= column_names("narrative_artifacts")
+    assert {"worldline_id", "source_conversation_id"} <= column_names("narrative_artifacts")
+    assert Base.metadata.tables["narrative_artifacts"].c.worldline_id.nullable is True
 
 
 def test_narrative_publication_schema_includes_workflow_columns() -> None:
     assert {
+        "worldline_id",
         "artifact_id",
         "source_draft_id",
         "status",
@@ -2424,3 +2432,4 @@ def test_narrative_publication_schema_includes_workflow_columns() -> None:
         "unpublished_at",
         "published_by_user_id",
     } <= column_names("narrative_publications")
+    assert Base.metadata.tables["narrative_publications"].c.worldline_id.nullable is True

@@ -66,11 +66,11 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 - [x] Write phase planning checkpoint.
 - [x] Decide and document the `narrative_artifacts` worldline strategy before implementation.
 - [x] Confirm provider-kernel text generation execution is available before provider-backed narrative generation.
-- [ ] Implement `narrative-writer-v2` scope only.
-- [ ] Use narrative quality package/router for any new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
+- [x] Implement `narrative-writer-v2` scope only.
+- [x] Use narrative quality package/router for any new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

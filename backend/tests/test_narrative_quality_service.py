@@ -33,6 +33,7 @@ from noveland.invocations.models import (
     PromptTemplate,
 )
 from noveland.media.models import MediaAsset
+from noveland.narrative.contracts import NarrativeArtifactKind
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextKind,
@@ -40,6 +41,7 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityPresentationAlignmentRequest,
+    NarrativeQualityWriterGenerateRequest,
 )
 from noveland.narrative_quality.service import (
     NarrativeQualityService,
@@ -555,6 +557,206 @@ def test_presentation_alignment_rejects_cross_worldline_request() -> None:
             assert "worldline" in str(exc)
         else:
             raise AssertionError("expected cross-worldline rejection")
+
+
+def test_narrative_writer_v2_creates_worldline_scoped_draft_and_invocation() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_narrative_v2(
+            world_id,
+            NarrativeQualityWriterGenerateRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                provider_id=provider_id,
+                artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT,
+                title="Quiet chapter",
+                prompt_goal="Draft a quiet reader-safe chapter.",
+            ),
+            actor_ref="test",
+        )
+        session.commit()
+
+    assert result.dry_run is False
+    assert result.provider.provider_kind == ProviderKind.TEXT_GENERATION
+    assert result.invocation.status == "succeeded"
+    assert result.artifact is not None
+    assert result.artifact.worldline_id == worldline_id
+    assert result.artifact.source_conversation_id == conversation_id
+    assert result.artifact.title == "Quiet chapter"
+    assert result.artifact.metadata["source"] == "narrative_writer_v2"
+    assert result.artifact.metadata["model_invocation_id"] == str(result.invocation.id)
+    assert "fake text:" in result.artifact.content
+    with Session(engine) as session:
+        artifact = session.get(NarrativeArtifact, result.artifact.id)
+        invocation = session.get(ModelInvocation, result.invocation.id)
+        snapshot = session.scalars(
+            select(PromptSnapshot).where(PromptSnapshot.invocation_id == result.invocation.id)
+        ).one()
+        publication_count = session.scalar(select(func.count(NarrativePublication.id)))
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    assert artifact is not None
+    assert artifact.worldline_id == worldline_id
+    assert invocation is not None
+    assert invocation.worldline_id == worldline_id
+    assert snapshot.raw_request_json is not None
+    assert snapshot.raw_request_json["request_json"]["context_kind"] == "narrative"
+    assert snapshot.raw_request_json["request_json"]["operation"] == (
+        "narrative_writer_v2_generation"
+    )
+    assert publication_count == 0
+    assert event_count == 0
+
+
+def test_narrative_writer_v2_dry_run_writes_invocation_but_no_artifact() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_narrative_v2(
+            world_id,
+            NarrativeQualityWriterGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                prompt_goal="Preview a world summary.",
+                artifact_kind=NarrativeArtifactKind.CONVERSATION_SUMMARY,
+                dry_run=True,
+            ),
+            actor_ref="test",
+        )
+        artifact_count = session.scalar(select(func.count(NarrativeArtifact.id)))
+        invocation_count = session.scalar(select(func.count(ModelInvocation.id)))
+
+    assert result.dry_run is True
+    assert result.artifact is None
+    assert result.diagnostics["artifact_persisted"] is False
+    assert artifact_count == 0
+    assert invocation_count == 1
+
+
+def test_narrative_writer_v2_rejects_cross_worldline_conversation() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    provider_id = _seed_text_provider(engine, world_id)
+    with Session(engine) as session:
+        fork_id = uuid.uuid4()
+        session.add(
+            Worldline(
+                id=fork_id,
+                world_id=world_id,
+                worldline_key=f"fork-{fork_id.hex[:8]}",
+                name="Fork",
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).generate_narrative_v2(
+                world_id,
+                NarrativeQualityWriterGenerateRequest(
+                    worldline_id=fork_id,
+                    conversation_id=conversation_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should not run.",
+                ),
+                actor_ref="test",
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "worldline" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline rejection")
+        assert session.scalar(select(func.count(NarrativeArtifact.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
+def test_narrative_writer_v2_rejects_non_text_provider() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_provider(engine, world_id, ProviderKind.IMAGE_GENERATION)
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).generate_narrative_v2(
+                world_id,
+                NarrativeQualityWriterGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should not run.",
+                ),
+                actor_ref="test",
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "text_generation" in str(exc)
+        else:
+            raise AssertionError("expected non-text provider rejection")
+        assert session.scalar(select(func.count(NarrativeArtifact.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
+def test_narrative_writer_v2_rejects_sensitive_request_json() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).generate_narrative_v2(
+                world_id,
+                NarrativeQualityWriterGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should not run.",
+                    provider_request_json={"nested": {"api_key": "sk-secret"}},
+                ),
+                actor_ref="test",
+            )
+        except ValueError as exc:
+            assert "api_key" in str(exc)
+        else:
+            raise AssertionError("expected sensitive request rejection")
+        assert session.scalar(select(func.count(NarrativeArtifact.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
+def test_narrative_writer_v2_sanitizes_result_and_artifact_metadata() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(
+        engine,
+        "storage_uri=media://hidden/object base64,AAAA",
+    )
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_narrative_v2(
+            world_id,
+            NarrativeQualityWriterGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                title="Leaky preview",
+                prompt_goal="storage_uri=media://hidden/object base64,AAAA",
+            ),
+            actor_ref="test",
+        )
+        artifact = session.get(NarrativeArtifact, result.artifact.id if result.artifact else None)
+
+    serialized = result.model_dump_json()
+    assert result.artifact is not None
+    assert artifact is not None
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized.lower()
+    assert "storage_uri" not in str(artifact.artifact_metadata)
+    assert "media://" not in str(artifact.artifact_metadata)
 
 
 def _engine() -> Engine:

@@ -14,6 +14,8 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityGMProposalGenerationResult,
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityPresentationAlignmentResult,
+    NarrativeQualityWriterGenerateRequest,
+    NarrativeQualityWriterGenerationResult,
 )
 from noveland.narrative_quality.service import (
     NarrativeQualityService,
@@ -117,6 +119,34 @@ def review_presentation_alignment(
             request,
         )
     except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/writer/generate",
+    response_model=NarrativeQualityWriterGenerationResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def generate_narrative_writer_v2_draft(
+    world_id: uuid.UUID,
+    request: NarrativeQualityWriterGenerateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityWriterGenerationResult:
+    actor_ref = "platform_admin" if is_platform_admin(subject) else f"world_admin:{subject.user_id}"
+    try:
+        return NarrativeQualityService(db_session).generate_narrative_v2(
+            world_id,
+            request,
+            actor_ref=actor_ref,
+        )
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except (ProviderExecutionError, ProviderValidationError) as exc:
         raise _unprocessable(str(exc)) from exc
     except ValueError as exc:
         raise _not_found(str(exc)) from exc

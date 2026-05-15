@@ -9,7 +9,9 @@ from noveland.agents.models import Agent
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import ConversationSessionRecord, ConversationTurnRecord
 from noveland.conversations.presentation import ConversationPresentationService
+from noveland.narrative.contracts import NarrativeArtifactCreate
 from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.services import NarrativeArtifactService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderExecutionRequest,
@@ -51,6 +53,8 @@ from .contracts import (
     NarrativeQualityPresentationAlignmentResult,
     NarrativeQualityProviderRef,
     NarrativeQualitySuggestedFix,
+    NarrativeQualityWriterGenerateRequest,
+    NarrativeQualityWriterGenerationResult,
 )
 
 _LEAK_KEYWORDS = {
@@ -115,8 +119,12 @@ class NarrativeQualityService:
             request.provider_request_json,
             field_name="provider_request_json",
         )
-        provider = self._resolve_text_provider(world_id, request)
-        self._validate_text_provider(provider)
+        provider = self._resolve_text_provider(
+            world_id,
+            provider_id=request.provider_id,
+            capability_key=request.capability_key,
+        )
+        self._validate_text_provider(provider, source="provider-backed GM proposal")
         context_pack = self._context_pack(world_id, worldline.id, request.context_limit)
         prompt_text = _gm_generation_prompt(request, context_pack)
         result = ProviderExecutionService(self._session).execute(
@@ -632,6 +640,146 @@ class NarrativeQualityService:
             diagnostics=diagnostics,
         )
 
+    def generate_narrative_v2(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityWriterGenerateRequest,
+        *,
+        actor_ref: str,
+    ) -> NarrativeQualityWriterGenerationResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        reject_sensitive_config(
+            request.provider_request_json,
+            field_name="provider_request_json",
+        )
+        provider = self._resolve_text_provider(
+            world_id,
+            provider_id=request.provider_id,
+            capability_key=request.capability_key,
+        )
+        self._validate_text_provider(provider, source="Narrative Writer v2")
+        conversation: ConversationSessionRecord | None = None
+        turns: list[ConversationTurnRecord] = []
+        if request.conversation_id is not None:
+            conversation = self._conversation_session_or_error(
+                world_id,
+                worldline.id,
+                request.conversation_id,
+            )
+            turns = self._conversation_service.list_turns(world_id, conversation.id)
+        context_pack = self._context_pack(world_id, worldline.id, request.context_limit)
+        prompt_text = _narrative_writer_prompt(
+            request,
+            context_pack=context_pack,
+            conversation=conversation,
+            turns=turns[-request.context_limit :],
+        )
+        result = ProviderExecutionService(self._session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                provider_id=provider.id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key=request.capability_key,
+                model_name=request.model_name,
+                input_text=prompt_text,
+                input_json={
+                    "context_kind": "narrative",
+                    "artifact_kind": request.artifact_kind.value,
+                    "prompt_goal": _safe_text(request.prompt_goal),
+                    "worldline_id": str(worldline.id),
+                    "conversation_id": None
+                    if conversation is None
+                    else str(conversation.id),
+                },
+                request_json={
+                    **dict(request.provider_request_json),
+                    "operation": "narrative_writer_v2_generation",
+                    "context_kind": "narrative",
+                    "context_limit": request.context_limit,
+                    "artifact_kind": request.artifact_kind.value,
+                    "narrative_quality_phase": "v0.6.5",
+                },
+                actor_ref=actor_ref,
+            )
+        )
+        content = _safe_generated_text(result.output_text, result.output_json)
+        artifact = None
+        if not request.dry_run:
+            artifact = NarrativeArtifactService(self._session).create_artifact(
+                NarrativeArtifactCreate(
+                    world_id=world_id,
+                    worldline_id=worldline.id,
+                    source_conversation_id=None if conversation is None else conversation.id,
+                    title=_narrative_writer_title(request, conversation),
+                    content=content,
+                    artifact_kind=request.artifact_kind,
+                    metadata=_sanitize_json(
+                        {
+                            "source": "narrative_writer_v2",
+                            "phase": "v0.6.5",
+                            "worldline_id": str(worldline.id),
+                            "conversation_id": None
+                            if conversation is None
+                            else str(conversation.id),
+                            "model_invocation_id": str(result.invocation.id),
+                            "provider_id": str(provider.id),
+                            "provider_kind": provider.provider_kind.value,
+                            "adapter_kind": provider.adapter_kind.value,
+                            "artifact_kind": request.artifact_kind.value,
+                            "source_turn_count": len(turns),
+                            "context_limit": request.context_limit,
+                            "dry_run": False,
+                            "prompt_goal_summary": _safe_text(_clip(request.prompt_goal, 500)),
+                        }
+                    ),
+                )
+            )
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id))]
+        if conversation is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="conversation", id=str(conversation.id))
+            )
+        evidence_refs.append(
+            NarrativeQualityEvidenceRef(kind="invocation", id=str(result.invocation.id))
+        )
+        if artifact is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="narrative_artifact", id=str(artifact.id))
+            )
+        return NarrativeQualityWriterGenerationResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            dry_run=request.dry_run,
+            provider=NarrativeQualityProviderRef(
+                id=provider.id,
+                provider_kind=provider.provider_kind,
+                adapter_kind=provider.adapter_kind,
+                provider_key=provider.provider_key,
+            ),
+            invocation=NarrativeQualityInvocationRef(
+                id=result.invocation.id,
+                status=result.invocation.status.value,
+                provider_kind=result.invocation.provider_kind.value,
+                error_text=_safe_text(result.invocation.error_text)
+                if result.invocation.error_text
+                else None,
+            ),
+            artifact=artifact,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "narrative",
+                    "artifact_persisted": artifact is not None,
+                    "artifact_kind": request.artifact_kind.value,
+                    "conversation_turn_count": len(turns),
+                    "context_pack": context_pack.to_metadata(),
+                    "provider_output_available": bool(result.output_text or result.output_json),
+                    "publication_created": False,
+                }
+            ),
+        )
+
     def _agent_context(
         self,
         world_id: uuid.UUID,
@@ -869,14 +1017,16 @@ class NarrativeQualityService:
     def _resolve_text_provider(
         self,
         world_id: uuid.UUID,
-        request: NarrativeQualityGMProposalGenerateRequest,
+        *,
+        provider_id: uuid.UUID | None,
+        capability_key: str | None,
     ) -> ProviderIntegrationRead:
         registry = ProviderRegistryService(self._session)
         try:
-            if request.provider_id is not None:
+            if provider_id is not None:
                 provider = registry.get_provider(
                     world_id,
-                    request.provider_id,
+                    provider_id,
                     platform_admin=True,
                     include_hidden=True,
                 )
@@ -886,15 +1036,15 @@ class NarrativeQualityService:
             return registry.resolve_provider_for_capability(
                 world_id,
                 provider_kind=ProviderKind.TEXT_GENERATION,
-                capability_key=request.capability_key,
+                capability_key=capability_key,
             )
         except (ProviderNotFoundError, ProviderValidationError) as exc:
             raise NarrativeQualityValidationError(str(exc)) from exc
 
-    def _validate_text_provider(self, provider: ProviderIntegrationRead) -> None:
+    def _validate_text_provider(self, provider: ProviderIntegrationRead, *, source: str) -> None:
         if provider.provider_kind != ProviderKind.TEXT_GENERATION:
             raise NarrativeQualityValidationError(
-                "provider-backed GM proposal requires provider_kind=text_generation"
+                f"{source} requires provider_kind=text_generation"
             )
         if provider.adapter_kind not in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
             raise NarrativeQualityValidationError(
@@ -1230,6 +1380,62 @@ def _gm_generation_prompt(
         "base64, file paths, raw prompts, or raw outputs."
     )
     return "\n".join(lines)
+
+
+def _narrative_writer_prompt(
+    request: NarrativeQualityWriterGenerateRequest,
+    *,
+    context_pack: LivingWorldContextPack,
+    conversation: ConversationSessionRecord | None,
+    turns: list[ConversationTurnRecord],
+) -> str:
+    lines = [
+        "Generate a reader-safe narrative draft.",
+        f"Artifact kind: {request.artifact_kind.value}",
+        f"Goal: {_clip(request.prompt_goal, 800)}",
+        "Rules:",
+        "- Preserve the supplied worldline context.",
+        "- Filter hidden, developer-only, operational, and storage details.",
+        (
+            "- Do not include internal prompts, model outputs, storage details, "
+            "encoded payloads, or secrets."
+        ),
+    ]
+    context_text = context_pack.to_prompt_text()
+    if context_text:
+        lines.extend(["Context:", context_text])
+    if conversation is not None:
+        lines.extend(
+            [
+                "Conversation:",
+                f"- Title: {_clip(conversation.title, 200)}",
+                f"- Objective: {_clip(conversation.objective, 600)}",
+            ]
+        )
+    turn_window = _turn_window_text(turns)
+    if turn_window:
+        lines.append(turn_window)
+    return "\n".join(lines)
+
+
+def _narrative_writer_title(
+    request: NarrativeQualityWriterGenerateRequest,
+    conversation: ConversationSessionRecord | None,
+) -> str:
+    if request.title:
+        return _clip(request.title, 160)
+    if conversation is not None:
+        suffix = "summary" if request.artifact_kind.value == "conversation_summary" else "draft"
+        return _clip(f"{conversation.title} {suffix}", 160)
+    return "Narrative Writer v2 draft"
+
+
+def _safe_generated_text(output_text: str | None, output_json: dict[str, Any]) -> str:
+    text = output_text or str(output_json.get("text") or "")
+    text = _safe_text(_clip(text, 20_000))
+    if not text or text == REDACTED:
+        return "Provider generated narrative draft text was redacted by safety filters."
+    return text
 
 
 def _candidate_from_provider_output(

@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 5.
-- Status: Phase 5 Narrative Writer v2 planning checkpoint is complete; implementation branch is next.
+- Status: Phase 5 Narrative Writer v2 implementation and targeted tests are complete; full local gate is next.
 
 ## Current Context
 
@@ -41,10 +41,10 @@
 
 ## Required Next Steps
 
-- Start Phase 5 implementation from clean local `main` on `feat/narrative-writer-v2`.
-- Implement first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts must store non-null `worldline_id`.
-- Use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
-- Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
+- Run the Phase 5 full local gate on `feat/narrative-writer-v2`.
+- If the gate passes, commit the implementation, fast-forward merge to local `main`, update merge bookkeeping, and continue to Phase 6 from clean `main`.
+- Preserve the first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts must store non-null `worldline_id`.
+- Keep provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
 - Do not push unless explicitly requested.
 
 ## Latest Verification
@@ -93,3 +93,4 @@
 - v0.6 Phase 4 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`27 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 4 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`338 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 4 fast-forward merge to local `main` completed.
+- v0.6 Phase 5 targeted checks passed: backend ruff for narrative quality/narrative/API/tests, backend mypy for narrative quality/narrative/API/tests, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.

@@ -34,6 +34,12 @@ class NarrativeArtifact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="artifact_kind",
         ),
         Index("ix_narrative_artifacts_world_created_at", "world_id", "created_at"),
+        Index(
+            "ix_narrative_artifacts_worldline_created_at",
+            "world_id",
+            "worldline_id",
+            "created_at",
+        ),
         Index("ix_narrative_artifacts_world_agent", "world_id", "agent_id"),
         Index(
             "ix_narrative_artifacts_world_conversation_created_at",
@@ -46,6 +52,10 @@ class NarrativeArtifact(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="SET NULL"),
+        nullable=True,
     )
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL"),
@@ -84,6 +94,13 @@ class NarrativePublication(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "status",
             "reader_visible",
         ),
+        Index(
+            "ix_narrative_publications_worldline_status_visible",
+            "world_id",
+            "worldline_id",
+            "status",
+            "reader_visible",
+        ),
         Index("ix_narrative_publications_world_published_at", "world_id", "published_at"),
         Index("ix_narrative_publications_source_draft", "source_draft_id"),
     )
@@ -91,6 +108,10 @@ class NarrativePublication(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     world_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("worlds.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worldline_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("worldlines.id", ondelete="SET NULL"),
+        nullable=True,
     )
     artifact_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("narrative_artifacts.id", ondelete="CASCADE"),

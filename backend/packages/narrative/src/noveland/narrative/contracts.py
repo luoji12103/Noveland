@@ -37,6 +37,7 @@ class _FrozenContract(BaseModel):
 
 class NarrativeArtifactCreate(_FrozenContract):
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID | None = None
     source_run_id: uuid.UUID | None = None
     source_conversation_id: uuid.UUID | None = None
@@ -49,6 +50,7 @@ class NarrativeArtifactCreate(_FrozenContract):
 class NarrativeArtifactRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     agent_id: uuid.UUID | None = None
     source_run_id: uuid.UUID | None = None
     source_conversation_id: uuid.UUID | None = None
@@ -69,6 +71,7 @@ class NarrativeArtifactRecord(_FrozenContract):
 class NarrativePublicationRecord(_FrozenContract):
     id: uuid.UUID
     world_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
     artifact_id: uuid.UUID
     source_draft_id: uuid.UUID | None = None
     status: NarrativePublicationStatus

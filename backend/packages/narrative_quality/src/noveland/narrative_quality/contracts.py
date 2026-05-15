@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from noveland.narrative.contracts import NarrativeArtifactKind, NarrativeArtifactRecord
 from noveland.providers.contracts import ProviderAdapterKind, ProviderKind
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -268,6 +269,64 @@ class NarrativeQualityPresentationAlignmentResult(_FrozenContract):
     voice_profile_id: uuid.UUID | None = None
     findings: list[NarrativeQualityAlignmentFinding] = Field(default_factory=list)
     suggested_fixes: list[NarrativeQualitySuggestedFix] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
+class NarrativeQualityWriterGenerateRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    provider_id: uuid.UUID | None = None
+    capability_key: str | None = Field(default=None, min_length=1, max_length=120)
+    model_name: str | None = Field(default=None, min_length=1, max_length=200)
+    artifact_kind: NarrativeArtifactKind = NarrativeArtifactKind.CHAPTER_DRAFT
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    prompt_goal: str = Field(min_length=1, max_length=1200)
+    provider_request_json: dict[str, Any] = Field(default_factory=dict)
+    context_limit: int = Field(default=5, ge=1, le=20)
+    dry_run: bool = False
+
+    @field_validator("prompt_goal", mode="after")
+    @classmethod
+    def normalize_prompt_goal(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("prompt_goal must not be empty")
+        return normalized
+
+    @field_validator("title", mode="after")
+    @classmethod
+    def normalize_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("title must not be empty")
+        return normalized
+
+    @field_validator("provider_request_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider_request_json")
+        return value
+
+    @model_validator(mode="after")
+    def validate_artifact_kind(self) -> NarrativeQualityWriterGenerateRequest:
+        if self.artifact_kind not in {
+            NarrativeArtifactKind.CONVERSATION_SUMMARY,
+            NarrativeArtifactKind.CHAPTER_DRAFT,
+        }:
+            raise ValueError("Narrative Writer v2 supports conversation_summary or chapter_draft")
+        return self
+
+
+class NarrativeQualityWriterGenerationResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    dry_run: bool
+    provider: NarrativeQualityProviderRef
+    invocation: NarrativeQualityInvocationRef
+    artifact: NarrativeArtifactRecord | None = None
     evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 

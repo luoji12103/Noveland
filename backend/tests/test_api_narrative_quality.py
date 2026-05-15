@@ -308,6 +308,99 @@ def test_narrative_quality_presentation_alignment_api_requires_world_admin() -> 
     assert response.status_code == 403
 
 
+def test_narrative_quality_writer_v2_api_creates_worldline_scoped_draft() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, _turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+    provider_id = _seed_text_provider(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/writer/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "provider_id": str(provider_id),
+            "artifact_kind": "chapter_draft",
+            "title": "Quiet chapter",
+            "prompt_goal": "Draft a quiet reader-safe chapter.",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["dry_run"] is False
+    assert body["artifact"]["worldline_id"] == str(worldline_id)
+    assert body["artifact"]["source_conversation_id"] == str(conversation_id)
+    assert body["artifact"]["metadata"]["source"] == "narrative_writer_v2"
+    assert body["invocation"]["status"] == "succeeded"
+    assert "raw_prompt" not in response.text
+    assert "storage_uri" not in response.text
+    with Session(engine) as session:
+        artifact = session.get(NarrativeArtifact, uuid.UUID(body["artifact"]["id"]))
+        assert artifact is not None
+        assert artifact.worldline_id == worldline_id
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 1
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_writer_v2_api_dry_run_creates_no_artifact() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    provider_id = _seed_text_provider(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/writer/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "prompt_goal": "Preview a draft.",
+            "dry_run": True,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["artifact"] is None
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(NarrativeArtifact.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 1
+
+
+def test_narrative_quality_writer_v2_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    provider_id = _seed_text_provider(engine, world_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/writer/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "prompt_goal": "Should be forbidden.",
+        },
+    )
+
+    assert response.status_code == 403
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(NarrativeArtifact.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

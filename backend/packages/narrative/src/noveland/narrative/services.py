@@ -221,6 +221,7 @@ class NarrativeArtifactService:
     ) -> NarrativeArtifactRecord:
         model = NarrativeArtifact(
             world_id=artifact_create.world_id,
+            worldline_id=artifact_create.worldline_id,
             agent_id=artifact_create.agent_id,
             source_run_id=artifact_create.source_run_id,
             source_conversation_id=artifact_create.source_conversation_id,
@@ -270,6 +271,7 @@ class NarrativeArtifactService:
             )
 
         now = datetime.now(UTC)
+        publication_worldline_id = artifact.worldline_id or _artifact_worldline_id(artifact)
         merged_metadata = {
             **publish_metadata,
             "publication_gate": {
@@ -283,6 +285,7 @@ class NarrativeArtifactService:
         if publication is None:
             publication = NarrativePublication(
                 world_id=world_id,
+                worldline_id=publication_worldline_id,
                 artifact_id=artifact_id,
                 source_draft_id=artifact_id,
                 status=NarrativePublicationStatus.PUBLISHED.value,
@@ -294,6 +297,7 @@ class NarrativeArtifactService:
             )
             self._session.add(publication)
         else:
+            publication.worldline_id = publication_worldline_id
             publication.status = NarrativePublicationStatus.PUBLISHED.value
             publication.reader_visible = reader_visible
             publication.published_metadata = merged_metadata
@@ -941,7 +945,11 @@ def _int_value(value: object) -> int:
 
 def _artifact_review_context(artifact: NarrativeArtifact) -> dict[str, object]:
     metadata = artifact.artifact_metadata or {}
-    worldline_id = metadata.get("worldline_id")
+    worldline_id = (
+        str(artifact.worldline_id)
+        if artifact.worldline_id is not None
+        else metadata.get("worldline_id")
+    )
     agent_id = None if artifact.agent_id is None else str(artifact.agent_id)
     return {
         "worldline_id": worldline_id if isinstance(worldline_id, str) else None,
@@ -952,6 +960,8 @@ def _artifact_review_context(artifact: NarrativeArtifact) -> dict[str, object]:
 
 
 def _artifact_worldline_id(artifact: NarrativeArtifact) -> uuid.UUID | None:
+    if artifact.worldline_id is not None:
+        return artifact.worldline_id
     raw_worldline_id = (artifact.artifact_metadata or {}).get("worldline_id")
     if not isinstance(raw_worldline_id, str):
         return None
@@ -965,6 +975,7 @@ def _record(model: NarrativeArtifact) -> NarrativeArtifactRecord:
     return NarrativeArtifactRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         agent_id=model.agent_id,
         source_run_id=model.source_run_id,
         source_conversation_id=model.source_conversation_id,
@@ -980,6 +991,7 @@ def _publication_record(model: NarrativePublication) -> NarrativePublicationReco
     return NarrativePublicationRecord(
         id=model.id,
         world_id=model.world_id,
+        worldline_id=model.worldline_id,
         artifact_id=model.artifact_id,
         source_draft_id=model.source_draft_id,
         status=NarrativePublicationStatus(model.status),

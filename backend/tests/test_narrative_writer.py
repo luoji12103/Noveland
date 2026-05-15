@@ -333,6 +333,7 @@ def test_publish_blocks_hidden_secret_leak_and_records_review() -> None:
         artifact = NarrativeArtifactService(session).create_artifact(
             NarrativeArtifactCreate(
                 world_id=world_id,
+                worldline_id=worldline_id,
                 agent_id=agent_id,
                 title="Leaky draft",
                 content="This draft says forbidden hidden content.",
@@ -355,6 +356,7 @@ def test_publish_blocks_hidden_secret_leak_and_records_review() -> None:
     assert blocked.review_status == "fail"
     assert review is not None
     assert review.status == "fail"
+    assert artifact.worldline_id == worldline_id
     assert any(issue["code"] == "hidden_secret_leak" for issue in review.issues)
 
 
