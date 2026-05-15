@@ -351,6 +351,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_media_service.py`
 - `backend/tests/test_media_storage.py`
 - `backend/tests/test_storage_integrity_service.py`
+- `backend/tests/test_deployment_profile_docs.py`
 - `backend/tests/test_provider_execution_service.py`
 - `backend/tests/test_provider_registry_service.py`
 - `backend/tests/test_comfyui_adapter.py`
