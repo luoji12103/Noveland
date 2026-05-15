@@ -7,6 +7,7 @@ import {
   listMediaObjects,
   listMediaReferences,
   mediaObjectDownloadPath,
+  readerMediaObjectDownloadPath,
   retryMediaJob,
   updateMediaAsset,
   uploadMediaAsset,
@@ -93,6 +94,10 @@ describe("media admin client", () => {
     expect(mediaObjectDownloadPath("world-1", "object-1")).toBe(
       "/api/worlds/world-1/media/objects/object-1/download",
     );
+    expect(
+      readerMediaObjectDownloadPath("/worlds/world-1/reader/media/objects/object-1/download"),
+    ).toBe("/api/worlds/world-1/reader/media/objects/object-1/download");
+    expect(readerMediaObjectDownloadPath("media://hidden/object")).toBe("");
   });
 });
 

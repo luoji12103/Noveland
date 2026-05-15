@@ -1565,6 +1565,7 @@ const conversations = [
   {
     id: seedConversationId,
     world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
     scene_id: null,
     session_key: "seed-reader",
     title: "Seed Reader Conversation",
@@ -1639,6 +1640,117 @@ const conversationTurns = [
     error_text: null,
     created_at: "2026-04-17T00:02:31.000Z",
     updated_at: "2026-04-17T00:02:31.000Z",
+  },
+];
+const playbackCompositeAssetId = "76800000-0000-4000-8000-000000000001";
+const playbackCompositeObjectId = "76810000-0000-4000-8000-000000000001";
+const playbackAudioAssetId = "76800000-0000-4000-8000-000000000002";
+const playbackAudioObjectId = "76810000-0000-4000-8000-000000000002";
+const conversationPresentations = [
+  {
+    id: "76900000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    conversation_id: seedConversationId,
+    turn_id: "76200000-0000-4000-8000-000000000002",
+    speaker_agent_id: agentGuideId,
+    emotion_key: "calm",
+    emotion_intensity: 0.7,
+    sprite_set_id: null,
+    sprite_variant_id: null,
+    voice_profile_id: "76700000-0000-4000-8000-000000000001",
+    tts_media_asset_id: playbackAudioAssetId,
+    background_asset_id: null,
+    composite_scene_asset_id: playbackCompositeAssetId,
+    transcript_id: null,
+    presentation_json: { caption: "Reader-safe playback caption" },
+    render_state: "speech_rendered",
+    created_at: "2026-04-17T00:02:40.000Z",
+    updated_at: "2026-04-17T00:02:41.000Z",
+  },
+];
+const readerMediaDescriptors = [
+  {
+    asset_id: playbackCompositeAssetId,
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    asset_kind: "image",
+    asset_role: "composite_image",
+    visibility: "reader_visible",
+    title: "Reader composite",
+    description: null,
+    content_type: "image/png",
+    size: 68,
+    width: 2,
+    height: 2,
+    duration_ms: null,
+    objects: [
+      {
+        object_id: playbackCompositeObjectId,
+        object_role: "original",
+        content_type: "image/png",
+        size: 68,
+        checksum_sha256: "c".repeat(64),
+        width: 2,
+        height: 2,
+        duration_ms: null,
+        sample_rate_hz: null,
+        audio_channels: null,
+        download_url: `/worlds/${worldOneId}/reader/media/objects/${playbackCompositeObjectId}/download`,
+      },
+    ],
+    references: [
+      {
+        reference_id: "76820000-0000-4000-8000-000000000001",
+        ref_kind: "conversation_turn",
+        ref_id: "76200000-0000-4000-8000-000000000002",
+        ref_role: "output",
+        display_order: 0,
+      },
+    ],
+    created_at: "2026-04-17T00:02:40.000Z",
+    updated_at: "2026-04-17T00:02:40.000Z",
+  },
+  {
+    asset_id: playbackAudioAssetId,
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    asset_kind: "audio",
+    asset_role: "speech_audio",
+    visibility: "reader_visible",
+    title: "Reader speech",
+    description: null,
+    content_type: "audio/wav",
+    size: 44,
+    width: null,
+    height: null,
+    duration_ms: 800,
+    objects: [
+      {
+        object_id: playbackAudioObjectId,
+        object_role: "original",
+        content_type: "audio/wav",
+        size: 44,
+        checksum_sha256: "d".repeat(64),
+        width: null,
+        height: null,
+        duration_ms: 800,
+        sample_rate_hz: 24000,
+        audio_channels: 1,
+        download_url: `/worlds/${worldOneId}/reader/media/objects/${playbackAudioObjectId}/download`,
+      },
+    ],
+    references: [
+      {
+        reference_id: "76820000-0000-4000-8000-000000000002",
+        ref_kind: "conversation_turn",
+        ref_id: "76200000-0000-4000-8000-000000000002",
+        ref_role: "output",
+        display_order: 1,
+      },
+    ],
+    created_at: "2026-04-17T00:02:41.000Z",
+    updated_at: "2026-04-17T00:02:41.000Z",
   },
 ];
 
@@ -2202,7 +2314,18 @@ async function handleWorldResource(request, response, url) {
     return;
   }
   if (resource === "conversations") {
-    await handleConversations(request, response, currentSubject, worldId, segments[3], segments[4]);
+    await handleConversations(
+      request,
+      response,
+      currentSubject,
+      worldId,
+      segments[3],
+      segments.slice(4),
+    );
+    return;
+  }
+  if (resource === "reader") {
+    await handleReaderResource(request, response, currentSubject, worldId, segments.slice(3), url);
     return;
   }
   sendJson(response, 404, { detail: "not found" });
@@ -6814,7 +6937,69 @@ async function handleNarrativeArtifacts(request, response, currentSubject, world
   sendJson(response, 405, { detail: "method not allowed" });
 }
 
-async function handleConversations(request, response, currentSubject, worldId, conversationId, action) {
+async function handleReaderResource(request, response, currentSubject, worldId, segments, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 404, { detail: "World not found" });
+    return;
+  }
+  if (request.method !== "GET" || segments[0] !== "media") {
+    sendJson(response, 404, { detail: "not found" });
+    return;
+  }
+  if (segments[1] === "objects" && segments[3] === "download") {
+    const objectId = segments[2];
+    if (objectId === playbackCompositeObjectId) {
+      response.writeHead(200, {
+        "content-type": "image/png",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(tinyPngBytes());
+      return;
+    }
+    if (objectId === playbackAudioObjectId) {
+      response.writeHead(200, {
+        "content-type": "audio/wav",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(tinyWavBytes());
+      return;
+    }
+    sendJson(response, 404, { detail: "Reader media not found" });
+    return;
+  }
+  if (segments[1] !== undefined) {
+    const descriptor = readerMediaDescriptors.find(
+      (item) => item.asset_id === segments[1] && item.world_id === worldId,
+    );
+    if (descriptor === undefined) {
+      sendJson(response, 404, { detail: "Reader media not found" });
+      return;
+    }
+    sendJson(response, 200, descriptor);
+    return;
+  }
+  const worldlineId = url.searchParams.get("worldline_id");
+  sendJson(
+    response,
+    200,
+    readerMediaDescriptors.filter(
+      (item) =>
+        item.world_id === worldId && (worldlineId === null || item.worldline_id === worldlineId),
+    ),
+  );
+}
+
+async function handleConversations(
+  request,
+  response,
+  currentSubject,
+  worldId,
+  conversationId,
+  actionSegments,
+) {
+  const action = actionSegments[0];
+  const nestedId = actionSegments[1];
+  const nestedAction = actionSegments[2];
   if (request.method === "GET" && conversationId === undefined) {
     sendJson(response, 200, conversations.filter((item) => item.world_id === worldId));
     return;
@@ -6887,6 +7072,19 @@ async function handleConversations(request, response, currentSubject, worldId, c
     return;
   }
   if (action === "turns" && request.method === "GET") {
+    if (nestedId !== undefined && nestedAction === "presentation") {
+      const turn = turnsForSession(conversationId).find((item) => item.id === nestedId);
+      if (turn === undefined) {
+        sendJson(response, 404, { detail: "Conversation turn not found" });
+        return;
+      }
+      sendJson(
+        response,
+        200,
+        conversationPresentations.find((item) => item.turn_id === nestedId) ?? null,
+      );
+      return;
+    }
     sendJson(response, 200, turnsForSession(conversationId));
     return;
   }
@@ -7967,6 +8165,23 @@ function primaryWorldlineFor(worldId) {
 
 function hasValidCsrf(request) {
   return hasCookie(request, "noveland_csrf", validCsrf) && request.headers["x-csrf-token"] === validCsrf;
+}
+
+function tinyPngBytes() {
+  return Buffer.from([
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+    0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65,
+    84, 120, 156, 99, 248, 207, 192, 240, 31, 0, 5, 0, 1, 255, 137, 153,
+    61, 29, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+  ]);
+}
+
+function tinyWavBytes() {
+  return Buffer.from([
+    82, 73, 70, 70, 36, 0, 0, 0, 87, 65, 86, 69, 102, 109, 116, 32, 16, 0, 0,
+    0, 1, 0, 1, 0, 64, 31, 0, 0, 128, 62, 0, 0, 2, 0, 16, 0, 100, 97, 116,
+    97, 0, 0, 0, 0,
+  ]);
 }
 
 function sendJson(response, status, body, setCookie = []) {

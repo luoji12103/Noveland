@@ -20,6 +20,7 @@ import type {
   ConversationParticipant,
   ConversationDiagnosticsSummary,
   ConversationSession,
+  ConversationTurnPresentation,
   ConversationTurn,
   DailyEpisodeDraft,
   DailyLifeEventCandidate,
@@ -99,6 +100,7 @@ import type {
   MediaJob,
   MediaObject,
   MediaReference,
+  ReaderMediaDescriptor,
 } from "@/lib/worlds/media";
 import type {
   SceneBackground,
@@ -232,6 +234,17 @@ export type ConversationDetailData = ConversationListData & {
   diagnosticsSummary: ConversationDiagnosticsSummary | null;
   narrativeArtifacts: NarrativeArtifact[];
   narrativeWriterPlugins: PluginCatalogEntry[];
+};
+
+export type ConversationPlaybackData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  conversations: ConversationSession[];
+  conversation: ConversationSession | null;
+  turns: ConversationTurn[];
+  presentationsByTurnId: Record<string, ConversationTurnPresentation | null>;
+  media: ReaderMediaDescriptor[];
+  loadError: string | null;
 };
 
 export type NarrativeWorkspaceData = {
@@ -1021,6 +1034,73 @@ export async function getConversationDetailData(
     narrativeArtifacts,
     narrativeWriterPlugins,
   };
+}
+
+export async function getConversationPlaybackData(
+  worldId: string,
+  conversationId: string,
+): Promise<ConversationPlaybackData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyConversationPlaybackData(worlds, "Unable to load playback.");
+    }
+
+    const conversations = await apiFetch<ConversationSession[]>(
+      `/worlds/${worldId}/conversations`,
+      cookies,
+    );
+    const conversation = conversations.find((item) => item.id === conversationId) ?? null;
+    if (conversation === null) {
+      return {
+        ...emptyConversationPlaybackData(worlds, "Conversation not found."),
+        selectedWorld,
+        conversations,
+      };
+    }
+
+    const turns = await apiFetch<ConversationTurn[]>(
+      `/worlds/${worldId}/conversations/${conversationId}/turns`,
+      cookies,
+    );
+    const mediaQuery =
+      conversation.worldline_id === null || conversation.worldline_id === undefined
+        ? ""
+        : `?worldline_id=${encodeURIComponent(conversation.worldline_id)}`;
+    const [presentationEntries, media] = await Promise.all([
+      Promise.all(
+        turns.map(async (turn) => {
+          const presentation = await apiFetch<ConversationTurnPresentation | null>(
+            `/worlds/${worldId}/conversations/${conversationId}/turns/${turn.id}/presentation`,
+            cookies,
+          );
+          return [turn.id, presentation] as const;
+        }),
+      ),
+      apiFetchOptional<ReaderMediaDescriptor[]>(
+        `/worlds/${worldId}/reader/media${mediaQuery}`,
+        cookies,
+      ),
+    ]);
+
+    return {
+      worlds,
+      selectedWorld,
+      conversations,
+      conversation,
+      turns,
+      presentationsByTurnId: Object.fromEntries(presentationEntries),
+      media: media ?? [],
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyConversationPlaybackData([], "Unable to load playback.");
+  }
 }
 
 export async function getNarrativeWorkspaceData(
@@ -1834,6 +1914,22 @@ function emptyNarrativeReaderDetailData(
     selectedWorld: null,
     conversations: [],
     artifact: null,
+    loadError,
+  };
+}
+
+function emptyConversationPlaybackData(
+  worlds: World[],
+  loadError: string,
+): ConversationPlaybackData {
+  return {
+    worlds,
+    selectedWorld: null,
+    conversations: [],
+    conversation: null,
+    turns: [],
+    presentationsByTurnId: {},
+    media: [],
     loadError,
   };
 }

@@ -263,6 +263,14 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
               Open source conversation
             </Link>
           ) : null}
+          {sourceConversation !== null ? (
+            <Link
+              className="secondary-button"
+              href={`/worlds/${worldId}/reader/conversations/${sourceConversation.id}/playback`}
+            >
+              Open playback
+            </Link>
+          ) : null}
         </div>
 
         <h2 className="section-title" id="artifact-title">

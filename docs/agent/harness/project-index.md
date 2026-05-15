@@ -90,6 +90,7 @@ Fast orientation for a new coding session.
 - `web/app/` — route entrypoints
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
+- `web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/` — authenticated reader/player conversation playback over safe presentation and reader media descriptors
 - `web/app/worlds/[worldId]/diagnostics/` — world-scoped multimodal diagnostics dashboard
 - `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
 - `web/app/worlds/[worldId]/invocations/` — world-scoped invocation ledger browser
@@ -127,7 +128,8 @@ Fast orientation for a new coding session.
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
-  - `web/features/worlds/` — world index, overview, narrative management workspace, and read-only reader components
+  - `web/features/worlds/` — world index, overview, narrative management workspace, read-only reader components, and conversation playback
+  - `web/features/worlds/conversation-playback.tsx` — reader/member-facing conversation playback surface over safe turn, presentation, and reader media DTOs
   - `web/features/workspace/` — shared workspace shell and form helpers
 - `web/components/` — reusable UI components
 - `web/lib/` — approved web-side helpers only

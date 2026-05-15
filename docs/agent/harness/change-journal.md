@@ -2153,3 +2153,15 @@
 - Tests added/updated: N/A, documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implement Phase 2 on `feat/conversation-playback-ui`; use `impeccable` context for the Web UI and reader-safe media descriptor DTOs for playback assets.
+
+## v0.8.2 Conversation Playback UI implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/conversation-playback-ui
+- Scope: v0.8 Public Experience & Ecosystem Phase 2 reader/player playback UI.
+- Summary: Added an authenticated reader playback route under the reader surface, a `ConversationPlayback` component, reader media Web DTO helpers, playback data loading over existing conversation turns/presentations and Phase 1 reader media descriptors, and mock/e2e fixtures for safe image/audio delivery. The UI renders turn text, local playback state, render/emotion metadata, reader-safe image/audio references, and deterministic missing-media fallbacks without exposing admin media DTOs, storage paths, raw prompts/outputs, or secrets.
+- Files changed: `/web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/page.tsx`, `/web/features/worlds/conversation-playback.tsx`, `/web/features/worlds/conversation-playback.test.tsx`, `/web/lib/worlds/{media,server}.ts`, `/web/lib/worlds/types.ts`, `/web/tests/e2e/{auth.spec.ts,start-with-mock-auth.mjs}`, Web CSS, OpenSpec tasks, and harness docs.
+- Tests added/updated: `web/features/worlds/conversation-playback.test.tsx`, `web/lib/worlds/media.test.ts`, and playback coverage in `web/tests/e2e/auth.spec.ts`.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with Web lint, Web typecheck, focused Vitest (`2 passed files, 7 passed tests`), focused playback e2e (`1 passed` after selector tightening), OpenSpec strict changes/spec validation, and `git diff --check`.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 2 back to local `main` if it stays green.

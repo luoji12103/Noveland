@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI.
-- Status: Phase 2 planning checkpoint is complete; implementation is next.
+- Status: Phase 2 implementation and targeted checks are complete; full local gate is next.
 
 ## Current Context
 
@@ -36,6 +36,7 @@
 - Phase 1 targeted tests add `backend/tests/test_api_reader_media.py` for ACL, visibility, no-leak descriptors, download streaming, cross-world/worldline rejection, and unchanged admin media download behavior.
 - v0.8 Phase 1 fast-forward merge to local `main` completed.
 - v0.8 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.2-conversation-playback-ui-plan.md`.
+- v0.8 Phase 2 implementation adds the reader playback page at `/worlds/{world_id}/reader/conversations/{conversation_id}/playback`, `ConversationPlayback`, reader media Web DTO helpers, and e2e mock reader media/presentation fixtures.
 - v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -55,8 +56,9 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start Phase 2 implementation on `feat/conversation-playback-ui` from clean local `main`.
-- Use reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
+- Run the v0.8 Phase 2 full local gate on `feat/conversation-playback-ui`.
+- If the full gate passes, fast-forward merge `feat/conversation-playback-ui` back to local `main`, confirm clean status, then continue to Phase 3.
+- Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
 - Preserve the authenticated-only reader media model unless OpenSpec is updated first.
 - Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
@@ -170,3 +172,4 @@
 - v0.8 feasibility review and OpenSpec plan adaptation are docs-only. Validation target is OpenSpec strict validation plus `git diff --check`.
 - v0.8 Phase 1 targeted checks passed: backend ruff for `packages/reader_delivery`, `reader_media.py`, and `test_api_reader_media.py`; backend mypy for the same paths; targeted pytest (`5 passed`).
 - v0.8 Phase 1 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.8 Phase 2 targeted checks passed: Web lint, Web typecheck, focused Vitest (`2 passed files, 7 passed tests`), focused playback e2e (`1 passed` after tightening a heading selector), OpenSpec strict changes/spec validation, and `git diff --check`.

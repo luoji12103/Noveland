@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const worldOneId = "10000000-0000-4000-8000-000000000001";
+const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 test.describe.configure({ timeout: 60000 });
 test.describe.configure({ mode: "serial" });
@@ -498,6 +499,27 @@ test("reader honors search, source, status, and published ordering filters", asy
   await page.goto(`/worlds/${worldOneId}/reader?publication_status=draft&q=Publication%20blocker`);
   await expect(page.getByRole("heading", { name: "No readable artifacts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Publication blocker draft" })).toHaveCount(0);
+});
+
+test("reader playback renders conversation turns through safe media", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/reader/conversations/${seedConversationId}/playback`);
+  await expect(page.getByRole("heading", { name: "Playback", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Turn 2/ }).click();
+  await expect(page.getByText("Guide replies to seed the conversation.")).toBeVisible();
+  await expect(page.getByLabel("Reader-safe scene media")).toBeVisible();
+  await expect(page.getByLabel("Turn audio")).toHaveAttribute(
+    "src",
+    `/api/worlds/${worldOneId}/reader/media/objects/76810000-0000-4000-8000-000000000002/download`,
+  );
+
+  const pageText = await page.locator("body").innerText();
+  expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret/i);
+
+  await page.getByRole("button", { name: /Turn 1/ }).click();
+  await expect(page.getByText("No reader-visible image for this turn.")).toBeVisible();
+  await expect(page.getByText("No reader-visible audio for this turn.")).toBeVisible();
 });
 
 test("release gate blockers are enforced by the workspace backend contract", async ({ page }) => {

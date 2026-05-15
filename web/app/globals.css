@@ -399,6 +399,128 @@ a {
   justify-content: flex-end;
 }
 
+.playback-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+.playback-main,
+.playback-sidebar {
+  min-width: 0;
+}
+
+.playback-stage {
+  display: grid;
+  min-height: 420px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: #eaf1ed;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.playback-scene-media,
+.playback-scene-empty {
+  min-height: 300px;
+}
+
+.playback-scene-media {
+  background-color: #dfe9e3;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.playback-scene-empty {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+.playback-subtitle {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-height: 120px;
+  padding: 18px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.playback-subtitle p {
+  max-width: 72ch;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.playback-speaker {
+  color: var(--forest-dark);
+  font-weight: 800;
+}
+
+.playback-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.playback-meta span {
+  padding: 6px 9px;
+  color: var(--forest-dark);
+  background: #eef6f2;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.playback-audio {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.playback-sidebar h3 {
+  margin: 0 0 12px;
+}
+
+.playback-turn-list {
+  display: grid;
+  gap: 8px;
+}
+
+.playback-turn-button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 12px;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.playback-turn-button[aria-pressed="true"] {
+  border-color: var(--forest);
+  background: #eef6f2;
+}
+
+.playback-turn-button span {
+  font-weight: 800;
+}
+
+.playback-turn-button small {
+  color: var(--muted);
+}
+
 .workspace-nav {
   display: flex;
   width: min(1120px, calc(100% - 32px));
@@ -636,6 +758,7 @@ a {
   .top-band-inner,
   .dashboard-grid,
   .evidence-grid,
+  .playback-grid,
   .management-columns,
   .clock-actions,
   .clock-grid,

@@ -608,6 +608,35 @@ export type ConversationTurn = {
   updated_at: string;
 };
 
+export type ConversationPresentationRenderState =
+  | "draft"
+  | "visual_rendered"
+  | "speech_rendered"
+  | "transcribed"
+  | "failed";
+
+export type ConversationTurnPresentation = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  conversation_id: string;
+  turn_id: string;
+  speaker_agent_id: string | null;
+  emotion_key: string | null;
+  emotion_intensity: number | null;
+  sprite_set_id: string | null;
+  sprite_variant_id: string | null;
+  voice_profile_id: string | null;
+  tts_media_asset_id: string | null;
+  background_asset_id: string | null;
+  composite_scene_asset_id: string | null;
+  transcript_id: string | null;
+  presentation_json: Record<string, unknown>;
+  render_state: ConversationPresentationRenderState;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ConversationAdvanceResult = {
   session: ConversationSession;
   turn: ConversationTurn;

@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI implementation
+- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI full local gate
 
 ## Blocked
 - None
@@ -244,11 +244,13 @@
 - v0.8 Public Experience & Ecosystem Phase 1 Reader Media Delivery fast-forward merge
 - v0.8 Public Experience & Ecosystem Phase 1 Reader Media Delivery implementation complete
 - v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI planning checkpoint
+- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI implementation
+- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI targeted tests
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
-- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI implementation is next.
+- v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI full local gate is next.
 - v0.8 implementation must use the adapted OpenSpec plan and a docs-only phase checkpoint before code changes.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.

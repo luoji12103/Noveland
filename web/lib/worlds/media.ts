@@ -161,6 +161,48 @@ export type MediaReference = {
   created_at: string;
 };
 
+export type ReaderMediaObjectDescriptor = {
+  object_id: string;
+  object_role: string;
+  content_type: string;
+  size: number;
+  checksum_sha256: string;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  sample_rate_hz: number | null;
+  audio_channels: number | null;
+  download_url: string;
+};
+
+export type ReaderMediaReferenceDescriptor = {
+  reference_id: string;
+  ref_kind: "conversation_turn" | "conversation_session" | "narrative_artifact" | string;
+  ref_id: string;
+  ref_role: string;
+  display_order: number;
+};
+
+export type ReaderMediaDescriptor = {
+  asset_id: string;
+  world_id: string;
+  worldline_id: string;
+  asset_kind: "image" | "audio" | "video";
+  asset_role: MediaAssetRole | string;
+  visibility: "world_member" | "player_visible" | "reader_visible" | string;
+  title: string | null;
+  description: string | null;
+  content_type: string | null;
+  size: number | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  objects: ReaderMediaObjectDescriptor[];
+  references: ReaderMediaReferenceDescriptor[];
+  created_at: string;
+  updated_at: string;
+};
+
 export type MediaAssetReferences = {
   asset_id: string;
   contexts: Array<Record<string, unknown>>;
@@ -406,6 +448,16 @@ export async function uploadMediaAsset(
 
 export function mediaObjectDownloadPath(worldId: string, objectId: string): string {
   return `/api/worlds/${worldId}/media/objects/${objectId}/download`;
+}
+
+export function readerMediaObjectDownloadPath(downloadUrl: string): string {
+  if (downloadUrl.startsWith("/api/worlds/")) {
+    return downloadUrl;
+  }
+  if (downloadUrl.startsWith("/worlds/")) {
+    return `/api${downloadUrl}`;
+  }
+  return "";
 }
 
 function query(filters: Record<string, unknown>): string {
