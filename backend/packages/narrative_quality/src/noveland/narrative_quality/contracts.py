@@ -421,6 +421,54 @@ class NarrativeQualityContinuityReviewResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityPacingReviewRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    current_turn_id: uuid.UUID | None = None
+    policy_id: uuid.UUID | None = None
+    lookahead_turns: int = Field(default=2, ge=0, le=20)
+    max_pending_jobs: int | None = Field(default=None, ge=0)
+    max_pending_cost: float | None = Field(default=None, ge=0)
+    include_offscreen: bool = True
+
+
+class NarrativeQualityPacingFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+
+
+class NarrativeQualityPacingRecommendation(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    target_ref: NarrativeQualityEvidenceRef | None = None
+    action_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("action_json", mode="after")
+    @classmethod
+    def validate_action_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "action_json")
+        return value
+
+
+class NarrativeQualityPacingReviewResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID | None = None
+    current_turn_id: uuid.UUID | None = None
+    policy_id: uuid.UUID | None = None
+    pacing_status: str
+    queue_summary: dict[str, Any] = Field(default_factory=dict)
+    budget_summary: dict[str, Any] = Field(default_factory=dict)
+    lookahead_summary: dict[str, Any] = Field(default_factory=dict)
+    offscreen_summary: dict[str, Any] = Field(default_factory=dict)
+    findings: list[NarrativeQualityPacingFinding] = Field(default_factory=list)
+    recommendations: list[NarrativeQualityPacingRecommendation] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json

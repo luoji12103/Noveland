@@ -4,6 +4,11 @@ import uuid
 from typing import cast
 
 from noveland.agents.models import Agent, AgentRelationshipEdge
+from noveland.asset_generation.models import (
+    AssetGenerationPolicy,
+    AssetGenerationProposal,
+    AssetGenerationRun,
+)
 from noveland.auth.models import User
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import (
@@ -32,7 +37,7 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
-from noveland.media.models import MediaAsset
+from noveland.media.models import MediaAsset, MediaJob
 from noveland.narrative.contracts import NarrativeArtifactKind
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
@@ -41,6 +46,7 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityContinuityReviewRequest,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityGMProposalGenerateRequest,
+    NarrativeQualityPacingReviewRequest,
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityWriterGenerateRequest,
 )
@@ -952,6 +958,199 @@ def test_continuity_review_v2_sanitizes_response() -> None:
     assert "raw_output" not in serialized
 
 
+def test_runtime_pacing_review_summarizes_policy_and_pending_jobs() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    policy_id = _seed_pacing_policy(
+        engine,
+        world_id,
+        worldline_id,
+        max_pending_jobs=3,
+        max_pending_cost=1.0,
+    )
+    _seed_media_job(engine, world_id, worldline_id, conversation_id, turn_id, priority=0)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_runtime_pacing(
+            world_id,
+            NarrativeQualityPacingReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                current_turn_id=turn_id,
+                policy_id=policy_id,
+            ),
+        )
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+        media_job_count = session.scalar(select(func.count(MediaJob.id)))
+
+    assert result.pacing_status == "warning"
+    assert result.policy_id == policy_id
+    assert result.queue_summary["pending_job_count"] == 1
+    assert result.budget_summary["max_pending_cost"] == 1.0
+    assert event_count == 0
+    assert media_job_count == 1
+
+
+def test_runtime_pacing_review_flags_job_limit_and_superseded_jobs() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    _seed_media_job(
+        engine,
+        world_id,
+        worldline_id,
+        conversation_id,
+        turn_id,
+        invalidation_key="turn:shared",
+    )
+    _seed_media_job(
+        engine,
+        world_id,
+        worldline_id,
+        conversation_id,
+        turn_id,
+        invalidation_key="turn:shared",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_runtime_pacing(
+            world_id,
+            NarrativeQualityPacingReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                current_turn_id=turn_id,
+                max_pending_jobs=1,
+            ),
+        )
+        running_count = session.scalar(
+            select(func.count(MediaJob.id)).where(MediaJob.status == "queued")
+        )
+
+    assert result.pacing_status == "warning"
+    assert result.queue_summary["duplicate_invalidation_key_count"] == 1
+    assert any(finding.code == "pending_media_job_limit_exceeded" for finding in result.findings)
+    assert any(finding.code == "superseded_media_jobs_detected" for finding in result.findings)
+    assert any(rec.code == "cancel_superseded_media_jobs" for rec in result.recommendations)
+    assert running_count == 2
+
+
+def test_runtime_pacing_review_flags_budget_overflow_and_current_turn_missing_assets() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    _seed_asset_generation_run_and_proposal(
+        engine,
+        world_id,
+        worldline_id,
+        conversation_id,
+        turn_id,
+        estimated_cost=2.5,
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_runtime_pacing(
+            world_id,
+            NarrativeQualityPacingReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                current_turn_id=turn_id,
+                max_pending_cost=1.0,
+            ),
+        )
+        proposal_count = session.scalar(select(func.count(AssetGenerationProposal.id)))
+
+    assert result.pacing_status == "warning"
+    assert result.budget_summary["estimated_pending_cost"] == 2.5
+    assert result.lookahead_summary["current_turn_missing_assets"] is True
+    assert any(finding.code == "asset_generation_budget_exceeded" for finding in result.findings)
+    assert any(finding.code == "current_turn_missing_assets" for finding in result.findings)
+    assert any(rec.code == "prioritize_current_visible_turn" for rec in result.recommendations)
+    assert proposal_count == 1
+
+
+def test_runtime_pacing_review_rejects_cross_worldline_turn() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    fork_id = _seed_worldline(engine, world_id)
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_runtime_pacing(
+                world_id,
+                NarrativeQualityPacingReviewRequest(
+                    worldline_id=fork_id,
+                    current_turn_id=turn_id,
+                ),
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "turn" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline turn rejection")
+
+
+def test_runtime_pacing_review_sanitizes_response() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    _seed_media_job(
+        engine,
+        world_id,
+        worldline_id,
+        conversation_id,
+        turn_id,
+        request_json={"storage_uri": "media://hidden/object", "safe": True},
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_runtime_pacing(
+            world_id,
+            NarrativeQualityPacingReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                current_turn_id=turn_id,
+            ),
+        )
+
+    serialized = result.model_dump_json().lower()
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -981,12 +1180,16 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, NarrativePublication.__table__),
         cast(Table, NarrativeContinuityReview.__table__),
+        cast(Table, AssetGenerationPolicy.__table__),
+        cast(Table, AssetGenerationRun.__table__),
+        cast(Table, AssetGenerationProposal.__table__),
         cast(Table, GMAgenda.__table__),
         cast(Table, GMEventProposal.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaJob.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
         cast(Table, PromptSnapshot.__table__),
@@ -1394,3 +1597,118 @@ def _seed_active_route(
         )
         session.commit()
         return route_id
+
+
+def _seed_pacing_policy(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    max_pending_jobs: int,
+    max_pending_cost: float,
+) -> uuid.UUID:
+    policy_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            AssetGenerationPolicy(
+                id=policy_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                policy_key=f"pacing-{policy_id.hex[:8]}",
+                status="active",
+                budget_json={"max_pending_cost": max_pending_cost},
+                lookahead_json={},
+                provider_preferences_json={},
+                rules_json={"max_pending_jobs": max_pending_jobs},
+            )
+        )
+        session.commit()
+        return policy_id
+
+
+def _seed_media_job(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    invalidation_key: str = "turn:one",
+    priority: int = 10,
+    request_json: dict[str, object] | None = None,
+) -> uuid.UUID:
+    job_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaJob(
+                id=job_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                job_kind="image_generation",
+                provider_kind="image_generation",
+                status="queued",
+                priority=priority,
+                cancel_policy="cancel_superseded",
+                dedupe_key=invalidation_key,
+                invalidation_key=invalidation_key,
+                provider_config_json={},
+                request_json=request_json or {"safe": True},
+                result_json={},
+                created_by_actor_ref="test",
+            )
+        )
+        session.commit()
+        return job_id
+
+
+def _seed_asset_generation_run_and_proposal(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    estimated_cost: float,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    run_id = uuid.uuid4()
+    proposal_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            AssetGenerationRun(
+                id=run_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                policy_id=None,
+                run_kind="preview",
+                status="succeeded",
+                summary_json={},
+                created_by_actor_ref="test",
+            )
+        )
+        session.add(
+            AssetGenerationProposal(
+                id=proposal_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                run_id=run_id,
+                proposal_kind="composite_scene",
+                target_ref_kind="conversation_turn",
+                target_ref_id=turn_id,
+                reason="missing composite scene",
+                evidence_json={"conversation_id": str(conversation_id), "turn_id": str(turn_id)},
+                priority=0,
+                estimated_cost=estimated_cost,
+                provider_kind=None,
+                provider_id=None,
+                request_json={
+                    "action": "compose_scene",
+                    "conversation_id": str(conversation_id),
+                    "turn_id": str(turn_id),
+                },
+                status="proposed",
+            )
+        )
+        session.commit()
+        return run_id, proposal_id

@@ -3,12 +3,22 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from noveland.agents.models import Agent
+from noveland.asset_generation.models import (
+    AssetGenerationPolicy,
+    AssetGenerationProposal,
+)
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import ConversationSessionRecord, ConversationTurnRecord
+from noveland.conversations.models import (
+    ConversationSession,
+    ConversationTurn,
+    ConversationTurnPresentation,
+)
 from noveland.conversations.presentation import ConversationPresentationService
+from noveland.media.models import MediaJob
 from noveland.narrative.contracts import NarrativeArtifactCreate
 from noveland.narrative.models import NarrativeArtifact
 from noveland.narrative.services import NarrativeArtifactService
@@ -60,6 +70,10 @@ from .contracts import (
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
     NarrativeQualityInvocationRef,
+    NarrativeQualityPacingFinding,
+    NarrativeQualityPacingRecommendation,
+    NarrativeQualityPacingReviewRequest,
+    NarrativeQualityPacingReviewResult,
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityPresentationAlignmentResult,
     NarrativeQualityProviderRef,
@@ -87,6 +101,7 @@ _LEAK_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _WHITESPACE_RE = re.compile(r"\s+")
+PENDING_MEDIA_JOB_STATUSES = {"queued", "running"}
 
 
 class NarrativeQualityValidationError(ValueError):
@@ -884,6 +899,118 @@ class NarrativeQualityService:
             ),
         )
 
+    def review_runtime_pacing(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityPacingReviewRequest,
+    ) -> NarrativeQualityPacingReviewResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        policy = None
+        if request.policy_id is not None:
+            policy = self._pacing_policy_or_error(world_id, worldline.id, request.policy_id)
+        conversation = None
+        if request.conversation_id is not None:
+            conversation = self._conversation_model_or_error(
+                world_id,
+                worldline.id,
+                request.conversation_id,
+            )
+        current_turn = None
+        if request.current_turn_id is not None:
+            current_turn = self._turn_model_or_error(
+                world_id,
+                worldline.id,
+                request.current_turn_id,
+            )
+            if conversation is not None and current_turn.session_id != conversation.id:
+                raise NarrativeQualityValidationError("turn does not belong to conversation")
+        max_pending_jobs = _limit_from_policy(
+            request.max_pending_jobs,
+            policy.rules_json if policy is not None else None,
+            "max_pending_jobs",
+        )
+        max_pending_cost = _float_limit_from_policy(
+            request.max_pending_cost,
+            policy.budget_json if policy is not None else None,
+            "max_pending_cost",
+            "max_total_estimated_cost",
+        )
+        media_jobs = self._pending_media_jobs(world_id, worldline.id, conversation, current_turn)
+        proposals = self._pending_asset_proposals(world_id, worldline.id, conversation)
+        queue_summary = _pacing_queue_summary(media_jobs)
+        budget_summary = _pacing_budget_summary(proposals, max_pending_cost=max_pending_cost)
+        lookahead_summary = self._pacing_lookahead_summary(
+            world_id,
+            worldline.id,
+            conversation,
+            current_turn,
+            lookahead_turns=request.lookahead_turns,
+        )
+        offscreen_summary = self._pacing_offscreen_summary(
+            world_id,
+            worldline.id,
+            conversation,
+            include_offscreen=request.include_offscreen,
+        )
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id))]
+        if policy is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="pacing_policy", id=str(policy.id))
+            )
+        if conversation is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="conversation", id=str(conversation.id))
+            )
+        if current_turn is not None:
+            evidence_refs.append(NarrativeQualityEvidenceRef(kind="turn", id=str(current_turn.id)))
+        findings = _pacing_findings(
+            queue_summary=queue_summary,
+            budget_summary=budget_summary,
+            lookahead_summary=lookahead_summary,
+            offscreen_summary=offscreen_summary,
+            max_pending_jobs=max_pending_jobs,
+            max_pending_cost=max_pending_cost,
+            policy=policy,
+            evidence_refs=evidence_refs,
+        )
+        recommendations = _pacing_recommendations(
+            queue_summary=queue_summary,
+            budget_summary=budget_summary,
+            lookahead_summary=lookahead_summary,
+            offscreen_summary=offscreen_summary,
+            evidence_refs=evidence_refs,
+        )
+        status = "pass"
+        if any(finding.severity == "error" for finding in findings):
+            status = "fail"
+        elif any(finding.severity == "warning" for finding in findings):
+            status = "warning"
+        return NarrativeQualityPacingReviewResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=None if conversation is None else conversation.id,
+            current_turn_id=None if current_turn is None else current_turn.id,
+            policy_id=None if policy is None else policy.id,
+            pacing_status=status,
+            queue_summary=_sanitize_json(queue_summary),
+            budget_summary=_sanitize_json(budget_summary),
+            lookahead_summary=_sanitize_json(lookahead_summary),
+            offscreen_summary=_sanitize_json(offscreen_summary),
+            findings=findings,
+            recommendations=recommendations,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "runtime_pacing",
+                    "policy_status": None if policy is None else policy.status,
+                    "media_job_mutation_count": 0,
+                    "asset_generation_mutation_count": 0,
+                    "provider_call_count": 0,
+                    "world_event_written": False,
+                }
+            ),
+        )
+
     def _agent_context(
         self,
         world_id: uuid.UUID,
@@ -1264,6 +1391,187 @@ class NarrativeQualityService:
                 details={"active_route_found": False},
             )
         ]
+
+    def _pacing_policy_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        policy_id: uuid.UUID,
+    ) -> AssetGenerationPolicy:
+        policy = self._session.get(AssetGenerationPolicy, policy_id)
+        if policy is None or policy.world_id != world_id or policy.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("pacing policy not found in worldline")
+        return policy
+
+    def _conversation_model_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+    ) -> ConversationSession:
+        conversation = self._session.get(ConversationSession, conversation_id)
+        if (
+            conversation is None
+            or conversation.world_id != world_id
+            or conversation.worldline_id != worldline_id
+        ):
+            raise NarrativeQualityValidationError("conversation not found in worldline")
+        return conversation
+
+    def _turn_model_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        turn_id: uuid.UUID,
+    ) -> ConversationTurn:
+        row = self._session.execute(
+            select(ConversationTurn, ConversationSession)
+            .join(ConversationSession, ConversationTurn.session_id == ConversationSession.id)
+            .where(ConversationTurn.id == turn_id)
+        ).one_or_none()
+        if row is None:
+            raise NarrativeQualityValidationError("turn not found in worldline")
+        turn = cast(ConversationTurn, row[0])
+        conversation = cast(ConversationSession, row[1])
+        if conversation.world_id != world_id or conversation.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("turn not found in worldline")
+        return turn
+
+    def _pending_media_jobs(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation: ConversationSession | None,
+        current_turn: ConversationTurn | None,
+    ) -> list[MediaJob]:
+        statement = select(MediaJob).where(
+            MediaJob.world_id == world_id,
+            MediaJob.worldline_id == worldline_id,
+            MediaJob.status.in_(PENDING_MEDIA_JOB_STATUSES),
+        )
+        if conversation is not None:
+            statement = statement.where(MediaJob.conversation_id == conversation.id)
+        if current_turn is not None:
+            statement = statement.where(MediaJob.turn_id == current_turn.id)
+        return list(self._session.scalars(statement.order_by(MediaJob.priority)).all())
+
+    def _pending_asset_proposals(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation: ConversationSession | None,
+    ) -> list[AssetGenerationProposal]:
+        statement = select(AssetGenerationProposal).where(
+            AssetGenerationProposal.world_id == world_id,
+            AssetGenerationProposal.worldline_id == worldline_id,
+            AssetGenerationProposal.status == "proposed",
+        )
+        if conversation is not None:
+            statement = statement.where(
+                AssetGenerationProposal.request_json["conversation_id"].as_string()
+                == str(conversation.id)
+            )
+        return list(
+            self._session.scalars(
+                statement.order_by(
+                    AssetGenerationProposal.priority,
+                    AssetGenerationProposal.created_at,
+                )
+            ).all()
+        )
+
+    def _pacing_lookahead_summary(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation: ConversationSession | None,
+        current_turn: ConversationTurn | None,
+        *,
+        lookahead_turns: int,
+    ) -> dict[str, Any]:
+        statement = (
+            select(ConversationTurn, ConversationSession)
+            .join(ConversationSession, ConversationTurn.session_id == ConversationSession.id)
+            .where(
+                ConversationSession.world_id == world_id,
+                ConversationSession.worldline_id == worldline_id,
+            )
+        )
+        if conversation is not None:
+            statement = statement.where(ConversationSession.id == conversation.id)
+        rows = self._session.execute(
+            statement.order_by(ConversationSession.created_at.desc(), ConversationTurn.turn_index)
+        ).all()
+        current_index = None if current_turn is None else current_turn.turn_index
+        within = 0
+        beyond = 0
+        current_missing_assets = False
+        for turn, _session_model in rows:
+            if current_turn is not None and turn.id == current_turn.id:
+                presentation = self._presentation_for_turn(turn.id)
+                current_missing_assets = presentation is None or (
+                    presentation.sprite_variant_id is None
+                    and presentation.tts_media_asset_id is None
+                    and presentation.composite_scene_asset_id is None
+                )
+            if current_index is None:
+                continue
+            if current_turn is None:
+                continue
+            if turn.session_id != current_turn.session_id:
+                continue
+            if turn.turn_index <= current_index:
+                continue
+            if turn.turn_index <= current_index + lookahead_turns:
+                within += 1
+            else:
+                beyond += 1
+        return {
+            "configured_lookahead_turns": lookahead_turns,
+            "lookahead_turn_count": within,
+            "beyond_lookahead_turn_count": beyond,
+            "current_turn_missing_assets": current_missing_assets,
+        }
+
+    def _pacing_offscreen_summary(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation: ConversationSession | None,
+        *,
+        include_offscreen: bool,
+    ) -> dict[str, Any]:
+        if not include_offscreen:
+            return {"included": False, "offscreen_conversation_count": 0}
+        statement = select(ConversationSession).where(
+            ConversationSession.world_id == world_id,
+            ConversationSession.worldline_id == worldline_id,
+        )
+        if conversation is not None:
+            statement = statement.where(ConversationSession.id != conversation.id)
+        sessions = list(self._session.scalars(statement).all())
+        offscreen = [
+            session
+            for session in sessions
+            if session.status in {"running", "paused", "completed"}
+        ]
+        return {
+            "included": True,
+            "offscreen_conversation_count": len(offscreen),
+            "compressible_conversation_count": sum(
+                1 for session in offscreen if session.status == "completed"
+            ),
+        }
+
+    def _presentation_for_turn(
+        self,
+        turn_id: uuid.UUID,
+    ) -> ConversationTurnPresentation | None:
+        return self._session.scalars(
+            select(ConversationTurnPresentation).where(
+                ConversationTurnPresentation.turn_id == turn_id
+            )
+        ).one_or_none()
 
     def _sprite_set_or_error(
         self,
@@ -1853,6 +2161,226 @@ def _continuity_repair_suggestions(
             )
         )
     return suggestions
+
+
+def _pacing_queue_summary(media_jobs: list[MediaJob]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    kind_counts: dict[str, int] = {}
+    priority_counts = {"p0": 0, "p1": 0, "p2_plus": 0}
+    invalidation_counts: dict[str, int] = {}
+    for job in media_jobs:
+        status_counts[job.status] = status_counts.get(job.status, 0) + 1
+        kind_counts[job.job_kind] = kind_counts.get(job.job_kind, 0) + 1
+        if job.priority <= 0:
+            priority_counts["p0"] += 1
+        elif job.priority <= 10:
+            priority_counts["p1"] += 1
+        else:
+            priority_counts["p2_plus"] += 1
+        if job.invalidation_key:
+            invalidation_counts[job.invalidation_key] = (
+                invalidation_counts.get(job.invalidation_key, 0) + 1
+            )
+    duplicate_keys = sorted(
+        key for key, count in invalidation_counts.items() if count > 1
+    )
+    return {
+        "pending_job_count": len(media_jobs),
+        "status_counts": status_counts,
+        "job_kind_counts": kind_counts,
+        "priority_counts": priority_counts,
+        "duplicate_invalidation_key_count": len(duplicate_keys),
+        "duplicate_invalidation_keys": duplicate_keys[:10],
+    }
+
+
+def _pacing_budget_summary(
+    proposals: list[AssetGenerationProposal],
+    *,
+    max_pending_cost: float | None,
+) -> dict[str, Any]:
+    proposed_count = len(proposals)
+    total_cost = sum(float(item.estimated_cost or 0.0) for item in proposals)
+    kind_counts: dict[str, int] = {}
+    for proposal in proposals:
+        kind_counts[proposal.proposal_kind] = kind_counts.get(proposal.proposal_kind, 0) + 1
+    return {
+        "proposed_asset_generation_count": proposed_count,
+        "estimated_pending_cost": round(total_cost, 4),
+        "max_pending_cost": max_pending_cost,
+        "proposal_kind_counts": kind_counts,
+        "over_budget": max_pending_cost is not None and total_cost > max_pending_cost,
+    }
+
+
+def _pacing_findings(
+    *,
+    queue_summary: dict[str, Any],
+    budget_summary: dict[str, Any],
+    lookahead_summary: dict[str, Any],
+    offscreen_summary: dict[str, Any],
+    max_pending_jobs: int | None,
+    max_pending_cost: float | None,
+    policy: AssetGenerationPolicy | None,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityPacingFinding]:
+    findings: list[NarrativeQualityPacingFinding] = []
+    pending_jobs = _int_value(queue_summary.get("pending_job_count"))
+    if max_pending_jobs is not None and pending_jobs > max_pending_jobs:
+        severity = "error" if max_pending_jobs == 0 else "warning"
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="pending_media_job_limit_exceeded",
+                severity=severity,
+                message="Pending media jobs exceed the configured pacing limit.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if _int_value(queue_summary.get("duplicate_invalidation_key_count")) > 0:
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="superseded_media_jobs_detected",
+                severity="warning",
+                message="Pending media jobs include duplicate invalidation keys.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if max_pending_cost is not None and bool(budget_summary.get("over_budget")):
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="asset_generation_budget_exceeded",
+                severity="warning",
+                message="Pending asset generation proposals exceed the configured cost budget.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if bool(lookahead_summary.get("current_turn_missing_assets")):
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="current_turn_missing_assets",
+                severity="warning",
+                message="Current visible turn is missing presentation assets.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if _int_value(offscreen_summary.get("compressible_conversation_count")) > 0:
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="offscreen_compression_available",
+                severity="info",
+                message="Completed offscreen conversations are available for compression review.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if policy is None and (max_pending_jobs is None and max_pending_cost is None):
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="pacing_policy_missing",
+                severity="info",
+                message="No pacing policy was provided; request limits are being used.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    elif policy is not None and policy.status != "active":
+        findings.append(
+            NarrativeQualityPacingFinding(
+                code="pacing_policy_disabled",
+                severity="info",
+                message="Selected pacing policy is not active.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    return findings
+
+
+def _pacing_recommendations(
+    *,
+    queue_summary: dict[str, Any],
+    budget_summary: dict[str, Any],
+    lookahead_summary: dict[str, Any],
+    offscreen_summary: dict[str, Any],
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityPacingRecommendation]:
+    recommendations: list[NarrativeQualityPacingRecommendation] = []
+    duplicate_keys = queue_summary.get("duplicate_invalidation_keys")
+    if isinstance(duplicate_keys, list) and duplicate_keys:
+        recommendations.append(
+            NarrativeQualityPacingRecommendation(
+                code="cancel_superseded_media_jobs",
+                message="Review duplicate invalidation keys and cancel superseded pending jobs.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"invalidation_keys": duplicate_keys, "mutates_state": False},
+            )
+        )
+    if bool(budget_summary.get("over_budget")):
+        recommendations.append(
+            NarrativeQualityPacingRecommendation(
+                code="reduce_asset_generation_budget_pressure",
+                message="Dismiss or defer lower-priority asset generation proposals.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_status": "defer"},
+            )
+        )
+    if bool(lookahead_summary.get("current_turn_missing_assets")):
+        recommendations.append(
+            NarrativeQualityPacingRecommendation(
+                code="prioritize_current_visible_turn",
+                message=(
+                    "Prioritize required assets for the current visible turn before "
+                    "lookahead work."
+                ),
+                target_ref=evidence_refs[-1] if evidence_refs else None,
+                action_json={"mutates_state": False, "priority_band": "p0"},
+            )
+        )
+    if _int_value(offscreen_summary.get("compressible_conversation_count")) > 0:
+        recommendations.append(
+            NarrativeQualityPacingRecommendation(
+                code="compress_offscreen_conversations",
+                message="Use explicit admin review before compressing completed offscreen context.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "mode": "review_only"},
+            )
+        )
+    return recommendations
+
+
+def _limit_from_policy(
+    explicit: int | None,
+    policy_json: dict[str, Any] | None,
+    *keys: str,
+) -> int | None:
+    if explicit is not None:
+        return explicit
+    if policy_json is None:
+        return None
+    for key in keys:
+        value = policy_json.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def _float_limit_from_policy(
+    explicit: float | None,
+    policy_json: dict[str, Any] | None,
+    *keys: str,
+) -> float | None:
+    if explicit is not None:
+        return explicit
+    if policy_json is None:
+        return None
+    for key in keys:
+        value = policy_json.get(key)
+        if isinstance(value, int | float) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def _int_value(value: Any) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return 0
 
 
 def _continuity_action(code: str) -> str | None:

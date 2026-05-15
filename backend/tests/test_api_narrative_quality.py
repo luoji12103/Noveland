@@ -7,6 +7,11 @@ from typing import cast
 
 from fastapi.testclient import TestClient
 from noveland.agents.models import Agent, AgentRelationshipEdge
+from noveland.asset_generation.models import (
+    AssetGenerationPolicy,
+    AssetGenerationProposal,
+    AssetGenerationRun,
+)
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -25,7 +30,7 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
-from noveland.media.models import MediaAsset
+from noveland.media.models import MediaAsset, MediaJob
 from noveland.narrative.models import NarrativeArtifact
 from noveland.providers.contracts import (
     ProviderAdapterKind,
@@ -483,6 +488,63 @@ def test_narrative_quality_continuity_review_api_rejects_sensitive_metadata() ->
         assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 0
 
 
+def test_narrative_quality_runtime_pacing_api_reviews_queue() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="Current line.",
+    )
+    _seed_media_job(engine, world_id, worldline_id, conversation_id, turn_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/pacing/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "current_turn_id": str(turn_id),
+            "max_pending_jobs": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["worldline_id"] == str(worldline_id)
+    assert body["queue_summary"]["pending_job_count"] == 1
+    assert body["pacing_status"] == "fail"
+    assert any(
+        finding["code"] == "pending_media_job_limit_exceeded"
+        for finding in body["findings"]
+    )
+    assert "storage_uri" not in response.text
+    assert "raw_prompt" not in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(MediaJob.id))) == 1
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_runtime_pacing_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/pacing/review",
+        json={"worldline_id": str(worldline_id)},
+    )
+
+    assert response.status_code == 403
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -525,11 +587,15 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, PlotThread.__table__),
         cast(Table, RouteAffinity.__table__),
         cast(Table, NarrativeContinuityReview.__table__),
+        cast(Table, AssetGenerationPolicy.__table__),
+        cast(Table, AssetGenerationRun.__table__),
+        cast(Table, AssetGenerationProposal.__table__),
         cast(Table, GMEventProposal.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaJob.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
         cast(Table, PromptSnapshot.__table__),
@@ -738,6 +804,39 @@ def _seed_narrative_artifact(
         )
         session.commit()
         return artifact_id
+
+
+def _seed_media_job(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+) -> uuid.UUID:
+    job_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaJob(
+                id=job_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                job_kind="image_generation",
+                provider_kind="image_generation",
+                status="queued",
+                priority=10,
+                cancel_policy="cancel_superseded",
+                dedupe_key="turn:one",
+                invalidation_key="turn:one",
+                provider_config_json={},
+                request_json={"safe": True},
+                result_json={},
+                created_by_actor_ref="test",
+            )
+        )
+        session.commit()
+        return job_id
 
 
 def _seed_aligned_presentation(
