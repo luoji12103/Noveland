@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/cost-rate-control
-- Objective: v0.7 Production Hardening Phase 3.
-- Status: Phase 3 Cost & Rate Control implementation, targeted tests, and full local gate are complete on `feat/cost-rate-control`; commit and fast-forward merge are next.
+- Branch: main
+- Objective: v0.7 Production Hardening Phase 4.
+- Status: Phase 3 Cost & Rate Control is fast-forward merged to local `main`; Phase 4 Object Storage & Backup v2 planning checkpoint is next.
 
 ## Current Context
 
@@ -131,3 +131,4 @@
 - v0.7 Phase 3 targeted checks passed: backend ruff for provider budget code/tests, backend mypy for provider budget code/tests, targeted pytest (`109 passed`), and `git diff --check`.
 - v0.7 Phase 3 full local gate passed: backend ruff, backend mypy (`248 source files`), backend pytest (`397 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after stabilizing an existing import/export response-body race), docker compose config, and `git diff --check`.
 - Flaky note: one e2e run hit a transient unauthenticated reader redirect 404 during Next dev dynamic route cold start; the isolated test and the subsequent full e2e run passed.
+- v0.7 Phase 3 fast-forward merge to local `main` completed.
