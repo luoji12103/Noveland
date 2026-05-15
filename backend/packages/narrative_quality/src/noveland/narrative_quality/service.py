@@ -39,6 +39,7 @@ from noveland.providers.service import ProviderExecutionService
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
 from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
 from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
+from noveland.worlds.beta import LivingWorldBetaService
 from noveland.worlds.gm import LivingWorldGMService
 from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.living_context import LivingWorldContextPack, LivingWorldContextSelector
@@ -74,6 +75,9 @@ from .contracts import (
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
     NarrativeQualityInvocationRef,
+    NarrativeQualityLongRunEvalResult,
+    NarrativeQualityLongRunEvalRunRequest,
+    NarrativeQualityLongRunFailureReport,
     NarrativeQualityPacingFinding,
     NarrativeQualityPacingRecommendation,
     NarrativeQualityPacingReviewRequest,
@@ -1138,6 +1142,65 @@ class NarrativeQualityService:
                 }
             ),
         )
+
+    def run_long_living_world_eval(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityLongRunEvalRunRequest,
+    ) -> NarrativeQualityLongRunEvalResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        try:
+            reject_sensitive_config(request.metadata, field_name="metadata")
+        except ValueError as exc:
+            raise NarrativeQualityValidationError(str(exc)) from exc
+        run = LivingWorldBetaService(self._session).run_long_eval(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            eval_key=request.eval_key,
+            horizon_days=request.horizon_days,
+            metadata=_sanitize_json(
+                {
+                    **dict(request.metadata),
+                    "source": "narrative_quality_long_run_eval",
+                    "phase": "v0.6.9",
+                    "worldline_id": str(worldline.id),
+                    "provider_call_count": 0,
+                    "daemon_run": False,
+                }
+            ),
+        )
+        return _long_run_quality_result(run)
+
+    def list_long_living_world_evals(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        *,
+        limit: int,
+    ) -> list[NarrativeQualityLongRunEvalResult]:
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        runs = self._session.scalars(
+            select(LongRunEvalRun)
+            .where(
+                LongRunEvalRun.world_id == world_id,
+                LongRunEvalRun.worldline_id == worldline.id,
+            )
+            .order_by(LongRunEvalRun.created_at.desc())
+            .limit(limit)
+        ).all()
+        return [_long_run_quality_result(run) for run in runs]
+
+    def get_long_living_world_eval(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+        run_id: uuid.UUID,
+    ) -> NarrativeQualityLongRunEvalResult:
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        run = self._session.get(LongRunEvalRun, run_id)
+        if run is None or run.world_id != world_id or run.worldline_id != worldline.id:
+            raise NarrativeQualityValidationError("long-run eval not found in worldline")
+        return _long_run_quality_result(run)
 
     def _agent_context(
         self,
@@ -3012,6 +3075,143 @@ def _progression_recommendations(
             )
         )
     return recommendations
+
+
+def _long_run_quality_result(run: LongRunEvalRun) -> NarrativeQualityLongRunEvalResult:
+    evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(run.worldline_id))]
+    traceability = run.metrics.get("traceability")
+    if isinstance(traceability, dict):
+        refs = traceability.get("refs")
+        if isinstance(refs, list):
+            for ref in refs[:20]:
+                if not isinstance(ref, dict):
+                    continue
+                kind = str(ref.get("kind") or "").strip()
+                ref_id = str(ref.get("id") or "").strip()
+                if kind and ref_id:
+                    evidence_refs.append(NarrativeQualityEvidenceRef(kind=kind, id=ref_id))
+    failure_reports = _long_run_failure_reports(run, evidence_refs=evidence_refs)
+    return NarrativeQualityLongRunEvalResult(
+        world_id=run.world_id,
+        worldline_id=run.worldline_id,
+        run_id=run.id,
+        eval_key=_safe_text(run.eval_key),
+        horizon_days=run.horizon_days,
+        status=run.status,
+        drift_metrics=_sanitize_json(_long_run_drift_metrics(run.metrics)),
+        failure_reports=failure_reports,
+        blockers=_sanitize_json(run.blockers),
+        recommendations=_sanitize_json(run.recommendations),
+        evidence_refs=evidence_refs,
+        diagnostics=_sanitize_json(
+            {
+                "context_kind": "long_run_living_world_simulation_eval",
+                "started_at": run.started_at.isoformat(),
+                "finished_at": run.finished_at.isoformat(),
+                "metadata": run.metadata_json,
+                "provider_call_count": 0,
+                "daemon_run": False,
+                "world_event_written": False,
+            }
+        ),
+    )
+
+
+def _long_run_drift_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
+    distribution = metrics.get("distribution")
+    traceability = metrics.get("traceability")
+    review_warnings = metrics.get("review_warnings")
+    return {
+        "horizon_days": metrics.get("horizon_days"),
+        "event_count": metrics.get("events"),
+        "day_coverage": _dict_value(distribution).get("day_coverage"),
+        "relationships": metrics.get("relationships"),
+        "route_affinities": metrics.get("route_affinities"),
+        "route_milestones": metrics.get("route_milestones"),
+        "ending_candidates": metrics.get("ending_candidates"),
+        "gm_proposals": metrics.get("gm_proposals"),
+        "resolved_gm_proposals": metrics.get("resolved_gm_proposals"),
+        "daily_candidates": metrics.get("daily_candidates"),
+        "player_choices": metrics.get("player_choices"),
+        "narrative_artifacts": metrics.get("narrative_artifacts"),
+        "publications": metrics.get("publications"),
+        "traceability_ref_count": _dict_value(traceability).get("event_ref_count", 0)
+        + _dict_value(traceability).get("snapshot_ref_count", 0),
+        "continuity_warning_count": _dict_value(review_warnings).get(
+            "continuity_or_style_warning_count",
+            0,
+        ),
+        "continuity_fail_count": _dict_value(review_warnings).get("continuity_fail_count", 0),
+        "publication_gate_warning_count": _dict_value(review_warnings).get(
+            "publication_gate_warning_count",
+            0,
+        ),
+    }
+
+
+def _long_run_failure_reports(
+    run: LongRunEvalRun,
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityLongRunFailureReport]:
+    reports: list[NarrativeQualityLongRunFailureReport] = []
+    for blocker in run.blockers:
+        reports.append(
+            NarrativeQualityLongRunFailureReport(
+                code=_safe_text(_clip(str(blocker.get("code") or "long_run_blocker"), 120)),
+                severity="error",
+                message=_safe_text(
+                    _clip(str(blocker.get("message") or "Long-run eval blocker."), 400)
+                ),
+                evidence_refs=evidence_refs,
+            )
+        )
+    metrics = _long_run_drift_metrics(run.metrics)
+    if _int_value(metrics.get("event_count")) == 0:
+        reports.append(
+            NarrativeQualityLongRunFailureReport(
+                code="no_worldline_events",
+                severity="error",
+                message="No worldline events are available for long-run evaluation.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if _int_value(metrics.get("relationships")) == 0:
+        reports.append(
+            NarrativeQualityLongRunFailureReport(
+                code="relationship_graph_sparse",
+                severity="warning",
+                message="Relationship graph is sparse for long-run drift detection.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if _int_value(metrics.get("route_milestones")) == 0 or _int_value(
+        metrics.get("ending_candidates")
+    ) == 0:
+        reports.append(
+            NarrativeQualityLongRunFailureReport(
+                code="route_endings_incomplete",
+                severity="warning",
+                message="Route milestones or ending candidates are missing from long-run evidence.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    if _int_value(metrics.get("continuity_fail_count")) > 0:
+        reports.append(
+            NarrativeQualityLongRunFailureReport(
+                code="continuity_failures_present",
+                severity="error",
+                message="Continuity review failures are present in the worldline.",
+                evidence_refs=evidence_refs,
+            )
+        )
+    return reports
+
+
+def _dict_value(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def _progression_finding(

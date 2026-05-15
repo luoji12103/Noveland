@@ -6,7 +6,8 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from fastapi.testclient import TestClient
-from noveland.agents.models import Agent, AgentRelationshipEdge
+from noveland.adapters.models import ProviderProfile
+from noveland.agents.models import Agent, AgentRelationshipEdge, AgentRuntimeRun
 from noveland.asset_generation.models import (
     AssetGenerationPolicy,
     AssetGenerationProposal,
@@ -16,13 +17,14 @@ from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
 from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
     ConversationTurn,
     ConversationTurnPresentation,
 )
-from noveland.events.models import WorldEventModel
+from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.invocations.models import (
     AgentRuntimeRunModelInvocation,
     ModelInvocation,
@@ -31,7 +33,16 @@ from noveland.invocations.models import (
     PromptTemplate,
 )
 from noveland.media.models import MediaAsset, MediaJob
-from noveland.narrative.models import NarrativeArtifact
+from noveland.memory.models import (
+    AgentMemoryItem,
+    AgentProfileSnapshotModel,
+    MemoryBackendProfile,
+    MemoryRetrievalLog,
+    MemoryWriteJob,
+    MemoryWriteLog,
+)
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
+from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderIntegrationCreate,
@@ -48,11 +59,21 @@ from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
+    DailyLifeEventCandidate,
     EndingCandidate,
+    FactionProgressTrack,
+    GMAgenda,
     GMEventProposal,
+    GMStyleReview,
+    InWorldNotification,
+    LongRunEvalRun,
     NarrativeContinuityReview,
+    OffscreenEventQueueItem,
+    OrganizationMembership,
     PlayerActorProfile,
     PlayerChoiceRecord,
+    PlayerInterventionRecord,
+    PlayerJournalEntry,
     PlotThread,
     RouteAffinity,
     RouteMilestone,
@@ -63,6 +84,7 @@ from noveland.worlds.models import (
     WorldBible,
     Worldline,
     WorldMembership,
+    WorldOrganization,
 )
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, func, select
@@ -602,6 +624,106 @@ def test_narrative_quality_progression_api_requires_world_admin() -> None:
     assert response.status_code == 403
 
 
+def test_narrative_quality_long_run_eval_api_runs_lists_and_gets_eval() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _seed_long_run_eval_evidence(engine, world_id, worldline_id, agent_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    run_response = client.post(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals/run",
+        json={
+            "worldline_id": str(worldline_id),
+            "eval_key": "api-long-run",
+            "horizon_days": 7,
+            "metadata": {"operator_note": "safe"},
+        },
+    )
+
+    assert run_response.status_code == 201
+    body = run_response.json()
+    assert body["worldline_id"] == str(worldline_id)
+    assert body["eval_key"] == "api-long-run"
+    assert body["drift_metrics"]["event_count"] == 1
+    assert body["diagnostics"]["provider_call_count"] == 0
+    assert body["diagnostics"]["daemon_run"] is False
+    assert body["diagnostics"]["world_event_written"] is False
+    assert "storage_uri" not in run_response.text
+    assert "raw_prompt" not in run_response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(LongRunEvalRun.id))) == 1
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 1
+
+    list_response = client.get(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals",
+        params={"worldline_id": str(worldline_id)},
+    )
+    get_response = client.get(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals/{body['run_id']}",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert list_response.status_code == 200
+    assert [item["run_id"] for item in list_response.json()] == [body["run_id"]]
+    assert get_response.status_code == 200
+    assert get_response.json()["run_id"] == body["run_id"]
+
+
+def test_narrative_quality_long_run_eval_api_requires_world_admin_and_csrf() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    forbidden = client.post(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals/run",
+        json={"worldline_id": str(worldline_id)},
+    )
+    _authenticate(client, owner_token)
+    client.headers.pop(CSRF_HEADER_NAME, None)
+    csrf = client.post(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals/run",
+        json={"worldline_id": str(worldline_id)},
+    )
+    listed = client.get(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert forbidden.status_code == 403
+    assert csrf.status_code == 403
+    assert listed.status_code == 200
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(LongRunEvalRun.id))) == 0
+
+
+def test_narrative_quality_long_run_eval_api_rejects_sensitive_metadata() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/long-run-evals/run",
+        json={
+            "worldline_id": str(worldline_id),
+            "metadata": {"nested": {"api_key": "sk-secret"}},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "api_key" in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(LongRunEvalRun.id))) == 0
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -634,12 +756,20 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldMembership.__table__),
         cast(Table, Scene.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, WorldOrganization.__table__),
+        cast(Table, OrganizationMembership.__table__),
+        cast(Table, FactionProgressTrack.__table__),
         cast(Table, AgentRelationshipEdge.__table__),
+        cast(Table, AgentCalendarEntry.__table__),
+        cast(Table, WorldScheduleRule.__table__),
         cast(Table, WorldEventModel.__table__),
+        cast(Table, WorldSnapshotModel.__table__),
         cast(Table, WorldBible.__table__),
         cast(Table, SecretRecord.__table__),
         cast(Table, CharacterKnowledgeFact.__table__),
         cast(Table, CharacterEmotionalState.__table__),
+        cast(Table, DailyLifeEventCandidate.__table__),
+        cast(Table, OffscreenEventQueueItem.__table__),
         cast(Table, StoryHook.__table__),
         cast(Table, PlotThread.__table__),
         cast(Table, RouteAffinity.__table__),
@@ -647,16 +777,29 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, EndingCandidate.__table__),
         cast(Table, PlayerActorProfile.__table__),
         cast(Table, PlayerChoiceRecord.__table__),
+        cast(Table, PlayerInterventionRecord.__table__),
+        cast(Table, PlayerJournalEntry.__table__),
+        cast(Table, InWorldNotification.__table__),
+        cast(Table, GMStyleReview.__table__),
         cast(Table, NarrativeContinuityReview.__table__),
         cast(Table, AssetGenerationPolicy.__table__),
         cast(Table, AssetGenerationRun.__table__),
         cast(Table, AssetGenerationProposal.__table__),
+        cast(Table, GMAgenda.__table__),
         cast(Table, GMEventProposal.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
+        cast(Table, AgentMemoryItem.__table__),
+        cast(Table, MemoryWriteJob.__table__),
+        cast(Table, MemoryWriteLog.__table__),
+        cast(Table, MemoryRetrievalLog.__table__),
+        cast(Table, AgentProfileSnapshotModel.__table__),
+        cast(Table, ProviderProfile.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaJob.__table__),
+        cast(Table, AgentRuntimeRun.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
         cast(Table, PromptSnapshot.__table__),
@@ -666,12 +809,15 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, NarrativePublication.__table__),
         cast(Table, VoiceProfile.__table__),
         cast(Table, AgentVoiceProfileBinding.__table__),
         cast(Table, SpeechStyleMapping.__table__),
         cast(Table, CharacterSpriteSet.__table__),
         cast(Table, CharacterSpriteVariant.__table__),
         cast(Table, ConversationTurnPresentation.__table__),
+        cast(Table, LongRunEvalRun.__table__),
+        cast(Table, RuntimeDiagnosticEvent.__table__),
     ):
         table.create(engine)
 
@@ -1166,6 +1312,141 @@ def _seed_aligned_presentation(
                 voice_profile_id=voice_profile_id,
                 presentation_json={"safe": True},
                 render_state="speech_rendered",
+            )
+        )
+        session.commit()
+
+
+def _seed_long_run_eval_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+) -> None:
+    target_agent_id = uuid.uuid4()
+    route_id = uuid.uuid4()
+    event_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=target_agent_id,
+                world_id=world_id,
+                agent_key=f"target-{target_agent_id.hex[:8]}",
+                display_name="Bob",
+                kind="role_agent",
+                character_profile={},
+                config={},
+            )
+        )
+        session.add(
+            AgentRelationshipEdge(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                source_agent_id=agent_id,
+                target_agent_id=target_agent_id,
+                relationship_type="friendship",
+                affection=40,
+                trust=60,
+                hostility=0,
+                intimacy=10,
+                obligation=0,
+                rivalry=0,
+                debt=0,
+                metadata_json={},
+            )
+        )
+        session.add(
+            RouteAffinity(
+                id=route_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                route_key=f"route-{route_id.hex[:8]}",
+                status="active",
+                affinity=30,
+                stage=1,
+                flags=[],
+                metadata_json={},
+            )
+        )
+        session.add(
+            RouteMilestone(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                route_affinity_id=route_id,
+                agent_id=agent_id,
+                milestone_key="opening",
+                title="Opening",
+                description="Opening route beat",
+                stage=1,
+                status="completed",
+                conditions={},
+                evidence_metadata={},
+                metadata_json={},
+            )
+        )
+        session.add(
+            EndingCandidate(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                route_affinity_id=route_id,
+                agent_id=agent_id,
+                ending_key="quiet-ending",
+                title="Quiet Ending",
+                ending_type="normal",
+                status="available",
+                requirements={"min_route_stage": 1},
+                outcome_summary=None,
+                evidence_metadata={},
+                metadata_json={},
+            )
+        )
+        session.add(
+            GMEventProposal(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="Resolved daily beat",
+                reason="Fixture proposal.",
+                event_name="gm.daily_beat",
+                proposed_payload={},
+                importance="daily",
+                risk_score=10,
+                affected_agents=[str(agent_id)],
+                affected_organizations=[],
+                source_context={},
+                status="resolved",
+            )
+        )
+        session.add(
+            WorldEventModel(
+                id=event_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sequence=1,
+                event_name="gm.daily_beat",
+                importance="daily",
+                payload={"safe": True},
+                wall_time=datetime.now(UTC),
+                world_time=datetime(2030, 1, 1, tzinfo=UTC),
+                actor_ref="gm:test",
+            )
+        )
+        session.add(
+            WorldSnapshotModel(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                covers_event_sequence=1,
+                schema_version="test/v1",
+                status="valid",
+                payload={"safe": True},
+                payload_uri=None,
+                snapshot_metadata={},
+                created_by_event_id=event_id,
             )
         )
         session.commit()

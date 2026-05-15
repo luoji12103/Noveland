@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from noveland.auth import AuthenticatedSubject
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextPreview,
@@ -14,6 +14,8 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityDialogueReviewResult,
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
+    NarrativeQualityLongRunEvalResult,
+    NarrativeQualityLongRunEvalRunRequest,
     NarrativeQualityPacingReviewRequest,
     NarrativeQualityPacingReviewResult,
     NarrativeQualityPresentationAlignmentRequest,
@@ -211,6 +213,72 @@ def review_route_relationship_progression(
         return NarrativeQualityService(db_session).review_route_relationship_progression(
             world_id,
             request,
+        )
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/long-run-evals/run",
+    response_model=NarrativeQualityLongRunEvalResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def run_long_living_world_simulation_eval(
+    world_id: uuid.UUID,
+    request: NarrativeQualityLongRunEvalRunRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityLongRunEvalResult:
+    try:
+        return NarrativeQualityService(db_session).run_long_living_world_eval(
+            world_id,
+            request,
+        )
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.get("/long-run-evals", response_model=list[NarrativeQualityLongRunEvalResult])
+def list_long_living_world_simulation_evals(
+    world_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> list[NarrativeQualityLongRunEvalResult]:
+    try:
+        return NarrativeQualityService(db_session).list_long_living_world_evals(
+            world_id,
+            worldline_id,
+            limit=limit,
+        )
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.get(
+    "/long-run-evals/{run_id}",
+    response_model=NarrativeQualityLongRunEvalResult,
+)
+def get_long_living_world_simulation_eval(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> NarrativeQualityLongRunEvalResult:
+    try:
+        return NarrativeQualityService(db_session).get_long_living_world_eval(
+            world_id,
+            worldline_id,
+            run_id,
         )
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc

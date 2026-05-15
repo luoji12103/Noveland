@@ -516,6 +516,49 @@ class NarrativeQualityProgressionReviewResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityLongRunEvalRunRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    eval_key: str = Field(default="narrative-quality-long-run", min_length=1, max_length=120)
+    horizon_days: int = Field(default=7, ge=1, le=90)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("eval_key", mode="after")
+    @classmethod
+    def normalize_eval_key(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("eval_key must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class NarrativeQualityLongRunFailureReport(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+
+
+class NarrativeQualityLongRunEvalResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    run_id: uuid.UUID
+    eval_key: str
+    horizon_days: int
+    status: str
+    drift_metrics: dict[str, Any] = Field(default_factory=dict)
+    failure_reports: list[NarrativeQualityLongRunFailureReport] = Field(default_factory=list)
+    blockers: list[dict[str, Any]] = Field(default_factory=list)
+    recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json
