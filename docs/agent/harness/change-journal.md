@@ -22,6 +22,17 @@
 - Docs updated: initial package
 - Follow-up notes: scaffold repository next
 
+## v0.5 Authoring & Import Studio archive entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: OpenSpec archive, v0.5 current specs, release notes, and harness bookkeeping
+- Summary: Archived the completed v0.5 Authoring & Import Studio OpenSpec change, synced implemented authoring/import capabilities into current OpenSpec specs, and added v0.5 release notes.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: OpenSpec current specs, OpenSpec archive, v0.5 release notes, project index, file inventory, task board, active handoff
+- Follow-up notes: Start v0.6 with feasibility review only; do not implement v0.6 until architecture scope is accepted.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

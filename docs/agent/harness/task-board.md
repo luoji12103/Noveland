@@ -139,10 +139,11 @@
 - v0.5 Authoring & Import Studio Phase 8 full local gate
 - v0.5 Authoring & Import Studio Phase 8 fast-forward merge
 - v0.5 Authoring & Import Studio implementation complete
+- v0.5 Authoring & Import Studio OpenSpec archive and release notes
 
 ## Upcoming Mainline
-- v0.5 OpenSpec archive and release-note work can be done as a separate
-  docs-only step if requested.
+- v0.6 Runtime Narrative Quality feasibility review should be done before any
+  implementation work.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

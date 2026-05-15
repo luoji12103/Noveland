@@ -39,7 +39,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.5.7-asset-import-matching-plan.md` — final v0.5 Authoring & Import Studio Phase 7 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.8-authoring-regression-fixture-plan.md` — final v0.5 Authoring & Import Studio Phase 8 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
-- `openspec/` — OpenSpec current specs, archived v0.4 Operator/Admin UX change, and proposed roadmap changes for v0.5+.
+- `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
+- `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.

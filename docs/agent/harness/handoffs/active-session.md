@@ -1,18 +1,20 @@
 # Active Session Handoff
 
-- Date: 2026-05-14T00:00:00Z
+- Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.5 Authoring & Import Studio closeout.
-- Status: v0.5 Phases 1-8 are implemented, full-gate validated, and fast-forward merged to local `main`.
+- Objective: v0.5 Authoring & Import Studio closeout and v0.6 feasibility review.
+- Status: v0.5 Phases 1-8 are implemented, full-gate validated, pushed by the user, and archived in OpenSpec with release notes.
 
 ## Current Context
 
-- `main` is ahead of `origin/main` locally; do not push unless explicitly requested.
+- `main` is aligned with `origin/main` after the user push; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
-- Current implemented behavior is represented under `openspec/specs/`.
+- Current Phase 3-13, v0.4, and v0.5 implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
+- The completed v0.5 change is archived under `openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/`.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
+- v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
 - v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
 - v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
@@ -39,9 +41,7 @@
 
 ## Required Next Steps
 
-- v0.5 OpenSpec archive and release-note work can be done as a separate docs-only step if requested.
-- Do not push unless explicitly requested.
-- Do not add new v0.5 routes to `worlds.py`; keep using the independent authoring router.
+- Perform v0.6 feasibility review only; do not implement v0.6 yet.
 - Do not push unless explicitly requested.
 
 ## Latest Verification
