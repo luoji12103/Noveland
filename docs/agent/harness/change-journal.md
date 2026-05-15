@@ -154,6 +154,17 @@
 - Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
 - Follow-up notes: Begin Phase 8 Route & Relationship Progression Quality from clean local `main`; no push performed.
 
+## v0.6.8 Route & Relationship Progression Quality planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 8 planning
+- Summary: Added the Phase 8 implementation checkpoint for API-first route and relationship progression diagnostics, reusing relationship edges, route affinities, milestones, endings, player choices, GM proposals, plot threads, and world events while forbidding canonical mutation, provider calls, Web UI, broad `worlds.py` routes, and replacement relationship semantics.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.8-route-relationship-progression-quality-plan.md`, `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, task board, active handoff, OpenSpec tasks
+- Follow-up notes: Implement Phase 8 on `feat/route-relationship-progression-quality`; no migration expected.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

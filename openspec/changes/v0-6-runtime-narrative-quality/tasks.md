@@ -103,7 +103,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 8 — Route & Relationship Progression Quality
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `route-relationship-progression-quality` scope only.
 - [ ] Keep implementation API-first; do not add Web dashboard work.
 - [ ] Use narrative quality package/router for any new v0.6 quality APIs.

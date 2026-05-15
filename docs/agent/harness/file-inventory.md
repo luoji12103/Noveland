@@ -201,7 +201,6 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`
 - `backend/tests/test_api_narrative_quality.py`
 - `backend/tests/test_narrative_quality_service.py`
-- `docs/agent/harness/feature-updates/v0.6.7-runtime-pacing-controller-plan.md`
 - `backend/packages/events/`
 - `backend/packages/events/src/noveland/events/contracts.py`
 - `backend/packages/events/src/noveland/events/errors.py`
@@ -427,6 +426,8 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.6.4-emotion-sprite-voice-alignment-plan.md`
 - `docs/agent/harness/feature-updates/v0.6.5-narrative-writer-v2-plan.md`
 - `docs/agent/harness/feature-updates/v0.6.6-continuity-review-v2-plan.md`
+- `docs/agent/harness/feature-updates/v0.6.7-runtime-pacing-controller-plan.md`
+- `docs/agent/harness/feature-updates/v0.6.8-route-relationship-progression-quality-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`

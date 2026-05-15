@@ -46,6 +46,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.6.5-narrative-writer-v2-plan.md` — final v0.6 Runtime Narrative Quality Phase 5 implementation plan.
 - `docs/agent/harness/feature-updates/v0.6.6-continuity-review-v2-plan.md` — final v0.6 Runtime Narrative Quality Phase 6 implementation plan.
 - `docs/agent/harness/feature-updates/v0.6.7-runtime-pacing-controller-plan.md` — final v0.6 Runtime Narrative Quality Phase 7 implementation plan.
+- `docs/agent/harness/feature-updates/v0.6.8-route-relationship-progression-quality-plan.md` — final v0.6 Runtime Narrative Quality Phase 8 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.
