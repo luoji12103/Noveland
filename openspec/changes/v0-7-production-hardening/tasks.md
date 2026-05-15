@@ -43,7 +43,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 4 — Object Storage & Backup v2
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `object-storage-backup-v2` scope only.
 - [ ] Audit media object and snapshot storage integrity without exposing filesystem paths.
 - [ ] Update backup/restore drill docs and local verification entrypoint if needed.

@@ -1881,3 +1881,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 4 Object Storage & Backup v2 from clean local `main`.
+
+## v0.7 Object Storage & Backup v2 plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 4.
+- Summary: Added the Phase 4 plan for safe storage integrity auditing and repeatable backup/restore verification. The plan keeps work inside existing storage/media/operator boundaries, expects no migration, avoids S3/GCS implementation, avoids Web UI and public media delivery, and requires audit output to omit raw storage URIs, filesystem paths, bytes, base64, raw prompts, and raw outputs.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.4-object-storage-backup-v2-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/object-storage-backup-v2` from clean local `main`.

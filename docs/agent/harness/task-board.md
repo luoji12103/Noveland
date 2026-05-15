@@ -209,13 +209,14 @@
 - v0.7 Production Hardening Phase 3 targeted tests
 - v0.7 Production Hardening Phase 3 full local gate
 - v0.7 Production Hardening Phase 3 fast-forward merge
+- v0.7 Production Hardening Phase 4 planning checkpoint
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.
 - v0.7 Phase 3 Cost & Rate Control is complete.
-- v0.7 Phase 4 Object Storage & Backup v2 planning checkpoint is next.
+- v0.7 Phase 4 Object Storage & Backup v2 implementation is next.
 - v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
