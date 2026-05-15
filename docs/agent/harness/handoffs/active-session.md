@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/deployment-profile
+- Branch: main
 - Objective: v0.7 Production Hardening Phase 5.
-- Status: Phase 5 Deployment Profile implementation and full local gate passed; fast-forward merge back to local `main` is next.
+- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics planning checkpoint is next.
 
 ## Current Context
 
@@ -44,9 +44,8 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Fast-forward merge `feat/deployment-profile` back to local `main`.
-- Record Phase 5 merge bookkeeping, then begin Phase 6 Observability & Incident Diagnostics from clean `main`.
-- Stop for an architecture decision if deployment profile work needs a new router or persisted deployment state.
+- Begin Phase 6 Observability & Incident Diagnostics from clean local `main`.
+- Stop for an architecture decision if incident diagnostics need raw prompt/output exposure, resolved secrets, storage paths, or a duplicate diagnostics framework.
 
 ## Latest Verification
 
@@ -141,3 +140,4 @@
 - v0.7 Phase 5 implementation expanded `docs/agent/operations/deployment-profile.md` and added `backend/tests/test_deployment_profile_docs.py`.
 - v0.7 Phase 5 targeted checks passed: backend ruff for the deployment profile docs test, backend mypy for the docs test, targeted pytest (`13 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 5 full local gate passed: backend ruff, backend mypy (`251 source files`), backend pytest (`404 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.7 Phase 5 fast-forward merge to local `main` completed.
