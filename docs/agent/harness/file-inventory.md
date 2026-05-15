@@ -430,6 +430,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.6.8-route-relationship-progression-quality-plan.md`
 - `docs/agent/harness/feature-updates/v0.6.9-long-run-living-world-simulation-eval-plan.md`
 - `docs/agent/harness/feature-updates/v0.6.10-narrative-quality-dashboard-api-plan.md`
+- `docs/agent/harness/feature-updates/v0.7-production-hardening-feasibility-review.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`

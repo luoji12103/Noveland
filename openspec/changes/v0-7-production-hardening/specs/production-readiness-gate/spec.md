@@ -2,30 +2,48 @@
 
 ## Capability
 
-Create an internal readiness gate distinct from public launch readiness. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
+Create an internal readiness gate that aggregates v0.7 hardening evidence while remaining distinct from public launch readiness. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Production Readiness Gate provides the planned workflow
-The system SHALL provide Production Readiness Gate capability for Readiness checklist, Gate report, Operator signoff while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Readiness gate reuses existing evidence
+The system SHALL aggregate existing beta, release, eval, diagnostics, provider, media, storage, cost, ACL, and security regression evidence rather than creating a duplicate release framework.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Production Readiness Gate
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse BetaChecklistRun, LongRunEvalRun, diagnostics services rather than creating a parallel subsystem.
+#### Scenario: Admin runs readiness gate
+- **Given** v0.7 hardening evidence exists for a world or deployment profile
+- **When** an authorized admin runs the readiness gate
+- **Then** the gate SHALL aggregate provider governance, budget status, storage integrity, deployment profile, diagnostics, security regression, beta checklist, long-run eval, multimodal eval, and narrative quality evidence where available
+- **And** it SHALL return actionable blockers and recommendations.
+
+### Requirement: Readiness gate is internal-only
+The system SHALL keep production readiness distinct from public launch readiness and SHALL not expose readiness internals to reader/member/player routes.
+
+#### Scenario: Reader requests readiness report
+- **Given** a readiness report exists
+- **When** a reader, member, or player-visible route attempts to access it
+- **Then** the system SHALL reject the request or return only a safe public projection accepted by a future change
+- **And** it SHALL NOT leak admin-only evidence.
+
+### Requirement: Operator signoff is safe
+The system SHALL record operator signoff only if the accepted implementation scope defines a safe write path and storage model.
+
+#### Scenario: Operator records signoff
+- **Given** a readiness report has blockers and recommendations
+- **When** an authorized operator records signoff
+- **Then** the signoff SHALL store actor reference, timestamp, and safe notes only
+- **And** it SHALL NOT store raw prompts, raw outputs, resolved secrets, storage paths, bytes, or base64.
 
 ### Requirement: Production Readiness Gate preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Production Readiness Gate, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+The system SHALL enforce Phase 13 architecture guardrails for readiness gate work.
 
 #### Scenario: Boundary enforcement
-- **Given** Production Readiness Gate reads or writes provider, media, invocation, visual, speech, event, or presentation data
+- **Given** the readiness gate reads or writes provider, media, invocation, visual, speech, event, presentation, authoring, eval, diagnostics, or narrative quality data
 - **When** the capability returns API/UI data or persists records
 - **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
 - **And** it SHALL validate world and worldline scope where applicable.
 
 ### Requirement: Production Readiness Gate has explicit acceptance evidence
-The system SHALL provide focused validation for Production Readiness Gate and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+The system SHALL provide focused validation and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
 
 #### Scenario: Phase acceptance
 - **Given** implementation for Production Readiness Gate is complete
@@ -37,3 +55,5 @@ The system SHALL provide focused validation for Production Readiness Gate and SH
 
 - Public launch gate
 - Marketing/release workflow
+- External compliance certification
+- Blocking every runtime path

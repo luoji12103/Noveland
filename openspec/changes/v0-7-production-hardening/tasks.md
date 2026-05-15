@@ -2,10 +2,12 @@
 
 Use these tasks when implementation is explicitly requested. Do not mark items complete during roadmap-only work.
 
-## Phase 1 — Permission Model Hardening
+## Phase 1 — Permission Matrix & ACL Regression Baseline
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `permission-model-hardening` scope only.
+- [ ] Document the current platform-admin/world-admin/world-member/reader/player route matrix.
+- [ ] Add or update route ACL and lower-privilege leak regression coverage.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -17,6 +19,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `secret-provider-governance` scope only.
+- [ ] Confirm disabled providers are blocked across provider, image, speech, narrative quality, and smoke-test execution paths.
+- [ ] Confirm auth_ref rotation never stores or returns resolved secret values.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -28,6 +32,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `cost-rate-control` scope only.
+- [ ] Define budget/quotas for provider execution, media jobs, asset generation, and provider-backed narrative quality generation.
+- [ ] Ensure budget blocks happen before external provider calls and produce safe evidence.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -39,6 +45,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `object-storage-backup-v2` scope only.
+- [ ] Audit media object and snapshot storage integrity without exposing filesystem paths.
+- [ ] Update backup/restore drill docs and local verification entrypoint if needed.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -50,6 +58,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `deployment-profile` scope only.
+- [ ] Document production-like local/single-host profile, health checks, migration procedure, and rollback prerequisites.
+- [ ] Validate deployment profile commands without introducing managed-cloud lock-in.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -61,6 +71,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `observability-incident-diagnostics` scope only.
+- [ ] Reuse runtime diagnostics, provider health, model invocation, media job, multimodal eval, and narrative quality evidence.
+- [ ] Ensure incident reports expose safe evidence refs only.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -72,6 +84,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `security-regression-suite` scope only.
+- [ ] Consolidate secret, prompt/output, storage/path, ACL, and worldline isolation regression fixtures.
+- [ ] Extend Phase 13 and v0.5/v0.6 regression coverage where useful.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.
@@ -83,6 +97,8 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 - [ ] Write phase planning checkpoint.
 - [ ] Implement `production-readiness-gate` scope only.
+- [ ] Reuse beta checklist, long-run eval, release profile, multimodal eval, narrative quality, diagnostics, and v0.7 hardening evidence.
+- [ ] Keep readiness gate internal and distinct from public launch readiness.
 - [ ] Preserve Phase 13 architecture guardrails.
 - [ ] Add or update focused tests.
 - [ ] Run targeted tests.

@@ -1767,3 +1767,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Keep `main` clean and do not push unless explicitly requested.
+
+## v0.7 Production Hardening feasibility review entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Documentation-only v0.7 planning review and OpenSpec optimization after v0.6 completion.
+- Summary: Reviewed the active `v0-7-production-hardening` OpenSpec change against the current v0.4-v0.6 baseline. Tightened the plan around API/test/docs-first hardening, Phase 1 permission matrix and ACL regression baseline, provider secret governance, pre-call cost/rate controls, object storage integrity, deployment profile, observability reuse, consolidated security regressions, and internal readiness evidence. The updated plan avoids broad `worlds.py` growth and records stop conditions for unresolved production-hardening package/router decisions.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7-production-hardening-feasibility-review.md`, `/openspec/changes/v0-7-production-hardening/proposal.md`, `/openspec/changes/v0-7-production-hardening/design.md`, `/openspec/changes/v0-7-production-hardening/phase-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/openspec/changes/v0-7-production-hardening/specs/*/spec.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A, documentation-only planning update.
+- Docs updated: v0.7 OpenSpec proposal, design, phase plan, task list, capability specs, feature review, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Validate OpenSpec and `git diff --check`, then commit as docs-only. Do not implement v0.7 or push unless explicitly requested.

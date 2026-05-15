@@ -192,10 +192,13 @@
 - v0.6 Runtime Narrative Quality Phase 10 full local gate
 - v0.6 Runtime Narrative Quality Phase 10 fast-forward merge
 - v0.6 Runtime Narrative Quality Phase 10 implementation complete
+- v0.7 Production Hardening feasibility review
+- v0.7 Production Hardening OpenSpec plan optimization
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality Phase 10 fast-forward merge and bookkeeping are complete.
-- Future runtime narrative quality work should start from a new accepted change or a later version.
+- v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
+- v0.7 Production Hardening should start with Phase 1 Permission Matrix & ACL Regression Baseline only after explicit implementation request.
+- v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

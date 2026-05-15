@@ -4,12 +4,16 @@
 
 Move local beta capabilities toward long-running production-like operation with stronger permissions, secret governance, budgets, backups, observability, and security regression.
 
+This revision is based on the post-v0.6 baseline: provider secrets, multimodal media, authoring/import, narrative quality diagnostics, and dashboard-ready admin APIs now exist locally. v0.7 should harden those existing surfaces before any public-player or production-like exposure expands.
+
 ## What Changes
 
 - Save v0.7 as an OpenSpec roadmap change with 8 independently implementable phases.
 - Define phase goals, scope, non-goals, reused systems, acceptance criteria, stop conditions, validation, and deliverables.
 - Add capability delta specs for each planned capability.
 - Preserve Phase 13 architecture freeze boundaries while planning future implementation.
+- Prefer API/test/docs-first implementation. Web dashboard work is not required for v0.7 unless a later phase plan explicitly accepts it.
+- Avoid broad new `worlds.py` routes. New APIs should use existing bounded routers/packages or a dedicated production-hardening boundary after an explicit architecture decision.
 
 ## Capabilities
 
@@ -31,3 +35,4 @@ Move local beta capabilities toward long-running production-like operation with 
 - Future backend, Web, docs, and test work will be driven by this change's `phase-plan.md`, `tasks.md`, and capability specs.
 - Current implementation behavior is unchanged by this roadmap skeleton.
 - Future implementation phases must run targeted tests and the full local gate before merge.
+- v0.6 remains ready to archive separately; this v0.7 planning update does not archive v0.6 and does not change current runtime behavior.

@@ -2,30 +2,48 @@
 
 ## Capability
 
-Add per-world budgets, per-provider budgets, media generation budgets, emergency stop, and quota status. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
+Add internal per-world, per-provider, media generation, and provider-backed narrative generation budget/rate controls. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Cost & Rate Control provides the planned workflow
-The system SHALL provide Cost & Rate Control capability for Budget model, Rate limits, Emergency disable switches while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Budget checks run before external calls
+The system SHALL enforce accepted budget/rate policies before external provider calls or automatic media/narrative generation spend.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Cost & Rate Control
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse model_invocations, media_jobs, provider integrations, asset generation policies rather than creating a parallel subsystem.
+#### Scenario: Provider execution exceeds budget
+- **Given** a world or provider budget has been reached
+- **When** a provider-backed image, speech, provider smoke/test, asset generation, or narrative quality workflow is requested
+- **Then** the system SHALL block before the external provider call
+- **And** it SHALL return safe quota status and a safe blocked-execution reason.
+
+### Requirement: Quota status is admin-visible
+The system SHALL expose quota and budget status to authorized admins using existing invocation, media job, provider, and asset generation evidence where possible.
+
+#### Scenario: Admin reviews quota status
+- **Given** model invocations, media jobs, provider integrations, and asset generation proposals exist for a world
+- **When** an authorized admin requests quota status
+- **Then** the response SHALL include safe aggregate counts/cost estimates
+- **And** it SHALL NOT expose raw prompts, raw outputs, resolved secrets, storage paths, bytes, or base64.
+
+### Requirement: Emergency stop is auditable
+The system SHALL provide an emergency stop mechanism for provider-backed spend that is reversible by authorized admins and visible through safe audit evidence.
+
+#### Scenario: Emergency stop is active
+- **Given** an emergency stop is active for a world or provider
+- **When** a provider-backed workflow is requested
+- **Then** the workflow SHALL be blocked before execution
+- **And** the block SHALL be visible in safe admin evidence without mutating canonical world state.
 
 ### Requirement: Cost & Rate Control preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Cost & Rate Control, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+The system SHALL enforce Phase 13 architecture guardrails for cost/rate controls.
 
 #### Scenario: Boundary enforcement
-- **Given** Cost & Rate Control reads or writes provider, media, invocation, visual, speech, event, or presentation data
+- **Given** cost/rate control reads or writes provider, media, invocation, visual, speech, event, presentation, asset generation, or narrative quality data
 - **When** the capability returns API/UI data or persists records
 - **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
 - **And** it SHALL validate world and worldline scope where applicable.
 
 ### Requirement: Cost & Rate Control has explicit acceptance evidence
-The system SHALL provide focused validation for Cost & Rate Control and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+The system SHALL provide focused validation and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
 
 #### Scenario: Phase acceptance
 - **Given** implementation for Cost & Rate Control is complete
@@ -36,3 +54,6 @@ The system SHALL provide focused validation for Cost & Rate Control and SHALL st
 ## Non-goals
 
 - Complex billing marketplace
+- Subscription management
+- Provider fallback/load balancing
+- Public user quota UX

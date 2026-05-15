@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.6 Runtime Narrative Quality Phase 10.
-- Status: Phase 10 fast-forward merge bookkeeping is complete; local v0.6 work is finished.
+- Objective: v0.7 Production Hardening planning review.
+- Status: v0.6 is locally complete; v0.7 OpenSpec planning has been reviewed and optimized for the post-v0.6 baseline.
 
 ## Current Context
 
@@ -26,6 +26,8 @@
 - v0.5 Phase 8 is complete: deterministic authoring regression fixture covers source registry, parser, character/lore extraction, conflict review, memory migration, asset matching, guarded review/apply, and side-effect leak checks.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
+- v0.6 Runtime Narrative Quality is complete locally and ready to archive if requested; this session does not archive it.
+- v0.7 Production Hardening is the next proposed OpenSpec change and should start API/test/docs-first.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -42,7 +44,10 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Treat v0.6 Runtime Narrative Quality Phase 10 as complete and use the current baseline for any later accepted change.
+- If requested, archive v0.6 and generate v0.6 release notes before v0.7 implementation starts.
+- If implementation is requested, start v0.7 with Phase 1 Permission Matrix & ACL Regression Baseline from clean local `main`.
+- Do not implement v0.7 until explicitly requested.
+- Stop for an architecture decision if v0.7 needs broad new `worlds.py` routes or a cross-cutting production-hardening package/router.
 
 ## Latest Verification
 
@@ -113,3 +118,5 @@
 - v0.6 Phase 10 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
 - Flaky note: the first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.
 - v0.6 Phase 10 fast-forward merge to local `main` completed.
+- v0.7 Production Hardening feasibility review optimized the OpenSpec proposal/design/phase-plan/tasks/specs after v0.6 completion.
+- v0.7 revised first implementation target is Phase 1 Permission Matrix & ACL Regression Baseline.

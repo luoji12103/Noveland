@@ -2,30 +2,47 @@
 
 ## Capability
 
-Define production compose/profile, health endpoints, migration procedure, and operator docs. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
+Define a repeatable local/single-host production-like deployment profile with health checks, migration procedure, rollback guidance, and operator docs. This capability belongs to v0.7 Production Hardening and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
-### Requirement: Deployment Profile provides the planned workflow
-The system SHALL provide Deployment Profile capability for Production deployment docs, Compose profile, Health checks while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+### Requirement: Deployment profile is explicit
+The system SHALL document the supported production-like deployment shape, required environment variables, startup order, health checks, backup prerequisites, migration commands, and rollback guidance.
 
-#### Scenario: Authorized workflow
-- **Given** an authorized actor is using Deployment Profile
-- **When** they perform the primary workflow for this capability
-- **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse infra compose, health API, migration config rather than creating a parallel subsystem.
+#### Scenario: Operator prepares deployment
+- **Given** the operator is preparing a local/single-host production-like deployment
+- **When** they follow the deployment profile
+- **Then** the profile SHALL identify API, database, NATS, object storage, migrations, provider env refs, and backup readiness
+- **And** it SHALL distinguish internal readiness from public launch readiness.
+
+### Requirement: Health checks are safe
+The system SHALL expose or document health checks that reveal operational status without exposing secrets or admin-only evidence.
+
+#### Scenario: Health endpoint is requested
+- **Given** a health check endpoint or command runs
+- **When** it reports API, dependency, provider, migration, or storage status
+- **Then** it SHALL return safe status, not resolved secrets, storage paths, raw prompts, raw outputs, bytes, or base64.
+
+### Requirement: Deployment validation is local and repeatable
+The system SHALL validate deployment configuration with local commands and no managed-cloud lock-in.
+
+#### Scenario: Deployment profile validation runs
+- **Given** the repository is checked out locally
+- **When** validation runs
+- **Then** it SHALL include compose config validation and any accepted health/config checks
+- **And** it SHALL NOT require Kubernetes, managed cloud services, or public CDN configuration.
 
 ### Requirement: Deployment Profile preserves architecture freeze boundaries
-The system SHALL enforce Phase 13 architecture guardrails for Deployment Profile, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+The system SHALL enforce Phase 13 architecture guardrails for deployment profile work.
 
 #### Scenario: Boundary enforcement
-- **Given** Deployment Profile reads or writes provider, media, invocation, visual, speech, event, or presentation data
+- **Given** deployment profile work reads provider, media, invocation, visual, speech, event, presentation, diagnostics, or storage data
 - **When** the capability returns API/UI data or persists records
 - **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
 - **And** it SHALL validate world and worldline scope where applicable.
 
 ### Requirement: Deployment Profile has explicit acceptance evidence
-The system SHALL provide focused validation for Deployment Profile and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+The system SHALL provide focused validation and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
 
 #### Scenario: Phase acceptance
 - **Given** implementation for Deployment Profile is complete
@@ -36,3 +53,6 @@ The system SHALL provide focused validation for Deployment Profile and SHALL sto
 ## Non-goals
 
 - Managed cloud platform lock-in
+- Kubernetes orchestration
+- Autoscaling
+- Public launch checklist
