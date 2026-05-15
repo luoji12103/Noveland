@@ -1451,3 +1451,14 @@
 - Docs updated: OpenSpec Phase 1 task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Commit Phase 1 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 2 Provider-backed GM Proposal from clean local `main`. Do not push unless explicitly requested.
+
+## v0.6 Runtime Context Contract v2 merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.6 Runtime Narrative Quality Phase 1.
+- Summary: Fast-forward merged `feat/runtime-context-contract-v2` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 1 tasks now mark implementation, targeted tests, full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 2 Provider-backed GM Proposal from clean local `main`; do not push unless explicitly requested.
