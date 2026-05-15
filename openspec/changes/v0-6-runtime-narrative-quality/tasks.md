@@ -117,15 +117,15 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 9 — Long-run Living World Simulation Eval
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `long-run-living-world-simulation-eval` scope only.
-- [ ] Keep implementation API-first; do not add Web dashboard work.
-- [ ] Use narrative quality package/router for any new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Implement `long-run-living-world-simulation-eval` scope only.
+- [x] Keep implementation API-first; do not add Web dashboard work.
+- [x] Use narrative quality package/router for any new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
+- [x] Fast-forward merge to local main.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 10 — Narrative Quality Dashboard/API
 

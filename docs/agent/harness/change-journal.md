@@ -1708,3 +1708,27 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 4 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 5 Narrative Writer v2 from clean local `main`; do not push unless explicitly requested.
+
+## v0.6 Long-run Living World Simulation Eval implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/long-run-living-world-simulation-eval
+- Scope: Backend-only v0.6 Runtime Narrative Quality Phase 9 long-run living world simulation eval.
+- Summary: Added admin-only long-run eval run/list/get APIs under the narrative quality router. The implementation reuses `LivingWorldBetaService.run_long_eval()` and `LongRunEvalRun`, returns drift metrics and failure reports, validates worldline scope, rejects sensitive metadata, redacts unsafe operational data, and avoids provider calls, daemon execution, world-event writes, Web UI, migrations, duplicate eval tables, and broad `worlds.py` routes.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`, `/backend/tests/test_api_narrative_quality.py`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Narrative quality service coverage for run/list/get, worldline isolation, sensitive metadata rejection, response sanitization, and no provider/event side effects; API coverage for run/list/get, ACL, CSRF, and sensitive metadata rejection.
+- Docs updated: OpenSpec Phase 9 task status, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`63 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`378 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
+- Flaky notes: The first Web e2e run hit the existing world composition import/export response-body race; the full e2e suite passed on rerun.
+- Follow-up notes: Commit Phase 9 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 10 Narrative Quality Dashboard/API from clean local `main`. Do not push unless explicitly requested.
+
+## v0.6 Long-run Living World Simulation Eval merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.6 Runtime Narrative Quality Phase 9.
+- Summary: Fast-forward merged `feat/long-run-living-world-simulation-eval` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 9 tasks now mark implementation, targeted tests, full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 9 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 10 Narrative Quality Dashboard/API from clean local `main`; do not push unless explicitly requested.

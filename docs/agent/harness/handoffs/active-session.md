@@ -2,12 +2,12 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.6 Runtime Narrative Quality Phase 9.
-- Status: Phase 9 Long-run Living World Simulation Eval planning checkpoint is complete; implementation branch is next.
+- Objective: v0.6 Runtime Narrative Quality Phase 10.
+- Status: Phase 9 Long-run Living World Simulation Eval is implemented, full-gate verified, and fast-forward merged to local `main`; Phase 10 planning checkpoint is next.
 
 ## Current Context
 
-- `main` is aligned with `origin/main` after the user push; do not push unless explicitly requested.
+- `main` is ahead of `origin/main` after local v0.6 work; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
 - Current Phase 3-13, v0.4, and v0.5 implemented behavior is represented under `openspec/specs/`.
@@ -41,10 +41,11 @@
 
 ## Required Next Steps
 
-- Start Phase 9 implementation from clean local `main` on `feat/long-run-living-world-simulation-eval`.
-- Keep Phase 9 API-first under the narrative quality package/router; do not add Web dashboard work or broad `worlds.py` routes.
-- Reuse `LongRunEvalRun`, runtime/conversation/worldline records, and existing eval/release evidence; do not create a duplicate eval framework unless implementation proves existing records insufficient.
-- Reuse `LivingWorldGuardrailService.review_narrative_continuity` and `NarrativeContinuityReview`; do not add a duplicate review table.
+- Start Phase 10 planning from clean local `main`, then implement on a dedicated feature branch after the docs-only planning checkpoint.
+- Keep Phase 10 API-first under the narrative quality package/router; do not add Web dashboard routes, components, or e2e scenarios.
+- Provide admin-scoped narrative quality dashboard/API summaries over existing context, provider, invocation, dialogue, alignment, writer, continuity, pacing, progression, and long-run eval data.
+- Reuse existing narrative quality services, `LongRunEvalRun`, multimodal diagnostics, and release/eval evidence; do not create a duplicate dashboard or eval framework.
+- Do not add broad `worlds.py` routes.
 - Preserve the first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts store non-null `worldline_id`.
 - Continue to use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
@@ -110,4 +111,7 @@
 - v0.6 Phase 8 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`56 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 8 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`371 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 8 fast-forward merge to local `main` completed.
-- v0.6 Phase 9 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
+- v0.6 Phase 9 planning checkpoint is docs-only and was validated with OpenSpec strict validation plus `git diff --check`.
+- v0.6 Phase 9 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`63 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 9 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`378 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; first attempt hit the existing world composition import/export response-body race), docker compose config, and `git diff --check`.
+- v0.6 Phase 9 fast-forward merge to local `main` completed.
