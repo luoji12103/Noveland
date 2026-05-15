@@ -51,6 +51,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.6.10-narrative-quality-dashboard-api-plan.md` — final v0.6 Runtime Narrative Quality Phase 10 implementation plan.
 - `docs/agent/harness/feature-updates/v0.7-production-hardening-feasibility-review.md` — feasibility review and optimized OpenSpec plan for the proposed v0.7 Production Hardening change after v0.6 completion.
 - `docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md` — final v0.7 Production Hardening Phase 1 implementation plan.
+- `docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md` — final v0.7 Production Hardening Phase 2 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.

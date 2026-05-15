@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.7 Production Hardening Phase 1.
-- Status: Phase 1 Permission Matrix & ACL Regression Baseline is fast-forward merged to local main; Phase 2 Secret & Provider Governance is next.
+- Objective: v0.7 Production Hardening Phase 2.
+- Status: Phase 2 Secret & Provider Governance planning checkpoint is added; implementation should start from clean local main on `feat/secret-provider-governance`.
 
 ## Current Context
 
@@ -45,8 +45,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - If requested, archive v0.6 and generate v0.6 release notes before v0.7 implementation starts.
-- If implementation is requested, start v0.7 with Phase 1 Permission Matrix & ACL Regression Baseline from clean local `main`.
-- Do not implement v0.7 until explicitly requested.
+- If implementation is requested, continue v0.7 with Phase 2 Secret & Provider Governance from clean local `main`.
 - Stop for an architecture decision if v0.7 needs broad new `worlds.py` routes or a cross-cutting production-hardening package/router.
 
 ## Latest Verification
@@ -124,3 +123,4 @@
 - v0.7 Phase 1 targeted checks passed: backend ruff for `test_api_permission_matrix.py`, backend mypy for `test_api_permission_matrix.py`, targeted pytest (`3 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 1 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`386 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 1 fast-forward merge to local `main` completed.
+- v0.7 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md`.

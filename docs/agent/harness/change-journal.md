@@ -1812,3 +1812,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 2 Secret & Provider Governance from clean local `main`.
+
+## v0.7 Secret & Provider Governance plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 2.
+- Summary: Added the Phase 2 plan for provider governance hardening across existing provider, smoke-test, image, speech, and narrative quality execution boundaries. The plan requires disabled providers to be blocked before external calls, `auth_ref` rotation to remain opaque, safe health/invocation/diagnostic evidence only, and no vault/KMS, marketplace, Web UI, or broad `worlds.py` growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/secret-provider-governance` from clean local `main`.

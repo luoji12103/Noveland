@@ -17,7 +17,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 2 — Secret & Provider Governance
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `secret-provider-governance` scope only.
 - [ ] Confirm disabled providers are blocked across provider, image, speech, narrative quality, and smoke-test execution paths.
 - [ ] Confirm auth_ref rotation never stores or returns resolved secret values.
