@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/permission-model-hardening
+- Branch: main
 - Objective: v0.7 Production Hardening Phase 1.
-- Status: Phase 1 Permission Matrix & ACL Regression Baseline implementation and full local gate are complete on the feature branch; next step is fast-forward merge back to local main.
+- Status: Phase 1 Permission Matrix & ACL Regression Baseline is fast-forward merged to local main; Phase 2 Secret & Provider Governance is next.
 
 ## Current Context
 
@@ -123,3 +123,4 @@
 - v0.7 Phase 1 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md`.
 - v0.7 Phase 1 targeted checks passed: backend ruff for `test_api_permission_matrix.py`, backend mypy for `test_api_permission_matrix.py`, targeted pytest (`3 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 1 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`386 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.7 Phase 1 fast-forward merge to local `main` completed.

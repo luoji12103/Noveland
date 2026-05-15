@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.7 Production Hardening Phase 1 implementation
+- None
 
 ## Blocked
 - None
@@ -198,10 +198,12 @@
 - v0.7 Production Hardening Phase 1 implementation
 - v0.7 Production Hardening Phase 1 targeted tests
 - v0.7 Production Hardening Phase 1 full local gate
+- v0.7 Production Hardening Phase 1 fast-forward merge
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening should start with Phase 1 Permission Matrix & ACL Regression Baseline only after explicit implementation request.
+- v0.7 next implementation target is Phase 2 Secret & Provider Governance.
 - v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
