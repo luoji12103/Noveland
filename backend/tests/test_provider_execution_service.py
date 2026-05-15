@@ -41,7 +41,7 @@ from noveland.providers.contracts import (
 from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.secrets import ProviderSecretResolver
-from noveland.providers.service import ProviderExecutionService
+from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -189,6 +189,48 @@ def test_missing_real_provider_secret_writes_safe_failed_invocation() -> None:
         assert invocation.request_params_json["auth_failed"] is True
         assert "MISSING_OPENAI_API_KEY" not in str(invocation.request_params_json)
         assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
+
+
+def test_disabled_provider_writes_failed_invocation_without_resolving_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-disabled-provider-secret")
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        model = session.get(ProviderIntegration, provider_id)
+        assert model is not None
+        model.status = "disabled"
+        model.auth_ref = "env:OPENAI_API_KEY"
+        with pytest.raises(ProviderExecutionError, match="disabled"):
+            ProviderExecutionService(
+                session,
+                secret_resolver=ProviderSecretResolver(),
+            ).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text="blocked",
+                )
+            )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert invocation.error_text == "provider integration is disabled"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["provider_status"] == "disabled"
+        assert invocation.request_params_json["auth_ref_present"] is True
+        assert invocation.request_params_json["auth_resolved"] is False
+        assert "sk-disabled-provider-secret" not in str(invocation.request_params_json)
+        assert "sk-disabled-provider-secret" not in str(invocation.response_metadata_json)
+        assert "sk-disabled-provider-secret" not in str(snapshot.raw_request_json)
+        assert "sk-disabled-provider-secret" not in str(snapshot.raw_response_json)
 
 
 def test_resolved_secret_is_not_written_to_ledger(

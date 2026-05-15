@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
+import pytest
 from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent, AgentRelationshipEdge, AgentRuntimeRun
 from noveland.asset_generation.models import (
@@ -76,6 +77,7 @@ from noveland.providers.contracts import (
 )
 from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
+from noveland.providers.service import ProviderExecutionError
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
 from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.models import (
@@ -341,6 +343,32 @@ def test_provider_backed_gm_generation_sanitizes_proposal_traceability() -> None
     assert proposal is not None
     assert "storage_uri" not in proposal.proposed_payload
     assert "model_invocation_id" in proposal.source_context
+
+
+def test_provider_backed_gm_generation_blocks_disabled_provider() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        provider = session.get(ProviderIntegration, provider_id)
+        assert provider is not None
+        provider.status = "disabled"
+        with pytest.raises(ProviderExecutionError, match="disabled"):
+            NarrativeQualityService(session).generate_gm_proposal(
+                world_id,
+                NarrativeQualityGMProposalGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should be blocked.",
+                ),
+                actor_ref="test",
+            )
+        invocation = session.scalars(select(ModelInvocation)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["provider_status"] == "disabled"
+        assert session.scalar(select(func.count(GMEventProposal.id))) == 0
 
 
 def test_dialogue_review_existing_turn_uses_speaker_profile() -> None:

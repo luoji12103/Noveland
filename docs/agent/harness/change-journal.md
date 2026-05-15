@@ -1823,3 +1823,15 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/secret-provider-governance` from clean local `main`.
+
+## v0.7 Secret & Provider Governance implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/secret-provider-governance
+- Scope: v0.7 Production Hardening Phase 2 provider secret and disabled-provider governance.
+- Summary: Hardened provider execution so non-active providers write safe failed invocation/snapshot evidence and stop before adapter execution or secret resolution. Smoke tests, health checks, image generation, speech TTS, and narrative quality provider-backed generation now have focused regressions for disabled-provider blocking. Auth reference rotation remains an opaque reference and secret-like update payloads continue to be rejected.
+- Files changed: `/backend/packages/providers/src/noveland/providers/service.py`, `/backend/packages/providers/src/noveland/providers/health.py`, `/backend/packages/providers/src/noveland/providers/registry.py`, `/backend/tests/test_provider_execution_service.py`, `/backend/tests/test_api_providers.py`, `/backend/tests/test_image_service.py`, `/backend/tests/test_speech_service.py`, `/backend/tests/test_narrative_quality_service.py`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Disabled provider execution coverage for direct provider execution, smoke/health API, image service, speech service, and narrative quality service; provider API auth_ref rotation regression.
+- Docs updated: OpenSpec Phase 2 task status, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`247 source files`), backend pytest (`391 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Commit Phase 2 implementation, fast-forward merge to local `main`, then record merge bookkeeping.

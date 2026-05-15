@@ -204,7 +204,7 @@ class ProviderRegistryService:
     ) -> ProviderIntegrationRead:
         if provider_id is not None:
             provider = self.get_provider(world_id, provider_id, platform_admin=True)
-            if provider is None or provider.status != ProviderIntegrationStatus.ACTIVE:
+            if provider is None:
                 raise ProviderNotFoundError("provider integration not found")
             return provider
         statement = select(ProviderIntegration).where(

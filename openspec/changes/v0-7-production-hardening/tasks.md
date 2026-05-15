@@ -18,13 +18,13 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 2 — Secret & Provider Governance
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `secret-provider-governance` scope only.
-- [ ] Confirm disabled providers are blocked across provider, image, speech, narrative quality, and smoke-test execution paths.
-- [ ] Confirm auth_ref rotation never stores or returns resolved secret values.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `secret-provider-governance` scope only.
+- [x] Confirm disabled providers are blocked across provider, image, speech, narrative quality, and smoke-test execution paths.
+- [x] Confirm auth_ref rotation never stores or returns resolved secret values.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 2.
-- Status: Phase 2 Secret & Provider Governance planning checkpoint is added; implementation should start from clean local main on `feat/secret-provider-governance`.
+- Status: Phase 2 Secret & Provider Governance implementation and full local gate are complete on `feat/secret-provider-governance`; commit and fast-forward merge are next.
 
 ## Current Context
 
@@ -124,3 +124,5 @@
 - v0.7 Phase 1 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`386 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 1 fast-forward merge to local `main` completed.
 - v0.7 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md`.
+- v0.7 Phase 2 targeted checks passed: backend ruff for provider governance code/tests, backend mypy for provider governance code/tests, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.7 Phase 2 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`391 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.

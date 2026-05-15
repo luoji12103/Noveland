@@ -253,6 +253,27 @@ def test_provider_api_rejects_secret_config_and_exposes_auth_ref_only() -> None:
     assert created.json()["auth_ref"] == "env:OPENAI_API_KEY"
     assert "sk-secret" not in created.text
 
+    rejected_update = client.patch(
+        f"/worlds/{world_id}/providers/{created.json()['id']}",
+        json={"default_params_json": {"headers": {"authorization": "Bearer sk-secret"}}},
+    )
+    rotated = client.patch(
+        f"/worlds/{world_id}/providers/{created.json()['id']}",
+        json={"auth_ref": "env:MIMO_API_KEY"},
+    )
+
+    assert rejected_update.status_code == 422
+    assert "sensitive key" in rejected_update.text
+    assert rotated.status_code == 200
+    assert rotated.json()["auth_ref"] == "env:MIMO_API_KEY"
+    assert "sk-secret" not in rotated.text
+    with Session(engine) as session:
+        model = session.get(ProviderIntegration, uuid.UUID(created.json()["id"]))
+        assert model is not None
+        assert model.auth_ref == "env:MIMO_API_KEY"
+        assert "sk-secret" not in str(model.config_json)
+        assert "sk-secret" not in str(model.default_params_json)
+
 
 def test_provider_smoke_missing_auth_writes_safe_health_and_invocation() -> None:
     client, engine = _client_with_database()
@@ -387,6 +408,59 @@ def test_provider_health_check_records_safe_auth_status() -> None:
     assert health.status_code == 201
     assert health.json()["status"] == "unhealthy"
     assert health.json()["metadata_json"]["auth_missing"] is True
+
+
+def test_disabled_provider_smoke_test_records_safe_failed_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-disabled-smoke-secret")
+
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_generation",
+            "adapter_kind": "fake",
+            "provider_key": "disabled-fake",
+            "display_name": "Disabled Fake",
+            "auth_ref": "env:OPENAI_API_KEY",
+            "status": "disabled",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={"worldline_id": str(worldline_id), "input_text": "blocked"},
+    )
+    health = client.post(f"/worlds/{world_id}/providers/{provider_id}/health-check")
+    health_list = client.get(f"/worlds/{world_id}/providers/{provider_id}/health-checks")
+
+    assert smoke.status_code == 201
+    assert smoke.json()["smoke_status"] == "failed"
+    assert smoke.json()["invocation"]["status"] == "failed"
+    assert smoke.json()["invocation"]["error_text"] == "provider integration is disabled"
+    assert "sk-disabled-smoke-secret" not in smoke.text
+    assert health.status_code == 201
+    assert health.json()["status"] == "unhealthy"
+    assert health.json()["metadata_json"]["execution_blocked"] is True
+    assert health.json()["metadata_json"]["reason"] == "provider_not_active"
+    assert health_list.status_code == 200
+    assert "sk-disabled-smoke-secret" not in health_list.text
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["provider_status"] == "disabled"
+        assert snapshot.raw_request_json is not None
+        assert snapshot.raw_request_json["provider_status"] == "disabled"
 
 
 class _ProviderApiClient(TestClient):

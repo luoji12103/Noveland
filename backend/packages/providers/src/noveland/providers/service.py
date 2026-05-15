@@ -52,6 +52,7 @@ from noveland.providers.contracts import (
     ProviderExecutionRequest,
     ProviderExecutionResult,
     ProviderIntegrationRead,
+    ProviderIntegrationStatus,
     ProviderKind,
 )
 from noveland.providers.fake import FakeProviderAdapter
@@ -117,8 +118,6 @@ class ProviderExecutionService:
         worldline_id = self._worldline_id(request.world_id, request.worldline_id)
         provider = self._resolve_provider(request)
         model = self._provider_model(provider.id)
-        if model.status != "active":
-            raise ProviderValidationError("provider integration is not active")
         if request.media_job_id is not None:
             self._validate_media_job(request.world_id, worldline_id, request.media_job_id)
         if request.media_asset_id is not None:
@@ -126,21 +125,39 @@ class ProviderExecutionService:
         reject_sensitive_config(request.input_json, field_name="input_json")
         reject_sensitive_config(request.request_json, field_name="request_json")
 
+        inactive_reason = (
+            None
+            if model.status == ProviderIntegrationStatus.ACTIVE.value
+            else _provider_not_active_reason(model.status)
+        )
         auth_metadata: dict[str, bool]
-        requires_auth = adapter_requires_auth(provider.adapter_kind, model.config_json)
-        if not requires_auth:
-            try:
-                resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
-            except ProviderSecretMissingError:
-                resolved_secret = None
-            auth_metadata = safe_auth_metadata(model.auth_ref, resolved_secret)
+        resolved_secret: object | None = None
+        if inactive_reason is not None:
+            auth_metadata = safe_auth_metadata(model.auth_ref, None)
         else:
-            try:
-                resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
+            requires_auth = adapter_requires_auth(provider.adapter_kind, model.config_json)
+            if not requires_auth:
+                try:
+                    resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
+                except ProviderSecretMissingError:
+                    resolved_secret = None
                 auth_metadata = safe_auth_metadata(model.auth_ref, resolved_secret)
-            except ProviderSecretMissingError:
-                resolved_secret = None
-                auth_metadata = failed_auth_metadata(model.auth_ref)
+            else:
+                try:
+                    resolved_secret = self._secret_resolver.resolve_auth_ref(model.auth_ref)
+                    auth_metadata = safe_auth_metadata(model.auth_ref, resolved_secret)
+                except ProviderSecretMissingError:
+                    resolved_secret = None
+                    auth_metadata = failed_auth_metadata(model.auth_ref)
+
+        safe_request_metadata = {
+            "provider_id": str(provider.id),
+            "provider_key": provider.provider_key,
+            "provider_kind": provider.provider_kind.value,
+            "adapter_kind": provider.adapter_kind.value,
+            "provider_status": model.status,
+            **auth_metadata,
+        }
 
         invocation = InvocationLedgerService(self._session).record(
             InvocationRecordCreate(
@@ -159,11 +176,7 @@ class ProviderExecutionService:
                 input_text=request.input_text,
                 input_json=request.input_json,
                 request_params_json={
-                    "provider_id": str(provider.id),
-                    "provider_key": provider.provider_key,
-                    "provider_kind": provider.provider_kind.value,
-                    "adapter_kind": provider.adapter_kind.value,
-                    **auth_metadata,
+                    **safe_request_metadata,
                     "request": sanitize_for_persistence(request.request_json),
                 },
                 status=InvocationStatus.RUNNING,
@@ -173,11 +186,7 @@ class ProviderExecutionService:
                 prompt_snapshot=PromptSnapshotCreate(
                     raw_prompt_text=request.input_text,
                     raw_request_json={
-                        "provider_id": str(provider.id),
-                        "provider_key": provider.provider_key,
-                        "provider_kind": provider.provider_kind.value,
-                        "adapter_kind": provider.adapter_kind.value,
-                        **auth_metadata,
+                        **safe_request_metadata,
                         "input_json": sanitize_for_persistence(request.input_json),
                         "request_json": sanitize_for_persistence(request.request_json),
                     },
@@ -187,6 +196,8 @@ class ProviderExecutionService:
         )
 
         try:
+            if inactive_reason is not None:
+                raise ProviderExecutionError(inactive_reason)
             if auth_metadata["auth_failed"]:
                 raise ProviderExecutionError("provider auth_missing")
             result = self._execute_provider(provider, model, request, worldline_id, resolved_secret)
@@ -197,12 +208,7 @@ class ProviderExecutionService:
                     status=InvocationStatus.SUCCEEDED,
                     output_text=result.output_text,
                     output_json=result.output_json,
-                    response_metadata_json={
-                        "provider_id": str(provider.id),
-                        "provider_key": provider.provider_key,
-                        "adapter_kind": provider.adapter_kind.value,
-                        **auth_metadata,
-                    },
+                    response_metadata_json=safe_request_metadata,
                     latency_ms=0,
                 ),
             )
@@ -232,22 +238,21 @@ class ProviderExecutionService:
                 output_objects=[] if result.output_objects is None else result.output_objects,
             )
         except Exception as exc:
+            failed_metadata = {
+                **safe_request_metadata,
+                **(
+                    failed_auth_metadata(model.auth_ref)
+                    if auth_metadata["auth_failed"]
+                    else auth_metadata
+                ),
+            }
             InvocationLedgerService(self._session).update_status(
                 request.world_id,
                 invocation.id,
                 InvocationStatusUpdate(
                     status=InvocationStatus.FAILED,
                     error_text=_safe_error_text(exc),
-                    response_metadata_json={
-                        "provider_id": str(provider.id),
-                        "provider_key": provider.provider_key,
-                        "adapter_kind": provider.adapter_kind.value,
-                        **(
-                            failed_auth_metadata(model.auth_ref)
-                            if auth_metadata["auth_failed"]
-                            else auth_metadata
-                        ),
-                    },
+                    response_metadata_json=failed_metadata,
                 ),
             )
             PromptSnapshotService(self._session).update_snapshot_for_invocation(
@@ -257,7 +262,32 @@ class ProviderExecutionService:
                     raw_output_text=None,
                 ),
             )
+            self._mark_media_job_failed(request, exc)
             raise
+
+    def _mark_media_job_failed(
+        self,
+        request: ProviderExecutionRequest,
+        exc: Exception,
+    ) -> None:
+        if request.media_job_id is None:
+            return
+        job = self._session.get(MediaJob, request.media_job_id)
+        if job is None or job.status in {
+            MediaJobStatus.SUCCEEDED.value,
+            MediaJobStatus.FAILED.value,
+            MediaJobStatus.CANCELLED.value,
+        }:
+            return
+        MediaJobService(self._session).update_job(
+            request.world_id,
+            request.media_job_id,
+            MediaJobUpdate(
+                status=MediaJobStatus.FAILED,
+                error_text=_safe_error_text(exc),
+                finished_at=datetime.now(UTC),
+            ),
+        )
 
     def execute_fake(
         self,
@@ -681,6 +711,14 @@ def _adapter_is_implemented(adapter_kind: ProviderAdapterKind) -> bool:
 def _resolved_secret_value(resolved_secret: object | None) -> str | None:
     value = getattr(resolved_secret, "value", None)
     return value if isinstance(value, str) else None
+
+
+def _provider_not_active_reason(status: str) -> str:
+    if status == ProviderIntegrationStatus.DISABLED.value:
+        return "provider integration is disabled"
+    if status == ProviderIntegrationStatus.DELETED.value:
+        return "provider integration is deleted"
+    return "provider integration is not active"
 
 
 def _safe_error_text(exc: Exception) -> str:

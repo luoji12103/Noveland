@@ -3,7 +3,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from noveland.providers.contracts import ProviderHealthCheckRead, ProviderHealthStatus
+from noveland.providers.contracts import (
+    ProviderHealthCheckRead,
+    ProviderHealthStatus,
+    ProviderIntegrationStatus,
+)
 from noveland.providers.models import ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderNotFoundError, ProviderRegistryService
 from noveland.providers.secrets import (
@@ -46,10 +50,22 @@ class ProviderHealthService:
             "adapter_kind": provider.adapter_kind.value,
             "provider_kind": provider.provider_kind.value,
             "provider_key": provider.provider_key,
+            "provider_status": model.status,
             "auth_ref_present": model.auth_ref is not None,
             "auth_resolved": False,
             "auth_missing": False,
         }
+        if provider.status != ProviderIntegrationStatus.ACTIVE:
+            status = ProviderHealthStatus.UNHEALTHY
+            metadata["execution_blocked"] = True
+            metadata["reason"] = "provider_not_active"
+            return self.record_health_check(
+                provider_id,
+                status=status,
+                latency_ms=0,
+                error_text=None,
+                metadata_json=metadata,
+            )
         if adapter_requires_auth(provider.adapter_kind, model.config_json):
             try:
                 resolved = self._secret_resolver.resolve_auth_ref(model.auth_ref)
