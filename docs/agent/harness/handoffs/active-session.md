@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: main
+- Branch: feat/emotion-sprite-voice-alignment
 - Objective: v0.6 Runtime Narrative Quality Phase 4.
-- Status: Phase 3 Dialogue Style & OOC Review implementation is complete and fast-forward merged to local `main`; Phase 4 Emotion/Sprite/Voice Alignment planning checkpoint is ready to commit.
+- Status: Phase 4 Emotion/Sprite/Voice Alignment implementation and full local gate are complete on the feature branch; fast-forward merge to local `main` is next.
 
 ## Current Context
 
@@ -41,7 +41,9 @@
 
 ## Required Next Steps
 
-- Implement Phase 4 only through `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
+- Commit the Phase 4 implementation on `feat/emotion-sprite-voice-alignment`.
+- Fast-forward merge Phase 4 to local `main`.
+- Record merge bookkeeping, then start Phase 5 only from clean local `main`.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
 - Do not push unless explicitly requested.
 
@@ -88,3 +90,5 @@
 - Flaky note: The first full Web test run had one isolated `agent-builder.test.tsx` mock-call failure; the individual test passed immediately afterward, and the full Web test/build/e2e sequence passed on rerun.
 - v0.6 Phase 3 fast-forward merge to local `main` completed.
 - v0.6 Phase 4 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
+- v0.6 Phase 4 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`27 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 4 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`338 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.

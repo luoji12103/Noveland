@@ -8,6 +8,7 @@ from typing import Any
 from noveland.agents.models import Agent
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import ConversationSessionRecord, ConversationTurnRecord
+from noveland.conversations.presentation import ConversationPresentationService
 from noveland.narrative.models import NarrativeArtifact
 from noveland.providers.contracts import (
     ProviderAdapterKind,
@@ -22,6 +23,9 @@ from noveland.providers.registry import (
 )
 from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS, reject_sensitive_config
 from noveland.providers.service import ProviderExecutionService
+from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
+from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
+from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.gm import LivingWorldGMService
 from noveland.worlds.living_context import LivingWorldContextPack, LivingWorldContextSelector
 from noveland.worlds.models import GMEventProposal, LongRunEvalRun, Worldline
@@ -30,6 +34,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .contracts import (
+    NarrativeQualityAlignmentFinding,
     NarrativeQualityContextKind,
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
@@ -42,7 +47,10 @@ from .contracts import (
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
     NarrativeQualityInvocationRef,
+    NarrativeQualityPresentationAlignmentRequest,
+    NarrativeQualityPresentationAlignmentResult,
     NarrativeQualityProviderRef,
+    NarrativeQualitySuggestedFix,
 )
 
 _LEAK_KEYWORDS = {
@@ -74,6 +82,7 @@ class NarrativeQualityService:
         self._session = session
         self._selector = LivingWorldContextSelector(session)
         self._conversation_service = ConversationService(session)
+        self._presentation_service = ConversationPresentationService(session)
 
     def preview_context(
         self,
@@ -272,6 +281,355 @@ class NarrativeQualityService:
                     "finding_count": len(findings),
                 }
             ),
+        )
+
+    def review_presentation_alignment(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityPresentationAlignmentRequest,
+    ) -> NarrativeQualityPresentationAlignmentResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        conversation = self._conversation_session_or_error(
+            world_id,
+            worldline.id,
+            request.conversation_id,
+        )
+        turn = self._turn_or_error(world_id, conversation.id, request.turn_id)
+        presentation = self._presentation_service.get_presentation(
+            world_id,
+            conversation.id,
+            turn.id,
+        )
+        evidence_refs = [
+            NarrativeQualityEvidenceRef(kind="conversation", id=str(conversation.id)),
+            NarrativeQualityEvidenceRef(kind="turn", id=str(turn.id)),
+            NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id)),
+        ]
+        findings: list[NarrativeQualityAlignmentFinding] = []
+        suggested_fixes: list[NarrativeQualitySuggestedFix] = []
+        diagnostics: dict[str, Any] = {
+            "context_kind": "presentation_alignment",
+            "presentation_found": presentation is not None,
+            "allow_missing_assets": request.allow_missing_assets,
+        }
+        if presentation is None:
+            findings.append(
+                _alignment_finding(
+                    "missing_presentation",
+                    "error",
+                    "Conversation turn has no presentation record to align.",
+                    evidence_refs=evidence_refs,
+                )
+            )
+            suggested_fixes.append(
+                NarrativeQualitySuggestedFix(
+                    code="create_turn_presentation",
+                    message="Create a turn presentation before running alignment diagnostics.",
+                    target_ref=NarrativeQualityEvidenceRef(kind="turn", id=str(turn.id)),
+                    patch_json={"turn_id": str(turn.id), "render_state": "draft"},
+                )
+            )
+            return _alignment_result(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                conversation_id=conversation.id,
+                turn_id=turn.id,
+                findings=findings,
+                suggested_fixes=suggested_fixes,
+                evidence_refs=evidence_refs,
+                diagnostics=diagnostics,
+            )
+        if presentation.worldline_id != worldline.id:
+            raise NarrativeQualityValidationError("presentation does not belong to worldline")
+        if presentation.speaker_agent_id is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="agent", id=str(presentation.speaker_agent_id))
+            )
+        speaker_agent_id = presentation.speaker_agent_id or turn.speaker_agent_id
+        emotion_key = _normalize_alignment_key(presentation.emotion_key)
+        sprite_set: CharacterSpriteSet | None = None
+        sprite_variant: CharacterSpriteVariant | None = None
+        voice_profile: VoiceProfile | None = None
+        voice_binding: AgentVoiceProfileBinding | None = None
+        if emotion_key is None:
+            findings.append(
+                _missing_alignment_finding(
+                    "missing_emotion",
+                    request.allow_missing_assets,
+                    "Presentation has no emotion key for visual or speech alignment.",
+                    evidence_refs,
+                )
+            )
+            suggested_fixes.append(
+                NarrativeQualitySuggestedFix(
+                    code="set_emotion_key",
+                    message="Set emotion_key to a normalized value such as neutral.",
+                    target_ref=NarrativeQualityEvidenceRef(
+                        kind="presentation",
+                        id=str(presentation.id),
+                    ),
+                    patch_json={"emotion_key": "neutral"},
+                )
+            )
+        if presentation.speaker_agent_id is not None and turn.speaker_agent_id is not None:
+            if presentation.speaker_agent_id != turn.speaker_agent_id:
+                findings.append(
+                    _alignment_finding(
+                        "speaker_mismatch",
+                        "error",
+                        "Presentation speaker does not match the conversation turn speaker.",
+                        evidence_refs=evidence_refs,
+                    )
+                )
+        if presentation.sprite_set_id is None:
+            findings.append(
+                _missing_alignment_finding(
+                    "missing_sprite_set",
+                    request.allow_missing_assets,
+                    "Presentation has no sprite set reference.",
+                    evidence_refs,
+                )
+            )
+        else:
+            sprite_set = self._sprite_set_or_error(
+                world_id,
+                worldline.id,
+                presentation.sprite_set_id,
+            )
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="sprite_set", id=str(sprite_set.id))
+            )
+            if speaker_agent_id is not None and sprite_set.agent_id != speaker_agent_id:
+                findings.append(
+                    _alignment_finding(
+                        "sprite_set_agent_mismatch",
+                        "error",
+                        "Sprite set is bound to a different agent than the turn speaker.",
+                        evidence_refs=[
+                            NarrativeQualityEvidenceRef(kind="sprite_set", id=str(sprite_set.id)),
+                            NarrativeQualityEvidenceRef(kind="agent", id=str(speaker_agent_id)),
+                        ],
+                    )
+                )
+        if presentation.sprite_variant_id is None:
+            findings.append(
+                _missing_alignment_finding(
+                    "missing_sprite_variant",
+                    request.allow_missing_assets,
+                    "Presentation has no sprite variant reference.",
+                    evidence_refs,
+                )
+            )
+            if sprite_set is not None:
+                fallback_id = sprite_set.default_variant_id or self._neutral_variant_id(
+                    sprite_set.id,
+                )
+                if fallback_id is not None:
+                    suggested_fixes.append(
+                        NarrativeQualitySuggestedFix(
+                            code="use_default_sprite_variant",
+                            message="Use the sprite set default or neutral variant as fallback.",
+                            target_ref=NarrativeQualityEvidenceRef(
+                                kind="presentation",
+                                id=str(presentation.id),
+                            ),
+                            patch_json={"sprite_variant_id": str(fallback_id)},
+                        )
+                    )
+        else:
+            sprite_variant = self._sprite_variant_or_error(
+                world_id,
+                worldline.id,
+                presentation.sprite_variant_id,
+            )
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="sprite_variant", id=str(sprite_variant.id))
+            )
+            if sprite_set is not None and sprite_variant.sprite_set_id != sprite_set.id:
+                findings.append(
+                    _alignment_finding(
+                        "sprite_variant_set_mismatch",
+                        "error",
+                        "Sprite variant does not belong to the presentation sprite set.",
+                        evidence_refs=[
+                            NarrativeQualityEvidenceRef(kind="sprite_set", id=str(sprite_set.id)),
+                            NarrativeQualityEvidenceRef(
+                                kind="sprite_variant",
+                                id=str(sprite_variant.id),
+                            ),
+                        ],
+                    )
+                )
+            if emotion_key is not None and not _sprite_covers_emotion(
+                sprite_variant,
+                emotion_key,
+            ):
+                findings.append(
+                    _alignment_finding(
+                        "sprite_emotion_mismatch",
+                        "warning",
+                        "Sprite variant expression or mood tags do not cover the emotion key.",
+                        evidence_refs=[
+                            NarrativeQualityEvidenceRef(
+                                kind="sprite_variant",
+                                id=str(sprite_variant.id),
+                            )
+                        ],
+                    )
+                )
+                exact_variant_id = self._matching_variant_id(
+                    world_id,
+                    worldline.id,
+                    sprite_variant.sprite_set_id,
+                    emotion_key,
+                )
+                if exact_variant_id is not None:
+                    suggested_fixes.append(
+                        NarrativeQualitySuggestedFix(
+                            code="use_matching_sprite_variant",
+                            message=(
+                                "Use a sprite variant whose expression or mood tags match "
+                                "emotion_key."
+                            ),
+                            target_ref=NarrativeQualityEvidenceRef(
+                                kind="presentation",
+                                id=str(presentation.id),
+                            ),
+                            patch_json={"sprite_variant_id": str(exact_variant_id)},
+                        )
+                    )
+        if presentation.voice_profile_id is None:
+            findings.append(
+                _missing_alignment_finding(
+                    "missing_voice_profile",
+                    request.allow_missing_assets,
+                    "Presentation has no voice profile reference.",
+                    evidence_refs,
+                )
+            )
+            if speaker_agent_id is not None:
+                try:
+                    resolved_profile, binding = VoiceProfileService(
+                        self._session
+                    ).resolve_agent_default(
+                        world_id,
+                        speaker_agent_id,
+                        worldline.id,
+                    )
+                except SpeechValidationError:
+                    binding = None
+                    resolved_profile = None
+                if resolved_profile is None:
+                    findings.append(
+                        _missing_alignment_finding(
+                            "missing_voice_binding",
+                            request.allow_missing_assets,
+                            "Turn speaker has no default voice binding for this worldline.",
+                            evidence_refs,
+                        )
+                    )
+                else:
+                    voice_binding = (
+                        None
+                        if binding is None
+                        else self._voice_binding_or_error(world_id, worldline.id, binding.id)
+                    )
+                    suggested_fixes.append(
+                        NarrativeQualitySuggestedFix(
+                            code="use_default_voice_profile",
+                            message="Use the speaker default voice profile for this presentation.",
+                            target_ref=NarrativeQualityEvidenceRef(
+                                kind="presentation",
+                                id=str(presentation.id),
+                            ),
+                            patch_json={"voice_profile_id": str(resolved_profile.id)},
+                        )
+                    )
+        else:
+            voice_profile = self._voice_profile_or_error(
+                world_id,
+                worldline.id,
+                presentation.voice_profile_id,
+            )
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="voice_profile", id=str(voice_profile.id))
+            )
+            if voice_profile.status != "active":
+                findings.append(
+                    _alignment_finding(
+                        "voice_profile_inactive",
+                        "warning",
+                        "Presentation voice profile is not active.",
+                        evidence_refs=[
+                            NarrativeQualityEvidenceRef(
+                                kind="voice_profile",
+                                id=str(voice_profile.id),
+                            )
+                        ],
+                    )
+                )
+            if speaker_agent_id is not None:
+                voice_binding = self._voice_binding_for_profile(
+                    world_id,
+                    worldline.id,
+                    speaker_agent_id,
+                    voice_profile.id,
+                )
+                if voice_binding is None:
+                    findings.append(
+                        _missing_alignment_finding(
+                            "missing_voice_binding",
+                            request.allow_missing_assets,
+                            "Voice profile is not bound to the turn speaker in this worldline.",
+                            evidence_refs,
+                        )
+                    )
+                else:
+                    evidence_refs.append(
+                        NarrativeQualityEvidenceRef(
+                            kind="voice_binding",
+                            id=str(voice_binding.id),
+                        )
+                    )
+        style_available = False
+        if emotion_key is not None and request.expected_tts_provider_kind is not None:
+            style_available = self._has_speech_style_mapping(
+                world_id,
+                provider_kind=request.expected_tts_provider_kind.value,
+                emotion_key=emotion_key,
+            )
+            if not style_available:
+                findings.append(
+                    _alignment_finding(
+                        "missing_speech_style_mapping",
+                        "info",
+                        "No speech style mapping exists for the expected TTS provider and emotion.",
+                        evidence_refs=evidence_refs,
+                    )
+                )
+        diagnostics.update(
+            {
+                "speaker_agent_id": None if speaker_agent_id is None else str(speaker_agent_id),
+                "sprite_set_checked": sprite_set is not None,
+                "sprite_variant_checked": sprite_variant is not None,
+                "voice_profile_checked": voice_profile is not None,
+                "voice_binding_checked": voice_binding is not None,
+                "speech_style_mapping_available": style_available,
+                "finding_count": len(findings),
+            }
+        )
+        return _alignment_result(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=conversation.id,
+            turn_id=turn.id,
+            emotion_key=emotion_key,
+            sprite_variant_id=presentation.sprite_variant_id,
+            voice_profile_id=presentation.voice_profile_id,
+            findings=findings,
+            suggested_fixes=suggested_fixes,
+            evidence_refs=evidence_refs,
+            diagnostics=diagnostics,
         )
 
     def _agent_context(
@@ -587,6 +945,150 @@ class NarrativeQualityService:
                 return turn
         raise NarrativeQualityValidationError("turn not found")
 
+    def _sprite_set_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        sprite_set_id: uuid.UUID,
+    ) -> CharacterSpriteSet:
+        model = self._session.get(CharacterSpriteSet, sprite_set_id)
+        if (
+            model is None
+            or model.world_id != world_id
+            or model.worldline_id != worldline_id
+            or model.status == "deleted"
+        ):
+            raise NarrativeQualityValidationError("sprite set not found")
+        return model
+
+    def _sprite_variant_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        sprite_variant_id: uuid.UUID,
+    ) -> CharacterSpriteVariant:
+        model = self._session.get(CharacterSpriteVariant, sprite_variant_id)
+        if (
+            model is None
+            or model.world_id != world_id
+            or model.worldline_id != worldline_id
+            or model.status == "deleted"
+        ):
+            raise NarrativeQualityValidationError("sprite variant not found")
+        return model
+
+    def _neutral_variant_id(self, sprite_set_id: uuid.UUID) -> uuid.UUID | None:
+        model = self._session.scalars(
+            select(CharacterSpriteVariant)
+            .where(
+                CharacterSpriteVariant.sprite_set_id == sprite_set_id,
+                CharacterSpriteVariant.status == "active",
+                CharacterSpriteVariant.expression_key == "neutral",
+            )
+            .order_by(CharacterSpriteVariant.priority, CharacterSpriteVariant.created_at)
+            .limit(1)
+        ).first()
+        return None if model is None else model.id
+
+    def _matching_variant_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        sprite_set_id: uuid.UUID,
+        emotion_key: str,
+    ) -> uuid.UUID | None:
+        variants = self._session.scalars(
+            select(CharacterSpriteVariant)
+            .where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.worldline_id == worldline_id,
+                CharacterSpriteVariant.sprite_set_id == sprite_set_id,
+                CharacterSpriteVariant.status == "active",
+            )
+            .order_by(
+                CharacterSpriteVariant.is_default.desc(),
+                CharacterSpriteVariant.priority,
+                CharacterSpriteVariant.created_at,
+            )
+        ).all()
+        match = next(
+            (variant for variant in variants if _sprite_covers_emotion(variant, emotion_key)),
+            None,
+        )
+        return None if match is None else match.id
+
+    def _voice_profile_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        voice_profile_id: uuid.UUID,
+    ) -> VoiceProfile:
+        model = self._session.get(VoiceProfile, voice_profile_id)
+        if model is None or model.world_id != world_id or model.status == "deleted":
+            raise NarrativeQualityValidationError("voice profile not found")
+        if model.worldline_id is not None and model.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("voice profile does not belong to worldline")
+        return model
+
+    def _voice_binding_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        binding_id: uuid.UUID,
+    ) -> AgentVoiceProfileBinding:
+        model = self._session.get(AgentVoiceProfileBinding, binding_id)
+        if model is None or model.world_id != world_id:
+            raise NarrativeQualityValidationError("voice binding not found")
+        if model.worldline_id is not None and model.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("voice binding does not belong to worldline")
+        return model
+
+    def _voice_binding_for_profile(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        voice_profile_id: uuid.UUID,
+    ) -> AgentVoiceProfileBinding | None:
+        return self._session.scalars(
+            select(AgentVoiceProfileBinding)
+            .where(
+                AgentVoiceProfileBinding.world_id == world_id,
+                AgentVoiceProfileBinding.agent_id == agent_id,
+                AgentVoiceProfileBinding.voice_profile_id == voice_profile_id,
+                (
+                    (AgentVoiceProfileBinding.worldline_id == worldline_id)
+                    | (AgentVoiceProfileBinding.worldline_id.is_(None))
+                ),
+            )
+            .order_by(
+                AgentVoiceProfileBinding.is_default.desc(),
+                AgentVoiceProfileBinding.priority,
+                AgentVoiceProfileBinding.created_at,
+            )
+            .limit(1)
+        ).first()
+
+    def _has_speech_style_mapping(
+        self,
+        world_id: uuid.UUID,
+        *,
+        provider_kind: str,
+        emotion_key: str,
+    ) -> bool:
+        return (
+            self._session.scalars(
+                select(SpeechStyleMapping.id)
+                .where(
+                    SpeechStyleMapping.world_id == world_id,
+                    SpeechStyleMapping.provider_kind == provider_kind,
+                    SpeechStyleMapping.emotion_key == emotion_key,
+                )
+                .limit(1)
+            ).first()
+            is not None
+        )
+
     def _preview(
         self,
         *,
@@ -623,6 +1125,91 @@ def _turn_window_text(turns: list[ConversationTurnRecord]) -> str:
         output_text = "" if turn.output_text is None else f" -> {_clip(turn.output_text, 500)}"
         lines.append(f"- #{turn.turn_index} {speaker}: {_clip(turn.input_text, 500)}{output_text}")
     return "\n".join(lines)
+
+
+def _alignment_result(
+    *,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    findings: list[NarrativeQualityAlignmentFinding],
+    suggested_fixes: list[NarrativeQualitySuggestedFix],
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+    diagnostics: dict[str, Any],
+    emotion_key: str | None = None,
+    sprite_variant_id: uuid.UUID | None = None,
+    voice_profile_id: uuid.UUID | None = None,
+) -> NarrativeQualityPresentationAlignmentResult:
+    status = "pass"
+    if any(finding.severity == "error" for finding in findings):
+        status = "fail"
+    elif any(finding.severity == "warning" for finding in findings):
+        status = "warning"
+    return NarrativeQualityPresentationAlignmentResult(
+        world_id=world_id,
+        worldline_id=worldline_id,
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        alignment_status=status,
+        emotion_key=emotion_key,
+        sprite_variant_id=sprite_variant_id,
+        voice_profile_id=voice_profile_id,
+        findings=findings,
+        suggested_fixes=suggested_fixes,
+        evidence_refs=evidence_refs,
+        diagnostics=_sanitize_json(diagnostics),
+    )
+
+
+def _alignment_finding(
+    code: str,
+    severity: str,
+    message: str,
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> NarrativeQualityAlignmentFinding:
+    return NarrativeQualityAlignmentFinding(
+        code=code,
+        severity=severity,
+        message=message,
+        evidence_refs=evidence_refs,
+    )
+
+
+def _missing_alignment_finding(
+    code: str,
+    allow_missing_assets: bool,
+    message: str,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> NarrativeQualityAlignmentFinding:
+    return _alignment_finding(
+        code,
+        "info" if allow_missing_assets else "warning",
+        message,
+        evidence_refs=evidence_refs,
+    )
+
+
+def _normalize_alignment_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _sprite_covers_emotion(
+    sprite_variant: CharacterSpriteVariant,
+    emotion_key: str,
+) -> bool:
+    normalized = emotion_key.strip().lower()
+    expression_key = sprite_variant.expression_key.strip().lower()
+    mood_tags = {
+        str(item).strip().lower()
+        for item in sprite_variant.mood_tags_json
+        if str(item).strip()
+    }
+    return expression_key == normalized or normalized in mood_tags
 
 
 def _gm_generation_prompt(

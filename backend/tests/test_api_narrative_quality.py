@@ -15,6 +15,7 @@ from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
     ConversationTurn,
+    ConversationTurnPresentation,
 )
 from noveland.events.models import WorldEventModel
 from noveland.invocations.models import (
@@ -24,6 +25,7 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
+from noveland.media.models import MediaAsset
 from noveland.narrative.models import NarrativeArtifact
 from noveland.providers.contracts import (
     ProviderAdapterKind,
@@ -36,6 +38,8 @@ from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
+from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
+from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
@@ -234,6 +238,76 @@ def test_narrative_quality_dialogue_review_api_requires_world_admin() -> None:
     assert response.status_code == 403
 
 
+def test_narrative_quality_presentation_alignment_api_reviews_turn() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/presentations/alignment",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["alignment_status"] == "pass"
+    assert body["emotion_key"] == "happy"
+    assert body["sprite_variant_id"] is not None
+    assert body["voice_profile_id"] is not None
+    assert "storage_uri" not in response.text
+    assert "raw_prompt" not in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_presentation_alignment_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="Hello.",
+    )
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/presentations/alignment",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -280,6 +354,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, MediaAsset.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
         cast(Table, PromptSnapshot.__table__),
@@ -289,6 +364,12 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, VoiceProfile.__table__),
+        cast(Table, AgentVoiceProfileBinding.__table__),
+        cast(Table, SpeechStyleMapping.__table__),
+        cast(Table, CharacterSpriteSet.__table__),
+        cast(Table, CharacterSpriteVariant.__table__),
+        cast(Table, ConversationTurnPresentation.__table__),
     ):
         table.create(engine)
 
@@ -458,3 +539,138 @@ def _seed_conversation_turn(
         )
         session.commit()
         return conversation_id, turn_id
+
+
+def _seed_aligned_presentation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+) -> None:
+    sprite_set_id = uuid.uuid4()
+    sprite_variant_id = uuid.uuid4()
+    voice_profile_id = uuid.uuid4()
+    sprite_asset_id = uuid.uuid4()
+    voice_asset_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaAsset(
+                id=sprite_asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind="image",
+                asset_role="character_sprite",
+                source_kind="test_fixture",
+                status="available",
+                visibility="world_admin",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.add(
+            MediaAsset(
+                id=voice_asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind="audio",
+                asset_role="voice_sample",
+                source_kind="test_fixture",
+                status="available",
+                visibility="world_admin",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteSet(
+                id=sprite_set_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                style_key="default",
+                display_name="Default",
+                default_variant_id=sprite_variant_id,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteVariant(
+                id=sprite_variant_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sprite_set_id=sprite_set_id,
+                asset_id=sprite_asset_id,
+                expression_key="happy",
+                mood_tags_json=["happy"],
+                priority=0,
+                is_default=True,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            VoiceProfile(
+                id=voice_profile_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                profile_key="alice",
+                display_name="Alice",
+                status="active",
+                visibility="world_admin",
+                owner_kind="agent",
+                owner_agent_id=agent_id,
+                default_language="en",
+                supported_languages_json=["en"],
+                voice_kind="preset",
+                reference_asset_id=voice_asset_id,
+                consent_status="not_required",
+                usage_policy_json={},
+                metadata_json={},
+            )
+        )
+        session.add(
+            AgentVoiceProfileBinding(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                voice_profile_id=voice_profile_id,
+                binding_role="default",
+                priority=0,
+                is_default=True,
+                style_overrides_json={},
+            )
+        )
+        session.add(
+            SpeechStyleMapping(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                mapping_key="tts-happy",
+                provider_kind="text_to_speech",
+                emotion_key="happy",
+                style_json={"style": "bright"},
+            )
+        )
+        session.add(
+            ConversationTurnPresentation(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                speaker_agent_id=agent_id,
+                emotion_key="happy",
+                emotion_intensity=1.0,
+                sprite_set_id=sprite_set_id,
+                sprite_variant_id=sprite_variant_id,
+                voice_profile_id=voice_profile_id,
+                presentation_json={"safe": True},
+                render_state="speech_rendered",
+            )
+        )
+        session.commit()

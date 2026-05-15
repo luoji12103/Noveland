@@ -229,6 +229,49 @@ class NarrativeQualityDialogueReviewResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityPresentationAlignmentRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID
+    turn_id: uuid.UUID
+    allow_missing_assets: bool = False
+    expected_tts_provider_kind: ProviderKind | None = ProviderKind.TEXT_TO_SPEECH
+
+
+class NarrativeQualityAlignmentFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+
+
+class NarrativeQualitySuggestedFix(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    target_ref: NarrativeQualityEvidenceRef | None = None
+    patch_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("patch_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "patch_json")
+        return value
+
+
+class NarrativeQualityPresentationAlignmentResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID
+    turn_id: uuid.UUID
+    alignment_status: str
+    emotion_key: str | None = None
+    sprite_variant_id: uuid.UUID | None = None
+    voice_profile_id: uuid.UUID | None = None
+    findings: list[NarrativeQualityAlignmentFinding] = Field(default_factory=list)
+    suggested_fixes: list[NarrativeQualitySuggestedFix] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json

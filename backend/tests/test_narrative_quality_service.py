@@ -22,6 +22,7 @@ from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
     ConversationTurn,
+    ConversationTurnPresentation,
 )
 from noveland.events.models import WorldEventModel
 from noveland.invocations.models import (
@@ -31,12 +32,14 @@ from noveland.invocations.models import (
     PromptSnapshot,
     PromptTemplate,
 )
+from noveland.media.models import MediaAsset
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextKind,
     NarrativeQualityContextPreviewRequest,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityGMProposalGenerateRequest,
+    NarrativeQualityPresentationAlignmentRequest,
 )
 from noveland.narrative_quality.service import (
     NarrativeQualityService,
@@ -50,6 +53,8 @@ from noveland.providers.contracts import (
 )
 from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
+from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
+from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
@@ -393,6 +398,165 @@ def test_dialogue_review_rejects_cross_worldline_conversation() -> None:
             raise AssertionError("expected cross-worldline rejection")
 
 
+def test_presentation_alignment_passes_for_matching_emotion_sprite_and_voice() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I sound happy.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_presentation_alignment(
+            world_id,
+            NarrativeQualityPresentationAlignmentRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            ),
+        )
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    assert result.alignment_status == "pass"
+    assert result.emotion_key == "happy"
+    assert result.sprite_variant_id is not None
+    assert result.voice_profile_id is not None
+    assert result.findings == []
+    assert result.diagnostics["speech_style_mapping_available"] is True
+    assert "storage_uri" not in result.model_dump_json()
+    assert event_count == 0
+
+
+def test_presentation_alignment_detects_sprite_emotion_mismatch() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I sound happy.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+        variant_expression="sad",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_presentation_alignment(
+            world_id,
+            NarrativeQualityPresentationAlignmentRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            ),
+        )
+
+    assert result.alignment_status == "warning"
+    assert any(finding.code == "sprite_emotion_mismatch" for finding in result.findings)
+    assert any(fix.code == "use_matching_sprite_variant" for fix in result.suggested_fixes)
+
+
+def test_presentation_alignment_detects_missing_voice_profile_and_binding() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I sound happy.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+        include_voice=False,
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_presentation_alignment(
+            world_id,
+            NarrativeQualityPresentationAlignmentRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            ),
+        )
+
+    assert result.alignment_status == "warning"
+    assert any(finding.code == "missing_voice_profile" for finding in result.findings)
+    assert any(finding.code == "missing_voice_binding" for finding in result.findings)
+
+
+def test_presentation_alignment_rejects_cross_worldline_request() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I sound happy.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+    )
+    fork_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Worldline(
+                id=fork_id,
+                world_id=world_id,
+                worldline_key=f"fork-{fork_id.hex[:8]}",
+                name="Fork",
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_presentation_alignment(
+                world_id,
+                NarrativeQualityPresentationAlignmentRequest(
+                    worldline_id=fork_id,
+                    conversation_id=conversation_id,
+                    turn_id=turn_id,
+                ),
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "worldline" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline rejection")
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -427,6 +591,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, MediaAsset.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptTemplate.__table__),
         cast(Table, PromptSnapshot.__table__),
@@ -435,6 +600,12 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
+        cast(Table, VoiceProfile.__table__),
+        cast(Table, AgentVoiceProfileBinding.__table__),
+        cast(Table, SpeechStyleMapping.__table__),
+        cast(Table, CharacterSpriteSet.__table__),
+        cast(Table, CharacterSpriteVariant.__table__),
+        cast(Table, ConversationTurnPresentation.__table__),
         cast(Table, LongRunEvalRun.__table__),
     ):
         table.create(engine)
@@ -551,6 +722,163 @@ def _seed_agent_turn(
         )
         session.commit()
         return turn_id
+
+
+def _seed_aligned_presentation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    *,
+    variant_expression: str = "happy",
+    include_voice: bool = True,
+) -> None:
+    sprite_set_id = uuid.uuid4()
+    selected_variant_id = uuid.uuid4()
+    matching_variant_id = uuid.uuid4()
+    voice_profile_id = uuid.uuid4()
+    sprite_asset_id = uuid.uuid4()
+    voice_asset_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            MediaAsset(
+                id=sprite_asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind="image",
+                asset_role="character_sprite",
+                source_kind="test_fixture",
+                status="available",
+                visibility="world_admin",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.add(
+            MediaAsset(
+                id=voice_asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind="audio",
+                asset_role="voice_sample",
+                source_kind="test_fixture",
+                status="available",
+                visibility="world_admin",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteSet(
+                id=sprite_set_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                style_key="default",
+                display_name="Default",
+                default_variant_id=selected_variant_id,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteVariant(
+                id=selected_variant_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sprite_set_id=sprite_set_id,
+                asset_id=sprite_asset_id,
+                expression_key=variant_expression,
+                mood_tags_json=[variant_expression],
+                priority=10,
+                is_default=True,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        if variant_expression != "happy":
+            session.add(
+                CharacterSpriteVariant(
+                    id=matching_variant_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    sprite_set_id=sprite_set_id,
+                    asset_id=sprite_asset_id,
+                    expression_key="happy",
+                    mood_tags_json=["happy"],
+                    priority=5,
+                    is_default=False,
+                    status="active",
+                    visibility="world_admin",
+                    metadata_json={},
+                )
+            )
+        if include_voice:
+            session.add(
+                VoiceProfile(
+                    id=voice_profile_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    profile_key="alice",
+                    display_name="Alice",
+                    status="active",
+                    visibility="world_admin",
+                    owner_kind="agent",
+                    owner_agent_id=agent_id,
+                    default_language="en",
+                    supported_languages_json=["en"],
+                    voice_kind="preset",
+                    reference_asset_id=voice_asset_id,
+                    consent_status="not_required",
+                    usage_policy_json={},
+                    metadata_json={},
+                )
+            )
+            session.add(
+                AgentVoiceProfileBinding(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    agent_id=agent_id,
+                    voice_profile_id=voice_profile_id,
+                    binding_role="default",
+                    priority=0,
+                    is_default=True,
+                    style_overrides_json={},
+                )
+            )
+        session.add(
+            SpeechStyleMapping(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                mapping_key="tts-happy",
+                provider_kind="text_to_speech",
+                emotion_key="happy",
+                style_json={"style": "bright"},
+            )
+        )
+        session.add(
+            ConversationTurnPresentation(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                speaker_agent_id=agent_id,
+                emotion_key="happy",
+                emotion_intensity=1.0,
+                sprite_set_id=sprite_set_id,
+                sprite_variant_id=selected_variant_id,
+                voice_profile_id=voice_profile_id if include_voice else None,
+                presentation_json={"safe": True},
+                render_state="speech_rendered",
+            )
+        )
+        session.commit()
 
 
 def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:

@@ -12,6 +12,8 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityDialogueReviewResult,
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
+    NarrativeQualityPresentationAlignmentRequest,
+    NarrativeQualityPresentationAlignmentResult,
 )
 from noveland.narrative_quality.service import (
     NarrativeQualityService,
@@ -92,6 +94,28 @@ def review_dialogue_style_and_ooc(
 ) -> NarrativeQualityDialogueReviewResult:
     try:
         return NarrativeQualityService(db_session).review_dialogue(world_id, request)
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/presentations/alignment",
+    response_model=NarrativeQualityPresentationAlignmentResult,
+    dependencies=[Depends(require_csrf)],
+)
+def review_presentation_alignment(
+    world_id: uuid.UUID,
+    request: NarrativeQualityPresentationAlignmentRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityPresentationAlignmentResult:
+    try:
+        return NarrativeQualityService(db_session).review_presentation_alignment(
+            world_id,
+            request,
+        )
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
     except ValueError as exc:
