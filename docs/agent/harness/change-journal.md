@@ -1835,3 +1835,14 @@
 - Docs updated: OpenSpec Phase 2 task status, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`247 source files`), backend pytest (`391 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Commit Phase 2 implementation, fast-forward merge to local `main`, then record merge bookkeeping.
+
+## v0.7 Secret & Provider Governance merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.7 Production Hardening Phase 2.
+- Summary: Fast-forward merged `feat/secret-provider-governance` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 2 tasks now mark implementation, disabled provider blocking, auth_ref rotation coverage, architecture guardrails, focused tests, targeted tests, full local gate, fast-forward merge, and harness updates complete.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 3 Cost & Rate Control from clean local `main`.
