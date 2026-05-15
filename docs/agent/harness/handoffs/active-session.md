@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/object-storage-backup-v2
-- Objective: v0.7 Production Hardening Phase 4.
-- Status: Phase 4 Object Storage & Backup v2 implementation, targeted tests, and full local gate are complete on `feat/object-storage-backup-v2`; commit and fast-forward merge are next.
+- Branch: main
+- Objective: v0.7 Production Hardening Phase 5.
+- Status: Phase 4 Object Storage & Backup v2 is fast-forward merged to local `main`; Phase 5 Deployment Profile planning checkpoint is next.
 
 ## Current Context
 
@@ -136,3 +136,4 @@
 - v0.7 Phase 4 implementation added safe storage integrity auditing for media objects and object-backed snapshots, plus a platform-admin read-only `/runtime/storage-audit` endpoint.
 - v0.7 Phase 4 targeted checks passed: backend ruff for storage/runtime files, backend mypy for storage/runtime files, targeted pytest (`38 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 4 full local gate passed: backend ruff, backend mypy (`250 source files`), backend pytest (`401 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.7 Phase 4 fast-forward merge to local `main` completed.

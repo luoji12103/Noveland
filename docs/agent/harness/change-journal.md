@@ -1904,3 +1904,14 @@
 - Docs updated: backup/restore playbook, OpenSpec Phase 4 task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`38 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`250 source files`), backend pytest (`401 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Commit Phase 4 implementation, fast-forward merge to local `main`, then record merge bookkeeping.
+
+## v0.7 Object Storage & Backup v2 merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.7 Production Hardening Phase 4.
+- Summary: Fast-forward merged `feat/object-storage-backup-v2` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 4 tasks now mark implementation, storage integrity auditing, backup/restore docs, architecture guardrails, focused tests, targeted tests, full local gate, fast-forward merge, and harness updates complete.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 5 Deployment Profile from clean local `main`.
