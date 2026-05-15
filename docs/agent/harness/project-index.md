@@ -38,6 +38,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.5.6-memory-migration-pipeline-plan.md` — final v0.5 Authoring & Import Studio Phase 6 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.7-asset-import-matching-plan.md` — final v0.5 Authoring & Import Studio Phase 7 implementation plan.
 - `docs/agent/harness/feature-updates/v0.5.8-authoring-regression-fixture-plan.md` — final v0.5 Authoring & Import Studio Phase 8 implementation plan.
+- `docs/agent/harness/feature-updates/v0.6-runtime-narrative-quality-feasibility-review.md` — feasibility review for the proposed v0.6 Runtime Narrative Quality OpenSpec change.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.

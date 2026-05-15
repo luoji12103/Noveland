@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.5 Authoring & Import Studio closeout and v0.6 feasibility review.
-- Status: v0.5 Phases 1-8 are implemented, full-gate validated, pushed by the user, and archived in OpenSpec with release notes.
+- Objective: v0.6 Runtime Narrative Quality OpenSpec revision.
+- Status: v0.5 is archived/release-noted; v0.6 feasibility review is documented and no v0.6 implementation has started.
 
 ## Current Context
 
@@ -41,7 +41,10 @@
 
 ## Required Next Steps
 
-- Perform v0.6 feasibility review only; do not implement v0.6 yet.
+- Update the v0.6 OpenSpec change before implementation:
+  provider text execution alignment, narrative artifact worldline strategy,
+  dedicated narrative quality router/package, and API-first diagnostics.
+- Do not implement v0.6 until those OpenSpec changes are accepted.
 - Do not push unless explicitly requested.
 
 ## Latest Verification

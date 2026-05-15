@@ -33,6 +33,17 @@
 - Docs updated: OpenSpec current specs, OpenSpec archive, v0.5 release notes, project index, file inventory, task board, active handoff
 - Follow-up notes: Start v0.6 with feasibility review only; do not implement v0.6 until architecture scope is accepted.
 
+## v0.6 Runtime Narrative Quality feasibility review entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 OpenSpec feasibility review
+- Summary: Reviewed the proposed v0.6 Runtime Narrative Quality change against current main and identified required OpenSpec revisions before implementation.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6-runtime-narrative-quality-feasibility-review.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: v0.6 feasibility review, project index, change journal, task board, active handoff
+- Follow-up notes: Update v0.6 OpenSpec before implementation; provider text execution alignment and narrative artifact worldline strategy are the main pre-implementation decisions.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
