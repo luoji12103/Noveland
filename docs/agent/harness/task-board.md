@@ -155,10 +155,11 @@
 - v0.6 Runtime Narrative Quality Phase 3 implementation
 - v0.6 Runtime Narrative Quality Phase 3 targeted tests
 - v0.6 Runtime Narrative Quality Phase 3 full local gate
+- v0.6 Runtime Narrative Quality Phase 3 fast-forward merge
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality Phase 3 should be fast-forward merged to local
-  `main`, then Phase 4 should start only from clean local `main`.
+- v0.6 Runtime Narrative Quality Phase 4 should start from clean local `main`
+  with a docs-only planning checkpoint before implementation.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.
