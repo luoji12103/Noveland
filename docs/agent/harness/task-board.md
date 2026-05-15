@@ -237,11 +237,12 @@
 - v0.7 Production Hardening final acceptance review
 - v0.8 Public Experience & Ecosystem feasibility review
 - v0.8 Public Experience & Ecosystem OpenSpec plan adaptation
+- v0.8 Public Experience & Ecosystem Phase 1 planning checkpoint
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
-- v0.8 Public Experience & Ecosystem should start with Phase 1 Reader Media Delivery after the reader media auth/delivery model is accepted.
+- v0.8 Public Experience & Ecosystem Phase 1 Reader Media Delivery is ready for implementation on a feature branch.
 - v0.8 implementation must use the adapted OpenSpec plan and a docs-only phase checkpoint before code changes.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.

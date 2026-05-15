@@ -11,9 +11,9 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 1 — Reader Media Delivery
 
-- [ ] Write docs-only phase planning checkpoint.
-- [ ] Decide first-cut reader media auth model and delivery mechanism.
-- [ ] Inventory current admin/member media download and narrative reader routes.
+- [x] Write docs-only phase planning checkpoint.
+- [x] Decide first-cut reader media auth model and delivery mechanism.
+- [x] Inventory current admin/member media download and narrative reader routes.
 - [ ] Implement reader-safe media descriptors and delivery policy only.
 - [ ] Add focused API, ACL, visibility, and leak tests.
 - [ ] Run targeted tests.

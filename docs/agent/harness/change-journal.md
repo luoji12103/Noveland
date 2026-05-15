@@ -2096,3 +2096,14 @@
 - Tests added/updated: N/A, documentation and OpenSpec planning only.
 - Docs updated: v0.8 feasibility review, OpenSpec v0.8 change docs/specs, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Archive v0.7 and generate release notes only if requested. Start v0.8 implementation with Phase 1 Reader Media Delivery after resolving the reader media auth/delivery model.
+
+## v0.8.1 Reader Media Delivery planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 1 planning
+- Summary: Added the Phase 1 reader media delivery checkpoint, confirming authenticated-only application-mediated delivery, dedicated reader delivery package/router boundaries, current admin media/narrative reader route inventory, no migration expectation, and safe descriptor/download visibility policy.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implement Phase 1 on a feature branch. Do not reuse admin media routes, do not add unauthenticated delivery, and stop if implementation needs a migration or broad `worlds.py` route growth.

@@ -30,6 +30,8 @@
 - v0.7 Production Hardening is complete locally and ready to archive/release-note work if requested; this session does not archive it.
 - v0.8 Public Experience & Ecosystem feasibility review has been added at `docs/agent/harness/feature-updates/v0.8-public-experience-ecosystem-feasibility-review.md`.
 - v0.8 OpenSpec now requires Reader Media Delivery to start with public/read-only contract inventory, reader-safe media descriptors, explicit auth/delivery model, and no storage path leak before playback/galgame UI phases.
+- v0.8 Phase 1 Reader Media Delivery planning checkpoint has been added at `docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md`.
+- Phase 1 accepted delivery model is authenticated-only, application-mediated download/streaming through a dedicated `reader_delivery` package and `reader_media.py` router.
 - v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -49,8 +51,8 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start v0.8 implementation only after a docs-only Phase 1 Reader Media Delivery checkpoint.
-- Resolve the Phase 1 reader media auth/delivery model before implementation: authenticated-reader/member-only, public unauthenticated, or mixed by visibility policy.
+- Start v0.8 Phase 1 implementation on a feature branch from clean local `main`.
+- Preserve the authenticated-only reader media model unless OpenSpec is updated first.
 - Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
 
 ## Latest Verification
