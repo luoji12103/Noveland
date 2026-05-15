@@ -28,7 +28,7 @@ Non-goals:
 ## Decisions
 
 - Add or confirm provider-kernel text generation execution before provider-backed GM or narrative generation.
-- Decide the `narrative_artifacts` worldline strategy before Narrative Writer v2.
+- Decide the `narrative_artifacts` worldline strategy before Narrative Writer v2: v2-generated narrative artifacts/publications require first-class worldline persistence before write paths are added. Legacy metadata may be read for compatibility, but new v2 write isolation must not rely on metadata alone.
 - Use a dedicated narrative quality boundary for new v0.6 APIs:
   `backend/packages/narrative_quality/` and
   `backend/services/api/src/noveland/services/api/narrative_quality.py`.

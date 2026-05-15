@@ -44,6 +44,17 @@
 - Docs updated: v0.6 feasibility review, project index, change journal, task board, active handoff
 - Follow-up notes: Update v0.6 OpenSpec before implementation; provider text execution alignment and narrative artifact worldline strategy are the main pre-implementation decisions.
 
+## v0.6.1 Runtime Context Contract v2 planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 1 planning
+- Summary: Added the Phase 1 implementation checkpoint for runtime context contracts and the dedicated narrative quality package/router boundary.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.1-runtime-context-contract-v2-plan.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, active handoff
+- Follow-up notes: Implement Phase 1 on `feat/runtime-context-contract-v2`; do not add Web UI or broad `worlds.py` routes.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

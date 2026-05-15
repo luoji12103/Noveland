@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.6 Runtime Narrative Quality OpenSpec revision.
-- Status: v0.5 is archived/release-noted; v0.6 feasibility review is documented and no v0.6 implementation has started.
+- Objective: v0.6 Runtime Narrative Quality Phase 1.
+- Status: v0.6 OpenSpec decisions are accepted; Phase 1 runtime context contract planning is in progress.
 
 ## Current Context
 
@@ -41,10 +41,11 @@
 
 ## Required Next Steps
 
-- Update the v0.6 OpenSpec change before implementation:
-  provider text execution alignment, narrative artifact worldline strategy,
-  dedicated narrative quality router/package, and API-first diagnostics.
-- Do not implement v0.6 until those OpenSpec changes are accepted.
+- Commit the v0.6.1 planning checkpoint.
+- Implement `runtime-context-contract-v2` on `feat/runtime-context-contract-v2`.
+- Add `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
+- Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
+- Run targeted tests and the full local gate before fast-forward merge.
 - Do not push unless explicitly requested.
 
 ## Latest Verification

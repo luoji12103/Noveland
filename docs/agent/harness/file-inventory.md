@@ -114,6 +114,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/images.py`
 - `backend/services/api/src/noveland/services/api/invocations.py`
 - `backend/services/api/src/noveland/services/api/media.py`
+- `backend/services/api/src/noveland/services/api/narrative_quality.py`
 - `backend/services/api/src/noveland/services/api/providers.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
@@ -193,6 +194,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/narrative/src/noveland/narrative/contracts.py`
 - `backend/packages/narrative/src/noveland/narrative/models.py`
 - `backend/packages/narrative/src/noveland/narrative/services.py`
+- `backend/packages/narrative_quality/`
+- `backend/packages/narrative_quality/pyproject.toml`
+- `backend/packages/narrative_quality/src/noveland/narrative_quality/__init__.py`
+- `backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`
+- `backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`
 - `backend/packages/events/`
 - `backend/packages/events/src/noveland/events/contracts.py`
 - `backend/packages/events/src/noveland/events/errors.py`
@@ -412,6 +418,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.5.7-asset-import-matching-plan.md`
 - `docs/agent/harness/feature-updates/v0.5.8-authoring-regression-fixture-plan.md`
 - `docs/agent/harness/feature-updates/v0.6-runtime-narrative-quality-feasibility-review.md`
+- `docs/agent/harness/feature-updates/v0.6.1-runtime-context-contract-v2-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
