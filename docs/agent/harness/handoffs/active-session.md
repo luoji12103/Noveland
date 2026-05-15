@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 8.
-- Status: Phase 7 Security Regression Suite is fast-forward merged to local `main`; Phase 8 Production Readiness Gate planning checkpoint is next.
+- Status: Phase 7 Security Regression Suite is fast-forward merged to local `main`; Phase 8 Production Readiness Gate planning checkpoint is complete and implementation is next.
 
 ## Current Context
 
@@ -45,8 +45,8 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Commit the Phase 6 docs-only planning checkpoint, then start implementation on `feat/observability-incident-diagnostics`.
-- Stop for an architecture decision if incident diagnostics need raw prompt/output exposure, resolved secrets, storage paths, or a duplicate diagnostics framework.
+- Commit the Phase 8 docs-only planning checkpoint, then start implementation on `feat/production-readiness-gate`.
+- Stop for an architecture decision if readiness aggregation needs a new schema, public launch semantics, raw prompt/output exposure, resolved secrets, storage paths, or a duplicate release/eval framework.
 
 ## Latest Verification
 
@@ -150,3 +150,4 @@
 - v0.7 Phase 7 targeted checks passed: backend ruff for security regression tests/helpers, backend mypy for security regression tests/helpers, and targeted pytest (`83 passed`).
 - v0.7 Phase 7 full local gate passed: backend ruff, backend mypy (`255 source files`), backend pytest (`411 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 7 fast-forward merge to local `main` completed.
+- v0.7 Phase 8 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.8-production-readiness-gate-plan.md`.

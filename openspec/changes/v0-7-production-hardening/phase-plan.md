@@ -404,6 +404,8 @@ Create an internal readiness gate that aggregates v0.7 hardening evidence withou
 ### Scope
 
 - Readiness checklist and gate report.
+- Read-only production-readiness aggregation under `noveland.observability`.
+- Platform-admin-only readiness API under the existing `/observability` router.
 - Operator signoff record or safe evidence reference.
 - Aggregation of provider governance, budget status, storage integrity, deployment profile, diagnostics, security regression, beta checklist, long-run eval, and multimodal/narrative quality evidence.
 - Actionable blocker/recommendation output.
@@ -429,7 +431,7 @@ Create an internal readiness gate that aggregates v0.7 hardening evidence withou
 ### Acceptance Criteria
 
 - Gate report aggregates existing evidence without duplicating release/eval systems.
-- Operator signoff is recorded safely if a write path is accepted.
+- Operator signoff remains deferred unless an existing safe write path is explicitly accepted.
 - Failed checks have actionable blockers and remediation hints.
 - Gate output does not expose raw prompts, raw outputs, resolved secrets, storage paths, bytes, base64, or unsafe event payloads.
 

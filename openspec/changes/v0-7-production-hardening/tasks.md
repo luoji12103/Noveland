@@ -95,7 +95,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 8 — Production Readiness Gate
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `production-readiness-gate` scope only.
 - [ ] Reuse beta checklist, long-run eval, release profile, multimodal eval, narrative quality, diagnostics, and v0.7 hardening evidence.
 - [ ] Keep readiness gate internal and distinct from public launch readiness.

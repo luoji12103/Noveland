@@ -2039,3 +2039,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 8 from clean local `main`; do not push unless explicitly requested.
+
+## v0.7.8 Production Readiness Gate planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 8.
+- Summary: Added the Phase 8 plan for a read-only, platform-admin internal production-readiness gate under the existing `noveland.observability` boundary. The plan aggregates existing beta checklist, long-run eval, release profile, provider, budget, storage, runtime diagnostics, incident, multimodal eval, narrative quality, and security regression evidence without adding a duplicate release framework, new schema, public launch semantics, Web UI, or broad `worlds.py`/`runtime.py` route growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.8-production-readiness-gate-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/openspec/changes/v0-7-production-hardening/phase-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, phase plan, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/production-readiness-gate` from clean local `main`.
