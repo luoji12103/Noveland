@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 8.
-- Status: Phase 8 Production Readiness Gate full local gate passed; fast-forward merge is next.
+- Status: v0.7 Production Hardening is locally complete and fast-forward merged to `main`.
 
 ## Current Context
 
@@ -45,8 +45,8 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Commit the Phase 8 docs-only planning checkpoint, then start implementation on `feat/production-readiness-gate`.
-- Stop for an architecture decision if readiness aggregation needs a new schema, public launch semantics, raw prompt/output exposure, resolved secrets, storage paths, or a duplicate release/eval framework.
+- Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
+- Start v0.8 with a feasibility review before implementation if requested.
 
 ## Latest Verification
 
@@ -153,3 +153,4 @@
 - v0.7 Phase 8 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.8-production-readiness-gate-plan.md`.
 - v0.7 Phase 8 targeted checks passed: backend ruff for observability readiness code/API/tests, backend mypy for the same files, and targeted pytest (`14 passed`).
 - v0.7 Phase 8 full local gate passed: backend ruff, backend mypy (`256 source files`), backend pytest (`415 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.7 Phase 8 fast-forward merge to local `main` completed.

@@ -2074,3 +2074,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`256 source files`), backend pytest (`415 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Fast-forward merge `feat/production-readiness-gate` to local `main`, then record merge bookkeeping to complete v0.7.
+
+## v0.7.8 Production Readiness Gate merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.7 Production Hardening Phase 8 merge bookkeeping.
+- Summary: Fast-forward merged `feat/production-readiness-gate` into local `main`, marked Phase 8 complete in OpenSpec tasks, and recorded v0.7 Production Hardening as locally complete.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: v0.7 is ready for archive/release notes if requested. Do not push unless explicitly requested.
