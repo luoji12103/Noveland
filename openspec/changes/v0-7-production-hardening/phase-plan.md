@@ -243,7 +243,7 @@ Define and test object storage integrity, backup/restore drills, checksum audit,
 
 ### Goal
 
-Define a repeatable internal production-like deployment profile with health checks, migration procedure, operator docs, and rollback guidance.
+Define a repeatable internal production-like deployment profile with health checks, migration procedure, operator docs, and rollback guidance using the existing operational surfaces.
 
 ### Scope
 
@@ -252,6 +252,7 @@ Define a repeatable internal production-like deployment profile with health chec
 - Health endpoint coverage for core dependencies.
 - Migration and rollback procedure.
 - Operator checklist for local/single-host deployment.
+- Docs/test validation only for the first pass; no new deployment router is expected because the current health and validation commands already exist.
 
 ### Non-goals
 
@@ -259,6 +260,8 @@ Define a repeatable internal production-like deployment profile with health chec
 - Kubernetes orchestration
 - Autoscaling
 - Public launch checklist
+- New runtime or deployment endpoint
+- New persisted deployment state
 
 ### Reused Systems
 

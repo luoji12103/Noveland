@@ -1779,6 +1779,17 @@
 - Docs updated: v0.7 OpenSpec proposal, design, phase plan, task list, capability specs, feature review, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Validate OpenSpec and `git diff --check`, then commit as docs-only. Do not implement v0.7 or push unless explicitly requested.
 
+## v0.7.5 Deployment Profile planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.7 Production Hardening Phase 5 planning
+- Summary: Added the Phase 5 implementation checkpoint for Deployment Profile and optimized the scope to reuse existing compose, runtime health, provider health, migration, and backup verification commands. The plan remains docs/test focused and does not require a new router or managed-cloud assumptions.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.5-deployment-profile-plan.md`, `/docs/agent/harness/**`, `/openspec/changes/v0-7-production-hardening/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, task board, active handoff, OpenSpec tasks
+- Follow-up notes: Implement Deployment Profile as docs-first validation work; stop if implementation would require a new router or persisted deployment state.
+
 ## v0.7 Permission Matrix & ACL Regression Baseline plan entry
 
 - Date: 2026-05-15

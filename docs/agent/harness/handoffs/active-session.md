@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 5.
-- Status: Phase 4 Object Storage & Backup v2 is fast-forward merged to local `main`; Phase 5 Deployment Profile planning checkpoint is next.
+- Status: Phase 4 Object Storage & Backup v2 is fast-forward merged to local `main`; Phase 5 Deployment Profile planning checkpoint is underway with a docs-first, existing-health-surface scope.
 
 ## Current Context
 
@@ -44,9 +44,8 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- If requested, archive v0.6 and generate v0.6 release notes before v0.7 implementation starts.
-- If implementation is requested, continue v0.7 with Phase 2 Secret & Provider Governance from clean local `main`.
-- Stop for an architecture decision if v0.7 needs broad new `worlds.py` routes or a cross-cutting production-hardening package/router.
+- Continue v0.7 from the Phase 5 Deployment Profile planning checkpoint using the current docs-first scope.
+- Stop for an architecture decision if deployment profile work needs a new router or persisted deployment state.
 
 ## Latest Verification
 

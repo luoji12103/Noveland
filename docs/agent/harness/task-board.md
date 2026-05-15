@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- v0.7 Production Hardening Phase 5: Deployment Profile
 
 ## Blocked
 - None
