@@ -1756,3 +1756,14 @@
 - Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`68 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
 - Flaky notes: The first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.
 - Follow-up notes: Fast-forward merge `feat/narrative-quality-dashboard-api` into local `main`, then update OpenSpec merge bookkeeping and keep `main` clean. Do not push unless explicitly requested.
+
+## v0.6 Narrative Quality Dashboard/API merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.6 Runtime Narrative Quality Phase 10.
+- Summary: Fast-forward merged `feat/narrative-quality-dashboard-api` into local `main` after the implementation commit and the full local gate passed. OpenSpec Phase 10 tasks now mark implementation, API-first diagnostics, package/router use, architecture guardrails, focused tests, targeted tests, and full local gate complete.
+- Files changed: `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Keep `main` clean and do not push unless explicitly requested.

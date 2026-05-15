@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/narrative-quality-dashboard-api
+- Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 10.
-- Status: Phase 10 Narrative Quality Dashboard/API implementation and full local gate are complete on the feature branch; next step is fast-forward merge back to local main.
+- Status: Phase 10 fast-forward merge bookkeeping is complete; local v0.6 work is finished.
 
 ## Current Context
 
@@ -41,15 +41,8 @@
 
 ## Required Next Steps
 
-- Fast-forward merge `feat/narrative-quality-dashboard-api` back to local `main`.
-- Keep Phase 10 API-first under the narrative quality package/router; do not add Web dashboard routes, components, or e2e scenarios.
-- Provide admin-scoped narrative quality dashboard/API summaries over existing context, provider, invocation, dialogue, alignment, writer, continuity, pacing, progression, and long-run eval data.
-- Reuse existing narrative quality services, `LongRunEvalRun`, multimodal diagnostics, and release/eval evidence; do not create a duplicate dashboard or eval framework.
-- Do not add broad `worlds.py` routes.
-- Preserve the first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts store non-null `worldline_id`.
-- Continue to use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
-- Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
-- Do not push unless explicitly requested.
+- Keep `main` clean and do not push unless explicitly requested.
+- Treat v0.6 Runtime Narrative Quality Phase 10 as complete and use the current baseline for any later accepted change.
 
 ## Latest Verification
 
@@ -119,3 +112,4 @@
 - v0.6 Phase 10 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`68 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 10 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
 - Flaky note: the first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.
+- v0.6 Phase 10 fast-forward merge to local `main` completed.
