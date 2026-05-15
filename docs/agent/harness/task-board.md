@@ -164,10 +164,12 @@
 - v0.6 Runtime Narrative Quality Phase 5 planning checkpoint
 - v0.6 Runtime Narrative Quality Phase 5 implementation
 - v0.6 Runtime Narrative Quality Phase 5 targeted tests
+- v0.6 Runtime Narrative Quality Phase 5 full local gate
+- v0.6 Runtime Narrative Quality Phase 5 fast-forward merge
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality Phase 5 full local gate should run on
-  `feat/narrative-writer-v2`; merge only if it passes.
+- v0.6 Runtime Narrative Quality Phase 6 should start with a planning checkpoint
+  from clean local `main`.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

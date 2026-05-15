@@ -77,6 +77,17 @@
 - Docs updated: task board, active handoff, change journal, migrations README
 - Follow-up notes: Full local gate must pass before fast-forward merge. Phase 5 does not publish artifacts, write world events, expand legacy provider profiles, or add Web UI.
 
+## v0.6.5 Narrative Writer v2 merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 5 merge bookkeeping
+- Summary: Recorded successful full local gate and fast-forward merge for Narrative Writer v2.
+- Files changed: `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: task board, active handoff, change journal, OpenSpec tasks
+- Follow-up notes: Begin Phase 6 Continuity Review v2 from clean local `main`; no push performed.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
