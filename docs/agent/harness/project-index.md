@@ -142,6 +142,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
   - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
   - `noveland.services.api.authoring` — world-scoped authoring source registry, import run, proposal, review decision, preview, and selective trace-only apply router
+  - `noveland.services.api.narrative_quality` — world-scoped admin-only v0.6 narrative quality context preview and diagnostics router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host
   - `noveland.services.runtime.clock_tick` — finite runtime tick service for advancing running clocks and emitting world events
@@ -177,6 +178,9 @@ Fast orientation for a new coding session.
   - `noveland.narrative.contracts` — narrative artifact contracts plus conversation narrative generation inputs
   - `noveland.narrative.models` — narrative artifact ORM model with optional source conversation linkage
   - `noveland.narrative.services` — narrative artifact create/list helpers and conversation-first writer pipeline
+- `backend/packages/narrative_quality/`
+  - `noveland.narrative_quality.contracts` — v0.6 narrative quality context-kind and safe context preview DTOs
+  - `noveland.narrative_quality.service` — admin-scoped runtime context contract preview service with worldline validation and response redaction
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models

@@ -141,10 +141,14 @@
 - v0.5 Authoring & Import Studio implementation complete
 - v0.5 Authoring & Import Studio OpenSpec archive and release notes
 - v0.6 Runtime Narrative Quality feasibility review
+- v0.6 Runtime Narrative Quality Phase 1 planning checkpoint
+- v0.6 Runtime Narrative Quality Phase 1 implementation
+- v0.6 Runtime Narrative Quality Phase 1 targeted tests
+- v0.6 Runtime Narrative Quality Phase 1 full local gate
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality OpenSpec should be revised before any
-  implementation work.
+- v0.6 Runtime Narrative Quality Phase 1 should be fast-forward merged to local
+  `main`, then Phase 2 should start only from clean local `main`.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

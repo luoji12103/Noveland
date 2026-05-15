@@ -19,6 +19,7 @@ members = [
     "noveland-memory",
     "noveland-multimodal-eval",
     "noveland-narrative",
+    "noveland-narrative-quality",
     "noveland-observability",
     "noveland-plugins",
     "noveland-providers",
@@ -630,6 +631,7 @@ dependencies = [
     { name = "noveland-memory" },
     { name = "noveland-multimodal-eval" },
     { name = "noveland-narrative" },
+    { name = "noveland-narrative-quality" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
@@ -669,6 +671,7 @@ requires-dist = [
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-multimodal-eval", editable = "packages/multimodal_eval" },
     { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-narrative-quality", editable = "packages/narrative_quality" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },
@@ -916,6 +919,33 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-narrative-quality"
+version = "0.1.0"
+source = { editable = "packages/narrative_quality" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-conversations" },
+    { name = "noveland-core" },
+    { name = "noveland-narrative" },
+    { name = "noveland-providers" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-observability"
 version = "0.1.0"
 source = { editable = "packages/observability" }
@@ -1000,6 +1030,7 @@ dependencies = [
     { name = "noveland-memory" },
     { name = "noveland-multimodal-eval" },
     { name = "noveland-narrative" },
+    { name = "noveland-narrative-quality" },
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
@@ -1031,6 +1062,7 @@ requires-dist = [
     { name = "noveland-memory", editable = "packages/memory" },
     { name = "noveland-multimodal-eval", editable = "packages/multimodal_eval" },
     { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "noveland-narrative-quality", editable = "packages/narrative_quality" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },

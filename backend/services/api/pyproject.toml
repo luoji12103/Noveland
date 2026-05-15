@@ -22,6 +22,7 @@ dependencies = [
   "noveland-memory",
   "noveland-media",
   "noveland-narrative",
+  "noveland-narrative-quality",
   "noveland-multimodal-eval",
   "noveland-observability",
   "noveland-plugins",
@@ -54,6 +55,7 @@ noveland-invocations = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
 noveland-narrative = { workspace = true }
+noveland-narrative-quality = { workspace = true }
 noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-plugins = { workspace = true }

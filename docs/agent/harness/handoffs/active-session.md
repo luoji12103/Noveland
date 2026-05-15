@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: main
+- Branch: feat/runtime-context-contract-v2
 - Objective: v0.6 Runtime Narrative Quality Phase 1.
-- Status: v0.6 OpenSpec decisions are accepted; Phase 1 runtime context contract planning is in progress.
+- Status: Phase 1 runtime context contract implementation and local validation are complete on the feature branch; fast-forward merge to local `main` is next.
 
 ## Current Context
 
@@ -41,11 +41,10 @@
 
 ## Required Next Steps
 
-- Commit the v0.6.1 planning checkpoint.
-- Implement `runtime-context-contract-v2` on `feat/runtime-context-contract-v2`.
-- Add `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
+- Commit the Phase 1 implementation on `feat/runtime-context-contract-v2`.
+- Fast-forward merge Phase 1 to local `main`.
+- Record merge bookkeeping, then start Phase 2 only from clean local `main`.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
-- Run targeted tests and the full local gate before fast-forward merge.
 - Do not push unless explicitly requested.
 
 ## Latest Verification
@@ -78,3 +77,5 @@
 - v0.5 Phase 8 targeted tests passed: `25 passed`.
 - v0.5 Phase 8 full local gate passed: backend ruff, backend mypy, backend pytest (`315 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
 - v0.5 Phase 8 fast-forward merge to local `main` completed.
+- v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.

@@ -1439,3 +1439,15 @@
 - Tests added/updated: N/A.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: v0.5 is complete locally; OpenSpec archive and release notes remain optional docs-only follow-up if requested. Do not push unless explicitly requested.
+
+## v0.6 Runtime Context Contract v2 implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/runtime-context-contract-v2
+- Scope: Backend-only v0.6 Runtime Narrative Quality Phase 1 runtime context contract preview.
+- Summary: Added the dedicated `narrative_quality` package and app-level narrative quality router with an admin-only context preview endpoint for agent, conversation, GM, narrative, and eval context kinds. The implementation reuses existing living-world context, conversation, GM proposal, narrative artifact, and long-run eval records; validates worldline scope; redacts storage paths, media URIs, base64, raw prompt/output, and secret-like fields; and avoids provider calls, world event writes, migrations, Web dashboard work, and broad `worlds.py` routes.
+- Files changed: `/backend/packages/narrative_quality/`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/services/api/src/noveland/services/api/app.py`, `/backend/tests/test_narrative_quality_service.py`, `/backend/tests/test_api_narrative_quality.py`, `/backend/tests/test_workspace_imports.py`, `/backend/pyproject.toml`, `/backend/services/api/pyproject.toml`, `/backend/uv.lock`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`
+- Tests added/updated: Narrative quality service context preview coverage, narrative quality API ACL/redaction coverage, and workspace import coverage.
+- Docs updated: OpenSpec Phase 1 task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Commit Phase 1 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 2 Provider-backed GM Proposal from clean local `main`. Do not push unless explicitly requested.

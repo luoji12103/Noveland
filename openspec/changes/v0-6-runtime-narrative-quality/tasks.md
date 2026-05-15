@@ -13,14 +13,14 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 1 — Runtime Context Contract v2
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `runtime-context-contract-v2` scope only.
-- [ ] Use narrative quality package/router for any new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `runtime-context-contract-v2` scope only.
+- [x] Use narrative quality package/router for any new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 2 — Provider-backed GM Proposal
 
