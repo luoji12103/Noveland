@@ -121,6 +121,17 @@
 - Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
 - Follow-up notes: Begin Phase 7 Runtime Pacing Controller from clean local `main`; no push performed.
 
+## v0.6.7 Runtime Pacing Controller planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 7 planning
+- Summary: Added the Phase 7 implementation checkpoint for API-first runtime pacing diagnostics, reusing asset generation policies/proposals and media jobs while forbidding daemon hooks, provider calls, automatic spend, Web UI, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.7-runtime-pacing-controller-plan.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, task board, active handoff
+- Follow-up notes: Implement Phase 7 on `feat/runtime-pacing-controller`; no migration expected.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
