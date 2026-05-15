@@ -1971,3 +1971,14 @@
 - Tests added/updated: incident summary service/API regression tests for safe evidence aggregation, platform-admin ACL, world filter behavior, and redaction boundaries.
 - Docs updated: file inventory, project index, task board, active handoff, and change journal.
 - Follow-up notes: Run the full local gate, then fast-forward merge Phase 6 back to local `main` if it stays green.
+
+## v0.7.6 Observability & Incident Diagnostics gate entry
+
+- Date: 2026-05-15
+- Branch: feat/observability-incident-diagnostics
+- Scope: v0.7 Production Hardening Phase 6 full local gate
+- Summary: Recorded the successful full local gate for Phase 6 after the incident diagnostics implementation.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Fast-forward merge `feat/observability-incident-diagnostics` to local `main`, then record merge bookkeeping before starting Phase 7.

@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 6.
-- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics implementation is complete locally and full gate is next.
+- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics full local gate passed and fast-forward merge is next.
 
 ## Current Context
 
@@ -141,3 +141,6 @@
 - v0.7 Phase 5 targeted checks passed: backend ruff for the deployment profile docs test, backend mypy for the docs test, targeted pytest (`13 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 5 full local gate passed: backend ruff, backend mypy (`251 source files`), backend pytest (`404 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 5 fast-forward merge to local `main` completed.
+- v0.7 Phase 6 implementation added `IncidentDiagnosticsService` and a platform-admin-only `/observability/incidents/summary` endpoint.
+- v0.7 Phase 6 targeted checks passed: backend ruff for observability/API/tests, backend mypy for observability/API/tests, targeted pytest (`15 passed`), OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- v0.7 Phase 6 full local gate passed: backend ruff, backend mypy (`253 source files`), backend pytest (`407 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
