@@ -2131,3 +2131,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
 - Follow-up notes: Fast-forward merge `feat/reader-media-delivery` to local `main`, then record merge bookkeeping before starting Phase 2.
+
+## v0.8.1 Reader Media Delivery merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 1 merge bookkeeping.
+- Summary: Fast-forward merged `feat/reader-media-delivery` into local `main`, marked Phase 1 complete in OpenSpec tasks, and moved harness handoff state to Phase 2 Conversation Playback UI planning.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 2 from clean local `main`; use the `impeccable` skill before frontend implementation, and continue using reader-safe media descriptors only.
