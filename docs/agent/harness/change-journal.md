@@ -1789,3 +1789,15 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/permission-model-hardening` from clean local `main`.
+
+## v0.7 Permission Matrix & ACL Regression Baseline implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/permission-model-hardening
+- Scope: v0.7 Production Hardening Phase 1 permission matrix and ACL regression baseline.
+- Summary: Added a stable permission matrix for platform-admin, world-admin, world-member, reader, and player expectations. Added focused API regression coverage proving lower-privilege actors cannot access high-risk admin-only provider, invocation, authoring, multimodal eval, narrative quality, visual, speech, asset generation, or presentation surfaces, and that denial responses avoid forbidden secret/prompt/storage/raw media tokens.
+- Files changed: `/docs/agent/architecture/permission-matrix.md`, `/backend/tests/test_api_permission_matrix.py`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: `backend/tests/test_api_permission_matrix.py`.
+- Docs updated: permission matrix, OpenSpec Phase 1 task status, project index, file inventory, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`3 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`247 source files`), backend pytest (`386 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Commit Phase 1 implementation, fast-forward merge to local `main`, then record merge bookkeeping.

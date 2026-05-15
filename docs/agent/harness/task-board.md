@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.7 Production Hardening Phase 1 planning checkpoint
+- v0.7 Production Hardening Phase 1 implementation
 
 ## Blocked
 - None
@@ -195,6 +195,9 @@
 - v0.7 Production Hardening feasibility review
 - v0.7 Production Hardening OpenSpec plan optimization
 - v0.7 Production Hardening Phase 1 planning checkpoint
+- v0.7 Production Hardening Phase 1 implementation
+- v0.7 Production Hardening Phase 1 targeted tests
+- v0.7 Production Hardening Phase 1 full local gate
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.

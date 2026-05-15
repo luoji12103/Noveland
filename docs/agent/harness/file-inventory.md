@@ -453,6 +453,7 @@ Track key structural files and prevent unregistered sprawl.
 - `openspec/specs/invocation-ledger-browser/spec.md`
 - `openspec/specs/multimodal-diagnostics-dashboard/spec.md`
 - `docs/agent/architecture/current-system-contracts.md`
+- `docs/agent/architecture/permission-matrix.md`
 - `docs/agent/architecture/api-contract-inventory.md`
 - `docs/agent/architecture/data-model-inventory.md`
 - `docs/agent/architecture/adr/0001-worldline-first-multimodal-state.md`

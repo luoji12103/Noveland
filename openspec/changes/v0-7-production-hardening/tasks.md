@@ -5,13 +5,13 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 1 — Permission Matrix & ACL Regression Baseline
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `permission-model-hardening` scope only.
-- [ ] Document the current platform-admin/world-admin/world-member/reader/player route matrix.
-- [ ] Add or update route ACL and lower-privilege leak regression coverage.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `permission-model-hardening` scope only.
+- [x] Document the current platform-admin/world-admin/world-member/reader/player route matrix.
+- [x] Add or update route ACL and lower-privilege leak regression coverage.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

@@ -68,6 +68,7 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/living-world-release-profile.md` — living-world release profile and beta checklist operator workflow.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 - `docs/agent/architecture/current-system-contracts.md` — frozen Phase 3-12 architecture boundary contracts for provider, invocation, media, visual, speech, presentation, asset generation, and eval layers.
+- `docs/agent/architecture/permission-matrix.md` — v0.7 baseline permission matrix for platform-admin, world-admin, world-member, reader, and player route expectations.
 - `docs/agent/architecture/api-contract-inventory.md` — stable backend API/router, DTO, service, ACL, worldline, side-effect, and test inventory for multimodal layers.
 - `docs/agent/architecture/data-model-inventory.md` — Phase 3-12 data model ownership, worldline behavior, reference, prohibited-storage, and migration inventory.
 - `docs/agent/architecture/adr/0001-worldline-first-multimodal-state.md` through `0009-multimodal-evals-reuse-release-framework.md` — concise accepted ADRs for Phase 3-12 multimodal architecture decisions.
