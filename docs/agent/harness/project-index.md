@@ -160,6 +160,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
   - `noveland.services.api.providers` — world-scoped provider integration, capability, health-check, and test-invocation router
+  - `noveland.services.api.reader_media` — authenticated reader/member/player/admin media descriptor and application-mediated object download router with safe visibility policy
   - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
   - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
@@ -232,6 +233,9 @@ Fast orientation for a new coding session.
   - `noveland.media.models` — worldline-scoped media asset, job, context, input, tag, collection, and collection item ORM models
   - `noveland.media.service` — media asset/context/lineage service and queued media job service
   - `noveland.media.storage` — binary local media object storage facade with opaque `media://` URIs
+- `backend/packages/reader_delivery/`
+  - `noveland.reader_delivery.contracts` — reader-safe media descriptor DTOs that expose stable media refs and application-mediated download URLs without storage internals
+  - `noveland.reader_delivery.service` — reader media visibility policy, reference intersection, descriptor assembly, and storage-backed object read service
 - `backend/packages/authoring/`
   - `noveland.authoring.contracts` — v0.5 authoring source, import run, proposal, review, preview, apply, and safe JSON DTOs
   - `noveland.authoring.models` — strict-worldline source batch, source asset, source fragment, import run, proposal, review decision, and source traceability ORM models
@@ -318,6 +322,7 @@ Fast orientation for a new coding session.
 - `backend/tests/fixtures/security_regression.py` — shared forbidden-token helpers for v0.7 security regression tests
 - `backend/tests/test_security_regression_suite.py` — consolidated v0.7 security regression entrypoint for leak, ACL, and fixture coverage
 - `backend/tests/test_production_readiness_gate.py` — v0.7 internal production-readiness aggregation regression entrypoint
+- `backend/tests/test_api_reader_media.py` — v0.8 Phase 1 reader media ACL, visibility, leak, download, and admin-route regression coverage
 
 ## Update rule
 

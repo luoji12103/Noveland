@@ -23,6 +23,7 @@ members = [
     "noveland-observability",
     "noveland-plugins",
     "noveland-providers",
+    "noveland-reader-delivery",
     "noveland-service-api",
     "noveland-service-runtime",
     "noveland-speech",
@@ -635,6 +636,7 @@ dependencies = [
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
+    { name = "noveland-reader-delivery" },
     { name = "noveland-service-api" },
     { name = "noveland-service-runtime" },
     { name = "noveland-speech" },
@@ -675,6 +677,7 @@ requires-dist = [
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-reader-delivery", editable = "packages/reader_delivery" },
     { name = "noveland-service-api", editable = "services/api" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-speech", editable = "packages/speech" },
@@ -1019,6 +1022,27 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-reader-delivery"
+version = "0.1.0"
+source = { editable = "packages/reader_delivery" }
+dependencies = [
+    { name = "noveland-conversations" },
+    { name = "noveland-media" },
+    { name = "noveland-narrative" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-narrative", editable = "packages/narrative" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-service-api"
 version = "0.1.0"
 source = { editable = "services/api" }
@@ -1042,6 +1066,7 @@ dependencies = [
     { name = "noveland-observability" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
+    { name = "noveland-reader-delivery" },
     { name = "noveland-service-runtime" },
     { name = "noveland-speech" },
     { name = "noveland-visual" },
@@ -1074,6 +1099,7 @@ requires-dist = [
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-reader-delivery", editable = "packages/reader_delivery" },
     { name = "noveland-service-runtime", editable = "services/runtime" },
     { name = "noveland-speech", editable = "packages/speech" },
     { name = "noveland-visual", editable = "packages/visual" },

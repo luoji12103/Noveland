@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: main
-- Objective: v0.8 Public Experience & Ecosystem planning adaptation.
-- Status: v0.7 Production Hardening is locally complete and v0.8 OpenSpec has been adapted to the current repository baseline.
+- Branch: feat/reader-media-delivery
+- Objective: v0.8 Public Experience & Ecosystem Phase 1 Reader Media Delivery.
+- Status: Phase 1 reader-safe media package/router implementation and targeted checks are complete; full local gate is next.
 
 ## Current Context
 
@@ -32,6 +32,8 @@
 - v0.8 OpenSpec now requires Reader Media Delivery to start with public/read-only contract inventory, reader-safe media descriptors, explicit auth/delivery model, and no storage path leak before playback/galgame UI phases.
 - v0.8 Phase 1 Reader Media Delivery planning checkpoint has been added at `docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md`.
 - Phase 1 accepted delivery model is authenticated-only, application-mediated download/streaming through a dedicated `reader_delivery` package and `reader_media.py` router.
+- Phase 1 implementation adds `backend/packages/reader_delivery/` and `backend/services/api/src/noveland/services/api/reader_media.py`.
+- Phase 1 targeted tests add `backend/tests/test_api_reader_media.py` for ACL, visibility, no-leak descriptors, download streaming, cross-world/worldline rejection, and unchanged admin media download behavior.
 - v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -51,7 +53,8 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start v0.8 Phase 1 implementation on a feature branch from clean local `main`.
+- Run the v0.8 Phase 1 full local gate on `feat/reader-media-delivery`.
+- If the full gate passes, fast-forward merge `feat/reader-media-delivery` back to local `main`, confirm clean status, then continue to Phase 2.
 - Preserve the authenticated-only reader media model unless OpenSpec is updated first.
 - Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
 
@@ -162,3 +165,4 @@
 - v0.7 Phase 8 full local gate passed: backend ruff, backend mypy (`256 source files`), backend pytest (`415 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 8 fast-forward merge to local `main` completed.
 - v0.8 feasibility review and OpenSpec plan adaptation are docs-only. Validation target is OpenSpec strict validation plus `git diff --check`.
+- v0.8 Phase 1 targeted checks passed: backend ruff for `packages/reader_delivery`, `reader_media.py`, and `test_api_reader_media.py`; backend mypy for the same paths; targeted pytest (`5 passed`).

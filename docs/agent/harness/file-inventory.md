@@ -116,6 +116,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/media.py`
 - `backend/services/api/src/noveland/services/api/narrative_quality.py`
 - `backend/services/api/src/noveland/services/api/providers.py`
+- `backend/services/api/src/noveland/services/api/reader_media.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/speech.py`
@@ -246,6 +247,11 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/asset_generation/src/noveland/asset_generation/contracts.py`
 - `backend/packages/asset_generation/src/noveland/asset_generation/models.py`
 - `backend/packages/asset_generation/src/noveland/asset_generation/service.py`
+- `backend/packages/reader_delivery/`
+- `backend/packages/reader_delivery/pyproject.toml`
+- `backend/packages/reader_delivery/src/noveland/reader_delivery/__init__.py`
+- `backend/packages/reader_delivery/src/noveland/reader_delivery/contracts.py`
+- `backend/packages/reader_delivery/src/noveland/reader_delivery/service.py`
 - `backend/packages/invocations/`
 - `backend/packages/invocations/pyproject.toml`
 - `backend/packages/invocations/src/noveland/invocations/__init__.py`
@@ -380,6 +386,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_authoring_regression_fixture.py`
 - `backend/tests/test_security_regression_suite.py`
 - `backend/tests/test_production_readiness_gate.py`
+- `backend/tests/test_api_reader_media.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`

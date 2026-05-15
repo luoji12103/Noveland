@@ -23,6 +23,7 @@ dependencies = [
   "noveland-observability",
   "noveland-plugins",
   "noveland-providers",
+  "noveland-reader-delivery",
   "noveland-service-api",
   "noveland-service-runtime",
   "noveland-speech",
@@ -65,6 +66,7 @@ members = [
   "packages/observability",
   "packages/plugins",
   "packages/providers",
+  "packages/reader_delivery",
   "packages/speech",
   "packages/storage",
   "packages/visual",
@@ -92,6 +94,7 @@ noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }
+noveland-reader-delivery = { workspace = true }
 noveland-service-api = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-speech = { workspace = true }
@@ -136,6 +139,7 @@ mypy_path = [
   "packages/observability/src",
   "packages/plugins/src",
   "packages/providers/src",
+  "packages/reader_delivery/src",
   "packages/speech/src",
   "packages/storage/src",
   "packages/visual/src",

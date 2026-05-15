@@ -2107,3 +2107,15 @@
 - Tests added/updated: N/A, documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implement Phase 1 on a feature branch. Do not reuse admin media routes, do not add unauthenticated delivery, and stop if implementation needs a migration or broad `worlds.py` route growth.
+
+## v0.8.1 Reader Media Delivery implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/reader-media-delivery
+- Scope: v0.8 Public Experience & Ecosystem Phase 1 reader-safe media delivery.
+- Summary: Added the dedicated `noveland.reader_delivery` package and app-level `reader_media.py` router for authenticated reader/member/player/admin media descriptors and application-mediated media object download. The service reuses the existing media kernel, requires available reader/player/member-visible media, suppresses hidden/private/developer-only assets, requires reader-visible media references, and keeps storage URIs, paths, base64, raw prompts/outputs, and secrets out of reader responses.
+- Files changed: `/backend/packages/reader_delivery/`, `/backend/services/api/src/noveland/services/api/reader_media.py`, `/backend/services/api/src/noveland/services/api/app.py`, backend workspace metadata, `/backend/tests/test_api_reader_media.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: `backend/tests/test_api_reader_media.py`.
+- Docs updated: OpenSpec task status, file inventory, project index, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff for reader delivery/API/tests, backend mypy for the same files, and targeted pytest (`5 passed`).
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 1 back to local `main` if it stays green.

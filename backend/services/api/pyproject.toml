@@ -27,6 +27,7 @@ dependencies = [
   "noveland-observability",
   "noveland-plugins",
   "noveland-providers",
+  "noveland-reader-delivery",
   "noveland-service-runtime",
   "noveland-speech",
   "noveland-visual",
@@ -60,6 +61,7 @@ noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }
+noveland-reader-delivery = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-speech = { workspace = true }
 noveland-visual = { workspace = true }
