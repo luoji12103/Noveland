@@ -96,12 +96,12 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 8 — Production Readiness Gate
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `production-readiness-gate` scope only.
-- [ ] Reuse beta checklist, long-run eval, release profile, multimodal eval, narrative quality, diagnostics, and v0.7 hardening evidence.
-- [ ] Keep readiness gate internal and distinct from public launch readiness.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
+- [x] Implement `production-readiness-gate` scope only.
+- [x] Reuse beta checklist, long-run eval, release profile, multimodal eval, narrative quality, diagnostics, and v0.7 hardening evidence.
+- [x] Keep readiness gate internal and distinct from public launch readiness.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

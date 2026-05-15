@@ -173,6 +173,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_observability_incidents.py`
 - `backend/tests/fixtures/security_regression.py`
 - `backend/tests/test_security_regression_suite.py`
+- `backend/tests/test_production_readiness_gate.py`
 - `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
 - `backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`
 - `backend/migrations/versions/20260504_0021_agent_preset_versioning.py`
@@ -378,6 +379,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_multimodal_sample_world_regression.py`
 - `backend/tests/test_authoring_regression_fixture.py`
 - `backend/tests/test_security_regression_suite.py`
+- `backend/tests/test_production_readiness_gate.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`
@@ -506,6 +508,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_observability_incidents.py`
 - `backend/tests/fixtures/security_regression.py`
 - `backend/tests/test_security_regression_suite.py`
+- `backend/tests/test_production_readiness_gate.py`
 
 ## Update rule
 

@@ -161,3 +161,36 @@ class IncidentSummary(_FrozenContract):
         if value.tzinfo is None or value.utcoffset() is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+class ProductionReadinessSection(_FrozenContract):
+    section_key: str = Field(min_length=1, max_length=120)
+    status: IncidentStatus
+    summary: str = Field(min_length=1, max_length=500)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    evidence_refs: list[IncidentEvidenceRef] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+
+
+class ProductionReadinessReport(_FrozenContract):
+    status: IncidentStatus
+    generated_at: datetime
+    world_id: uuid.UUID | None = None
+    readiness_kind: str = Field(default="internal_production_readiness", min_length=1)
+    section_count: int = Field(ge=0)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    sections: list[ProductionReadinessSection] = Field(default_factory=list)
+    suppressed_fields: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)

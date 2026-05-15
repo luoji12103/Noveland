@@ -5,8 +5,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from noveland.auth import AuthenticatedSubject
-from noveland.observability import IncidentDiagnosticsService, IncidentSummary
+from noveland.core.settings import load_settings
+from noveland.media.storage import LocalMediaObjectStorage
+from noveland.observability import (
+    IncidentDiagnosticsService,
+    IncidentSummary,
+    ProductionReadinessGateService,
+    ProductionReadinessReport,
+)
 from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
+from noveland.storage import LocalObjectStorage
+from noveland.storage.integrity import StorageIntegrityAuditService
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/observability", tags=["observability"])
@@ -25,4 +34,27 @@ def get_incident_summary(
         world_id=world_id,
         retention_days=retention_days,
         evidence_limit_per_component=evidence_limit_per_component,
+    )
+
+
+@router.get("/readiness/production", response_model=ProductionReadinessReport)
+def get_production_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    world_id: Annotated[uuid.UUID | None, Query()] = None,
+    evidence_limit_per_section: Annotated[int, Query(ge=1, le=20)] = 5,
+    storage_audit_limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
+    storage_finding_limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+) -> ProductionReadinessReport:
+    del subject
+    settings = load_settings()
+    storage_audit = StorageIntegrityAuditService(
+        db_session,
+        media_storage=LocalMediaObjectStorage(settings.object_storage_root / "media"),
+        object_storage=LocalObjectStorage(settings.object_storage_root),
+    ).audit(limit=storage_audit_limit, finding_limit=storage_finding_limit)
+    return ProductionReadinessGateService(db_session).report(
+        world_id=world_id,
+        evidence_limit_per_section=evidence_limit_per_section,
+        storage_audit=storage_audit,
     )

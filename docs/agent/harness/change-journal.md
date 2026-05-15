@@ -2050,3 +2050,15 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, phase plan, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/production-readiness-gate` from clean local `main`.
+
+## v0.7.8 Production Readiness Gate implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/production-readiness-gate
+- Scope: v0.7 Production Hardening Phase 8 production-readiness aggregation.
+- Summary: Added a read-only internal production-readiness report under `noveland.observability`, exposed it through the platform-admin-only `/observability/readiness/production` endpoint, and added regression coverage for safe aggregation, blockers, ACL, redaction, and no duplicate release/eval/readiness persistence framework. The implementation reuses beta checklist, long-run eval, release profile, provider health, budget policy, storage integrity, incident diagnostics, multimodal eval, narrative quality, and security regression evidence without migrations, Web UI, daemon execution, public launch semantics, or broad `worlds.py` growth.
+- Files changed: `/backend/packages/observability/src/noveland/observability/{contracts,services,__init__}.py`, `/backend/services/api/src/noveland/services/api/observability.py`, `/backend/tests/test_production_readiness_gate.py`, `/openspec/changes/v0-7-production-hardening/tasks.md`, and harness docs.
+- Tests added/updated: `backend/tests/test_production_readiness_gate.py`.
+- Docs updated: OpenSpec task status, file inventory, project index, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff for observability readiness code/API/tests, backend mypy for the same files, and targeted pytest (`14 passed`).
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 8 back to local `main` if it stays green.
