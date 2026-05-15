@@ -1732,3 +1732,14 @@
 - Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 9 full local gate.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 10 Narrative Quality Dashboard/API from clean local `main`; do not push unless explicitly requested.
+
+## v0.6 Narrative Quality Dashboard/API plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.6 Runtime Narrative Quality Phase 10.
+- Summary: Added the Phase 10 plan for a read-only, admin-only narrative quality dashboard/API summary under the dedicated narrative quality boundary. The plan aggregates existing v0.6 quality signals into safe metrics, blockers, warnings, recommendations, and evidence refs while avoiding Web dashboard work, provider calls, runtime daemon execution, state mutation, migrations, world events, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.10-narrative-quality-dashboard-api-plan.md`, `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implementation should start on `feat/narrative-quality-dashboard-api` after this docs-only checkpoint is committed. Do not push unless explicitly requested.

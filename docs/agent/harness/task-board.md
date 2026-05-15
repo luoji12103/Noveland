@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- v0.6 Runtime Narrative Quality Phase 10 implementation
 
 ## Blocked
 - None
@@ -186,10 +186,11 @@
 - v0.6 Runtime Narrative Quality Phase 9 targeted tests
 - v0.6 Runtime Narrative Quality Phase 9 full local gate
 - v0.6 Runtime Narrative Quality Phase 9 fast-forward merge
+- v0.6 Runtime Narrative Quality Phase 10 planning checkpoint
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality Phase 10 planning should start from clean local
-  `main`.
+- v0.6 Runtime Narrative Quality Phase 10 implementation should start on
+  `feat/narrative-quality-dashboard-api` from clean local `main`.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

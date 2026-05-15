@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 10.
-- Status: Phase 9 Long-run Living World Simulation Eval is implemented, full-gate verified, and fast-forward merged to local `main`; Phase 10 planning checkpoint is next.
+- Status: Phase 10 Narrative Quality Dashboard/API planning checkpoint is recorded; implementation is next on a dedicated feature branch.
 
 ## Current Context
 
@@ -41,7 +41,7 @@
 
 ## Required Next Steps
 
-- Start Phase 10 planning from clean local `main`, then implement on a dedicated feature branch after the docs-only planning checkpoint.
+- Start Phase 10 implementation on `feat/narrative-quality-dashboard-api` after the docs-only planning checkpoint is committed.
 - Keep Phase 10 API-first under the narrative quality package/router; do not add Web dashboard routes, components, or e2e scenarios.
 - Provide admin-scoped narrative quality dashboard/API summaries over existing context, provider, invocation, dialogue, alignment, writer, continuity, pacing, progression, and long-run eval data.
 - Reuse existing narrative quality services, `LongRunEvalRun`, multimodal diagnostics, and release/eval evidence; do not create a duplicate dashboard or eval framework.
