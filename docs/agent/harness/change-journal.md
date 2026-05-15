@@ -1473,3 +1473,15 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implementation should start on `feat/provider-backed-gm-proposal` after this docs-only checkpoint is committed.
+
+## v0.6 Provider-backed GM Proposal implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/provider-backed-gm-proposal
+- Scope: Backend-only v0.6 Runtime Narrative Quality Phase 2 provider-backed GM proposal generation.
+- Summary: Added admin-only provider-backed GM proposal generation under the dedicated narrative quality router. The implementation confirms provider-kernel text generation through fake/local-stub `ProviderExecutionService`, writes invocation and prompt snapshot evidence, creates proposed `gm_event_proposals` only after provider execution succeeds, supports dry-run without proposal persistence, stores safe traceability in `source_context`, rejects non-text providers, and avoids world event mutation, migrations, Web UI, broad `worlds.py` routes, and legacy provider profile fallback.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`, `/backend/tests/test_api_narrative_quality.py`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Narrative quality service coverage for provider-backed proposal creation, dry-run behavior, non-text provider rejection, traceability redaction, plus API coverage for creation and ACL.
+- Docs updated: OpenSpec Phase 2 task status, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`327 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Commit Phase 2 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 3 Dialogue Style & OOC Review from clean local `main`. Do not push unless explicitly requested.

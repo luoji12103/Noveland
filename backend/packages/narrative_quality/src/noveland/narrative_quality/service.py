@@ -9,7 +9,20 @@ from noveland.agents.models import Agent
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import ConversationSessionRecord, ConversationTurnRecord
 from noveland.narrative.models import NarrativeArtifact
-from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderExecutionRequest,
+    ProviderIntegrationRead,
+    ProviderKind,
+)
+from noveland.providers.registry import (
+    ProviderNotFoundError,
+    ProviderRegistryService,
+    ProviderValidationError,
+)
+from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS, reject_sensitive_config
+from noveland.providers.service import ProviderExecutionService
+from noveland.worlds.gm import LivingWorldGMService
 from noveland.worlds.living_context import LivingWorldContextPack, LivingWorldContextSelector
 from noveland.worlds.models import GMEventProposal, LongRunEvalRun, Worldline
 from noveland.worlds.worldlines import worldline_or_404
@@ -21,6 +34,12 @@ from .contracts import (
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
     NarrativeQualityEvidenceRef,
+    NarrativeQualityGMImportance,
+    NarrativeQualityGMProposalCandidate,
+    NarrativeQualityGMProposalGenerateRequest,
+    NarrativeQualityGMProposalGenerationResult,
+    NarrativeQualityInvocationRef,
+    NarrativeQualityProviderRef,
 )
 
 _LEAK_KEYWORDS = {
@@ -70,6 +89,100 @@ class NarrativeQualityService:
         if request.context_kind == NarrativeQualityContextKind.EVAL:
             return self._eval_context(world_id, worldline, request)
         raise NarrativeQualityValidationError("unsupported context kind")
+
+    def generate_gm_proposal(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityGMProposalGenerateRequest,
+        *,
+        actor_ref: str,
+    ) -> NarrativeQualityGMProposalGenerationResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        reject_sensitive_config(request.payload_json, field_name="payload_json")
+        reject_sensitive_config(
+            request.provider_request_json,
+            field_name="provider_request_json",
+        )
+        provider = self._resolve_text_provider(world_id, request)
+        self._validate_text_provider(provider)
+        context_pack = self._context_pack(world_id, worldline.id, request.context_limit)
+        prompt_text = _gm_generation_prompt(request, context_pack)
+        result = ProviderExecutionService(self._session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                provider_id=provider.id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key=request.capability_key,
+                model_name=request.model_name,
+                input_text=prompt_text,
+                input_json={
+                    "context_kind": "gm",
+                    "prompt_goal": _safe_text(request.prompt_goal),
+                    "worldline_id": str(worldline.id),
+                },
+                request_json={
+                    **dict(request.provider_request_json),
+                    "operation": "gm_proposal_generation",
+                    "context_kind": "gm",
+                    "context_limit": request.context_limit,
+                    "narrative_quality_phase": "v0.6.2",
+                },
+                actor_ref=actor_ref,
+            )
+        )
+        candidate = _candidate_from_provider_output(
+            request,
+            provider=provider,
+            invocation_id=result.invocation.id,
+            output_text=result.output_text,
+            output_json=result.output_json,
+        )
+        proposal_model: GMEventProposal | None = None
+        if not request.dry_run:
+            proposal_model = LivingWorldGMService(self._session).create_proposal(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                agenda_id=None,
+                title=candidate.title,
+                reason=candidate.reason,
+                event_name=candidate.event_name,
+                proposed_payload=candidate.proposed_payload,
+                importance=candidate.importance.value,
+                risk_score=candidate.risk_score,
+                affected_agents=candidate.affected_agents,
+                affected_organizations=candidate.affected_organizations,
+                source_context=candidate.source_context,
+            )
+            candidate = _proposal_candidate(proposal_model)
+        return NarrativeQualityGMProposalGenerationResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            dry_run=request.dry_run,
+            provider=NarrativeQualityProviderRef(
+                id=provider.id,
+                provider_kind=provider.provider_kind,
+                adapter_kind=provider.adapter_kind,
+                provider_key=provider.provider_key,
+            ),
+            invocation=NarrativeQualityInvocationRef(
+                id=result.invocation.id,
+                status=result.invocation.status.value,
+                provider_kind=result.invocation.provider_kind.value,
+                error_text=_safe_text(result.invocation.error_text)
+                if result.invocation.error_text
+                else None,
+            ),
+            proposal=candidate,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "gm",
+                    "context_limit": request.context_limit,
+                    "proposal_persisted": proposal_model is not None,
+                    "provider_output_available": bool(result.output_text or result.output_json),
+                }
+            ),
+        )
 
     def _agent_context(
         self,
@@ -305,6 +418,41 @@ class NarrativeQualityService:
             evidence_refs=[NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id))],
         )
 
+    def _resolve_text_provider(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityGMProposalGenerateRequest,
+    ) -> ProviderIntegrationRead:
+        registry = ProviderRegistryService(self._session)
+        try:
+            if request.provider_id is not None:
+                provider = registry.get_provider(
+                    world_id,
+                    request.provider_id,
+                    platform_admin=True,
+                    include_hidden=True,
+                )
+                if provider is None:
+                    raise ProviderNotFoundError("provider integration not found")
+                return provider
+            return registry.resolve_provider_for_capability(
+                world_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key=request.capability_key,
+            )
+        except (ProviderNotFoundError, ProviderValidationError) as exc:
+            raise NarrativeQualityValidationError(str(exc)) from exc
+
+    def _validate_text_provider(self, provider: ProviderIntegrationRead) -> None:
+        if provider.provider_kind != ProviderKind.TEXT_GENERATION:
+            raise NarrativeQualityValidationError(
+                "provider-backed GM proposal requires provider_kind=text_generation"
+            )
+        if provider.adapter_kind not in {ProviderAdapterKind.FAKE, ProviderAdapterKind.LOCAL_STUB}:
+            raise NarrativeQualityValidationError(
+                "provider adapter does not support provider-kernel text generation yet"
+            )
+
     def _context_pack(
         self,
         world_id: uuid.UUID,
@@ -375,6 +523,103 @@ def _turn_window_text(turns: list[ConversationTurnRecord]) -> str:
     return "\n".join(lines)
 
 
+def _gm_generation_prompt(
+    request: NarrativeQualityGMProposalGenerateRequest,
+    context_pack: LivingWorldContextPack,
+) -> str:
+    lines = [
+        "Generate one GM proposal candidate.",
+        f"Goal: {_clip(request.prompt_goal, 800)}",
+        f"Importance: {request.importance.value}",
+        f"Risk score target: {request.risk_score}",
+    ]
+    context_text = context_pack.to_prompt_text()
+    if context_text:
+        lines.extend(["Context:", context_text])
+    lines.append(
+        "Return a concise proposal reason. Do not include secrets, storage paths, "
+        "base64, file paths, raw prompts, or raw outputs."
+    )
+    return "\n".join(lines)
+
+
+def _candidate_from_provider_output(
+    request: NarrativeQualityGMProposalGenerateRequest,
+    *,
+    provider: ProviderIntegrationRead,
+    invocation_id: uuid.UUID,
+    output_text: str | None,
+    output_json: dict[str, Any],
+) -> NarrativeQualityGMProposalCandidate:
+    raw_proposal = output_json.get("proposal")
+    proposal_json = raw_proposal if isinstance(raw_proposal, dict) else {}
+    reason = _safe_text(
+        _clip(
+            str(proposal_json.get("reason") or output_text or output_json.get("text") or ""),
+            1200,
+        )
+    )
+    if not reason or reason == REDACTED:
+        reason = "Provider generated a GM proposal candidate; details were redacted."
+    title = _safe_text(
+        _clip(
+            str(proposal_json.get("title") or request.title or request.prompt_goal),
+            160,
+        )
+    )
+    if not title or title == REDACTED:
+        title = "Provider-backed GM proposal"
+    event_name = str(proposal_json.get("event_name") or request.event_name)
+    proposed_payload = _sanitize_json(
+        {
+            **dict(request.payload_json),
+            "source": "provider_backed_gm_proposal",
+            "goal": _clip(request.prompt_goal, 500),
+        }
+    )
+    source_context = _sanitize_json(
+        {
+            "source": "provider_backed_gm_proposal",
+            "phase": "v0.6.2",
+            "provider_id": str(provider.id),
+            "provider_kind": provider.provider_kind.value,
+            "adapter_kind": provider.adapter_kind.value,
+            "model_invocation_id": str(invocation_id),
+            "context_kind": "gm",
+            "context_limit": request.context_limit,
+        }
+    )
+    return NarrativeQualityGMProposalCandidate(
+        status="preview" if request.dry_run else "proposed",
+        title=title,
+        reason=reason,
+        event_name=_clip(event_name, 120),
+        proposed_payload=proposed_payload,
+        importance=request.importance,
+        risk_score=request.risk_score,
+        affected_agents=list(request.affected_agents),
+        affected_organizations=list(request.affected_organizations),
+        source_context=source_context,
+    )
+
+
+def _proposal_candidate(proposal: GMEventProposal) -> NarrativeQualityGMProposalCandidate:
+    return NarrativeQualityGMProposalCandidate(
+        id=proposal.id,
+        status=proposal.status,
+        title=_safe_text(proposal.title),
+        reason=_safe_text(proposal.reason),
+        event_name=proposal.event_name,
+        proposed_payload=_sanitize_json(proposal.proposed_payload),
+        importance=NarrativeQualityGMImportance(proposal.importance),
+        risk_score=proposal.risk_score,
+        affected_agents=list(proposal.affected_agents),
+        affected_organizations=list(proposal.affected_organizations),
+        source_context=_sanitize_json(proposal.source_context),
+        created_at=proposal.created_at,
+    )
+
+
 def _metadata_worldline_id(artifact: NarrativeArtifact) -> uuid.UUID | None:
     raw_worldline_id = (artifact.artifact_metadata or {}).get("worldline_id")
     if not isinstance(raw_worldline_id, str):
@@ -410,7 +655,7 @@ def _sanitize_json(value: Any) -> Any:
         for key, item in value.items():
             key_text = str(key)
             if _is_leaky_key(key_text):
-                sanitized[key_text] = REDACTED
+                sanitized[f"redacted_{len(sanitized) + 1}"] = REDACTED
             else:
                 sanitized[key_text] = _sanitize_json(item)
         return sanitized

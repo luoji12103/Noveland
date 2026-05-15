@@ -24,15 +24,31 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextKind,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityGMProposalGenerateRequest,
 )
 from noveland.narrative_quality.service import (
     NarrativeQualityService,
     NarrativeQualityValidationError,
 )
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
@@ -50,7 +66,7 @@ from noveland.worlds.models import (
     Worldline,
 )
 from noveland.worlds.worldlines import ensure_primary_worldline
-from sqlalchemy import Table, create_engine
+from sqlalchemy import Table, create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -161,6 +177,130 @@ def test_gm_narrative_and_eval_contexts_return_safe_worldline_previews() -> None
             assert "storage_uri" not in preview.model_dump_json()
 
 
+def test_provider_backed_gm_generation_creates_proposal_and_invocation() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_gm_proposal(
+            world_id,
+            NarrativeQualityGMProposalGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                prompt_goal="Suggest a quiet daily event.",
+                title="Quiet daily event",
+                event_name="gm.daily_quiet_event",
+                payload_json={"kind": "daily"},
+            ),
+            actor_ref="test",
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        proposal = session.get(GMEventProposal, result.proposal.id)
+        invocation = session.get(ModelInvocation, result.invocation.id)
+        snapshot = session.scalars(
+            select(PromptSnapshot).where(PromptSnapshot.invocation_id == result.invocation.id)
+        ).one()
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    assert result.dry_run is False
+    assert result.provider.provider_kind == ProviderKind.TEXT_GENERATION
+    assert result.invocation.status == "succeeded"
+    assert proposal is not None
+    assert proposal.worldline_id == worldline_id
+    assert proposal.status == "proposed"
+    assert proposal.source_context["model_invocation_id"] == str(result.invocation.id)
+    assert proposal.proposed_payload == {
+        "kind": "daily",
+        "source": "provider_backed_gm_proposal",
+        "goal": "Suggest a quiet daily event.",
+    }
+    assert invocation is not None
+    assert invocation.worldline_id == worldline_id
+    assert snapshot.raw_request_json is not None
+    assert snapshot.raw_request_json["request_json"]["context_kind"] == "gm"
+    assert event_count == 0
+
+
+def test_provider_backed_gm_generation_dry_run_writes_no_proposal() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_gm_proposal(
+            world_id,
+            NarrativeQualityGMProposalGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                prompt_goal="Preview only.",
+                dry_run=True,
+            ),
+            actor_ref="test",
+        )
+        proposal_count = session.scalar(select(func.count(GMEventProposal.id)))
+        invocation_count = session.scalar(select(func.count(ModelInvocation.id)))
+
+    assert result.dry_run is True
+    assert result.proposal.id is None
+    assert result.proposal.status == "preview"
+    assert proposal_count == 0
+    assert invocation_count == 1
+
+
+def test_provider_backed_gm_generation_rejects_non_text_provider() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_provider(engine, world_id, ProviderKind.IMAGE_GENERATION)
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).generate_gm_proposal(
+                world_id,
+                NarrativeQualityGMProposalGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should not run.",
+                ),
+                actor_ref="test",
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "text_generation" in str(exc)
+        else:
+            raise AssertionError("expected non-text provider rejection")
+        assert session.scalar(select(func.count(GMEventProposal.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
+def test_provider_backed_gm_generation_sanitizes_proposal_traceability() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).generate_gm_proposal(
+            world_id,
+            NarrativeQualityGMProposalGenerateRequest(
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                prompt_goal="storage_uri=media://hidden/object base64,AAAA",
+                payload_json={"storage_uri": "media://hidden/object"},
+            ),
+            actor_ref="test",
+        )
+        serialized = result.model_dump_json()
+        proposal = session.get(GMEventProposal, result.proposal.id)
+
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized.lower()
+    assert proposal is not None
+    assert "storage_uri" not in proposal.proposed_payload
+    assert "model_invocation_id" in proposal.source_context
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -192,6 +332,14 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, NarrativeContinuityReview.__table__),
         cast(Table, GMAgenda.__table__),
         cast(Table, GMEventProposal.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
@@ -286,3 +434,27 @@ def _seed_conversation(
         service.seed_session(world_id, created.id, ConversationSeed(input_text="Operator seed"))
         session.commit()
         return created.id
+
+
+def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    return _seed_provider(engine, world_id, ProviderKind.TEXT_GENERATION)
+
+
+def _seed_provider(
+    engine: Engine,
+    world_id: uuid.UUID,
+    provider_kind: ProviderKind,
+) -> uuid.UUID:
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=provider_kind,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key=f"fake-{provider_kind.value}",
+                display_name=f"Fake {provider_kind.value}",
+            )
+        )
+        session.commit()
+        return provider.id

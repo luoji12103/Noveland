@@ -17,14 +17,32 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import (
+    AgentRuntimeRunModelInvocation,
+    ModelInvocation,
+    ModelInvocationTag,
+    PromptSnapshot,
+    PromptTemplate,
+)
 from noveland.narrative.models import NarrativeArtifact
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
+    GMEventProposal,
+    NarrativeContinuityReview,
     PlotThread,
+    RouteAffinity,
     Scene,
     SecretRecord,
     StoryHook,
@@ -34,7 +52,7 @@ from noveland.worlds.models import (
     WorldMembership,
 )
 from noveland.worlds.worldlines import ensure_primary_worldline
-from sqlalchemy import Table, create_engine
+from sqlalchemy import Table, create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -101,6 +119,63 @@ def test_narrative_quality_context_preview_api_sanitizes_leaky_context() -> None
     assert "base64" not in text
 
 
+def test_narrative_quality_gm_generation_api_creates_proposal() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    provider_id = _seed_text_provider(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/gm/proposals/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "prompt_goal": "Create a daily classroom beat.",
+            "title": "Daily classroom beat",
+            "event_name": "gm.classroom_beat",
+            "payload_json": {"kind": "daily"},
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["dry_run"] is False
+    assert body["provider"]["provider_kind"] == "text_generation"
+    assert body["proposal"]["status"] == "proposed"
+    assert body["proposal"]["id"] is not None
+    assert "raw_output" not in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(GMEventProposal.id))) == 1
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 1
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_gm_generation_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    provider_id = _seed_text_provider(engine, world_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/gm/proposals/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "prompt_goal": "Should be forbidden.",
+        },
+    )
+
+    assert response.status_code == 403
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(GMEventProposal.id))) == 0
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -141,6 +216,17 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, CharacterEmotionalState.__table__),
         cast(Table, StoryHook.__table__),
         cast(Table, PlotThread.__table__),
+        cast(Table, RouteAffinity.__table__),
+        cast(Table, NarrativeContinuityReview.__table__),
+        cast(Table, GMEventProposal.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptTemplate.__table__),
+        cast(Table, PromptSnapshot.__table__),
+        cast(Table, AgentRuntimeRunModelInvocation.__table__),
+        cast(Table, ModelInvocationTag.__table__),
         cast(Table, ConversationSession.__table__),
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
@@ -238,3 +324,19 @@ def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.set(SESSION_COOKIE_NAME, token)
     client.cookies.set(CSRF_COOKIE_NAME, "csrf")
     client.headers.update({CSRF_HEADER_NAME: "csrf"})
+
+
+def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="fake-text",
+                display_name="Fake Text",
+            )
+        )
+        session.commit()
+        return provider.id

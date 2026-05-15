@@ -25,15 +25,15 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 2 — Provider-backed GM Proposal
 
 - [x] Write phase planning checkpoint.
-- [ ] Add or confirm provider-kernel text generation execution before GM generation.
-- [ ] Implement `provider-backed-gm-proposal` scope only.
-- [ ] Use narrative quality package/router for any new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Add or confirm provider-kernel text generation execution before GM generation.
+- [x] Implement `provider-backed-gm-proposal` scope only.
+- [x] Use narrative quality package/router for any new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 3 — Dialogue Style & OOC Review
 
