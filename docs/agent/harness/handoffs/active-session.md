@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 7.
-- Status: Phase 6 Observability & Incident Diagnostics is fast-forward merged to local `main`; Phase 7 Security Regression Suite planning checkpoint is next.
+- Status: Phase 6 Observability & Incident Diagnostics is fast-forward merged to local `main`; Phase 7 Security Regression Suite planning checkpoint is complete and implementation is next.
 
 ## Current Context
 
@@ -28,6 +28,7 @@
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - v0.6 Runtime Narrative Quality is complete locally and ready to archive if requested; this session does not archive it.
 - v0.7 Production Hardening Phase 7 should consolidate secret, prompt/output, storage/path, ACL, and worldline isolation regressions without adding product runtime behavior.
+- v0.7 Phase 7 first implementation should be test-only unless a regression exposes a narrow bug that can be fixed without schema or router growth.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -145,3 +146,4 @@
 - v0.7 Phase 6 targeted checks passed: backend ruff for observability/API/tests, backend mypy for observability/API/tests, targeted pytest (`15 passed`), OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.7 Phase 6 full local gate passed: backend ruff, backend mypy (`253 source files`), backend pytest (`407 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 6 fast-forward merge to local `main` completed.
+- v0.7 Phase 7 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.7-security-regression-suite-plan.md`.

@@ -1993,3 +1993,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.
+
+## v0.7.7 Security Regression Suite planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 7.
+- Summary: Added the Phase 7 plan for a backend test-focused security regression suite covering forbidden payload leaks, ACL matrix behavior, and cross-worldline isolation across v0.4-v0.7 surfaces. The plan keeps Phase 7 test-only unless regressions expose narrow bugs, and explicitly avoids migrations, new routers, Web UI, SAST/DAST rollout, and broad `worlds.py` refactors.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.7-security-regression-suite-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Start implementation on `feat/security-regression-suite` from clean local `main`.

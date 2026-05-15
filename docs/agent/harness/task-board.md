@@ -228,7 +228,7 @@
 - v0.7 Phase 4 Object Storage & Backup v2 is complete.
 - v0.7 Phase 5 Deployment Profile is complete.
 - v0.7 Phase 6 Observability & Incident Diagnostics is complete.
-- v0.7 Phase 7 Security Regression Suite planning checkpoint is next.
+- v0.7 Phase 7 Security Regression Suite planning checkpoint is complete; implementation is next.
 - v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are

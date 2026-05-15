@@ -82,7 +82,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 7 — Security Regression Suite
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `security-regression-suite` scope only.
 - [ ] Consolidate secret, prompt/output, storage/path, ACL, and worldline isolation regression fixtures.
 - [ ] Extend Phase 13 and v0.5/v0.6 regression coverage where useful.
