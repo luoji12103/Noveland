@@ -132,6 +132,28 @@
 - Docs updated: project index, file inventory, change journal, task board, active handoff
 - Follow-up notes: Implement Phase 7 on `feat/runtime-pacing-controller`; no migration expected.
 
+## v0.6.7 Runtime Pacing Controller implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/runtime-pacing-controller
+- Scope: v0.6 Runtime Narrative Quality Phase 7 implementation
+- Summary: Added an admin-only runtime pacing review API under the narrative quality router, summarizing pending media jobs, asset generation proposal budget pressure, lookahead coverage, current-turn asset gaps, offscreen compression opportunities, and safe recommendations without mutating media jobs, running providers, creating asset-generation jobs, writing world events, or adding Web UI.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_api_narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: narrative quality service/API tests for queue summaries, policy limits, duplicate invalidation keys, budget overflow, current-turn asset gaps, cross-worldline rejection, response sanitization, and admin ACL.
+- Docs updated: OpenSpec tasks
+- Follow-up notes: Full local gate passed before fast-forward merge. Phase 7 did not add migrations, provider calls, media job mutations, daemon hooks, Web UI, broad `worlds.py` routes, or world event writes.
+
+## v0.6.7 Runtime Pacing Controller merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 7 merge bookkeeping
+- Summary: Recorded successful targeted tests, full local gate, and fast-forward merge for Runtime Pacing Controller. OpenSpec Phase 7 tasks now mark full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
+- Follow-up notes: Begin Phase 8 Route & Relationship Progression Quality from clean local `main`; no push performed.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

@@ -185,8 +185,8 @@ Fast orientation for a new coding session.
   - `noveland.narrative.models` — narrative artifact ORM model with optional source conversation linkage
   - `noveland.narrative.services` — narrative artifact create/list helpers and conversation-first writer pipeline
 - `backend/packages/narrative_quality/`
-  - `noveland.narrative_quality.contracts` — v0.6 narrative quality context, GM proposal, dialogue review, presentation alignment, writer, and continuity review DTOs
-  - `noveland.narrative_quality.service` — admin-scoped runtime context, provider-backed GM proposal, dialogue/OOC review, presentation alignment, Narrative Writer v2, and Continuity Review v2 service with worldline validation and response redaction
+  - `noveland.narrative_quality.contracts` — v0.6 narrative quality context, GM proposal, dialogue review, presentation alignment, writer, continuity review, and pacing review DTOs
+  - `noveland.narrative_quality.service` — admin-scoped runtime context, provider-backed GM proposal, dialogue/OOC review, presentation alignment, Narrative Writer v2, Continuity Review v2, and runtime pacing diagnostics with worldline validation and response redaction
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models

@@ -97,9 +97,9 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 - [x] Preserve Phase 13 architecture guardrails.
 - [x] Add or update focused tests.
 - [x] Run targeted tests.
-- [ ] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Run full local gate.
+- [x] Fast-forward merge to local main.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 8 — Route & Relationship Progression Quality
 

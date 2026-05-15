@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.6 Runtime Narrative Quality Phase 7.
-- Status: Phase 7 Runtime Pacing Controller planning checkpoint is complete; implementation branch is next.
+- Objective: v0.6 Runtime Narrative Quality Phase 8.
+- Status: Phase 7 Runtime Pacing Controller is complete and fast-forward merged; Phase 8 Route & Relationship Progression Quality planning is next.
 
 ## Current Context
 
@@ -41,9 +41,9 @@
 
 ## Required Next Steps
 
-- Start Phase 7 implementation from clean local `main` on `feat/runtime-pacing-controller`.
-- Keep Phase 7 API-first under the narrative quality package/router; do not add Web dashboard work or broad `worlds.py` routes.
-- Reuse asset generation policies/proposals/runs and media jobs for pacing diagnostics; do not add daemon hooks, provider calls, media job mutation, or automatic spend.
+- Start Phase 8 planning from clean local `main`.
+- Keep Phase 8 API-first under the narrative quality package/router; do not add Web dashboard work or broad `worlds.py` routes.
+- Reuse existing route, relationship, worldline, world event, and diagnostics records for progression-quality review; do not replace route or relationship semantics.
 - Reuse `LivingWorldGuardrailService.review_narrative_continuity` and `NarrativeContinuityReview`; do not add a duplicate review table.
 - Preserve the first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts store non-null `worldline_id`.
 - Continue to use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
@@ -103,3 +103,6 @@
 - v0.6 Phase 6 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`358 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 6 fast-forward merge to local `main` completed.
 - v0.6 Phase 7 planning checkpoint is docs-only and validated with OpenSpec strict validation plus `git diff --check`.
+- v0.6 Phase 7 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`50 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 7 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`365 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; first attempt hit an existing world composition import/export response-body race), docker compose config, and `git diff --check`.
+- v0.6 Phase 7 fast-forward merge to local `main` completed.
