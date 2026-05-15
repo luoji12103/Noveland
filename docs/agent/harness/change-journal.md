@@ -1554,3 +1554,14 @@
 - Docs updated: OpenSpec Phase 4 task status, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`27 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`338 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Commit Phase 4 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 5 Narrative Writer v2 from clean local `main`. Do not push unless explicitly requested.
+
+## v0.6 Emotion/Sprite/Voice Alignment merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Fast-forward merge bookkeeping for v0.6 Runtime Narrative Quality Phase 4.
+- Summary: Fast-forward merged `feat/emotion-sprite-voice-alignment` into local `main` after targeted tests and the full local gate passed. OpenSpec Phase 4 tasks now mark the fast-forward merge complete, and the active handoff points to Phase 5 Narrative Writer v2 planning.
+- Files changed: `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/change-journal.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/task-board.md`
+- Tests added/updated: Documentation-only bookkeeping after the already-passing Phase 4 full local gate.
+- Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
+- Follow-up notes: Start Phase 5 Narrative Writer v2 from clean local `main`; do not push unless explicitly requested.
