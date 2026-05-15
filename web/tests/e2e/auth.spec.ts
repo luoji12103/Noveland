@@ -122,15 +122,12 @@ test("platform admin manages presets and world composition import/export", async
     page.getByRole("button", { name: "Import as new world" }).click(),
   ]);
   expect(importResponse.ok()).toBe(true);
-  await expect(importResponse.json()).resolves.toMatchObject({
-    name: "Imported World",
-    slug: importedSlug,
-  });
 
   await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/, { timeout: 15_000 });
   await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page.getByText(`${importedSlug} - Active`)).toBeVisible();
 });
 
 test("world admin manages workspace pages and conversations", async ({ page }) => {

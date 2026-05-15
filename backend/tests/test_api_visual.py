@@ -48,7 +48,12 @@ from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.narrative.models import NarrativeArtifact
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
@@ -338,6 +343,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

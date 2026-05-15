@@ -42,14 +42,21 @@ from noveland.media.models import (
 from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
+from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderBudgetPolicyCreate,
     ProviderCapabilityCreate,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
 )
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.service import ProviderExecutionError
 from noveland.speech.contracts import (
@@ -358,6 +365,52 @@ def test_tts_blocks_disabled_provider_and_marks_job_failed(tmp_path: Path) -> No
         assert session.scalars(select(MediaAsset)).all() == []
 
 
+def test_tts_budget_block_marks_job_failed(tmp_path: Path) -> None:
+    engine = _engine()
+    graph = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(
+            session,
+            graph.world_id,
+            ProviderKind.TEXT_TO_SPEECH,
+            capabilities=("supports_tts",),
+        )
+        voice_profile_id = _seed_voice_profile(
+            session,
+            graph.world_id,
+            graph.worldline_id,
+            provider_id=provider_id,
+        )
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=graph.world_id,
+                provider_id=provider_id,
+                policy_key="stop-speech",
+                emergency_stop_enabled=True,
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="emergency_stop"):
+            SpeechService(session, storage).text_to_speech(
+                graph.world_id,
+                TTSRequest(
+                    worldline_id=graph.worldline_id,
+                    provider_id=provider_id,
+                    voice_profile_id=voice_profile_id,
+                    text="blocked speech",
+                ),
+                actor_ref="user:test",
+            )
+        invocation = session.scalars(select(ModelInvocation)).one()
+        job = session.scalars(select(MediaJob)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["budget_blocked"] is True
+        assert job.status == "failed"
+        assert session.scalars(select(MediaAsset)).all() == []
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -377,6 +430,7 @@ def _engine() -> Engine:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

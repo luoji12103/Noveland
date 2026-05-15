@@ -7,6 +7,7 @@ from typing import Any
 from noveland.core.database import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -152,6 +153,50 @@ class ProviderHealthCheck(UUIDPrimaryKeyMixin, Base):
         default=lambda: datetime.now(UTC),
     )
     error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata",
+        _json_column(),
+        nullable=False,
+        default=dict,
+    )
+
+
+class ProviderBudgetPolicy(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "provider_budget_policies"
+    __table_args__ = (
+        UniqueConstraint("world_id", "provider_id", "policy_key", name="uq_provider_budget_key"),
+        CheckConstraint("status IN ('active', 'disabled', 'deleted')", name="status"),
+        Index("ix_provider_budget_world_status", "world_id", "status"),
+        Index("ix_provider_budget_provider_status", "provider_id", "status"),
+    )
+
+    world_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("worlds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("provider_integrations.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    policy_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        server_default=text("'active'"),
+        default="active",
+    )
+    emergency_stop_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+        default=False,
+    )
+    limits_json: Mapped[dict[str, Any]] = mapped_column(
+        "limits",
+        _json_column(),
+        nullable=False,
+        default=dict,
+    )
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata",
         _json_column(),

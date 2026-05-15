@@ -69,13 +69,20 @@ from noveland.narrative_quality.service import (
     NarrativeQualityValidationError,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderBudgetPolicyCreate,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
 )
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.service import ProviderExecutionError
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
@@ -368,6 +375,37 @@ def test_provider_backed_gm_generation_blocks_disabled_provider() -> None:
         assert invocation.status == "failed"
         assert invocation.request_params_json is not None
         assert invocation.request_params_json["provider_status"] == "disabled"
+        assert session.scalar(select(func.count(GMEventProposal.id))) == 0
+
+
+def test_provider_backed_gm_generation_budget_block_writes_no_proposal() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    with Session(engine) as session:
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="stop-gm",
+                emergency_stop_enabled=True,
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="emergency_stop"):
+            NarrativeQualityService(session).generate_gm_proposal(
+                world_id,
+                NarrativeQualityGMProposalGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt_goal="This should be budget-blocked.",
+                ),
+                actor_ref="test",
+            )
+        invocation = session.scalars(select(ModelInvocation)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["budget_blocked"] is True
         assert session.scalar(select(func.count(GMEventProposal.id))) == 0
 
 
@@ -1645,6 +1683,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, AgentRuntimeRun.__table__),

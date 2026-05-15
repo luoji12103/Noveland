@@ -9,8 +9,13 @@ from noveland.auth import AuthenticatedSubject
 from noveland.core.settings import load_settings
 from noveland.invocations.contracts import InvocationRecordView
 from noveland.media.storage import LocalMediaObjectStorage
+from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderBudgetPolicyCreate,
+    ProviderBudgetPolicyRead,
+    ProviderBudgetPolicyStatus,
+    ProviderBudgetPolicyUpdate,
     ProviderCapabilityCreate,
     ProviderCapabilityRead,
     ProviderExecutionRequest,
@@ -23,6 +28,7 @@ from noveland.providers.contracts import (
     ProviderIntegrationStatus,
     ProviderIntegrationUpdate,
     ProviderKind,
+    ProviderQuotaStatusRead,
     ProviderScopeKind,
     ProviderSmokeTestResult,
     ProviderTestInvocationRequest,
@@ -96,6 +102,22 @@ class ProviderSmokeTestRequestBody(BaseModel):
     media_asset_id: uuid.UUID | None = None
 
 
+class ProviderBudgetPolicyCreateRequest(BaseModel):
+    provider_id: uuid.UUID | None = None
+    policy_key: str = Field(min_length=1, max_length=120)
+    status: ProviderBudgetPolicyStatus = ProviderBudgetPolicyStatus.ACTIVE
+    emergency_stop_enabled: bool = False
+    limits_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderBudgetPolicyUpdateRequest(BaseModel):
+    status: ProviderBudgetPolicyStatus | None = None
+    emergency_stop_enabled: bool | None = None
+    limits_json: dict[str, Any] | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
 @router.get("", response_model=list[ProviderIntegrationRead])
 def list_providers(
     world_id: uuid.UUID,
@@ -164,6 +186,90 @@ def create_provider(
         )
     except (ProviderValidationError, ValueError) as exc:
         raise _unprocessable(str(exc)) from exc
+
+
+@router.get("/budget-policies", response_model=list[ProviderBudgetPolicyRead])
+def list_provider_budget_policies(
+    world_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    provider_id: Annotated[uuid.UUID | None, Query()] = None,
+    include_inactive: Annotated[bool, Query()] = False,
+) -> list[ProviderBudgetPolicyRead]:
+    return ProviderBudgetService(db_session).list_policies(
+        world_id,
+        provider_id=provider_id,
+        include_inactive=include_inactive,
+    )
+
+
+@router.post(
+    "/budget-policies",
+    response_model=ProviderBudgetPolicyRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def create_provider_budget_policy(
+    world_id: uuid.UUID,
+    request: ProviderBudgetPolicyCreateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderBudgetPolicyRead:
+    try:
+        return ProviderBudgetService(db_session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=request.provider_id,
+                policy_key=request.policy_key,
+                status=request.status,
+                emergency_stop_enabled=request.emergency_stop_enabled,
+                limits_json=dict(request.limits_json),
+                metadata_json=dict(request.metadata_json),
+            )
+        )
+    except (ProviderNotFoundError, ProviderValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.patch(
+    "/budget-policies/{policy_id}",
+    response_model=ProviderBudgetPolicyRead,
+    dependencies=[Depends(require_csrf)],
+)
+def update_provider_budget_policy(
+    world_id: uuid.UUID,
+    policy_id: uuid.UUID,
+    request: ProviderBudgetPolicyUpdateRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderBudgetPolicyRead:
+    try:
+        return ProviderBudgetService(db_session).update_policy(
+            world_id,
+            policy_id,
+            ProviderBudgetPolicyUpdate(
+                status=request.status,
+                emergency_stop_enabled=request.emergency_stop_enabled,
+                limits_json=None if request.limits_json is None else dict(request.limits_json),
+                metadata_json=(
+                    None if request.metadata_json is None else dict(request.metadata_json)
+                ),
+            ),
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except (ProviderValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.get("/quota-status", response_model=ProviderQuotaStatusRead)
+def get_provider_quota_status(
+    world_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    provider_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> ProviderQuotaStatusRead:
+    return ProviderBudgetService(db_session).quota_status(world_id, provider_id=provider_id)
 
 
 @router.get("/{provider_id}", response_model=ProviderIntegrationRead)

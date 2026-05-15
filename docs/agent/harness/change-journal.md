@@ -1857,3 +1857,16 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/cost-rate-control` from clean local `main`.
+
+## v0.7 Cost & Rate Control implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/cost-rate-control
+- Scope: v0.7 Production Hardening Phase 3 provider-owned cost/rate control.
+- Summary: Added provider budget policy persistence, admin-only budget policy/quota APIs under the providers router, and a provider execution budget guard that runs before secret resolution and adapter execution. Emergency stop and daily invocation/cost/media-job limits produce safe failed invocation/snapshot evidence, blocked media-backed executions mark non-terminal media jobs failed, and existing asset-generation proposal budget behavior remains in place.
+- Files changed: `/backend/packages/providers/src/noveland/providers/budget.py`, `/backend/packages/providers/src/noveland/providers/contracts.py`, `/backend/packages/providers/src/noveland/providers/models.py`, `/backend/packages/providers/src/noveland/providers/service.py`, `/backend/services/api/src/noveland/services/api/providers.py`, `/backend/migrations/versions/20260515_0042_provider_budget_policies.py`, provider/image/speech/narrative quality/API/schema tests, `/web/tests/e2e/auth.spec.ts`, `/openspec/changes/v0-7-production-hardening/tasks.md`, and harness docs.
+- Tests added/updated: Direct provider execution emergency stop and daily invocation limit tests; provider budget API smoke/quota test; image, speech, and narrative quality budget block regressions; alembic head update.
+- Docs updated: OpenSpec Phase 3 task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`109 passed`), and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`248 source files`), backend pytest (`397 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after stabilizing the import/export response-body assertion), docker compose config, and `git diff --check`.
+- Flaky note: one e2e run hit a transient unauthenticated reader redirect 404 during Next dev dynamic route cold start; the isolated test and subsequent full e2e run passed.
+- Follow-up notes: Commit Phase 3 implementation, fast-forward merge to local `main`, then record merge bookkeeping.

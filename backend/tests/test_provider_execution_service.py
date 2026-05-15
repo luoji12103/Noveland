@@ -31,14 +31,21 @@ from noveland.media.models import (
 )
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
+from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderBudgetPolicyCreate,
     ProviderExecutionRequest,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
 )
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.secrets import ProviderSecretResolver
 from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
@@ -233,6 +240,99 @@ def test_disabled_provider_writes_failed_invocation_without_resolving_secret(
         assert "sk-disabled-provider-secret" not in str(snapshot.raw_response_json)
 
 
+def test_emergency_stop_blocks_before_secret_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-budget-secret")
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        provider = session.get(ProviderIntegration, provider_id)
+        assert provider is not None
+        provider.auth_ref = "env:OPENAI_API_KEY"
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="provider-stop",
+                emergency_stop_enabled=True,
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="emergency_stop"):
+            ProviderExecutionService(
+                session,
+                secret_resolver=ProviderSecretResolver(),
+            ).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text="blocked",
+                )
+            )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["budget_checked"] is True
+        assert invocation.request_params_json["budget_blocked"] is True
+        assert invocation.request_params_json["auth_ref_present"] is True
+        assert invocation.request_params_json["auth_resolved"] is False
+        assert "sk-budget-secret" not in str(invocation.request_params_json)
+        assert "sk-budget-secret" not in str(invocation.response_metadata_json)
+        assert "sk-budget-secret" not in str(snapshot.raw_request_json)
+
+
+def test_daily_invocation_limit_blocks_after_limit_is_reached() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="one-call",
+                limits_json={"max_daily_invocations": 1},
+            )
+        )
+        first = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                input_text="allowed",
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="daily_invocation_limit"):
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text="blocked",
+                )
+            )
+        session.commit()
+
+    with Session(engine) as session:
+        invocations = session.scalars(
+            select(ModelInvocation).order_by(ModelInvocation.created_at)
+        ).all()
+        assert first.invocation.status == "succeeded"
+        assert [item.status for item in invocations] == ["succeeded", "failed"]
+        assert invocations[-1].request_params_json is not None
+        assert invocations[-1].request_params_json["budget_block_reason"].endswith(
+            "daily_invocation_limit"
+        )
+
+
 def test_resolved_secret_is_not_written_to_ledger(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -291,6 +391,7 @@ def _engine() -> Engine:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

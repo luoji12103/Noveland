@@ -52,7 +52,12 @@ from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.narrative.models import NarrativeArtifact
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.speech.models import (
     AgentVoiceProfileBinding,
     SpeechStyleMapping,
@@ -349,6 +354,7 @@ def _engine() -> Engine:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

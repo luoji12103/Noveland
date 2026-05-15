@@ -34,6 +34,7 @@ from noveland.media.models import (
 )
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.providers.models import (
+    ProviderBudgetPolicy,
     ProviderCapability,
     ProviderHealthCheck,
     ProviderIntegration,
@@ -463,6 +464,61 @@ def test_disabled_provider_smoke_test_records_safe_failed_evidence(
         assert snapshot.raw_request_json["provider_status"] == "disabled"
 
 
+def test_provider_budget_policy_emergency_stop_blocks_smoke_and_reports_quota() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_generation",
+            "adapter_kind": "fake",
+            "provider_key": "budget-fake",
+            "display_name": "Budget Fake",
+        },
+    )
+    provider_id = created.json()["id"]
+
+    policy = client.post(
+        f"/worlds/{world_id}/providers/budget-policies",
+        json={
+            "provider_id": provider_id,
+            "policy_key": "provider-stop",
+            "emergency_stop_enabled": True,
+            "limits_json": {"max_daily_invocations": 10},
+        },
+    )
+    quota = client.get(
+        f"/worlds/{world_id}/providers/quota-status",
+        params={"provider_id": provider_id},
+    )
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={"worldline_id": str(worldline_id), "input_text": "blocked"},
+    )
+    unblocked = client.patch(
+        f"/worlds/{world_id}/providers/budget-policies/{policy.json()['id']}",
+        json={"emergency_stop_enabled": False},
+    )
+
+    assert policy.status_code == 201
+    assert policy.json()["emergency_stop_enabled"] is True
+    assert quota.status_code == 200
+    assert quota.json()["emergency_stop_active"] is True
+    assert quota.json()["blocked_reasons"] == ["emergency_stop"]
+    assert "storage_uri" not in quota.text
+    assert smoke.status_code == 201
+    assert smoke.json()["smoke_status"] == "failed"
+    assert smoke.json()["invocation"]["status"] == "failed"
+    assert "emergency_stop" in smoke.json()["invocation"]["error_text"]
+    assert unblocked.status_code == 200
+    assert unblocked.json()["emergency_stop_enabled"] is False
+
+
 class _ProviderApiClient(TestClient):
     media_storage: LocalMediaObjectStorage
 
@@ -506,6 +562,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

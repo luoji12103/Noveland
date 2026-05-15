@@ -245,6 +245,7 @@ Fast orientation for a new coding session.
   - `noveland.providers.models` — provider integration, capability, and health-check ORM models
   - `noveland.providers.registry` — provider CRUD, capability update/list, visibility filtering, and world-over-global resolution service
   - `noveland.providers.health` — provider health-check recording and fake health dispatch service
+  - `noveland.providers.budget` — provider-owned world/provider budget policy, emergency stop, quota status, and pre-call execution guard service
   - `noveland.providers.service` — provider execution service with invocation ledger writes, fake media/text/speech execution, image adapter dispatch, and media writeback
   - `noveland.providers.fake` — deterministic fake adapter for text, image, STT, and TTS provider execution tests
   - `noveland.providers.routing` — provider-kind/adapter-kind compatibility and mapping helpers
@@ -298,7 +299,7 @@ Fast orientation for a new coding session.
 - `infra/compose.yaml` — local PostgreSQL/pgvector and NATS JetStream stack
 
 ### Database
-- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, Conversation Turn Presentation migration, and Asset Generation Orchestrator migration
+- `backend/migrations/` — Alembic migration entrypoint and versions, including core schema, world clock state, event/snapshot baseline, auth/session baseline, calendar, long-term memory refactor (Mem0 OSS foundation, context integration, profiles/forget/evals), agent/runtime narrative baseline, runtime diagnostics, provider reliability, agent persona/observations, conversation workspace baseline, conversation policy/stop-condition baseline, narrative writer/summarizer baseline, agent composition presets, explicit plugin runtime bindings, narrative publications, observation traceability, agent preset versioning, plugin diagnostic component support, V2 living-world state through beta release readiness, runtime worldline memory-isolation remediation, Media Kernel/Catalog migrations, Model Invocation Ledger migration, Provider Execution Kernel migration, Speech Voice Pipeline migration, Visual Asset System migration, Conversation Turn Presentation migration, Asset Generation Orchestrator migration, and Provider Budget Policy migration
 
 ### Regression fixtures
 - `backend/tests/fixtures/multimodal_sample_world.py` — deterministic Phase 13 multimodal sample-world fixture helper for backend regression tests

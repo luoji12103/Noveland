@@ -47,6 +47,7 @@ from noveland.providers.adapters.openai_compatible_image import OpenAICompatible
 from noveland.providers.adapters.openai_image import ImageAdapterInput, OpenAIImageAdapter
 from noveland.providers.adapters.openai_speech import OpenAISpeechAdapter
 from noveland.providers.adapters.speech_common import SpeechAdapterInput
+from noveland.providers.budget import ProviderBudgetExceededError, ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderExecutionRequest,
@@ -130,9 +131,29 @@ class ProviderExecutionService:
             if model.status == ProviderIntegrationStatus.ACTIVE.value
             else _provider_not_active_reason(model.status)
         )
+        budget_block_reason: str | None = None
+        budget_metadata: dict[str, object] = {"budget_checked": False, "budget_blocked": False}
+        if inactive_reason is None:
+            try:
+                quota = ProviderBudgetService(self._session).check_provider_execution(
+                    request.world_id,
+                    provider.id,
+                ).quota_status
+                budget_metadata = {
+                    "budget_checked": True,
+                    "budget_blocked": False,
+                    "quota_policy_count": len(quota.active_policy_ids),
+                }
+            except ProviderBudgetExceededError as exc:
+                budget_block_reason = _safe_error_text(exc)
+                budget_metadata = {
+                    "budget_checked": True,
+                    "budget_blocked": True,
+                    "budget_block_reason": budget_block_reason,
+                }
         auth_metadata: dict[str, bool]
         resolved_secret: object | None = None
-        if inactive_reason is not None:
+        if inactive_reason is not None or budget_block_reason is not None:
             auth_metadata = safe_auth_metadata(model.auth_ref, None)
         else:
             requires_auth = adapter_requires_auth(provider.adapter_kind, model.config_json)
@@ -156,6 +177,7 @@ class ProviderExecutionService:
             "provider_kind": provider.provider_kind.value,
             "adapter_kind": provider.adapter_kind.value,
             "provider_status": model.status,
+            **budget_metadata,
             **auth_metadata,
         }
 
@@ -198,6 +220,8 @@ class ProviderExecutionService:
         try:
             if inactive_reason is not None:
                 raise ProviderExecutionError(inactive_reason)
+            if budget_block_reason is not None:
+                raise ProviderExecutionError(budget_block_reason)
             if auth_metadata["auth_failed"]:
                 raise ProviderExecutionError("provider auth_missing")
             result = self._execute_provider(provider, model, request, worldline_id, resolved_secret)

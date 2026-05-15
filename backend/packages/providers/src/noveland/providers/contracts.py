@@ -71,6 +71,12 @@ class ProviderHealthStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ProviderBudgetPolicyStatus(StrEnum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    DELETED = "deleted"
+
+
 class _FrozenContract(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -212,6 +218,74 @@ class ProviderHealthCheckRead(_FrozenContract):
     @classmethod
     def normalize_datetime(cls, value: datetime) -> datetime:
         return _utc(value)
+
+
+class ProviderBudgetPolicyCreate(_FrozenContract):
+    world_id: uuid.UUID
+    provider_id: uuid.UUID | None = None
+    policy_key: str = Field(min_length=1, max_length=120)
+    status: ProviderBudgetPolicyStatus = ProviderBudgetPolicyStatus.ACTIVE
+    emergency_stop_enabled: bool = False
+    limits_json: dict[str, Any] = Field(default_factory=dict)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("policy_key", mode="after")
+    @classmethod
+    def normalize_key(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized == "":
+            raise ValueError("policy_key must not be empty")
+        return normalized
+
+    @field_validator("limits_json", "metadata_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider budget policy JSON")
+        return value
+
+
+class ProviderBudgetPolicyUpdate(_FrozenContract):
+    status: ProviderBudgetPolicyStatus | None = None
+    emergency_stop_enabled: bool | None = None
+    limits_json: dict[str, Any] | None = None
+    metadata_json: dict[str, Any] | None = None
+
+    @field_validator("limits_json", "metadata_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None:
+            _assert_json_serializable(value, "provider budget policy JSON")
+        return value
+
+
+class ProviderBudgetPolicyRead(_FrozenContract):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    provider_id: uuid.UUID | None
+    policy_key: str
+    status: ProviderBudgetPolicyStatus
+    emergency_stop_enabled: bool
+    limits_json: dict[str, Any]
+    metadata_json: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at", mode="after")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _utc(value)
+
+
+class ProviderQuotaStatusRead(_FrozenContract):
+    world_id: uuid.UUID
+    provider_id: uuid.UUID | None = None
+    emergency_stop_active: bool
+    blocked_reasons: list[str] = Field(default_factory=list)
+    active_policy_ids: list[uuid.UUID] = Field(default_factory=list)
+    daily_invocation_count: int = Field(ge=0)
+    daily_media_job_count: int = Field(ge=0)
+    daily_estimated_cost: float = Field(ge=0)
+    limits_json: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProviderExecutionRequest(_FrozenContract):

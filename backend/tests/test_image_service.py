@@ -52,14 +52,21 @@ from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
 from noveland.narrative.models import NarrativeArtifact
+from noveland.providers.budget import ProviderBudgetService
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderBudgetPolicyCreate,
     ProviderCapabilityCreate,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
 )
-from noveland.providers.models import ProviderCapability, ProviderHealthCheck, ProviderIntegration
+from noveland.providers.models import (
+    ProviderBudgetPolicy,
+    ProviderCapability,
+    ProviderHealthCheck,
+    ProviderIntegration,
+)
 from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.service import ProviderExecutionError
 from noveland.worlds.models import World, Worldline
@@ -276,6 +283,45 @@ def test_image_generate_blocks_disabled_provider_before_media_success(
         assert session.scalars(select(MediaAsset)).all() == []
 
 
+def test_image_generate_budget_block_marks_job_failed(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(
+            session,
+            world_id,
+            ProviderKind.IMAGE_GENERATION,
+            capabilities=("supports_image_generation",),
+        )
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="stop-images",
+                emergency_stop_enabled=True,
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="emergency_stop"):
+            ImageService(session, storage).generate_image(
+                world_id,
+                ImageGenerateRequest(
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    prompt="blocked image",
+                ),
+                actor_ref="user:test",
+            )
+        invocation = session.scalars(select(ModelInvocation)).one()
+        job = session.scalars(select(MediaJob)).one()
+        assert invocation.status == "failed"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["budget_blocked"] is True
+        assert job.status == "failed"
+        assert session.scalars(select(MediaAsset)).all() == []
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -295,6 +341,7 @@ def _engine() -> Engine:
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderHealthCheck.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),

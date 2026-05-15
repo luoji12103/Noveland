@@ -483,6 +483,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/memory_migration.py`
 - `backend/services/api/src/noveland/services/api/authoring.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
+- `backend/packages/providers/src/noveland/providers/budget.py`
+- `backend/migrations/versions/20260515_0042_provider_budget_policies.py`
 - `backend/tests/test_authoring_service.py`
 - `backend/tests/test_api_authoring.py`
 - `backend/tests/test_authoring_regression_fixture.py`
