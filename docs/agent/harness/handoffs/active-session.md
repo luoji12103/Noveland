@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: feat/provider-backed-gm-proposal
-- Objective: v0.6 Runtime Narrative Quality Phase 2.
-- Status: Phase 2 provider-backed GM proposal implementation and full local gate are complete on the feature branch; fast-forward merge to local `main` is next.
+- Branch: main
+- Objective: v0.6 Runtime Narrative Quality Phase 3.
+- Status: Phase 2 provider-backed GM proposal implementation is complete and fast-forward merged to local `main`; Phase 3 Dialogue Style & OOC Review planning is next.
 
 ## Current Context
 
@@ -41,9 +41,8 @@
 
 ## Required Next Steps
 
-- Commit the Phase 2 implementation on `feat/provider-backed-gm-proposal`.
-- Fast-forward merge Phase 2 to local `main`.
-- Record merge bookkeeping, then start Phase 3 only from clean local `main`.
+- Write and commit the v0.6.3 Dialogue Style & OOC Review planning checkpoint.
+- Implement Phase 3 only through `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
 - Do not push unless explicitly requested.
 
@@ -83,3 +82,4 @@
 - v0.6 Phase 2 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
 - v0.6 Phase 2 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 2 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`327 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- v0.6 Phase 2 fast-forward merge to local `main` completed.
