@@ -187,6 +187,9 @@
 - v0.6 Runtime Narrative Quality Phase 9 full local gate
 - v0.6 Runtime Narrative Quality Phase 9 fast-forward merge
 - v0.6 Runtime Narrative Quality Phase 10 planning checkpoint
+- v0.6 Runtime Narrative Quality Phase 10 implementation
+- v0.6 Runtime Narrative Quality Phase 10 targeted tests
+- v0.6 Runtime Narrative Quality Phase 10 full local gate
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality Phase 10 implementation should start on

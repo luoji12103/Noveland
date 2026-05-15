@@ -130,12 +130,12 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 10 — Narrative Quality Dashboard/API
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `narrative-quality-dashboard-api` scope only.
-- [ ] Implement API-first diagnostics only; do not add Web dashboard routes/components/e2e scenarios.
-- [ ] Use narrative quality package/router for all new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `narrative-quality-dashboard-api` scope only.
+- [x] Implement API-first diagnostics only; do not add Web dashboard routes/components/e2e scenarios.
+- [x] Use narrative quality package/router for all new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

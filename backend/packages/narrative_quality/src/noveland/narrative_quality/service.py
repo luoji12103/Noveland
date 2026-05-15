@@ -19,6 +19,7 @@ from noveland.conversations.models import (
 )
 from noveland.conversations.presentation import ConversationPresentationService
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaJob
 from noveland.narrative.contracts import NarrativeArtifactCreate
 from noveland.narrative.models import NarrativeArtifact
@@ -29,6 +30,7 @@ from noveland.providers.contracts import (
     ProviderIntegrationRead,
     ProviderKind,
 )
+from noveland.providers.models import ProviderHealthCheck, ProviderIntegration
 from noveland.providers.registry import (
     ProviderNotFoundError,
     ProviderRegistryService,
@@ -66,6 +68,9 @@ from .contracts import (
     NarrativeQualityContinuityFinding,
     NarrativeQualityContinuityReviewRequest,
     NarrativeQualityContinuityReviewResult,
+    NarrativeQualityDashboardRecommendation,
+    NarrativeQualityDashboardSignal,
+    NarrativeQualityDashboardSummary,
     NarrativeQualityDialogueFinding,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityDialogueReviewResult,
@@ -1202,6 +1207,606 @@ class NarrativeQualityService:
             raise NarrativeQualityValidationError("long-run eval not found in worldline")
         return _long_run_quality_result(run)
 
+    def dashboard_summary(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> NarrativeQualityDashboardSummary:
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id))]
+        metrics = _sanitize_json(
+            {
+                "providers": self._dashboard_provider_metrics(world_id),
+                "invocations": self._dashboard_invocation_metrics(world_id, worldline.id),
+                "gm_proposals": self._dashboard_gm_proposal_metrics(world_id, worldline.id),
+                "dialogue": self._dashboard_dialogue_metrics(world_id, worldline.id),
+                "presentation_alignment": self._dashboard_presentation_metrics(
+                    world_id,
+                    worldline.id,
+                ),
+                "narrative_writer": self._dashboard_narrative_writer_metrics(
+                    world_id,
+                    worldline.id,
+                ),
+                "continuity": self._dashboard_continuity_metrics(world_id, worldline.id),
+                "pacing": self._dashboard_pacing_metrics(world_id, worldline.id),
+                "progression": self._dashboard_progression_metrics(world_id, worldline.id),
+                "long_run": self._dashboard_long_run_metrics(world_id, worldline.id),
+                "world_events": self._dashboard_world_event_metrics(world_id, worldline.id),
+            }
+        )
+        blockers = _dashboard_blockers(metrics, evidence_refs=evidence_refs)
+        warnings = _dashboard_warnings(metrics, evidence_refs=evidence_refs)
+        recommendations = _dashboard_recommendations(
+            blockers,
+            warnings,
+            evidence_refs=evidence_refs,
+        )
+        quality_status = "pass"
+        if blockers:
+            quality_status = "fail"
+        elif warnings:
+            quality_status = "warning"
+        summary = _sanitize_json(
+            {
+                "status": quality_status,
+                "blocker_count": len(blockers),
+                "warning_count": len(warnings),
+                "recommendation_count": len(recommendations),
+                "provider_ready": _int_value(
+                    _dict_value(metrics.get("providers")).get("active_text_provider_count")
+                )
+                > 0,
+                "long_run_eval_available": _dict_value(metrics.get("long_run")).get(
+                    "latest_run_id"
+                )
+                is not None,
+                "world_event_leak_count": _int_value(
+                    _dict_value(metrics.get("world_events")).get("unsafe_payload_event_count")
+                ),
+                "provider_call_count": 0,
+                "mutation_count": 0,
+            }
+        )
+        return NarrativeQualityDashboardSummary(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            quality_status=quality_status,
+            summary=summary,
+            metrics=metrics,
+            blockers=blockers,
+            warnings=warnings,
+            recommendations=recommendations,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "narrative_quality_dashboard_api",
+                    "source": "narrative_quality_dashboard_api",
+                    "phase": "v0.6.10",
+                    "provider_call_count": 0,
+                    "mutation_count": 0,
+                    "world_event_written": False,
+                    "web_dashboard_required": False,
+                }
+            ),
+            generated_at=datetime.now(UTC),
+        )
+
+    def _dashboard_provider_metrics(self, world_id: uuid.UUID) -> dict[str, Any]:
+        providers = list(
+            self._session.scalars(
+                select(ProviderIntegration)
+                .where(
+                    (ProviderIntegration.world_id == world_id)
+                    | (ProviderIntegration.scope_kind == "global"),
+                    ProviderIntegration.status != "deleted",
+                )
+                .order_by(ProviderIntegration.provider_kind, ProviderIntegration.provider_key)
+            ).all()
+        )
+        provider_ids = [provider.id for provider in providers]
+        latest_health_by_provider: dict[uuid.UUID, ProviderHealthCheck] = {}
+        if provider_ids:
+            health_checks = self._session.scalars(
+                select(ProviderHealthCheck)
+                .where(ProviderHealthCheck.provider_integration_id.in_(provider_ids))
+                .order_by(
+                    ProviderHealthCheck.provider_integration_id,
+                    ProviderHealthCheck.checked_at.desc(),
+                )
+            ).all()
+            for check in health_checks:
+                latest_health_by_provider.setdefault(check.provider_integration_id, check)
+        status_counts: dict[str, int] = {}
+        provider_kind_counts: dict[str, int] = {}
+        adapter_kind_counts: dict[str, int] = {}
+        health_status_counts: dict[str, int] = {}
+        unsafe_config_count = 0
+        unsafe_health_metadata_count = 0
+        auth_ref_count = 0
+        for provider in providers:
+            status_counts[provider.status] = status_counts.get(provider.status, 0) + 1
+            provider_kind_counts[provider.provider_kind] = (
+                provider_kind_counts.get(provider.provider_kind, 0) + 1
+            )
+            adapter_kind_counts[provider.adapter_kind] = (
+                adapter_kind_counts.get(provider.adapter_kind, 0) + 1
+            )
+            if provider.auth_ref:
+                auth_ref_count += 1
+            if _json_contains_leak(provider.config_json) or _json_contains_leak(
+                provider.default_params_json
+            ):
+                unsafe_config_count += 1
+            latest_health = latest_health_by_provider.get(provider.id)
+            if latest_health is not None:
+                health_status_counts[latest_health.status] = (
+                    health_status_counts.get(latest_health.status, 0) + 1
+                )
+                if _json_contains_leak(latest_health.metadata_json) or (
+                    latest_health.error_text is not None
+                    and _json_contains_leak(latest_health.error_text)
+                ):
+                    unsafe_health_metadata_count += 1
+        return {
+            "provider_count": len(providers),
+            "active_provider_count": status_counts.get("active", 0),
+            "active_text_provider_count": sum(
+                1
+                for provider in providers
+                if provider.status == "active"
+                and provider.provider_kind == ProviderKind.TEXT_GENERATION.value
+            ),
+            "auth_ref_count": auth_ref_count,
+            "status_counts": status_counts,
+            "provider_kind_counts": provider_kind_counts,
+            "adapter_kind_counts": adapter_kind_counts,
+            "latest_health_status_counts": health_status_counts,
+            "latest_unhealthy_count": health_status_counts.get("unhealthy", 0),
+            "latest_degraded_count": health_status_counts.get("degraded", 0),
+            "unsafe_provider_config_count": unsafe_config_count,
+            "unsafe_health_metadata_count": unsafe_health_metadata_count,
+        }
+
+    def _dashboard_invocation_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        invocations = list(
+            self._session.scalars(
+                select(ModelInvocation)
+                .where(
+                    ModelInvocation.world_id == world_id,
+                    ModelInvocation.worldline_id == worldline_id,
+                )
+                .order_by(ModelInvocation.created_at.desc())
+                .limit(500)
+            ).all()
+        )
+        status_counts: dict[str, int] = {}
+        kind_counts: dict[str, int] = {}
+        provider_kind_counts: dict[str, int] = {}
+        estimated_cost = 0.0
+        latency_values: list[int] = []
+        unsafe_metadata_count = 0
+        for invocation in invocations:
+            status_counts[invocation.status] = status_counts.get(invocation.status, 0) + 1
+            kind_counts[invocation.invocation_kind] = (
+                kind_counts.get(invocation.invocation_kind, 0) + 1
+            )
+            provider_kind_counts[invocation.provider_kind] = (
+                provider_kind_counts.get(invocation.provider_kind, 0) + 1
+            )
+            if invocation.estimated_cost is not None:
+                estimated_cost += float(invocation.estimated_cost)
+            if invocation.latency_ms is not None:
+                latency_values.append(invocation.latency_ms)
+            if (
+                _json_contains_leak(invocation.request_params_json)
+                or _json_contains_leak(invocation.response_metadata_json)
+                or _json_contains_leak(invocation.input_json)
+                or _json_contains_leak(invocation.output_json)
+            ):
+                unsafe_metadata_count += 1
+        snapshots = list(
+            self._session.scalars(
+                select(PromptSnapshot)
+                .join(ModelInvocation, PromptSnapshot.invocation_id == ModelInvocation.id)
+                .where(
+                    ModelInvocation.world_id == world_id,
+                    ModelInvocation.worldline_id == worldline_id,
+                )
+                .limit(500)
+            ).all()
+        )
+        return {
+            "sampled_invocation_count": len(invocations),
+            "status_counts": status_counts,
+            "invocation_kind_counts": kind_counts,
+            "provider_kind_counts": provider_kind_counts,
+            "failed_invocation_count": status_counts.get("failed", 0),
+            "estimated_cost_total": round(estimated_cost, 8),
+            "average_latency_ms": (
+                None if not latency_values else round(sum(latency_values) / len(latency_values))
+            ),
+            "unsafe_invocation_metadata_count": unsafe_metadata_count,
+            "prompt_snapshot_count": len(snapshots),
+            "sensitive_prompt_snapshot_count": sum(
+                1 for snapshot in snapshots if snapshot.contains_sensitive_context
+            ),
+            "raw_sensitive_prompt_snapshot_count": sum(
+                1
+                for snapshot in snapshots
+                if snapshot.contains_sensitive_context and snapshot.redaction_status == "raw"
+            ),
+        }
+
+    def _dashboard_gm_proposal_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        proposals = list(
+            self._session.scalars(
+                select(GMEventProposal).where(
+                    GMEventProposal.world_id == world_id,
+                    GMEventProposal.worldline_id == worldline_id,
+                )
+            ).all()
+        )
+        status_counts: dict[str, int] = {}
+        importance_counts: dict[str, int] = {}
+        unsafe_payload_count = 0
+        provider_backed_count = 0
+        high_risk_open_count = 0
+        for proposal in proposals:
+            status_counts[proposal.status] = status_counts.get(proposal.status, 0) + 1
+            importance_counts[proposal.importance] = (
+                importance_counts.get(proposal.importance, 0) + 1
+            )
+            if proposal.status in {"proposed", "accepted"} and proposal.risk_score >= 70:
+                high_risk_open_count += 1
+            if "model_invocation_id" in proposal.source_context:
+                provider_backed_count += 1
+            if _json_contains_leak(proposal.proposed_payload) or _json_contains_leak(
+                proposal.source_context
+            ):
+                unsafe_payload_count += 1
+        return {
+            "proposal_count": len(proposals),
+            "status_counts": status_counts,
+            "importance_counts": importance_counts,
+            "provider_backed_proposal_count": provider_backed_count,
+            "high_risk_open_proposal_count": high_risk_open_count,
+            "unsafe_payload_count": unsafe_payload_count,
+        }
+
+    def _dashboard_dialogue_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        conversations = list(
+            self._session.scalars(
+                select(ConversationSession).where(
+                    ConversationSession.world_id == world_id,
+                    ConversationSession.worldline_id == worldline_id,
+                )
+            ).all()
+        )
+        conversation_ids = [conversation.id for conversation in conversations]
+        turns: list[ConversationTurn] = []
+        if conversation_ids:
+            turns = list(
+                self._session.scalars(
+                    select(ConversationTurn).where(
+                        ConversationTurn.session_id.in_(conversation_ids)
+                    )
+                ).all()
+            )
+        return {
+            "conversation_count": len(conversations),
+            "turn_count": len(turns),
+            "agent_turn_count": sum(1 for turn in turns if turn.speaker_kind == "agent"),
+            "failed_turn_count": sum(1 for turn in turns if turn.status == "failed"),
+            "unsafe_turn_text_count": sum(
+                1
+                for turn in turns
+                if _json_contains_leak(turn.input_text)
+                or (turn.output_text is not None and _json_contains_leak(turn.output_text))
+            ),
+        }
+
+    def _dashboard_presentation_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        presentations = list(
+            self._session.scalars(
+                select(ConversationTurnPresentation).where(
+                    ConversationTurnPresentation.world_id == world_id,
+                    ConversationTurnPresentation.worldline_id == worldline_id,
+                )
+            ).all()
+        )
+        sprite_sets = list(
+            self._session.scalars(
+                select(CharacterSpriteSet).where(
+                    CharacterSpriteSet.world_id == world_id,
+                    CharacterSpriteSet.worldline_id == worldline_id,
+                    CharacterSpriteSet.status == "active",
+                )
+            ).all()
+        )
+        variants = list(
+            self._session.scalars(
+                select(CharacterSpriteVariant).where(
+                    CharacterSpriteVariant.world_id == world_id,
+                    CharacterSpriteVariant.worldline_id == worldline_id,
+                    CharacterSpriteVariant.status == "active",
+                )
+            ).all()
+        )
+        agents = list(
+            self._session.scalars(
+                select(Agent).where(Agent.world_id == world_id, Agent.is_enabled.is_(True))
+            ).all()
+        )
+        bindings = list(
+            self._session.scalars(
+                select(AgentVoiceProfileBinding).where(
+                    AgentVoiceProfileBinding.world_id == world_id,
+                    (
+                        (AgentVoiceProfileBinding.worldline_id == worldline_id)
+                        | (AgentVoiceProfileBinding.worldline_id.is_(None))
+                    ),
+                )
+            ).all()
+        )
+        variants_by_set: dict[uuid.UUID, list[CharacterSpriteVariant]] = {}
+        for variant in variants:
+            variants_by_set.setdefault(variant.sprite_set_id, []).append(variant)
+        sprite_sets_missing_default = 0
+        for sprite_set in sprite_sets:
+            if sprite_set.default_variant_id is not None:
+                continue
+            if not any(
+                variant.expression_key == "neutral"
+                for variant in variants_by_set.get(sprite_set.id, [])
+            ):
+                sprite_sets_missing_default += 1
+        bound_agent_ids = {
+            binding.agent_id
+            for binding in bindings
+            if binding.is_default and binding.binding_role == "default"
+        }
+        render_state_counts: dict[str, int] = {}
+        for presentation in presentations:
+            render_state_counts[presentation.render_state] = (
+                render_state_counts.get(presentation.render_state, 0) + 1
+            )
+        return {
+            "presentation_count": len(presentations),
+            "missing_emotion_count": sum(1 for item in presentations if not item.emotion_key),
+            "missing_sprite_variant_count": sum(
+                1 for item in presentations if item.sprite_variant_id is None
+            ),
+            "missing_voice_profile_count": sum(
+                1 for item in presentations if item.voice_profile_id is None
+            ),
+            "render_state_counts": render_state_counts,
+            "active_sprite_set_count": len(sprite_sets),
+            "active_sprite_variant_count": len(variants),
+            "sprite_set_missing_default_count": sprite_sets_missing_default,
+            "default_voice_binding_count": len(bound_agent_ids),
+            "agent_missing_default_voice_binding_count": sum(
+                1 for agent in agents if agent.id not in bound_agent_ids
+            ),
+        }
+
+    def _dashboard_narrative_writer_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        artifacts = list(
+            self._session.scalars(
+                select(NarrativeArtifact)
+                .where(
+                    NarrativeArtifact.world_id == world_id,
+                    NarrativeArtifact.worldline_id == worldline_id,
+                )
+                .order_by(NarrativeArtifact.created_at.desc())
+                .limit(100)
+            ).all()
+        )
+        kind_counts: dict[str, int] = {}
+        writer_v2_count = 0
+        unsafe_metadata_count = 0
+        for artifact in artifacts:
+            kind_counts[artifact.artifact_kind] = kind_counts.get(artifact.artifact_kind, 0) + 1
+            metadata = artifact.artifact_metadata or {}
+            if metadata.get("source") == "narrative_writer_v2":
+                writer_v2_count += 1
+            if _json_contains_leak(metadata):
+                unsafe_metadata_count += 1
+        return {
+            "sampled_artifact_count": len(artifacts),
+            "artifact_kind_counts": kind_counts,
+            "writer_v2_artifact_count": writer_v2_count,
+            "unsafe_artifact_metadata_count": unsafe_metadata_count,
+        }
+
+    def _dashboard_continuity_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        reviews = list(
+            self._session.scalars(
+                select(NarrativeContinuityReview)
+                .where(
+                    NarrativeContinuityReview.world_id == world_id,
+                    NarrativeContinuityReview.worldline_id == worldline_id,
+                )
+                .order_by(NarrativeContinuityReview.created_at.desc())
+                .limit(100)
+            ).all()
+        )
+        status_counts: dict[str, int] = {}
+        issue_counts: dict[str, int] = {}
+        unsafe_metadata_count = 0
+        for review in reviews:
+            status_counts[review.status] = status_counts.get(review.status, 0) + 1
+            if _json_contains_leak(review.metadata_json):
+                unsafe_metadata_count += 1
+            for issue in review.issues:
+                code = str(issue.get("code") or "continuity_issue")
+                issue_counts[code] = issue_counts.get(code, 0) + 1
+        return {
+            "review_count": len(reviews),
+            "status_counts": status_counts,
+            "failed_review_count": status_counts.get("fail", 0),
+            "warning_review_count": status_counts.get("warning", 0),
+            "issue_counts": issue_counts,
+            "unsafe_review_metadata_count": unsafe_metadata_count,
+        }
+
+    def _dashboard_pacing_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        media_jobs = self._pending_media_jobs(world_id, worldline_id, None, None)
+        proposals = self._pending_asset_proposals(world_id, worldline_id, None)
+        queue_summary = _pacing_queue_summary(media_jobs)
+        budget_summary = _pacing_budget_summary(proposals, max_pending_cost=None)
+        return {
+            "queue_summary": queue_summary,
+            "budget_summary": budget_summary,
+            "unsafe_media_job_json_count": sum(
+                1
+                for job in media_jobs
+                if _json_contains_leak(job.provider_config_json)
+                or _json_contains_leak(job.request_json)
+                or _json_contains_leak(job.result_json)
+            ),
+            "unsafe_asset_proposal_json_count": sum(
+                1
+                for proposal in proposals
+                if _json_contains_leak(proposal.evidence_json)
+                or _json_contains_leak(proposal.request_json)
+            ),
+        }
+
+    def _dashboard_progression_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        relationships = self._relationship_edges(world_id, worldline_id, None)
+        routes = self._route_affinities(world_id, worldline_id, None, None)
+        milestones = self._route_milestones(world_id, worldline_id, None, routes)
+        endings = self._ending_candidates(world_id, worldline_id, None, routes)
+        choices = self._player_choice_records(world_id, worldline_id, routes)
+        events = self._recent_progression_events(world_id, worldline_id, limit=50)
+        proposals = self._progression_gm_proposals(world_id, worldline_id, None)
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline_id))]
+        relationship_summary = _progression_relationship_summary(relationships)
+        route_summary = _progression_route_summary(routes, milestones, endings, choices)
+        event_summary = _progression_event_summary(events)
+        proposal_summary = _progression_proposal_summary(proposals)
+        findings = _progression_findings(
+            relationships=relationships,
+            routes=routes,
+            milestones=milestones,
+            endings=endings,
+            events=events,
+            proposals=proposals,
+            relationship_summary=relationship_summary,
+            route_summary=route_summary,
+            evidence_refs=evidence_refs,
+        )
+        return {
+            "relationship_summary": relationship_summary,
+            "route_summary": route_summary,
+            "event_summary": event_summary,
+            "proposal_summary": proposal_summary,
+            "finding_count": len(findings),
+            "error_finding_count": sum(1 for finding in findings if finding.severity == "error"),
+            "warning_finding_count": sum(
+                1 for finding in findings if finding.severity == "warning"
+            ),
+        }
+
+    def _dashboard_long_run_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        runs = list(
+            self._session.scalars(
+                select(LongRunEvalRun)
+                .where(
+                    LongRunEvalRun.world_id == world_id,
+                    LongRunEvalRun.worldline_id == worldline_id,
+                )
+                .order_by(LongRunEvalRun.created_at.desc())
+                .limit(20)
+            ).all()
+        )
+        status_counts: dict[str, int] = {}
+        for run in runs:
+            status_counts[run.status] = status_counts.get(run.status, 0) + 1
+        latest = runs[0] if runs else None
+        latest_result = None if latest is None else _long_run_quality_result(latest)
+        return {
+            "run_count": len(runs),
+            "status_counts": status_counts,
+            "latest_run_id": None if latest is None else str(latest.id),
+            "latest_status": None if latest is None else latest.status,
+            "latest_eval_key": None if latest is None else _safe_text(latest.eval_key),
+            "latest_drift_metrics": {}
+            if latest_result is None
+            else latest_result.drift_metrics,
+            "latest_failure_report_count": 0
+            if latest_result is None
+            else len(latest_result.failure_reports),
+        }
+
+    def _dashboard_world_event_metrics(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        events = list(
+            self._session.scalars(
+                select(WorldEventModel)
+                .where(
+                    WorldEventModel.world_id == world_id,
+                    WorldEventModel.worldline_id == worldline_id,
+                )
+                .order_by(WorldEventModel.sequence.desc())
+                .limit(500)
+            ).all()
+        )
+        importance_counts: dict[str, int] = {}
+        unsafe_count = 0
+        max_sequence = 0
+        for event in events:
+            importance_counts[event.importance] = importance_counts.get(event.importance, 0) + 1
+            max_sequence = max(max_sequence, int(event.sequence))
+            if _json_contains_leak(event.payload):
+                unsafe_count += 1
+        return {
+            "sampled_event_count": len(events),
+            "importance_counts": importance_counts,
+            "latest_sequence": max_sequence,
+            "unsafe_payload_event_count": unsafe_count,
+        }
+
     def _agent_context(
         self,
         world_id: uuid.UUID,
@@ -2117,6 +2722,429 @@ class NarrativeQualityService:
             evidence_refs=evidence_refs,
             generated_at=datetime.now(UTC),
         )
+
+
+def _dashboard_blockers(
+    metrics: dict[str, Any],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityDashboardSignal]:
+    provider = _dict_value(metrics.get("providers"))
+    invocations = _dict_value(metrics.get("invocations"))
+    gm = _dict_value(metrics.get("gm_proposals"))
+    dialogue = _dict_value(metrics.get("dialogue"))
+    narrative = _dict_value(metrics.get("narrative_writer"))
+    continuity = _dict_value(metrics.get("continuity"))
+    pacing = _dict_value(metrics.get("pacing"))
+    progression = _dict_value(metrics.get("progression"))
+    long_run = _dict_value(metrics.get("long_run"))
+    events = _dict_value(metrics.get("world_events"))
+    blockers: list[NarrativeQualityDashboardSignal] = []
+    if _int_value(provider.get("unsafe_provider_config_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_provider_config",
+                "error",
+                "Provider configuration contains secret-like or unsafe operational data.",
+                evidence_refs,
+                {"count": provider.get("unsafe_provider_config_count")},
+            )
+        )
+    if _int_value(provider.get("unsafe_health_metadata_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_provider_health_metadata",
+                "error",
+                "Provider health metadata contains secret-like or unsafe operational data.",
+                evidence_refs,
+                {"count": provider.get("unsafe_health_metadata_count")},
+            )
+        )
+    if _int_value(invocations.get("unsafe_invocation_metadata_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_invocation_metadata",
+                "error",
+                "Invocation metadata contains unsafe operational data.",
+                evidence_refs,
+                {"count": invocations.get("unsafe_invocation_metadata_count")},
+            )
+        )
+    if _int_value(invocations.get("raw_sensitive_prompt_snapshot_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "raw_sensitive_prompt_snapshot",
+                "error",
+                "Sensitive prompt snapshots remain in raw redaction state.",
+                evidence_refs,
+                {"count": invocations.get("raw_sensitive_prompt_snapshot_count")},
+            )
+        )
+    if _int_value(gm.get("unsafe_payload_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_gm_proposal_payload",
+                "error",
+                "GM proposal payload or source context contains unsafe operational data.",
+                evidence_refs,
+                {"count": gm.get("unsafe_payload_count")},
+            )
+        )
+    if _int_value(dialogue.get("unsafe_turn_text_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_dialogue_text",
+                "error",
+                "Conversation turn text contains unsafe operational data.",
+                evidence_refs,
+                {"count": dialogue.get("unsafe_turn_text_count")},
+            )
+        )
+    if _int_value(narrative.get("unsafe_artifact_metadata_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_narrative_artifact_metadata",
+                "error",
+                "Narrative artifact metadata contains unsafe operational data.",
+                evidence_refs,
+                {"count": narrative.get("unsafe_artifact_metadata_count")},
+            )
+        )
+    if _int_value(continuity.get("failed_review_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "continuity_review_failures",
+                "error",
+                "Failed continuity reviews are present in this worldline.",
+                evidence_refs,
+                {"count": continuity.get("failed_review_count")},
+            )
+        )
+    if _int_value(continuity.get("unsafe_review_metadata_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_continuity_review_metadata",
+                "error",
+                "Continuity review metadata contains unsafe operational data.",
+                evidence_refs,
+                {"count": continuity.get("unsafe_review_metadata_count")},
+            )
+        )
+    if _int_value(pacing.get("unsafe_media_job_json_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_media_job_json",
+                "error",
+                "Pending media job JSON contains unsafe operational data.",
+                evidence_refs,
+                {"count": pacing.get("unsafe_media_job_json_count")},
+            )
+        )
+    if _int_value(pacing.get("unsafe_asset_proposal_json_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_asset_generation_proposal_json",
+                "error",
+                "Asset generation proposal JSON contains unsafe operational data.",
+                evidence_refs,
+                {"count": pacing.get("unsafe_asset_proposal_json_count")},
+            )
+        )
+    if _int_value(progression.get("error_finding_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "progression_error_findings",
+                "error",
+                "Route or relationship progression diagnostics contain error findings.",
+                evidence_refs,
+                {"count": progression.get("error_finding_count")},
+            )
+        )
+    if long_run.get("latest_status") == "failed":
+        blockers.append(
+            _dashboard_signal(
+                "latest_long_run_eval_failed",
+                "error",
+                "The latest long-run narrative quality eval failed.",
+                evidence_refs,
+                {"latest_run_id": long_run.get("latest_run_id")},
+            )
+        )
+    if _int_value(events.get("unsafe_payload_event_count")) > 0:
+        blockers.append(
+            _dashboard_signal(
+                "unsafe_world_event_payload",
+                "error",
+                "World event payloads contain storage paths, raw prompt markers, or secrets.",
+                evidence_refs,
+                {"count": events.get("unsafe_payload_event_count")},
+            )
+        )
+    return blockers
+
+
+def _dashboard_warnings(
+    metrics: dict[str, Any],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityDashboardSignal]:
+    provider = _dict_value(metrics.get("providers"))
+    invocations = _dict_value(metrics.get("invocations"))
+    gm = _dict_value(metrics.get("gm_proposals"))
+    dialogue = _dict_value(metrics.get("dialogue"))
+    presentation = _dict_value(metrics.get("presentation_alignment"))
+    continuity = _dict_value(metrics.get("continuity"))
+    pacing = _dict_value(metrics.get("pacing"))
+    progression = _dict_value(metrics.get("progression"))
+    long_run = _dict_value(metrics.get("long_run"))
+    warnings: list[NarrativeQualityDashboardSignal] = []
+    if _int_value(provider.get("active_text_provider_count")) == 0:
+        warnings.append(
+            _dashboard_signal(
+                "text_provider_missing",
+                "warning",
+                "No active text-generation provider is configured for narrative quality work.",
+                evidence_refs,
+                {},
+            )
+        )
+    if _int_value(provider.get("latest_unhealthy_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "provider_health_unhealthy",
+                "warning",
+                "Latest provider health checks include unhealthy providers.",
+                evidence_refs,
+                {"count": provider.get("latest_unhealthy_count")},
+            )
+        )
+    if _int_value(provider.get("latest_degraded_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "provider_health_degraded",
+                "warning",
+                "Latest provider health checks include degraded providers.",
+                evidence_refs,
+                {"count": provider.get("latest_degraded_count")},
+            )
+        )
+    if _int_value(invocations.get("failed_invocation_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "failed_invocations_present",
+                "warning",
+                "Failed model invocations are present in this worldline.",
+                evidence_refs,
+                {"count": invocations.get("failed_invocation_count")},
+            )
+        )
+    if _int_value(gm.get("high_risk_open_proposal_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "high_risk_gm_proposals_open",
+                "warning",
+                "High-risk GM proposals remain open for review.",
+                evidence_refs,
+                {"count": gm.get("high_risk_open_proposal_count")},
+            )
+        )
+    turn_count = _int_value(dialogue.get("turn_count"))
+    presentation_count = _int_value(presentation.get("presentation_count"))
+    if turn_count > presentation_count:
+        warnings.append(
+            _dashboard_signal(
+                "turn_presentation_coverage_gap",
+                "warning",
+                "Conversation turns exist without canonical presentation records.",
+                evidence_refs,
+                {"missing_count": turn_count - presentation_count},
+            )
+        )
+    if _int_value(presentation.get("active_sprite_set_count")) == 0:
+        warnings.append(
+            _dashboard_signal(
+                "sprite_sets_missing",
+                "warning",
+                "No active character sprite sets exist for this worldline.",
+                evidence_refs,
+                {},
+            )
+        )
+    if _int_value(presentation.get("sprite_set_missing_default_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "sprite_defaults_missing",
+                "warning",
+                "Active sprite sets are missing a default or neutral fallback.",
+                evidence_refs,
+                {"count": presentation.get("sprite_set_missing_default_count")},
+            )
+        )
+    if _int_value(presentation.get("agent_missing_default_voice_binding_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "voice_bindings_missing",
+                "warning",
+                "Enabled agents are missing default voice bindings for this worldline.",
+                evidence_refs,
+                {"count": presentation.get("agent_missing_default_voice_binding_count")},
+            )
+        )
+    if _int_value(continuity.get("warning_review_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "continuity_warnings_present",
+                "warning",
+                "Continuity reviews include warnings.",
+                evidence_refs,
+                {"count": continuity.get("warning_review_count")},
+            )
+        )
+    queue = _dict_value(pacing.get("queue_summary"))
+    budget = _dict_value(pacing.get("budget_summary"))
+    if _int_value(queue.get("pending_job_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "pending_media_jobs_present",
+                "warning",
+                "Pending media jobs may affect current-turn narrative quality readiness.",
+                evidence_refs,
+                {"count": queue.get("pending_job_count")},
+            )
+        )
+    if _int_value(budget.get("proposed_asset_generation_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "asset_generation_proposals_open",
+                "warning",
+                "Asset generation proposals remain proposed for admin review.",
+                evidence_refs,
+                {"count": budget.get("proposed_asset_generation_count")},
+            )
+        )
+    if _int_value(progression.get("warning_finding_count")) > 0:
+        warnings.append(
+            _dashboard_signal(
+                "progression_warnings_present",
+                "warning",
+                "Route or relationship progression diagnostics contain warnings.",
+                evidence_refs,
+                {"count": progression.get("warning_finding_count")},
+            )
+        )
+    if _int_value(long_run.get("run_count")) == 0:
+        warnings.append(
+            _dashboard_signal(
+                "long_run_eval_missing",
+                "warning",
+                "No long-run narrative quality eval exists for this worldline.",
+                evidence_refs,
+                {},
+            )
+        )
+    elif long_run.get("latest_status") == "warning":
+        warnings.append(
+            _dashboard_signal(
+                "latest_long_run_eval_warning",
+                "warning",
+                "The latest long-run narrative quality eval completed with warnings.",
+                evidence_refs,
+                {"latest_run_id": long_run.get("latest_run_id")},
+            )
+        )
+    return warnings
+
+
+def _dashboard_recommendations(
+    blockers: list[NarrativeQualityDashboardSignal],
+    warnings: list[NarrativeQualityDashboardSignal],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityDashboardRecommendation]:
+    codes = {signal.code for signal in blockers + warnings}
+    recommendations: list[NarrativeQualityDashboardRecommendation] = []
+    mapping = {
+        "text_provider_missing": (
+            "configure_text_provider",
+            (
+                "Configure an active provider-kernel text-generation provider before "
+                "provider-backed quality generation."
+            ),
+        ),
+        "unsafe_world_event_payload": (
+            "audit_world_event_payloads",
+            "Audit and sanitize world event payloads before relying on dashboard results.",
+        ),
+        "continuity_review_failures": (
+            "resolve_continuity_failures",
+            "Resolve failed continuity reviews before publication or route progression.",
+        ),
+        "turn_presentation_coverage_gap": (
+            "complete_turn_presentations",
+            "Create canonical turn presentations for existing conversation turns.",
+        ),
+        "sprite_defaults_missing": (
+            "add_sprite_defaults",
+            "Add default or neutral sprite variants for active sprite sets.",
+        ),
+        "voice_bindings_missing": (
+            "add_voice_bindings",
+            "Bind default voice profiles to enabled agents in this worldline.",
+        ),
+        "high_risk_gm_proposals_open": (
+            "review_high_risk_gm_proposals",
+            "Review or resolve high-risk GM proposals before advancing the route.",
+        ),
+        "pending_media_jobs_present": (
+            "review_media_queue",
+            "Review pending media jobs and reprioritize current visible turn needs.",
+        ),
+        "asset_generation_proposals_open": (
+            "review_asset_generation_proposals",
+            "Apply, dismiss, or defer asset generation proposals through explicit admin review.",
+        ),
+        "long_run_eval_missing": (
+            "run_long_run_eval",
+            "Run a long-run narrative quality eval for this worldline.",
+        ),
+    }
+    for source_code, (recommendation_code, message) in mapping.items():
+        if source_code not in codes:
+            continue
+        recommendations.append(
+            NarrativeQualityDashboardRecommendation(
+                code=recommendation_code,
+                message=message,
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "source_code": source_code},
+            )
+        )
+    if any(code.startswith("unsafe_") or code.startswith("raw_") for code in codes):
+        recommendations.append(
+            NarrativeQualityDashboardRecommendation(
+                code="review_redaction_boundaries",
+                message="Review provider, invocation, media, and event redaction boundaries.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "source_code": "unsafe_boundary"},
+            )
+        )
+    return recommendations
+
+
+def _dashboard_signal(
+    code: str,
+    severity: str,
+    message: str,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+    details: dict[str, Any],
+) -> NarrativeQualityDashboardSignal:
+    return NarrativeQualityDashboardSignal(
+        code=code,
+        severity=severity,
+        message=message,
+        evidence_refs=evidence_refs,
+        details=_sanitize_json(details),
+    )
 
 
 def _turn_window_text(turns: list[ConversationTurnRecord]) -> str:

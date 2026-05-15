@@ -724,6 +724,79 @@ def test_narrative_quality_long_run_eval_api_rejects_sensitive_metadata() -> Non
         assert session.scalar(select(func.count(LongRunEvalRun.id))) == 0
 
 
+def test_narrative_quality_dashboard_api_requires_world_admin_and_is_read_only() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _seed_text_provider(engine, world_id)
+    conversation_id, turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    forbidden = client.get(
+        f"/worlds/{world_id}/narrative-quality/dashboard",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    _authenticate(client, owner_token)
+    response = client.get(
+        f"/worlds/{world_id}/narrative-quality/dashboard",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert forbidden.status_code == 403
+    assert response.status_code == 200
+    body = response.json()
+    assert body["worldline_id"] == str(worldline_id)
+    assert body["metrics"]["providers"]["active_text_provider_count"] == 1
+    assert body["metrics"]["presentation_alignment"]["presentation_count"] == 1
+    assert body["diagnostics"]["provider_call_count"] == 0
+    assert body["diagnostics"]["mutation_count"] == 0
+    assert "storage_uri" not in response.text
+    assert "media://" not in response.text
+    assert "raw_prompt" not in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(ModelInvocation.id))) == 0
+        assert session.scalar(select(func.count(LongRunEvalRun.id))) == 0
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_dashboard_api_rejects_foreign_worldline() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, _worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    other_world_id, other_worldline_id, _other_agent_id = _seed_world_agent_and_fact(
+        engine,
+        owner_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    assert other_world_id != world_id
+
+    _authenticate(client, owner_token)
+    response = client.get(
+        f"/worlds/{world_id}/narrative-quality/dashboard",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+
+    assert response.status_code == 404
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

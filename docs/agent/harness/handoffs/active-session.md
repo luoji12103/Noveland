@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: main
+- Branch: feat/narrative-quality-dashboard-api
 - Objective: v0.6 Runtime Narrative Quality Phase 10.
-- Status: Phase 10 Narrative Quality Dashboard/API planning checkpoint is recorded; implementation is next on a dedicated feature branch.
+- Status: Phase 10 Narrative Quality Dashboard/API implementation and full local gate are complete on the feature branch; next step is fast-forward merge back to local main.
 
 ## Current Context
 
@@ -41,7 +41,7 @@
 
 ## Required Next Steps
 
-- Start Phase 10 implementation on `feat/narrative-quality-dashboard-api` after the docs-only planning checkpoint is committed.
+- Fast-forward merge `feat/narrative-quality-dashboard-api` back to local `main`.
 - Keep Phase 10 API-first under the narrative quality package/router; do not add Web dashboard routes, components, or e2e scenarios.
 - Provide admin-scoped narrative quality dashboard/API summaries over existing context, provider, invocation, dialogue, alignment, writer, continuity, pacing, progression, and long-run eval data.
 - Reuse existing narrative quality services, `LongRunEvalRun`, multimodal diagnostics, and release/eval evidence; do not create a duplicate dashboard or eval framework.
@@ -115,3 +115,7 @@
 - v0.6 Phase 9 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`63 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 9 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`378 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; first attempt hit the existing world composition import/export response-body race), docker compose config, and `git diff --check`.
 - v0.6 Phase 9 fast-forward merge to local `main` completed.
+- v0.6 Phase 10 implementation added a read-only admin-scoped dashboard summary API under the narrative quality router.
+- v0.6 Phase 10 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`68 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 10 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
+- Flaky note: the first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.

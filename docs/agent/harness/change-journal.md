@@ -1743,3 +1743,16 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implementation should start on `feat/narrative-quality-dashboard-api` after this docs-only checkpoint is committed. Do not push unless explicitly requested.
+
+## v0.6 Narrative Quality Dashboard/API implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/narrative-quality-dashboard-api
+- Scope: Backend-only v0.6 Runtime Narrative Quality Phase 10 read-only narrative quality dashboard/API summary.
+- Summary: Added an admin-scoped dashboard summary API under the narrative quality router. The implementation aggregates provider, invocation, proposal, dialogue, presentation, writer, continuity, pacing, progression, long-run eval, and world-event signals into safe blocker/warning/recommendation buckets, validates worldline scope, preserves the architecture freeze boundaries, avoids Web dashboard routes/components/e2e work, avoids provider calls and state mutation, and keeps secrets, raw prompts/outputs, storage paths, bytes, base64, and other unsafe details out of responses.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`, `/backend/tests/test_api_narrative_quality.py`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Narrative quality service coverage for dashboard metrics, blocker sanitization, and foreign-worldline rejection; API coverage for admin ACL and foreign-worldline rejection.
+- Docs updated: OpenSpec Phase 10 task status, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`68 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
+- Flaky notes: The first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.
+- Follow-up notes: Fast-forward merge `feat/narrative-quality-dashboard-api` into local `main`, then update OpenSpec merge bookkeeping and keep `main` clean. Do not push unless explicitly requested.

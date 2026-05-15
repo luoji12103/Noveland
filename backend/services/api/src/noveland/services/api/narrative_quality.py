@@ -10,6 +10,7 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityContextPreviewRequest,
     NarrativeQualityContinuityReviewRequest,
     NarrativeQualityContinuityReviewResult,
+    NarrativeQualityDashboardSummary,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityDialogueReviewResult,
     NarrativeQualityGMProposalGenerateRequest,
@@ -42,6 +43,21 @@ from noveland.services.api.dependencies import (
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/worlds/{world_id}/narrative-quality", tags=["narrative-quality"])
+
+
+@router.get("/dashboard", response_model=NarrativeQualityDashboardSummary)
+def get_narrative_quality_dashboard(
+    world_id: uuid.UUID,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> NarrativeQualityDashboardSummary:
+    try:
+        return NarrativeQualityService(db_session).dashboard_summary(world_id, worldline_id)
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
 
 
 @router.post(

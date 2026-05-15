@@ -1424,6 +1424,139 @@ def test_long_living_world_eval_sanitizes_response_metadata_and_blockers() -> No
     assert "raw_output" not in serialized
 
 
+def test_narrative_quality_dashboard_summarizes_read_only_metrics() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    _seed_text_provider(engine, world_id)
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+    _seed_aligned_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        conversation_id,
+        turn_id,
+    )
+    _seed_long_run_eval_evidence(engine, world_id, worldline_id, agent_id)
+    with Session(engine) as session:
+        NarrativeQualityService(session).run_long_living_world_eval(
+            world_id,
+            NarrativeQualityLongRunEvalRunRequest(worldline_id=worldline_id),
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        before_invocations = session.scalar(select(func.count(ModelInvocation.id)))
+        before_events = session.scalar(select(func.count(WorldEventModel.id)))
+        before_evals = session.scalar(select(func.count(LongRunEvalRun.id)))
+        result = NarrativeQualityService(session).dashboard_summary(world_id, worldline_id)
+        after_invocations = session.scalar(select(func.count(ModelInvocation.id)))
+        after_events = session.scalar(select(func.count(WorldEventModel.id)))
+        after_evals = session.scalar(select(func.count(LongRunEvalRun.id)))
+
+    assert result.worldline_id == worldline_id
+    assert result.quality_status in {"pass", "warning"}
+    assert result.metrics["providers"]["active_text_provider_count"] == 1
+    assert result.metrics["dialogue"]["turn_count"] >= 1
+    assert result.metrics["presentation_alignment"]["presentation_count"] == 1
+    assert result.metrics["long_run"]["run_count"] == 1
+    assert result.diagnostics["provider_call_count"] == 0
+    assert result.diagnostics["mutation_count"] == 0
+    assert before_invocations == after_invocations
+    assert before_events == after_events
+    assert before_evals == after_evals
+    serialized = result.model_dump_json().lower()
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "raw_prompt" not in serialized
+
+
+def test_narrative_quality_dashboard_detects_blockers_and_sanitizes_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+    _seed_provider_health(
+        engine,
+        provider_id,
+        status="unhealthy",
+        metadata={"nested": {"api_key": "sk-secret"}},
+        error_text="auth failed for sk-secret",
+    )
+    with Session(engine) as session:
+        session.add(
+            NarrativeContinuityReview(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                artifact_id=None,
+                source_kind="manual",
+                source_ref=None,
+                reviewed_text="storage_uri=media://hidden/object",
+                status="fail",
+                issues=[
+                    {
+                        "code": "knowledge_leak_risk",
+                        "severity": "error",
+                        "message": "storage_uri=media://hidden/object",
+                    }
+                ],
+                metadata_json={"safe": True},
+            )
+        )
+        session.add(
+            WorldEventModel(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sequence=1,
+                event_name="system.audit",
+                importance="system",
+                payload={"storage_uri": "media://hidden/object", "safe": True},
+                wall_time=datetime.now(UTC),
+                actor_ref="test",
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).dashboard_summary(world_id, worldline_id)
+
+    codes = {signal.code for signal in result.blockers}
+    assert result.quality_status == "fail"
+    assert "continuity_review_failures" in codes
+    assert "unsafe_world_event_payload" in codes
+    assert "unsafe_provider_health_metadata" in codes
+    serialized = result.model_dump_json().lower()
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "sk-secret" not in serialized
+    assert "raw_prompt" not in serialized
+
+
+def test_narrative_quality_dashboard_rejects_foreign_worldline() -> None:
+    engine = _engine()
+    world_id, _worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    other_world_id, other_worldline_id, _other_agent_id = _seed_world_agent_and_fact(
+        engine,
+        "Other fact.",
+    )
+    assert other_world_id != world_id
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).dashboard_summary(world_id, other_worldline_id)
+        except ValueError as exc:
+            assert "worldline" in str(exc)
+        else:
+            raise AssertionError("expected foreign worldline rejection")
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -1799,6 +1932,28 @@ def _seed_provider(
         )
         session.commit()
         return provider.id
+
+
+def _seed_provider_health(
+    engine: Engine,
+    provider_id: uuid.UUID,
+    *,
+    status: str,
+    metadata: dict[str, object] | None = None,
+    error_text: str | None = None,
+) -> None:
+    with Session(engine) as session:
+        session.add(
+            ProviderHealthCheck(
+                id=uuid.uuid4(),
+                provider_integration_id=provider_id,
+                status=status,
+                latency_ms=50,
+                error_text=error_text,
+                metadata_json=metadata or {},
+            )
+        )
+        session.commit()
 
 
 def _seed_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:

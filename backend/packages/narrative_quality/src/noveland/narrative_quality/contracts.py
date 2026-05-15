@@ -559,6 +559,60 @@ class NarrativeQualityLongRunEvalResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityDashboardSignal(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("details", mode="after")
+    @classmethod
+    def validate_details_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "details")
+        return value
+
+
+class NarrativeQualityDashboardRecommendation(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    target_ref: NarrativeQualityEvidenceRef | None = None
+    action_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("action_json", mode="after")
+    @classmethod
+    def validate_action_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "action_json")
+        return value
+
+
+class NarrativeQualityDashboardSummary(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    quality_status: str = Field(min_length=1, max_length=40)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    blockers: list[NarrativeQualityDashboardSignal] = Field(default_factory=list)
+    warnings: list[NarrativeQualityDashboardSignal] = Field(default_factory=list)
+    recommendations: list[NarrativeQualityDashboardRecommendation] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+    generated_at: datetime
+
+    @field_validator("summary", "metrics", "diagnostics", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "dashboard JSON")
+        return value
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json
