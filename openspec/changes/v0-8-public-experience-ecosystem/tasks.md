@@ -23,8 +23,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 2 — Conversation Playback UI
 
-- [ ] Write docs-only phase planning checkpoint.
-- [ ] Confirm Phase 1 reader media descriptors are stable.
+- [x] Write docs-only phase planning checkpoint.
+- [x] Confirm Phase 1 reader media descriptors are stable.
 - [ ] Implement playback UI over safe presentation DTOs only.
 - [ ] Add component and e2e playback smoke tests.
 - [ ] Run targeted tests.

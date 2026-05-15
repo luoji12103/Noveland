@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI planning.
-- Status: Phase 1 Reader Media Delivery is complete and fast-forward merged; Phase 2 planning checkpoint is next.
+- Objective: v0.8 Public Experience & Ecosystem Phase 2 Conversation Playback UI.
+- Status: Phase 2 planning checkpoint is complete; implementation is next.
 
 ## Current Context
 
@@ -35,6 +35,7 @@
 - Phase 1 implementation adds `backend/packages/reader_delivery/` and `backend/services/api/src/noveland/services/api/reader_media.py`.
 - Phase 1 targeted tests add `backend/tests/test_api_reader_media.py` for ACL, visibility, no-leak descriptors, download streaming, cross-world/worldline rejection, and unchanged admin media download behavior.
 - v0.8 Phase 1 fast-forward merge to local `main` completed.
+- v0.8 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.2-conversation-playback-ui-plan.md`.
 - v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
@@ -54,8 +55,9 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start v0.8 Phase 2 with a docs-only Conversation Playback UI planning checkpoint from clean local `main`.
-- Use the `impeccable` skill before Phase 2 frontend implementation work.
+- Start Phase 2 implementation on `feat/conversation-playback-ui` from clean local `main`.
+- Use reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
+- Continue using `impeccable` context for Web UI decisions.
 - Preserve the authenticated-only reader media model unless OpenSpec is updated first.
 - Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
 

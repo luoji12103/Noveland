@@ -2142,3 +2142,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 2 from clean local `main`; use the `impeccable` skill before frontend implementation, and continue using reader-safe media descriptors only.
+
+## v0.8.2 Conversation Playback UI planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 2 planning.
+- Summary: Added the Phase 2 checkpoint for a reader/player-facing conversation playback surface that consumes existing conversation turns, optional turn presentations, and Phase 1 reader media descriptors. The plan keeps this phase Web-focused, avoids migrations and provider execution, and preserves the no admin media DTO/no storage path/no raw prompt-output boundary.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.2-conversation-playback-ui-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implement Phase 2 on `feat/conversation-playback-ui`; use `impeccable` context for the Web UI and reader-safe media descriptor DTOs for playback assets.
