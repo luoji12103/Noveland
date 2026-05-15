@@ -55,6 +55,17 @@
 - Docs updated: project index, file inventory, change journal, active handoff
 - Follow-up notes: Implement Phase 1 on `feat/runtime-context-contract-v2`; do not add Web UI or broad `worlds.py` routes.
 
+## v0.6.5 Narrative Writer v2 planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 5 planning
+- Summary: Added the Phase 5 implementation checkpoint for Narrative Writer v2, including first-class narrative artifact/publication worldline strategy and provider-kernel text generation boundaries.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.5-narrative-writer-v2-plan.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, task board, active handoff
+- Follow-up notes: Implement Phase 5 on `feat/narrative-writer-v2`; do not add Web UI, broad `worlds.py` routes, legacy provider profile expansion, automatic publication, or world event writes.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

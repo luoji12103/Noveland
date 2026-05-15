@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 5.
-- Status: Phase 4 Emotion/Sprite/Voice Alignment implementation is complete and fast-forward merged to local `main`; Phase 5 Narrative Writer v2 planning checkpoint is next.
+- Status: Phase 5 Narrative Writer v2 planning checkpoint is complete; implementation branch is next.
 
 ## Current Context
 
@@ -41,9 +41,9 @@
 
 ## Required Next Steps
 
-- Start Phase 5 from clean local `main` with a docs-only planning checkpoint.
-- Decide and document the `narrative_artifacts` worldline strategy before implementation.
-- Confirm provider-kernel text generation execution remains available before provider-backed narrative generation.
+- Start Phase 5 implementation from clean local `main` on `feat/narrative-writer-v2`.
+- Implement first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts must store non-null `worldline_id`.
+- Use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
 - Do not push unless explicitly requested.
 

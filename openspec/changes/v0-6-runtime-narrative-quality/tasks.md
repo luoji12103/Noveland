@@ -63,9 +63,9 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 5 — Narrative Writer v2
 
-- [ ] Write phase planning checkpoint.
-- [ ] Decide and document the `narrative_artifacts` worldline strategy before implementation.
-- [ ] Confirm provider-kernel text generation execution is available before provider-backed narrative generation.
+- [x] Write phase planning checkpoint.
+- [x] Decide and document the `narrative_artifacts` worldline strategy before implementation.
+- [x] Confirm provider-kernel text generation execution is available before provider-backed narrative generation.
 - [ ] Implement `narrative-writer-v2` scope only.
 - [ ] Use narrative quality package/router for any new v0.6 quality APIs.
 - [ ] Preserve Phase 13 architecture guardrails.
