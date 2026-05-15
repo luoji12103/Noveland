@@ -2028,3 +2028,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`255 source files`), backend pytest (`411 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - Follow-up notes: Fast-forward merge `feat/security-regression-suite` to local `main`, then record merge bookkeeping before starting Phase 8.
+
+## v0.7.7 Security Regression Suite merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.7 Production Hardening Phase 7 merge bookkeeping.
+- Summary: Fast-forward merged `feat/security-regression-suite` into local `main`, marked Phase 7 complete in OpenSpec tasks, and moved harness handoff state to Phase 8 Production Readiness Gate planning.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 8 from clean local `main`; do not push unless explicitly requested.
