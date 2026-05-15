@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- None
+- v0.7 Production Hardening Phase 6: Observability & Incident Diagnostics
 
 ## Blocked
 - None
@@ -227,7 +227,7 @@
 - v0.7 Phase 3 Cost & Rate Control is complete.
 - v0.7 Phase 4 Object Storage & Backup v2 is complete.
 - v0.7 Phase 5 Deployment Profile is complete.
-- v0.7 Phase 6 Observability & Incident Diagnostics planning checkpoint is next.
+- v0.7 Phase 6 Observability & Incident Diagnostics planning checkpoint is underway.
 - v0.7 should stay API/test/docs-first until a later phase explicitly accepts Web scope.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are

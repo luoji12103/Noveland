@@ -1949,3 +1949,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 6 Observability & Incident Diagnostics from clean local `main`.
+
+## v0.7.6 Observability & Incident Diagnostics planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 6.
+- Summary: Added the Phase 6 plan for safe incident diagnostics over existing runtime diagnostics, provider health, model invocation, media job, multimodal eval, budget, and narrative quality evidence. The plan uses `noveland.observability` as the owning package, permits a bounded platform-admin observability router if an API is needed, and explicitly avoids raw prompt/output replay, public incident routes, duplicate diagnostics frameworks, and broad `worlds.py` or runtime route growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.6-observability-incident-diagnostics-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/openspec/changes/v0-7-production-hardening/phase-plan.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, phase plan, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/observability-incident-diagnostics` from clean local `main`.

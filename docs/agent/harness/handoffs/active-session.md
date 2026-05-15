@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.7 Production Hardening Phase 5.
-- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics planning checkpoint is next.
+- Objective: v0.7 Production Hardening Phase 6.
+- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics planning checkpoint is underway.
 
 ## Current Context
 
@@ -44,7 +44,7 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Begin Phase 6 Observability & Incident Diagnostics from clean local `main`.
+- Commit the Phase 6 docs-only planning checkpoint, then start implementation on `feat/observability-incident-diagnostics`.
 - Stop for an architecture decision if incident diagnostics need raw prompt/output exposure, resolved secrets, storage paths, or a duplicate diagnostics framework.
 
 ## Latest Verification

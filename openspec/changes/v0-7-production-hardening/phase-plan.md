@@ -304,6 +304,7 @@ Expose safe incident diagnostics and retention controls over provider, media, ru
 - Safe evidence refs for provider failures, media job failures, budget blocks, eval failures, and runtime diagnostics.
 - Diagnostic retention dry-run/prune behavior where already supported.
 - Failure replay metadata without raw prompt/output or resolved secret exposure.
+- Dedicated observability service and, if needed, a bounded platform-admin observability router; avoid broad runtime route growth.
 
 ### Non-goals
 
@@ -321,6 +322,7 @@ Expose safe incident diagnostics and retention controls over provider, media, ru
 - media jobs
 - multimodal eval service
 - narrative quality dashboard summary
+- platform-admin authorization dependencies
 
 ### Acceptance Criteria
 

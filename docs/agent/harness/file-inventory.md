@@ -439,6 +439,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.7.3-cost-rate-control-plan.md`
 - `docs/agent/harness/feature-updates/v0.7.4-object-storage-backup-v2-plan.md`
 - `docs/agent/harness/feature-updates/v0.7.5-deployment-profile-plan.md`
+- `docs/agent/harness/feature-updates/v0.7.6-observability-incident-diagnostics-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`

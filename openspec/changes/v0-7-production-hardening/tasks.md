@@ -69,7 +69,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 6 — Observability & Incident Diagnostics
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `observability-incident-diagnostics` scope only.
 - [ ] Reuse runtime diagnostics, provider health, model invocation, media job, multimodal eval, and narrative quality evidence.
 - [ ] Ensure incident reports expose safe evidence refs only.
