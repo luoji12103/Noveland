@@ -29,17 +29,28 @@ from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping,
 from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
 from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.gm import LivingWorldGMService
+from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.living_context import LivingWorldContextPack, LivingWorldContextSelector
-from noveland.worlds.models import GMEventProposal, LongRunEvalRun, Worldline
+from noveland.worlds.models import (
+    GMEventProposal,
+    LongRunEvalRun,
+    NarrativeContinuityReview,
+    RouteAffinity,
+    Worldline,
+)
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .contracts import (
     NarrativeQualityAlignmentFinding,
+    NarrativeQualityConflictReport,
     NarrativeQualityContextKind,
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityContinuityFinding,
+    NarrativeQualityContinuityReviewRequest,
+    NarrativeQualityContinuityReviewResult,
     NarrativeQualityDialogueFinding,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityDialogueReviewResult,
@@ -52,6 +63,7 @@ from .contracts import (
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityPresentationAlignmentResult,
     NarrativeQualityProviderRef,
+    NarrativeQualityRepairSuggestion,
     NarrativeQualitySuggestedFix,
     NarrativeQualityWriterGenerateRequest,
     NarrativeQualityWriterGenerationResult,
@@ -780,6 +792,98 @@ class NarrativeQualityService:
             ),
         )
 
+    def review_continuity_v2(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityContinuityReviewRequest,
+    ) -> NarrativeQualityContinuityReviewResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        try:
+            reject_sensitive_config(request.metadata, field_name="metadata")
+        except ValueError as exc:
+            raise NarrativeQualityValidationError(str(exc)) from exc
+        artifact = None
+        if request.artifact_id is not None:
+            artifact = self._artifact_or_error(world_id, worldline.id, request.artifact_id)
+        reviewed_text = request.reviewed_text
+        if reviewed_text is None and artifact is not None:
+            reviewed_text = artifact.content
+        if reviewed_text is None or reviewed_text.strip() == "":
+            raise NarrativeQualityValidationError("continuity review requires text")
+        metadata = _sanitize_json(
+            {
+                **dict(request.metadata),
+                "source": "continuity_review_v2",
+                "phase": "v0.6.6",
+                "worldline_id": str(worldline.id),
+                "context_limit": request.context_limit,
+                "artifact_id": None if artifact is None else str(artifact.id),
+                "artifact_worldline_id": None
+                if artifact is None or artifact.worldline_id is None
+                else str(artifact.worldline_id),
+                "legacy_metadata_worldline_id": None
+                if artifact is None
+                else str(_metadata_worldline_id(artifact) or ""),
+            }
+        )
+        review = LivingWorldGuardrailService(self._session).review_narrative_continuity(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            artifact_id=request.artifact_id,
+            source_kind=request.source_kind,
+            source_ref=request.source_ref,
+            reviewed_text=reviewed_text,
+            metadata=metadata,
+        )
+        evidence_refs = [
+            NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id)),
+            NarrativeQualityEvidenceRef(kind="continuity_review", id=str(review.id)),
+        ]
+        if artifact is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="narrative_artifact", id=str(artifact.id))
+            )
+        findings = _continuity_findings(review, evidence_refs=evidence_refs)
+        conflict_reports = self._continuity_conflicts(
+            review,
+            world_id=world_id,
+            worldline_id=worldline.id,
+            reviewed_text=reviewed_text,
+            metadata=request.metadata,
+            evidence_refs=evidence_refs,
+        )
+        repair_suggestions = _continuity_repair_suggestions(
+            findings,
+            conflict_reports,
+            evidence_refs=evidence_refs,
+        )
+        return NarrativeQualityContinuityReviewResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            review_id=review.id,
+            artifact_id=review.artifact_id,
+            source_kind=review.source_kind,
+            source_ref=review.source_ref,
+            review_status=review.status,
+            findings=findings,
+            conflict_reports=conflict_reports,
+            repair_suggestions=repair_suggestions,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "continuity_review",
+                    "context_limit": request.context_limit,
+                    "artifact_reviewed": artifact is not None,
+                    "explicit_text_reviewed": request.reviewed_text is not None,
+                    "finding_count": len(findings),
+                    "conflict_count": len(conflict_reports),
+                    "repair_suggestion_count": len(repair_suggestions),
+                    "persisted_review_id": str(review.id),
+                    "world_event_written": False,
+                }
+            ),
+        )
+
     def _agent_context(
         self,
         world_id: uuid.UUID,
@@ -1094,6 +1198,72 @@ class NarrativeQualityService:
             if turn.id == turn_id:
                 return turn
         raise NarrativeQualityValidationError("turn not found")
+
+    def _artifact_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        artifact_id: uuid.UUID,
+    ) -> NarrativeArtifact:
+        artifact = self._session.get(NarrativeArtifact, artifact_id)
+        if artifact is None or artifact.world_id != world_id:
+            raise NarrativeQualityValidationError("narrative artifact not found")
+        if artifact.worldline_id is not None and artifact.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("narrative artifact does not belong to worldline")
+        return artifact
+
+    def _continuity_conflicts(
+        self,
+        review: NarrativeContinuityReview,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        reviewed_text: str,
+        metadata: dict[str, Any],
+        evidence_refs: list[NarrativeQualityEvidenceRef],
+    ) -> list[NarrativeQualityConflictReport]:
+        reports = _continuity_conflicts_from_review(review, evidence_refs=evidence_refs)
+        reports.extend(_relationship_jump_conflicts(metadata, evidence_refs=evidence_refs))
+        reports.extend(
+            self._route_reference_conflicts(
+                world_id,
+                worldline_id,
+                reviewed_text,
+                evidence_refs=evidence_refs,
+            )
+        )
+        return reports
+
+    def _route_reference_conflicts(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        reviewed_text: str,
+        *,
+        evidence_refs: list[NarrativeQualityEvidenceRef],
+    ) -> list[NarrativeQualityConflictReport]:
+        if "route" not in reviewed_text.lower():
+            return []
+        active_route = self._session.scalars(
+            select(RouteAffinity.id)
+            .where(
+                RouteAffinity.world_id == world_id,
+                RouteAffinity.worldline_id == worldline_id,
+                RouteAffinity.status == "active",
+            )
+            .limit(1)
+        ).first()
+        if active_route is not None:
+            return []
+        return [
+            NarrativeQualityConflictReport(
+                code="route_context_missing",
+                severity="warning",
+                summary="Text references route progression without an active route context.",
+                evidence_refs=evidence_refs,
+                details={"active_route_found": False},
+            )
+        ]
 
     def _sprite_set_or_error(
         self,
@@ -1515,6 +1685,187 @@ def _proposal_candidate(proposal: GMEventProposal) -> NarrativeQualityGMProposal
     )
 
 
+def _continuity_findings(
+    review: NarrativeContinuityReview,
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityContinuityFinding]:
+    return [
+        NarrativeQualityContinuityFinding(
+            code=_safe_text(_clip(str(issue.get("code") or "continuity_issue"), 120)),
+            severity=_safe_text(_clip(str(issue.get("severity") or "info"), 40)),
+            message=_safe_text(
+                _clip(str(issue.get("message") or "Continuity issue detected."), 400)
+            ),
+            evidence_refs=evidence_refs,
+            suggested_action=_continuity_action(str(issue.get("code") or "")),
+        )
+        for issue in review.issues
+    ]
+
+
+def _continuity_conflicts_from_review(
+    review: NarrativeContinuityReview,
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityConflictReport]:
+    conflict_codes = {
+        "hidden_secret_leak",
+        "knowledge_leak_risk",
+        "time_contradiction_risk",
+        "forbidden_change",
+        "ooc_marker",
+    }
+    reports: list[NarrativeQualityConflictReport] = []
+    for issue in review.issues:
+        code = str(issue.get("code") or "continuity_issue")
+        if code not in conflict_codes:
+            continue
+        details = {
+            key: value
+            for key, value in issue.items()
+            if key not in {"message"} and key != "secret_id"
+        }
+        if "secret_id" in issue:
+            details["secret_ref_present"] = True
+        reports.append(
+            NarrativeQualityConflictReport(
+                code=code,
+                severity=str(issue.get("severity") or "warning"),
+                summary=_safe_text(
+                    _clip(str(issue.get("message") or "Continuity conflict detected."), 400)
+                ),
+                evidence_refs=evidence_refs,
+                details=_sanitize_json(details),
+            )
+        )
+    return reports
+
+
+def _relationship_jump_conflicts(
+    metadata: dict[str, Any],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityConflictReport]:
+    deltas = _relationship_deltas(metadata)
+    reports: list[NarrativeQualityConflictReport] = []
+    for field, delta in sorted(deltas.items()):
+        if abs(delta) < 40:
+            continue
+        reports.append(
+            NarrativeQualityConflictReport(
+                code="relationship_jump",
+                severity="warning",
+                summary=(
+                    f"Metadata claims a large relationship {field} delta without "
+                    "reviewed transition evidence."
+                ),
+                evidence_refs=evidence_refs,
+                details={"field": field, "delta": delta, "threshold": 40},
+            )
+        )
+    return reports
+
+
+def _relationship_deltas(metadata: dict[str, Any]) -> dict[str, int]:
+    candidates: list[Any] = []
+    for key in ("relationship_delta", "relationship_deltas", "relationship_changes"):
+        if key in metadata:
+            candidates.append(metadata[key])
+    nested = metadata.get("relationship")
+    if isinstance(nested, dict):
+        for key in ("delta", "deltas", "changes"):
+            if key in nested:
+                candidates.append(nested[key])
+    deltas: dict[str, int] = {}
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        for key, value in candidate.items():
+            normalized = str(key).strip().lower()
+            if normalized not in {
+                "affection",
+                "trust",
+                "intimacy",
+                "hostility",
+                "obligation",
+                "rivalry",
+                "debt",
+            }:
+                continue
+            parsed = _int_or_none(value)
+            if parsed is not None:
+                deltas[normalized] = parsed
+    return deltas
+
+
+def _continuity_repair_suggestions(
+    findings: list[NarrativeQualityContinuityFinding],
+    conflict_reports: list[NarrativeQualityConflictReport],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityRepairSuggestion]:
+    suggestions: list[NarrativeQualityRepairSuggestion] = []
+    codes = {item.code for item in findings} | {item.code for item in conflict_reports}
+    if "hidden_secret_leak" in codes:
+        suggestions.append(
+            NarrativeQualityRepairSuggestion(
+                code="remove_hidden_secret_reference",
+                message="Remove or obfuscate hidden secret material before publication.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                patch_json={"action": "rewrite_secret_reference"},
+            )
+        )
+    if "time_contradiction_risk" in codes:
+        suggestions.append(
+            NarrativeQualityRepairSuggestion(
+                code="clarify_timeline_order",
+                message="Add explicit timeline ordering or adjust the scene timing.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                patch_json={"action": "add_timeline_bridge"},
+            )
+        )
+    if "knowledge_leak_risk" in codes:
+        suggestions.append(
+            NarrativeQualityRepairSuggestion(
+                code="scope_character_knowledge",
+                message="Limit knowledge claims to agents who can plausibly know them.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                patch_json={"action": "scope_knowledge_visibility"},
+            )
+        )
+    if "relationship_jump" in codes:
+        suggestions.append(
+            NarrativeQualityRepairSuggestion(
+                code="add_relationship_transition",
+                message="Add an intermediate relationship beat before applying the large delta.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                patch_json={"action": "insert_relationship_transition"},
+            )
+        )
+    if "route_context_missing" in codes:
+        suggestions.append(
+            NarrativeQualityRepairSuggestion(
+                code="attach_route_context",
+                message="Attach an active route or rewrite the text to avoid route progression.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                patch_json={"action": "attach_route_or_rewrite"},
+            )
+        )
+    return suggestions
+
+
+def _continuity_action(code: str) -> str | None:
+    actions = {
+        "hidden_secret_leak": "Remove hidden secret details or restrict visibility.",
+        "knowledge_leak_risk": "Scope the claim to characters with valid knowledge.",
+        "time_contradiction_risk": "Clarify the timeline before publication.",
+        "forbidden_change": "Route this change through a canon review before use.",
+        "ooc_marker": "Remove OOC framing from reader-facing narrative text.",
+    }
+    return actions.get(code)
+
+
 def _turn_dialogue_text(turn: ConversationTurnRecord | None) -> str | None:
     if turn is None:
         return None
@@ -1657,6 +2008,21 @@ def _metadata_worldline_id(artifact: NarrativeArtifact) -> uuid.UUID | None:
         return uuid.UUID(raw_worldline_id)
     except ValueError:
         return None
+
+
+def _int_or_none(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _turn_metadata(turn: ConversationTurnRecord) -> dict[str, Any]:

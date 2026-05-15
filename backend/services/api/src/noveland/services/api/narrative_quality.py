@@ -8,6 +8,8 @@ from noveland.auth import AuthenticatedSubject
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityContinuityReviewRequest,
+    NarrativeQualityContinuityReviewResult,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityDialogueReviewResult,
     NarrativeQualityGMProposalGenerateRequest,
@@ -147,6 +149,25 @@ def generate_narrative_writer_v2_draft(
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
     except (ProviderExecutionError, ProviderValidationError) as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/continuity/review",
+    response_model=NarrativeQualityContinuityReviewResult,
+    dependencies=[Depends(require_csrf)],
+)
+def review_narrative_continuity_v2(
+    world_id: uuid.UUID,
+    request: NarrativeQualityContinuityReviewRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityContinuityReviewResult:
+    try:
+        return NarrativeQualityService(db_session).review_continuity_v2(world_id, request)
+    except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
     except ValueError as exc:
         raise _not_found(str(exc)) from exc

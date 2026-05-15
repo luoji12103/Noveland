@@ -401,6 +401,88 @@ def test_narrative_quality_writer_v2_api_requires_world_admin() -> None:
         assert session.scalar(select(func.count(ModelInvocation.id))) == 0
 
 
+def test_narrative_quality_continuity_review_api_reviews_artifact() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        worldline_id,
+        content="Everyone knows a time paradox happened on this route.",
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/continuity/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "artifact_id": str(artifact_id),
+            "source_kind": "artifact",
+            "source_ref": str(artifact_id),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["worldline_id"] == str(worldline_id)
+    assert body["artifact_id"] == str(artifact_id)
+    assert body["review_status"] == "warning"
+    assert any(finding["code"] == "knowledge_leak_risk" for finding in body["findings"])
+    assert any(report["code"] == "route_context_missing" for report in body["conflict_reports"])
+    assert "storage_uri" not in response.text
+    assert "raw_prompt" not in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 1
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 0
+
+
+def test_narrative_quality_continuity_review_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/continuity/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_kind": "manual",
+            "reviewed_text": "Safe text.",
+        },
+    )
+
+    assert response.status_code == 403
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 0
+
+
+def test_narrative_quality_continuity_review_api_rejects_sensitive_metadata() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/continuity/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_kind": "manual",
+            "reviewed_text": "Safe text.",
+            "metadata": {"nested": {"api_key": "sk-secret"}},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "api_key" in response.text
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 0
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -632,6 +714,30 @@ def _seed_conversation_turn(
         )
         session.commit()
         return conversation_id, turn_id
+
+
+def _seed_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    content: str,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="Fixture artifact",
+                content=content,
+                artifact_kind="chapter_draft",
+                artifact_metadata={"worldline_id": str(worldline_id)},
+            )
+        )
+        session.commit()
+        return artifact_id
 
 
 def _seed_aligned_presentation(

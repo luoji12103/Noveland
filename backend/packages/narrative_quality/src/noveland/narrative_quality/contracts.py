@@ -331,6 +331,96 @@ class NarrativeQualityWriterGenerationResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityContinuityReviewRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    artifact_id: uuid.UUID | None = None
+    source_kind: str = Field(min_length=1, max_length=40)
+    source_ref: str | None = Field(default=None, max_length=160)
+    reviewed_text: str | None = Field(default=None, min_length=1, max_length=80_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    context_limit: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("source_kind", mode="after")
+    @classmethod
+    def normalize_source_kind(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("source_kind must not be empty")
+        return normalized
+
+    @field_validator("source_ref", "reviewed_text", mode="after")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("text fields must not be empty")
+        return normalized
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+    @model_validator(mode="after")
+    def validate_review_source(self) -> NarrativeQualityContinuityReviewRequest:
+        if self.artifact_id is None and self.reviewed_text is None:
+            raise ValueError("continuity review requires artifact_id or reviewed_text")
+        return self
+
+
+class NarrativeQualityContinuityFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    suggested_action: str | None = Field(default=None, max_length=400)
+
+
+class NarrativeQualityConflictReport(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    summary: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("details", mode="after")
+    @classmethod
+    def validate_details_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "details")
+        return value
+
+
+class NarrativeQualityRepairSuggestion(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    target_ref: NarrativeQualityEvidenceRef | None = None
+    patch_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("patch_json", mode="after")
+    @classmethod
+    def validate_patch_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "patch_json")
+        return value
+
+
+class NarrativeQualityContinuityReviewResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    review_id: uuid.UUID
+    artifact_id: uuid.UUID | None = None
+    source_kind: str
+    source_ref: str | None = None
+    review_status: str
+    findings: list[NarrativeQualityContinuityFinding] = Field(default_factory=list)
+    conflict_reports: list[NarrativeQualityConflictReport] = Field(default_factory=list)
+    repair_suggestions: list[NarrativeQualityRepairSuggestion] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json

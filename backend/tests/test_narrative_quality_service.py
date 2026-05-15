@@ -38,6 +38,7 @@ from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextKind,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityContinuityReviewRequest,
     NarrativeQualityDialogueReviewRequest,
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityPresentationAlignmentRequest,
@@ -759,6 +760,198 @@ def test_narrative_writer_v2_sanitizes_result_and_artifact_metadata() -> None:
     assert "media://" not in str(artifact.artifact_metadata)
 
 
+def test_continuity_review_v2_reviews_artifact_content_and_persists_review() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        worldline_id,
+        content="The daily scene stays in canon.",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                artifact_id=artifact_id,
+                source_kind="artifact",
+                source_ref=str(artifact_id),
+            ),
+        )
+        review = session.get(NarrativeContinuityReview, result.review_id)
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    assert result.worldline_id == worldline_id
+    assert result.artifact_id == artifact_id
+    assert result.review_status in {"pass", "warning"}
+    assert review is not None
+    assert review.artifact_id == artifact_id
+    assert review.worldline_id == worldline_id
+    assert event_count == 0
+
+
+def test_continuity_review_v2_reviews_explicit_text_without_artifact() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                source_kind="manual",
+                reviewed_text="Everyone knows the same time paradox happened on this route.",
+            ),
+        )
+
+    assert result.artifact_id is None
+    assert result.review_status == "warning"
+    codes = {finding.code for finding in result.findings}
+    assert "knowledge_leak_risk" in codes
+    assert "time_contradiction_risk" in codes
+    assert any(report.code == "route_context_missing" for report in result.conflict_reports)
+
+
+def test_continuity_review_v2_detects_hidden_secret_leak() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    _seed_hidden_secret(engine, world_id, worldline_id, "The locked diary is under the desk.")
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                source_kind="manual",
+                reviewed_text="The locked diary is under the desk.",
+                metadata={"agent_id": str(agent_id)},
+            ),
+        )
+
+    assert result.review_status == "fail"
+    assert any(finding.code == "hidden_secret_leak" for finding in result.findings)
+    serialized = result.model_dump_json()
+    assert "locked diary" not in serialized.lower()
+    assert "secret_id" not in serialized
+
+
+def test_continuity_review_v2_detects_relationship_jump_from_metadata() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                source_kind="manual",
+                reviewed_text="They decide to trust each other after one scene.",
+                metadata={"relationship_delta": {"trust": 75}},
+            ),
+        )
+
+    assert result.review_status == "pass"
+    assert any(report.code == "relationship_jump" for report in result.conflict_reports)
+    assert any(fix.code == "add_relationship_transition" for fix in result.repair_suggestions)
+
+
+def test_continuity_review_v2_does_not_flag_route_when_active_route_exists() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    _seed_active_route(engine, world_id, worldline_id, agent_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                source_kind="manual",
+                reviewed_text="This route scene moves forward quietly.",
+            ),
+        )
+
+    assert not any(report.code == "route_context_missing" for report in result.conflict_reports)
+
+
+def test_continuity_review_v2_rejects_cross_worldline_artifact() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    fork_id = _seed_worldline(engine, world_id)
+    artifact_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        worldline_id,
+        content="Original worldline artifact.",
+    )
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_continuity_v2(
+                world_id,
+                NarrativeQualityContinuityReviewRequest(
+                    worldline_id=fork_id,
+                    artifact_id=artifact_id,
+                    source_kind="artifact",
+                ),
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "worldline" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline artifact rejection")
+        assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 0
+
+
+def test_continuity_review_v2_rejects_sensitive_metadata() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_continuity_v2(
+                world_id,
+                NarrativeQualityContinuityReviewRequest(
+                    worldline_id=worldline_id,
+                    source_kind="manual",
+                    reviewed_text="Safe text.",
+                    metadata={"nested": {"api_key": "sk-secret"}},
+                ),
+            )
+        except ValueError as exc:
+            assert "api_key" in str(exc)
+        else:
+            raise AssertionError("expected sensitive metadata rejection")
+        assert session.scalar(select(func.count(NarrativeContinuityReview.id))) == 0
+
+
+def test_continuity_review_v2_sanitizes_response() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(
+        engine,
+        "storage_uri=media://hidden/object base64,AAAA",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_continuity_v2(
+            world_id,
+            NarrativeQualityContinuityReviewRequest(
+                worldline_id=worldline_id,
+                source_kind="manual",
+                reviewed_text="storage_uri=media://hidden/object base64,AAAA",
+                metadata={"notes": "file:///tmp/secret.txt"},
+            ),
+        )
+
+    serialized = result.model_dump_json().lower()
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized
+    assert "file://" not in serialized
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -1105,3 +1298,99 @@ def _seed_provider(
         )
         session.commit()
         return provider.id
+
+
+def _seed_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    fork_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Worldline(
+                id=fork_id,
+                world_id=world_id,
+                worldline_key=f"fork-{fork_id.hex[:8]}",
+                name="Fork",
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+        return fork_id
+
+
+def _seed_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    content: str,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="Fixture artifact",
+                content=content,
+                artifact_kind=NarrativeArtifactKind.CHAPTER_DRAFT.value,
+                artifact_metadata={"worldline_id": str(worldline_id)},
+            )
+        )
+        session.commit()
+        return artifact_id
+
+
+def _seed_hidden_secret(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    content: str,
+) -> uuid.UUID:
+    secret_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            SecretRecord(
+                id=secret_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                secret_key=f"secret-{secret_id.hex[:8]}",
+                title="Hidden diary",
+                content=content,
+                status="hidden",
+                visibility="holders",
+                holder_agent_ids=[],
+                reveal_conditions={},
+                consequence_metadata={},
+                metadata_json={},
+            )
+        )
+        session.commit()
+        return secret_id
+
+
+def _seed_active_route(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+) -> uuid.UUID:
+    route_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            RouteAffinity(
+                id=route_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                route_key=f"route-{route_id.hex[:8]}",
+                status="active",
+                affinity=10,
+                stage=1,
+                flags=[],
+                metadata_json={},
+            )
+        )
+        session.commit()
+        return route_id
