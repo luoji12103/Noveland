@@ -17,7 +17,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] Implement reader-safe media descriptors and delivery policy only.
 - [x] Add focused API, ACL, visibility, and leak tests.
 - [x] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

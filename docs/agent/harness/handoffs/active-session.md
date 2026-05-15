@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: feat/reader-media-delivery
 - Objective: v0.8 Public Experience & Ecosystem Phase 1 Reader Media Delivery.
-- Status: Phase 1 reader-safe media package/router implementation and targeted checks are complete; full local gate is next.
+- Status: Phase 1 reader-safe media package/router implementation and full local gate are complete; fast-forward merge is next.
 
 ## Current Context
 
@@ -53,8 +53,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Run the v0.8 Phase 1 full local gate on `feat/reader-media-delivery`.
-- If the full gate passes, fast-forward merge `feat/reader-media-delivery` back to local `main`, confirm clean status, then continue to Phase 2.
+- Fast-forward merge `feat/reader-media-delivery` back to local `main`, confirm clean status, then continue to Phase 2.
 - Preserve the authenticated-only reader media model unless OpenSpec is updated first.
 - Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
 
@@ -166,3 +165,4 @@
 - v0.7 Phase 8 fast-forward merge to local `main` completed.
 - v0.8 feasibility review and OpenSpec plan adaptation are docs-only. Validation target is OpenSpec strict validation plus `git diff --check`.
 - v0.8 Phase 1 targeted checks passed: backend ruff for `packages/reader_delivery`, `reader_media.py`, and `test_api_reader_media.py`; backend mypy for the same paths; targeted pytest (`5 passed`).
+- v0.8 Phase 1 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.

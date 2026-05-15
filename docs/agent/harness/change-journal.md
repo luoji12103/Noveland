@@ -2119,3 +2119,15 @@
 - Docs updated: OpenSpec task status, file inventory, project index, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff for reader delivery/API/tests, backend mypy for the same files, and targeted pytest (`5 passed`).
 - Follow-up notes: Run the full local gate, then fast-forward merge Phase 1 back to local `main` if it stays green.
+
+## v0.8.1 Reader Media Delivery gate entry
+
+- Date: 2026-05-15
+- Branch: feat/reader-media-delivery
+- Scope: v0.8 Public Experience & Ecosystem Phase 1 full local gate.
+- Summary: Recorded the successful full local gate for the authenticated reader media delivery implementation.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
+- Follow-up notes: Fast-forward merge `feat/reader-media-delivery` to local `main`, then record merge bookkeeping before starting Phase 2.
