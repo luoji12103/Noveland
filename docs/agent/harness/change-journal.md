@@ -187,6 +187,17 @@
 - Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
 - Follow-up notes: Begin Phase 9 Long-run Living World Simulation Eval from clean local `main`; no push performed.
 
+## v0.6.9 Long-run Living World Simulation Eval planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 9 planning
+- Summary: Added the Phase 9 implementation checkpoint for an API-first long-run living world simulation eval under the narrative quality boundary. The plan reuses `LongRunEvalRun` and `LivingWorldBetaService.run_long_eval()` for persisted metrics and forbids duplicate eval tables, provider calls, runtime daemon simulation, Web UI, broad `worlds.py` routes, and release gate semantic changes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.9-long-run-living-world-simulation-eval-plan.md`, `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, task board, active handoff, OpenSpec tasks
+- Follow-up notes: Implement Phase 9 on `feat/long-run-living-world-simulation-eval`; no migration expected.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04

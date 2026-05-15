@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 9.
-- Status: Phase 8 Route & Relationship Progression Quality is complete and fast-forward merged; Phase 9 Long-run Living World Simulation Eval planning is next.
+- Status: Phase 9 Long-run Living World Simulation Eval planning checkpoint is complete; implementation branch is next.
 
 ## Current Context
 
@@ -41,7 +41,7 @@
 
 ## Required Next Steps
 
-- Start Phase 9 planning from clean local `main`.
+- Start Phase 9 implementation from clean local `main` on `feat/long-run-living-world-simulation-eval`.
 - Keep Phase 9 API-first under the narrative quality package/router; do not add Web dashboard work or broad `worlds.py` routes.
 - Reuse `LongRunEvalRun`, runtime/conversation/worldline records, and existing eval/release evidence; do not create a duplicate eval framework unless implementation proves existing records insufficient.
 - Reuse `LivingWorldGuardrailService.review_narrative_continuity` and `NarrativeContinuityReview`; do not add a duplicate review table.
@@ -110,3 +110,4 @@
 - v0.6 Phase 8 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`56 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 8 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`371 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 8 fast-forward merge to local `main` completed.
+- v0.6 Phase 9 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
