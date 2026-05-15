@@ -1778,3 +1778,14 @@
 - Tests added/updated: N/A, documentation-only planning update.
 - Docs updated: v0.7 OpenSpec proposal, design, phase plan, task list, capability specs, feature review, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Validate OpenSpec and `git diff --check`, then commit as docs-only. Do not implement v0.7 or push unless explicitly requested.
+
+## v0.7 Permission Matrix & ACL Regression Baseline plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 1.
+- Summary: Added the Phase 1 plan for API/test/docs-first permission hardening over the existing v0.4-v0.6 route surface. The plan requires a route permission matrix, lower-privilege leak regression coverage, narrow ACL fixes only, and preservation of existing auth/package/router boundaries.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/permission-model-hardening` from clean local `main`.

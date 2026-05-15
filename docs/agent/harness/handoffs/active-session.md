@@ -2,8 +2,8 @@
 
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
-- Objective: v0.7 Production Hardening planning review.
-- Status: v0.6 is locally complete; v0.7 OpenSpec planning has been reviewed and optimized for the post-v0.6 baseline.
+- Objective: v0.7 Production Hardening Phase 1.
+- Status: Phase 1 Permission Matrix & ACL Regression Baseline planning checkpoint is in progress.
 
 ## Current Context
 
@@ -120,3 +120,4 @@
 - v0.6 Phase 10 fast-forward merge to local `main` completed.
 - v0.7 Production Hardening feasibility review optimized the OpenSpec proposal/design/phase-plan/tasks/specs after v0.6 completion.
 - v0.7 revised first implementation target is Phase 1 Permission Matrix & ACL Regression Baseline.
+- v0.7 Phase 1 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md`.

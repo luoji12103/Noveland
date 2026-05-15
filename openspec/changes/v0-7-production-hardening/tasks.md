@@ -4,7 +4,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 1 — Permission Matrix & ACL Regression Baseline
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `permission-model-hardening` scope only.
 - [ ] Document the current platform-admin/world-admin/world-member/reader/player route matrix.
 - [ ] Add or update route ACL and lower-privilege leak regression coverage.
