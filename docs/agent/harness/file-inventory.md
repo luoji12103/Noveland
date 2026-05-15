@@ -433,6 +433,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.7-production-hardening-feasibility-review.md`
 - `docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md`
 - `docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md`
+- `docs/agent/harness/feature-updates/v0.7.3-cost-rate-control-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`

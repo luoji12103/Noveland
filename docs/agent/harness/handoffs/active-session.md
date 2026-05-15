@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 3.
-- Status: Phase 2 Secret & Provider Governance is fast-forward merged to local main; Phase 3 Cost & Rate Control is next.
+- Status: Phase 3 Cost & Rate Control planning checkpoint is added; implementation should start from clean local main on `feat/cost-rate-control`.
 
 ## Current Context
 
@@ -127,3 +127,4 @@
 - v0.7 Phase 2 targeted checks passed: backend ruff for provider governance code/tests, backend mypy for provider governance code/tests, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.7 Phase 2 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`391 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.7 Phase 2 fast-forward merge to local `main` completed.
+- v0.7 Phase 3 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.3-cost-rate-control-plan.md`.

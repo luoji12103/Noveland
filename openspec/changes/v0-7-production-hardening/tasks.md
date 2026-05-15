@@ -30,7 +30,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 3 — Cost & Rate Control
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `cost-rate-control` scope only.
 - [ ] Define budget/quotas for provider execution, media jobs, asset generation, and provider-backed narrative quality generation.
 - [ ] Ensure budget blocks happen before external provider calls and produce safe evidence.

@@ -1846,3 +1846,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 3 Cost & Rate Control from clean local `main`.
+
+## v0.7 Cost & Rate Control plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.7 Production Hardening Phase 3.
+- Summary: Added the Phase 3 plan for provider-owned budget/rate controls covering world/provider limits, emergency stop, safe quota status, pre-call provider execution blocking, media job failure marking for blocked executions, and reuse of existing asset generation proposal budgets. The plan keeps implementation inside the existing providers boundary and explicitly avoids a new production-hardening router, Web UI, billing marketplace, provider fallback, or broad `worlds.py` growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.7.3-cost-rate-control-plan.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/cost-rate-control` from clean local `main`.
