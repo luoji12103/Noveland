@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from noveland.agents.models import Agent
+from noveland.agents.models import Agent, AgentRelationshipEdge
 from noveland.asset_generation.models import (
     AssetGenerationPolicy,
     AssetGenerationProposal,
@@ -18,6 +18,7 @@ from noveland.conversations.models import (
     ConversationTurnPresentation,
 )
 from noveland.conversations.presentation import ConversationPresentationService
+from noveland.events.models import WorldEventModel
 from noveland.media.models import MediaJob
 from noveland.narrative.contracts import NarrativeArtifactCreate
 from noveland.narrative.models import NarrativeArtifact
@@ -42,10 +43,13 @@ from noveland.worlds.gm import LivingWorldGMService
 from noveland.worlds.guardrails import LivingWorldGuardrailService
 from noveland.worlds.living_context import LivingWorldContextPack, LivingWorldContextSelector
 from noveland.worlds.models import (
+    EndingCandidate,
     GMEventProposal,
     LongRunEvalRun,
     NarrativeContinuityReview,
+    PlayerChoiceRecord,
     RouteAffinity,
+    RouteMilestone,
     Worldline,
 )
 from noveland.worlds.worldlines import worldline_or_404
@@ -76,6 +80,10 @@ from .contracts import (
     NarrativeQualityPacingReviewResult,
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityPresentationAlignmentResult,
+    NarrativeQualityProgressionFinding,
+    NarrativeQualityProgressionRecommendation,
+    NarrativeQualityProgressionReviewRequest,
+    NarrativeQualityProgressionReviewResult,
     NarrativeQualityProviderRef,
     NarrativeQualityRepairSuggestion,
     NarrativeQualitySuggestedFix,
@@ -1011,6 +1019,126 @@ class NarrativeQualityService:
             ),
         )
 
+    def review_route_relationship_progression(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityProgressionReviewRequest,
+    ) -> NarrativeQualityProgressionReviewResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        agent = None
+        if request.agent_id is not None:
+            agent = self._agent_or_error(world_id, request.agent_id)
+        route = None
+        if request.route_affinity_id is not None:
+            route = self._route_affinity_or_error(
+                world_id,
+                worldline.id,
+                request.route_affinity_id,
+            )
+            if agent is not None and route.agent_id != agent.id:
+                raise NarrativeQualityValidationError("route does not belong to agent")
+        relationships = (
+            self._relationship_edges(world_id, worldline.id, agent)
+            if request.include_relationships
+            else []
+        )
+        routes = (
+            self._route_affinities(world_id, worldline.id, agent, route)
+            if request.include_routes
+            else []
+        )
+        milestones = (
+            self._route_milestones(world_id, worldline.id, agent, routes)
+            if request.include_routes
+            else []
+        )
+        endings = (
+            self._ending_candidates(world_id, worldline.id, agent, routes)
+            if request.include_routes
+            else []
+        )
+        choices = (
+            self._player_choice_records(world_id, worldline.id, routes)
+            if request.include_routes
+            else []
+        )
+        events = (
+            self._recent_progression_events(
+                world_id,
+                worldline.id,
+                limit=request.recent_event_limit,
+            )
+            if request.include_events
+            else []
+        )
+        proposals = (
+            self._progression_gm_proposals(world_id, worldline.id, agent)
+            if request.include_proposals
+            else []
+        )
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="worldline", id=str(worldline.id))]
+        if agent is not None:
+            evidence_refs.append(NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id)))
+        if route is not None:
+            evidence_refs.append(NarrativeQualityEvidenceRef(kind="route", id=str(route.id)))
+        relationship_summary = _progression_relationship_summary(relationships)
+        route_summary = _progression_route_summary(
+            routes,
+            milestones,
+            endings,
+            choices,
+        )
+        event_summary = _progression_event_summary(events)
+        proposal_summary = _progression_proposal_summary(proposals)
+        findings = _progression_findings(
+            relationships=relationships,
+            routes=routes,
+            milestones=milestones,
+            endings=endings,
+            events=events,
+            proposals=proposals,
+            relationship_summary=relationship_summary,
+            route_summary=route_summary,
+            evidence_refs=evidence_refs,
+        )
+        recommendations = _progression_recommendations(
+            findings,
+            evidence_refs=evidence_refs,
+        )
+        status = "pass"
+        if any(finding.severity == "error" for finding in findings):
+            status = "fail"
+        elif any(finding.severity == "warning" for finding in findings):
+            status = "warning"
+        return NarrativeQualityProgressionReviewResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            agent_id=None if agent is None else agent.id,
+            route_affinity_id=None if route is None else route.id,
+            progression_status=status,
+            relationship_summary=_sanitize_json(relationship_summary),
+            route_summary=_sanitize_json(route_summary),
+            event_summary=_sanitize_json(event_summary),
+            proposal_summary=_sanitize_json(proposal_summary),
+            findings=findings,
+            recommendations=recommendations,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "route_relationship_progression",
+                    "include_relationships": request.include_relationships,
+                    "include_routes": request.include_routes,
+                    "include_events": request.include_events,
+                    "include_proposals": request.include_proposals,
+                    "recent_event_limit": request.recent_event_limit,
+                    "relationship_mutation_count": 0,
+                    "route_mutation_count": 0,
+                    "provider_call_count": 0,
+                    "world_event_written": False,
+                }
+            ),
+        )
+
     def _agent_context(
         self,
         world_id: uuid.UUID,
@@ -1572,6 +1700,192 @@ class NarrativeQualityService:
                 ConversationTurnPresentation.turn_id == turn_id
             )
         ).one_or_none()
+
+    def _route_affinity_or_error(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        route_affinity_id: uuid.UUID,
+    ) -> RouteAffinity:
+        route = self._session.get(RouteAffinity, route_affinity_id)
+        if route is None or route.world_id != world_id or route.worldline_id != worldline_id:
+            raise NarrativeQualityValidationError("route affinity not found in worldline")
+        return route
+
+    def _relationship_edges(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent | None,
+    ) -> list[AgentRelationshipEdge]:
+        statement = select(AgentRelationshipEdge).where(
+            AgentRelationshipEdge.world_id == world_id,
+            AgentRelationshipEdge.worldline_id == worldline_id,
+        )
+        if agent is not None:
+            statement = statement.where(
+                (AgentRelationshipEdge.source_agent_id == agent.id)
+                | (AgentRelationshipEdge.target_agent_id == agent.id)
+            )
+        return list(
+            self._session.scalars(
+                statement.order_by(
+                    AgentRelationshipEdge.source_agent_id,
+                    AgentRelationshipEdge.target_agent_id,
+                    AgentRelationshipEdge.relationship_type,
+                )
+            ).all()
+        )
+
+    def _route_affinities(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent | None,
+        route: RouteAffinity | None,
+    ) -> list[RouteAffinity]:
+        if route is not None:
+            return [route]
+        statement = select(RouteAffinity).where(
+            RouteAffinity.world_id == world_id,
+            RouteAffinity.worldline_id == worldline_id,
+        )
+        if agent is not None:
+            statement = statement.where(RouteAffinity.agent_id == agent.id)
+        return list(
+            self._session.scalars(
+                statement.order_by(
+                    RouteAffinity.stage.desc(),
+                    RouteAffinity.affinity.desc(),
+                    RouteAffinity.route_key,
+                )
+            ).all()
+        )
+
+    def _route_milestones(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent | None,
+        routes: list[RouteAffinity],
+    ) -> list[RouteMilestone]:
+        statement = select(RouteMilestone).where(
+            RouteMilestone.world_id == world_id,
+            RouteMilestone.worldline_id == worldline_id,
+        )
+        route_ids = [route.id for route in routes]
+        if route_ids:
+            statement = statement.where(
+                (RouteMilestone.route_affinity_id.in_(route_ids))
+                | (RouteMilestone.route_affinity_id.is_(None))
+            )
+        if agent is not None:
+            statement = statement.where(
+                (RouteMilestone.agent_id == agent.id) | (RouteMilestone.agent_id.is_(None))
+            )
+        return list(
+            self._session.scalars(
+                statement.order_by(RouteMilestone.stage, RouteMilestone.created_at)
+            ).all()
+        )
+
+    def _ending_candidates(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent | None,
+        routes: list[RouteAffinity],
+    ) -> list[EndingCandidate]:
+        statement = select(EndingCandidate).where(
+            EndingCandidate.world_id == world_id,
+            EndingCandidate.worldline_id == worldline_id,
+        )
+        route_ids = [route.id for route in routes]
+        if route_ids:
+            statement = statement.where(
+                (EndingCandidate.route_affinity_id.in_(route_ids))
+                | (EndingCandidate.route_affinity_id.is_(None))
+            )
+        if agent is not None:
+            statement = statement.where(
+                (EndingCandidate.agent_id == agent.id) | (EndingCandidate.agent_id.is_(None))
+            )
+        return list(
+            self._session.scalars(
+                statement.order_by(EndingCandidate.status, EndingCandidate.ending_key)
+            ).all()
+        )
+
+    def _player_choice_records(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        routes: list[RouteAffinity],
+    ) -> list[PlayerChoiceRecord]:
+        choice_ids = [route.last_choice_id for route in routes if route.last_choice_id is not None]
+        statement = select(PlayerChoiceRecord).where(
+            PlayerChoiceRecord.world_id == world_id,
+            PlayerChoiceRecord.worldline_id == worldline_id,
+        )
+        if choice_ids:
+            statement = statement.where(PlayerChoiceRecord.id.in_(choice_ids))
+        else:
+            statement = statement.where(PlayerChoiceRecord.choice_kind == "route")
+        return list(
+            self._session.scalars(
+                statement.order_by(PlayerChoiceRecord.created_at.desc()).limit(50)
+            ).all()
+        )
+
+    def _recent_progression_events(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        *,
+        limit: int,
+    ) -> list[WorldEventModel]:
+        if limit == 0:
+            return []
+        return list(
+            self._session.scalars(
+                select(WorldEventModel)
+                .where(
+                    WorldEventModel.world_id == world_id,
+                    WorldEventModel.worldline_id == worldline_id,
+                    WorldEventModel.importance.in_(["relationship", "route", "main_plot"]),
+                )
+                .order_by(WorldEventModel.sequence.desc())
+                .limit(limit)
+            ).all()
+        )
+
+    def _progression_gm_proposals(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent | None,
+    ) -> list[GMEventProposal]:
+        statement = select(GMEventProposal).where(
+            GMEventProposal.world_id == world_id,
+            GMEventProposal.worldline_id == worldline_id,
+            GMEventProposal.importance.in_(["relationship", "route", "main_plot"]),
+            GMEventProposal.status.in_(["proposed", "accepted"]),
+        )
+        proposals = list(
+            self._session.scalars(
+                statement.order_by(GMEventProposal.risk_score.desc(), GMEventProposal.created_at)
+            ).all()
+        )
+        if agent is None:
+            return proposals
+        agent_id_text = str(agent.id)
+        agent_key = agent.agent_key
+        return [
+            proposal
+            for proposal in proposals
+            if agent_id_text in {str(item) for item in proposal.affected_agents}
+            or agent_key in {str(item) for item in proposal.affected_agents}
+        ]
 
     def _sprite_set_or_error(
         self,
@@ -2345,6 +2659,459 @@ def _pacing_recommendations(
     return recommendations
 
 
+def _progression_relationship_summary(
+    relationships: list[AgentRelationshipEdge],
+) -> dict[str, Any]:
+    type_counts: dict[str, int] = {}
+    contradiction_count = 0
+    one_way_count = 0
+    pairs: dict[tuple[uuid.UUID, uuid.UUID], int] = {}
+    for edge in relationships:
+        type_counts[edge.relationship_type] = type_counts.get(edge.relationship_type, 0) + 1
+        if _relationship_is_contradictory(edge):
+            contradiction_count += 1
+        source_id, target_id = sorted((edge.source_agent_id, edge.target_agent_id), key=str)
+        ordered_pair = (source_id, target_id)
+        pairs[ordered_pair] = pairs.get(ordered_pair, 0) + 1
+    for count in pairs.values():
+        if count == 1:
+            one_way_count += 1
+    return {
+        "relationship_count": len(relationships),
+        "relationship_type_counts": type_counts,
+        "contradictory_relationship_count": contradiction_count,
+        "one_way_pair_count": one_way_count,
+    }
+
+
+def _progression_route_summary(
+    routes: list[RouteAffinity],
+    milestones: list[RouteMilestone],
+    endings: list[EndingCandidate],
+    choices: list[PlayerChoiceRecord],
+) -> dict[str, Any]:
+    route_status_counts: dict[str, int] = {}
+    milestone_status_counts: dict[str, int] = {}
+    ending_status_counts: dict[str, int] = {}
+    for route in routes:
+        route_status_counts[route.status] = route_status_counts.get(route.status, 0) + 1
+    for milestone in milestones:
+        milestone_status_counts[milestone.status] = (
+            milestone_status_counts.get(milestone.status, 0) + 1
+        )
+    for ending in endings:
+        ending_status_counts[ending.status] = ending_status_counts.get(ending.status, 0) + 1
+    return {
+        "route_count": len(routes),
+        "route_status_counts": route_status_counts,
+        "active_route_count": sum(1 for route in routes if route.status == "active"),
+        "blocked_route_count": sum(1 for route in routes if route.status == "blocked"),
+        "milestone_count": len(milestones),
+        "milestone_status_counts": milestone_status_counts,
+        "ending_count": len(endings),
+        "ending_status_counts": ending_status_counts,
+        "route_choice_count": len(choices),
+    }
+
+
+def _progression_event_summary(events: list[WorldEventModel]) -> dict[str, Any]:
+    importance_counts: dict[str, int] = {}
+    event_name_counts: dict[str, int] = {}
+    relationship_delta_count = 0
+    leaky_payload_count = 0
+    for event in events:
+        importance_counts[event.importance] = importance_counts.get(event.importance, 0) + 1
+        event_name_counts[event.event_name] = event_name_counts.get(event.event_name, 0) + 1
+        if _relationship_deltas(event.payload):
+            relationship_delta_count += 1
+        if _json_contains_leak(event.payload):
+            leaky_payload_count += 1
+    return {
+        "recent_event_count": len(events),
+        "importance_counts": importance_counts,
+        "event_name_counts": event_name_counts,
+        "relationship_delta_event_count": relationship_delta_count,
+        "unsafe_payload_event_count": leaky_payload_count,
+    }
+
+
+def _progression_proposal_summary(proposals: list[GMEventProposal]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    importance_counts: dict[str, int] = {}
+    high_risk_count = 0
+    for proposal in proposals:
+        status_counts[proposal.status] = status_counts.get(proposal.status, 0) + 1
+        importance_counts[proposal.importance] = importance_counts.get(proposal.importance, 0) + 1
+        if proposal.risk_score >= 70:
+            high_risk_count += 1
+    return {
+        "open_proposal_count": len(proposals),
+        "status_counts": status_counts,
+        "importance_counts": importance_counts,
+        "high_risk_open_proposal_count": high_risk_count,
+    }
+
+
+def _progression_findings(
+    *,
+    relationships: list[AgentRelationshipEdge],
+    routes: list[RouteAffinity],
+    milestones: list[RouteMilestone],
+    endings: list[EndingCandidate],
+    events: list[WorldEventModel],
+    proposals: list[GMEventProposal],
+    relationship_summary: dict[str, Any],
+    route_summary: dict[str, Any],
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityProgressionFinding]:
+    findings: list[NarrativeQualityProgressionFinding] = []
+    if not relationships:
+        findings.append(
+            _progression_finding(
+                "relationship_graph_sparse",
+                "info",
+                "No relationship edges are available for progression review.",
+                evidence_refs,
+            )
+        )
+    for edge in relationships:
+        edge_refs = [
+            *evidence_refs,
+            NarrativeQualityEvidenceRef(kind="relationship", id=str(edge.id)),
+        ]
+        if _relationship_is_contradictory(edge):
+            findings.append(
+                _progression_finding(
+                    "relationship_metric_contradiction",
+                    "warning",
+                    (
+                        "Relationship edge combines high affection or trust with high "
+                        "hostility or rivalry."
+                    ),
+                    edge_refs,
+                )
+            )
+        if edge.worldline_id is None:
+            findings.append(
+                _progression_finding(
+                    "relationship_worldline_missing",
+                    "error",
+                    (
+                        "Relationship edge has no worldline and cannot be used for "
+                        "v0.6 progression review."
+                    ),
+                    edge_refs,
+                )
+            )
+    if _int_value(relationship_summary.get("one_way_pair_count")) > 0:
+        findings.append(
+            _progression_finding(
+                "relationship_reciprocity_missing",
+                "info",
+                "Some relationship pairs only have one directed edge.",
+                evidence_refs,
+            )
+        )
+    if not routes:
+        findings.append(
+            _progression_finding(
+                "route_graph_sparse",
+                "info",
+                "No route affinities are available for progression review.",
+                evidence_refs,
+            )
+        )
+    milestones_by_route: dict[uuid.UUID, list[RouteMilestone]] = {}
+    for milestone in milestones:
+        if milestone.route_affinity_id is not None:
+            milestones_by_route.setdefault(milestone.route_affinity_id, []).append(milestone)
+    for route in routes:
+        route_refs = [*evidence_refs, NarrativeQualityEvidenceRef(kind="route", id=str(route.id))]
+        route_milestones = milestones_by_route.get(route.id, [])
+        if route.status == "active" and not route_milestones:
+            findings.append(
+                _progression_finding(
+                    "active_route_missing_milestones",
+                    "warning",
+                    "Active route has no route milestones.",
+                    route_refs,
+                )
+            )
+        if route.status == "blocked" and not _route_block_reason(route):
+            findings.append(
+                _progression_finding(
+                    "blocked_route_missing_reason",
+                    "warning",
+                    "Blocked route has no blocking reason in metadata or flags.",
+                    route_refs,
+                )
+            )
+        if route.status == "completed" and any(
+            milestone.status != "completed" for milestone in route_milestones
+        ):
+            findings.append(
+                _progression_finding(
+                    "completed_route_has_open_milestones",
+                    "warning",
+                    "Completed route still has open milestones.",
+                    route_refs,
+                )
+            )
+        for milestone in route_milestones:
+            if milestone.stage > route.stage and milestone.status in {"active", "completed"}:
+                findings.append(
+                    _progression_finding(
+                        "route_stage_milestone_mismatch",
+                        "warning",
+                        "Route milestone stage is ahead of the route affinity stage.",
+                        [
+                            *route_refs,
+                            NarrativeQualityEvidenceRef(
+                                kind="route_milestone",
+                                id=str(milestone.id),
+                            ),
+                        ],
+                    )
+                )
+    for ending in endings:
+        ending_route = next(
+            (item for item in routes if item.id == ending.route_affinity_id),
+            None,
+        )
+        issues = _ending_requirement_issues(ending, ending_route, milestones)
+        if issues:
+            findings.append(
+                _progression_finding(
+                    "ending_requirements_unsatisfied",
+                    "warning",
+                    "Ending candidate requirements are not currently satisfiable.",
+                    [
+                        *evidence_refs,
+                        NarrativeQualityEvidenceRef(kind="ending_candidate", id=str(ending.id)),
+                    ],
+                )
+            )
+    if _int_value(route_summary.get("route_choice_count")) == 0 and routes:
+        findings.append(
+            _progression_finding(
+                "route_choice_trace_missing",
+                "info",
+                "Route affinities have no associated route choice trace in this review scope.",
+                evidence_refs,
+            )
+        )
+    for proposal in proposals:
+        if proposal.risk_score < 70:
+            continue
+        findings.append(
+            _progression_finding(
+                "high_risk_progression_proposal_open",
+                "warning",
+                "High-risk relationship or route GM proposal is still open for review.",
+                [
+                    *evidence_refs,
+                    NarrativeQualityEvidenceRef(kind="gm_event_proposal", id=str(proposal.id)),
+                ],
+            )
+        )
+    for event in events:
+        if _json_contains_leak(event.payload):
+            findings.append(
+                _progression_finding(
+                    "unsafe_progression_event_payload",
+                    "error",
+                    "Recent route or relationship event payload contains unsafe operational data.",
+                    [
+                        *evidence_refs,
+                        NarrativeQualityEvidenceRef(kind="world_event", id=str(event.id)),
+                    ],
+                )
+            )
+        for _field, delta in _relationship_deltas(event.payload).items():
+            if abs(delta) >= 40:
+                findings.append(
+                    _progression_finding(
+                        "relationship_delta_jump",
+                        "warning",
+                        "Recent event contains a large relationship delta.",
+                        [
+                            *evidence_refs,
+                            NarrativeQualityEvidenceRef(kind="world_event", id=str(event.id)),
+                        ],
+                    )
+                )
+                break
+    return findings
+
+
+def _progression_recommendations(
+    findings: list[NarrativeQualityProgressionFinding],
+    *,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> list[NarrativeQualityProgressionRecommendation]:
+    recommendations: list[NarrativeQualityProgressionRecommendation] = []
+    codes = {finding.code for finding in findings}
+    if "relationship_metric_contradiction" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="review_relationship_tension",
+                message="Review whether contradictory relationship metrics are intended tension.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_action": "review_relationship"},
+            )
+        )
+    if "active_route_missing_milestones" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="add_route_milestones",
+                message="Add planned route milestones before relying on active route progression.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_action": "plan_milestones"},
+            )
+        )
+    if "route_stage_milestone_mismatch" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="align_route_stage_and_milestones",
+                message=(
+                    "Review route stage and milestone statuses before applying more "
+                    "route beats."
+                ),
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_action": "review_route_stage"},
+            )
+        )
+    if "ending_requirements_unsatisfied" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="review_ending_requirements",
+                message="Review ending requirements against current route state and milestones.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={
+                    "mutates_state": False,
+                    "recommended_action": "review_ending_requirements",
+                },
+            )
+        )
+    if "high_risk_progression_proposal_open" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="resolve_high_risk_progression_proposals",
+                message="Resolve high-risk route or relationship proposals before progressing.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_action": "review_proposals"},
+            )
+        )
+    if "unsafe_progression_event_payload" in codes:
+        recommendations.append(
+            NarrativeQualityProgressionRecommendation(
+                code="sanitize_progression_events",
+                message="Remove unsafe operational data from progression event payloads.",
+                target_ref=evidence_refs[0] if evidence_refs else None,
+                action_json={"mutates_state": False, "recommended_action": "audit_events"},
+            )
+        )
+    return recommendations
+
+
+def _progression_finding(
+    code: str,
+    severity: str,
+    message: str,
+    evidence_refs: list[NarrativeQualityEvidenceRef],
+) -> NarrativeQualityProgressionFinding:
+    return NarrativeQualityProgressionFinding(
+        code=code,
+        severity=severity,
+        message=message,
+        evidence_refs=evidence_refs,
+    )
+
+
+def _relationship_is_contradictory(edge: AgentRelationshipEdge) -> bool:
+    positive = edge.affection >= 70 or edge.trust >= 70 or edge.intimacy >= 70
+    negative = edge.hostility >= 70 or edge.rivalry >= 70
+    if not (positive and negative):
+        return False
+    metadata = edge.metadata_json or {}
+    if bool(metadata.get("intentional_tension")) or bool(metadata.get("justified_tension")):
+        return False
+    return True
+
+
+def _route_block_reason(route: RouteAffinity) -> str | None:
+    metadata = route.metadata_json or {}
+    for key in ("blocked_reason", "block_reason", "reason"):
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    for flag in route.flags:
+        text = str(flag).strip().lower()
+        if text.startswith("blocked:") or text.startswith("block_reason:"):
+            return text
+    return None
+
+
+def _ending_requirement_issues(
+    ending: EndingCandidate,
+    route: RouteAffinity | None,
+    milestones: list[RouteMilestone],
+) -> list[str]:
+    requirements = ending.requirements or {}
+    issues: list[str] = []
+    if route is None and any(
+        key in requirements
+        for key in (
+            "min_route_affinity",
+            "max_route_affinity",
+            "min_route_stage",
+            "max_route_stage",
+            "required_route_flags",
+            "forbidden_route_flags",
+        )
+    ):
+        issues.append("route_missing")
+        return issues
+    if route is not None:
+        min_affinity = _int_or_none(requirements.get("min_route_affinity"))
+        if min_affinity is not None and route.affinity < min_affinity:
+            issues.append("min_route_affinity")
+        max_affinity = _int_or_none(requirements.get("max_route_affinity"))
+        if max_affinity is not None and route.affinity > max_affinity:
+            issues.append("max_route_affinity")
+        min_stage = _int_or_none(requirements.get("min_route_stage"))
+        if min_stage is not None and route.stage < min_stage:
+            issues.append("min_route_stage")
+        max_stage = _int_or_none(requirements.get("max_route_stage"))
+        if max_stage is not None and route.stage > max_stage:
+            issues.append("max_route_stage")
+        flags = {str(flag) for flag in route.flags}
+        required_flags = {
+            str(flag) for flag in _list_value(requirements.get("required_route_flags"))
+        }
+        if required_flags and not required_flags.issubset(flags):
+            issues.append("required_route_flags")
+        forbidden_flags = {
+            str(flag) for flag in _list_value(requirements.get("forbidden_route_flags"))
+        }
+        if forbidden_flags and forbidden_flags.intersection(flags):
+            issues.append("forbidden_route_flags")
+    completed_required = _int_or_none(requirements.get("min_completed_milestones"))
+    if completed_required is not None:
+        completed_count = sum(1 for milestone in milestones if milestone.status == "completed")
+        if completed_count < completed_required:
+            issues.append("min_completed_milestones")
+    return issues
+
+
+def _list_value(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return []
+
+
 def _limit_from_policy(
     explicit: int | None,
     policy_json: dict[str, Any] | None,
@@ -2600,3 +3367,16 @@ def _safe_text(value: str) -> str:
     if _LEAK_PATTERN.search(value):
         return REDACTED
     return value
+
+
+def _json_contains_leak(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if _is_leaky_key(str(key)) or _json_contains_leak(item):
+                return True
+        return False
+    if isinstance(value, list | tuple):
+        return any(_json_contains_leak(item) for item in value)
+    if isinstance(value, str):
+        return _LEAK_PATTERN.search(value) is not None
+    return False

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import cast
 
 from noveland.agents.models import Agent, AgentRelationshipEdge
@@ -48,6 +49,7 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityPacingReviewRequest,
     NarrativeQualityPresentationAlignmentRequest,
+    NarrativeQualityProgressionReviewRequest,
     NarrativeQualityWriterGenerateRequest,
 )
 from noveland.narrative_quality.service import (
@@ -67,12 +69,16 @@ from noveland.visual.models import CharacterSpriteSet, CharacterSpriteVariant
 from noveland.worlds.models import (
     CharacterEmotionalState,
     CharacterKnowledgeFact,
+    EndingCandidate,
     GMAgenda,
     GMEventProposal,
     LongRunEvalRun,
     NarrativeContinuityReview,
+    PlayerActorProfile,
+    PlayerChoiceRecord,
     PlotThread,
     RouteAffinity,
+    RouteMilestone,
     Scene,
     SecretRecord,
     StoryHook,
@@ -1151,6 +1157,127 @@ def test_runtime_pacing_review_sanitizes_response() -> None:
     assert "raw_output" not in serialized
 
 
+def test_route_relationship_progression_review_summarizes_records() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    route_id = _seed_progression_fixture(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        include_milestone=True,
+        include_choice=True,
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_route_relationship_progression(
+            world_id,
+            NarrativeQualityProgressionReviewRequest(
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                route_affinity_id=route_id,
+            ),
+        )
+
+    assert result.progression_status == "warning"
+    assert result.relationship_summary["relationship_count"] == 1
+    assert result.route_summary["route_count"] == 1
+    assert result.route_summary["milestone_count"] == 1
+    assert result.route_summary["route_choice_count"] == 1
+    assert result.event_summary["recent_event_count"] == 1
+    assert result.proposal_summary["open_proposal_count"] == 1
+    assert any(
+        finding.code == "relationship_metric_contradiction"
+        for finding in result.findings
+    )
+    assert any(
+        recommendation.action_json.get("mutates_state") is False
+        for recommendation in result.recommendations
+    )
+    with Session(engine) as session:
+        assert session.scalar(select(func.count(WorldEventModel.id))) == 1
+        assert session.scalar(select(func.count(RouteAffinity.id))) == 1
+
+
+def test_route_relationship_progression_review_flags_route_gaps() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    route_id = _seed_progression_fixture(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        route_stage=1,
+        milestone_stage=3,
+        include_choice=False,
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_route_relationship_progression(
+            world_id,
+            NarrativeQualityProgressionReviewRequest(
+                worldline_id=worldline_id,
+                route_affinity_id=route_id,
+            ),
+        )
+
+    codes = {finding.code for finding in result.findings}
+    assert result.progression_status == "warning"
+    assert "route_stage_milestone_mismatch" in codes
+    assert "ending_requirements_unsatisfied" in codes
+    assert "route_choice_trace_missing" in codes
+
+
+def test_route_relationship_progression_review_rejects_cross_worldline_route() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    fork_id = _seed_worldline(engine, world_id)
+    route_id = _seed_active_route(engine, world_id, fork_id, agent_id)
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_route_relationship_progression(
+                world_id,
+                NarrativeQualityProgressionReviewRequest(
+                    worldline_id=worldline_id,
+                    route_affinity_id=route_id,
+                ),
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "route affinity" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline route rejection")
+
+
+def test_route_relationship_progression_review_sanitizes_response() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    route_id = _seed_progression_fixture(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        event_payload={"storage_uri": "media://hidden/object", "safe": True},
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_route_relationship_progression(
+            world_id,
+            NarrativeQualityProgressionReviewRequest(
+                worldline_id=worldline_id,
+                route_affinity_id=route_id,
+            ),
+        )
+
+    serialized = result.model_dump_json().lower()
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+    assert any(finding.code == "unsafe_progression_event_payload" for finding in result.findings)
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -1177,6 +1304,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, StoryHook.__table__),
         cast(Table, PlotThread.__table__),
         cast(Table, RouteAffinity.__table__),
+        cast(Table, RouteMilestone.__table__),
+        cast(Table, EndingCandidate.__table__),
+        cast(Table, PlayerActorProfile.__table__),
+        cast(Table, PlayerChoiceRecord.__table__),
         cast(Table, NarrativeArtifact.__table__),
         cast(Table, NarrativePublication.__table__),
         cast(Table, NarrativeContinuityReview.__table__),
@@ -1593,6 +1724,173 @@ def _seed_active_route(
                 stage=1,
                 flags=[],
                 metadata_json={},
+            )
+        )
+        session.commit()
+        return route_id
+
+
+def _seed_progression_fixture(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    *,
+    route_stage: int = 2,
+    milestone_stage: int = 2,
+    include_milestone: bool = True,
+    include_choice: bool = False,
+    event_payload: dict[str, object] | None = None,
+) -> uuid.UUID:
+    target_agent_id = uuid.uuid4()
+    route_id = uuid.uuid4()
+    milestone_id = uuid.uuid4()
+    ending_id = uuid.uuid4()
+    actor_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    choice_id = uuid.uuid4() if include_choice else None
+    with Session(engine) as session:
+        player_email = f"player-{user_id.hex[:8]}@example.test"
+        session.add(User(id=user_id, email=player_email, display_name=player_email))
+        session.add(
+            Agent(
+                id=target_agent_id,
+                world_id=world_id,
+                agent_key=f"target-{target_agent_id.hex[:8]}",
+                display_name="Bob",
+                kind="role_agent",
+                character_profile={},
+                config={},
+            )
+        )
+        session.add(
+            AgentRelationshipEdge(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                source_agent_id=agent_id,
+                target_agent_id=target_agent_id,
+                relationship_type="affection",
+                affection=85,
+                trust=80,
+                hostility=75,
+                intimacy=30,
+                obligation=0,
+                rivalry=0,
+                debt=0,
+                metadata_json={},
+            )
+        )
+        session.add(
+            PlayerActorProfile(
+                id=actor_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                user_id=user_id,
+                actor_ref="test-player",
+                display_name="Player",
+                profile_json={},
+                is_active=True,
+            )
+        )
+        if choice_id is not None:
+            session.add(
+                PlayerChoiceRecord(
+                    id=choice_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    user_id=user_id,
+                    player_actor_id=actor_id,
+                    choice_key="route-choice",
+                    choice_kind="route",
+                    prompt="Choose route",
+                    selected_option="Stay",
+                    context_json={},
+                    consequence_preview={},
+                )
+            )
+        session.add(
+            RouteAffinity(
+                id=route_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                route_key=f"route-{route_id.hex[:8]}",
+                status="active",
+                affinity=20,
+                stage=route_stage,
+                flags=[],
+                last_choice_id=choice_id,
+                metadata_json={},
+            )
+        )
+        if include_milestone:
+            session.add(
+                RouteMilestone(
+                    id=milestone_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    route_affinity_id=route_id,
+                    agent_id=agent_id,
+                    milestone_key="confession",
+                    title="Confession",
+                    description="Route beat",
+                    stage=milestone_stage,
+                    status="active",
+                    conditions={},
+                    evidence_metadata={},
+                    metadata_json={},
+                )
+            )
+        session.add(
+            EndingCandidate(
+                id=ending_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                route_affinity_id=route_id,
+                agent_id=agent_id,
+                ending_key="good-ending",
+                title="Good Ending",
+                ending_type="normal",
+                status="available",
+                requirements={
+                    "min_route_affinity": 80,
+                    "min_route_stage": 5,
+                    "min_completed_milestones": 1,
+                },
+                outcome_summary=None,
+                evidence_metadata={},
+                metadata_json={},
+            )
+        )
+        session.add(
+            GMEventProposal(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="High risk route shift",
+                reason="Review this route change.",
+                event_name="gm.route_shift",
+                proposed_payload={},
+                importance="route",
+                risk_score=80,
+                affected_agents=[str(agent_id)],
+                affected_organizations=[],
+                source_context={},
+                status="proposed",
+            )
+        )
+        session.add(
+            WorldEventModel(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sequence=1,
+                event_name="route.progression",
+                importance="route",
+                payload=event_payload or {"relationship_delta": {"affection": 45}},
+                wall_time=datetime.now(UTC),
+                actor_ref="test",
             )
         )
         session.commit()

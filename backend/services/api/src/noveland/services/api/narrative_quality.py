@@ -18,6 +18,8 @@ from noveland.narrative_quality.contracts import (
     NarrativeQualityPacingReviewResult,
     NarrativeQualityPresentationAlignmentRequest,
     NarrativeQualityPresentationAlignmentResult,
+    NarrativeQualityProgressionReviewRequest,
+    NarrativeQualityProgressionReviewResult,
     NarrativeQualityWriterGenerateRequest,
     NarrativeQualityWriterGenerationResult,
 )
@@ -188,6 +190,28 @@ def review_runtime_pacing(
 ) -> NarrativeQualityPacingReviewResult:
     try:
         return NarrativeQualityService(db_session).review_runtime_pacing(world_id, request)
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/progression/review",
+    response_model=NarrativeQualityProgressionReviewResult,
+    dependencies=[Depends(require_csrf)],
+)
+def review_route_relationship_progression(
+    world_id: uuid.UUID,
+    request: NarrativeQualityProgressionReviewRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityProgressionReviewResult:
+    try:
+        return NarrativeQualityService(db_session).review_route_relationship_progression(
+            world_id,
+            request,
+        )
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
     except ValueError as exc:

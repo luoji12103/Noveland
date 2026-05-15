@@ -469,6 +469,53 @@ class NarrativeQualityPacingReviewResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityProgressionReviewRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    agent_id: uuid.UUID | None = None
+    route_affinity_id: uuid.UUID | None = None
+    include_relationships: bool = True
+    include_routes: bool = True
+    include_events: bool = True
+    include_proposals: bool = True
+    recent_event_limit: int = Field(default=20, ge=0, le=100)
+
+
+class NarrativeQualityProgressionFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+
+
+class NarrativeQualityProgressionRecommendation(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=400)
+    target_ref: NarrativeQualityEvidenceRef | None = None
+    action_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("action_json", mode="after")
+    @classmethod
+    def validate_action_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "action_json")
+        return value
+
+
+class NarrativeQualityProgressionReviewResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    agent_id: uuid.UUID | None = None
+    route_affinity_id: uuid.UUID | None = None
+    progression_status: str
+    relationship_summary: dict[str, Any] = Field(default_factory=dict)
+    route_summary: dict[str, Any] = Field(default_factory=dict)
+    event_summary: dict[str, Any] = Field(default_factory=dict)
+    proposal_summary: dict[str, Any] = Field(default_factory=dict)
+    findings: list[NarrativeQualityProgressionFinding] = Field(default_factory=list)
+    recommendations: list[NarrativeQualityProgressionRecommendation] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json
