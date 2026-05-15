@@ -1531,3 +1531,14 @@
 - Tests added/updated: N/A.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 4 Emotion/Sprite/Voice Alignment from clean local `main`; do not push unless explicitly requested.
+
+## v0.6 Emotion/Sprite/Voice Alignment plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.6 Runtime Narrative Quality Phase 4.
+- Summary: Added the Phase 4 plan for API-first deterministic alignment diagnostics over turn presentation emotion, sprite variant, voice profile, voice binding, and speech style mapping records. The plan requires reuse of presentation, visual, and speech systems and explicitly avoids provider calls, media generation, automatic binding changes, Web UI, migrations unless required, world events, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.4-emotion-sprite-voice-alignment-plan.md`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implementation should start on `feat/emotion-sprite-voice-alignment` after this docs-only checkpoint is committed.

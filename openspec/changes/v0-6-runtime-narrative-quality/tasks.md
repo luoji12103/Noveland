@@ -50,7 +50,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 4 — Emotion/Sprite/Voice Alignment
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Implement `emotion-sprite-voice-alignment` scope only.
 - [ ] Keep implementation API-first; do not add Web dashboard work.
 - [ ] Use narrative quality package/router for any new v0.6 quality APIs.
