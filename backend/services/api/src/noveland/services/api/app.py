@@ -14,6 +14,7 @@ from noveland.services.api.media import router as media_router
 from noveland.services.api.media import turn_media_router
 from noveland.services.api.multimodal_evals import router as multimodal_evals_router
 from noveland.services.api.narrative_quality import router as narrative_quality_router
+from noveland.services.api.observability import router as observability_router
 from noveland.services.api.providers import router as providers_router
 from noveland.services.api.realtime import router as realtime_router
 from noveland.services.api.runtime import router as runtime_router
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     api.include_router(providers_router)
     api.include_router(conversations_router)
     api.include_router(conversation_presentations_router)
+    api.include_router(observability_router)
     api.include_router(realtime_router)
 
     @api.get("/health", response_model=HealthResponse)

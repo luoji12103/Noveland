@@ -70,12 +70,12 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 6 — Observability & Incident Diagnostics
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `observability-incident-diagnostics` scope only.
-- [ ] Reuse runtime diagnostics, provider health, model invocation, media job, multimodal eval, and narrative quality evidence.
-- [ ] Ensure incident reports expose safe evidence refs only.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
+- [x] Implement `observability-incident-diagnostics` scope only.
+- [x] Reuse runtime diagnostics, provider health, model invocation, media job, multimodal eval, and narrative quality evidence.
+- [x] Ensure incident reports expose safe evidence refs only.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

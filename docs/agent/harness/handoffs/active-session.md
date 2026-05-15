@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.7 Production Hardening Phase 6.
-- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics planning checkpoint is underway.
+- Status: Phase 5 Deployment Profile is fast-forward merged to local `main`; Phase 6 Observability & Incident Diagnostics implementation is complete locally and full gate is next.
 
 ## Current Context
 
@@ -27,7 +27,7 @@
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
 - v0.6 Runtime Narrative Quality is complete locally and ready to archive if requested; this session does not archive it.
-- v0.7 Production Hardening is the next proposed OpenSpec change and should start API/test/docs-first.
+- v0.7 Production Hardening Phase 6 incident diagnostics is in progress on `feat/observability-incident-diagnostics`; keep it platform-admin-only and read-only.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.

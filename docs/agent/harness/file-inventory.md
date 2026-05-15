@@ -170,6 +170,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_api_authoring.py`
 - `backend/tests/test_authoring_regression_fixture.py`
 - `backend/tests/test_authoring_service.py`
+- `backend/tests/test_observability_incidents.py`
 - `backend/migrations/versions/20260422_0014_agent_composition_presets.py`
 - `backend/migrations/versions/20260422_0015_plugin_runtime_wiring.py`
 - `backend/migrations/versions/20260504_0021_agent_preset_versioning.py`
@@ -300,6 +301,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/observability/src/noveland/observability/contracts.py`
 - `backend/packages/observability/src/noveland/observability/models.py`
 - `backend/packages/observability/src/noveland/observability/services.py`
+- `backend/services/api/src/noveland/services/api/observability.py`
 - `backend/migrations/`
 - `backend/migrations/versions/20260415_0001_core_schema.py`
 - `backend/migrations/versions/20260415_0002_world_clock_state.py`
@@ -488,12 +490,14 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/conflict_review.py`
 - `backend/packages/authoring/src/noveland/authoring/memory_migration.py`
 - `backend/services/api/src/noveland/services/api/authoring.py`
+- `backend/services/api/src/noveland/services/api/observability.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/packages/providers/src/noveland/providers/budget.py`
 - `backend/migrations/versions/20260515_0042_provider_budget_policies.py`
 - `backend/tests/test_authoring_service.py`
 - `backend/tests/test_api_authoring.py`
 - `backend/tests/test_authoring_regression_fixture.py`
+- `backend/tests/test_observability_incidents.py`
 
 ## Update rule
 

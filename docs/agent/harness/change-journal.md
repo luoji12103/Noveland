@@ -1960,3 +1960,14 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, phase plan, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/observability-incident-diagnostics` from clean local `main`.
+
+## v0.7.6 Observability & Incident Diagnostics implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/observability-incident-diagnostics
+- Scope: v0.7 Production Hardening Phase 6 implementation
+- Summary: Added a safe incident diagnostics aggregation service under `noveland.observability`, a dedicated platform-admin-only `/observability/incidents/summary` router, and regression coverage that verifies the summary only returns counts, statuses, timestamps, and evidence refs while omitting raw prompts, outputs, storage paths, and secret material.
+- Files changed: `/backend/packages/observability/**`, `/backend/services/api/src/noveland/services/api/observability.py`, `/backend/services/api/src/noveland/services/api/app.py`, `/backend/tests/test_observability_incidents.py`, `/docs/agent/harness/{file-inventory,project-index,task-board,handoffs/active-session,change-journal}.md`, `/backend/packages/observability/pyproject.toml`, `/backend/packages/observability/src/noveland/observability/{contracts,services,__init__}.py`
+- Tests added/updated: incident summary service/API regression tests for safe evidence aggregation, platform-admin ACL, world filter behavior, and redaction boundaries.
+- Docs updated: file inventory, project index, task board, active handoff, and change journal.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 6 back to local `main` if it stays green.

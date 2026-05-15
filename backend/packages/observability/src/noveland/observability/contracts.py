@@ -14,6 +14,12 @@ class DiagnosticSeverity(StrEnum):
     ERROR = "error"
 
 
+class IncidentStatus(StrEnum):
+    OK = "ok"
+    WATCH = "watch"
+    BLOCKED = "blocked"
+
+
 class DiagnosticComponent(StrEnum):
     RUNTIME = "runtime"
     PROVIDER = "provider"
@@ -81,3 +87,77 @@ class DiagnosticRetentionDryRun(_FrozenContract):
 
 class DiagnosticRetentionPruneResult(DiagnosticRetentionDryRun):
     pruned_count: int = Field(ge=0)
+
+
+class IncidentEvidenceRef(_FrozenContract):
+    kind: str = Field(min_length=1, max_length=120)
+    id: str = Field(min_length=1, max_length=200)
+    component: str = Field(min_length=1, max_length=120)
+    status: str = Field(min_length=1, max_length=80)
+    reason_code: str = Field(min_length=1, max_length=120)
+    world_id: uuid.UUID | None = None
+    worldline_id: uuid.UUID | None = None
+    occurred_at: datetime | None = None
+
+    @field_validator("occurred_at", mode="after")
+    @classmethod
+    def normalize_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
+class IncidentComponentSummary(_FrozenContract):
+    component: str = Field(min_length=1, max_length=120)
+    status: IncidentStatus
+    evidence_count: int = Field(ge=0)
+    error_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    latest_at: datetime | None = None
+    evidence_refs: list[IncidentEvidenceRef] = Field(default_factory=list)
+
+    @field_validator("latest_at", mode="after")
+    @classmethod
+    def normalize_latest_at(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
+class IncidentRetentionSummary(_FrozenContract):
+    authority: str = Field(min_length=1, max_length=120)
+    retention_days: int = Field(ge=1)
+    cutoff: datetime
+    pruneable_count: int = Field(ge=0)
+    retained_count: int = Field(ge=0)
+
+    @field_validator("cutoff", mode="after")
+    @classmethod
+    def normalize_cutoff(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
+class IncidentSummary(_FrozenContract):
+    status: IncidentStatus
+    generated_at: datetime
+    component_count: int = Field(ge=0)
+    evidence_count: int = Field(ge=0)
+    error_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    world_id: uuid.UUID | None = None
+    components: list[IncidentComponentSummary] = Field(default_factory=list)
+    retention: IncidentRetentionSummary
+    suppressed_fields: list[str] = Field(default_factory=list)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)

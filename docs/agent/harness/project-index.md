@@ -151,6 +151,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
+  - `noveland.services.api.observability` — platform-admin incident summary router over safe runtime/provider/media/eval evidence
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
@@ -294,7 +295,7 @@ Fast orientation for a new coding session.
 - `backend/packages/observability/`
   - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model
-  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, and detail redaction
+  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, and detail redaction
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

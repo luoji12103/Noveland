@@ -951,6 +951,10 @@ version = "0.1.0"
 source = { editable = "packages/observability" }
 dependencies = [
     { name = "noveland-core" },
+    { name = "noveland-invocations" },
+    { name = "noveland-media" },
+    { name = "noveland-providers" },
+    { name = "noveland-worlds" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
@@ -958,6 +962,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-invocations", editable = "packages/invocations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
