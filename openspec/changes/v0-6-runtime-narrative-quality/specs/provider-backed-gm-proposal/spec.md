@@ -2,18 +2,28 @@
 
 ## Capability
 
-Use providers to generate GM proposals without directly mutating world state. This capability belongs to v0.6 Runtime Narrative Quality and is planned future work until implemented and archived.
+Use provider-kernel text generation to generate GM proposals without directly mutating world state. This capability belongs to v0.6 Runtime Narrative Quality and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
 ### Requirement: Provider-backed GM Proposal provides the planned workflow
-The system SHALL provide Provider-backed GM Proposal capability for GM proposal generation, Review/apply boundary, Impact classification while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+The system SHALL provide Provider-backed GM Proposal capability for provider-kernel text generation alignment, GM proposal generation, Review/apply boundary, Impact classification while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
 
 #### Scenario: Authorized workflow
 - **Given** an authorized actor is using Provider-backed GM Proposal
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse ProviderExecutionService, InvocationLedgerService, world events rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse ProviderExecutionService, ProviderSecretResolver, InvocationLedgerService, prompt snapshots, world events rather than creating a parallel subsystem.
+- **And** real provider-backed GM generation SHALL NOT use the legacy provider profile path for new v0.6 execution.
+
+### Requirement: Provider-backed GM Proposal uses the narrative quality API boundary
+The system SHALL expose new v0.6 GM quality APIs through `narrative_quality.py` rather than adding broad routes to `worlds.py`.
+
+#### Scenario: New GM proposal API is added
+- **Given** a v0.6 implementation adds provider-backed GM proposal endpoints
+- **When** those endpoints are registered
+- **Then** they SHALL be registered through the narrative quality router
+- **And** they SHALL be admin-scoped and worldline-aware.
 
 ### Requirement: Provider-backed GM Proposal preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Provider-backed GM Proposal, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
@@ -36,3 +46,4 @@ The system SHALL provide focused validation for Provider-backed GM Proposal and 
 ## Non-goals
 
 - Automatic high-impact event apply
+- Broad new `worlds.py` routes

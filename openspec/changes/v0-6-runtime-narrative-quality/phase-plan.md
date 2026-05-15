@@ -11,7 +11,16 @@ Noveland runtime should produce more consistent, character-faithful, emotionally
 - Bypassing context visibility
 - Automatic GM apply for high-impact events
 - Public launch
+- Broad new runtime-quality routes in `worlds.py`
+- Web dashboard implementation in initial v0.6 phases
 - Making quality evaluation block every runtime path initially
+
+## Accepted Planning Decisions
+
+1. Add or confirm provider-kernel text generation execution before provider-backed GM or narrative generation.
+2. Decide the `narrative_artifacts` worldline strategy before Narrative Writer v2.
+3. Use `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py` for new v0.6 APIs.
+4. Implement API-first diagnostics and defer Web dashboard work.
 
 ## Phase Discipline
 
@@ -19,6 +28,8 @@ Noveland runtime should produce more consistent, character-faithful, emotionally
 - Each phase starts from clean local `main`.
 - Each phase is independently testable, mergeable, and reversible.
 - Do not continue to the next phase after a failing gate or unresolved architecture decision.
+- New v0.6 APIs go through `narrative_quality.py`; do not add broad new quality routes to `worlds.py`.
+- Backend diagnostic phases are API-first; if Web dashboard work becomes required to finish a backend phase, stop for review.
 - Do not push unless the user explicitly requests it.
 
 ## Phase 1 — Runtime Context Contract v2
@@ -81,6 +92,7 @@ Use providers to generate GM proposals without directly mutating world state.
 ### Scope
 
 - GM proposal generation
+- Provider-kernel text generation execution alignment before GM generation
 - Review/apply boundary
 - Impact classification
 
@@ -91,7 +103,9 @@ Use providers to generate GM proposals without directly mutating world state.
 ### Reused Systems
 
 - ProviderExecutionService
+- ProviderSecretResolver
 - InvocationLedgerService
+- prompt snapshots
 - world events
 
 ### Acceptance Criteria
@@ -99,12 +113,15 @@ Use providers to generate GM proposals without directly mutating world state.
 - Provider calls write ledger evidence
 - GM outputs become proposals
 - Apply remains explicit
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Provider-kernel text generation execution remains unavailable or would require legacy provider profile expansion.
+- Implementation requires broad new `worlds.py` routes.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -148,12 +165,15 @@ Check character speech style, relationship consistency, and out-of-character ris
 - Reviews attach evidence to dialogue
 - OOC warnings are explainable
 - Reader output is not polluted with diagnostics
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -197,12 +217,15 @@ Check and suggest fixes for emotion tag, sprite variant, and voice style alignme
 - Misalignment is detected
 - Fix suggestions preserve worldline scope
 - No media path leaks occur
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -228,6 +251,7 @@ Generate chapters from world events and conversation turns with worldline, visib
 ### Scope
 
 - Narrative generation v2
+- Narrative artifact worldline strategy decision before implementation
 - Visibility filter
 - Reader-safe output
 
@@ -248,12 +272,16 @@ Generate chapters from world events and conversation turns with worldline, visib
 - Generated drafts are reader-safe
 - Provider calls are audited
 - Hidden/developer-only content is filtered
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- `narrative_artifacts` worldline strategy is unresolved.
+- Provider-kernel text generation execution remains unavailable or would require legacy provider profile expansion.
+- Implementation requires broad new `worlds.py` routes.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -297,12 +325,15 @@ Check causality, secret leakage, timeline conflicts, relationship jumps, and rou
 - Continuity blockers have evidence
 - Repair suggestions are reviewable
 - Secret leakage is detected
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -347,12 +378,15 @@ Control world evolution speed, reading speed, lookahead, offscreen compression, 
 - Pacing policy caps background work
 - Offscreen compression is explainable
 - Budgets block excess proposals
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -397,12 +431,15 @@ Review route progression, affection/conflict/repair, and relationship state chan
 - Progression changes are explainable
 - Drift warnings reference evidence
 - No hidden state is exposed to players
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -447,12 +484,15 @@ Run multi-day/multi-turn simulations to detect character drift, narrative breaks
 - Eval produces metrics and blockers
 - Failures point to evidence
 - Sample scenario is deterministic
+- New APIs live under the narrative quality router if APIs are added
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this backend diagnostic phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 
@@ -473,17 +513,19 @@ Run multi-day/multi-turn simulations to detect character drift, narrative breaks
 
 ### Goal
 
-Expose quality metrics, blockers, and repair recommendations to admins.
+Expose API-first quality metrics, blockers, and repair recommendations to admins. Web dashboard implementation is deferred until API contracts are stable.
 
 ### Scope
 
 - Quality API
 - Dashboard-ready DTOs
 - Diagnostic summaries
+- Narrative quality package/router boundary
 
 ### Non-goals
 
 - Public quality dashboard
+- Initial Web dashboard routes, components, or e2e scenarios
 - Changing diagnostics semantics without tests
 
 ### Reused Systems
@@ -491,18 +533,23 @@ Expose quality metrics, blockers, and repair recommendations to admins.
 - multimodal evals
 - runtime diagnostics
 - admin API patterns
+- narrative quality package/router
 
 ### Acceptance Criteria
 
 - Admin APIs summarize quality results
 - Reader/member routes cannot access admin evidence
 - DTOs avoid raw prompts and storage paths
+- New APIs live under the narrative quality router
+- No Web dashboard work is required for phase acceptance
 
 ### Stop Conditions
 
 - Architecture conflict with current OpenSpec specs or Phase 13 ADRs.
 - Migration conflict or unexpected schema requirement not covered by this phase.
 - Provider boundary, secret boundary, storage path, raw prompt/output, or worldline isolation risk.
+- Implementation requires broad new `worlds.py` routes.
+- Implementation requires Web dashboard work to complete this API-first phase.
 - Scope creep into a listed non-goal.
 - Targeted tests or full local gate fail during implementation.
 

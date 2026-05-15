@@ -2,18 +2,37 @@
 
 ## Capability
 
-Generate chapters from world events and conversation turns with worldline, visibility, and reader-safe filtering. This capability belongs to v0.6 Runtime Narrative Quality and is planned future work until implemented and archived.
+Generate chapters from world events and conversation turns with worldline, visibility, and reader-safe filtering after the narrative artifact worldline strategy is decided. This capability belongs to v0.6 Runtime Narrative Quality and is planned future work until implemented and archived.
 
 ## ADDED Requirements
 
 ### Requirement: Narrative Writer v2 provides the planned workflow
-The system SHALL provide Narrative Writer v2 capability for Narrative generation v2, Visibility filter, Reader-safe output while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+The system SHALL provide Narrative Writer v2 capability for Narrative generation v2, narrative artifact worldline strategy, Visibility filter, Reader-safe output while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
 
 #### Scenario: Authorized workflow
 - **Given** an authorized actor is using Narrative Writer v2
 - **When** they perform the primary workflow for this capability
 - **Then** the system SHALL support the planned scope
-- **And** the workflow SHALL reuse narrative services, events, invocation ledger, media references rather than creating a parallel subsystem.
+- **And** the workflow SHALL reuse narrative services, events, provider execution, invocation ledger, media references rather than creating a parallel subsystem.
+- **And** provider-backed narrative generation SHALL NOT start until provider-kernel text generation execution is available.
+
+### Requirement: Narrative Writer v2 resolves narrative artifact worldline strategy first
+The system SHALL stop implementation before Narrative Writer v2 if strict worldline behavior for narrative artifacts and publications is unresolved.
+
+#### Scenario: Narrative artifact worldline strategy is unresolved
+- **Given** Narrative Writer v2 implementation is about to persist generated narrative drafts
+- **When** `narrative_artifacts` worldline behavior has not been decided
+- **Then** implementation SHALL stop for architecture review
+- **And** generated drafts SHALL NOT rely only on ad hoc metadata for required worldline isolation.
+
+### Requirement: Narrative Writer v2 uses the narrative quality API boundary
+The system SHALL expose new v0.6 narrative writer quality APIs through `narrative_quality.py` rather than adding broad routes to `worlds.py`.
+
+#### Scenario: New narrative writer API is added
+- **Given** a v0.6 implementation adds Narrative Writer v2 endpoints
+- **When** those endpoints are registered
+- **Then** they SHALL be registered through the narrative quality router
+- **And** they SHALL be admin-scoped and worldline-aware.
 
 ### Requirement: Narrative Writer v2 preserves architecture freeze boundaries
 The system SHALL enforce Phase 13 architecture guardrails for Narrative Writer v2, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
@@ -37,3 +56,4 @@ The system SHALL provide focused validation for Narrative Writer v2 and SHALL st
 
 - Narrative artifacts as media storage
 - Raw prompt/output in world_events.payload
+- Broad new `worlds.py` routes
