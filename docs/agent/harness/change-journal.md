@@ -99,6 +99,28 @@
 - Docs updated: project index, file inventory, change journal, task board, active handoff
 - Follow-up notes: Implement Phase 6 on `feat/continuity-review-v2`; no migration expected.
 
+## v0.6.6 Continuity Review v2 implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/continuity-review-v2
+- Scope: v0.6 Runtime Narrative Quality Phase 6 implementation
+- Summary: Added an admin-only Continuity Review v2 API under the narrative quality router, reusing `LivingWorldGuardrailService.review_narrative_continuity` and existing `NarrativeContinuityReview` records while returning safe findings, conflict reports, repair suggestions, and evidence refs.
+- Files changed: `/backend/packages/narrative_quality/**`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: narrative quality service/API tests for artifact review, explicit text review, hidden secret leak, time/knowledge risks, relationship jumps, route context gaps, cross-worldline rejection, sensitive metadata rejection, ACL, and response redaction.
+- Docs updated: OpenSpec tasks
+- Follow-up notes: Full local gate must pass before fast-forward merge. Phase 6 does not add provider calls, automatic repair apply, Web UI, broad `worlds.py` routes, or world event writes.
+
+## v0.6.6 Continuity Review v2 merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 6 merge bookkeeping
+- Summary: Recorded successful targeted tests, full local gate, and fast-forward merge for Continuity Review v2.
+- Files changed: `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
+- Follow-up notes: Begin Phase 7 Runtime Pacing Controller from clean local `main`; no push performed.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
