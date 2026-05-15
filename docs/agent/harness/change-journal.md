@@ -1496,3 +1496,14 @@
 - Tests added/updated: N/A.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 3 Dialogue Style & OOC Review from clean local `main`; do not push unless explicitly requested.
+
+## v0.6 Dialogue Style & OOC Review plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.6 Runtime Narrative Quality Phase 3.
+- Summary: Added the Phase 3 plan for API-first deterministic dialogue style and out-of-character review through the narrative quality boundary. The plan reuses conversation turns, agent profiles, relationships, and context helpers; avoids provider-backed review, migrations unless required, Web UI, automatic dialogue blocking, turn mutation, memory writes, world events, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.3-dialogue-style-ooc-review-plan.md`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implementation should start on `feat/dialogue-style-ooc-review` after this docs-only checkpoint is committed.
