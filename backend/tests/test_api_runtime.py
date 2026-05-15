@@ -18,6 +18,7 @@ from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.core.models import RuntimeControlState
 from noveland.core.settings import load_settings
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.media.models import MediaAsset, MediaObject
 from noveland.memory.models import (
     AgentMemoryItem,
     MemoryBackendProfile,
@@ -402,6 +403,24 @@ def test_provider_health_reports_secret_ref_statuses(monkeypatch: pytest.MonkeyP
         load_settings.cache_clear()
 
 
+def test_platform_admin_runs_storage_audit() -> None:
+    client, engine = _client_with_database()
+    owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
+    _authenticate(client, token)
+    _seed_storage_audit_media(engine, owner_id)
+
+    response = client.get("/runtime/storage-audit")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["media_object_count"] == 1
+    assert response.json()["snapshot_payload_count"] == 1
+    assert response.json()["finding_count"] == 0
+    assert "storage_uri" not in response.text
+    assert "media://" not in response.text
+    assert "object://" not in response.text
+
+
 def test_platform_admin_lists_plugin_bindings_with_validation_status() -> None:
     client, engine = _client_with_database()
     owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)
@@ -525,6 +544,8 @@ def _create_tables(engine: Engine) -> None:
         ConversationTurn.__table__,
         WorldEventModel.__table__,
         WorldSnapshotModel.__table__,
+        MediaAsset.__table__,
+        MediaObject.__table__,
         AgentMemoryItem.__table__,
         MemoryWriteJob.__table__,
         MemoryWriteLog.__table__,
@@ -535,6 +556,139 @@ def _create_tables(engine: Engine) -> None:
     ):
         table = cast(Table, table)
         table.create(engine)
+
+
+def _seed_storage_audit_media(engine: Engine, owner_id: uuid.UUID) -> None:
+    from noveland.media.storage import LocalMediaObjectStorage
+    from noveland.storage import LocalObjectStorage
+
+    settings = load_settings()
+    media_storage = LocalMediaObjectStorage(settings.object_storage_root / "media")
+    object_storage = LocalObjectStorage(settings.object_storage_root)
+    world_id = uuid.uuid4()
+    worldline_id = uuid.uuid4()
+    asset_id = uuid.uuid4()
+    media_data = b"runtime-storage-audit"
+    stored_media = media_storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/original.png",
+        media_data,
+        content_type="image/png",
+    )
+    event_id = uuid.uuid4()
+    stored_snapshot = object_storage.write_json(
+        f"worlds/{world_id}/worldlines/{worldline_id}/snapshots/1.json",
+        {"world_id": str(world_id), "source_sequence": 1, "clock": None},
+    )
+
+    with Session(engine) as session:
+        session.add(
+            World(
+                id=world_id,
+                owner_user_id=owner_id,
+                slug="storage-audit-world",
+                name="Storage Audit World",
+                rules_config={},
+            ),
+        )
+        session.add(
+            Worldline(
+                id=worldline_id,
+                world_id=world_id,
+                worldline_key="primary",
+                name="Primary",
+                description=None,
+                parent_worldline_id=None,
+                forked_from_snapshot_id=None,
+                fork_event_sequence=None,
+                status="active",
+                created_by_actor_ref="system:test",
+                metadata={},
+            ),
+        )
+        session.add(
+            MediaAsset(
+                id=asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_kind="image",
+                asset_role="original_image",
+                source_kind="manual_upload",
+                status="available",
+                visibility="private",
+                storage_uri=stored_media.uri,
+                preview_uri=None,
+                thumbnail_uri=None,
+                mime_type="image/png",
+                file_ext="png",
+                size_bytes=stored_media.size_bytes,
+                checksum_sha256=stored_media.checksum_sha256,
+                width=None,
+                height=None,
+                duration_ms=None,
+                sample_rate_hz=None,
+                audio_channels=None,
+                has_alpha=None,
+                color_mode=None,
+                provider_kind=None,
+                source_job_id=None,
+                source_event_id=None,
+                source_invocation_id=None,
+                title="Audit Media",
+                description=None,
+                created_by_actor_ref="user:test",
+                metadata_json={},
+            ),
+        )
+        session.add(
+            MediaObject(
+                id=uuid.uuid4(),
+                asset_id=asset_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                object_role="original",
+                storage_uri=stored_media.uri,
+                filename="original.png",
+                mime_type="image/png",
+                size_bytes=stored_media.size_bytes,
+                checksum_sha256=stored_media.checksum_sha256,
+                width=None,
+                height=None,
+                duration_ms=None,
+                sample_rate_hz=None,
+                audio_channels=None,
+                frame_rate=None,
+                metadata_json={},
+            ),
+        )
+        session.add(
+            WorldEventModel(
+                id=event_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sequence=1,
+                event_name="world.clock_advanced",
+                importance="system",
+                payload={},
+                wall_time=datetime.now(UTC),
+                world_time=None,
+                actor_ref="system:runtime",
+            ),
+        )
+        session.add(
+            WorldSnapshotModel(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                covers_event_sequence=1,
+                schema_version="world_state.v1",
+                status="valid",
+                payload=None,
+                payload_uri=stored_snapshot.uri,
+                snapshot_metadata={},
+                created_by_event_id=event_id,
+            ),
+        )
+        session.commit()
 
 
 def _seed_user(engine: Engine, email: str, platform_admin: bool) -> tuple[uuid.UUID, str]:

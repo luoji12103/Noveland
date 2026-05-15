@@ -295,6 +295,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/storage/`
 - `backend/packages/storage/src/noveland/storage/local.py`
 - `backend/packages/storage/src/noveland/storage/backup.py`
+- `backend/packages/storage/src/noveland/storage/integrity.py`
 - `backend/packages/observability/`
 - `backend/packages/observability/src/noveland/observability/contracts.py`
 - `backend/packages/observability/src/noveland/observability/models.py`
@@ -349,6 +350,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_media_catalog_service.py`
 - `backend/tests/test_media_service.py`
 - `backend/tests/test_media_storage.py`
+- `backend/tests/test_storage_integrity_service.py`
 - `backend/tests/test_provider_execution_service.py`
 - `backend/tests/test_provider_registry_service.py`
 - `backend/tests/test_comfyui_adapter.py`

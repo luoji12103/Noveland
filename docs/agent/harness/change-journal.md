@@ -1892,3 +1892,15 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit the docs-only checkpoint, then start implementation on `feat/object-storage-backup-v2` from clean local `main`.
+
+## v0.7 Object Storage & Backup v2 implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/object-storage-backup-v2
+- Scope: v0.7 Production Hardening Phase 4 safe object storage and backup verification.
+- Summary: Added `noveland.storage.integrity` for read-only storage integrity auditing across `media_objects` and object-backed `world_snapshots`. Added a platform-admin-only `/runtime/storage-audit` endpoint that returns safe counts and finding refs without raw storage URIs, filesystem paths, bytes, base64, raw prompts, or raw outputs. Updated the backup/restore playbook to include storage audit verification before backup and after restore.
+- Files changed: `/backend/packages/storage/src/noveland/storage/integrity.py`, `/backend/packages/storage/src/noveland/storage/__init__.py`, `/backend/services/api/src/noveland/services/api/runtime.py`, `/backend/tests/test_storage_integrity_service.py`, `/backend/tests/test_api_runtime.py`, `/docs/agent/operations/backup-restore.md`, `/openspec/changes/v0-7-production-hardening/tasks.md`, and harness docs.
+- Tests added/updated: Storage integrity service tests for matching media/snapshot payloads, missing media object, size mismatch, checksum mismatch, missing snapshot payload, and safe output; runtime API coverage for platform-admin storage audit.
+- Docs updated: backup/restore playbook, OpenSpec Phase 4 task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`38 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`250 source files`), backend pytest (`401 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Commit Phase 4 implementation, fast-forward merge to local `main`, then record merge bookkeeping.

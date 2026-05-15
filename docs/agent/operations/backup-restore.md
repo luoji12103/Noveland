@@ -14,16 +14,24 @@ This playbook covers the supported local/single-host backup workflow for the dat
    cd backend
    uv run noveland-backup-verify
    ```
-3. Dump the database:
+3. Run the platform-admin storage audit before taking the backup:
+   ```sh
+   curl -sS -H "cookie: noveland_session=<admin-session>" \
+     http://127.0.0.1:8000/runtime/storage-audit
+   ```
+   The audit reports media object and snapshot payload counts plus safe mismatch
+   reasons. It must not return raw storage URIs, filesystem paths, object bytes,
+   base64, raw prompts, or raw outputs.
+4. Dump the database:
    ```sh
    pg_dump "$NOVELAND_DATABASE_URL" > .local/backups/noveland-db.sql
    ```
-4. Archive object storage:
+5. Archive object storage:
    ```sh
    tar -C "${NOVELAND_OBJECT_STORAGE_ROOT:-.local/object-storage}" \
      -czf .local/backups/noveland-object-storage.tgz .
    ```
-5. Record the current migration head:
+6. Record the current migration head:
    ```sh
    cd backend
    uv run alembic current
@@ -52,10 +60,14 @@ This playbook covers the supported local/single-host backup workflow for the dat
    cd backend
    uv run noveland-backup-verify
    ```
+6. Re-run the platform-admin storage audit and confirm it returns `status=ok`.
 
 ## Notes
 
 - New world snapshots store replay payloads in local object storage and keep a safe `object://...` URI in the database.
 - Older inline snapshots remain readable and do not require an object storage payload.
+- Media object payloads are verified through the storage abstraction by object
+  IDs, sizes, checksums, and safe reason codes rather than by exposing local
+  filesystem paths.
 - Human actions should be attributable to user/session refs in API paths. Runtime-created events use `system:runtime`; this is an operational actor ref, not a login-capable user.
 - This playbook intentionally does not expose destructive restore actions through the Web UI.

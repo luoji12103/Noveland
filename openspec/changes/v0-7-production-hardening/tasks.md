@@ -44,13 +44,13 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 4 — Object Storage & Backup v2
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `object-storage-backup-v2` scope only.
-- [ ] Audit media object and snapshot storage integrity without exposing filesystem paths.
-- [ ] Update backup/restore drill docs and local verification entrypoint if needed.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `object-storage-backup-v2` scope only.
+- [x] Audit media object and snapshot storage integrity without exposing filesystem paths.
+- [x] Update backup/restore drill docs and local verification entrypoint if needed.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

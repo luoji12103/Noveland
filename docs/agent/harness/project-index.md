@@ -145,7 +145,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.auth` — initial HTTP auth router for CSRF, login, current user, and logout
   - `noveland.services.api.csrf` — cookie and double-submit CSRF helpers
   - `noveland.services.api.dependencies` — API database/session and current-subject dependencies
-  - `noveland.services.api.runtime` — platform-admin runtime control, supervision, external tool policy, scale readiness, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
+  - `noveland.services.api.runtime` — platform-admin runtime control, supervision, external tool policy, scale readiness, safe storage audit, metrics, diagnostics retention, provider profile, plugin binding validation, memory backend profile, memory backfill, queue readiness, and memory write job operator router
   - `noveland.services.api.realtime` — runtime/world/conversation SSE delta routes and conversation live WebSocket control
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
@@ -288,6 +288,7 @@ Fast orientation for a new coding session.
 - `backend/packages/storage/`
   - `noveland.storage.local` — local filesystem object storage rooted by `NOVELAND_OBJECT_STORAGE_ROOT`
   - `noveland.storage.backup` — local backup verification command for database, migration head, object root, and snapshot payload readability checks
+  - `noveland.storage.integrity` — safe media object and snapshot payload storage integrity audit service
 - `backend/packages/observability/`
   - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model

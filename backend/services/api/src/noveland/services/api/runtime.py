@@ -24,6 +24,7 @@ from noveland.auth import AuthenticatedSubject
 from noveland.conversations.models import ConversationSession
 from noveland.core.settings import load_settings
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory import (
     MemoryBackendHealth,
     MemoryBackendKind,
@@ -70,6 +71,8 @@ from noveland.services.api.dependencies import (
     get_platform_admin_subject,
 )
 from noveland.services.runtime.daemon import get_runtime_control_view, set_runtime_desired_state
+from noveland.storage import LocalObjectStorage
+from noveland.storage.integrity import StorageIntegrityAuditService
 from noveland.worlds.models import World
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -151,6 +154,31 @@ class ScaleReadinessResponse(BaseModel):
     blocker_count: int
     generated_at: datetime
     sections: list[ScaleReadinessSectionResponse]
+
+
+class StorageAuditFindingResponse(BaseModel):
+    record_kind: str
+    record_id: str
+    world_id: str | None
+    worldline_id: str | None
+    status: str
+    reason: str
+    expected_size_bytes: int | None
+    actual_size_bytes: int | None
+
+
+class StorageAuditResponse(BaseModel):
+    status: Literal["ok", "error"]
+    media_object_count: int
+    snapshot_payload_count: int
+    ok_count: int
+    missing_count: int
+    size_mismatch_count: int
+    checksum_mismatch_count: int
+    unreadable_count: int
+    invalid_metadata_count: int
+    finding_count: int
+    findings: list[StorageAuditFindingResponse]
 
 
 class RuntimeControlUpdateRequest(BaseModel):
@@ -591,6 +619,25 @@ def get_scale_readiness(
 ) -> ScaleReadinessResponse:
     del subject
     return _scale_readiness_response(db_session)
+
+
+@router.get("/runtime/storage-audit", response_model=StorageAuditResponse)
+def get_storage_audit(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
+    finding_limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    include_ok: bool = False,
+) -> StorageAuditResponse:
+    del subject
+    settings = load_settings()
+    service = StorageIntegrityAuditService(
+        db_session,
+        media_storage=LocalMediaObjectStorage(settings.object_storage_root / "media"),
+        object_storage=LocalObjectStorage(settings.object_storage_root),
+    )
+    result = service.audit(limit=limit, finding_limit=finding_limit, include_ok=include_ok)
+    return _storage_audit_response(result)
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
@@ -1910,4 +1957,32 @@ def _diagnostic_retention_response(
         pruneable_count=result.pruneable_count,
         retained_count=result.retained_count,
         pruned_count=pruned_count,
+    )
+
+
+def _storage_audit_response(result: Any) -> StorageAuditResponse:
+    return StorageAuditResponse(
+        status=result.status,
+        media_object_count=result.media_object_count,
+        snapshot_payload_count=result.snapshot_payload_count,
+        ok_count=result.ok_count,
+        missing_count=result.missing_count,
+        size_mismatch_count=result.size_mismatch_count,
+        checksum_mismatch_count=result.checksum_mismatch_count,
+        unreadable_count=result.unreadable_count,
+        invalid_metadata_count=result.invalid_metadata_count,
+        finding_count=result.finding_count,
+        findings=[
+            StorageAuditFindingResponse(
+                record_kind=finding.record_kind,
+                record_id=finding.record_id,
+                world_id=finding.world_id,
+                worldline_id=finding.worldline_id,
+                status=finding.status,
+                reason=finding.reason,
+                expected_size_bytes=finding.expected_size_bytes,
+                actual_size_bytes=finding.actual_size_bytes,
+            )
+            for finding in result.findings
+        ],
     )
