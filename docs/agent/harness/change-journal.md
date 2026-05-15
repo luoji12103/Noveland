@@ -165,6 +165,28 @@
 - Docs updated: project index, file inventory, change journal, task board, active handoff, OpenSpec tasks
 - Follow-up notes: Implement Phase 8 on `feat/route-relationship-progression-quality`; no migration expected.
 
+## v0.6.8 Route & Relationship Progression Quality implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/route-relationship-progression-quality
+- Scope: v0.6 Runtime Narrative Quality Phase 8 implementation
+- Summary: Added an admin-only route and relationship progression review API under the narrative quality router. The implementation reads existing relationship edges, route affinities, milestones, endings, player choices, GM proposals, and recent world events to return safe summaries, findings, and review-only recommendations without provider calls, canonical mutation, world event writes, Web UI, broad `worlds.py` routes, migrations, or replacement relationship semantics.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_api_narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`
+- Tests added/updated: narrative quality service/API tests for progression summaries, contradictory relationship metrics, route stage/milestone mismatch, unsatisfied ending requirements, high-risk progression proposal pressure, cross-worldline route rejection, response sanitization, no mutation side effects, and admin ACL.
+- Docs updated: N/A
+- Follow-up notes: Full local gate passed before fast-forward merge. Phase 8 did not add migrations, provider calls, canonical mutations, Web UI, broad `worlds.py` routes, or world event writes.
+
+## v0.6.8 Route & Relationship Progression Quality merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 8 merge bookkeeping
+- Summary: Recorded successful targeted tests, full local gate, and fast-forward merge for Route & Relationship Progression Quality. OpenSpec Phase 8 tasks now mark implementation, targeted tests, full local gate, fast-forward merge, and harness update complete.
+- Files changed: `/docs/agent/harness/**`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: project index, task board, active handoff, change journal, OpenSpec tasks
+- Follow-up notes: Begin Phase 9 Long-run Living World Simulation Eval from clean local `main`; no push performed.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
