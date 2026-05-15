@@ -2016,3 +2016,15 @@
 - Docs updated: OpenSpec task status, file inventory, project index, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff for the security regression tests/helpers, backend mypy for the same files, and targeted pytest (`83 passed`).
 - Follow-up notes: Run the full local gate, then fast-forward merge Phase 7 back to local `main` if it stays green.
+
+## v0.7.7 Security Regression Suite gate entry
+
+- Date: 2026-05-15
+- Branch: feat/security-regression-suite
+- Scope: v0.7 Production Hardening Phase 7 full local gate.
+- Summary: Recorded the successful full local gate for the security regression suite after the test-only implementation.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`255 source files`), backend pytest (`411 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Follow-up notes: Fast-forward merge `feat/security-regression-suite` to local `main`, then record merge bookkeeping before starting Phase 8.
