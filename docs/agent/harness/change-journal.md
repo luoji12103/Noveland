@@ -1982,3 +1982,14 @@
 - Tests added/updated: N/A, gate bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Fast-forward merge `feat/observability-incident-diagnostics` to local `main`, then record merge bookkeeping before starting Phase 7.
+
+## v0.7.6 Observability & Incident Diagnostics merge entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.7 Production Hardening Phase 6 merge bookkeeping
+- Summary: Fast-forward merged `feat/observability-incident-diagnostics` into local `main`, marked Phase 6 complete in OpenSpec tasks, and moved harness handoff state to Phase 7 Security Regression Suite planning.
+- Files changed: `/openspec/changes/v0-7-production-hardening/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 7 from clean local `main`; do not push unless explicitly requested.
