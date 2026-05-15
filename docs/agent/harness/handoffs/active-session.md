@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-15T00:00:00Z
-- Branch: main
+- Branch: feat/dialogue-style-ooc-review
 - Objective: v0.6 Runtime Narrative Quality Phase 3.
-- Status: Phase 2 provider-backed GM proposal implementation is complete and fast-forward merged to local `main`; Phase 3 Dialogue Style & OOC Review planning checkpoint is ready to commit.
+- Status: Phase 3 Dialogue Style & OOC Review implementation and full local gate are complete on the feature branch; fast-forward merge to local `main` is next.
 
 ## Current Context
 
@@ -41,7 +41,9 @@
 
 ## Required Next Steps
 
-- Implement Phase 3 only through `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
+- Commit the Phase 3 implementation on `feat/dialogue-style-ooc-review`.
+- Fast-forward merge Phase 3 to local `main`.
+- Record merge bookkeeping, then start Phase 4 only from clean local `main`.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
 - Do not push unless explicitly requested.
 
@@ -83,3 +85,6 @@
 - v0.6 Phase 2 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`327 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 2 fast-forward merge to local `main` completed.
 - v0.6 Phase 3 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
+- v0.6 Phase 3 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.6 Phase 3 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`332 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after rerun), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Flaky note: The first full Web test run had one isolated `agent-builder.test.tsx` mock-call failure; the individual test passed immediately afterward, and the full Web test/build/e2e sequence passed on rerun.

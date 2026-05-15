@@ -152,10 +152,13 @@
 - v0.6 Runtime Narrative Quality Phase 2 full local gate
 - v0.6 Runtime Narrative Quality Phase 2 fast-forward merge
 - v0.6 Runtime Narrative Quality Phase 3 planning checkpoint
+- v0.6 Runtime Narrative Quality Phase 3 implementation
+- v0.6 Runtime Narrative Quality Phase 3 targeted tests
+- v0.6 Runtime Narrative Quality Phase 3 full local gate
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality Phase 3 should implement Dialogue Style & OOC
-  Review on a feature branch after this planning checkpoint.
+- v0.6 Runtime Narrative Quality Phase 3 should be fast-forward merged to local
+  `main`, then Phase 4 should start only from clean local `main`.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

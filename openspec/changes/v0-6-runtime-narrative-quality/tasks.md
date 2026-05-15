@@ -38,15 +38,15 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 3 — Dialogue Style & OOC Review
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `dialogue-style-ooc-review` scope only.
-- [ ] Keep implementation API-first; do not add Web dashboard work.
-- [ ] Use narrative quality package/router for any new v0.6 quality APIs.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `dialogue-style-ooc-review` scope only.
+- [x] Keep implementation API-first; do not add Web dashboard work.
+- [x] Use narrative quality package/router for any new v0.6 quality APIs.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 4 — Emotion/Sprite/Voice Alignment
 

@@ -8,6 +8,8 @@ from noveland.auth import AuthenticatedSubject
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityDialogueReviewRequest,
+    NarrativeQualityDialogueReviewResult,
     NarrativeQualityGMProposalGenerateRequest,
     NarrativeQualityGMProposalGenerationResult,
 )
@@ -77,9 +79,28 @@ def generate_provider_backed_gm_proposal(
         raise _not_found(str(exc)) from exc
 
 
+@router.post(
+    "/dialogue/review",
+    response_model=NarrativeQualityDialogueReviewResult,
+    dependencies=[Depends(require_csrf)],
+)
+def review_dialogue_style_and_ooc(
+    world_id: uuid.UUID,
+    request: NarrativeQualityDialogueReviewRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> NarrativeQualityDialogueReviewResult:
+    try:
+        return NarrativeQualityService(db_session).review_dialogue(world_id, request)
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
 def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
 def _unprocessable(detail: str) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)

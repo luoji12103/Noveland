@@ -180,6 +180,55 @@ class NarrativeQualityGMProposalGenerationResult(_FrozenContract):
     diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
+class NarrativeQualityDialogueReviewRequest(_FrozenContract):
+    worldline_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID
+    turn_id: uuid.UUID | None = None
+    speaker_agent_id: uuid.UUID | None = None
+    text: str | None = Field(default=None, min_length=1, max_length=4000)
+    context_limit: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("text", mode="after")
+    @classmethod
+    def normalize_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if normalized == "":
+            raise ValueError("text must not be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_subject(self) -> NarrativeQualityDialogueReviewRequest:
+        if self.turn_id is None and self.text is None:
+            raise ValueError("dialogue review requires turn_id or text")
+        return self
+
+
+class NarrativeQualityDialogueFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    message: str = Field(min_length=1, max_length=400)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    suggested_action: str | None = Field(default=None, max_length=400)
+
+
+class NarrativeQualityDialogueReviewResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID
+    turn_id: uuid.UUID | None = None
+    speaker_agent_id: uuid.UUID | None = None
+    review_status: str
+    style_score: int = Field(ge=0, le=100)
+    ooc_risk_score: int = Field(ge=0, le=100)
+    relationship_consistency_score: int = Field(ge=0, le=100)
+    reviewed_text: str
+    findings: list[NarrativeQualityDialogueFinding] = Field(default_factory=list)
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: Any, field_name: str) -> None:
     try:
         import json

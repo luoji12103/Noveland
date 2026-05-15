@@ -1507,3 +1507,16 @@
 - Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implementation should start on `feat/dialogue-style-ooc-review` after this docs-only checkpoint is committed.
+
+## v0.6 Dialogue Style & OOC Review implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/dialogue-style-ooc-review
+- Scope: Backend-only v0.6 Runtime Narrative Quality Phase 3 deterministic dialogue style and OOC review.
+- Summary: Added admin-only dialogue review under the narrative quality router. The implementation reviews existing conversation turns or explicit text samples, validates conversation worldline scope, compares against speaker profile and relationship context, returns structured findings and scores, redacts unsafe operational content, avoids provider calls, avoids turn mutation, avoids memory writes, avoids world events, and keeps diagnostics out of reader/member routes.
+- Files changed: `/backend/packages/narrative_quality/src/noveland/narrative_quality/contracts.py`, `/backend/packages/narrative_quality/src/noveland/narrative_quality/service.py`, `/backend/services/api/src/noveland/services/api/narrative_quality.py`, `/backend/tests/test_narrative_quality_service.py`, `/backend/tests/test_api_narrative_quality.py`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Narrative quality service coverage for turn review, unsafe text redaction, cross-worldline rejection, plus API coverage for dialogue review and ACL.
+- Docs updated: OpenSpec Phase 3 task status, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff, backend mypy, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`. Full local gate passed with backend ruff, backend mypy (`246 source files`), backend pytest (`332 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after rerun), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
+- Flaky notes: The first full Web test run had one isolated `agent-builder.test.tsx` mock-call failure; the individual test passed immediately afterward, and the full Web test/build/e2e sequence passed on rerun.
+- Follow-up notes: Commit Phase 3 implementation, fast-forward merge to local `main`, record merge bookkeeping, then start Phase 4 Emotion/Sprite/Voice Alignment from clean local `main`. Do not push unless explicitly requested.

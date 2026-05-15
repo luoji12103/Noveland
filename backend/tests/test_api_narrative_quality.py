@@ -176,6 +176,64 @@ def test_narrative_quality_gm_generation_api_requires_world_admin() -> None:
         assert session.scalar(select(func.count(ModelInvocation.id))) == 0
 
 
+def test_narrative_quality_dialogue_review_api_reviews_turn() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/dialogue/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["speaker_agent_id"] == str(agent_id)
+    assert body["turn_id"] == str(turn_id)
+    assert body["review_status"] in {"pass", "warning"}
+
+
+def test_narrative_quality_dialogue_review_api_requires_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, owner_id)
+    conversation_id, _turn_id = _seed_conversation_turn(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        output_text="Hello.",
+    )
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, member_token)
+    response = client.post(
+        f"/worlds/{world_id}/narrative-quality/dialogue/review",
+        json={
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "speaker_agent_id": str(agent_id),
+            "text": "Hello.",
+        },
+    )
+
+    assert response.status_code == 403
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -340,3 +398,63 @@ def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
         )
         session.commit()
         return provider.id
+
+
+def _seed_conversation_turn(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    *,
+    output_text: str,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    conversation_id = uuid.uuid4()
+    turn_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                session_key=f"session-{conversation_id.hex[:8]}",
+                title="Review session",
+                scope_type="world",
+                mode="manual_chain",
+                status="running",
+                objective="Review dialogue.",
+                opening_prompt="Start.",
+                max_turns=4,
+                policy_config={
+                    "error_policy": "fail_session",
+                    "max_consecutive_failed_turns": 2,
+                    "loop_guard_window": 3,
+                    "repeat_output_threshold": 2,
+                    "speaker_policy": "round_robin",
+                },
+                writer_config={},
+                memory_config={},
+            )
+        )
+        session.add(
+            ConversationParticipant(
+                id=uuid.uuid4(),
+                session_id=conversation_id,
+                agent_id=agent_id,
+                turn_order=0,
+                is_enabled=True,
+            )
+        )
+        session.add(
+            ConversationTurn(
+                id=turn_id,
+                session_id=conversation_id,
+                turn_index=0,
+                speaker_kind="agent",
+                speaker_agent_id=agent_id,
+                input_text="Operator prompt",
+                output_text=output_text,
+                status="succeeded",
+            )
+        )
+        session.commit()
+        return conversation_id, turn_id

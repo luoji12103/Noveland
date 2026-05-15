@@ -33,6 +33,9 @@ from .contracts import (
     NarrativeQualityContextKind,
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityDialogueFinding,
+    NarrativeQualityDialogueReviewRequest,
+    NarrativeQualityDialogueReviewResult,
     NarrativeQualityEvidenceRef,
     NarrativeQualityGMImportance,
     NarrativeQualityGMProposalCandidate,
@@ -180,6 +183,93 @@ class NarrativeQualityService:
                     "context_limit": request.context_limit,
                     "proposal_persisted": proposal_model is not None,
                     "provider_output_available": bool(result.output_text or result.output_json),
+                }
+            ),
+        )
+
+    def review_dialogue(
+        self,
+        world_id: uuid.UUID,
+        request: NarrativeQualityDialogueReviewRequest,
+    ) -> NarrativeQualityDialogueReviewResult:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        conversation = self._conversation_session_or_error(
+            world_id,
+            worldline.id,
+            request.conversation_id,
+        )
+        turn: ConversationTurnRecord | None = None
+        if request.turn_id is not None:
+            turn = self._turn_or_error(world_id, conversation.id, request.turn_id)
+        speaker_agent_id = request.speaker_agent_id or (
+            None if turn is None else turn.speaker_agent_id
+        )
+        text = request.text or _turn_dialogue_text(turn)
+        if text is None or text.strip() == "":
+            raise NarrativeQualityValidationError("dialogue review requires text")
+        agent = (
+            None
+            if speaker_agent_id is None
+            else self._agent_or_error(world_id, speaker_agent_id)
+        )
+        context = (
+            None
+            if speaker_agent_id is None
+            else self._selector.select_for_agent_prompt(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                agent_id=speaker_agent_id,
+                limit=request.context_limit,
+            )
+        )
+        findings = _dialogue_findings(text, agent=agent, context=context)
+        severity_penalty = sum(_finding_penalty(item) for item in findings)
+        style_score = max(0, 100 - severity_penalty)
+        ooc_risk_score = min(100, severity_penalty)
+        relationship_summaries = [] if context is None else context.relationship_summaries
+        relationship_score = 100
+        if relationship_summaries:
+            relationship_score = max(
+                0,
+                100
+                - sum(
+                    _finding_penalty(item)
+                    for item in findings
+                    if item.code.startswith("relationship")
+                ),
+            )
+        review_status = "pass"
+        if any(item.severity == "error" for item in findings):
+            review_status = "fail"
+        elif any(item.severity == "warning" for item in findings):
+            review_status = "warning"
+        evidence_refs = [NarrativeQualityEvidenceRef(kind="conversation", id=str(conversation.id))]
+        if turn is not None:
+            evidence_refs.append(NarrativeQualityEvidenceRef(kind="turn", id=str(turn.id)))
+        if speaker_agent_id is not None:
+            evidence_refs.append(
+                NarrativeQualityEvidenceRef(kind="agent", id=str(speaker_agent_id))
+            )
+        return NarrativeQualityDialogueReviewResult(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=conversation.id,
+            turn_id=None if turn is None else turn.id,
+            speaker_agent_id=speaker_agent_id,
+            review_status=review_status,
+            style_score=style_score,
+            ooc_risk_score=ooc_risk_score,
+            relationship_consistency_score=relationship_score,
+            reviewed_text=_safe_text(_clip(text, 1200)),
+            findings=findings,
+            evidence_refs=evidence_refs,
+            diagnostics=_sanitize_json(
+                {
+                    "context_kind": "dialogue_review",
+                    "context_limit": request.context_limit,
+                    "has_agent_profile": agent is not None,
+                    "relationship_summary_count": len(relationship_summaries),
+                    "finding_count": len(findings),
                 }
             ),
         )
@@ -485,6 +575,18 @@ class NarrativeQualityService:
             raise NarrativeQualityValidationError("conversation does not belong to worldline")
         return session
 
+    def _turn_or_error(
+        self,
+        world_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        turn_id: uuid.UUID,
+    ) -> ConversationTurnRecord:
+        turns = self._conversation_service.list_turns(world_id, conversation_id)
+        for turn in turns:
+            if turn.id == turn_id:
+                return turn
+        raise NarrativeQualityValidationError("turn not found")
+
     def _preview(
         self,
         *,
@@ -618,6 +720,140 @@ def _proposal_candidate(proposal: GMEventProposal) -> NarrativeQualityGMProposal
         source_context=_sanitize_json(proposal.source_context),
         created_at=proposal.created_at,
     )
+
+
+def _turn_dialogue_text(turn: ConversationTurnRecord | None) -> str | None:
+    if turn is None:
+        return None
+    return turn.output_text or turn.input_text
+
+
+def _dialogue_findings(
+    text: str,
+    *,
+    agent: Agent | None,
+    context: object | None,
+) -> list[NarrativeQualityDialogueFinding]:
+    findings: list[NarrativeQualityDialogueFinding] = []
+    if _safe_text(text) == REDACTED:
+        findings.append(
+            NarrativeQualityDialogueFinding(
+                code="unsafe_text_leak",
+                severity="error",
+                message=(
+                    "Dialogue text contains unsafe operational content such as "
+                    "media references, encoded payloads, secrets, or raw prompt markers."
+                ),
+                suggested_action="Remove unsafe operational content before exposing this dialogue.",
+            )
+        )
+    if agent is None:
+        findings.append(
+            NarrativeQualityDialogueFinding(
+                code="missing_speaker_agent",
+                severity="warning",
+                message="Dialogue has no speaker agent profile to compare against.",
+                suggested_action=(
+                    "Attach a speaker agent before treating this review as style evidence."
+                ),
+            )
+        )
+    else:
+        profile_text = _agent_profile_text(agent)
+        if profile_text and not _shares_profile_token(text, profile_text):
+            findings.append(
+                NarrativeQualityDialogueFinding(
+                    code="style_profile_weak_match",
+                    severity="info",
+                    message="Dialogue has weak lexical overlap with the speaker profile.",
+                    evidence_refs=[NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id))],
+                    suggested_action="Review whether the line reflects the character voice.",
+                )
+            )
+        forbidden_terms = _profile_list(agent.character_profile, "forbidden_terms")
+        matched_forbidden = [term for term in forbidden_terms if term.lower() in text.lower()]
+        if matched_forbidden:
+            findings.append(
+                NarrativeQualityDialogueFinding(
+                    code="style_forbidden_term",
+                    severity="warning",
+                    message="Dialogue uses a term marked as disallowed for this speaker.",
+                    evidence_refs=[NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id))],
+                    suggested_action=(
+                        "Rewrite the line or update the character profile if this is intentional."
+                    ),
+                )
+            )
+    if len(text.strip()) < 8:
+        findings.append(
+            NarrativeQualityDialogueFinding(
+                code="low_confidence_short_text",
+                severity="info",
+                message="Dialogue is too short for high-confidence style review.",
+                suggested_action="Review with surrounding turns if this line matters.",
+            )
+        )
+    relationship_summaries = getattr(context, "relationship_summaries", [])
+    if isinstance(relationship_summaries, list) and relationship_summaries:
+        hostile_context = any(
+            isinstance(item, str) and "hostility" in item and not item.endswith("hostility 0")
+            for item in relationship_summaries
+        )
+        intimate_language = any(term in text.lower() for term in ("love", "trust you", "dear"))
+        if hostile_context and intimate_language:
+            findings.append(
+                NarrativeQualityDialogueFinding(
+                    code="relationship_tone_jump",
+                    severity="warning",
+                    message="Dialogue tone may jump ahead of current relationship context.",
+                    suggested_action=(
+                        "Check whether a relationship repair or affection event should "
+                        "precede this line."
+                    ),
+                )
+            )
+    return findings
+
+
+def _agent_profile_text(agent: Agent) -> str:
+    profile = agent.character_profile or {}
+    chunks = [
+        agent.display_name,
+        str(agent.narrative_role or ""),
+        str(profile.get("personality") or ""),
+        str(profile.get("speech_style") or ""),
+        str(profile.get("style_notes") or ""),
+    ]
+    return " ".join(item for item in chunks if item)
+
+
+def _shares_profile_token(text: str, profile_text: str) -> bool:
+    text_tokens = _signal_tokens(text)
+    profile_tokens = _signal_tokens(profile_text)
+    return bool(text_tokens & profile_tokens)
+
+
+def _signal_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[A-Za-z0-9_']+", value.lower())
+        if len(token) >= 4
+    }
+
+
+def _profile_list(profile: dict[str, Any], key: str) -> list[str]:
+    value = profile.get(key)
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return []
+
+
+def _finding_penalty(finding: NarrativeQualityDialogueFinding) -> int:
+    if finding.severity == "error":
+        return 60
+    if finding.severity == "warning":
+        return 25
+    return 8
 
 
 def _metadata_worldline_id(artifact: NarrativeArtifact) -> uuid.UUID | None:

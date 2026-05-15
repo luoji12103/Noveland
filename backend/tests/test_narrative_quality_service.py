@@ -35,6 +35,7 @@ from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
     NarrativeQualityContextKind,
     NarrativeQualityContextPreviewRequest,
+    NarrativeQualityDialogueReviewRequest,
     NarrativeQualityGMProposalGenerateRequest,
 )
 from noveland.narrative_quality.service import (
@@ -301,6 +302,97 @@ def test_provider_backed_gm_generation_sanitizes_proposal_traceability() -> None
     assert "model_invocation_id" in proposal.source_context
 
 
+def test_dialogue_review_existing_turn_uses_speaker_profile() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    turn_id = _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I will keep the quiet lantern safe.",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_dialogue(
+            world_id,
+            NarrativeQualityDialogueReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+            ),
+        )
+        original_turn = session.get(ConversationTurn, turn_id)
+
+    assert result.review_status in {"pass", "warning"}
+    assert result.speaker_agent_id == agent_id
+    assert result.turn_id == turn_id
+    assert result.reviewed_text == "I will keep the quiet lantern safe."
+    assert original_turn is not None
+    assert original_turn.output_text == "I will keep the quiet lantern safe."
+
+
+def test_dialogue_review_redacts_unsafe_text_and_writes_no_event() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).review_dialogue(
+            world_id,
+            NarrativeQualityDialogueReviewRequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                speaker_agent_id=agent_id,
+                text="storage_uri=media://hidden/object base64,AAAA",
+            ),
+        )
+        event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    serialized = result.model_dump_json()
+    assert result.review_status == "fail"
+    assert any(finding.code == "unsafe_text_leak" for finding in result.findings)
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "base64" not in serialized.lower()
+    assert event_count == 0
+
+
+def test_dialogue_review_rejects_cross_worldline_conversation() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    with Session(engine) as session:
+        fork_id = uuid.uuid4()
+        session.add(
+            Worldline(
+                id=fork_id,
+                world_id=world_id,
+                worldline_key=f"fork-{fork_id.hex[:8]}",
+                name="Fork",
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        try:
+            NarrativeQualityService(session).review_dialogue(
+                world_id,
+                NarrativeQualityDialogueReviewRequest(
+                    worldline_id=fork_id,
+                    conversation_id=conversation_id,
+                    text="Hello there.",
+                ),
+            )
+        except NarrativeQualityValidationError as exc:
+            assert "worldline" in str(exc)
+        else:
+            raise AssertionError("expected cross-worldline rejection")
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -434,6 +526,31 @@ def _seed_conversation(
         service.seed_session(world_id, created.id, ConversationSeed(input_text="Operator seed"))
         session.commit()
         return created.id
+
+
+def _seed_agent_turn(
+    engine: Engine,
+    conversation_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    *,
+    output_text: str,
+) -> uuid.UUID:
+    turn_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            ConversationTurn(
+                id=turn_id,
+                session_id=conversation_id,
+                turn_index=99,
+                speaker_kind="agent",
+                speaker_agent_id=agent_id,
+                input_text="Operator prompt",
+                output_text=output_text,
+                status="succeeded",
+            )
+        )
+        session.commit()
+        return turn_id
 
 
 def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
