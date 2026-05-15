@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 5.
-- Status: Phase 5 Narrative Writer v2 implementation is complete and fast-forward merged to local `main`; Phase 6 Continuity Review v2 planning checkpoint is next.
+- Status: Phase 6 Continuity Review v2 planning checkpoint is complete; implementation branch is next.
 
 ## Current Context
 
@@ -41,7 +41,8 @@
 
 ## Required Next Steps
 
-- Start Phase 6 from clean local `main` with a docs-only planning checkpoint.
+- Start Phase 6 implementation from clean local `main` on `feat/continuity-review-v2`.
+- Reuse `LivingWorldGuardrailService.review_narrative_continuity` and `NarrativeContinuityReview`; do not add a duplicate review table.
 - Preserve the first-class nullable `worldline_id` columns for `narrative_artifacts` and `narrative_publications`; v2 writer-created artifacts store non-null `worldline_id`.
 - Continue to use provider-kernel text generation through `ProviderExecutionService`; do not expand legacy provider profiles.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.

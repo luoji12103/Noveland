@@ -88,6 +88,17 @@
 - Docs updated: task board, active handoff, change journal, OpenSpec tasks
 - Follow-up notes: Begin Phase 6 Continuity Review v2 from clean local `main`; no push performed.
 
+## v0.6.6 Continuity Review v2 planning entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: v0.6 Runtime Narrative Quality Phase 6 planning
+- Summary: Added the Phase 6 implementation checkpoint for API-first Continuity Review v2, reusing existing guardrail review records and forbidding automatic repair, provider calls, Web UI, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.6-continuity-review-v2-plan.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: project index, file inventory, change journal, task board, active handoff
+- Follow-up notes: Implement Phase 6 on `feat/continuity-review-v2`; no migration expected.
+
 ## Storage backup auth runtime ops entry
 
 - Date: 2026-05-04
