@@ -2004,3 +2004,15 @@
 - Tests added/updated: Documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Start implementation on `feat/security-regression-suite` from clean local `main`.
+
+## v0.7.7 Security Regression Suite implementation entry
+
+- Date: 2026-05-15
+- Branch: feat/security-regression-suite
+- Scope: v0.7 Production Hardening Phase 7 security regression suite.
+- Summary: Added a consolidated backend regression suite and shared fixture helpers for forbidden secret, prompt/output, storage/path, ACL, and worldline isolation markers across v0.4-v0.7 surfaces. The suite reuses existing permission, provider secret, multimodal sample-world, authoring import, narrative quality, and observability coverage without adding migrations, routers, providers, Web UI, runtime behavior, or broad `worlds.py` changes.
+- Files changed: `/backend/tests/fixtures/security_regression.py`, `/backend/tests/test_security_regression_suite.py`, `/openspec/changes/v0-7-production-hardening/tasks.md`, and harness docs.
+- Tests added/updated: `backend/tests/test_security_regression_suite.py` and `backend/tests/fixtures/security_regression.py`.
+- Docs updated: OpenSpec task status, file inventory, project index, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff for the security regression tests/helpers, backend mypy for the same files, and targeted pytest (`83 passed`).
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 7 back to local `main` if it stays green.

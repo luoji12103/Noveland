@@ -312,6 +312,8 @@ Fast orientation for a new coding session.
 - `backend/tests/test_multimodal_sample_world_regression.py` — Phase 13 sample-world architecture regression entrypoint
 - `backend/tests/fixtures/authoring_sample_import.py` — deterministic v0.5 authoring sample import fixture helper for backend regression tests
 - `backend/tests/test_authoring_regression_fixture.py` — v0.5 authoring import pipeline regression entrypoint
+- `backend/tests/fixtures/security_regression.py` — shared forbidden-token helpers for v0.7 security regression tests
+- `backend/tests/test_security_regression_suite.py` — consolidated v0.7 security regression entrypoint for leak, ACL, and fixture coverage
 
 ## Update rule
 
