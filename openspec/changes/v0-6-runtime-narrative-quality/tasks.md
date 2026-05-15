@@ -24,7 +24,7 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 
 ## Phase 2 — Provider-backed GM Proposal
 
-- [ ] Write phase planning checkpoint.
+- [x] Write phase planning checkpoint.
 - [ ] Add or confirm provider-kernel text generation execution before GM generation.
 - [ ] Implement `provider-backed-gm-proposal` scope only.
 - [ ] Use narrative quality package/router for any new v0.6 quality APIs.

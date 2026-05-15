@@ -3,7 +3,7 @@
 - Date: 2026-05-15T00:00:00Z
 - Branch: main
 - Objective: v0.6 Runtime Narrative Quality Phase 2.
-- Status: Phase 1 runtime context contract implementation is complete and fast-forward merged to local `main`; Phase 2 Provider-backed GM Proposal planning is next.
+- Status: Phase 1 runtime context contract implementation is complete and fast-forward merged to local `main`; Phase 2 Provider-backed GM Proposal planning checkpoint is ready to commit.
 
 ## Current Context
 
@@ -41,7 +41,6 @@
 
 ## Required Next Steps
 
-- Write and commit the v0.6.2 Provider-backed GM Proposal planning checkpoint.
 - Confirm provider-kernel text generation execution before adding provider-backed GM generation.
 - Implement Phase 2 only through `backend/packages/narrative_quality/` and `backend/services/api/src/noveland/services/api/narrative_quality.py`.
 - Keep implementation API-first; do not add Web dashboard work or broad `worlds.py` routes.
@@ -80,3 +79,4 @@
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.
+- v0.6 Phase 2 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.

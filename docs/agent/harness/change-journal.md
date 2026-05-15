@@ -1462,3 +1462,14 @@
 - Tests added/updated: N/A.
 - Docs updated: OpenSpec tasks, change journal, task board, and active handoff.
 - Follow-up notes: Start Phase 2 Provider-backed GM Proposal from clean local `main`; do not push unless explicitly requested.
+
+## v0.6 Provider-backed GM Proposal plan entry
+
+- Date: 2026-05-15
+- Branch: main
+- Scope: Final implementation plan for v0.6 Runtime Narrative Quality Phase 2.
+- Summary: Added the Phase 2 plan for admin-only provider-backed GM proposal generation through the dedicated narrative quality boundary. The plan confirms current provider-kernel text generation is available through fake/local-stub execution with ledger evidence, forbids legacy provider profile fallback, keeps provider output behind proposal/review/apply boundaries, and avoids world event mutation, migrations unless proven necessary, broad `worlds.py` routes, Web UI, and new external provider adapters.
+- Files changed: `/docs/agent/harness/feature-updates/v0.6.2-provider-backed-gm-proposal-plan.md`, `/openspec/changes/v0-6-runtime-narrative-quality/tasks.md`, `/docs/agent/harness/project-index.md`, `/docs/agent/harness/file-inventory.md`, `/docs/agent/harness/task-board.md`, `/docs/agent/harness/handoffs/active-session.md`, `/docs/agent/harness/change-journal.md`
+- Tests added/updated: Documentation-only planning checkpoint; verify with OpenSpec validation and `git diff --check`.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implementation should start on `feat/provider-backed-gm-proposal` after this docs-only checkpoint is committed.

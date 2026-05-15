@@ -421,6 +421,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.5.8-authoring-regression-fixture-plan.md`
 - `docs/agent/harness/feature-updates/v0.6-runtime-narrative-quality-feasibility-review.md`
 - `docs/agent/harness/feature-updates/v0.6.1-runtime-context-contract-v2-plan.md`
+- `docs/agent/harness/feature-updates/v0.6.2-provider-backed-gm-proposal-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
