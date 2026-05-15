@@ -57,13 +57,13 @@ Use these tasks when implementation is explicitly requested. Do not mark items c
 ## Phase 5 — Deployment Profile
 
 - [x] Write phase planning checkpoint.
-- [ ] Implement `deployment-profile` scope only.
-- [ ] Document production-like local/single-host profile, health checks, migration procedure, and rollback prerequisites.
-- [ ] Validate deployment profile commands without introducing managed-cloud lock-in.
-- [ ] Preserve Phase 13 architecture guardrails.
-- [ ] Add or update focused tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement `deployment-profile` scope only.
+- [x] Document production-like local/single-host profile, health checks, migration procedure, and rollback prerequisites.
+- [x] Validate deployment profile commands without introducing managed-cloud lock-in.
+- [x] Preserve Phase 13 architecture guardrails.
+- [x] Add or update focused tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 
