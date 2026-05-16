@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 
@@ -1942,6 +1943,8 @@ const mockServer = createServer(async (request, response) => {
 });
 
 mockServer.listen(mockPort, "127.0.0.1", () => {
+  rmSync(new URL("../../.next/dev", import.meta.url), { recursive: true, force: true });
+
   const nextProcess = spawn(
     "npm",
     ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(nextPort)],
