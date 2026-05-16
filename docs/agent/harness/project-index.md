@@ -62,6 +62,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md` — final v0.8 Public Experience & Ecosystem Phase 1 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.2-conversation-playback-ui-plan.md` — final v0.8 Public Experience & Ecosystem Phase 2 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.3-player-interaction-ui-plan.md` — final v0.8 Public Experience & Ecosystem Phase 3 implementation plan.
+- `docs/agent/harness/feature-updates/v0.8.4-worldline-browser-plan.md` — final v0.8 Public Experience & Ecosystem Phase 4 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.

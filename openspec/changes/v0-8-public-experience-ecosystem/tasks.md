@@ -45,7 +45,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 4 — Worldline Browser
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Define read-only worldline browser DTOs and ACL expectations.
 - [ ] Implement browsing/comparison without rollback execution.
 - [ ] Add worldline isolation, ACL, and UI tests.

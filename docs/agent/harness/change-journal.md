@@ -2234,3 +2234,15 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 4 from clean local `main`; use the `impeccable` skill before frontend implementation, and keep worldline browsing read-only.
+
+## v0.8.4 Worldline Browser planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 4 planning.
+- Summary: Added the Phase 4 checkpoint for an authenticated read-only worldline browser that reuses existing worldline list and comparison DTOs, keeps fork/rollback/merge/switching out of reader/player UI, and limits comparison output to safe aggregate counts.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.4-worldline-browser-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 4 on a feature branch. A narrow member-safe worldline compare ACL adjustment is acceptable if required, but no destructive worldline operations or raw event payload display are in scope.

@@ -3,7 +3,7 @@
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
 - Objective: v0.8 Public Experience & Ecosystem Phase 4 Worldline Browser.
-- Status: Phase 3 fast-forward merge is complete; Phase 4 docs-only planning checkpoint is next.
+- Status: Phase 4 docs-only planning checkpoint is complete; implementation branch is next.
 
 ## Current Context
 
@@ -45,6 +45,8 @@
 - v0.8 Phase 3 implementation adds `/worlds/{world_id}/player`, `PlayerInteractions`, player data loading in the Web server helper, and a workspace Player nav link. The backend change is limited to existing player actor/choice route ACLs and current-user filtering, plus safer player choice/intervention event payload summaries.
 - v0.8 Phase 3 fast-forward merge to local `main` completed.
 - v0.8 Phase 4 must implement read-only worldline browsing/comparison only. Do not add rollback, merge, destructive branch operations, or unsafe raw event payload exposure.
+- v0.8 Phase 4 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.4-worldline-browser-plan.md`.
+- v0.8 Phase 4 should reuse existing worldline list/compare records and helpers. A narrow member-safe compare ACL adjustment is acceptable if needed, but fork/rollback/merge must remain unavailable in reader/player UI.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -63,7 +65,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start Phase 4 from clean local `main` with a docs-only planning checkpoint.
+- Implement Phase 4 on a feature branch from clean local `main`.
 - Use `impeccable` before Phase 4 frontend implementation work.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
@@ -187,3 +189,4 @@
 - v0.8 Phase 3 targeted checks passed: backend pytest for the member-owned player interaction API/ACL regression, focused Web component tests for player interactions, Web typecheck, Web lint, focused player interaction e2e, targeted backend ruff for changed Phase 3 backend files, and `git diff --check`.
 - v0.8 Phase 3 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`421 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`37 passed files`, `118 passed`), Web build, Web `check:next-env`, Web e2e (`16 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.8 Phase 3 fast-forward merge to local `main` completed.
+- v0.8 Phase 4 planning checkpoint is docs-only and validated with OpenSpec strict changes validation plus `git diff --check`.
