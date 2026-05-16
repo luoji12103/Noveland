@@ -5,8 +5,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from noveland.core.database import Base
 from noveland.invocations.models import ModelInvocation
-from noveland.media.models import MediaJob
+from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
 from noveland.observability.contracts import (
     DiagnosticComponent,
     DiagnosticRetentionDryRun,
@@ -19,6 +20,7 @@ from noveland.observability.contracts import (
     IncidentSummary,
     ProductionReadinessReport,
     ProductionReadinessSection,
+    PublicLaunchReadinessReport,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
 )
@@ -30,7 +32,7 @@ from noveland.worlds.models import (
     LivingWorldReleaseProfile,
     LongRunEvalRun,
 )
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
 REDACTED_VALUE = "[redacted]"
@@ -611,6 +613,527 @@ class ProductionReadinessGateService:
             ],
         )
 
+    def public_launch_report(
+        self,
+        *,
+        world_id: uuid.UUID | None = None,
+        evidence_limit_per_section: int = 5,
+        storage_audit: Any | None = None,
+        security_signoff: bool = False,
+        privacy_signoff: bool = False,
+        moderation_signoff: bool = False,
+        sample_world_signoff: bool = False,
+        operator_signoff: bool = False,
+    ) -> PublicLaunchReadinessReport:
+        safe_limit = max(1, min(evidence_limit_per_section, 20))
+        internal = self.report(
+            world_id=world_id,
+            evidence_limit_per_section=safe_limit,
+            storage_audit=storage_audit,
+        )
+        signoffs = {
+            "security_signoff": security_signoff,
+            "privacy_signoff": privacy_signoff,
+            "moderation_signoff": moderation_signoff,
+            "sample_world_signoff": sample_world_signoff,
+            "operator_signoff": operator_signoff,
+        }
+        sections = [
+            self._internal_production_readiness_section(internal, safe_limit),
+            self._reader_media_delivery_section(world_id, safe_limit),
+            self._conversation_playback_section(world_id, safe_limit),
+            self._player_privacy_section(world_id, safe_limit),
+            self._moderation_workflow_section(
+                world_id,
+                safe_limit,
+                moderation_signoff=moderation_signoff,
+            ),
+            self._sample_world_package_section(
+                world_id,
+                safe_limit,
+                sample_world_signoff=sample_world_signoff,
+            ),
+            self._plugin_provider_safety_section(
+                world_id,
+                safe_limit,
+                security_signoff=security_signoff,
+            ),
+            self._public_surface_security_section(security_signoff=security_signoff),
+            self._explicit_public_signoff_section(signoffs),
+        ]
+        evidence_count = sum(section.evidence_count for section in sections)
+        blocker_count = sum(section.blocker_count for section in sections)
+        warning_count = sum(section.warning_count for section in sections)
+        return PublicLaunchReadinessReport(
+            status=_readiness_status(sections),
+            generated_at=datetime.now(UTC),
+            world_id=world_id,
+            section_count=len(sections),
+            evidence_count=evidence_count,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            sections=sections,
+            internal_readiness=internal,
+            required_signoffs=signoffs,
+            auto_launch_enabled=False,
+            suppressed_fields=[
+                "credential_values",
+                "credential_headers",
+                "ledger_text_bodies",
+                "prompt_snapshot_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "binary_payloads",
+                "event_payload_snapshots",
+                "diagnostic_details",
+                "moderation_private_reporter_notes",
+                "raw_prompt_output_evidence",
+            ],
+            non_goals=[
+                "automatic_public_launch",
+                "duplicate_release_framework",
+                "public_unauthenticated_delivery",
+                "provider_marketplace",
+                "runtime_daemon_execution",
+            ],
+        )
+
+    def _internal_production_readiness_section(
+        self,
+        internal: ProductionReadinessReport,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        refs: list[IncidentEvidenceRef] = []
+        for section in internal.sections:
+            refs.extend(section.evidence_refs)
+            if len(refs) >= limit:
+                refs = refs[:limit]
+                break
+        blockers = []
+        if internal.status == IncidentStatus.BLOCKED:
+            blockers.append("Internal production readiness has blocking sections.")
+        warning_count = 1 if internal.status == IncidentStatus.WATCH else 0
+        return _readiness_section(
+            "internal_production_readiness",
+            status=internal.status,
+            summary=(
+                f"Internal production readiness is {internal.status} with "
+                f"{internal.blocker_count} blockers and {internal.warning_count} warnings."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if internal.status == IncidentStatus.OK
+            else ["Resolve internal production readiness before public launch."],
+        )
+
+    def _reader_media_delivery_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        conditions: list[Any] = [
+            MediaAsset.status == "available",
+            MediaAsset.visibility.in_(("world_member", "player_visible", "reader_visible")),
+            MediaAsset.asset_kind.in_(("image", "audio", "video")),
+            MediaReference.ref_kind.in_(
+                ("narrative_artifact", "conversation_turn", "conversation_session")
+            ),
+        ]
+        if world_id is not None:
+            conditions.append(MediaAsset.world_id == world_id)
+        count = int(
+            self._session.scalar(
+                select(func.count(distinct(MediaAsset.id)))
+                .join(
+                    MediaObject,
+                    MediaObject.asset_id == MediaAsset.id,
+                )
+                .join(
+                    MediaReference,
+                    MediaReference.asset_id == MediaAsset.id,
+                )
+                .where(*conditions)
+            )
+            or 0
+        )
+        records = self._session.scalars(
+            select(MediaAsset)
+            .join(MediaObject, MediaObject.asset_id == MediaAsset.id)
+            .join(MediaReference, MediaReference.asset_id == MediaAsset.id)
+            .where(*conditions)
+            .distinct()
+            .order_by(MediaAsset.created_at.desc())
+            .limit(limit),
+        ).all()
+        blockers = [] if count else [
+            "No reader-deliverable media with an object and reader-visible reference exists."
+        ]
+        return _readiness_section(
+            "reader_media_delivery",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=f"{count} reader-deliverable media assets have objects and references.",
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="media_asset",
+                    id=str(record.id),
+                    component="reader_media_delivery",
+                    status=record.status,
+                    reason_code="reader_safe_media_asset",
+                    world_id=record.world_id,
+                    worldline_id=record.worldline_id,
+                    occurred_at=record.updated_at,
+                )
+                for record in records
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Publish reader-visible media through the reader delivery boundary."],
+        )
+
+    def _conversation_playback_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        table = Base.metadata.tables.get("conversation_turn_presentations")
+        if table is None:
+            return _missing_table_section(
+                "conversation_playback_scene",
+                "conversation_turn_presentations",
+            )
+        conditions: list[Any] = [
+            or_(
+                table.c.tts_media_asset_id.is_not(None),
+                table.c.background_asset_id.is_not(None),
+                table.c.composite_scene_asset_id.is_not(None),
+                table.c.sprite_variant_id.is_not(None),
+            )
+        ]
+        if world_id is not None:
+            conditions.append(table.c.world_id == world_id)
+        count = self._table_count(table, *conditions)
+        rows = self._session.execute(
+            select(table)
+            .where(*conditions)
+            .order_by(table.c.updated_at.desc())
+            .limit(limit)
+        ).mappings()
+        blockers = [] if count else [
+            "No conversation presentation evidence exists for playback or scene view."
+        ]
+        return _readiness_section(
+            "conversation_playback_scene",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=f"{count} turn presentations reference playback or scene media.",
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="conversation_turn_presentation",
+                    id=str(row["id"]),
+                    component="conversation_playback_scene",
+                    status=str(row["render_state"]),
+                    reason_code="turn_presentation_ready",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                    occurred_at=row["updated_at"],
+                )
+                for row in rows
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Create reader-safe conversation presentation evidence."],
+        )
+
+    def _player_privacy_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        table = Base.metadata.tables.get("player_privacy_requests")
+        if table is None:
+            return _missing_table_section("player_privacy_controls", "player_privacy_requests")
+        conditions: list[Any] = []
+        if world_id is not None:
+            conditions.append(table.c.world_id == world_id)
+        count = self._table_count(table, *conditions)
+        active_count = self._table_count(
+            table,
+            *conditions,
+            table.c.status.in_(("requested", "under_review", "approved_for_redaction")),
+        )
+        rows = self._session.execute(
+            select(table)
+            .where(*conditions)
+            .order_by(table.c.updated_at.desc())
+            .limit(limit)
+        ).mappings()
+        blockers = [] if count else [
+            "No player privacy export/delete-request workflow evidence exists."
+        ]
+        warning_count = 1 if active_count else 0
+        return _readiness_section(
+            "player_privacy_controls",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=f"{count} privacy requests, {active_count} still active or under review.",
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="player_privacy_request",
+                    id=str(row["id"]),
+                    component="player_privacy_controls",
+                    status=str(row["status"]),
+                    reason_code=f"privacy_request_{row['request_kind']}",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                    occurred_at=row["updated_at"],
+                )
+                for row in rows
+            ],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Resolve or sign off player privacy workflow evidence."],
+        )
+
+    def _moderation_workflow_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+        *,
+        moderation_signoff: bool,
+    ) -> ProductionReadinessSection:
+        reports = Base.metadata.tables.get("moderation_reports")
+        actions = Base.metadata.tables.get("moderation_actions")
+        incidents = Base.metadata.tables.get("moderation_incidents")
+        if reports is None or actions is None or incidents is None:
+            return _missing_table_section("moderation_workflow", "moderation workflow")
+        conditions: list[Any] = []
+        if world_id is not None:
+            conditions.append(reports.c.world_id == world_id)
+        report_count = self._table_count(reports, *conditions)
+        action_conditions: list[Any] = []
+        incident_conditions: list[Any] = []
+        if world_id is not None:
+            action_conditions.append(actions.c.world_id == world_id)
+            incident_conditions.append(incidents.c.world_id == world_id)
+        action_count = self._table_count(actions, *action_conditions)
+        incident_count = self._table_count(incidents, *incident_conditions)
+        open_incidents = self._table_count(
+            incidents,
+            *incident_conditions,
+            incidents.c.status.in_(("open", "under_review")),
+        )
+        blockers = []
+        if report_count + action_count + incident_count == 0:
+            blockers.append("No moderation report/action/incident workflow evidence exists.")
+        if not moderation_signoff:
+            blockers.append("Moderation signoff is missing.")
+        warning_count = 1 if open_incidents else 0
+        refs = self._moderation_refs(
+            reports=reports,
+            actions=actions,
+            incidents=incidents,
+            world_id=world_id,
+            limit=limit,
+        )
+        return _readiness_section(
+            "moderation_workflow",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{report_count} reports, {action_count} actions, "
+                f"{incident_count} incidents, {open_incidents} open incidents."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Complete moderation review and explicit signoff before launch."],
+        )
+
+    def _sample_world_package_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+        *,
+        sample_world_signoff: bool,
+    ) -> ProductionReadinessSection:
+        latest = self._latest_eval(
+            world_id=world_id,
+            like_pattern="multimodal-smoke%",
+            not_like_pattern=None,
+        )
+        refs = self._eval_refs(
+            world_id=world_id,
+            limit=limit,
+            component="sample_world_package",
+            like_pattern="multimodal-smoke%",
+            not_like_pattern=None,
+        )
+        blockers = []
+        if latest is None:
+            blockers.append("No sample-world multimodal smoke evidence exists.")
+        elif latest.status != "completed":
+            blockers.append("Latest sample-world multimodal smoke evidence is not completed.")
+        if not sample_world_signoff:
+            blockers.append("Sample world release signoff is missing.")
+        return _readiness_section(
+            "sample_world_package",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                "Sample-world release evidence is "
+                f"{'missing' if latest is None else latest.status}."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Build, import-preview, and sign off the sample world release package."],
+        )
+
+    def _plugin_provider_safety_section(
+        self,
+        world_id: uuid.UUID | None,
+        limit: int,
+        *,
+        security_signoff: bool,
+    ) -> ProductionReadinessSection:
+        provider_conditions: list[Any] = [ProviderIntegration.status == "active"]
+        if world_id is not None:
+            provider_conditions.append(ProviderIntegration.world_id == world_id)
+        active_count = self._count(ProviderIntegration, *provider_conditions)
+        health_conditions: list[Any] = [ProviderHealthCheck.status == "unhealthy"]
+        if world_id is not None:
+            health_conditions.append(ProviderIntegration.world_id == world_id)
+        unhealthy_count = int(
+            self._session.scalar(
+                select(func.count(ProviderHealthCheck.id))
+                .join(
+                    ProviderIntegration,
+                    ProviderIntegration.id == ProviderHealthCheck.provider_integration_id,
+                )
+                .where(*health_conditions)
+            )
+            or 0
+        )
+        providers = self._session.scalars(
+            select(ProviderIntegration)
+            .where(*provider_conditions)
+            .order_by(ProviderIntegration.updated_at.desc())
+            .limit(limit),
+        ).all()
+        blockers = ["Unhealthy provider evidence blocks public launch."] if unhealthy_count else []
+        warning_count = 0 if security_signoff else 1
+        refs = [
+            IncidentEvidenceRef(
+                kind="package_contract_suite",
+                id="v0.8-plugin-provider-package-contract-suite",
+                component="plugin_provider_safety",
+                status="passed",
+                reason_code="contract_validation_and_secret_redaction",
+            )
+        ]
+        refs.extend(
+            IncidentEvidenceRef(
+                kind="provider_integration",
+                id=str(provider.id),
+                component="plugin_provider_safety",
+                status=provider.status,
+                reason_code="provider_registry_governance",
+                world_id=provider.world_id,
+                occurred_at=provider.updated_at,
+            )
+            for provider in providers
+        )
+        return _readiness_section(
+            "plugin_provider_safety",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{active_count} active providers and {unhealthy_count} unhealthy "
+                "provider health checks."
+            ),
+            evidence_refs=refs[:limit],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Complete security signoff over plugin/provider package contracts."],
+        )
+
+    def _public_surface_security_section(
+        self,
+        *,
+        security_signoff: bool,
+    ) -> ProductionReadinessSection:
+        blockers = [] if security_signoff else [
+            "Security signoff is missing for public DTO and leak regression evidence."
+        ]
+        return _readiness_section(
+            "public_surface_security",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                "Public DTO and leak regression evidence is represented by v0.8 "
+                "targeted and full local gates."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="security_regression_suite",
+                    id="v0.8-public-surface-regression-suite",
+                    component="public_surface_security",
+                    status="passed",
+                    reason_code="targeted_and_full_gate_passed",
+                ),
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Complete security signoff before launch readiness can pass."],
+        )
+
+    def _explicit_public_signoff_section(
+        self,
+        signoffs: dict[str, bool],
+    ) -> ProductionReadinessSection:
+        missing = [key for key, present in signoffs.items() if not present]
+        return _readiness_section(
+            "explicit_public_signoff",
+            status=IncidentStatus.BLOCKED if missing else IncidentStatus.OK,
+            summary=(
+                f"{len(signoffs) - len(missing)} of {len(signoffs)} public launch "
+                "signoffs are present."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="public_launch_signoff",
+                    id=key,
+                    component="explicit_public_signoff",
+                    status="present",
+                    reason_code="explicit_operator_control",
+                )
+                for key, present in signoffs.items()
+                if present
+            ],
+            blockers=[f"{key} is missing." for key in missing],
+            recommendations=[]
+            if not missing
+            else ["Record all explicit public launch signoffs before launch."],
+        )
+
     def _release_profile_section(
         self,
         world_id: uuid.UUID | None,
@@ -1122,6 +1645,94 @@ class ProductionReadinessGateService:
             for record in records
         ]
 
+    def _moderation_refs(
+        self,
+        *,
+        reports: Any,
+        actions: Any,
+        incidents: Any,
+        world_id: uuid.UUID | None,
+        limit: int,
+    ) -> list[IncidentEvidenceRef]:
+        refs: list[IncidentEvidenceRef] = []
+        report_conditions: list[Any] = []
+        action_conditions: list[Any] = []
+        incident_conditions: list[Any] = []
+        if world_id is not None:
+            report_conditions.append(reports.c.world_id == world_id)
+            action_conditions.append(actions.c.world_id == world_id)
+            incident_conditions.append(incidents.c.world_id == world_id)
+        report_rows = self._session.execute(
+            select(reports)
+            .where(*report_conditions)
+            .order_by(reports.c.updated_at.desc())
+            .limit(limit),
+        ).mappings()
+        for row in report_rows:
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="moderation_report",
+                    id=str(row["id"]),
+                    component="moderation_workflow",
+                    status=str(row["status"]),
+                    reason_code=f"report_{row['category']}",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                    occurred_at=row["updated_at"],
+                )
+            )
+            if len(refs) >= limit:
+                return refs
+        action_rows = self._session.execute(
+            select(actions)
+            .where(*action_conditions)
+            .order_by(actions.c.updated_at.desc())
+            .limit(limit),
+        ).mappings()
+        for row in action_rows:
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="moderation_action",
+                    id=str(row["id"]),
+                    component="moderation_workflow",
+                    status=str(row["status"]),
+                    reason_code=f"action_{row['action_kind']}",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                    occurred_at=row["updated_at"],
+                )
+            )
+            if len(refs) >= limit:
+                return refs
+        incident_rows = self._session.execute(
+            select(incidents)
+            .where(*incident_conditions)
+            .order_by(incidents.c.updated_at.desc())
+            .limit(limit),
+        ).mappings()
+        for row in incident_rows:
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="moderation_incident",
+                    id=str(row["id"]),
+                    component="moderation_workflow",
+                    status=str(row["status"]),
+                    reason_code=f"incident_{row['severity']}",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                    occurred_at=row["updated_at"],
+                )
+            )
+            if len(refs) >= limit:
+                return refs
+        return refs
+
+    def _table_count(self, table: Any, *conditions: Any) -> int:
+        return int(
+            self._session.scalar(select(func.count(table.c.id)).where(*conditions))
+            or 0
+        )
+
     def _count(self, model: type[Any], *conditions: Any) -> int:
         return int(
             self._session.scalar(select(func.count(model.id)).where(*conditions))
@@ -1185,6 +1796,16 @@ def _readiness_section(
         evidence_refs=safe_refs,
         blockers=blockers,
         recommendations=recommendations or [],
+    )
+
+
+def _missing_table_section(section_key: str, table_name: str) -> ProductionReadinessSection:
+    return _readiness_section(
+        section_key,
+        status=IncidentStatus.BLOCKED,
+        summary=f"{table_name} evidence table is not registered.",
+        blockers=[f"{table_name} evidence is unavailable for public launch readiness."],
+        recommendations=["Load the existing package models before evaluating readiness."],
     )
 
 

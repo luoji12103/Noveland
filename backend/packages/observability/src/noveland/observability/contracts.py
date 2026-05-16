@@ -194,3 +194,27 @@ class ProductionReadinessReport(_FrozenContract):
         if value.tzinfo is None or value.utcoffset() is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+class PublicLaunchReadinessReport(_FrozenContract):
+    status: IncidentStatus
+    generated_at: datetime
+    world_id: uuid.UUID | None = None
+    readiness_kind: str = Field(default="public_launch_readiness", min_length=1)
+    section_count: int = Field(ge=0)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    sections: list[ProductionReadinessSection] = Field(default_factory=list)
+    internal_readiness: ProductionReadinessReport
+    required_signoffs: dict[str, bool] = Field(default_factory=dict)
+    auto_launch_enabled: bool = False
+    suppressed_fields: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)

@@ -124,9 +124,9 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 - [x] Write docs-only phase planning checkpoint.
 - [x] Define public readiness evidence inputs from v0.7 and v0.8 phases.
-- [ ] Implement public launch readiness aggregation without duplicate release framework.
-- [ ] Add readiness, blocker, ACL, signoff, and evidence-redaction tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Implement public launch readiness aggregation without duplicate release framework.
+- [x] Add readiness, blocker, ACL, signoff, and evidence-redaction tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

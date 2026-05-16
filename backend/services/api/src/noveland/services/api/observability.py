@@ -12,6 +12,7 @@ from noveland.observability import (
     IncidentSummary,
     ProductionReadinessGateService,
     ProductionReadinessReport,
+    PublicLaunchReadinessReport,
 )
 from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
 from noveland.storage import LocalObjectStorage
@@ -57,4 +58,37 @@ def get_production_readiness(
         world_id=world_id,
         evidence_limit_per_section=evidence_limit_per_section,
         storage_audit=storage_audit,
+    )
+
+
+@router.get("/readiness/public-launch", response_model=PublicLaunchReadinessReport)
+def get_public_launch_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    world_id: Annotated[uuid.UUID | None, Query()] = None,
+    evidence_limit_per_section: Annotated[int, Query(ge=1, le=20)] = 5,
+    storage_audit_limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
+    storage_finding_limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    security_signoff: Annotated[bool, Query()] = False,
+    privacy_signoff: Annotated[bool, Query()] = False,
+    moderation_signoff: Annotated[bool, Query()] = False,
+    sample_world_signoff: Annotated[bool, Query()] = False,
+    operator_signoff: Annotated[bool, Query()] = False,
+) -> PublicLaunchReadinessReport:
+    del subject
+    settings = load_settings()
+    storage_audit = StorageIntegrityAuditService(
+        db_session,
+        media_storage=LocalMediaObjectStorage(settings.object_storage_root / "media"),
+        object_storage=LocalObjectStorage(settings.object_storage_root),
+    ).audit(limit=storage_audit_limit, finding_limit=storage_finding_limit)
+    return ProductionReadinessGateService(db_session).public_launch_report(
+        world_id=world_id,
+        evidence_limit_per_section=evidence_limit_per_section,
+        storage_audit=storage_audit,
+        security_signoff=security_signoff,
+        privacy_signoff=privacy_signoff,
+        moderation_signoff=moderation_signoff,
+        sample_world_signoff=sample_world_signoff,
+        operator_signoff=operator_signoff,
     )

@@ -11,9 +11,16 @@ from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.conversations.models import (
+    ConversationSession,
+    ConversationTurn,
+    ConversationTurnPresentation,
+)
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.invocations.models import ModelInvocation
-from noveland.media.models import MediaAsset, MediaJob, MediaObject
+from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
+from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import (
     DiagnosticComponent,
     DiagnosticSeverity,
@@ -22,6 +29,7 @@ from noveland.observability import (
     RuntimeDiagnosticsService,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.player_privacy.models import PlayerPrivacyRequest
 from noveland.providers.models import (
     ProviderBudgetPolicy,
     ProviderHealthCheck,
@@ -152,6 +160,150 @@ def test_production_readiness_does_not_create_duplicate_framework_tables() -> No
     assert "production_readiness_reports" not in table_names
 
 
+def test_public_launch_readiness_blocks_internal_readiness_blockers_safely() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    _seed_blocking_evidence(engine, world_id, worldline_id)
+    _seed_public_launch_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).public_launch_report(
+            world_id=world_id,
+            storage_audit=_StorageAuditStub(status="error", finding_count=2),
+            security_signoff=True,
+            privacy_signoff=True,
+            moderation_signoff=True,
+            sample_world_signoff=True,
+            operator_signoff=True,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert report.readiness_kind == "public_launch_readiness"
+    assert report.internal_readiness.status == "blocked"
+    assert report.auto_launch_enabled is False
+    assert sections["internal_production_readiness"].status == "blocked"
+    assert "Internal production readiness has blocking sections." in (
+        sections["internal_production_readiness"].blockers
+    )
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_public_launch_readiness_requires_explicit_signoffs() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    _seed_ready_evidence(engine, world_id, worldline_id)
+    _seed_public_launch_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).public_launch_report(
+            world_id=world_id,
+            storage_audit=_StorageAuditStub(),
+            security_signoff=True,
+            privacy_signoff=True,
+            moderation_signoff=False,
+            sample_world_signoff=True,
+            operator_signoff=False,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert report.required_signoffs["moderation_signoff"] is False
+    assert report.required_signoffs["operator_signoff"] is False
+    assert sections["moderation_workflow"].status == "blocked"
+    assert "Moderation signoff is missing." in sections["moderation_workflow"].blockers
+    assert sections["explicit_public_signoff"].status == "blocked"
+    assert "operator_signoff is missing." in sections["explicit_public_signoff"].blockers
+
+
+def test_public_launch_readiness_passes_with_required_evidence_and_signoffs() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    _seed_ready_evidence(engine, world_id, worldline_id)
+    _seed_public_launch_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        before_counts = _framework_counts(session)
+        report = ProductionReadinessGateService(session).public_launch_report(
+            world_id=world_id,
+            storage_audit=_StorageAuditStub(),
+            security_signoff=True,
+            privacy_signoff=True,
+            moderation_signoff=True,
+            sample_world_signoff=True,
+            operator_signoff=True,
+        )
+        after_counts = _framework_counts(session)
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "ok"
+    assert report.auto_launch_enabled is False
+    assert report.blocker_count == 0
+    assert report.internal_readiness.status == "ok"
+    assert sections["reader_media_delivery"].status == "ok"
+    assert sections["conversation_playback_scene"].status == "ok"
+    assert sections["player_privacy_controls"].status == "ok"
+    assert sections["moderation_workflow"].status == "ok"
+    assert sections["sample_world_package"].status == "ok"
+    assert sections["plugin_provider_safety"].status == "ok"
+    assert sections["public_surface_security"].status == "ok"
+    assert sections["explicit_public_signoff"].status == "ok"
+    assert before_counts == after_counts
+
+
+def test_public_launch_readiness_endpoint_is_platform_admin_only_and_safe() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-launch@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    _seed_ready_evidence(engine, world_id, worldline_id)
+    _seed_public_launch_evidence(engine, world_id, worldline_id)
+    _authenticate(client, platform_token)
+
+    response = client.get(
+        "/observability/readiness/public-launch",
+        params={
+            "world_id": str(world_id),
+            "security_signoff": "true",
+            "privacy_signoff": "true",
+            "moderation_signoff": "true",
+            "sample_world_signoff": "true",
+            "operator_signoff": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["readiness_kind"] == "public_launch_readiness"
+    assert response.json()["world_id"] == str(world_id)
+    assert response.json()["auto_launch_enabled"] is False
+    assert response.json()["status"] == "blocked"
+    assert (
+        response.json()["sections"][0]["section_key"]
+        == "internal_production_readiness"
+    )
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in response.text
+
+    _member_id, member_token = _seed_user(engine, "member-launch@example.test", False)
+    _authenticate(client, member_token)
+    forbidden = client.get("/observability/readiness/public-launch")
+    assert forbidden.status_code == 403
+
+
+def test_public_launch_readiness_does_not_create_duplicate_framework_tables() -> None:
+    table_names = {
+        "beta_checklist_runs",
+        "long_run_eval_runs",
+        "living_world_release_profiles",
+    }
+    assert "public_launch_readiness_runs" not in table_names
+    assert "public_launch_readiness_reports" not in table_names
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -166,8 +318,18 @@ def _engine() -> Engine:
         Worldline.__table__,
         WorldEventModel.__table__,
         WorldSnapshotModel.__table__,
+        ConversationSession.__table__,
+        ConversationTurn.__table__,
         MediaAsset.__table__,
         MediaObject.__table__,
+        MediaReference.__table__,
+        NarrativeArtifact.__table__,
+        NarrativePublication.__table__,
+        ConversationTurnPresentation.__table__,
+        PlayerPrivacyRequest.__table__,
+        ModerationReport.__table__,
+        ModerationIncident.__table__,
+        ModerationAction.__table__,
         MediaJob.__table__,
         ModelInvocation.__table__,
         RuntimeDiagnosticEvent.__table__,
@@ -405,6 +567,240 @@ def _seed_blocking_evidence(
                 status="active",
                 emergency_stop_enabled=True,
                 limits_json={"max_daily_estimated_cost": 1},
+                metadata_json={},
+            ),
+        )
+        session.commit()
+
+
+def _seed_public_launch_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> None:
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        world = session.get(World, world_id)
+        if world is None:
+            raise RuntimeError("seeded world is missing")
+        owner_id = world.owner_user_id
+        artifact_id = uuid.uuid4()
+        publication_id = uuid.uuid4()
+        conversation_id = uuid.uuid4()
+        turn_id = uuid.uuid4()
+        background_asset_id = uuid.uuid4()
+        audio_asset_id = uuid.uuid4()
+        composite_asset_id = uuid.uuid4()
+        for asset_id, role, kind in (
+            (background_asset_id, "scene_background", "image"),
+            (audio_asset_id, "speech_audio", "audio"),
+            (composite_asset_id, "composite_image", "image"),
+        ):
+            session.add(
+                MediaAsset(
+                    id=asset_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    asset_kind=kind,
+                    asset_role=role,
+                    source_kind="test_fixture",
+                    status="available",
+                    visibility="reader_visible",
+                    storage_uri=f"media://private-object/{asset_id}",
+                    mime_type="audio/wav" if kind == "audio" else "image/png",
+                    size_bytes=16,
+                    checksum_sha256="a" * 64,
+                    created_by_actor_ref="system:test",
+                    metadata_json={"secret": "must not leak"},
+                ),
+            )
+            session.add(
+                MediaObject(
+                    id=uuid.uuid4(),
+                    asset_id=asset_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    object_role="original",
+                    storage_uri=f"media://private-object/{asset_id}/object",
+                    filename="private-file.png" if kind == "image" else "private-file.wav",
+                    mime_type="audio/wav" if kind == "audio" else "image/png",
+                    size_bytes=16,
+                    checksum_sha256="a" * 64,
+                    metadata_json={"storage_uri": "must not leak"},
+                ),
+            )
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="Public Launch Chapter",
+                content="Reader-safe content.",
+                artifact_kind="chapter_draft",
+                artifact_metadata={},
+            ),
+        )
+        session.add(
+            NarrativePublication(
+                id=publication_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                artifact_id=artifact_id,
+                status="published",
+                reader_visible=True,
+                published_metadata={"public_launch_fixture": True},
+                published_at=now,
+                published_by_user_id=owner_id,
+            ),
+        )
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                scene_id=None,
+                session_key=f"launch-{conversation_id.hex[:8]}",
+                title="Public Launch Playback",
+                scope_type="world",
+                mode="manual_chain",
+                status="completed",
+                objective="Readiness playback",
+                opening_prompt="",
+                max_turns=1,
+                next_turn_index=1,
+                policy_config={},
+                writer_config={},
+                memory_config={},
+            ),
+        )
+        session.add(
+            ConversationTurn(
+                id=turn_id,
+                session_id=conversation_id,
+                turn_index=0,
+                speaker_kind="operator",
+                speaker_agent_id=None,
+                input_text="Reader-safe input",
+                output_text="Reader-safe output",
+                status="succeeded",
+            ),
+        )
+        session.add(
+            ConversationTurnPresentation(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=turn_id,
+                speaker_agent_id=None,
+                emotion_key="neutral",
+                emotion_intensity=0.5,
+                tts_media_asset_id=audio_asset_id,
+                background_asset_id=background_asset_id,
+                composite_scene_asset_id=composite_asset_id,
+                presentation_json={"safe": True},
+                render_state="speech_rendered",
+            ),
+        )
+        for asset_id, role in (
+            (background_asset_id, "background"),
+            (audio_asset_id, "output"),
+            (composite_asset_id, "output"),
+        ):
+            session.add(
+                MediaReference(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    asset_id=asset_id,
+                    ref_kind="conversation_turn",
+                    ref_id=turn_id,
+                    ref_role=role,
+                    display_order=0,
+                    metadata_json={"path": "must not leak"},
+                ),
+            )
+        session.add(
+            PlayerPrivacyRequest(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                user_id=owner_id,
+                request_kind="export",
+                status="completed",
+                target_ref_kind=None,
+                target_ref_id=None,
+                reason="public launch fixture",
+                summary_json={"safe": True},
+                redaction_plan_json={"shared_world_records_protected": True},
+                created_by_actor_ref=f"user:{owner_id}",
+                reviewed_by_actor_ref="system:test",
+                reviewed_at=now,
+                review_note="completed",
+                metadata_json={},
+            ),
+        )
+        report_id = uuid.uuid4()
+        incident_id = uuid.uuid4()
+        action_id = uuid.uuid4()
+        session.add(
+            ModerationReport(
+                id=report_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                reporter_user_id=owner_id,
+                target_ref_kind="media_asset",
+                target_ref_id=background_asset_id,
+                category="quality",
+                severity="low",
+                status="resolved",
+                reason="public launch fixture",
+                reporter_note="private reporter note with /tmp/private-file",
+                evidence_refs_json=[{"kind": "media_asset", "id": str(background_asset_id)}],
+                created_by_actor_ref=f"user:{owner_id}",
+                reviewed_by_actor_ref="system:test",
+                reviewed_at=now,
+                review_note="resolved",
+                metadata_json={"secret": "must not leak"},
+            ),
+        )
+        session.add(
+            ModerationIncident(
+                id=incident_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                status="closed",
+                severity="low",
+                title="Public launch fixture incident",
+                summary="Resolved public surface review.",
+                report_ids_json=[str(report_id)],
+                action_ids_json=[str(action_id)],
+                evidence_refs_json=[],
+                created_by_actor_ref="system:test",
+                reviewed_by_actor_ref="system:test",
+                reviewed_at=now,
+                review_note="closed",
+                metadata_json={},
+            ),
+        )
+        session.add(
+            ModerationAction(
+                id=action_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                report_id=report_id,
+                incident_id=incident_id,
+                action_kind="note_only",
+                status="applied",
+                target_ref_kind="media_asset",
+                target_ref_id=background_asset_id,
+                reason="public launch fixture action",
+                audit_summary_json={"safe": True},
+                evidence_refs_json=[],
+                created_by_actor_ref="system:test",
+                reviewed_by_actor_ref="system:test",
+                reviewed_at=now,
+                review_note="applied",
                 metadata_json={},
             ),
         )
