@@ -2375,3 +2375,15 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 7 from clean local `main`; keep packaging manifest-safe and preview/apply-first, with no secret, storage path, or raw prompt export.
+
+## v0.8.7 World Packaging planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 7 planning.
+- Summary: Added the Phase 7 checkpoint for backend/API-only safe world packaging. The first implementation uses a dedicated packaging package/router, produces portable world/media manifests, validates import preview before mutation, applies only on explicit admin request, and avoids migrations, Web UI, broad `worlds.py` growth, provider execution, marketplace scope, and export of secrets/storage paths/raw prompt data.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 7 on a feature branch. Keep package manifests portable and safe; no storage path, secret, bytes/base64, raw prompt/output, provider call, daemon job, or public marketplace scope.

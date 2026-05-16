@@ -2,8 +2,8 @@
 
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
-- Objective: v0.8 Public Experience & Ecosystem Phase 7 World Packaging planning.
-- Status: Phase 6 Player Privacy & Data Controls passed the full local gate and fast-forward merged to local `main`; Phase 7 planning is next.
+- Objective: v0.8 Public Experience & Ecosystem Phase 7 World Packaging implementation.
+- Status: Phase 7 docs-only planning checkpoint is complete; Phase 7 implementation is next.
 
 ## Current Context
 
@@ -61,6 +61,8 @@
 - v0.8 Phase 6 Web implementation adds `/worlds/{world_id}/player/privacy` and `PlayerPrivacyControls` for export records and deletion review requests over the safe privacy API.
 - v0.8 Phase 6 fast-forward merge to local `main` completed.
 - v0.8 Phase 7 World Packaging must implement safe manifest-based export/import preview/apply discipline without exporting secrets, raw prompt snapshots by default, direct storage paths, or public marketplace scope.
+- v0.8 Phase 7 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md`.
+- v0.8 Phase 7 first implementation should be backend/API-only, use a dedicated `world_packaging` package/router, add no migration, and avoid broad `worlds.py` growth.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -79,7 +81,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start Phase 7 World Packaging from clean local `main` with a docs-only planning checkpoint before code changes.
+- Implement Phase 7 on a feature branch from clean local `main`.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.

@@ -78,7 +78,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 7 — World Packaging
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Define safe bundle and media manifest schemas.
 - [ ] Implement export, import preview, and reviewed apply.
 - [ ] Add manifest, import/export, compatibility, and leak tests.
