@@ -2407,3 +2407,15 @@
 - Commit merged: `7d12ef7 feat(v0.8): add world packaging`
 - Summary: Fast-forward merged Phase 7 World Packaging to local `main` after full local gate and OpenSpec validation passed.
 - Follow-up notes: Start Phase 8 with docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
+
+## v0.8.8 Plugin/Provider Package Contract planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 8 planning.
+- Summary: Added the Phase 8 checkpoint for backend/API-only plugin/provider package contract validation and safe provider config export. The first implementation uses response-only contracts, validates submitted plugin/provider metadata against existing plugin/provider concepts, exports only sanitized provider config summaries, and avoids migrations, Web UI, provider execution, marketplace scope, user-managed secret UI, untrusted-code installation, and broad `worlds.py` growth.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.8-plugin-provider-package-contract-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 8 on a feature branch. Keep package contracts safe, admin-scoped, response-only, and free of resolved secrets, storage paths, raw prompts/outputs, provider calls, daemon jobs, marketplace behavior, and runtime plugin installation.

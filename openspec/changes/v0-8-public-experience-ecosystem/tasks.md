@@ -89,7 +89,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 8 — Plugin/Provider Package Contract
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Define package metadata, capability, config export, and safety review contracts.
 - [ ] Implement contract validation without marketplace or untrusted-code installation.
 - [ ] Add plugin/provider governance and secret-redaction tests.

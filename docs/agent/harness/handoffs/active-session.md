@@ -64,6 +64,8 @@
 - v0.8 Phase 7 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md`.
 - v0.8 Phase 7 first implementation should be backend/API-only, use a dedicated `world_packaging` package/router, add no migration, and avoid broad `worlds.py` growth.
 - v0.8 Phase 7 implementation adds `backend/packages/world_packaging/`, `world_packaging.py`, safe package manifest DTOs, export preview, import preview, and explicit import apply without migration, provider calls, byte copy, world event writes, or Web UI.
+- v0.8 Phase 8 Plugin/Provider Package Contract planning checkpoint added `docs/agent/harness/feature-updates/v0.8.8-plugin-provider-package-contract-plan.md`.
+- v0.8 Phase 8 first implementation should be backend/API-only, response-only/no-migration, and use a dedicated package/router for package contract validation and safe provider config export without marketplace, provider execution, user-managed secret UI, or untrusted-code installation.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -83,7 +85,7 @@
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
 - Implement Phase 7 on a feature branch from clean local `main`.
-- Start v0.8 Phase 8 Plugin/Provider Package Contract with a docs-only planning checkpoint from clean local `main`.
+- Implement v0.8 Phase 8 Plugin/Provider Package Contract on a feature branch from clean local `main`.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -220,3 +222,4 @@
 - v0.8 Phase 7 targeted checks passed: backend ruff and mypy for world packaging files, targeted pytest (`7 passed`) including package API coverage and existing world composition round trip, and no forbidden storage/prompt/secret markers in tested manifests.
 - v0.8 Phase 7 full local gate passed: backend ruff, backend mypy (`272 source files`), backend pytest (`430 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.8 Phase 7 fast-forward merge to local `main` completed.
+- v0.8 Phase 8 planning checkpoint completed.
