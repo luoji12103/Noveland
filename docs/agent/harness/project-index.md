@@ -349,6 +349,8 @@ Fast orientation for a new coding session.
 ### Regression fixtures
 - `backend/tests/fixtures/multimodal_sample_world.py` — deterministic Phase 13 multimodal sample-world fixture helper for backend regression tests
 - `backend/tests/test_multimodal_sample_world_regression.py` — Phase 13 sample-world architecture regression entrypoint
+- `backend/tests/fixtures/sample_world_release_package.py` — deterministic v0.8 sample world release package helper built from the Phase 13 multimodal fixture and world packaging manifest contracts
+- `backend/tests/test_sample_world_release_package.py` — v0.8 sample world release package manifest, import preview/apply, rights/visibility, and leak regression entrypoint
 - `backend/tests/fixtures/authoring_sample_import.py` — deterministic v0.5 authoring sample import fixture helper for backend regression tests
 - `backend/tests/test_authoring_regression_fixture.py` — v0.5 authoring import pipeline regression entrypoint
 - `backend/tests/fixtures/security_regression.py` — shared forbidden-token helpers for v0.7 security regression tests

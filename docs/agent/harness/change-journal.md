@@ -2451,3 +2451,15 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 9 on a feature branch. Keep the sample package deterministic, fixture-linked, manifest-safe, and free of storage paths, raw prompt/output, bytes/base64, resolved secrets, provider calls, daemon jobs, marketplace behavior, and production seed framework scope.
+
+## v0.8.9 Sample World Release Package implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/sample-world-release-package
+- Scope: v0.8 Public Experience & Ecosystem Phase 9 deterministic sample world release package.
+- Summary: Added a test/docs-only sample release package helper that builds a safe `WorldPackageManifest` from the Phase 13 multimodal sample-world fixture, records fixture linkage, expected counts, rights/source/visibility metadata, reader playback/scene media roles, and diagnostics evidence refs, then validates preview/apply through `WorldPackagingService`. No runtime API, migration, provider execution, byte copy, production seed framework, marketplace behavior, or Web UI was added.
+- Files changed: `/backend/tests/fixtures/sample_world_release_package.py`, `/backend/tests/test_sample_world_release_package.py`, `/docs/agent/fixtures/sample-world-release-package.md`, OpenSpec tasks, and harness docs.
+- Tests added/updated: sample release package determinism, rights/visibility/reader-media roles, import preview/apply safety, diagnostics linkage, no-leak assertions, existing multimodal fixture regression, world packaging API regression, security regression, and workspace imports.
+- Docs updated: fixture docs, OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for sample release package files, targeted pytest (`19 passed`), and the full local gate: backend ruff, backend mypy (`279 source files`), backend pytest (`439 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
+- Follow-up notes: Fast-forward merge Phase 9 back to local `main` if the branch remains clean.

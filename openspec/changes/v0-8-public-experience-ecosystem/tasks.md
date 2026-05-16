@@ -101,11 +101,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 9 — Sample World Release Package
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Define sample content/media manifest and fixture linkage.
-- [ ] Implement deterministic sample package import/export support only.
-- [ ] Add sample package, fixture, rights/visibility, and leak tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Define sample content/media manifest and fixture linkage.
+- [x] Implement deterministic sample package import/export support only.
+- [x] Add sample package, fixture, rights/visibility, and leak tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

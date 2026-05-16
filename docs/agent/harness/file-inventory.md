@@ -406,6 +406,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/fixtures/multimodal_sample_world.py`
 - `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/fixtures/security_regression.py`
+- `backend/tests/fixtures/sample_world_release_package.py`
 - `backend/tests/test_multimodal_sample_world_regression.py`
 - `backend/tests/test_authoring_regression_fixture.py`
 - `backend/tests/test_security_regression_suite.py`
@@ -566,6 +567,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_production_readiness_gate.py`
 - `backend/tests/test_api_world_packaging.py`
 - `backend/tests/test_api_package_contracts.py`
+- `backend/tests/test_sample_world_release_package.py`
 
 ## Update rule
 
