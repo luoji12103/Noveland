@@ -2495,3 +2495,11 @@
 - Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff and mypy for moderation/API/reader-delivery/schema files, targeted pytest (`41 passed`), and the full local gate: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
 - Follow-up notes: Commit Phase 10 implementation and fast-forward merge to local `main` if the branch remains clean. Keep Phase 10 backend/API-only; no Web UI, automatic moderation, provider execution, daemon work, public unauthenticated access, duplicate readiness framework, or broad `worlds.py` routes.
+
+## v0.8.10 Moderation & Incident Workflow merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Commit merged: `50e843b feat(v0.8): add moderation incident workflow`
+- Summary: Fast-forward merged Phase 10 Moderation & Incident Workflow to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
+- Follow-up notes: Start Phase 11 Public Launch Gate with a docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
