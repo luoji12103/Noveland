@@ -1,7 +1,10 @@
 # Task Board
 
 ## Open
-- None
+- v0.9 Self-use MVP Demo World Cut feasibility review
+- v0.9 Self-use MVP Demo World Cut implementation, after feasibility review acceptance
+- v1.0 Private Beta MVP feasibility review, after v0.9 completion/archive
+- v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
 - None
@@ -302,6 +305,7 @@
 - v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate full local gate
 - v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate fast-forward merge
 - v0.8 Public Experience & Ecosystem OpenSpec archive and release notes
+- OpenSpec v0.9/v1.0/v1.1 milestone roadmap baseline
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is archived and closed locally.
@@ -315,7 +319,7 @@
 - v0.7 Phase 6 Observability & Incident Diagnostics is complete.
 - v0.7 Phase 7 Security Regression Suite is complete.
 - v0.7 Phase 8 Production Readiness Gate is complete.
-- OpenSpec active changes are empty after v0.6/v0.7/v0.8 archive cleanup.
+- OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmap baselines. Do not start implementation from these changes until the relevant version feasibility review is written and accepted.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

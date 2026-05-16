@@ -1,0 +1,35 @@
+# Multi-world / Multi-user Stress
+
+## ADDED Requirements
+
+### Requirement: Stress tests cover multiple worlds and players
+The system SHALL provide controlled stress fixtures or evals for multiple worlds, multiple players, multiple provider profiles, and long sessions.
+
+#### Scenario: Multi-world stress run
+- **Given** a stress fixture creates multiple worlds and players
+- **When** the stress run executes
+- **Then** each world and player SHALL remain isolated
+- **And** cross-world or cross-worldline data leakage SHALL be reported as a failure.
+
+### Requirement: Stress tests use fake providers by default
+The system SHALL use fake or mocked providers in default stress tests and SHALL require opt-in for real provider stress.
+
+#### Scenario: Default stress test
+- **Given** the default local gate runs
+- **When** stress tests execute
+- **Then** no real provider quota SHALL be consumed.
+
+### Requirement: Stress reports are safe
+The system SHALL produce stress reports with aggregate metrics and safe evidence references.
+
+#### Scenario: Stress report generated
+- **Given** a long-session stress run completes
+- **When** the report is returned
+- **Then** it SHALL include latency, cost, failure, quota, worldline, and session summaries
+- **And** it SHALL NOT expose raw prompts, raw outputs, storage paths, or secrets.
+
+## Non-goals
+
+- Unbounded load testing.
+- Default real-provider spend.
+- External load testing service.

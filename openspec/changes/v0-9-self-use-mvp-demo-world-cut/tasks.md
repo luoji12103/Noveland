@@ -1,0 +1,102 @@
+# Tasks — v0.9 Self-use MVP Demo World Cut
+
+Use these tasks when implementation is explicitly requested. Planning tasks may be marked complete during roadmap alignment; implementation tasks must only be marked complete after code, tests, full local gate, fast-forward merge, and harness updates are done.
+
+## 1. Planning / Preflight
+
+- [ ] 1.1 Confirm v0.8 archived current specs and no active OpenSpec changes conflict with v0.9.
+- [ ] 1.2 Write v0.9 feasibility review before implementation begins.
+- [ ] 1.3 Confirm provider text execution, model discovery, and template ownership.
+- [ ] 1.4 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
+- [ ] 1.5 Confirm frontend phases will use `impeccable` before Web implementation.
+
+## 2. Phase 1 — MVP Provider Settings & Model Lab
+
+- [ ] 2.1 Write docs-only phase planning checkpoint.
+- [ ] 2.2 Inventory current provider integrations, adapters, capabilities, smoke tests, and v0.4 provider admin UI.
+- [ ] 2.3 Implement provider templates, editable settings, model discovery, manual model fallback, and safe smoke checks.
+- [ ] 2.4 Add provider settings/model lab UI only after using `impeccable`.
+- [ ] 2.5 Add provider template, model list, manual fallback, ACL, and leak tests.
+- [ ] 2.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 2.7 Fast-forward merge to local main and update harness docs.
+
+## 3. Phase 2 — Provider Worktree Integration Test Harness
+
+- [ ] 3.1 Write docs-only phase planning checkpoint.
+- [ ] 3.2 Document provider lab worktree setup and opt-in env variables.
+- [ ] 3.3 Add real-provider test markers/profile with default skip behavior.
+- [ ] 3.4 Add fake-provider parity tests and opt-in smoke examples.
+- [ ] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 3.6 Fast-forward merge to local main and update harness docs.
+
+## 4. Phase 3 — Galgame Source Intake
+
+- [ ] 4.1 Write docs-only phase planning checkpoint.
+- [ ] 4.2 Confirm authoring source registry reuse and any migration need.
+- [ ] 4.3 Implement already-unpacked source directory intake and preview inventory.
+- [ ] 4.4 Add source intake UI only after using `impeccable` if Web scope is approved.
+- [ ] 4.5 Add intake, source traceability, media import, ACL, and leak tests.
+- [ ] 4.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 4.7 Fast-forward merge to local main and update harness docs.
+
+## 5. Phase 4 — Script Dialogue Extraction
+
+- [ ] 5.1 Write docs-only phase planning checkpoint.
+- [ ] 5.2 Implement deterministic extraction for selected sample formats and manual-label fallback.
+- [ ] 5.3 Keep provider extraction optional and ledger-backed if included.
+- [ ] 5.4 Add parser, proposal, speaker mapping, uncertainty, ACL, and leak tests.
+- [ ] 5.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 5.6 Fast-forward merge to local main and update harness docs.
+
+## 6. Phase 5 — Character Memory Distillation Agent
+
+- [ ] 6.1 Write docs-only phase planning checkpoint.
+- [ ] 6.2 Implement provider-backed persona card and memory candidate generation through `ProviderExecutionService`.
+- [ ] 6.3 Implement review/apply to persona and memory only after explicit approval.
+- [ ] 6.4 Add invocation ledger, prompt redaction, source traceability, apply, and no-leak tests.
+- [ ] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 6.6 Fast-forward merge to local main and update harness docs.
+
+## 7. Phase 6 — Visual Asset Mapping
+
+- [ ] 7.1 Write docs-only phase planning checkpoint.
+- [ ] 7.2 Implement sprite/background/CG mapping proposals and reviewed apply.
+- [ ] 7.3 Reuse visual resolver and reader-safe media delivery.
+- [ ] 7.4 Add visual mapping UI only after using `impeccable` if Web scope is approved.
+- [ ] 7.5 Add mapping, fallback, worldline isolation, ACL, and no-leak tests.
+- [ ] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 7.7 Fast-forward merge to local main and update harness docs.
+
+## 8. Phase 7 — Voice Profile Mapping
+
+- [ ] 8.1 Write docs-only phase planning checkpoint.
+- [ ] 8.2 Implement voice reference/provider mapping proposals and reviewed apply.
+- [ ] 8.3 Implement MiMo/generic speech provider settings usage without hardcoded endpoints.
+- [ ] 8.4 Add voice mapping UI only after using `impeccable` if Web scope is approved.
+- [ ] 8.5 Add TTS smoke, binding, style mapping, ACL, and no-secret tests.
+- [ ] 8.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 8.7 Fast-forward merge to local main and update harness docs.
+
+## 9. Phase 8 — Demo World Assembly
+
+- [ ] 9.1 Write docs-only phase planning checkpoint.
+- [ ] 9.2 Implement reviewed demo assembly from applied import/persona/memory/visual/voice/dialogue proposals.
+- [ ] 9.3 Add demo-world setup UI only after using `impeccable` if Web scope is approved.
+- [ ] 9.4 Add assembly, source traceability, playback, scene, memory, and no-leak tests.
+- [ ] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 9.6 Fast-forward merge to local main and update harness docs.
+
+## 10. Phase 9 — 30-Minute Self-use MVP Gate
+
+- [ ] 10.1 Write docs-only phase planning checkpoint.
+- [ ] 10.2 Implement self-use MVP gate evidence aggregation or checklist.
+- [ ] 10.3 Validate 30-minute play evidence, resume behavior, provider failure messaging, and admin inspection links.
+- [ ] 10.4 Add gate pass/fail, persistence, memory, provider/media diagnostics, ACL, and no-leak tests.
+- [ ] 10.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [ ] 10.6 Fast-forward merge to local main and update harness docs.
+
+## 11. Closeout
+
+- [ ] 11.1 Archive the completed OpenSpec change only after all phases are accepted.
+- [ ] 11.2 Generate v0.9 release notes.
+- [ ] 11.3 Confirm main is clean and report ahead/behind origin.

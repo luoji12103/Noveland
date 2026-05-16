@@ -2,8 +2,8 @@
 
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
-- Objective: v0.8 Public Experience & Ecosystem completion checkpoint.
-- Status: v0.8 Public Experience & Ecosystem is implemented, archived in OpenSpec, release-noted, and closed locally.
+- Objective: v0.9/v1.0/v1.1 OpenSpec milestone roadmap planning baseline.
+- Status: v0.9, v1.0, and v1.1 are captured as active OpenSpec roadmap changes. No backend or Web implementation has started for these milestones.
 
 ## Current Context
 
@@ -16,6 +16,12 @@
 - The completed v0.6 change is archived under `openspec/changes/archive/2026-05-16-v0-6-runtime-narrative-quality/`.
 - The completed v0.7 change is archived under `openspec/changes/archive/2026-05-16-v0-7-production-hardening/`.
 - The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
+- Active v0.9 roadmap change: `openspec/changes/v0-9-self-use-mvp-demo-world-cut/`.
+- Active v1.0 roadmap change: `openspec/changes/v1-0-private-beta-mvp/`.
+- Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
+- v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
+- v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
+- v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
 - v0.8 release notes live at `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`.
@@ -98,8 +104,10 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- OpenSpec active changes are empty after v0.6/v0.7/v0.8 archive cleanup.
-- Do not continue to v0.9 without a fresh OpenSpec proposal and explicit request.
+- OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
+- Do not implement v0.9 before writing and accepting a v0.9 feasibility review against current `main`.
+- Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
+- Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.

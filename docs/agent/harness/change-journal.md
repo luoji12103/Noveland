@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9-v1.1 OpenSpec milestone roadmap entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: OpenSpec roadmap planning for v0.9 Self-use MVP Demo World Cut, v1.0 Private Beta MVP, and v1.1 Normal Use / Release Candidate
+- Summary: Added active OpenSpec roadmap changes for the next three milestones, shifting the project from platform expansion toward self-use playable demo, private beta, and release-candidate readiness.
+- Files changed: `/openspec/changes/v0-9-self-use-mvp-demo-world-cut/**`, `/openspec/changes/v1-0-private-beta-mvp/**`, `/openspec/changes/v1-1-normal-use-release-candidate/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: OpenSpec proposals/designs/phase plans/tasks/specs plus project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Do not implement v0.9 until a feasibility review is written and accepted. v1.0 requires v0.9 completion/archive first; v1.1 requires v1.0 completion/archive first. No backend/Web runtime behavior changed.
+
 ## v0.8 Public Experience & Ecosystem archive entry
 
 - Date: 2026-05-16

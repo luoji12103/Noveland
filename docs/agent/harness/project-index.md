@@ -73,7 +73,10 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
-- `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8 changes. No active changes remain after the 2026-05-16 archive cleanup.
+- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.6/v0.7/v0.8 changes, and active v0.9/v1.0/v1.1 milestone roadmap changes.
+- `openspec/changes/v0-9-self-use-mvp-demo-world-cut/` — active OpenSpec roadmap for a self-use playable demo world: provider settings/model lab, provider lab worktree, galgame source intake, dialogue extraction, persona/memory distillation, visual/voice mapping, demo assembly, and a 30-minute self-use gate.
+- `openspec/changes/v1-0-private-beta-mvp/` — active OpenSpec roadmap for invite-only private beta: onboarding, setup wizard, session stability, memory/persona QA, beta feedback, quota enforcement, repair loop, and private beta gate.
+- `openspec/changes/v1-1-normal-use-release-candidate/` — active OpenSpec roadmap for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
