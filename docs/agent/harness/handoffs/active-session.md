@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-16T00:00:00Z
-- Branch: main
+- Branch: feat/scene-view-galgame
 - Objective: v0.8 Public Experience & Ecosystem Phase 5 Scene View / Galgame View.
-- Status: Phase 5 docs-only planning checkpoint is complete; implementation branch is next.
+- Status: Phase 5 full local gate is complete; implementation commit and fast-forward merge are next.
 
 ## Current Context
 
@@ -52,6 +52,7 @@
 - v0.8 Phase 5 must build a basic galgame scene view from conversation presentation/playback data and Phase 1 reader-safe media delivery. It must not add a full game engine, direct admin media API usage, public unauthenticated access, or raw internal state exposure.
 - v0.8 Phase 5 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.5-scene-view-galgame-view-plan.md`.
 - v0.8 Phase 5 should reuse Phase 2 conversation playback data and reader-safe media resolution patterns rather than adding a second media/composition path.
+- v0.8 Phase 5 implementation adds `/worlds/{world_id}/reader/conversations/{conversation_id}/scene`, `ConversationSceneView`, and shared `playback-media` helpers reused by playback and scene view.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -70,8 +71,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Implement Phase 5 on a feature branch from clean local `main`.
-- Use `impeccable` before Phase 5 frontend implementation work.
+- Commit Phase 5 implementation, fast-forward merge to local `main`, confirm `main` clean, and then start Phase 6 from clean local `main`.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -199,3 +199,5 @@
 - v0.8 Phase 4 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`38 passed files`, `121 passed`), Web build, Web `check:next-env`, Web e2e (`18 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.8 Phase 4 fast-forward merge to local `main` completed.
 - v0.8 Phase 5 planning checkpoint is docs-only and validated with OpenSpec strict changes validation plus `git diff --check`.
+- v0.8 Phase 5 targeted checks passed: focused Web component tests for scene view and playback, focused scene view e2e, Web lint, Web typecheck, OpenSpec strict changes validation, and `git diff --check`.
+- v0.8 Phase 5 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`39 passed files`, `124 passed`), Web build, Web `check:next-env`, Web e2e (`19 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.

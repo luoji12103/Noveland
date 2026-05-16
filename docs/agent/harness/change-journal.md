@@ -2293,3 +2293,27 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 5 on a feature branch. Reuse reader-safe media descriptors only; no direct admin media DTOs, public unauthenticated access, or full game engine scope.
+
+## v0.8.5 Scene View / Galgame View implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/scene-view-galgame
+- Scope: v0.8 Public Experience & Ecosystem Phase 5 reader/player scene view.
+- Summary: Added an authenticated scene route at `/worlds/{world_id}/reader/conversations/{conversation_id}/scene`, a `ConversationSceneView` component, shared `playback-media` helpers reused by playback and scene view, a playback-to-scene link, scene-stage CSS, and e2e coverage for safe media, dialogue, audio, and deterministic missing-media fallbacks.
+- Files changed: `/web/app/worlds/[worldId]/reader/conversations/[conversationId]/scene/page.tsx`, `/web/features/worlds/{conversation-scene-view,conversation-scene-view.test}.tsx`, `/web/features/worlds/playback-media.ts`, `/web/features/worlds/conversation-playback.tsx`, Web CSS, `/web/tests/e2e/auth.spec.ts`, OpenSpec tasks, and harness docs.
+- Tests added/updated: `web/features/worlds/conversation-scene-view.test.tsx`, scene view coverage in `web/tests/e2e/auth.spec.ts`, and playback component coverage for the scene-view link through the shared media helper refactor.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with focused Web component tests for scene view and playback, focused scene view e2e, Web lint, Web typecheck, OpenSpec strict changes validation, and `git diff --check`.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 5 back to local `main` if it stays green.
+
+## v0.8.5 Scene View / Galgame View gate entry
+
+- Date: 2026-05-16
+- Branch: feat/scene-view-galgame
+- Scope: v0.8 Public Experience & Ecosystem Phase 5 full local gate.
+- Summary: Recorded the successful full local gate for the reader/player scene view and shared reader-safe playback media resolution.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`39 passed files`, `124 passed`), Web build, Web `check:next-env`, Web e2e (`19 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 5 implementation, fast-forward merge `feat/scene-view-galgame` to local `main`, then record merge bookkeeping before starting Phase 6.

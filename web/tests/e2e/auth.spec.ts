@@ -536,6 +536,28 @@ test("reader playback renders conversation turns through safe media", async ({ p
   await expect(page.getByText("No reader-visible audio for this turn.")).toBeVisible();
 });
 
+test("reader scene view renders galgame-style safe media", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/reader/conversations/${seedConversationId}/scene`);
+  await expect(page.getByRole("heading", { level: 1, name: "Scene view" })).toBeVisible();
+  await page.getByRole("button", { name: /Turn 2/ }).click();
+  await expect(page.getByText("Guide replies to seed the conversation.")).toBeVisible();
+  await expect(page.getByLabel("Reader-safe scene image")).toBeVisible();
+  await expect(page.getByLabel("Scene audio")).toHaveAttribute(
+    "src",
+    `/api/worlds/${worldOneId}/reader/media/objects/76810000-0000-4000-8000-000000000002/download`,
+  );
+
+  await page.getByRole("button", { name: /Turn 1/ }).click();
+  await expect(page.getByText("No reader-visible scene image for this turn.")).toBeVisible();
+  await expect(page.getByText("Audio is not available for this turn.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /edit|compose|generate/i })).toHaveCount(0);
+
+  const pageText = await page.locator("body").innerText();
+  expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|payload/i);
+});
+
 test("player interactions reuse existing player records", async ({ page }) => {
   await signIn(page, "member@example.test");
 

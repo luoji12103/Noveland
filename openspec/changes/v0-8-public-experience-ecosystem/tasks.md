@@ -57,11 +57,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 5 — Scene View / Galgame View
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Confirm Phase 1 and Phase 2 safe media/playback contracts are sufficient.
-- [ ] Implement scene view over presentation records and reader media descriptors.
-- [ ] Add responsive, accessibility, component, and e2e tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Confirm Phase 1 and Phase 2 safe media/playback contracts are sufficient.
+- [x] Implement scene view over presentation records and reader media descriptors.
+- [x] Add responsive, accessibility, component, and e2e tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

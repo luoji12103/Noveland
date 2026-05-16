@@ -718,6 +718,142 @@ a {
   font-size: 1.1rem;
 }
 
+.scene-view {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.scene-shell {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.scene-toolbar {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.scene-toolbar h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.scene-toolbar p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.scene-stage {
+  position: relative;
+  display: grid;
+  min-height: 460px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: oklch(28% 0.018 210deg);
+}
+
+.scene-image,
+.scene-fallback {
+  grid-area: 1 / 1;
+  min-height: 460px;
+}
+
+.scene-image {
+  background-position: center;
+  background-size: cover;
+}
+
+.scene-fallback {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: oklch(90% 0.012 210deg);
+  background:
+    linear-gradient(135deg, oklch(30% 0.018 210deg), oklch(24% 0.015 240deg)),
+    oklch(28% 0.018 210deg);
+  font-weight: 800;
+  text-align: center;
+}
+
+.scene-dialogue {
+  align-self: end;
+  grid-area: 1 / 1;
+  margin: 24px;
+  padding: 18px;
+  color: oklch(96% 0.008 220deg);
+  background: oklch(20% 0.012 220deg / 88%);
+  border: 1px solid oklch(88% 0.012 220deg / 35%);
+  border-radius: 8px;
+}
+
+.scene-dialogue p {
+  max-width: 72ch;
+  margin: 0;
+}
+
+.scene-speaker {
+  margin-bottom: 8px !important;
+  color: oklch(84% 0.06 92deg);
+  font-weight: 900;
+}
+
+.scene-controls,
+.scene-meta,
+.scene-turns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.scene-controls {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scene-meta span {
+  padding: 7px 10px;
+  color: var(--forest-dark);
+  background: oklch(96% 0.018 164deg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.scene-turn-button {
+  display: grid;
+  gap: 4px;
+  min-width: 132px;
+  padding: 10px 12px;
+  color: var(--text);
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.scene-turn-button[aria-pressed="true"] {
+  background: oklch(97% 0.017 92deg);
+  border-color: oklch(72% 0.095 92deg);
+}
+
+.scene-turn-button span {
+  font-weight: 900;
+}
+
+.scene-turn-button small {
+  color: var(--muted);
+}
+
 .workspace-nav {
   display: flex;
   width: min(1120px, calc(100% - 32px));
@@ -969,6 +1105,22 @@ a {
   .player-form,
   .world-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .scene-toolbar,
+  .scene-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scene-stage,
+  .scene-image,
+  .scene-fallback {
+    min-height: 360px;
+  }
+
+  .scene-dialogue {
+    margin: 12px;
   }
 
   .resource-row {

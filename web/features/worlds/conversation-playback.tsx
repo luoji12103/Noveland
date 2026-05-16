@@ -4,27 +4,19 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { readerMediaObjectDownloadPath } from "@/lib/worlds/media";
-import type {
-  ReaderMediaDescriptor,
-  ReaderMediaObjectDescriptor,
-} from "@/lib/worlds/media";
 import type { ConversationPlaybackData } from "@/lib/worlds/server";
-import type {
-  ConversationTurn,
-  ConversationTurnPresentation,
-} from "@/lib/worlds/types";
+import {
+  emptyTurnMedia,
+  mediaSummary,
+  resolveTurnMedia,
+  speakerLabel,
+  turnText,
+} from "@/features/worlds/playback-media";
 
 type ConversationPlaybackProps = {
   worldId: string;
   conversationId: string;
   data: ConversationPlaybackData;
-};
-
-type ResolvedTurnMedia = {
-  image: ReaderMediaDescriptor | null;
-  imageObject: ReaderMediaObjectDescriptor | null;
-  audio: ReaderMediaDescriptor | null;
-  audioObject: ReaderMediaObjectDescriptor | null;
 };
 
 export function ConversationPlayback({ worldId, conversationId, data }: ConversationPlaybackProps) {
@@ -66,6 +58,12 @@ export function ConversationPlayback({ worldId, conversationId, data }: Conversa
           <div className="button-row">
             <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
               Back to reader
+            </Link>
+            <Link
+              className="secondary-button"
+              href={`/worlds/${worldId}/reader/conversations/${conversationId}/scene`}
+            >
+              Scene view
             </Link>
           </div>
           <h2 className="section-title" id="playback-title">
@@ -144,110 +142,4 @@ export function ConversationPlayback({ worldId, conversationId, data }: Conversa
       </section>
     </section>
   );
-}
-
-function resolveTurnMedia(
-  turn: ConversationTurn,
-  presentation: ConversationTurnPresentation | null,
-  conversationId: string,
-  media: ReaderMediaDescriptor[],
-  mediaByAssetId: Map<string, ReaderMediaDescriptor>,
-): ResolvedTurnMedia {
-  const referenced = media.filter((item) =>
-    item.references.some(
-      (reference) =>
-        (reference.ref_kind === "conversation_turn" && reference.ref_id === turn.id)
-        || (reference.ref_kind === "conversation_session" && reference.ref_id === conversationId),
-    ),
-  );
-  const image =
-    assetFromId(mediaByAssetId, presentation?.composite_scene_asset_id, "image")
-    ?? assetFromId(mediaByAssetId, presentation?.background_asset_id, "image")
-    ?? preferredReferencedMedia(referenced, "image");
-  const audio =
-    assetFromId(mediaByAssetId, presentation?.tts_media_asset_id, "audio")
-    ?? preferredReferencedMedia(referenced, "audio");
-  return {
-    image,
-    imageObject: primaryObject(image),
-    audio,
-    audioObject: primaryObject(audio),
-  };
-}
-
-function assetFromId(
-  mediaByAssetId: Map<string, ReaderMediaDescriptor>,
-  assetId: string | null | undefined,
-  kind: "image" | "audio",
-): ReaderMediaDescriptor | null {
-  if (assetId === null || assetId === undefined) {
-    return null;
-  }
-  const media = mediaByAssetId.get(assetId) ?? null;
-  return media?.asset_kind === kind ? media : null;
-}
-
-function preferredReferencedMedia(
-  media: ReaderMediaDescriptor[],
-  kind: "image" | "audio",
-): ReaderMediaDescriptor | null {
-  return (
-    media
-      .filter((item) => item.asset_kind === kind)
-      .sort((left, right) => mediaPriority(left) - mediaPriority(right))[0] ?? null
-  );
-}
-
-function mediaPriority(media: ReaderMediaDescriptor): number {
-  if (media.asset_role === "composite_image") {
-    return 0;
-  }
-  if (media.asset_role === "scene_background") {
-    return 1;
-  }
-  if (media.asset_role === "character_sprite") {
-    return 2;
-  }
-  if (media.asset_role === "speech_audio") {
-    return 0;
-  }
-  return 10;
-}
-
-function primaryObject(media: ReaderMediaDescriptor | null): ReaderMediaObjectDescriptor | null {
-  return media?.objects[0] ?? null;
-}
-
-function emptyTurnMedia(): ResolvedTurnMedia {
-  return {
-    image: null,
-    imageObject: null,
-    audio: null,
-    audioObject: null,
-  };
-}
-
-function speakerLabel(turn: ConversationTurn): string {
-  if (turn.speaker_kind === "operator") {
-    return "Operator";
-  }
-  return "Agent";
-}
-
-function turnText(turn: ConversationTurn): string {
-  if (turn.status !== "succeeded") {
-    return "Turn unavailable.";
-  }
-  return turn.output_text ?? turn.input_text;
-}
-
-function mediaSummary(media: ResolvedTurnMedia): string {
-  const parts = [];
-  if (media.image !== null) {
-    parts.push("image");
-  }
-  if (media.audio !== null) {
-    parts.push("audio");
-  }
-  return parts.length === 0 ? "none" : parts.join(", ");
 }

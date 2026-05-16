@@ -94,6 +94,7 @@ Fast orientation for a new coding session.
 - `web/app/login/` — dedicated local sign-in route
 - `web/app/worlds/` — world-first workspace pages for world overview, agents, conversations, narrative management, and reader surfaces
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/` — authenticated reader/player conversation playback over safe presentation and reader media descriptors
+- `web/app/worlds/[worldId]/reader/conversations/[conversationId]/scene/` — authenticated reader/player scene view over safe presentation and reader media descriptors
 - `web/app/worlds/[worldId]/player/` — authenticated player/member interaction surface over existing player choices, interventions, journal entries, notifications, and spoiler-safe summaries
 - `web/app/worlds/[worldId]/worldlines/` — authenticated read-only worldline browser over safe branch metadata and aggregate comparison counts
 - `web/app/worlds/[worldId]/diagnostics/` — world-scoped multimodal diagnostics dashboard
@@ -135,6 +136,8 @@ Fast orientation for a new coding session.
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
   - `web/features/worlds/` — world index, overview, narrative management workspace, read-only reader components, conversation playback, and player interactions
   - `web/features/worlds/conversation-playback.tsx` — reader/member-facing conversation playback surface over safe turn, presentation, and reader media DTOs
+  - `web/features/worlds/conversation-scene-view.tsx` — reader/member-facing scene view over the same safe turn, presentation, and reader media DTOs
+  - `web/features/worlds/playback-media.ts` — shared reader-safe turn media resolution helpers for playback and scene view
   - `web/features/worlds/player-interactions.tsx` — player/member-facing choices, interventions, journal, notifications, and spoiler-safe feedback surface over existing player records
   - `web/features/worlds/worldline-browser.tsx` — reader/member-facing read-only worldline branch inventory and safe comparison count surface
   - `web/features/workspace/` — shared workspace shell and form helpers
