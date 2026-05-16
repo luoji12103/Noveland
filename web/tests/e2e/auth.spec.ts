@@ -34,6 +34,13 @@ test("redirects unauthenticated player visitors to login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
 });
 
+test("redirects unauthenticated player privacy visitors to login", async ({ page }) => {
+  await page.goto(`/worlds/${worldOneId}/player/privacy`);
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+});
+
 test("redirects unauthenticated worldline visitors to login", async ({ page }) => {
   await page.goto(`/worlds/${worldOneId}/worldlines`);
 
@@ -582,6 +589,31 @@ test("player interactions reuse existing player records", async ({ page }) => {
 
   const pageText = await page.locator("body").innerText();
   expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret/i);
+});
+
+test("player privacy exports safe data and creates review requests", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/player/privacy`);
+  await expect(page.getByRole("heading", { name: "Player privacy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Export summary" })).toBeVisible();
+  const profilePanel = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Profile" }) });
+  await expect(profilePanel.getByText("member@example.test", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Player privacy counts").getByText(/[1-9]\d* choices/)).toBeVisible();
+  await expect(page.getByText("delete · requested")).toBeVisible();
+
+  await page.getByRole("button", { name: "Create export record" }).click();
+  await expect(page.getByText("Export request recorded.")).toBeVisible();
+
+  await page.getByPlaceholder("Review note").fill("Review my player-owned notes.");
+  await page.getByRole("button", { name: "Request deletion review" }).click();
+  await expect(page.getByText("Delete request sent for review.")).toBeVisible();
+  await expect(page.getByText("all_player_data").first()).toBeVisible();
+
+  const pageText = await page.locator("body").innerText();
+  expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|payload/i);
 });
 
 test("worldline browser renders read-only safe comparisons", async ({ page }) => {

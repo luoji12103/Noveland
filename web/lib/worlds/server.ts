@@ -56,6 +56,8 @@ import type {
   PlayerChoice,
   PlayerInterventionRecord,
   PlayerJournalEntry,
+  PlayerPrivacyExport,
+  PlayerPrivacyRequest,
   PlotThread,
   RelationshipEventSuggestion,
   RelationshipRepairRecord,
@@ -260,6 +262,16 @@ export type PlayerInteractionData = {
   scenes: Scene[];
   agents: Agent[];
   selectedWorldlineId: string | null;
+  loadError: string | null;
+};
+
+export type PlayerPrivacyData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  worldlines: Worldline[];
+  selectedWorldlineId: string | null;
+  exportPreview: PlayerPrivacyExport | null;
+  privacyRequests: PlayerPrivacyRequest[];
   loadError: string | null;
 };
 
@@ -1194,6 +1206,51 @@ export async function getPlayerInteractionData(
   }
 }
 
+export async function getPlayerPrivacyData(worldId: string): Promise<PlayerPrivacyData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyPlayerPrivacyData(worlds, "Unable to load player privacy controls.");
+    }
+    const worldlines = await apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies);
+    const selectedWorldlineId =
+      worldlines.find((worldline) => worldline.parent_worldline_id === null)?.id
+      ?? worldlines[0]?.id
+      ?? null;
+    const worldlineQuery =
+      selectedWorldlineId === null
+        ? ""
+        : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}`;
+    const [exportPreview, privacyRequests] = await Promise.all([
+      apiFetchOptional<PlayerPrivacyExport>(
+        `/worlds/${worldId}/player/privacy/export${worldlineQuery}`,
+        cookies,
+      ),
+      apiFetchOptional<PlayerPrivacyRequest[]>(
+        `/worlds/${worldId}/player/privacy/requests${worldlineQuery}`,
+        cookies,
+      ),
+    ]);
+
+    return {
+      worlds,
+      selectedWorld,
+      worldlines,
+      selectedWorldlineId,
+      exportPreview,
+      privacyRequests: privacyRequests ?? [],
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyPlayerPrivacyData([], "Unable to load player privacy controls.");
+  }
+}
+
 export async function getWorldlineBrowserData(
   worldId: string,
   baseWorldlineId?: string | null,
@@ -2093,6 +2150,18 @@ function emptyPlayerInteractionData(
     scenes: [],
     agents: [],
     selectedWorldlineId: null,
+    loadError,
+  };
+}
+
+function emptyPlayerPrivacyData(worlds: World[], loadError: string): PlayerPrivacyData {
+  return {
+    worlds,
+    selectedWorld: null,
+    worldlines: [],
+    selectedWorldlineId: null,
+    exportPreview: null,
+    privacyRequests: [],
     loadError,
   };
 }

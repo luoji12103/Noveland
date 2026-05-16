@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
@@ -137,6 +138,9 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
           <span>{data.playerChoices.length} choices</span>
           <span>{data.interventions.length} interventions</span>
           <span>{data.notifications.filter((item) => item.status === "unread").length} unread</span>
+          <Link className="secondary-button" href={`/worlds/${worldId}/player/privacy`}>
+            Privacy
+          </Link>
         </div>
       </section>
 

@@ -1466,6 +1466,139 @@ export type PlayerInterventionRecord = {
   updated_at: string;
 };
 
+export type PlayerPrivacyRequestStatus =
+  | "requested"
+  | "under_review"
+  | "approved_for_redaction"
+  | "rejected"
+  | "completed";
+
+export type PlayerPrivacyRequestKind = "export" | "delete";
+
+export type PlayerPrivacyTargetKind =
+  | "player_profile"
+  | "player_choices"
+  | "player_journal"
+  | "notifications"
+  | "interventions"
+  | "conversation_references"
+  | "all_player_data";
+
+export type PlayerPrivacyProfile = {
+  user_id: string;
+  email: string;
+  display_name: string;
+  world_role: string | null;
+};
+
+export type PlayerPrivacyExport = {
+  request_id: string | null;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  generated_at: string;
+  profile: PlayerPrivacyProfile;
+  counts: Record<string, number>;
+  player_actors: Array<{
+    id: string;
+    worldline_id: string;
+    display_name: string;
+    current_scene_id: string | null;
+    profile: Record<string, unknown>;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  }>;
+  choices: Array<{
+    id: string;
+    worldline_id: string;
+    player_actor_id: string;
+    choice_key: string;
+    choice_kind: string;
+    selected_option: string;
+    applied_event_id: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  journal_entries: Array<{
+    id: string;
+    worldline_id: string;
+    player_actor_id: string | null;
+    entry_kind: string;
+    title: string;
+    body: string;
+    source_ref: string | null;
+    visibility: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  notifications: Array<{
+    id: string;
+    worldline_id: string;
+    notification_kind: string;
+    title: string;
+    body: string;
+    source_ref: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  interventions: Array<{
+    id: string;
+    worldline_id: string;
+    player_actor_id: string;
+    intervention_kind: string;
+    target_agent_id: string | null;
+    target_scene_id: string | null;
+    choice_id: string | null;
+    event_id: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  conversation_references: Array<{
+    id: string;
+    worldline_id: string;
+    session_key: string;
+    title: string;
+    scope_type: string;
+    mode: string;
+    status: string;
+    scene_id: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  safeguards: string[];
+};
+
+export type PlayerPrivacyRequestCreateInput = {
+  worldline_id?: string | null;
+  target_ref_kind?: PlayerPrivacyTargetKind;
+  target_ref_id?: string | null;
+  reason?: string | null;
+};
+
+export type PlayerPrivacyRequest = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  request_kind: PlayerPrivacyRequestKind;
+  status: PlayerPrivacyRequestStatus;
+  target_ref_kind: string | null;
+  target_ref_id: string | null;
+  reason: string | null;
+  summary: Record<string, unknown>;
+  redaction_plan: Record<string, unknown>;
+  created_by_actor_ref: string;
+  reviewed_by_actor_ref: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ReviewStatus = "pass" | "warning" | "fail";
 
 export type GMStyleReview = {

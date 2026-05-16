@@ -68,10 +68,10 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 6 — Player Privacy & Data Controls
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Decide export/delete request schema and shared-world safeguards.
-- [ ] Implement player data export/delete-request workflow only.
-- [ ] Add privacy, ACL, export-redaction, and request-review tests.
-- [ ] Run targeted tests.
+- [x] Decide export/delete request schema and shared-world safeguards.
+- [x] Implement player data export/delete-request workflow only.
+- [x] Add privacy, ACL, export-redaction, and request-review tests.
+- [x] Run targeted tests.
 - [ ] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.

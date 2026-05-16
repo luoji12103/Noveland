@@ -3,7 +3,7 @@
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
 - Objective: v0.8 Public Experience & Ecosystem Phase 6 Player Privacy & Data Controls.
-- Status: Phase 6 docs-only planning checkpoint is complete; Phase 6 implementation is next.
+- Status: Phase 6 implementation and targeted tests are complete; Phase 6 full local gate is next.
 
 ## Current Context
 
@@ -57,6 +57,8 @@
 - v0.8 Phase 6 must distinguish player-owned data from shared canonical world records. It must not destructively delete shared world/media/provider records.
 - v0.8 Phase 6 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.6-player-privacy-data-controls-plan.md`.
 - v0.8 Phase 6 implementation should add a narrow privacy boundary, deterministic sanitized export, and reviewable deletion/redaction requests without provider calls, daemon jobs, or automatic shared-record deletion.
+- v0.8 Phase 6 implementation adds `backend/packages/player_privacy/`, `player_privacy.py`, `player_privacy_requests`, and `/worlds/{world_id}/player/privacy/*` APIs for sanitized export preview/export request, delete request creation, request listing, and admin review.
+- v0.8 Phase 6 Web implementation adds `/worlds/{world_id}/player/privacy` and `PlayerPrivacyControls` for export records and deletion review requests over the safe privacy API.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -75,7 +77,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start Phase 6 implementation from clean local `main` on a feature branch.
+- Run the Phase 6 full local gate, then fast-forward merge back to local `main` if it stays green.
 - Use `impeccable` before Phase 6 frontend implementation work if Web UI is implemented.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

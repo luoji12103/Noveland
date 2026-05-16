@@ -97,6 +97,7 @@ Fast orientation for a new coding session.
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/` — authenticated reader/player conversation playback over safe presentation and reader media descriptors
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/scene/` — authenticated reader/player scene view over safe presentation and reader media descriptors
 - `web/app/worlds/[worldId]/player/` — authenticated player/member interaction surface over existing player choices, interventions, journal entries, notifications, and spoiler-safe summaries
+- `web/app/worlds/[worldId]/player/privacy/` — authenticated player privacy controls for sanitized export records and reviewable deletion requests
 - `web/app/worlds/[worldId]/worldlines/` — authenticated read-only worldline browser over safe branch metadata and aggregate comparison counts
 - `web/app/worlds/[worldId]/diagnostics/` — world-scoped multimodal diagnostics dashboard
 - `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
@@ -140,6 +141,7 @@ Fast orientation for a new coding session.
   - `web/features/worlds/conversation-scene-view.tsx` — reader/member-facing scene view over the same safe turn, presentation, and reader media DTOs
   - `web/features/worlds/playback-media.ts` — shared reader-safe turn media resolution helpers for playback and scene view
   - `web/features/worlds/player-interactions.tsx` — player/member-facing choices, interventions, journal, notifications, and spoiler-safe feedback surface over existing player records
+  - `web/features/worlds/player-privacy-controls.tsx` — player/member-facing data export and deletion review request surface over the dedicated player privacy API
   - `web/features/worlds/worldline-browser.tsx` — reader/member-facing read-only worldline branch inventory and safe comparison count surface
   - `web/features/workspace/` — shared workspace shell and form helpers
 - `web/components/` — reusable UI components
@@ -170,6 +172,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
   - `noveland.services.api.observability` — platform-admin incident summary router over safe runtime/provider/media/eval evidence
+  - `noveland.services.api.player_privacy` — world-scoped player privacy export, request listing, delete-request creation, and admin review router over sanitized player-owned/player-visible records
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
@@ -318,6 +321,10 @@ Fast orientation for a new coding session.
   - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model
   - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, and detail redaction
+- `backend/packages/player_privacy/`
+  - `noveland.player_privacy.contracts` — player privacy export and request DTOs for sanitized data controls
+  - `noveland.player_privacy.models` — `player_privacy_requests` ORM model for reviewable export/delete requests
+  - `noveland.player_privacy.service` — deterministic sanitized export, delete-request creation, request listing, and admin review service
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

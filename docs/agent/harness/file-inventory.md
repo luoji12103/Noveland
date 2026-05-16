@@ -29,6 +29,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/`
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/scene/`
 - `web/app/worlds/[worldId]/player/`
+- `web/app/worlds/[worldId]/player/privacy/`
 - `web/app/worlds/[worldId]/worldlines/`
 - `web/app/admin/`
 - `web/app/admin/memory-backends/`
@@ -92,6 +93,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/worlds/conversation-playback.tsx`
 - `web/features/worlds/player-interactions.test.tsx`
 - `web/features/worlds/player-interactions.tsx`
+- `web/features/worlds/player-privacy-controls.test.tsx`
+- `web/features/worlds/player-privacy-controls.tsx`
 - `web/features/worlds/worldline-browser.test.tsx`
 - `web/features/worlds/worldline-browser.tsx`
 - `web/components/`
@@ -324,6 +327,13 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/observability/src/noveland/observability/models.py`
 - `backend/packages/observability/src/noveland/observability/services.py`
 - `backend/services/api/src/noveland/services/api/observability.py`
+- `backend/packages/player_privacy/`
+- `backend/packages/player_privacy/pyproject.toml`
+- `backend/packages/player_privacy/src/noveland/player_privacy/__init__.py`
+- `backend/packages/player_privacy/src/noveland/player_privacy/contracts.py`
+- `backend/packages/player_privacy/src/noveland/player_privacy/models.py`
+- `backend/packages/player_privacy/src/noveland/player_privacy/service.py`
+- `backend/services/api/src/noveland/services/api/player_privacy.py`
 - `backend/migrations/`
 - `backend/migrations/versions/20260415_0001_core_schema.py`
 - `backend/migrations/versions/20260415_0002_world_clock_state.py`
@@ -359,6 +369,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/migrations/versions/20260512_0037_visual_asset_system.py`
 - `backend/migrations/versions/20260512_0038_conversation_turn_presentations.py`
 - `backend/migrations/versions/20260512_0039_asset_generation_orchestrator.py`
+- `backend/migrations/versions/20260516_0043_player_privacy_requests.py`
 - `backend/tests/`
 - `backend/tests/test_api_conversation_presentations.py`
 - `backend/tests/test_api_visual.py`
@@ -400,6 +411,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_security_regression_suite.py`
 - `backend/tests/test_production_readiness_gate.py`
 - `backend/tests/test_api_reader_media.py`
+- `backend/tests/test_api_player_privacy.py`
 - `backend/tests/test_narrative_writer.py`
 - `contracts/`
 - `infra/`

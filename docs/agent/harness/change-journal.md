@@ -2340,3 +2340,15 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 6 on a feature branch. Keep privacy controls authenticated, deterministic, reviewable, and free of storage path, raw prompt/output, bytes/base64, or secret leaks.
+
+## v0.8.6 Player Privacy & Data Controls implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/player-privacy-controls
+- Scope: v0.8 Public Experience & Ecosystem Phase 6 player privacy export and delete-request workflow.
+- Summary: Added a dedicated `player_privacy` backend package, `player_privacy.py` router, `player_privacy_requests` migration, sanitized player export preview/export request API, reviewable delete request API, admin review route, player privacy Web page, component tests, and e2e coverage. The workflow records requests and safe summaries only; it does not delete shared world records or write world event payloads.
+- Files changed: `/backend/packages/player_privacy/**`, `/backend/services/api/src/noveland/services/api/player_privacy.py`, `/backend/migrations/versions/20260516_0043_player_privacy_requests.py`, `/backend/tests/test_api_player_privacy.py`, `/web/app/worlds/[worldId]/player/privacy/page.tsx`, `/web/features/worlds/player-privacy-controls.tsx`, `/web/features/worlds/player-privacy-controls.test.tsx`, `/web/tests/e2e/{auth.spec.ts,start-with-mock-auth.mjs}`, OpenSpec tasks, and harness docs.
+- Tests added/updated: backend privacy API/schema/import tests, `PlayerPrivacyControls` Vitest coverage, and e2e coverage for authenticated player privacy export/delete review workflows and no leak markers.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for player privacy files, backend pytest (`28 passed`), Web lint, Web typecheck, focused privacy component tests (`2 passed`), focused privacy e2e (`1 passed`), and no forbidden storage/prompt/secret markers in tested responses/pages.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 6 back to local `main` if it stays green.

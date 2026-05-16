@@ -111,6 +111,7 @@ def test_core_schema_tables_are_registered() -> None:
         "player_choice_records",
         "player_intervention_records",
         "player_journal_entries",
+        "player_privacy_requests",
         "platform_settings",
         "plot_threads",
         "platform_role_assignments",
@@ -1225,6 +1226,37 @@ def test_living_world_knowledge_player_guardrail_columns_are_registered() -> Non
         "event_id",
         "status",
     } <= column_names("player_intervention_records")
+    assert {
+        "world_id",
+        "worldline_id",
+        "user_id",
+        "request_kind",
+        "status",
+        "target_ref_kind",
+        "target_ref_id",
+        "reason",
+        "summary",
+        "redaction_plan",
+        "created_by_actor_ref",
+        "reviewed_by_actor_ref",
+        "reviewed_at",
+        "review_note",
+        "metadata",
+    } <= column_names("player_privacy_requests")
+    assert Base.metadata.tables["player_privacy_requests"].c.worldline_id.nullable is False
+    assert {
+        "ix_player_privacy_requests_worldline_user",
+        "ix_player_privacy_requests_status",
+    } <= index_names("player_privacy_requests")
+    assert {
+        "ck_player_privacy_requests_request_kind",
+        "ck_player_privacy_requests_status",
+    } <= constraint_names("player_privacy_requests", CheckConstraint)
+    assert foreign_key_targets("player_privacy_requests") == {
+        "users.id",
+        "worldlines.id",
+        "worlds.id",
+    }
     assert {
         "worldline_id",
         "source_kind",

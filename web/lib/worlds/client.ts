@@ -132,6 +132,9 @@ import type {
   PlayerChoiceCreateInput,
   PlayerInterventionRecord,
   PlayerJournalEntry,
+  PlayerPrivacyExport,
+  PlayerPrivacyRequest,
+  PlayerPrivacyRequestCreateInput,
   PluginBinding,
   PluginCatalogEntry,
   PluginCategory,
@@ -1833,6 +1836,31 @@ export function createIntervention(
     body: input,
     csrf: true,
   });
+}
+
+export function createPlayerPrivacyExport(
+  worldId: string,
+  input: PlayerPrivacyRequestCreateInput,
+): Promise<PlayerPrivacyExport> {
+  return worldRequest<PlayerPrivacyExport>(`/api/worlds/${worldId}/player/privacy/export`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function createPlayerDeleteRequest(
+  worldId: string,
+  input: PlayerPrivacyRequestCreateInput,
+): Promise<PlayerPrivacyRequest> {
+  return worldRequest<PlayerPrivacyRequest>(
+    `/api/worlds/${worldId}/player/privacy/delete-requests`,
+    {
+      method: "POST",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function listGMStyleReviews(

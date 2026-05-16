@@ -536,6 +536,31 @@ const notifications = [
   },
 ];
 const interventions = [];
+const privacyRequests = [
+  {
+    id: "84600000-0000-4000-8000-000000000001",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: memberUserId,
+    request_kind: "delete",
+    status: "requested",
+    target_ref_kind: "all_player_data",
+    target_ref_id: null,
+    reason: "Review player data.",
+    summary: { counts: { choices: 1 } },
+    redaction_plan: {
+      automatic_delete: false,
+      shared_canonical_records_protected: true,
+    },
+    created_by_actor_ref: `user:${memberUserId}`,
+    reviewed_by_actor_ref: null,
+    reviewed_at: null,
+    review_note: null,
+    metadata: {},
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
+];
 const gmStyleReviews = [];
 const narrativeContinuityReviews = [
   {
@@ -2114,6 +2139,10 @@ async function handleWorldResource(request, response, url) {
   }
   if (resource === "player-choices") {
     await handlePlayerChoices(request, response, currentSubject, worldId, segments[3], url);
+    return;
+  }
+  if (resource === "player") {
+    await handlePlayerPrivacy(request, response, currentSubject, worldId, segments[3], segments[4], url);
     return;
   }
   if (resource === "living-world-dashboard") {
@@ -4614,6 +4643,210 @@ async function handlePlayerChoices(request, response, currentSubject, worldId, a
   };
   playerChoices.unshift(choice);
   sendJson(response, 201, choice);
+}
+
+async function handlePlayerPrivacy(request, response, currentSubject, worldId, area, action, url) {
+  if (area !== "privacy" || !canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 404, { detail: "not found" });
+    return;
+  }
+  if (action === "export" && request.method === "GET") {
+    sendJson(response, 200, playerPrivacyExport(worldId, currentSubject.user_id, url));
+    return;
+  }
+  if (action === "export" && request.method === "POST") {
+    if (!hasValidCsrf(request)) {
+      sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+      return;
+    }
+    const body = await readJson(request);
+    const exportPayload = playerPrivacyExport(worldId, currentSubject.user_id, url, body.worldline_id);
+    const requestRecord = {
+      ...privacyRequestBase(worldId, exportPayload.worldline_id, currentSubject.user_id, "export"),
+      status: "completed",
+      summary: { counts: exportPayload.counts },
+      redaction_plan: {},
+    };
+    privacyRequests.unshift(requestRecord);
+    sendJson(response, 200, { ...exportPayload, request_id: requestRecord.id });
+    return;
+  }
+  if (action === "requests" && request.method === "GET") {
+    const canManageAll = canManageWorld(currentSubject, worldId);
+    sendJson(
+      response,
+      200,
+      privacyRequests
+        .filter((item) => item.world_id === worldId)
+        .filter((item) => canManageAll || item.user_id === currentSubject.user_id),
+    );
+    return;
+  }
+  if (action === "delete-requests" && request.method === "POST") {
+    if (!hasValidCsrf(request)) {
+      sendJson(response, 403, { detail: "CSRF token is missing or invalid" });
+      return;
+    }
+    const body = await readJson(request);
+    const worldlineId = body.worldline_id ?? primaryWorldlineId;
+    const exportPayload = playerPrivacyExport(worldId, currentSubject.user_id, url, worldlineId);
+    const requestRecord = {
+      ...privacyRequestBase(worldId, worldlineId, currentSubject.user_id, "delete"),
+      target_ref_kind: body.target_ref_kind ?? "all_player_data",
+      reason: body.reason ?? null,
+      summary: { counts: exportPayload.counts, shared_world_records_protected: true },
+      redaction_plan: {
+        mode: "review_required",
+        automatic_delete: false,
+        shared_canonical_records_protected: true,
+      },
+    };
+    privacyRequests.unshift(requestRecord);
+    sendJson(response, 201, requestRecord);
+    return;
+  }
+  sendJson(response, 405, { detail: "method not allowed" });
+}
+
+function playerPrivacyExport(worldId, userId, url, explicitWorldlineId = null) {
+  const worldlineId = explicitWorldlineId ?? url.searchParams.get("worldline_id") ?? primaryWorldlineId;
+  const userProfile = users.find((item) => item.id === userId);
+  const actors = playerActors
+    .filter((actor) => actor.world_id === worldId && actor.worldline_id === worldlineId && actor.user_id === userId)
+    .map((actor) => ({
+      id: actor.id,
+      worldline_id: actor.worldline_id,
+      display_name: actor.display_name,
+      current_scene_id: actor.current_scene_id,
+      profile: actor.profile,
+      is_active: actor.is_active,
+      created_at: actor.created_at,
+      updated_at: actor.updated_at,
+    }));
+  const choices = playerChoices
+    .filter((choice) => choice.world_id === worldId && choice.worldline_id === worldlineId && choice.user_id === userId)
+    .map((choice) => ({
+      id: choice.id,
+      worldline_id: choice.worldline_id,
+      player_actor_id: choice.player_actor_id,
+      choice_key: choice.choice_key,
+      choice_kind: choice.choice_kind,
+      selected_option: choice.selected_option,
+      applied_event_id: choice.applied_event_id,
+      created_at: choice.created_at,
+      updated_at: choice.updated_at,
+    }));
+  const journalEntries = playerJournal
+    .filter((entry) => entry.world_id === worldId && entry.worldline_id === worldlineId && entry.user_id === userId)
+    .map((entry) => ({
+      id: entry.id,
+      worldline_id: entry.worldline_id,
+      player_actor_id: entry.player_actor_id,
+      entry_kind: entry.entry_kind,
+      title: entry.title,
+      body: entry.body,
+      source_ref: entry.source_ref,
+      visibility: entry.visibility,
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+    }));
+  const playerNotifications = notifications
+    .filter((item) => item.world_id === worldId && item.worldline_id === worldlineId && item.user_id === userId)
+    .map((item) => ({
+      id: item.id,
+      worldline_id: item.worldline_id,
+      notification_kind: item.notification_kind,
+      title: item.title,
+      body: item.body,
+      source_ref: item.source_ref,
+      status: item.status,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    }));
+  const playerInterventions = interventions
+    .filter((item) => item.world_id === worldId && item.worldline_id === worldlineId && item.user_id === userId)
+    .map((item) => ({
+      id: item.id,
+      worldline_id: item.worldline_id,
+      player_actor_id: item.player_actor_id,
+      intervention_kind: item.intervention_kind,
+      target_agent_id: item.target_agent_id,
+      target_scene_id: item.target_scene_id,
+      choice_id: item.choice_id,
+      event_id: item.event_id,
+      status: item.status,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    }));
+  const conversationReferences = conversations
+    .filter((item) => item.world_id === worldId && item.worldline_id === worldlineId)
+    .map((item) => ({
+      id: item.id,
+      worldline_id: item.worldline_id,
+      session_key: item.session_key,
+      title: item.title,
+      scope_type: item.scope_type,
+      mode: item.mode,
+      status: item.status,
+      scene_id: item.scene_id,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    }));
+  return {
+    request_id: null,
+    world_id: worldId,
+    worldline_id: worldlineId,
+    user_id: userId,
+    generated_at: new Date().toISOString(),
+    profile: {
+      user_id: userId,
+      email: userProfile?.email ?? "member@example.test",
+      display_name: userProfile?.display_name ?? "Member",
+      world_role: membershipFor(worldId, userId)?.role ?? null,
+    },
+    counts: {
+      player_actors: actors.length,
+      choices: choices.length,
+      journal_entries: journalEntries.length,
+      notifications: playerNotifications.length,
+      interventions: playerInterventions.length,
+      conversation_references: conversationReferences.length,
+    },
+    player_actors: actors,
+    choices,
+    journal_entries: journalEntries,
+    notifications: playerNotifications,
+    interventions: playerInterventions,
+    conversation_references: conversationReferences,
+    safeguards: [
+      "raw prompts and raw outputs are excluded",
+      "storage paths and encoded data are excluded",
+      "shared canonical world history is not deleted by privacy workflows",
+    ],
+  };
+}
+
+function privacyRequestBase(worldId, worldlineId, userId, requestKind) {
+  return {
+    id: randomUUID(),
+    world_id: worldId,
+    worldline_id: worldlineId,
+    user_id: userId,
+    request_kind: requestKind,
+    status: "requested",
+    target_ref_kind: "all_player_data",
+    target_ref_id: null,
+    reason: null,
+    summary: {},
+    redaction_plan: {},
+    created_by_actor_ref: `user:${userId}`,
+    reviewed_by_actor_ref: null,
+    reviewed_at: null,
+    review_note: null,
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 }
 
 async function handleScenes(request, response, currentSubject, worldId, sceneId) {
