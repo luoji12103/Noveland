@@ -2165,3 +2165,15 @@
 - Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with Web lint, Web typecheck, focused Vitest (`2 passed files, 7 passed tests`), focused playback e2e (`1 passed` after selector tightening), OpenSpec strict changes/spec validation, and `git diff --check`.
 - Follow-up notes: Run the full local gate, then fast-forward merge Phase 2 back to local `main` if it stays green.
+
+## v0.8.2 Conversation Playback UI gate entry
+
+- Date: 2026-05-16
+- Branch: feat/conversation-playback-ui
+- Scope: v0.8 Public Experience & Ecosystem Phase 2 full local gate.
+- Summary: Fixed the Phase 2 playback e2e blocker by clearing stale Next dev CSS cache before the mock-auth e2e server starts, so the active reader-safe scene media renders visibly in the playback surface.
+- Files changed: `/web/tests/e2e/start-with-mock-auth.mjs`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, blocker fix and gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Focused playback e2e passed, full Web e2e passed (`14 passed`), and the full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`36 passed`, `115 passed`), Web build, Web `check:next-env`, Web e2e (`14 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
+- Follow-up notes: Fast-forward merge `feat/conversation-playback-ui` to local `main`, then record merge bookkeeping before starting Phase 3.

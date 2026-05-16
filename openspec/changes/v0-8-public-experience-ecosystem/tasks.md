@@ -28,7 +28,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] Implement playback UI over safe presentation DTOs only.
 - [x] Add component and e2e playback smoke tests.
 - [x] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 
