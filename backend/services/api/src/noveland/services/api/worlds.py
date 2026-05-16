@@ -3433,22 +3433,28 @@ def dry_run_resolution_rule(
 
 @router.get("/{world_id}/player-actors", response_model=list[PlayerActorResponse])
 def list_player_actors(
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> list[PlayerActorResponse]:
     _world_or_404(db_session, context.world_id)
     resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
         context.world_id,
         worldline_id,
     )
+    requested_user_id = user_id or context.subject.user_id
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    if requested_user_id != context.subject.user_id and not can_manage:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    statement = select(PlayerActorProfile).where(
+        PlayerActorProfile.world_id == context.world_id,
+        PlayerActorProfile.worldline_id == resolved_worldline.id,
+    )
+    if not can_manage or user_id is not None:
+        statement = statement.where(PlayerActorProfile.user_id == requested_user_id)
     actors = db_session.scalars(
-        select(PlayerActorProfile)
-        .where(
-            PlayerActorProfile.world_id == context.world_id,
-            PlayerActorProfile.worldline_id == resolved_worldline.id,
-        )
-        .order_by(PlayerActorProfile.display_name),
+        statement.order_by(PlayerActorProfile.display_name),
     ).all()
     return [_player_actor_response(actor) for actor in actors]
 
@@ -3457,12 +3463,15 @@ def list_player_actors(
 def bind_player_actor(
     actor_bind: PlayerActorBindRequest,
     request: Request,
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> PlayerActorResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
     user_id = actor_bind.user_id or context.subject.user_id
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    if user_id != context.subject.user_id and not can_manage:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     _user_or_404(db_session, user_id)
     if actor_bind.current_scene_id is not None:
         _scene_or_404(db_session, context.world_id, actor_bind.current_scene_id)
@@ -3479,7 +3488,7 @@ def bind_player_actor(
 
 @router.get("/{world_id}/player-choices", response_model=list[PlayerChoiceResponse])
 def list_player_choices(
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
     user_id: uuid.UUID | None = None,
@@ -3494,8 +3503,14 @@ def list_player_choices(
         PlayerChoiceRecord.world_id == context.world_id,
         PlayerChoiceRecord.worldline_id == resolved_worldline.id,
     )
-    if user_id is not None:
-        statement = statement.where(PlayerChoiceRecord.user_id == user_id)
+    requested_user_id = user_id or context.subject.user_id
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    if requested_user_id != context.subject.user_id and not can_manage:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if can_manage and user_id is None:
+        statement = statement
+    else:
+        statement = statement.where(PlayerChoiceRecord.user_id == requested_user_id)
     choices = db_session.scalars(
         statement.order_by(PlayerChoiceRecord.created_at.desc()).limit(limit),
     ).all()
@@ -3510,12 +3525,15 @@ def list_player_choices(
 def record_player_choice(
     choice_create: PlayerChoiceCreateRequest,
     request: Request,
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> PlayerChoiceResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
     user_id = choice_create.user_id or context.subject.user_id
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    if user_id != context.subject.user_id and not can_manage:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     try:
         choice = LivingWorldGMService(db_session).record_player_choice(
             world_id=context.world_id,
@@ -3546,11 +3564,15 @@ def record_player_choice(
 def preview_player_choice_consequences(
     choice_create: PlayerChoiceCreateRequest,
     request: Request,
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ChoiceConsequencePreviewResponse:
     require_csrf(request)
     _world_or_404(db_session, context.world_id)
+    user_id = choice_create.user_id or context.subject.user_id
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    if user_id != context.subject.user_id and not can_manage:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     preview = LivingWorldGMService(db_session).choice_consequence_preview(
         world_id=context.world_id,
         worldline_id=choice_create.worldline_id,

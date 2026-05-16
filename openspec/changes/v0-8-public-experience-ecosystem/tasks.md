@@ -35,11 +35,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 3 — Player Interaction UI
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Map UI workflows to existing player choice, journal, notification, and intervention records.
-- [ ] Implement player interaction UI without a new player record framework.
-- [ ] Add UI, API, ACL, and spoiler/leak tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Map UI workflows to existing player choice, journal, notification, and intervention records.
+- [x] Implement player interaction UI without a new player record framework.
+- [x] Add UI, API, ACL, and spoiler/leak tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

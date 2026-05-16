@@ -2620,6 +2620,131 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     }
 
 
+def test_world_member_can_use_own_player_interaction_records_without_admin_scope() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-player-ui@example.test")
+    member_id, member_token = _seed_user(engine, "member-player-ui@example.test")
+    other_id, _other_token = _seed_user(engine, "other-player-ui@example.test")
+    world_id = _seed_world(engine, owner_id, "player-ui-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
+    scene_id = _seed_scene(engine, world_id, "club-room")
+    agent_id = _seed_agent(engine, world_id, "guide", scene_id=scene_id)
+
+    _authenticate(client, owner_token)
+    owner_actor = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={
+            "user_id": str(other_id),
+            "display_name": "Other Player",
+            "current_scene_id": str(scene_id),
+        },
+    )
+    assert owner_actor.status_code == 200
+
+    _authenticate(client, member_token)
+    member_actor = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={"display_name": "Member Player", "current_scene_id": str(scene_id)},
+    )
+    other_actor_attempt = client.put(
+        f"/worlds/{world_id}/player-actors",
+        json={
+            "user_id": str(other_id),
+            "display_name": "Other Hijack",
+            "current_scene_id": str(scene_id),
+        },
+    )
+    listed_actors = client.get(f"/worlds/{world_id}/player-actors")
+    preview = client.post(
+        f"/worlds/{world_id}/player-choices/preview",
+        json={
+            "player_actor_id": member_actor.json()["id"],
+            "choice_key": "stay-after-school",
+            "choice_kind": "route",
+            "prompt": "Help with festival preparations?",
+            "selected_option": "Stay after school.",
+            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
+            "apply": False,
+        },
+    )
+    choice = client.post(
+        f"/worlds/{world_id}/player-choices",
+        json={
+            "player_actor_id": member_actor.json()["id"],
+            "choice_key": "stay-after-school",
+            "choice_kind": "route",
+            "prompt": "Help with festival preparations?",
+            "selected_option": "Stay after school.",
+            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
+            "apply": True,
+        },
+    )
+    other_choice_attempt = client.post(
+        f"/worlds/{world_id}/player-choices",
+        json={
+            "user_id": str(other_id),
+            "player_actor_id": owner_actor.json()["id"],
+            "choice_key": "other-choice",
+            "choice_kind": "route",
+            "prompt": "Should not be accepted.",
+            "selected_option": "No.",
+            "apply": True,
+        },
+    )
+    listed_choices = client.get(f"/worlds/{world_id}/player-choices")
+    other_choices = client.get(f"/worlds/{world_id}/player-choices?user_id={other_id}")
+    intervention = client.post(
+        f"/worlds/{world_id}/interventions",
+        json={
+            "player_actor_id": member_actor.json()["id"],
+            "intervention_kind": "contact",
+            "target_agent_id": str(agent_id),
+            "prompt": "Send a short message after school.",
+        },
+    )
+
+    with Session(engine) as session:
+        choice_event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.world_id == world_id,
+                WorldEventModel.event_name == "player.choice_recorded",
+            ),
+        ).one()
+        intervention_event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.world_id == world_id,
+                WorldEventModel.event_name == "player.intervention_recorded",
+            ),
+        ).one()
+
+    assert member_actor.status_code == 200
+    assert other_actor_attempt.status_code == 403
+    assert listed_actors.status_code == 200
+    assert [actor["user_id"] for actor in listed_actors.json()] == [str(member_id)]
+    assert preview.status_code == 200
+    assert preview.json()["diagnostics"] == [
+        "0 relationship update(s)",
+        "0 faction update(s)",
+        "0 offscreen event(s)",
+    ]
+    assert choice.status_code == 201
+    assert choice.json()["user_id"] == str(member_id)
+    assert other_choice_attempt.status_code == 403
+    assert listed_choices.status_code == 200
+    assert [item["user_id"] for item in listed_choices.json()] == [str(member_id)]
+    assert other_choices.status_code == 403
+    assert intervention.status_code == 201
+    serialized_payloads = f"{choice_event.payload} {intervention_event.payload}"
+    assert "Help with festival preparations?" not in serialized_payloads
+    assert "Stay after school." not in serialized_payloads
+    assert "Send a short message after school." not in serialized_payloads
+    assert "storage_uri" not in serialized_payloads
+    assert "raw_prompt" not in serialized_payloads
+    assert "raw_output" not in serialized_payloads
+
+
 def test_membership_management_and_final_admin_guard() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")

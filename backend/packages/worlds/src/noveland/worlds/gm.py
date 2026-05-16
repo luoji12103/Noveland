@@ -765,8 +765,11 @@ class LivingWorldGMService:
                     "choice_id": str(choice.id),
                     "player_actor_id": str(player_actor.id),
                     "choice_key": choice.choice_key,
-                    "selected_option": choice.selected_option,
-                    "consequences": choice.consequence_preview,
+                    "choice_kind": choice.choice_kind,
+                    "selected_option_present": bool(choice.selected_option),
+                    "consequence_diagnostic_count": len(
+                        _list_of_strings(choice.consequence_preview.get("diagnostics"))
+                    ),
                 },
                 importance=WorldEventImportance.ROUTE,
                 wall_time=datetime.now(UTC),

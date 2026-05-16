@@ -27,6 +27,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/reader/`
 - `web/app/worlds/[worldId]/reader/[artifactId]/`
 - `web/app/worlds/[worldId]/reader/conversations/[conversationId]/playback/`
+- `web/app/worlds/[worldId]/player/`
 - `web/app/admin/`
 - `web/app/admin/memory-backends/`
 - `web/app/admin/presets/`
@@ -84,6 +85,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/worlds/narrative-reader.tsx`
 - `web/features/worlds/conversation-playback.test.tsx`
 - `web/features/worlds/conversation-playback.tsx`
+- `web/features/worlds/player-interactions.test.tsx`
+- `web/features/worlds/player-interactions.tsx`
 - `web/components/`
 - `web/lib/`
 - `web/lib/admin/`

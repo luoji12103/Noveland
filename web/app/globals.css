@@ -521,6 +521,72 @@ a {
   color: var(--muted);
 }
 
+.player-surface {
+  display: grid;
+  gap: 6px;
+}
+
+.player-summary {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  gap: 22px;
+  align-items: start;
+}
+
+.player-grid .management-panel {
+  width: 100%;
+  margin: 0;
+}
+
+.player-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.player-metrics span,
+.compact-list li {
+  padding: 7px 10px;
+  color: var(--forest-dark);
+  background: #eef6f2;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.player-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 18px;
+  align-items: end;
+}
+
+.player-form textarea,
+.player-form .button-row {
+  grid-column: 1 / -1;
+}
+
+.compact-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
 .workspace-nav {
   display: flex;
   width: min(1120px, calc(100% - 32px));
@@ -759,6 +825,7 @@ a {
   .dashboard-grid,
   .evidence-grid,
   .playback-grid,
+  .player-grid,
   .management-columns,
   .clock-actions,
   .clock-grid,
@@ -767,6 +834,7 @@ a {
   }
 
   .management-form,
+  .player-form,
   .world-toolbar {
     grid-template-columns: 1fr;
   }

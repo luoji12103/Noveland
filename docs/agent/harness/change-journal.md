@@ -2199,3 +2199,27 @@
 - Tests added/updated: N/A, documentation-only planning checkpoint.
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Implement Phase 3 on a feature branch. Journal, notifications, and interventions are already member-facing; player choice endpoints may need a narrow existing-route ACL adjustment, not broad new `worlds.py` routes.
+
+## v0.8.3 Player Interaction UI implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/player-interaction-ui
+- Scope: v0.8 Public Experience & Ecosystem Phase 3 player/member interaction UI.
+- Summary: Added an authenticated player surface at `/worlds/{world_id}/player`, a `PlayerInteractions` component, server-side player interaction data loading, a workspace Player nav entry, and mock/e2e fixtures for player-owned choices, interventions, journal entries, and notifications. Backend changes are limited to existing player actor and player choice route ACLs/current-user filtering plus safer choice/intervention world event payload summaries.
+- Files changed: `/web/app/worlds/[worldId]/player/page.tsx`, `/web/features/worlds/player-interactions.tsx`, `/web/features/worlds/player-interactions.test.tsx`, `/web/lib/worlds/{client,server}.ts`, `/web/features/workspace/workspace-shell.tsx`, Web CSS, `/web/tests/e2e/{auth.spec.ts,start-with-mock-auth.mjs}`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/packages/worlds/src/noveland/worlds/{gm,guardrails}.py`, `/backend/tests/test_api_worlds.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: `web/features/worlds/player-interactions.test.tsx`, player interaction coverage in `web/tests/e2e/auth.spec.ts`, and `test_world_member_can_use_own_player_interaction_records_without_admin_scope` in `backend/tests/test_api_worlds.py`.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend pytest for the player interaction API/ACL regression, focused Web component tests, Web typecheck, Web lint, focused player interaction e2e, targeted backend ruff for changed Phase 3 backend files, and `git diff --check`.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 3 back to local `main` if it stays green.
+
+## v0.8.3 Player Interaction UI gate entry
+
+- Date: 2026-05-16
+- Branch: feat/player-interaction-ui
+- Scope: v0.8 Public Experience & Ecosystem Phase 3 full local gate.
+- Summary: Recorded the successful full local gate for the authenticated player interaction UI and member-owned existing player record workflow.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`421 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`37 passed files`, `118 passed`), Web build, Web `check:next-env`, Web e2e (`16 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 3 implementation, fast-forward merge `feat/player-interaction-ui` to local `main`, then record merge bookkeeping before starting Phase 4.

@@ -247,6 +247,21 @@ export type ConversationPlaybackData = {
   loadError: string | null;
 };
 
+export type PlayerInteractionData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  worldlines: Worldline[];
+  playerActors: PlayerActor[];
+  playerChoices: PlayerChoice[];
+  playerJournal: PlayerJournalEntry[];
+  notifications: InWorldNotification[];
+  interventions: PlayerInterventionRecord[];
+  scenes: Scene[];
+  agents: Agent[];
+  selectedWorldlineId: string | null;
+  loadError: string | null;
+};
+
 export type NarrativeWorkspaceData = {
   worlds: World[];
   selectedWorld: World | null;
@@ -1103,6 +1118,70 @@ export async function getConversationPlaybackData(
   }
 }
 
+export async function getPlayerInteractionData(
+  worldId: string,
+  userId: string,
+): Promise<PlayerInteractionData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyPlayerInteractionData(worlds, "Unable to load player interactions.");
+    }
+
+    const worldlines = await apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies);
+    const selectedWorldlineId = worldlines[0]?.id ?? null;
+    const worldlineQuery =
+      selectedWorldlineId === null
+        ? ""
+        : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}`;
+    const userQuery =
+      selectedWorldlineId === null
+        ? `?user_id=${encodeURIComponent(userId)}`
+        : `${worldlineQuery}&user_id=${encodeURIComponent(userId)}`;
+    const [playerActors, playerChoices, playerJournal, notifications, interventions, scenes, agents] =
+      await Promise.all([
+        apiFetchOptional<PlayerActor[]>(`/worlds/${worldId}/player-actors${userQuery}`, cookies),
+        apiFetchOptional<PlayerChoice[]>(`/worlds/${worldId}/player-choices${userQuery}`, cookies),
+        apiFetchOptional<PlayerJournalEntry[]>(
+          `/worlds/${worldId}/player-journal${userQuery}`,
+          cookies,
+        ),
+        apiFetchOptional<InWorldNotification[]>(
+          `/worlds/${worldId}/notifications${worldlineQuery}`,
+          cookies,
+        ),
+        apiFetchOptional<PlayerInterventionRecord[]>(
+          `/worlds/${worldId}/interventions${userQuery}`,
+          cookies,
+        ),
+        apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
+        apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      ]);
+
+    return {
+      worlds,
+      selectedWorld,
+      worldlines,
+      playerActors: playerActors ?? [],
+      playerChoices: playerChoices ?? [],
+      playerJournal: playerJournal ?? [],
+      notifications: (notifications ?? []).filter((notification) => notification.user_id === userId),
+      interventions: interventions ?? [],
+      scenes,
+      agents,
+      selectedWorldlineId,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyPlayerInteractionData([], "Unable to load player interactions.");
+  }
+}
+
 export async function getNarrativeWorkspaceData(
   worldId: string,
 ): Promise<NarrativeWorkspaceData> {
@@ -1930,6 +2009,26 @@ function emptyConversationPlaybackData(
     turns: [],
     presentationsByTurnId: {},
     media: [],
+    loadError,
+  };
+}
+
+function emptyPlayerInteractionData(
+  worlds: World[],
+  loadError: string,
+): PlayerInteractionData {
+  return {
+    worlds,
+    selectedWorld: null,
+    worldlines: [],
+    playerActors: [],
+    playerChoices: [],
+    playerJournal: [],
+    notifications: [],
+    interventions: [],
+    scenes: [],
+    agents: [],
+    selectedWorldlineId: null,
     loadError,
   };
 }

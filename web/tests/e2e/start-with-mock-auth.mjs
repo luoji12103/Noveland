@@ -404,6 +404,19 @@ const playerActors = [
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
   },
+  {
+    id: "81900000-0000-4000-8000-000000000002",
+    world_id: worldOneId,
+    worldline_id: primaryWorldlineId,
+    user_id: memberUserId,
+    actor_ref: `player:${memberUserId}:primary`,
+    display_name: "Member Player",
+    current_scene_id: sceneHomeId,
+    profile: {},
+    is_active: true,
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
 ];
 const knowledgeFacts = [
   {
@@ -468,14 +481,20 @@ const playerChoices = [
     id: "83500000-0000-4000-8000-000000000001",
     world_id: worldOneId,
     worldline_id: primaryWorldlineId,
-    user_id: adminUserId,
-    player_actor_id: "81900000-0000-4000-8000-000000000001",
+    user_id: memberUserId,
+    player_actor_id: "81900000-0000-4000-8000-000000000002",
     choice_key: "help-festival",
     choice_kind: "route",
     prompt: "Help with festival preparations?",
     selected_option: "Stay after school.",
     context: {},
-    consequence_preview: {},
+    consequence_preview: {
+      diagnostics: [
+        "0 relationship update(s)",
+        "0 faction update(s)",
+        "0 offscreen event(s)",
+      ],
+    },
     applied_event_id: "76000000-0000-4000-8000-000000000001",
     created_at: "2026-04-17T00:00:00.000Z",
     updated_at: "2026-04-17T00:00:00.000Z",
@@ -486,8 +505,8 @@ const playerJournal = [
     id: "83300000-0000-4000-8000-000000000001",
     world_id: worldOneId,
     worldline_id: primaryWorldlineId,
-    user_id: adminUserId,
-    player_actor_id: "81900000-0000-4000-8000-000000000001",
+    user_id: memberUserId,
+    player_actor_id: "81900000-0000-4000-8000-000000000002",
     entry_kind: "choice",
     title: "Festival prep",
     body: "The player helped with festival preparations.",
@@ -504,7 +523,7 @@ const notifications = [
     id: "83500000-0000-4000-8000-000000000001",
     world_id: worldOneId,
     worldline_id: primaryWorldlineId,
-    user_id: adminUserId,
+    user_id: memberUserId,
     notification_kind: "rumor",
     title: "Club room notice",
     body: "Someone mentioned the hidden letter.",
@@ -4358,18 +4377,27 @@ async function handleInterventions(request, response, currentSubject, worldId, u
     return;
   }
   const body = await readJson(request);
+  const interventionUserId = body.user_id ?? currentSubject.user_id;
+  if (interventionUserId !== currentSubject.user_id && !canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
   const event = appendWorldEvent(worldId, {
     worldline_id: body.worldline_id ?? primaryWorldlineId,
     event_name: "player.intervention_recorded",
     importance: "daily",
-    payload: { intervention_kind: body.intervention_kind, prompt: body.prompt },
+    payload: {
+      intervention_kind: body.intervention_kind,
+      prompt_present: Boolean(body.prompt),
+      prompt_length: String(body.prompt ?? "").length,
+    },
     actor_ref: `user:${currentSubject.user_id}`,
   });
   const intervention = {
     id: randomUUID(),
     world_id: worldId,
     worldline_id: body.worldline_id ?? primaryWorldlineId,
-    user_id: body.user_id ?? currentSubject.user_id,
+    user_id: interventionUserId,
     player_actor_id: body.player_actor_id,
     intervention_kind: body.intervention_kind,
     target_agent_id: body.target_agent_id ?? null,
@@ -4457,13 +4485,25 @@ async function handleNarrativeContinuityReviews(request, response, currentSubjec
   sendJson(response, 201, review);
 }
 
-async function handlePlayerActors(request, response, currentSubject, worldId) {
-  if (!canManageWorld(currentSubject, worldId)) {
+async function handlePlayerActors(request, response, currentSubject, worldId, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const requestedUserId = url.searchParams.get("user_id") ?? currentSubject.user_id;
+  if (requestedUserId !== currentSubject.user_id && !canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
   }
   if (request.method === "GET") {
-    sendJson(response, 200, playerActors.filter((actor) => actor.world_id === worldId));
+    const canManageAll = canManageWorld(currentSubject, worldId) && !url.searchParams.has("user_id");
+    sendJson(
+      response,
+      200,
+      playerActors
+        .filter((actor) => matchesWorldline(actor, worldId, url))
+        .filter((actor) => canManageAll || actor.user_id === requestedUserId),
+    );
     return;
   }
   if (!hasValidCsrf(request)) {
@@ -4471,30 +4511,61 @@ async function handlePlayerActors(request, response, currentSubject, worldId) {
     return;
   }
   const body = await readJson(request);
-  const actor = {
+  const actorUserId = body.user_id ?? currentSubject.user_id;
+  if (actorUserId !== currentSubject.user_id && !canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const actorWorldlineId = body.worldline_id ?? primaryWorldlineId;
+  const existingActor = playerActors.find(
+    (actor) =>
+      actor.world_id === worldId
+      && actor.worldline_id === actorWorldlineId
+      && actor.user_id === actorUserId,
+  );
+  const actor = existingActor ?? {
     id: randomUUID(),
     world_id: worldId,
-    worldline_id: body.worldline_id ?? primaryWorldlineId,
-    user_id: body.user_id ?? currentSubject.user_id,
-    actor_ref: `player:${body.user_id ?? currentSubject.user_id}:primary`,
-    display_name: body.display_name,
-    current_scene_id: body.current_scene_id ?? null,
-    profile: body.profile ?? {},
+    worldline_id: actorWorldlineId,
+    user_id: actorUserId,
+    actor_ref: `player:${actorUserId}:primary`,
+    display_name: "",
+    current_scene_id: null,
+    profile: {},
     is_active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  playerActors.push(actor);
+  actor.display_name = body.display_name;
+  actor.current_scene_id = body.current_scene_id ?? null;
+  actor.profile = body.profile ?? {};
+  actor.is_active = true;
+  actor.updated_at = new Date().toISOString();
+  if (existingActor === undefined) {
+    playerActors.push(actor);
+  }
   sendJson(response, 200, actor);
 }
 
-async function handlePlayerChoices(request, response, currentSubject, worldId, action) {
-  if (!canManageWorld(currentSubject, worldId)) {
+async function handlePlayerChoices(request, response, currentSubject, worldId, action, url) {
+  if (!canReadWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
+  const requestedUserId = url.searchParams.get("user_id") ?? currentSubject.user_id;
+  if (requestedUserId !== currentSubject.user_id && !canManageWorld(currentSubject, worldId)) {
     sendJson(response, 403, { detail: "Forbidden" });
     return;
   }
   if (request.method === "GET" && action === undefined) {
-    sendJson(response, 200, playerChoices.filter((choice) => choice.world_id === worldId));
+    const canManageAll = canManageWorld(currentSubject, worldId) && !url.searchParams.has("user_id");
+    sendJson(
+      response,
+      200,
+      playerChoices
+        .filter((choice) => matchesWorldline(choice, worldId, url))
+        .filter((choice) => canManageAll || choice.user_id === requestedUserId),
+    );
     return;
   }
   if (!hasValidCsrf(request)) {
@@ -4502,6 +4573,11 @@ async function handlePlayerChoices(request, response, currentSubject, worldId, a
     return;
   }
   const body = await readJson(request);
+  const choiceUserId = body.user_id ?? currentSubject.user_id;
+  if (choiceUserId !== currentSubject.user_id && !canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
+    return;
+  }
   const preview = {
     relationship_updates: body.effects?.relationship_updates ?? [],
     faction_updates: body.effects?.faction_updates ?? [],
@@ -4520,7 +4596,7 @@ async function handlePlayerChoices(request, response, currentSubject, worldId, a
     id: randomUUID(),
     world_id: worldId,
     worldline_id: body.worldline_id ?? primaryWorldlineId,
-    user_id: body.user_id ?? currentSubject.user_id,
+    user_id: choiceUserId,
     player_actor_id: body.player_actor_id,
     choice_key: body.choice_key,
     choice_kind: body.choice_kind,

@@ -27,6 +27,13 @@ test("redirects unauthenticated reader visitors to login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
 });
 
+test("redirects unauthenticated player visitors to login", async ({ page }) => {
+  await page.goto(`/worlds/${worldOneId}/player`);
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+});
+
 test("renders the login form", async ({ page }) => {
   await page.goto("/login");
 
@@ -520,6 +527,32 @@ test("reader playback renders conversation turns through safe media", async ({ p
   await page.getByRole("button", { name: /Turn 1/ }).click();
   await expect(page.getByText("No reader-visible image for this turn.")).toBeVisible();
   await expect(page.getByText("No reader-visible audio for this turn.")).toBeVisible();
+});
+
+test("player interactions reuse existing player records", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/player`);
+  await expect(page.getByRole("heading", { name: "Player interactions" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Member Player" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Festival prep" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Club room notice" })).toBeVisible();
+  await expect(page.getByText("0 relationship update(s)")).toBeVisible();
+
+  await page.getByPlaceholder("choice-key").fill(`member-route-${Date.now()}`);
+  await page.getByPlaceholder("Choice prompt").fill("Help with route preparations?");
+  await page.getByPlaceholder("Selected option").fill("Stay and help.");
+  await page.getByRole("button", { name: "Preview choice" }).click();
+  await expect(page.getByText("Choice consequence preview loaded.")).toBeVisible();
+  await page.getByRole("button", { name: "Record choice" }).click();
+  await expect(page.getByText("Player choice recorded.")).toBeVisible();
+
+  await page.getByPlaceholder("Intervention prompt").fill("Contact the guide after class.");
+  await page.getByRole("button", { name: "Submit intervention" }).click();
+  await expect(page.getByText("Intervention recorded.")).toBeVisible();
+
+  const pageText = await page.locator("body").innerText();
+  expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret/i);
 });
 
 test("release gate blockers are enforced by the workspace backend contract", async ({ page }) => {

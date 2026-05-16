@@ -419,12 +419,14 @@ export function dryRunResolutionRule(
 
 export function listPlayerActors(
   worldId: string,
-  filters: WorldlineScopedFilters = {},
+  filters: WorldlineScopedFilters & { user_id?: string | null } = {},
 ): Promise<PlayerActor[]> {
-  return worldRequest<PlayerActor[]>(
-    `/api/worlds/${worldId}/player-actors${worldlineSuffix(filters)}`,
-    { method: "GET" },
-  );
+  const search = new URLSearchParams();
+  appendOptional(search, "worldline_id", filters.worldline_id);
+  appendOptional(search, "user_id", filters.user_id);
+  return worldRequest<PlayerActor[]>(`/api/worlds/${worldId}/player-actors${searchSuffix(search)}`, {
+    method: "GET",
+  });
 }
 
 export function bindPlayerActor(

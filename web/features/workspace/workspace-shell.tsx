@@ -68,6 +68,7 @@ export function WorkspaceShell({
             <Link href={`/worlds/${worldId}/diagnostics`}>Diagnostics</Link>
             <Link href={`/worlds/${worldId}/narrative`}>Narrative</Link>
             <Link href={`/worlds/${worldId}/reader`}>Reader</Link>
+            <Link href={`/worlds/${worldId}/player`}>Player</Link>
           </>
         ) : null}
         {isPlatformAdmin ? (
