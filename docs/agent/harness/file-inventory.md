@@ -554,6 +554,7 @@ Track key structural files and prevent unregistered sprawl.
 - `openspec/changes/v0-9-self-use-mvp-demo-world-cut/phase-plan.md`
 - `openspec/changes/v0-9-self-use-mvp-demo-world-cut/tasks.md`
 - `openspec/changes/v0-9-self-use-mvp-demo-world-cut/specs/`
+- `openspec/changes/v0-9-self-use-mvp-demo-world-cut/specs/visual-generation-control-plane/spec.md`
 - `openspec/changes/v1-0-private-beta-mvp/`
 - `openspec/changes/v1-0-private-beta-mvp/proposal.md`
 - `openspec/changes/v1-0-private-beta-mvp/design.md`

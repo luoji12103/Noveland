@@ -11,6 +11,15 @@ The system SHALL map imported character sprites, expression variants, background
 - **Then** the system SHALL propose sprite set and neutral, happy, and sad variant bindings
 - **And** it SHALL NOT overwrite existing visual bindings unless explicitly selected by an authorized operator.
 
+### Requirement: Imported art can support visual generation profiles
+The system SHALL allow imported visual assets to be selected as reference assets for character visual generation profiles and provider-neutral visual generation plans.
+
+#### Scenario: Imported sprite becomes reference image
+- **Given** an imported sprite asset is reviewed and visible for internal generation use
+- **When** a character visual generation profile is proposed
+- **Then** the profile MAY reference that sprite as a character reference asset
+- **And** reader/player APIs SHALL NOT expose storage paths, raw source paths, bytes, or base64.
+
 ### Requirement: Visual mapping preserves worldline isolation
 The system SHALL validate world and worldline scope for every mapped media asset, sprite variant, background profile, and scene reference.
 
@@ -32,4 +41,5 @@ The system SHALL expose mapped visual assets to reader/player surfaces only thro
 
 - New media storage system.
 - New visual resolver.
+- New image generation planner.
 - Automatic destructive remapping.

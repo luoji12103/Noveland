@@ -19,7 +19,8 @@
 - Active v0.9 roadmap change: `openspec/changes/v0-9-self-use-mvp-demo-world-cut/`.
 - Active v1.0 roadmap change: `openspec/changes/v1-0-private-beta-mvp/`.
 - Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
-- v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
+- v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
+- v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.

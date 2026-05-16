@@ -20,6 +20,15 @@ The system SHALL allow operators to pull model lists when a provider exposes a c
 - **Then** the operator SHALL be able to enter a model name manually
 - **And** the failed discovery SHALL produce safe health or smoke evidence without leaking credentials.
 
+### Requirement: Image provider settings expose generation-control capability metadata
+The system SHALL let image provider templates declare supported visual generation controls such as text-to-image, image-to-image, edit, inpaint, reference images, mask images, workflow templates, LoRA slots, checkpoint slots, seed, size, sampler, and output format.
+
+#### Scenario: Configure image provider capabilities
+- **Given** an authorized operator configures a ComfyUI, Z-Image, GPT Image, OpenAI-compatible image, or generic image provider
+- **When** they save capability metadata
+- **Then** the provider SHALL expose safe capability flags to the visual generation planner
+- **And** unsupported controls SHALL be rejected or omitted before adapter execution.
+
 ### Requirement: Provider test actions preserve secret and ledger boundaries
 The system SHALL run explicit provider tests and smoke checks through the provider kernel and SHALL record safe invocation or health evidence.
 
@@ -35,3 +44,4 @@ The system SHALL run explicit provider tests and smoke checks through the provid
 - Client-side API keys.
 - Provider marketplace.
 - New provider execution framework.
+- Image workflow editor.

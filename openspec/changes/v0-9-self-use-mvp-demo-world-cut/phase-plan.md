@@ -2,7 +2,7 @@
 
 ## Version Goal
 
-Create a real playable demo world that the developer can use for about 30 minutes, using configurable real providers and user-provided already-unpacked galgame materials while preserving Noveland's existing provider, media, authoring, memory, visual, speech, worldline, and safety boundaries.
+Create a real playable demo world that the developer can use for about 30 minutes, using configurable real providers, controlled visual generation planning, and user-provided already-unpacked galgame materials while preserving Noveland's existing provider, media, authoring, memory, visual, speech, worldline, and safety boundaries.
 
 ## Version Non-Goals
 
@@ -10,6 +10,8 @@ Create a real playable demo world that the developer can use for about 30 minute
 - Public launch, public unauthenticated access, marketplace, or multi-user beta.
 - Hidden provider spend or provider tests in the default gate.
 - Direct canon, memory, visual, or world-state mutation from provider output.
+- Runtime agent execution of arbitrary ComfyUI workflow JSON.
+- Full ComfyUI workflow editor, custom node management, LoRA training, or model downloading.
 - Broad `worlds.py` route growth.
 - Duplicate provider, media, memory, eval, packaging, or readiness systems.
 
@@ -35,6 +37,7 @@ Let an operator configure and test LLM, image, TTS, and ASR providers from setti
 - Editable custom `base_url`, `auth_ref`, `model_name`, model list endpoint/discovery strategy, capabilities, `adapter_kind`, and provider kind.
 - Add/edit/delete/test/smoke-check/model-list/manual-model-name workflows.
 - Safe API responses that return only auth refs and redacted config.
+- Image-provider capability metadata for text-to-image, image-to-image, edit, inpaint, reference images, workflow templates, LoRA slots, checkpoint slots, seed, size, sampler, and output format.
 
 ### Non-Goals
 
@@ -42,6 +45,7 @@ Let an operator configure and test LLM, image, TTS, and ASR providers from setti
 - Direct client-side API keys.
 - Provider marketplace or user secret vault.
 - Hidden provider execution outside explicit test/smoke actions.
+- Image workflow editor.
 
 ### Reused Systems
 
@@ -61,18 +65,78 @@ Let an operator configure and test LLM, image, TTS, and ASR providers from setti
 - Provider template CRUD.
 - OpenAI-compatible and Anthropic-compatible LLM setup.
 - MiMo TTS/ASR setup with configurable base URL.
-- Z-Image setup with configurable base URL/model.
+- Z-Image and ComfyUI setup with configurable base URL/model/capability metadata.
 - Model list success and manual fallback.
 - No secret or prompt/storage leak in responses, logs, prompt snapshots, or events.
 
 ### Stop Conditions
 
-- Text provider execution cannot be safely represented in the provider kernel.
+- Text or image provider execution cannot be safely represented in the provider kernel.
 - API key/auth ref boundary is unclear.
 - Model discovery requires client-side secrets.
 - Provider config would leak to reader/member/player APIs.
 
-## Phase 2 — Provider Worktree Integration Test Harness
+## Phase 2 — Visual Generation Control Plane
+
+### Goal
+
+Define controlled image generation planning across ComfyUI, Z-Image, GPT Image, OpenAI-compatible image APIs, and generic image providers.
+
+### Scope
+
+- Versioned workflow template registry.
+- Validated template slots for ComfyUI workflow JSON and other provider request templates.
+- Visual model asset inventory for checkpoints, LoRAs, VAE, embeddings, ControlNet, IP-Adapter, workflow templates, and prompt presets.
+- Character/worldline visual generation profiles.
+- Provider-neutral visual generation plan DTOs and validation.
+- Reference image selection policies.
+- ComfyUI slot mapping and validation boundary.
+- AI-assisted workflow binding/profile proposals.
+- AI-assisted workflow variant proposals as reviewable, versioned, validated, admin-applied changes only.
+
+### Non-Goals
+
+- Arbitrary AI-generated ComfyUI workflow execution.
+- Full ComfyUI workflow editor.
+- Installing or managing ComfyUI custom nodes.
+- LoRA training.
+- Model downloading.
+- Making ComfyUI a required dependency.
+
+### Reused Systems
+
+- Provider capabilities and provider execution service.
+- Media assets, media objects, media references, and reader-safe media descriptors.
+- Visual binding and resolver concepts.
+- Authoring proposal/review/apply patterns.
+- Invocation ledger and prompt snapshots for provider-backed generation.
+- v0.7 secret/provider governance and v0.8 package/provider contract safety.
+
+### Expected Files / Packages / Routes
+
+- Prefer a bounded visual-generation or visual/provider extension after feasibility review.
+- Keep ComfyUI support optional and adapter-scoped.
+- No broad `worlds.py` growth.
+
+### Targeted Tests
+
+- Register workflow template with validated slots.
+- Reject raw runtime ComfyUI workflow JSON execution.
+- Refresh/select checkpoint and LoRA inventory without exposing local paths.
+- Validate allowed/default/banned LoRAs and checkpoint compatibility.
+- Create character visual generation profile and provider-neutral plan.
+- Map ComfyUI, Z-Image, GPT Image, and generic image fields through capability validation.
+- Ensure generated outputs go through media assets/media objects and ledger links.
+- No local model path, storage path, raw workflow JSON, raw prompt/output, bytes, base64, or secret leak.
+
+### Stop Conditions
+
+- Workflow/profile schema ownership conflicts with existing provider/media/visual packages.
+- ComfyUI validation cannot be made safe without arbitrary JSON execution.
+- Runtime agents would need direct workflow JSON execution.
+- Provider-neutral plan cannot express required Z-Image/GPT Image/generic image behavior.
+
+## Phase 3 — Provider Worktree Integration Test Harness
 
 ### Goal
 
@@ -84,6 +148,7 @@ Create an opt-in real-provider test discipline that does not pollute the main wo
 - Provider lab test profile.
 - `NOVELAND_RUN_REAL_PROVIDER_TESTS=1` style opt-in.
 - Sample smoke, model list, generation, TTS, ASR, and image checks.
+- Optional ComfyUI workflow-template dry-run/mock validation under provider lab controls.
 
 ### Non-Goals
 
@@ -96,19 +161,21 @@ Create an opt-in real-provider test discipline that does not pollute the main wo
 - Existing fake provider tests.
 - Provider smoke tests and health checks.
 - Invocation ledger and prompt snapshot redaction.
+- Visual generation control plane validation tests.
 
 ### Targeted Tests
 
 - Default real-provider tests are skipped.
 - Opt-in env enables marked tests.
 - Secrets are not printed or persisted.
+- ComfyUI workflow dry-run tests do not run by default.
 
 ### Stop Conditions
 
 - Test profile would call external APIs by default.
 - Worktree setup requires repository policy changes outside docs/tests.
 
-## Phase 3 — Galgame Source Intake
+## Phase 4 — Galgame Source Intake
 
 ### Goal
 
@@ -120,6 +187,7 @@ Import user-provided already-unpacked galgame assets and text as traceable sourc
 - Media asset/object creation for imported files.
 - Source fragment records for text.
 - Preview-only import inventory.
+- Source and media metadata that can later feed visual generation profiles as reference assets.
 
 ### Non-Goals
 
@@ -145,7 +213,7 @@ Import user-provided already-unpacked galgame assets and text as traceable sourc
 - Intake path requires storing raw filesystem paths in reader-visible records.
 - Existing authoring source records cannot preserve required traceability.
 
-## Phase 4 — Script Dialogue Extraction
+## Phase 5 — Script Dialogue Extraction
 
 ### Goal
 
@@ -181,7 +249,7 @@ Extract dialogue, narration, scenes, choices, routes, emotion hints, and relatio
 - Parser requires unsafe raw source exposure.
 - Provider extraction would bypass invocation ledger.
 
-## Phase 5 — Character Memory Distillation Agent
+## Phase 6 — Character Memory Distillation Agent
 
 ### Goal
 
@@ -192,18 +260,21 @@ Generate persona cards and initial memory candidates so character agents are not
 - Persona card, speech style, relationship summary, key memories, emotional baseline, taboo/secret knowledge, route-specific facts, sample dialogue style, uncertainty/conflict notes.
 - Provider-backed extraction through `ProviderExecutionService`.
 - Reviewable authoring proposals before memory/persona apply.
+- Optional visual generation profile recommendations as proposals when source context supports them.
 
 ### Non-Goals
 
 - Direct unreviewed memory writes.
 - Full raw script copies in runtime prompts.
 - Provider output mutating canon.
+- Direct activation of AI-proposed workflow/profile changes.
 
 ### Reused Systems
 
 - Provider execution, invocation ledger, prompt snapshots.
 - Authoring proposals and review/apply.
 - Memory service and agent persona services on explicit apply.
+- Visual generation control plane proposals.
 
 ### Targeted Tests
 
@@ -217,11 +288,11 @@ Generate persona cards and initial memory candidates so character agents are not
 - Prompt snapshot visibility or raw source boundary is unclear.
 - Memory apply cannot be kept reviewable.
 
-## Phase 6 — Visual Asset Mapping
+## Phase 7 — Visual Asset Mapping
 
 ### Goal
 
-Map imported sprites, variants, backgrounds, and CGs into the visual system for galgame playback.
+Map imported sprites, variants, backgrounds, and CGs into the visual system for galgame playback, and make approved imported assets available as generation references where appropriate.
 
 ### Scope
 
@@ -230,12 +301,14 @@ Map imported sprites, variants, backgrounds, and CGs into the visual system for 
 - CG association as reader-safe media where appropriate.
 - Filename, directory, metadata, and manual mapping proposals.
 - Preview/apply without overwriting existing bindings automatically.
+- Optional reference-asset assignment into character visual generation profiles.
 
 ### Non-Goals
 
 - New visual storage system.
 - Automatic destructive remapping.
 - Public raw source delivery.
+- New image generation planner beyond Phase 2.
 
 ### Reused Systems
 
@@ -243,6 +316,7 @@ Map imported sprites, variants, backgrounds, and CGs into the visual system for 
 - v0.9 source traceability.
 - v0.8 scene view and reader media delivery.
 - Phase 9 visual resolver and bindings.
+- Visual generation control plane reference-asset policies.
 
 ### Targeted Tests
 
@@ -250,13 +324,14 @@ Map imported sprites, variants, backgrounds, and CGs into the visual system for 
 - Map 3-5 backgrounds.
 - Reject cross-world and cross-worldline assets.
 - Galgame view can resolve imported assets after apply.
+- Imported reference assets can be used in generation profiles without exposing paths.
 
 ### Stop Conditions
 
 - Visual binding worldline isolation is unclear.
 - Mapping would expose hidden/developer/private assets to readers.
 
-## Phase 7 — Voice Profile Mapping
+## Phase 8 — Voice Profile Mapping
 
 ### Goal
 
@@ -293,17 +368,18 @@ Bind imported voice references or configurable MiMo/generic speech providers to 
 - Speech provider config cannot be represented safely as `auth_ref`.
 - TTS smoke would require client-side secrets.
 
-## Phase 8 — Demo World Assembly
+## Phase 9 — Demo World Assembly
 
 ### Goal
 
-Assemble a minimal demo world from reviewed source, persona, memory, visual, voice, and dialogue proposals.
+Assemble a minimal demo world from reviewed source, persona, memory, visual generation profile, visual mapping, voice, and dialogue proposals.
 
 ### Scope
 
 - 2-3 characters.
 - One initial conversation path.
 - Backgrounds, sprites, optional CG, and voice.
+- Character visual generation profiles and workflow/template bindings.
 - Initial relationships and memories.
 - Source traceability for applied content.
 
@@ -312,17 +388,19 @@ Assemble a minimal demo world from reviewed source, persona, memory, visual, voi
 - Private beta onboarding.
 - Perfect content polish.
 - Global canon pollution.
+- Automatic workflow/profile mutation.
 
 ### Reused Systems
 
 - Authoring preview/apply.
 - Worlds, worldlines, agents, conversations.
-- Media, visual, speech, memory, reader playback, scene view.
+- Media, visual, visual generation control plane, speech, memory, reader playback, scene view.
 
 ### Targeted Tests
 
 - Demo world can be entered.
 - Characters have persona/memory.
+- Characters have visual generation profiles when applicable.
 - Conversation triggers presentation.
 - Visual/audio assets resolve safely.
 
@@ -330,8 +408,9 @@ Assemble a minimal demo world from reviewed source, persona, memory, visual, voi
 
 - Assembly requires developer-only DB edits as the primary workflow.
 - Source traceability is lost on apply.
+- Visual generation profiles can activate without review/apply.
 
-## Phase 9 — 30-Minute Self-use MVP Gate
+## Phase 10 — 30-Minute Self-use MVP Gate
 
 ### Goal
 
@@ -339,7 +418,7 @@ Validate a self-use demo world that can be played for about 30 minutes and resum
 
 ### Scope
 
-- Manual/test-backed gate for entering the world, sustained conversation, state persistence, memory persistence, visual/speech follow-through, provider failure messaging, and admin ledger/media/job/provider inspection.
+- Manual/test-backed gate for entering the world, sustained conversation, state persistence, memory persistence, visual/speech follow-through, visual generation plan readiness, provider failure messaging, and admin ledger/media/job/provider inspection.
 - Failure log and follow-up proposal capture.
 
 ### Non-Goals
@@ -353,15 +432,16 @@ Validate a self-use demo world that can be played for about 30 minutes and resum
 - v0.8 public launch/readiness evidence patterns.
 - Multimodal diagnostics.
 - Invocation ledger, media jobs, provider health, memory diagnostics.
+- Visual generation control plane diagnostics or evidence.
 
 ### Targeted Tests
 
 - Gate report passes when required evidence is present.
-- Gate blocks when provider, memory, visual, or speech evidence is missing.
+- Gate blocks when provider, memory, visual generation, visual mapping, or speech evidence is missing.
 - Resume preserves conversation and memory state.
 
 ### Stop Conditions
 
 - Demo requires manual DB edits to begin.
 - Provider failures are unsafe or incomprehensible.
-- Raw prompts, outputs, storage paths, or secrets appear in reports.
+- Raw prompts, outputs, storage paths, local model paths, raw workflow JSON, or secrets appear in reports.

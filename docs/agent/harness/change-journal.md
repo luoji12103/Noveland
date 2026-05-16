@@ -22,6 +22,17 @@
 - Docs updated: OpenSpec proposals/designs/phase plans/tasks/specs plus project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Do not implement v0.9 until a feasibility review is written and accepted. v1.0 requires v0.9 completion/archive first; v1.1 requires v1.0 completion/archive first. No backend/Web runtime behavior changed.
 
+## v0.9 Visual Generation Control Plane OpenSpec update entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: OpenSpec roadmap update for v0.9 Self-use MVP Demo World Cut
+- Summary: Inserted Visual Generation Control Plane as v0.9 Phase 2, adding provider-neutral image generation planning across ComfyUI, Z-Image, GPT Image, OpenAI-compatible image APIs, and generic image providers. The plan forbids arbitrary runtime agent ComfyUI workflow JSON execution and uses versioned workflow templates, validated slots, model inventory, character visual generation profiles, and reviewable AI-assisted workflow/profile proposals.
+- Files changed: `/openspec/changes/v0-9-self-use-mvp-demo-world-cut/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: v0.9 proposal, design, phase plan, tasks, affected v0.9 specs, new visual-generation-control-plane spec, project index, file inventory, active handoff, and change journal.
+- Follow-up notes: Future v0.9 feasibility review must resolve package/router/schema ownership for workflow templates, model inventory, visual generation profiles, and provider-neutral visual generation plans before implementation. No backend/Web runtime behavior changed.
+
 ## v0.8 Public Experience & Ecosystem archive entry
 
 - Date: 2026-05-16
