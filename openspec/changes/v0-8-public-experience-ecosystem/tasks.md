@@ -51,8 +51,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] Add worldline isolation, ACL, and UI tests.
 - [x] Run targeted tests.
 - [x] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Fast-forward merge to local main.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 5 — Scene View / Galgame View
 

@@ -2270,3 +2270,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`38 passed files`, `121 passed`), Web build, Web `check:next-env`, Web e2e (`18 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - Follow-up notes: Commit Phase 4 implementation, fast-forward merge `feat/worldline-browser` to local `main`, then record merge bookkeeping before starting Phase 5.
+
+## v0.8.4 Worldline Browser merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 4 merge bookkeeping.
+- Summary: Fast-forward merged `feat/worldline-browser` into local `main`, marked Phase 4 complete in OpenSpec tasks, and moved harness handoff state to Phase 5 Scene View / Galgame View planning.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 5 from clean local `main`; use the `impeccable` skill before frontend implementation, and keep scene view on reader-safe media descriptors only.
