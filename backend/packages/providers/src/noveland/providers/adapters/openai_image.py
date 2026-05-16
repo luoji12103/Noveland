@@ -7,8 +7,6 @@ from typing import Any
 import httpx
 from noveland.providers.adapters.speech_common import SpeechAdapterInput
 
-OPENAI_API_BASE_URL = "https://api.openai.com/v1"
-
 
 class OpenAIImageAdapterError(RuntimeError):
     pass
@@ -119,7 +117,9 @@ def _decode_image_response(raw: dict[str, Any], output_format: object) -> ImageA
 
 
 def _endpoint(base_url: str | None, path: str) -> str:
-    return f"{(base_url or OPENAI_API_BASE_URL).rstrip('/')}{path}"
+    if not isinstance(base_url, str) or base_url.strip() == "":
+        raise OpenAIImageAdapterError("OpenAI image adapter requires configured base_url")
+    return f"{base_url.rstrip('/')}{path}"
 
 
 def _api_key(auth_ref: str | None, config_json: dict[str, Any]) -> str:

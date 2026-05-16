@@ -496,6 +496,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md`
 - `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`
 - `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`
+- `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
@@ -619,6 +620,10 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/moderation.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/packages/providers/src/noveland/providers/budget.py`
+- `backend/packages/providers/src/noveland/providers/templates.py`
+- `backend/packages/providers/src/noveland/providers/model_discovery.py`
+- `backend/packages/providers/src/noveland/providers/adapters/openai_text.py`
+- `backend/packages/providers/src/noveland/providers/adapters/anthropic_text.py`
 - `backend/migrations/versions/20260515_0042_provider_budget_policies.py`
 - `backend/tests/test_authoring_service.py`
 - `backend/tests/test_api_authoring.py`

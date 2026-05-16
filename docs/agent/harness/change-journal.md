@@ -2590,3 +2590,26 @@
 - Tests added/updated: N/A, documentation-only feasibility review.
 - Verification: OpenSpec strict changes validation, OpenSpec strict specs validation, and `git diff --check`.
 - Follow-up notes: Start v0.9 Phase 1 only after accepting the feasibility review and writing the Phase 1 planning checkpoint. Do not push unless explicitly requested.
+
+## v0.9.1 MVP Provider Settings & Model Lab planning entry
+
+- Date: 2026-05-16
+- Branch: feat/v0.9-provider-settings-model-lab
+- Scope: v0.9 Phase 1 planning checkpoint before implementation.
+- Summary: Added the Phase 1 checkpoint for provider settings/model lab. The phase will use static/code-owned provider templates over the existing provider registry, add server-side redacted model discovery with manual fallback, align OpenAI-compatible and Anthropic-compatible text execution through `ProviderExecutionService`, keep real provider tests opt-in, and preserve `auth_ref`/secret-only handling. No Visual Generation Control Plane, galgame intake, script parsing, memory distillation, or demo assembly work is included.
+- Files changed: `/docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md`, `/openspec/changes/v0-9-self-use-mvp-demo-world-cut/tasks.md`, and harness docs.
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Verification: pending docs-only OpenSpec validation and `git diff --check` before phase implementation commit.
+- Follow-up notes: Implement Phase 1 backend/API/UI on the feature branch. Use existing provider package/router/UI surfaces only; do not add persistent provider-template tables or broad `worlds.py` routes.
+
+## v0.9.1 MVP Provider Settings & Model Lab implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/v0.9-provider-settings-model-lab
+- Scope: v0.9 Phase 1 backend/API/Web provider settings and model lab only.
+- Summary: Added static provider templates, redacted server-side model discovery, manual model-name fallback, OpenAI-compatible and Anthropic-compatible text adapters in `ProviderExecutionService`, and an operator-grade provider admin model lab UI. Phase 1 adds no migrations, no persistent provider-template tables, no Visual Generation Control Plane, no galgame intake, no reader/player provider routes, no broad `worlds.py` routes, and no default real provider tests.
+- Files changed: provider templates/discovery/text adapters/contracts/service/API, provider API/execution tests, provider Web client/server helpers, provider admin UI/tests, OpenSpec tasks, Phase 1 checkpoint, and harness docs.
+- Tests added/updated: provider template/discovery ACL and leak tests, model discovery failure/manual fallback tests, OpenAI/Anthropic-compatible dry-run ledger tests, Web provider client tests, and provider admin model lab UI tests.
+- Verification: Targeted backend tests passed (`21 passed`), targeted Web tests passed (`9 passed`), full backend ruff/mypy/pytest passed (`453 passed, 7 skipped`), full Web lint/typecheck/unit/build/check:next-env passed (`128 unit tests`), Web e2e passed on rerun (`21 passed`), docker compose config passed, OpenSpec strict changes/specs validation passed, and `git diff --check` passed.
+- Flaky notes: The first full Web e2e run timed out on the existing broad `world admin manages workspace pages and conversations` scenario while waiting for participant save. The isolated scenario passed immediately, and the subsequent full e2e run passed.
+- Follow-up notes: Fast-forward merge Phase 1 to local `main`. Next accepted v0.9 work is Phase 2 Visual Generation Control Plane planning; do not start Phase 2 until explicitly requested.

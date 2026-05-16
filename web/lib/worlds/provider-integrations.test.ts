@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createProviderIntegration,
+  discoverProviderModels,
   listProviderCapabilities,
   listProviderHealthChecks,
   listProviderIntegrations,
+  listProviderTemplates,
   runProviderHealthCheck,
   runProviderSmokeTest,
   updateProviderIntegration,
@@ -60,6 +62,42 @@ describe("provider integration client", () => {
     expect(request.body).not.toContain("sk-");
   });
 
+  it("lists templates and discovers models with manual fallback fields", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([providerTemplate]))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          provider_id: "provider-1",
+          provider_kind: "text_generation",
+          adapter_kind: "openai_compatible",
+          discovery_status: "succeeded",
+          models: ["alpha-model"],
+          manual_fallback_allowed: true,
+          error_code: null,
+          error_message: null,
+          metadata_json: {},
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listProviderTemplates("world-1");
+    await discoverProviderModels("world-1", {
+      provider_id: "provider-1",
+      base_url: "https://gateway.example/v1",
+      auth_ref: "env:OPENAI_API_KEY",
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/worlds/world-1/providers/templates");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/providers/model-discovery");
+    const request = fetchMock.mock.calls[1][1];
+    expect(request.method).toBe("POST");
+    expect((request.headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    expect(request.body).toContain("env:OPENAI_API_KEY");
+    expect(request.body).not.toContain("sk-");
+  });
+
   it("updates, checks health, lists health, and smoke-tests providers", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -105,6 +143,21 @@ const providerRecord = {
   visibility: "world_admin",
   created_at: "2026-05-13T00:00:00.000Z",
   updated_at: "2026-05-13T00:00:00.000Z",
+};
+
+const providerTemplate = {
+  template_key: "openai-compatible-llm",
+  display_name: "OpenAI-compatible LLM",
+  provider_kind: "text_generation",
+  adapter_kind: "openai_compatible",
+  description: "Chat/completions-compatible text provider with custom base URL.",
+  base_url_placeholder: "https://gateway.example/v1",
+  model_name_placeholder: "model-name",
+  auth_ref_placeholder: "env:OPENAI_API_KEY",
+  config_json: { model_discovery_path: "/models" },
+  default_params_json: { temperature: 0.7 },
+  capabilities: [{ capability_key: "text.generate", capability_json: {} }],
+  model_discovery: { strategy: "openai_models", path: "/models" },
 };
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {

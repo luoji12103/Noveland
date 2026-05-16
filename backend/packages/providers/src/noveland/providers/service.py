@@ -38,6 +38,7 @@ from noveland.media.errors import MediaValidationError
 from noveland.media.models import MediaAsset, MediaJob
 from noveland.media.service import MediaJobService, MediaService
 from noveland.media.storage import MediaObjectStorage
+from noveland.providers.adapters.anthropic_text import AnthropicCompatibleTextAdapter
 from noveland.providers.adapters.comfyui import ComfyUIAdapter
 from noveland.providers.adapters.gpt_sovits import GPTSoVITSAdapter
 from noveland.providers.adapters.mimo_asr import MiMOASRAdapter
@@ -46,6 +47,7 @@ from noveland.providers.adapters.omnivoice import OmniVoiceAdapter
 from noveland.providers.adapters.openai_compatible_image import OpenAICompatibleImageAdapter
 from noveland.providers.adapters.openai_image import ImageAdapterInput, OpenAIImageAdapter
 from noveland.providers.adapters.openai_speech import OpenAISpeechAdapter
+from noveland.providers.adapters.openai_text import OpenAICompatibleTextAdapter
 from noveland.providers.adapters.speech_common import SpeechAdapterInput
 from noveland.providers.budget import ProviderBudgetExceededError, ProviderBudgetService
 from noveland.providers.contracts import (
@@ -108,6 +110,8 @@ class ProviderExecutionService:
         self._fake = FakeProviderAdapter()
         self._openai_image = OpenAIImageAdapter()
         self._openai_compatible_image = OpenAICompatibleImageAdapter()
+        self._openai_text = OpenAICompatibleTextAdapter()
+        self._anthropic_text = AnthropicCompatibleTextAdapter()
         self._comfyui = ComfyUIAdapter()
         self._openai_speech = OpenAISpeechAdapter()
         self._mimo_tts = MiMOTTSAdapter()
@@ -401,6 +405,8 @@ class ProviderExecutionService:
     ) -> (
         OpenAIImageAdapter
         | OpenAICompatibleImageAdapter
+        | OpenAICompatibleTextAdapter
+        | AnthropicCompatibleTextAdapter
         | ComfyUIAdapter
         | OpenAISpeechAdapter
         | MiMOTTSAdapter
@@ -411,9 +417,18 @@ class ProviderExecutionService:
         if adapter_kind == ProviderAdapterKind.OPENAI:
             if provider_kind in {ProviderKind.SPEECH_TO_TEXT, ProviderKind.TEXT_TO_SPEECH}:
                 return self._openai_speech
+            if provider_kind == ProviderKind.TEXT_GENERATION:
+                return self._openai_text
             return self._openai_image
         if adapter_kind == ProviderAdapterKind.OPENAI_COMPATIBLE:
+            if provider_kind == ProviderKind.TEXT_GENERATION:
+                return self._openai_text
             return self._openai_compatible_image
+        if adapter_kind in {
+            ProviderAdapterKind.ANTHROPIC,
+            ProviderAdapterKind.ANTHROPIC_COMPATIBLE,
+        }:
+            return self._anthropic_text
         if adapter_kind == ProviderAdapterKind.COMFYUI:
             return self._comfyui
         if adapter_kind == ProviderAdapterKind.MIMO_TTS:
@@ -724,6 +739,8 @@ def _adapter_is_implemented(adapter_kind: ProviderAdapterKind) -> bool:
     return adapter_kind in {
         ProviderAdapterKind.OPENAI,
         ProviderAdapterKind.OPENAI_COMPATIBLE,
+        ProviderAdapterKind.ANTHROPIC,
+        ProviderAdapterKind.ANTHROPIC_COMPATIBLE,
         ProviderAdapterKind.COMFYUI,
         ProviderAdapterKind.MIMO_TTS,
         ProviderAdapterKind.MIMO_ASR,

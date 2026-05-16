@@ -27,6 +27,8 @@ _ALLOWED_REFERENCE_PREFIXES = ("env:", "secret:")
 _AUTH_REQUIRED_ADAPTERS = {
     "openai",
     "openai_compatible",
+    "anthropic",
+    "anthropic_compatible",
     "mimo_tts",
     "mimo_asr",
     "omnivoice",

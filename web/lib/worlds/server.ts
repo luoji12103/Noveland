@@ -96,6 +96,7 @@ import type {
   ProviderCapability,
   ProviderHealthCheck,
   ProviderIntegration,
+  ProviderTemplate,
 } from "@/lib/worlds/provider-integrations";
 import type {
   MediaAsset,
@@ -345,6 +346,7 @@ export type ProviderIntegrationAdminData = {
   selectedWorld: World | null;
   memberships: Membership[];
   providers: ProviderIntegration[];
+  providerTemplates: ProviderTemplate[];
   capabilitiesByProviderId: Record<string, ProviderCapability[]>;
   healthChecksByProviderId: Record<string, ProviderHealthCheck[]>;
   canManageSelectedWorld: boolean;
@@ -1480,7 +1482,7 @@ export async function getProviderIntegrationAdminData(
         "Unable to load selected world.",
       );
     }
-    const [memberships, providers] = await Promise.all([
+    const [memberships, providers, providerTemplates] = await Promise.all([
       apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
       apiFetch<ProviderIntegration[]>(
         `/worlds/${worldId}/providers?include_global=true&include_hidden=${String(
@@ -1488,6 +1490,7 @@ export async function getProviderIntegrationAdminData(
         )}`,
         cookies,
       ),
+      apiFetch<ProviderTemplate[]>(`/worlds/${worldId}/providers/templates`, cookies),
     ]);
     const [capabilityEntries, healthEntries] = await Promise.all([
       Promise.all(
@@ -1514,6 +1517,7 @@ export async function getProviderIntegrationAdminData(
       selectedWorld,
       memberships: memberships ?? [],
       providers,
+      providerTemplates,
       capabilitiesByProviderId: Object.fromEntries(
         capabilityEntries.map(([providerId, capabilities]) => [providerId, capabilities ?? []]),
       ),
@@ -2200,6 +2204,7 @@ function emptyProviderIntegrationAdminData(
     selectedWorld,
     memberships: [],
     providers: [],
+    providerTemplates: [],
     capabilitiesByProviderId: {},
     healthChecksByProviderId: {},
     canManageSelectedWorld: false,

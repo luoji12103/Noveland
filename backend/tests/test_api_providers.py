@@ -352,6 +352,7 @@ def test_provider_smoke_openai_image_uses_env_secret_without_persisting_it(
             "adapter_kind": "openai",
             "provider_key": "openai-image",
             "display_name": "OpenAI Image",
+            "base_url": "https://gateway.example/v1",
             "auth_ref": "env:OPENAI_API_KEY",
         },
     )
@@ -382,6 +383,114 @@ def test_provider_smoke_openai_image_uses_env_secret_without_persisting_it(
         assert "sk-phase8-secret" not in str(invocation.response_metadata_json)
         assert "sk-phase8-secret" not in str(snapshot.raw_request_json)
         assert "sk-phase8-secret" not in str(snapshot.raw_response_json)
+
+
+def test_provider_templates_and_model_discovery_are_admin_scoped_and_redacted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, admin_id)
+    _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-model-discovery-secret")
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers["authorization"]
+        return httpx.Response(
+            200,
+            json={"data": [{"id": "alpha-model"}, {"id": "beta-model"}]},
+        )
+
+    monkeypatch.setattr(httpx, "Client", _httpx_client_factory(handler))
+
+    _authenticate(client, member_token)
+    forbidden_templates = client.get(f"/worlds/{world_id}/providers/templates")
+
+    _authenticate(client, admin_token)
+    templates = client.get(f"/worlds/{world_id}/providers/templates")
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "text_generation",
+            "adapter_kind": "openai_compatible",
+            "provider_key": "openai-compatible-llm",
+            "display_name": "OpenAI-compatible LLM",
+            "base_url": "https://gateway.example/v1",
+            "auth_ref": "env:OPENAI_API_KEY",
+            "config_json": {"model_discovery_path": "/models"},
+        },
+    )
+    discovery = client.post(
+        f"/worlds/{world_id}/providers/model-discovery",
+        json={"provider_id": created.json()["id"]},
+    )
+
+    template_keys = {item["template_key"] for item in templates.json()}
+    assert forbidden_templates.status_code == 403
+    assert templates.status_code == 200
+    assert {
+        "openai-compatible-llm",
+        "anthropic-compatible-llm",
+        "mimo-v2-5-tts",
+        "mimo-v2-5-asr",
+        "z-image",
+        "gpt-image",
+        "comfyui",
+        "openai-compatible-image",
+        "generic-image-custom-http",
+    }.issubset(template_keys)
+    assert "sk-model-discovery-secret" not in templates.text
+    assert created.status_code == 201
+    assert discovery.status_code == 200
+    assert discovery.json()["discovery_status"] == "succeeded"
+    assert discovery.json()["models"] == ["alpha-model", "beta-model"]
+    assert discovery.json()["manual_fallback_allowed"] is True
+    assert captured["url"] == "https://gateway.example/v1/models"
+    assert captured["authorization"] == "Bearer sk-model-discovery-secret"
+    assert "sk-model-discovery-secret" not in discovery.text
+
+
+def test_provider_model_discovery_failure_keeps_manual_fallback_safe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-failing-discovery-secret")
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    monkeypatch.setattr(httpx, "Client", _httpx_client_factory(handler))
+    discovery = client.post(
+        f"/worlds/{world_id}/providers/model-discovery",
+        json={
+            "provider_kind": "text_generation",
+            "adapter_kind": "openai_compatible",
+            "base_url": "https://gateway.example/v1",
+            "auth_ref": "env:OPENAI_API_KEY",
+            "config_json": {"model_discovery_path": "/models"},
+        },
+    )
+
+    assert discovery.status_code == 200
+    assert discovery.json()["discovery_status"] == "failed"
+    assert discovery.json()["manual_fallback_allowed"] is True
+    assert discovery.json()["models"] == []
+    assert discovery.json()["error_message"] == (
+        "Model discovery failed. Enter a model name manually."
+    )
+    assert "sk-failing-discovery-secret" not in discovery.text
+    assert "OPENAI_API_KEY" not in discovery.text
 
 
 def test_provider_health_check_records_safe_auth_status() -> None:

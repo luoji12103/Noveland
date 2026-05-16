@@ -368,6 +368,49 @@ class ProviderSmokeTestResult(ProviderExecutionResult):
     smoke_status: str
 
 
+class ProviderTemplateRead(_FrozenContract):
+    template_key: str
+    display_name: str
+    provider_kind: ProviderKind
+    adapter_kind: ProviderAdapterKind
+    description: str
+    base_url_placeholder: str | None = None
+    model_name_placeholder: str | None = None
+    auth_ref_placeholder: str | None = None
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    default_params_json: dict[str, Any] = Field(default_factory=dict)
+    capabilities: tuple[ProviderCapabilityCreate, ...] = ()
+    model_discovery: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderModelDiscoveryRequest(_FrozenContract):
+    provider_id: uuid.UUID | None = None
+    provider_kind: ProviderKind | None = None
+    adapter_kind: ProviderAdapterKind | None = None
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    auth_ref: str | None = Field(default=None, min_length=1, max_length=200)
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    default_params_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("config_json", "default_params_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider model discovery JSON")
+        return value
+
+
+class ProviderModelDiscoveryRead(_FrozenContract):
+    provider_id: uuid.UUID | None = None
+    provider_kind: ProviderKind
+    adapter_kind: ProviderAdapterKind
+    discovery_status: str
+    models: list[str] = Field(default_factory=list)
+    manual_fallback_allowed: bool = True
+    error_code: str | None = None
+    error_message: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
 def _assert_json_serializable(value: dict[str, Any], field_name: str) -> None:
     try:
         json.dumps(value)

@@ -28,14 +28,18 @@ from noveland.providers.contracts import (
     ProviderIntegrationStatus,
     ProviderIntegrationUpdate,
     ProviderKind,
+    ProviderModelDiscoveryRead,
+    ProviderModelDiscoveryRequest,
     ProviderQuotaStatusRead,
     ProviderScopeKind,
     ProviderSmokeTestResult,
+    ProviderTemplateRead,
     ProviderTestInvocationRequest,
     ProviderTestInvocationResult,
     ProviderVisibility,
 )
 from noveland.providers.health import ProviderHealthService
+from noveland.providers.model_discovery import ProviderModelDiscoveryService
 from noveland.providers.registry import (
     ProviderNotFoundError,
     ProviderRegistryService,
@@ -43,6 +47,7 @@ from noveland.providers.registry import (
 )
 from noveland.providers.secrets import reject_sensitive_config
 from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
+from noveland.providers.templates import provider_templates
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -116,6 +121,46 @@ class ProviderBudgetPolicyUpdateRequest(BaseModel):
     emergency_stop_enabled: bool | None = None
     limits_json: dict[str, Any] | None = None
     metadata_json: dict[str, Any] | None = None
+
+
+@router.get("/templates", response_model=list[ProviderTemplateRead])
+def list_provider_templates(
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+) -> list[ProviderTemplateRead]:
+    return provider_templates()
+
+
+class ProviderModelDiscoveryRequestBody(BaseModel):
+    provider_id: uuid.UUID | None = None
+    provider_kind: ProviderKind | None = None
+    adapter_kind: ProviderAdapterKind | None = None
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    auth_ref: str | None = Field(default=None, min_length=1, max_length=200)
+    config_json: dict[str, Any] = Field(default_factory=dict)
+    default_params_json: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post(
+    "/model-discovery",
+    response_model=ProviderModelDiscoveryRead,
+    dependencies=[Depends(require_csrf)],
+)
+def discover_provider_models(
+    world_id: uuid.UUID,
+    request: ProviderModelDiscoveryRequestBody,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderModelDiscoveryRead:
+    try:
+        reject_sensitive_config(request.config_json, field_name="config_json")
+        reject_sensitive_config(request.default_params_json, field_name="default_params_json")
+        return ProviderModelDiscoveryService(db_session).discover(
+            world_id,
+            ProviderModelDiscoveryRequest(**request.model_dump()),
+            platform_admin=context.is_platform_admin,
+        )
+    except (ProviderNotFoundError, ProviderValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("", response_model=list[ProviderIntegrationRead])

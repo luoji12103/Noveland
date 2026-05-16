@@ -4,22 +4,22 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 1. Planning / Preflight
 
-- [ ] 1.1 Confirm v0.8 archived current specs and no active OpenSpec changes conflict with v0.9.
+- [x] 1.1 Confirm v0.8 archived current specs and no active OpenSpec changes conflict with v0.9.
 - [x] 1.2 Write v0.9 feasibility review before implementation begins.
-- [ ] 1.3 Confirm provider text/image execution, model discovery, and template ownership.
+- [x] 1.3 Confirm provider text/image execution, model discovery, and template ownership.
 - [ ] 1.4 Confirm Visual Generation Control Plane package/router/schema ownership before implementation.
 - [ ] 1.5 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
-- [ ] 1.6 Confirm frontend phases will use `impeccable` before Web implementation.
+- [x] 1.6 Confirm frontend phases will use `impeccable` before Web implementation.
 
 ## 2. Phase 1 — MVP Provider Settings & Model Lab
 
-- [ ] 2.1 Write docs-only phase planning checkpoint.
-- [ ] 2.2 Inventory current provider integrations, adapters, capabilities, smoke tests, and v0.4 provider admin UI.
-- [ ] 2.3 Implement provider templates, editable settings, model discovery, manual model fallback, image capability metadata, and safe smoke checks.
-- [ ] 2.4 Add provider settings/model lab UI only after using `impeccable`.
-- [ ] 2.5 Add provider template, model list, manual fallback, image capability, ACL, and leak tests.
-- [ ] 2.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 2.7 Fast-forward merge to local main and update harness docs.
+- [x] 2.1 Write docs-only phase planning checkpoint.
+- [x] 2.2 Inventory current provider integrations, adapters, capabilities, smoke tests, and v0.4 provider admin UI.
+- [x] 2.3 Implement provider templates, editable settings, model discovery, manual model fallback, image capability metadata, and safe smoke checks.
+- [x] 2.4 Add provider settings/model lab UI only after using `impeccable`.
+- [x] 2.5 Add provider template, model list, manual fallback, image capability, ACL, and leak tests.
+- [x] 2.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 2.7 Fast-forward merge to local main and update harness docs.
 
 ## 3. Phase 2 — Visual Generation Control Plane
 

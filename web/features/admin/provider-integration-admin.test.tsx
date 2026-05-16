@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ProviderIntegrationAdmin } from "@/features/admin/provider-integration-admin";
 import {
   createProviderIntegration,
+  discoverProviderModels,
   runProviderHealthCheck,
   runProviderSmokeTest,
   updateProviderIntegration,
@@ -24,6 +25,7 @@ vi.mock("@/lib/worlds/provider-integrations", async () => {
     createProviderIntegration: vi.fn(),
     updateProviderIntegration: vi.fn(),
     deleteProviderIntegration: vi.fn(),
+    discoverProviderModels: vi.fn(),
     runProviderHealthCheck: vi.fn(),
     runProviderSmokeTest: vi.fn(),
   };
@@ -34,6 +36,9 @@ describe("ProviderIntegrationAdmin", () => {
     render(<ProviderIntegrationAdmin worldId="world-1" data={providerData} />);
 
     expect(screen.getByRole("heading", { name: "Provider integration overview" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Provider template" })).toHaveValue(
+      "openai-compatible-llm",
+    );
     expect(screen.getByText("Fake image")).toBeInTheDocument();
     expect(screen.getAllByText(/env:OPENAI_API_KEY/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/sk-live-secret/)).not.toBeInTheDocument();
@@ -41,6 +46,20 @@ describe("ProviderIntegrationAdmin", () => {
     expect(screen.getByRole("table", { name: "Provider capabilities" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Provider health checks" })).toBeInTheDocument();
     expect(screen.getByText("auth_resolved")).toBeInTheDocument();
+  });
+
+  it("applies provider templates to the create form", () => {
+    render(<ProviderIntegrationAdmin worldId="world-1" data={providerData} />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Provider template" }), {
+      target: { value: "mimo-v2-5-tts" },
+    });
+
+    expect(screen.getByDisplayValue("mimo-v2-5-tts")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Display name")).toHaveValue("MiMo V2.5 TTS");
+    expect(screen.getByDisplayValue("text_to_speech")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("mimo_tts")).toBeInTheDocument();
+    expect(screen.queryByText(/sk-live-secret/)).not.toBeInTheDocument();
   });
 
   it("creates and updates provider integrations through safe client helpers", async () => {
@@ -76,6 +95,17 @@ describe("ProviderIntegrationAdmin", () => {
 
   it("runs health checks and smoke tests through explicit admin actions", async () => {
     vi.mocked(runProviderHealthCheck).mockResolvedValue(providerData.healthChecksByProviderId["provider-1"][0]);
+    vi.mocked(discoverProviderModels).mockResolvedValue({
+      provider_id: "provider-1",
+      provider_kind: "image_generation",
+      adapter_kind: "fake",
+      discovery_status: "succeeded",
+      models: ["safe-model"],
+      manual_fallback_allowed: true,
+      error_code: null,
+      error_message: null,
+      metadata_json: {},
+    });
     vi.mocked(runProviderSmokeTest).mockResolvedValue({
       smoke_status: "succeeded",
       provider: providerData.providers[0],
@@ -91,13 +121,23 @@ describe("ProviderIntegrationAdmin", () => {
       expect(runProviderHealthCheck).toHaveBeenCalledWith("world-1", "provider-1");
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Pull model list" }));
+
+    await waitFor(() => {
+      expect(discoverProviderModels).toHaveBeenCalledWith("world-1", { provider_id: "provider-1" });
+    });
+
+    expect(await screen.findByDisplayValue("safe-model")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Smoke test" }));
 
     await waitFor(() => {
       expect(runProviderSmokeTest).toHaveBeenCalledWith(
         "world-1",
         "provider-1",
-        expect.objectContaining({ input_text: "Noveland provider smoke test" }),
+        expect.objectContaining({
+          input_text: "Noveland provider smoke test",
+          model_name: "safe-model",
+        }),
       );
     });
   });
@@ -166,6 +206,39 @@ const providerData: ProviderIntegrationAdminData = {
       },
     ],
   },
+  providerTemplates: [
+    {
+      template_key: "openai-compatible-llm",
+      display_name: "OpenAI-compatible LLM",
+      provider_kind: "text_generation",
+      adapter_kind: "openai_compatible",
+      description: "Chat/completions-compatible text provider with custom base URL.",
+      base_url_placeholder: "https://gateway.example/v1",
+      model_name_placeholder: "model-name",
+      auth_ref_placeholder: "env:OPENAI_API_KEY",
+      config_json: {
+        model_discovery_path: "/models",
+        chat_completions_path: "/chat/completions",
+      },
+      default_params_json: { temperature: 0.7 },
+      capabilities: [{ capability_key: "text.generate", capability_json: {} }],
+      model_discovery: { strategy: "openai_models", path: "/models" },
+    },
+    {
+      template_key: "mimo-v2-5-tts",
+      display_name: "MiMo V2.5 TTS",
+      provider_kind: "text_to_speech",
+      adapter_kind: "mimo_tts",
+      description: "MiMo-compatible TTS routed through configurable endpoint or gateway.",
+      base_url_placeholder: "https://gateway.example",
+      model_name_placeholder: "mimo-tts-model",
+      auth_ref_placeholder: "env:MIMO_API_KEY",
+      config_json: { endpoint: "/tts", model_discovery_path: "/models" },
+      default_params_json: { output_format: "wav" },
+      capabilities: [{ capability_key: "speech.tts", capability_json: {} }],
+      model_discovery: { strategy: "generic_models", path: "/models" },
+    },
+  ],
   canManageSelectedWorld: true,
   isPlatformAdmin: true,
   loadError: null,

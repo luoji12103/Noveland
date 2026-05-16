@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v0.9 Self-use MVP Demo World Cut implementation, after feasibility review acceptance
+- v0.9 Phase 2 Visual Generation Control Plane planning checkpoint and implementation, after explicit start
 - v1.0 Private Beta MVP feasibility review, after v0.9 completion/archive
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
@@ -12,6 +12,7 @@
 - None
 
 ## Done
+- v0.9 Phase 1 MVP Provider Settings & Model Lab
 - Pre-build architecture and governance package drafted
 - Scaffold repository structure
 - Establish backend service skeletons
@@ -306,6 +307,7 @@
 - v0.8 Public Experience & Ecosystem OpenSpec archive and release notes
 - OpenSpec v0.9/v1.0/v1.1 milestone roadmap baseline
 - v0.9 Self-use MVP Demo World Cut feasibility review
+- v0.9 Phase 1 MVP Provider Settings & Model Lab planning checkpoint
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is archived and closed locally.

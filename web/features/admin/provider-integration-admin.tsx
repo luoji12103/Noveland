@@ -16,6 +16,7 @@ import { formString, jsonObject, messageForError, optionalFormString } from "@/f
 import {
   createProviderIntegration,
   deleteProviderIntegration,
+  discoverProviderModels,
   providerAdapterOptions,
   providerKindOptions,
   providerStatusOptions,
@@ -30,7 +31,9 @@ import type {
   ProviderIntegration,
   ProviderIntegrationStatus,
   ProviderKind,
+  ProviderModelDiscoveryResult,
   ProviderScopeKind,
+  ProviderTemplate,
   ProviderVisibility,
 } from "@/lib/worlds/provider-integrations";
 import type { ProviderIntegrationAdminData } from "@/lib/worlds/server";
@@ -45,9 +48,20 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
   const [notice, setNotice] = useState<string | null>(data.loadError);
   const [isBusy, setIsBusy] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState(data.providers[0]?.id ?? null);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(
+    data.providerTemplates[0]?.template_key ?? "custom",
+  );
+  const [modelDiscovery, setModelDiscovery] = useState<ProviderModelDiscoveryResult | null>(null);
+  const [manualModelName, setManualModelName] = useState("");
   const selectedProvider = useMemo(
     () => data.providers.find((provider) => provider.id === selectedProviderId) ?? null,
     [data.providers, selectedProviderId],
+  );
+  const selectedTemplate = useMemo(
+    () =>
+      data.providerTemplates.find((template) => template.template_key === selectedTemplateKey) ??
+      null,
+    [data.providerTemplates, selectedTemplateKey],
   );
   const selectedCapabilities =
     selectedProvider === null ? [] : data.capabilitiesByProviderId[selectedProvider.id] ?? [];
@@ -88,6 +102,8 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
         capabilities: parseCapabilities(formString(form, "capabilities")),
       });
       setSelectedProviderId(provider.id);
+      setModelDiscovery(null);
+      setManualModelName("");
       formElement.reset();
     }, "Provider integration created.");
   }
@@ -109,6 +125,31 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
         }),
       "Provider integration saved.",
     );
+  }
+
+  async function handleDiscoverModels() {
+    if (selectedProvider === null) {
+      return;
+    }
+    setIsBusy(true);
+    setNotice(null);
+    setModelDiscovery(null);
+    try {
+      const result = await discoverProviderModels(worldId, { provider_id: selectedProvider.id });
+      setModelDiscovery(result);
+      if (result.models.length > 0) {
+        setManualModelName(result.models[0]);
+      }
+      setNotice(
+        result.discovery_status === "succeeded"
+          ? "Model discovery completed."
+          : "Model discovery failed. Enter a model name manually.",
+      );
+    } catch (error) {
+      setNotice(messageForError(error));
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   const activeCount = data.providers.filter((provider) => provider.status === "active").length;
@@ -143,29 +184,60 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
         title="Create provider integration"
         description="Dispatch uses adapter_kind from the provider kernel. Do not place API keys in JSON fields."
       >
-        <form className="management-form" onSubmit={handleCreate}>
+        <TemplatePicker
+          templates={data.providerTemplates}
+          selectedTemplateKey={selectedTemplateKey}
+          onSelect={(templateKey) => setSelectedTemplateKey(templateKey)}
+        />
+        <form className="management-form" key={selectedTemplateKey} onSubmit={handleCreate}>
           <select className="text-input" name="scope_kind" defaultValue="world">
             <option value="world">world</option>
             {data.isPlatformAdmin ? <option value="global">global</option> : null}
           </select>
-          <select className="text-input" name="provider_kind" defaultValue="image_generation">
+          <select
+            className="text-input"
+            name="provider_kind"
+            defaultValue={selectedTemplate?.provider_kind ?? "image_generation"}
+          >
             {providerKindOptions.map((value) => (
               <option key={value} value={value}>
                 {value}
               </option>
             ))}
           </select>
-          <select className="text-input" name="adapter_kind" defaultValue="fake">
+          <select
+            className="text-input"
+            name="adapter_kind"
+            defaultValue={selectedTemplate?.adapter_kind ?? "fake"}
+          >
             {providerAdapterOptions.map((value) => (
               <option key={value} value={value}>
                 {value}
               </option>
             ))}
           </select>
-          <input className="text-input" name="provider_key" placeholder="fake-image" />
-          <input className="text-input" name="display_name" placeholder="Display name" />
-          <input className="text-input" name="base_url" placeholder="https://provider.example" />
-          <input className="text-input" name="auth_ref" placeholder="env:OPENAI_API_KEY" />
+          <input
+            className="text-input"
+            name="provider_key"
+            defaultValue={selectedTemplate?.template_key ?? ""}
+            placeholder="fake-image"
+          />
+          <input
+            className="text-input"
+            name="display_name"
+            defaultValue={selectedTemplate?.display_name ?? ""}
+            placeholder="Display name"
+          />
+          <input
+            className="text-input"
+            name="base_url"
+            placeholder={selectedTemplate?.base_url_placeholder ?? "https://provider.example"}
+          />
+          <input
+            className="text-input"
+            name="auth_ref"
+            placeholder={selectedTemplate?.auth_ref_placeholder ?? "env:OPENAI_API_KEY"}
+          />
           <select className="text-input" name="status" defaultValue="active">
             {providerStatusOptions.map((value) => (
               <option key={value} value={value}>
@@ -180,13 +252,29 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
               </option>
             ))}
           </select>
-          <textarea className="text-input" name="config_json" defaultValue="{}" rows={3} />
-          <textarea className="text-input" name="default_params_json" defaultValue="{}" rows={3} />
+          <textarea
+            className="text-input"
+            name="config_json"
+            defaultValue={JSON.stringify(selectedTemplate?.config_json ?? {}, null, 2)}
+            rows={3}
+          />
+          <textarea
+            className="text-input"
+            name="default_params_json"
+            defaultValue={JSON.stringify(selectedTemplate?.default_params_json ?? {}, null, 2)}
+            rows={3}
+          />
           <textarea
             className="text-input"
             name="capabilities"
             rows={4}
-            defaultValue={'[{"capability_key":"image.generate","capability_json":{}}]'}
+            defaultValue={JSON.stringify(
+              selectedTemplate?.capabilities ?? [
+                { capability_key: "image.generate", capability_json: {} },
+              ],
+              null,
+              2,
+            )}
           />
           <button className="primary-button" type="submit" disabled={isBusy || !data.canManageSelectedWorld}>
             Create provider integration
@@ -228,6 +316,10 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
               "Provider health check completed.",
             )
           }
+          onDiscoverModels={handleDiscoverModels}
+          modelDiscovery={modelDiscovery}
+          manualModelName={manualModelName}
+          onManualModelNameChange={setManualModelName}
           onSmokeTest={() =>
             runAction(
               () =>
@@ -235,6 +327,7 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
                   input_text: "Noveland provider smoke test",
                   input_json: {},
                   request_json: {},
+                  model_name: manualModelName.trim() === "" ? null : manualModelName.trim(),
                 }),
               "Provider smoke test completed.",
             )
@@ -248,6 +341,49 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
         />
       )}
     </section>
+  );
+}
+
+function TemplatePicker({
+  templates,
+  selectedTemplateKey,
+  onSelect,
+}: {
+  templates: ProviderTemplate[];
+  selectedTemplateKey: string;
+  onSelect: (templateKey: string) => void;
+}) {
+  if (templates.length === 0) {
+    return (
+      <AdminState title="No provider templates">
+        Use manual provider fields. Static templates are unavailable from the backend.
+      </AdminState>
+    );
+  }
+  const selected = templates.find((template) => template.template_key === selectedTemplateKey);
+  return (
+    <div className="resource-row">
+      <div>
+        <h3>Template</h3>
+        <p>{selected?.description ?? "Select a static setup template."}</p>
+        <p>
+          {selected?.provider_kind ?? "-"} / {selected?.adapter_kind ?? "-"} / model{" "}
+          {selected?.model_name_placeholder ?? "manual"}
+        </p>
+      </div>
+      <select
+        className="text-input"
+        value={selectedTemplateKey}
+        aria-label="Provider template"
+        onChange={(event) => onSelect(event.target.value)}
+      >
+        {templates.map((template) => (
+          <option key={template.template_key} value={template.template_key}>
+            {template.display_name}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -293,6 +429,10 @@ function ProviderDetail({
   isBusy,
   onUpdate,
   onHealthCheck,
+  onDiscoverModels,
+  modelDiscovery,
+  manualModelName,
+  onManualModelNameChange,
   onSmokeTest,
   onDelete,
 }: {
@@ -309,6 +449,10 @@ function ProviderDetail({
   isBusy: boolean;
   onUpdate: (event: FormEvent<HTMLFormElement>) => void;
   onHealthCheck: () => void;
+  onDiscoverModels: () => void;
+  modelDiscovery: ProviderModelDiscoveryResult | null;
+  manualModelName: string;
+  onManualModelNameChange: (value: string) => void;
   onSmokeTest: () => void;
   onDelete: () => void;
 }) {
@@ -375,6 +519,9 @@ function ProviderDetail({
           <button className="secondary-button" type="button" disabled={isBusy} onClick={onHealthCheck}>
             Run health check
           </button>
+          <button className="secondary-button" type="button" disabled={isBusy} onClick={onDiscoverModels}>
+            Pull model list
+          </button>
           <button className="secondary-button" type="button" disabled={isBusy} onClick={onSmokeTest}>
             Smoke test
           </button>
@@ -383,6 +530,11 @@ function ProviderDetail({
           </button>
         </AdminActionBar>
       </form>
+      <ModelLabPanel
+        discovery={modelDiscovery}
+        manualModelName={manualModelName}
+        onManualModelNameChange={onManualModelNameChange}
+      />
       <AdminTable
         caption="Provider capabilities"
         rows={capabilities}
@@ -409,6 +561,46 @@ function ProviderDetail({
         emptyMessage="Run a health check or smoke test to record safe provider status."
       />
     </AdminSection>
+  );
+}
+
+function ModelLabPanel({
+  discovery,
+  manualModelName,
+  onManualModelNameChange,
+}: {
+  discovery: ProviderModelDiscoveryResult | null;
+  manualModelName: string;
+  onManualModelNameChange: (value: string) => void;
+}) {
+  return (
+    <div className="resource-row">
+      <div>
+        <h3>Model lab</h3>
+        {discovery === null ? (
+          <p>Pull a server-side model list or enter a model name for the next smoke test.</p>
+        ) : (
+          <>
+            <p>
+              Discovery {discovery.discovery_status}. Manual fallback{" "}
+              {discovery.manual_fallback_allowed ? "available" : "unavailable"}.
+            </p>
+            <p>
+              {discovery.models.length > 0
+                ? `Models: ${discovery.models.slice(0, 6).join(", ")}`
+                : discovery.error_message ?? "No models returned."}
+            </p>
+          </>
+        )}
+      </div>
+      <input
+        className="text-input"
+        aria-label="Manual model name"
+        value={manualModelName}
+        onChange={(event) => onManualModelNameChange(event.target.value)}
+        placeholder="manual-model-name"
+      />
+    </div>
   );
 }
 

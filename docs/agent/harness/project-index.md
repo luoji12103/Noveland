@@ -71,6 +71,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md` — final v0.8 Public Experience & Ecosystem Phase 10 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md` — final v0.8 Public Experience & Ecosystem Phase 11 implementation plan.
 - `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md` — feasibility review for the proposed v0.9 Self-use MVP Demo World Cut after v0.8 completion and roadmap planning.
+- `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md` — v0.9 Phase 1 checkpoint for provider settings/model lab implementation decisions.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -348,6 +349,11 @@ Fast orientation for a new coding session.
 - `backend/packages/package_contracts/`
   - `noveland.package_contracts.contracts` — plugin/provider package metadata, validation, issue, and safe provider config export DTOs
   - `noveland.package_contracts.service` — response-only package validation and provider config export service without marketplace, provider execution, or secret resolution
+- `backend/packages/providers/`
+  - `noveland.providers.templates` — static/code-owned v0.9 provider setup templates over provider integrations
+  - `noveland.providers.model_discovery` — server-side, redacted model discovery with manual model-name fallback
+  - `noveland.providers.adapters.openai_text` — OpenAI-compatible text adapter routed through `ProviderExecutionService`
+  - `noveland.providers.adapters.anthropic_text` — Anthropic-compatible text adapter routed through `ProviderExecutionService`
 
 ### OpenSpec current specs
 - `openspec/specs/runtime-context-contract-v2/spec.md` — v0.6 runtime context schema, visibility, worldline, and prompt traceability contract.

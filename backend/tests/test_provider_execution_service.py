@@ -372,6 +372,80 @@ def test_resolved_secret_is_not_written_to_ledger(
         assert "sk-super-secret" not in str(snapshot.raw_request_json)
 
 
+def test_openai_compatible_text_dry_run_writes_ledger_without_secret() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        model = session.get(ProviderIntegration, provider_id)
+        assert model is not None
+        model.adapter_kind = ProviderAdapterKind.OPENAI_COMPATIBLE.value
+        model.base_url = "https://gateway.example/v1"
+        model.auth_ref = "env:MISSING_OPENAI_API_KEY"
+        model.config_json = {"dry_run": True}
+        result = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                input_text="hello model lab",
+                model_name="manual-model",
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert result.output_text == "openai-compatible dry-run: hello model lab"
+        assert invocation.status == "succeeded"
+        assert invocation.model_name == "manual-model"
+        assert invocation.provider_kind == "openai_compatible"
+        assert snapshot.raw_response_json == {
+            "dry_run": True,
+            "text": "openai-compatible dry-run: hello model lab",
+        }
+        assert "MISSING_OPENAI_API_KEY" not in str(invocation.request_params_json)
+        assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
+
+
+def test_anthropic_compatible_text_dry_run_writes_ledger_without_secret() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        model = session.get(ProviderIntegration, provider_id)
+        assert model is not None
+        model.adapter_kind = ProviderAdapterKind.ANTHROPIC_COMPATIBLE.value
+        model.base_url = "https://gateway.example"
+        model.auth_ref = "env:MISSING_ANTHROPIC_API_KEY"
+        model.config_json = {"dry_run": True}
+        result = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                input_text="hello anthropic",
+            )
+        )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert result.output_text == "anthropic-compatible dry-run: hello anthropic"
+        assert invocation.status == "succeeded"
+        assert invocation.provider_kind == "anthropic_compatible"
+        assert snapshot.raw_response_json == {
+            "dry_run": True,
+            "text": "anthropic-compatible dry-run: hello anthropic",
+        }
+        assert "MISSING_ANTHROPIC_API_KEY" not in str(invocation.request_params_json)
+        assert "MISSING_ANTHROPIC_API_KEY" not in str(snapshot.raw_request_json)
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",

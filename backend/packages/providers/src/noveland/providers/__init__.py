@@ -13,6 +13,11 @@ _EXPORTS = {
     "ProviderExecutionResult": ("noveland.providers.contracts", "ProviderExecutionResult"),
     "ProviderIntegrationCreate": ("noveland.providers.contracts", "ProviderIntegrationCreate"),
     "ProviderIntegrationRead": ("noveland.providers.contracts", "ProviderIntegrationRead"),
+    "ProviderModelDiscoveryService": (
+        "noveland.providers.model_discovery",
+        "ProviderModelDiscoveryService",
+    ),
+    "provider_templates": ("noveland.providers.templates", "provider_templates"),
 }
 
 

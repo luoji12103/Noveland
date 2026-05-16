@@ -40,6 +40,43 @@ export type ProviderCapabilityInput = {
   capability_json: Record<string, unknown>;
 };
 
+export type ProviderTemplate = {
+  template_key: string;
+  display_name: string;
+  provider_kind: ProviderKind;
+  adapter_kind: ProviderAdapterKind;
+  description: string;
+  base_url_placeholder: string | null;
+  model_name_placeholder: string | null;
+  auth_ref_placeholder: string | null;
+  config_json: Record<string, unknown>;
+  default_params_json: Record<string, unknown>;
+  capabilities: ProviderCapabilityInput[];
+  model_discovery: Record<string, unknown>;
+};
+
+export type ProviderModelDiscoveryInput = {
+  provider_id?: string | null;
+  provider_kind?: ProviderKind | null;
+  adapter_kind?: ProviderAdapterKind | null;
+  base_url?: string | null;
+  auth_ref?: string | null;
+  config_json?: Record<string, unknown>;
+  default_params_json?: Record<string, unknown>;
+};
+
+export type ProviderModelDiscoveryResult = {
+  provider_id: string | null;
+  provider_kind: ProviderKind;
+  adapter_kind: ProviderAdapterKind;
+  discovery_status: "succeeded" | "failed" | string;
+  models: string[];
+  manual_fallback_allowed: boolean;
+  error_code: string | null;
+  error_message: string | null;
+  metadata_json: Record<string, unknown>;
+};
+
 export type ProviderIntegrationInput = {
   scope_kind: ProviderScopeKind;
   provider_kind: ProviderKind;
@@ -195,6 +232,22 @@ export function listProviderIntegrations(
   return adminRequest<ProviderIntegration[]>(
     `/api/worlds/${worldId}/providers${providerQuery(filters)}`,
     { method: "GET" },
+  );
+}
+
+export function listProviderTemplates(worldId: string): Promise<ProviderTemplate[]> {
+  return adminRequest<ProviderTemplate[]>(`/api/worlds/${worldId}/providers/templates`, {
+    method: "GET",
+  });
+}
+
+export function discoverProviderModels(
+  worldId: string,
+  input: ProviderModelDiscoveryInput,
+): Promise<ProviderModelDiscoveryResult> {
+  return adminRequest<ProviderModelDiscoveryResult>(
+    `/api/worlds/${worldId}/providers/model-discovery`,
+    { method: "POST", body: input, csrf: true },
   );
 }
 
