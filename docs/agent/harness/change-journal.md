@@ -2439,3 +2439,15 @@
 - Commit merged: `cf0a511 feat(v0.8): add plugin provider package contracts`
 - Summary: Fast-forward merged Phase 8 Plugin/Provider Package Contract to local `main` after full local gate and OpenSpec validation passed.
 - Follow-up notes: Start Phase 9 with docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
+
+## v0.8.9 Sample World Release Package planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 9 planning.
+- Summary: Added the Phase 9 checkpoint for a deterministic sample world release package tied to the Phase 13 multimodal sample-world fixture and Phase 7 world packaging. The first implementation stays in tests/docs, builds a safe manifest with rights/visibility/fixture linkage metadata, validates preview/apply through `WorldPackagingService`, and avoids migrations, Web UI, provider execution, daemon jobs, marketplace scope, byte copying, and production seed framework behavior.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 9 on a feature branch. Keep the sample package deterministic, fixture-linked, manifest-safe, and free of storage paths, raw prompt/output, bytes/base64, resolved secrets, provider calls, daemon jobs, marketplace behavior, and production seed framework scope.

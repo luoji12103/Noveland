@@ -491,6 +491,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.8.6-player-privacy-data-controls-plan.md`
 - `docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md`
 - `docs/agent/harness/feature-updates/v0.8.8-plugin-provider-package-contract-plan.md`
+- `docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
@@ -526,6 +527,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/architecture/adr/0009-multimodal-evals-reuse-release-framework.md`
 - `docs/agent/fixtures/`
 - `docs/agent/fixtures/multimodal-sample-world.md`
+- `docs/agent/fixtures/sample-world-release-package.md`
 - `backend/packages/authoring/`
 - `backend/packages/authoring/pyproject.toml`
 - `backend/packages/authoring/src/noveland/authoring/__init__.py`

@@ -100,7 +100,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 9 — Sample World Release Package
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Define sample content/media manifest and fixture linkage.
 - [ ] Implement deterministic sample package import/export support only.
 - [ ] Add sample package, fixture, rights/visibility, and leak tests.
