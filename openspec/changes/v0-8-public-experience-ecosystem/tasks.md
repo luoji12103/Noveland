@@ -56,7 +56,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 5 — Scene View / Galgame View
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Confirm Phase 1 and Phase 2 safe media/playback contracts are sufficient.
 - [ ] Implement scene view over presentation records and reader media descriptors.
 - [ ] Add responsive, accessibility, component, and e2e tests.

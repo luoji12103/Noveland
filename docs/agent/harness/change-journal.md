@@ -2281,3 +2281,15 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 5 from clean local `main`; use the `impeccable` skill before frontend implementation, and keep scene view on reader-safe media descriptors only.
+
+## v0.8.5 Scene View / Galgame View planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 5 planning.
+- Summary: Added the Phase 5 checkpoint for an authenticated reader/player scene view that reuses Phase 2 playback data and Phase 1 reader-safe media descriptors to render one active turn with image, dialogue, and optional audio without adding a game engine or second media path.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.5-scene-view-galgame-view-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 5 on a feature branch. Reuse reader-safe media descriptors only; no direct admin media DTOs, public unauthenticated access, or full game engine scope.
