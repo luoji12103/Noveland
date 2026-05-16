@@ -1,0 +1,39 @@
+# Route & Relationship Progression Quality Specification
+
+## Purpose
+
+This spec captures the current v0.6 admin-only route and relationship progression quality diagnostics on `main`. It covers progression reviews, drift detection, safe recommendations, and reuse of existing relationship, route, world event, proposal, and diagnostic records.
+
+## Requirements
+### Requirement: Route & Relationship Progression Quality provides the current workflow
+The system SHALL provide Route & Relationship Progression Quality capability for Relationship progression review, Route progression review, Drift detection while preserving worldline, ACL, provider, media, secret, and invocation boundaries.
+
+#### Scenario: Authorized workflow
+- **Given** an authorized actor is using Route & Relationship Progression Quality
+- **When** they perform the primary workflow for this capability
+- **Then** the system SHALL support the implemented progression review scope
+- **And** the workflow SHALL reuse relationship records, route records, world events, diagnostics rather than creating a parallel subsystem.
+
+### Requirement: Route & Relationship Progression Quality preserves architecture freeze boundaries
+The system SHALL enforce Phase 13 architecture guardrails for Route & Relationship Progression Quality, including safe event payloads, secret redaction, media boundary reuse, and reader/member visibility filtering.
+
+#### Scenario: Boundary enforcement
+- **Given** Route & Relationship Progression Quality reads or writes provider, media, invocation, visual, speech, event, or presentation data
+- **When** the capability returns API/UI data or persists records
+- **Then** it SHALL NOT expose resolved secrets, storage_uri, filesystem paths, bytes, base64, raw prompts, or raw outputs
+- **And** it SHALL validate world and worldline scope where applicable.
+
+### Requirement: Route & Relationship Progression Quality has explicit acceptance evidence
+The system SHALL provide focused validation for Route & Relationship Progression Quality and SHALL stop implementation if targeted tests, full local gate, or architecture checks fail.
+
+#### Scenario: Phase acceptance
+- **Given** implementation for Route & Relationship Progression Quality is complete
+- **When** targeted validation and the full local gate run
+- **Then** all expected validation checks SHALL pass
+- **And** the phase SHALL be merged only by fast-forward to clean local main.
+
+## Non-goals
+
+- Replacing relationship model semantics.
+- Canonical route or relationship mutation.
+- Provider execution or Web dashboard work.

@@ -73,7 +73,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
-- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.8 changes, and active proposed changes for v0.6/v0.7.
+- `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8 changes. No active changes remain after the 2026-05-16 archive cleanup.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
@@ -346,6 +346,24 @@ Fast orientation for a new coding session.
   - `noveland.package_contracts.service` — response-only package validation and provider config export service without marketplace, provider execution, or secret resolution
 
 ### OpenSpec current specs
+- `openspec/specs/runtime-context-contract-v2/spec.md` — v0.6 runtime context schema, visibility, worldline, and prompt traceability contract.
+- `openspec/specs/provider-backed-gm-proposal/spec.md` — v0.6 provider-backed GM proposal and review/apply boundary contract.
+- `openspec/specs/dialogue-style-ooc-review/spec.md` — v0.6 dialogue style and OOC review contract.
+- `openspec/specs/emotion-sprite-voice-alignment/spec.md` — v0.6 emotion, sprite, and voice alignment diagnostics contract.
+- `openspec/specs/narrative-writer-v2/spec.md` — v0.6 Narrative Writer v2 and strict-worldline draft artifact contract.
+- `openspec/specs/continuity-review-v2/spec.md` — v0.6 continuity diagnostics and safe repair suggestion contract.
+- `openspec/specs/runtime-pacing-controller/spec.md` — v0.6 runtime pacing diagnostics and recommendation contract.
+- `openspec/specs/route-relationship-progression-quality/spec.md` — v0.6 route and relationship progression diagnostics contract.
+- `openspec/specs/long-run-living-world-simulation-eval/spec.md` — v0.6 long-run living world simulation eval contract.
+- `openspec/specs/narrative-quality-dashboard-api/spec.md` — v0.6 API-first narrative quality summary contract.
+- `openspec/specs/permission-model-hardening/spec.md` — v0.7 permission matrix and ACL regression contract.
+- `openspec/specs/secret-provider-governance/spec.md` — v0.7 provider disabled-state, opaque auth ref, and safe audit contract.
+- `openspec/specs/cost-rate-control/spec.md` — v0.7 provider budget, quota, emergency stop, and pre-call guard contract.
+- `openspec/specs/object-storage-backup-v2/spec.md` — v0.7 storage integrity audit and backup/restore contract.
+- `openspec/specs/deployment-profile/spec.md` — v0.7 local/single-host deployment profile contract.
+- `openspec/specs/observability-incident-diagnostics/spec.md` — v0.7 incident summary and diagnostics retention contract.
+- `openspec/specs/security-regression-suite/spec.md` — v0.7 forbidden payload, ACL, and worldline isolation regression contract.
+- `openspec/specs/production-readiness-gate/spec.md` — v0.7 internal production readiness aggregation contract.
 - `openspec/specs/reader-media-delivery/spec.md` — v0.8 authenticated reader media descriptor and delivery contract.
 - `openspec/specs/conversation-playback-ui/spec.md` — v0.8 reader/player conversation playback UI contract.
 - `openspec/specs/player-interaction-ui/spec.md` — v0.8 player choices, interventions, journal, notification, and feedback UI contract.

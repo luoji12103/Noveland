@@ -10,9 +10,11 @@
 - `main` is ahead of `origin/main`; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
-- Current Phase 3-13, v0.4, and v0.5 implemented behavior is represented under `openspec/specs/`.
+- Current Phase 3-13, v0.4, v0.5, v0.6, v0.7, and v0.8 implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
 - The completed v0.5 change is archived under `openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/`.
+- The completed v0.6 change is archived under `openspec/changes/archive/2026-05-16-v0-6-runtime-narrative-quality/`.
+- The completed v0.7 change is archived under `openspec/changes/archive/2026-05-16-v0-7-production-hardening/`.
 - The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
@@ -28,8 +30,8 @@
 - v0.5 Phase 8 is complete: deterministic authoring regression fixture covers source registry, parser, character/lore extraction, conflict review, memory migration, asset matching, guarded review/apply, and side-effect leak checks.
 - Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
 - v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
-- v0.6 Runtime Narrative Quality is complete locally and ready to archive if requested; this session does not archive it.
-- v0.7 Production Hardening is complete locally and ready to archive/release-note work if requested; this session does not archive it.
+- v0.6 Runtime Narrative Quality is archived and closed locally.
+- v0.7 Production Hardening is archived and closed locally.
 - v0.8 Public Experience & Ecosystem feasibility review has been added at `docs/agent/harness/feature-updates/v0.8-public-experience-ecosystem-feasibility-review.md`.
 - v0.8 OpenSpec now requires Reader Media Delivery to start with public/read-only contract inventory, reader-safe media descriptors, explicit auth/delivery model, and no storage path leak before playback/galgame UI phases.
 - v0.8 Phase 1 Reader Media Delivery planning checkpoint has been added at `docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md`.
@@ -96,7 +98,7 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
+- OpenSpec active changes are empty after v0.6/v0.7/v0.8 archive cleanup.
 - Do not continue to v0.9 without a fresh OpenSpec proposal and explicit request.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

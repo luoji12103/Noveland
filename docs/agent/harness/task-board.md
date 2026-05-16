@@ -235,6 +235,8 @@
 - v0.7 Production Hardening Phase 8 full local gate
 - v0.7 Production Hardening Phase 8 fast-forward merge
 - v0.7 Production Hardening final acceptance review
+- v0.6 Runtime Narrative Quality OpenSpec historical archive cleanup
+- v0.7 Production Hardening OpenSpec historical archive cleanup
 - v0.8 Public Experience & Ecosystem feasibility review
 - v0.8 Public Experience & Ecosystem OpenSpec plan adaptation
 - v0.8 Public Experience & Ecosystem Phase 1 planning checkpoint
@@ -302,8 +304,8 @@
 - v0.8 Public Experience & Ecosystem OpenSpec archive and release notes
 
 ## Upcoming Mainline
-- v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
-- v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
+- v0.6 Runtime Narrative Quality is archived and closed locally.
+- v0.7 Production Hardening is archived and closed locally.
 - v0.8 Public Experience & Ecosystem is archived and closed locally.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.
@@ -313,7 +315,7 @@
 - v0.7 Phase 6 Observability & Incident Diagnostics is complete.
 - v0.7 Phase 7 Security Regression Suite is complete.
 - v0.7 Phase 8 Production Readiness Gate is complete.
-- v0.8 should keep reader/media/API contracts stable before playback, galgame, packaging, moderation, and launch-gate implementation.
+- OpenSpec active changes are empty after v0.6/v0.7/v0.8 archive cleanup.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

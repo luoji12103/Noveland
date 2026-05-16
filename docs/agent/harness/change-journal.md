@@ -22,6 +22,17 @@
 - Docs updated: OpenSpec current specs, OpenSpec archive, v0.8 release notes, project index, file inventory, task board, active handoff
 - Follow-up notes: v0.8 is closed. v0.6 and v0.7 remain locally complete and ready to archive only if explicitly requested. Do not push unless explicitly requested.
 
+## v0.6/v0.7 OpenSpec historical archive cleanup entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: OpenSpec historical archive cleanup and current spec sync
+- Summary: Archived the completed v0.6 Runtime Narrative Quality and v0.7 Production Hardening OpenSpec changes so `openspec validate --changes --strict` has no active changes remaining.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-16-v0-6-runtime-narrative-quality/**`, `/openspec/changes/archive/2026-05-16-v0-7-production-hardening/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: OpenSpec current specs, OpenSpec archives, project index, file inventory, task board, active handoff
+- Follow-up notes: v0.6/v0.7 release notes were not requested and were not generated. No backend/Web runtime behavior changed.
+
 ## Initial entry
 
 - Date: TBD
