@@ -2430,4 +2430,12 @@
 - Tests added/updated: package contract API tests for valid metadata, registry/secret issues, safe provider config export, ACL, existing provider route compatibility, and workspace imports.
 - Docs updated: OpenSpec task status, task board, active handoff, file inventory, project index, and change journal.
 - Verification: Targeted checks passed with backend ruff and mypy for package contract files, targeted pytest (`37 passed`), and the full local gate: backend ruff, backend mypy (`277 source files`), backend pytest (`435 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
-- Follow-up notes: Fast-forward merge Phase 8 back to local `main` if the branch remains clean.
+- Follow-up notes: Phase 8 fast-forward merged to local `main`; continue with Phase 9 Sample World Release Package planning checkpoint from clean `main`.
+
+## v0.8.8 Plugin/Provider Package Contract merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Commit merged: `cf0a511 feat(v0.8): add plugin provider package contracts`
+- Summary: Fast-forward merged Phase 8 Plugin/Provider Package Contract to local `main` after full local gate and OpenSpec validation passed.
+- Follow-up notes: Start Phase 9 with docs-only planning checkpoint before implementation. Do not push unless explicitly requested.

@@ -86,7 +86,7 @@
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
 - Implement Phase 7 on a feature branch from clean local `main`.
-- Fast-forward merge v0.8 Phase 8 back to local `main` if the branch remains clean.
+- Start v0.8 Phase 9 Sample World Release Package with a docs-only planning checkpoint from clean local `main`.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -226,3 +226,4 @@
 - v0.8 Phase 8 planning checkpoint completed.
 - v0.8 Phase 8 targeted checks passed: backend ruff and mypy for package contract files, targeted pytest (`37 passed`) including package contract API coverage, provider API compatibility, plugin registry/contract harness, provider registry service, and workspace imports.
 - v0.8 Phase 8 full local gate passed: backend ruff, backend mypy (`277 source files`), backend pytest (`435 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- v0.8 Phase 8 fast-forward merge to local `main` completed.
