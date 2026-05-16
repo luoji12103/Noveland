@@ -2,8 +2,8 @@
 
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
-- Objective: v0.8 Public Experience & Ecosystem Phase 7 World Packaging implementation.
-- Status: Phase 7 docs-only planning checkpoint is complete; Phase 7 implementation is next.
+- Objective: v0.8 Public Experience & Ecosystem completion checkpoint.
+- Status: Phase 11 Public Launch Gate is implemented, full local gate passed, and fast-forward merged to local `main`.
 
 ## Current Context
 
@@ -75,8 +75,9 @@
 - v0.8 Phase 10 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md` and resolved ownership to a dedicated `backend/packages/moderation/` package plus `moderation.py` router.
 - v0.8 Phase 10 implementation adds `backend/packages/moderation/`, `moderation.py`, migration `20260516_0044_moderation_incident_workflow.py`, and reader-delivery suppression for explicitly applied moderation takedown actions without mutating media/provider/world-event rows.
 - v0.8 Phase 10 Moderation & Incident Workflow fast-forward merged to local `main`.
-- v0.8 Phase 11 Public Launch Gate planning checkpoint added `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`. Implementation should extend the existing observability/readiness boundary without migration or duplicate framework.
-- v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
+- v0.8 Phase 11 Public Launch Gate planning checkpoint added `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`.
+- v0.8 Phase 11 implementation extends the existing observability/readiness boundary with a platform-admin-only `/observability/readiness/public-launch` report, reuses v0.7 internal production readiness, aggregates v0.8 public-surface evidence, requires explicit signoff flags, and keeps `auto_launch_enabled=false`.
+- v0.8 Public Experience & Ecosystem is complete locally across Phases 1-11 and ready to archive/release-note work if requested.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -94,8 +95,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Implement Phase 7 on a feature branch from clean local `main`.
-- Implement v0.8 Phase 11 Public Launch Gate on a feature branch from clean local `main`.
+- Archive `v0-8-public-experience-ecosystem` and write v0.8 release notes only if explicitly requested.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -245,3 +245,6 @@
 - v0.8 Phase 10 full local gate passed: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.8 Phase 10 fast-forward merge to local `main` completed.
 - v0.8 Phase 11 planning checkpoint completed. Evidence inputs are v0.7 production readiness, reader media, conversation presentations, player privacy, moderation workflow, sample package/eval evidence, package/provider safety evidence, security regression, and explicit platform-admin signoffs.
+- v0.8 Phase 11 targeted checks passed: backend ruff and mypy for observability/API/test files, targeted pytest (`70 passed`) covering production readiness, observability incidents, moderation, reader media, sample package, package contracts, player privacy, multimodal sample regression, schema, Alembic, and workspace imports.
+- v0.8 Phase 11 full local gate passed: backend ruff, backend mypy (`285 source files`), backend pytest (`449 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.8 Phase 11 fast-forward merge to local `main` completed.

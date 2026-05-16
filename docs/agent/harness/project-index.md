@@ -326,9 +326,9 @@ Fast orientation for a new coding session.
   - `noveland.storage.backup` — local backup verification command for database, migration head, object root, and snapshot payload readability checks
   - `noveland.storage.integrity` — safe media object and snapshot payload storage integrity audit service
 - `backend/packages/observability/`
-  - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
+  - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, retention DTOs, internal production-readiness reports, and public launch readiness reports
   - `noveland.observability.models` — runtime diagnostic event ORM model
-  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, and detail redaction
+  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, internal production readiness, public launch readiness aggregation, and detail redaction
 - `backend/packages/moderation/`
   - `noveland.moderation.contracts` — report, action, incident, target, severity, status, and action-kind DTOs
   - `noveland.moderation.models` — persisted moderation report/action/incident workflow ORM models
@@ -362,7 +362,7 @@ Fast orientation for a new coding session.
 - `backend/tests/test_authoring_regression_fixture.py` — v0.5 authoring import pipeline regression entrypoint
 - `backend/tests/fixtures/security_regression.py` — shared forbidden-token helpers for v0.7 security regression tests
 - `backend/tests/test_security_regression_suite.py` — consolidated v0.7 security regression entrypoint for leak, ACL, and fixture coverage
-- `backend/tests/test_production_readiness_gate.py` — v0.7 internal production-readiness aggregation regression entrypoint
+- `backend/tests/test_production_readiness_gate.py` — v0.7 internal production-readiness and v0.8 public-launch readiness aggregation regression entrypoint
 - `backend/tests/test_api_reader_media.py` — v0.8 Phase 1 reader media ACL, visibility, leak, download, and admin-route regression coverage
 
 ## Update rule

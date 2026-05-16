@@ -2515,3 +2515,23 @@
 - Docs updated: feature plan, OpenSpec task list/phase plan, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 11 on a feature branch. Keep it read-only/admin-only and do not duplicate v0.7 readiness or release frameworks.
+
+## v0.8.11 Public Launch Gate implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/public-launch-gate
+- Scope: v0.8 Public Experience & Ecosystem Phase 11 public launch readiness aggregation.
+- Summary: Extended the existing `noveland.observability` readiness boundary with `PublicLaunchReadinessReport`, `ProductionReadinessGateService.public_launch_report()`, and the platform-admin-only `/observability/readiness/public-launch` endpoint. The report reuses v0.7 internal production readiness, aggregates v0.8 reader media, conversation presentation, privacy, moderation, sample package/eval, plugin/provider safety, and public DTO security evidence, requires explicit signoff flags, keeps `auto_launch_enabled=false`, and does not add migrations, duplicate readiness/release tables, Web UI, provider execution, daemon work, public unauthenticated access, or broad `worlds.py` routes.
+- Files changed: `/backend/packages/observability/src/noveland/observability/{contracts,services,__init__}.py`, `/backend/services/api/src/noveland/services/api/observability.py`, `/backend/tests/test_production_readiness_gate.py`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, and harness docs.
+- Tests added/updated: public launch readiness tests for internal-readiness blocker propagation, explicit signoff blockers, successful evidence/signoff aggregation, platform-admin-only endpoint ACL, response redaction, and no duplicate readiness framework tables.
+- Docs updated: OpenSpec task status, project index, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for observability/API/test files and targeted pytest (`70 passed`). Full local gate passed: backend ruff, backend mypy (`285 source files`), backend pytest (`449 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
+- Follow-up notes: Fast-forward merged Phase 11 back to local `main`; v0.8 Public Experience & Ecosystem is locally complete. Do not push unless explicitly requested.
+
+## v0.8.11 Public Launch Gate merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Commit merged: `283433d feat(v0.8): add public launch readiness gate`
+- Summary: Fast-forward merged Phase 11 Public Launch Gate to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
+- Follow-up notes: v0.8 Public Experience & Ecosystem is complete locally and ready for archive/release-note work if requested. No push performed.
