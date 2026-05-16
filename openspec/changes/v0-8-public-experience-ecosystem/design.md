@@ -34,7 +34,7 @@ v0.8 is the first roadmap section that intentionally exposes reader/player and e
 - Worldline Browser starts as read-only browse/compare. Destructive rollback or switch execution requires explicit phase-level approval.
 - World Packaging uses preview/apply discipline and excludes secrets, internal paths, raw prompt/output evidence, and resolved provider config.
 - Plugin/Provider Package Contract builds on the plugin catalog, plugin binding validation, provider registry, provider capabilities, and `ProviderSecretResolver`.
-- Moderation & Incident Workflow needs an explicit schema/router decision before implementation.
+- Moderation & Incident Workflow uses a dedicated `moderation` package and `moderation.py` router for persisted reports, actions, and incident workflow records. It reuses v0.7 observability evidence concepts but does not extend observability into workflow ownership.
 - Public Launch Gate builds on v0.7 `ProductionReadinessGateService` and must not replace internal production readiness.
 
 ## Architecture Guardrails
@@ -65,4 +65,4 @@ This roadmap update adds no migrations. Future implementation phases must declar
 - Is first-cut reader media delivery authenticated-reader/member-only, public unauthenticated, or mixed by visibility policy?
 - Should delivery use application streaming, opaque short-lived media tokens, or both?
 - Which existing media/publication visibility fields are authoritative for reader media access?
-- Should moderation records live in a dedicated package/router or extend observability?
+- Resolved for Phase 10: moderation records live in a dedicated package/router; observability remains derived diagnostics/readiness.

@@ -347,6 +347,7 @@ Support report review, rollback review, disable actions, and public-surface inci
 - Moderator review and status transitions.
 - Safe disable-world/provider action flow.
 - Incident evidence refs without raw evidence exposure.
+- Dedicated `backend/packages/moderation/` package and `moderation.py` router for persisted workflow records.
 
 ### Non-Goals
 

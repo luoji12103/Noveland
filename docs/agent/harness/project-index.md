@@ -68,6 +68,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md` — final v0.8 Public Experience & Ecosystem Phase 7 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.8-plugin-provider-package-contract-plan.md` — final v0.8 Public Experience & Ecosystem Phase 8 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md` — final v0.8 Public Experience & Ecosystem Phase 9 implementation plan.
+- `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md` — final v0.8 Public Experience & Ecosystem Phase 10 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.

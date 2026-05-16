@@ -111,8 +111,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 10 — Moderation & Incident Workflow
 
-- [ ] Write docs-only phase planning checkpoint.
-- [ ] Resolve schema/router ownership before implementation.
+- [x] Write docs-only phase planning checkpoint.
+- [x] Resolve schema/router ownership before implementation.
 - [ ] Implement report/review/disable workflow without automatic moderation.
 - [ ] Add moderation ACL, evidence-redaction, audit, and rollback-review tests.
 - [ ] Run targeted tests.

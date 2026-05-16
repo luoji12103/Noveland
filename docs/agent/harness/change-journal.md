@@ -2471,3 +2471,15 @@
 - Commit merged: `2949acb feat(v0.8): add sample world release package`
 - Summary: Fast-forward merged Phase 9 Sample World Release Package to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
 - Follow-up notes: Start Phase 10 Moderation & Incident Workflow with a docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
+
+## v0.8.10 Moderation & Incident Workflow planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 10 planning.
+- Summary: Added the Phase 10 checkpoint and resolved schema/router ownership to a dedicated `moderation` package and `moderation.py` router for persisted public reports, moderation actions, and incident workflow records. The plan reuses v0.7 observability evidence concepts but keeps observability as derived diagnostics/readiness, not workflow ownership.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/openspec/changes/v0-8-public-experience-ecosystem/design.md`, `/openspec/changes/v0-8-public-experience-ecosystem/phase-plan.md`, and harness docs.
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list/design/phase plan, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 10 on a feature branch. Do not add Web UI, automatic moderation, provider calls, daemon work, public unauthenticated access, duplicate observability/readiness framework, or broad `worlds.py` routes.
