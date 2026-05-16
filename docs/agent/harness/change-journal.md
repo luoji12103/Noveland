@@ -2246,3 +2246,27 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 4 on a feature branch. A narrow member-safe worldline compare ACL adjustment is acceptable if required, but no destructive worldline operations or raw event payload display are in scope.
+
+## v0.8.4 Worldline Browser implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/worldline-browser
+- Scope: v0.8 Public Experience & Ecosystem Phase 4 read-only worldline browser.
+- Summary: Added an authenticated `/worlds/{world_id}/worldlines` route, a `WorldlineBrowser` component, server-side worldline browser data loading, a workspace Worldlines nav link, and mock/e2e fixtures for branch comparison. Backend changes are limited to making the existing safe aggregate worldline compare GET member-readable while keeping fork creation admin-only.
+- Files changed: `/web/app/worlds/[worldId]/worldlines/page.tsx`, `/web/features/worlds/worldline-browser.tsx`, `/web/features/worlds/worldline-browser.test.tsx`, `/web/lib/worlds/server.ts`, `/web/features/workspace/workspace-shell.tsx`, Web CSS, `/web/tests/e2e/{auth.spec.ts,start-with-mock-auth.mjs}`, `/backend/services/api/src/noveland/services/api/worlds.py`, `/backend/tests/test_api_worlds.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: `web/features/worlds/worldline-browser.test.tsx`, worldline browser coverage in `web/tests/e2e/auth.spec.ts`, and `test_world_member_can_read_safe_worldline_comparison_without_mutation` in `backend/tests/test_api_worlds.py`.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for changed worldline API/test files, focused backend pytest for member-safe comparison, focused Web component tests, Web lint, Web typecheck, focused worldline browser e2e, and `git diff --check`.
+- Follow-up notes: Run the full local gate, then fast-forward merge Phase 4 back to local `main` if it stays green.
+
+## v0.8.4 Worldline Browser gate entry
+
+- Date: 2026-05-16
+- Branch: feat/worldline-browser
+- Scope: v0.8 Public Experience & Ecosystem Phase 4 full local gate.
+- Summary: Recorded the successful full local gate for the authenticated read-only worldline browser and member-safe aggregate comparison workflow.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`38 passed files`, `121 passed`), Web build, Web `check:next-env`, Web e2e (`18 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 4 implementation, fast-forward merge `feat/worldline-browser` to local `main`, then record merge bookkeeping before starting Phase 5.

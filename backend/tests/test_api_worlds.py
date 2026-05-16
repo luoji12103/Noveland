@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -2743,6 +2744,60 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert "storage_uri" not in serialized_payloads
     assert "raw_prompt" not in serialized_payloads
     assert "raw_output" not in serialized_payloads
+
+
+def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-worldline-browser@example.test")
+    member_id, member_token = _seed_user(engine, "member-worldline-browser@example.test")
+    world_id = _seed_world(engine, owner_id, "worldline-browser-world")
+    other_world_id = _seed_world(engine, owner_id, "worldline-browser-other-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, fork_id = _seed_worldlines(engine, world_id)
+    _other_primary_id, other_fork_id = _seed_worldlines(engine, other_world_id)
+
+    _authenticate(client, member_token)
+    listed = client.get(f"/worlds/{world_id}/worldlines")
+    comparison = client.get(f"/worlds/{world_id}/worldlines/{primary_id}/compare/{fork_id}")
+    fork_attempt = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={"source_worldline_id": str(primary_id), "worldline_key": "member-fork"},
+    )
+    cross_world_comparison = client.get(
+        f"/worlds/{world_id}/worldlines/{primary_id}/compare/{other_fork_id}",
+    )
+
+    assert listed.status_code == 200
+    assert comparison.status_code == 200
+    assert comparison.json() == {
+        "base_worldline_id": str(primary_id),
+        "compare_worldline_id": str(fork_id),
+        "fork_event_sequence": None,
+        "divergent_event_count": 0,
+        "relationship_delta_count": 0,
+        "faction_delta_count": 0,
+        "choice_delta_count": 0,
+    }
+    assert fork_attempt.status_code == 403
+    assert cross_world_comparison.status_code == 404
+    serialized = json.dumps(comparison.json())
+    assert "payload" not in serialized
+    assert "storage_uri" not in serialized
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+    assert "secret" not in serialized
+
+    _authenticate(client, owner_token)
+    admin_fork = client.post(
+        f"/worlds/{world_id}/worldlines/fork",
+        json={
+            "source_worldline_id": str(primary_id),
+            "worldline_key": "admin-fork",
+            "name": "Admin Fork",
+        },
+    )
+    assert admin_fork.status_code == 201
 
 
 def test_membership_management_and_final_admin_guard() -> None:

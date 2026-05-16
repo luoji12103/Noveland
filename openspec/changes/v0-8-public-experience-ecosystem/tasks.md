@@ -46,11 +46,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 4 — Worldline Browser
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Define read-only worldline browser DTOs and ACL expectations.
-- [ ] Implement browsing/comparison without rollback execution.
-- [ ] Add worldline isolation, ACL, and UI tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Define read-only worldline browser DTOs and ACL expectations.
+- [x] Implement browsing/comparison without rollback execution.
+- [x] Add worldline isolation, ACL, and UI tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

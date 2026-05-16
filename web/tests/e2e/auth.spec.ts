@@ -34,6 +34,13 @@ test("redirects unauthenticated player visitors to login", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
 });
 
+test("redirects unauthenticated worldline visitors to login", async ({ page }) => {
+  await page.goto(`/worlds/${worldOneId}/worldlines`);
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+});
+
 test("renders the login form", async ({ page }) => {
   await page.goto("/login");
 
@@ -553,6 +560,22 @@ test("player interactions reuse existing player records", async ({ page }) => {
 
   const pageText = await page.locator("body").innerText();
   expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret/i);
+});
+
+test("worldline browser renders read-only safe comparisons", async ({ page }) => {
+  await signIn(page, "member@example.test");
+
+  await page.goto(`/worlds/${worldOneId}/worldlines`);
+  await expect(page.getByRole("heading", { name: "Worldline browser" })).toBeVisible();
+  await expect(page.getByRole("heading", { exact: true, name: "Primary Worldline" })).toBeVisible();
+  await expect(page.getByRole("heading", { exact: true, name: "Empty Fork" })).toBeVisible();
+  await expect(page.getByText("Divergent events")).toBeVisible();
+  await expect(page.getByText("Choice deltas")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Compare worldlines" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /rollback|merge|switch|fork/i })).toHaveCount(0);
+
+  const pageText = await page.locator("body").innerText();
+  expect(pageText).not.toMatch(/storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|payload/i);
 });
 
 test("release gate blockers are enforced by the workspace backend contract", async ({ page }) => {

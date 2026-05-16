@@ -88,6 +88,7 @@ import type {
   WorldSnapshotIntegrity,
   WorldOrganization,
   Worldline,
+  WorldlineComparison,
 } from "@/lib/worlds/types";
 import type {
   ProviderCapability,
@@ -259,6 +260,17 @@ export type PlayerInteractionData = {
   scenes: Scene[];
   agents: Agent[];
   selectedWorldlineId: string | null;
+  loadError: string | null;
+};
+
+export type WorldlineBrowserData = {
+  worlds: World[];
+  selectedWorld: World | null;
+  worldlines: Worldline[];
+  baseWorldlineId: string | null;
+  compareWorldlineId: string | null;
+  comparison: WorldlineComparison | null;
+  comparisonError: string | null;
   loadError: string | null;
 };
 
@@ -1182,6 +1194,58 @@ export async function getPlayerInteractionData(
   }
 }
 
+export async function getWorldlineBrowserData(
+  worldId: string,
+  baseWorldlineId?: string | null,
+  compareWorldlineId?: string | null,
+): Promise<WorldlineBrowserData> {
+  const cookies = await cookieHeader();
+  try {
+    const worlds = await apiFetch<World[]>("/worlds", cookies);
+    const selectedWorld = worlds.find((world) => world.id === worldId) ?? null;
+    if (selectedWorld === null) {
+      return emptyWorldlineBrowserData(worlds, "Unable to load worldlines.");
+    }
+
+    const worldlines = await apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies);
+    const fallbackBase =
+      worldlines.find((worldline) => worldline.parent_worldline_id === null)?.id
+      ?? worldlines[0]?.id
+      ?? null;
+    const baseId = idInWorldlines(worldlines, baseWorldlineId) ?? fallbackBase;
+    const fallbackCompare =
+      worldlines.find((worldline) => worldline.id !== baseId)?.id
+      ?? baseId;
+    const compareId = idInWorldlines(worldlines, compareWorldlineId) ?? fallbackCompare ?? null;
+    const comparison =
+      baseId === null || compareId === null
+        ? null
+        : await apiFetchOptional<WorldlineComparison>(
+            `/worlds/${worldId}/worldlines/${baseId}/compare/${compareId}`,
+            cookies,
+          );
+
+    return {
+      worlds,
+      selectedWorld,
+      worldlines,
+      baseWorldlineId: baseId,
+      compareWorldlineId: compareId,
+      comparison,
+      comparisonError:
+        baseId !== null && compareId !== null && comparison === null
+          ? "Comparison is unavailable for the selected branches."
+          : null,
+      loadError: null,
+    };
+  } catch (error) {
+    if (error instanceof WorldServerError && error.status === 401) {
+      throw error;
+    }
+    return emptyWorldlineBrowserData([], "Unable to load worldlines.");
+  }
+}
+
 export async function getNarrativeWorkspaceData(
   worldId: string,
 ): Promise<NarrativeWorkspaceData> {
@@ -2031,6 +2095,29 @@ function emptyPlayerInteractionData(
     selectedWorldlineId: null,
     loadError,
   };
+}
+
+function emptyWorldlineBrowserData(
+  worlds: World[],
+  loadError: string,
+): WorldlineBrowserData {
+  return {
+    worlds,
+    selectedWorld: null,
+    worldlines: [],
+    baseWorldlineId: null,
+    compareWorldlineId: null,
+    comparison: null,
+    comparisonError: null,
+    loadError,
+  };
+}
+
+function idInWorldlines(worldlines: Worldline[], worldlineId: string | null | undefined): string | null {
+  if (worldlineId === null || worldlineId === undefined || worldlineId === "") {
+    return null;
+  }
+  return worldlines.some((worldline) => worldline.id === worldlineId) ? worldlineId : null;
 }
 
 function emptyProviderIntegrationAdminData(

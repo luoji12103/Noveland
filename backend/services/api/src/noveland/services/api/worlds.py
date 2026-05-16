@@ -3121,7 +3121,7 @@ def fork_worldline(
 def compare_worldlines(
     base_worldline_id: uuid.UUID,
     compare_worldline_id: uuid.UUID,
-    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldlineComparisonResponse:
     _world_or_404(db_session, context.world_id)

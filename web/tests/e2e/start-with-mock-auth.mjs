@@ -2422,11 +2422,11 @@ async function handleWorldlines(request, response, currentSubject, worldId, acti
     sendJson(response, 200, worldlines.filter((worldline) => worldline.world_id === worldId));
     return;
   }
-  if (!canManageWorld(currentSubject, worldId)) {
-    sendJson(response, 403, { detail: "Forbidden" });
-    return;
-  }
   if (request.method === "GET" && action !== undefined && baseId === "compare" && compareId !== undefined) {
+    if (!canReadWorld(currentSubject, worldId)) {
+      sendJson(response, 403, { detail: "Forbidden" });
+      return;
+    }
     const choices = playerChoices.filter((choice) => choice.worldline_id === compareId);
     sendJson(response, 200, {
       base_worldline_id: action,
@@ -2437,6 +2437,10 @@ async function handleWorldlines(request, response, currentSubject, worldId, acti
       faction_delta_count: 0,
       choice_delta_count: choices.length,
     });
+    return;
+  }
+  if (!canManageWorld(currentSubject, worldId)) {
+    sendJson(response, 403, { detail: "Forbidden" });
     return;
   }
   if (!hasValidCsrf(request)) {

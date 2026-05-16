@@ -587,6 +587,137 @@ a {
   list-style: none;
 }
 
+.worldline-browser {
+  display: grid;
+  gap: 6px;
+}
+
+.worldline-summary {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.worldline-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.worldline-metrics span {
+  padding: 7px 10px;
+  color: var(--forest-dark);
+  background: oklch(96% 0.018 164deg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.worldline-browser-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  gap: 22px;
+  align-items: start;
+}
+
+.worldline-browser-grid .management-panel {
+  width: 100%;
+  margin: 0;
+}
+
+.worldline-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.worldline-list-item {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.worldline-list-item[data-selected="true"] {
+  background: oklch(97% 0.017 92deg);
+  border-color: oklch(72% 0.095 92deg);
+}
+
+.worldline-list-item h3,
+.worldline-comparison h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.worldline-list-item p,
+.worldline-comparison p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.worldline-list-item dl,
+.worldline-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.worldline-list-item dt,
+.worldline-metric span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.worldline-list-item dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+}
+
+.worldline-compare-form {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.worldline-compare-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.worldline-comparison {
+  display: grid;
+  gap: 14px;
+}
+
+.worldline-metric {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: oklch(98% 0.008 220deg);
+}
+
+.worldline-metric strong {
+  color: var(--forest-dark);
+  font-size: 1.1rem;
+}
+
 .workspace-nav {
   display: flex;
   width: min(1120px, calc(100% - 32px));
@@ -826,6 +957,7 @@ a {
   .evidence-grid,
   .playback-grid,
   .player-grid,
+  .worldline-browser-grid,
   .management-columns,
   .clock-actions,
   .clock-grid,
