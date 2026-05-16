@@ -2503,3 +2503,15 @@
 - Commit merged: `50e843b feat(v0.8): add moderation incident workflow`
 - Summary: Fast-forward merged Phase 10 Moderation & Incident Workflow to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
 - Follow-up notes: Start Phase 11 Public Launch Gate with a docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
+
+## v0.8.11 Public Launch Gate planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 11 planning.
+- Summary: Added the Phase 11 checkpoint for platform-admin-only public launch readiness aggregation under the existing observability/readiness boundary. The plan reuses v0.7 `ProductionReadinessGateService`, adds v0.8 public-surface evidence and explicit signoff flags, and avoids migrations, duplicate readiness/release tables, Web UI, automatic launch, public unauthenticated access, provider execution, daemon work, and broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/openspec/changes/v0-8-public-experience-ecosystem/phase-plan.md`, and harness docs.
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list/phase plan, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 11 on a feature branch. Keep it read-only/admin-only and do not duplicate v0.7 readiness or release frameworks.

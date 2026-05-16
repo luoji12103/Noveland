@@ -122,8 +122,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 11 — Public Launch Gate
 
-- [ ] Write docs-only phase planning checkpoint.
-- [ ] Define public readiness evidence inputs from v0.7 and v0.8 phases.
+- [x] Write docs-only phase planning checkpoint.
+- [x] Define public readiness evidence inputs from v0.7 and v0.8 phases.
 - [ ] Implement public launch readiness aggregation without duplicate release framework.
 - [ ] Add readiness, blocker, ACL, signoff, and evidence-redaction tests.
 - [ ] Run targeted tests.

@@ -4,7 +4,7 @@
 - None
 
 ## In Progress
-- v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate planning checkpoint
+- v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate implementation
 
 ## Blocked
 - None
@@ -294,11 +294,12 @@
 - v0.8 Public Experience & Ecosystem Phase 10 Moderation & Incident Workflow targeted tests
 - v0.8 Public Experience & Ecosystem Phase 10 Moderation & Incident Workflow full local gate
 - v0.8 Public Experience & Ecosystem Phase 10 Moderation & Incident Workflow fast-forward merge
+- v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate planning checkpoint
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
-- v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate planning checkpoint is next.
+- v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate implementation is next.
 - v0.8 implementation must use the adapted OpenSpec plan and a docs-only phase checkpoint before code changes.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.

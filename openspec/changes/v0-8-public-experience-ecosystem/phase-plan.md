@@ -385,6 +385,7 @@ Define public launch readiness separate from, and dependent on, v0.7 internal pr
 - Security/privacy/moderation/sample-world signoff.
 - Evidence aggregation from prior v0.8 phases.
 - Blocker/warning output.
+- Platform-admin-only public readiness endpoint under the existing observability boundary.
 
 ### Non-Goals
 
@@ -400,6 +401,7 @@ Define public launch readiness separate from, and dependent on, v0.7 internal pr
 - multimodal/narrative diagnostics
 - moderation evidence
 - sample-world release package
+- reader media, conversation presentation, player privacy, and package contract evidence
 
 ### Acceptance Criteria
 
