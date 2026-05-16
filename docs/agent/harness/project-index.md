@@ -326,6 +326,9 @@ Fast orientation for a new coding session.
   - `noveland.player_privacy.contracts` — player privacy export and request DTOs for sanitized data controls
   - `noveland.player_privacy.models` — `player_privacy_requests` ORM model for reviewable export/delete requests
   - `noveland.player_privacy.service` — deterministic sanitized export, delete-request creation, request listing, and admin review service
+- `backend/packages/world_packaging/`
+  - `noveland.world_packaging.contracts` — safe world package manifest, preview, issue, and apply DTOs
+  - `noveland.world_packaging.service` — backend-only export preview, import preview, and explicit apply service without provider execution or storage path export
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

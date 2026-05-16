@@ -2387,3 +2387,15 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 7 on a feature branch. Keep package manifests portable and safe; no storage path, secret, bytes/base64, raw prompt/output, provider call, daemon job, or public marketplace scope.
+
+## v0.8.7 World Packaging implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/world-packaging
+- Scope: v0.8 Public Experience & Ecosystem Phase 7 backend/API world packaging.
+- Summary: Added a dedicated `world_packaging` package and `world_packaging.py` router for safe package export preview, import preview, and explicit import apply. The first implementation is response-only/no-migration for preview, creates only safe imported world/worldline/scene/media metadata on apply, and does not copy bytes, expose storage paths, execute providers, write world events, add Web UI, or touch `worlds.py`.
+- Files changed: `/backend/packages/world_packaging/**`, `/backend/services/api/src/noveland/services/api/world_packaging.py`, backend workspace metadata, `/backend/tests/test_api_world_packaging.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: package manifest API tests for safe export, preview blockers/no mutation, explicit apply, forbidden marker rejection, router separation, and existing world composition round-trip regression.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for world packaging files, targeted pytest (`7 passed`), broader targeted pytest (`34 passed`), and the full local gate: backend ruff, backend mypy, backend pytest (`430 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
+- Follow-up notes: Fast-forward merge Phase 7 back to local `main` if the branch remains clean.

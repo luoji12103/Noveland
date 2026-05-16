@@ -79,11 +79,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 7 — World Packaging
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Define safe bundle and media manifest schemas.
-- [ ] Implement export, import preview, and reviewed apply.
-- [ ] Add manifest, import/export, compatibility, and leak tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Define safe bundle and media manifest schemas.
+- [x] Implement export, import preview, and reviewed apply.
+- [x] Add manifest, import/export, compatibility, and leak tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

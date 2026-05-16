@@ -32,6 +32,7 @@ dependencies = [
   "noveland-service-runtime",
   "noveland-speech",
   "noveland-visual",
+  "noveland-world-packaging",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.13,<3",
@@ -67,6 +68,7 @@ noveland-reader-delivery = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-speech = { workspace = true }
 noveland-visual = { workspace = true }
+noveland-world-packaging = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
