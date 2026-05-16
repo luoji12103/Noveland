@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This spec captures the current Noveland system behavior on `main` after Phase 3-13. It summarizes the implemented backend/Web surface and points to narrower specs for architecture, providers, media, and multimodal flows.
+This spec captures the current Noveland system behavior on `main` after Phase 3-13 and archived v0.4, v0.5, and v0.8 work. It summarizes the implemented backend/Web surface and points to narrower specs for architecture, providers, media, multimodal flows, authoring, admin UX, and public experience capabilities.
 
 ## Requirements
 
@@ -25,13 +25,13 @@ The system SHALL expose backend routers for auth, runtime, worlds, media, images
 - **AND** multimodal routes SHALL be separate modules instead of being folded into `worlds.py`.
 
 ### Requirement: Web app exposes existing product and admin surfaces
-The system SHALL provide Web routes for world lists, world detail, agents, conversations, narrative workspace, narrative reader, login, runtime admin, provider admin, presets, memory backends, and API proxy routes.
+The system SHALL provide Web routes for world lists, world detail, agents, conversations, narrative workspace, narrative reader, login, runtime admin, provider admin, presets, memory backends, public reader/player playback surfaces, player privacy controls, worldline browsing, and API proxy routes.
 
 #### Scenario: Web route inventory
 - **GIVEN** a user navigates the current Next.js app
 - **WHEN** they use existing pages under `web/app`
-- **THEN** the app SHALL serve current world, agent, conversation, narrative, reader, auth, runtime, provider, preset, and memory admin surfaces
-- **AND** it SHALL not imply Phase 9-13 added Web visual/audio preview UI.
+- **THEN** the app SHALL serve current world, agent, conversation, narrative, reader/player, auth, runtime, provider, preset, memory admin, playback, scene, privacy, and worldline surfaces
+- **AND** it SHALL not imply direct storage delivery, public unauthenticated media access, or admin-only diagnostics in reader/player routes.
 
 ### Requirement: Full local gate is the acceptance authority
 The system SHALL rely on the local backend, Web, infra, and diff checks as the primary acceptance gate because the project currently has no GitHub CI requirement.
@@ -54,7 +54,7 @@ The system SHALL include a deterministic backend sample-world fixture and regres
 
 ## Non-goals
 
-- This spec does not define future v0.4-v0.8 roadmap behavior.
+- This spec does not define proposed behavior that has not been archived into current specs.
 - This spec does not add implementation tasks.
 - This spec does not replace detailed package specs or ADRs.
 - This spec does not require Web support for visual/audio preview beyond existing surfaces.

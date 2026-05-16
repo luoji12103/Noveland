@@ -3,7 +3,7 @@
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
 - Objective: v0.8 Public Experience & Ecosystem completion checkpoint.
-- Status: Phase 11 Public Launch Gate is implemented, full local gate passed, and fast-forward merged to local `main`.
+- Status: v0.8 Public Experience & Ecosystem is implemented, archived in OpenSpec, release-noted, and closed locally.
 
 ## Current Context
 
@@ -13,8 +13,10 @@
 - Current Phase 3-13, v0.4, and v0.5 implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
 - The completed v0.5 change is archived under `openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/`.
+- The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
+- v0.8 release notes live at `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`.
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
 - v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
 - v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
@@ -77,7 +79,7 @@
 - v0.8 Phase 10 Moderation & Incident Workflow fast-forward merged to local `main`.
 - v0.8 Phase 11 Public Launch Gate planning checkpoint added `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`.
 - v0.8 Phase 11 implementation extends the existing observability/readiness boundary with a platform-admin-only `/observability/readiness/public-launch` report, reuses v0.7 internal production readiness, aggregates v0.8 public-surface evidence, requires explicit signoff flags, and keeps `auto_launch_enabled=false`.
-- v0.8 Public Experience & Ecosystem is complete locally across Phases 1-11 and ready to archive/release-note work if requested.
+- v0.8 Public Experience & Ecosystem is complete locally across Phases 1-11 and has been archived/release-noted.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
 - Do not push unless explicitly requested.
@@ -95,7 +97,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Archive `v0-8-public-experience-ecosystem` and write v0.8 release notes only if explicitly requested.
+- Do not continue to v0.9 without a fresh OpenSpec proposal and explicit request.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.

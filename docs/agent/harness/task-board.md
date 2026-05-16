@@ -299,11 +299,12 @@
 - v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate targeted tests
 - v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate full local gate
 - v0.8 Public Experience & Ecosystem Phase 11 Public Launch Gate fast-forward merge
+- v0.8 Public Experience & Ecosystem OpenSpec archive and release notes
 
 ## Upcoming Mainline
 - v0.6 Runtime Narrative Quality is locally complete and ready to archive if requested.
 - v0.7 Production Hardening is locally complete and ready to archive/release-note work if requested.
-- v0.8 Public Experience & Ecosystem is locally complete and ready to archive/release-note work if requested.
+- v0.8 Public Experience & Ecosystem is archived and closed locally.
 - v0.7 Production Hardening Phase 1 Permission Matrix & ACL Regression Baseline is complete.
 - v0.7 Phase 2 Secret & Provider Governance is complete.
 - v0.7 Phase 3 Cost & Rate Control is complete.

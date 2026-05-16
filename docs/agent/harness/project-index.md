@@ -72,7 +72,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md` — final v0.8 Public Experience & Ecosystem Phase 11 implementation plan.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
-- `openspec/` — OpenSpec current specs, archived v0.4/v0.5 changes, and proposed roadmap changes for v0.6+.
+- `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
+- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.8 changes, and active proposed changes for v0.6/v0.7.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.
@@ -343,6 +344,19 @@ Fast orientation for a new coding session.
 - `backend/packages/package_contracts/`
   - `noveland.package_contracts.contracts` — plugin/provider package metadata, validation, issue, and safe provider config export DTOs
   - `noveland.package_contracts.service` — response-only package validation and provider config export service without marketplace, provider execution, or secret resolution
+
+### OpenSpec current specs
+- `openspec/specs/reader-media-delivery/spec.md` — v0.8 authenticated reader media descriptor and delivery contract.
+- `openspec/specs/conversation-playback-ui/spec.md` — v0.8 reader/player conversation playback UI contract.
+- `openspec/specs/player-interaction-ui/spec.md` — v0.8 player choices, interventions, journal, notification, and feedback UI contract.
+- `openspec/specs/worldline-browser/spec.md` — v0.8 read-only worldline browser and comparison contract.
+- `openspec/specs/scene-view-galgame-view/spec.md` — v0.8 scene/galgame reading surface contract.
+- `openspec/specs/player-privacy-data-controls/spec.md` — v0.8 player data export and reviewable deletion request contract.
+- `openspec/specs/world-packaging/spec.md` — v0.8 safe world packaging manifest, preview, and apply contract.
+- `openspec/specs/plugin-provider-package-contract/spec.md` — v0.8 plugin/provider package metadata, capability, and config export contract.
+- `openspec/specs/sample-world-release-package/spec.md` — v0.8 deterministic sample world release package contract.
+- `openspec/specs/moderation-incident-workflow/spec.md` — v0.8 report, moderation action, incident, and takedown workflow contract.
+- `openspec/specs/public-launch-gate/spec.md` — v0.8 public launch readiness aggregation contract.
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

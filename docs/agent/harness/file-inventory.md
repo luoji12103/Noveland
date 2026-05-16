@@ -498,6 +498,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
+- `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`
 - `openspec/`
 - `openspec/specs/admin-ux-foundation/spec.md`
 - `openspec/specs/asset-import-matching/spec.md`
@@ -515,6 +516,18 @@ Track key structural files and prevent unregistered sprawl.
 - `openspec/specs/speech-admin-console/spec.md`
 - `openspec/specs/invocation-ledger-browser/spec.md`
 - `openspec/specs/multimodal-diagnostics-dashboard/spec.md`
+- `openspec/specs/reader-media-delivery/spec.md`
+- `openspec/specs/conversation-playback-ui/spec.md`
+- `openspec/specs/player-interaction-ui/spec.md`
+- `openspec/specs/worldline-browser/spec.md`
+- `openspec/specs/scene-view-galgame-view/spec.md`
+- `openspec/specs/player-privacy-data-controls/spec.md`
+- `openspec/specs/world-packaging/spec.md`
+- `openspec/specs/plugin-provider-package-contract/spec.md`
+- `openspec/specs/sample-world-release-package/spec.md`
+- `openspec/specs/moderation-incident-workflow/spec.md`
+- `openspec/specs/public-launch-gate/spec.md`
+- `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`
 - `docs/agent/architecture/current-system-contracts.md`
 - `docs/agent/architecture/permission-matrix.md`
 - `docs/agent/architecture/api-contract-inventory.md`

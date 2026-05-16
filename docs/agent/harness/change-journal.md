@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.8 Public Experience & Ecosystem archive entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: OpenSpec archive, v0.8 current specs, release notes, and harness bookkeeping
+- Summary: Archived the completed v0.8 Public Experience & Ecosystem OpenSpec change, synced implemented public experience capabilities into current OpenSpec specs, and added v0.8 release notes.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/**`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: OpenSpec current specs, OpenSpec archive, v0.8 release notes, project index, file inventory, task board, active handoff
+- Follow-up notes: v0.8 is closed. v0.6 and v0.7 remain locally complete and ready to archive only if explicitly requested. Do not push unless explicitly requested.
+
 ## Initial entry
 
 - Date: TBD
