@@ -70,6 +70,8 @@
 - v0.8 Phase 9 Sample World Release Package planning checkpoint added `docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md`.
 - v0.8 Phase 9 first implementation should be test/docs-only runtime scope: build a deterministic sample release package helper from the Phase 13 fixture, validate with world packaging preview/apply, and avoid migration, provider calls, byte copy, Web UI, marketplace behavior, or production seed framework scope.
 - v0.8 Phase 9 implementation adds `backend/tests/fixtures/sample_world_release_package.py`, sample release package regression tests, and fixture docs without runtime API, migration, provider calls, byte copy, production seed framework behavior, marketplace behavior, or Web UI.
+- v0.8 Phase 9 Sample World Release Package fast-forward merged to local `main`.
+- v0.8 Phase 10 Moderation & Incident Workflow must start with schema/router ownership resolution. Prefer a dedicated moderation/incident package/router if persistent records or APIs are needed; do not extend `worlds.py`.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -89,7 +91,7 @@
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
 - Implement Phase 7 on a feature branch from clean local `main`.
-- Fast-forward merge v0.8 Phase 9 back to local `main` if the branch remains clean.
+- Start v0.8 Phase 10 Moderation & Incident Workflow with a docs-only planning checkpoint from clean local `main`.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -233,3 +235,4 @@
 - v0.8 Phase 9 planning checkpoint completed.
 - v0.8 Phase 9 targeted checks passed: backend ruff and mypy for sample release package files, targeted pytest (`19 passed`) covering sample release package, multimodal fixture, world packaging API, security regression, and workspace imports.
 - v0.8 Phase 9 full local gate passed: backend ruff, backend mypy (`279 source files`), backend pytest (`439 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- v0.8 Phase 9 fast-forward merge to local `main` completed.

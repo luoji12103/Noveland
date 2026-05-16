@@ -2463,3 +2463,11 @@
 - Docs updated: fixture docs, OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff and mypy for sample release package files, targeted pytest (`19 passed`), and the full local gate: backend ruff, backend mypy (`279 source files`), backend pytest (`439 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
 - Follow-up notes: Fast-forward merge Phase 9 back to local `main` if the branch remains clean.
+
+## v0.8.9 Sample World Release Package merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Commit merged: `2949acb feat(v0.8): add sample world release package`
+- Summary: Fast-forward merged Phase 9 Sample World Release Package to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
+- Follow-up notes: Start Phase 10 Moderation & Incident Workflow with a docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
