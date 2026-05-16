@@ -2398,4 +2398,12 @@
 - Tests added/updated: package manifest API tests for safe export, preview blockers/no mutation, explicit apply, forbidden marker rejection, router separation, and existing world composition round-trip regression.
 - Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff and mypy for world packaging files, targeted pytest (`7 passed`), broader targeted pytest (`34 passed`), and the full local gate: backend ruff, backend mypy, backend pytest (`430 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
-- Follow-up notes: Fast-forward merge Phase 7 back to local `main` if the branch remains clean.
+- Follow-up notes: Phase 7 fast-forward merged to local `main`; continue with Phase 8 Plugin/Provider Package Contract planning checkpoint from clean `main`.
+
+## v0.8.7 World Packaging merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Commit merged: `7d12ef7 feat(v0.8): add world packaging`
+- Summary: Fast-forward merged Phase 7 World Packaging to local `main` after full local gate and OpenSpec validation passed.
+- Follow-up notes: Start Phase 8 with docs-only planning checkpoint before implementation. Do not push unless explicitly requested.
