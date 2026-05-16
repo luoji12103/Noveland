@@ -174,6 +174,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
   - `noveland.services.api.observability` — platform-admin incident summary router over safe runtime/provider/media/eval evidence
+  - `noveland.services.api.package_contracts` — world-admin package contract validation and safe provider config export router
   - `noveland.services.api.player_privacy` — world-scoped player privacy export, request listing, delete-request creation, and admin review router over sanitized player-owned/player-visible records
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
@@ -330,6 +331,9 @@ Fast orientation for a new coding session.
 - `backend/packages/world_packaging/`
   - `noveland.world_packaging.contracts` — safe world package manifest, preview, issue, and apply DTOs
   - `noveland.world_packaging.service` — backend-only export preview, import preview, and explicit apply service without provider execution or storage path export
+- `backend/packages/package_contracts/`
+  - `noveland.package_contracts.contracts` — plugin/provider package metadata, validation, issue, and safe provider config export DTOs
+  - `noveland.package_contracts.service` — response-only package validation and provider config export service without marketplace, provider execution, or secret resolution
 
 ### Contracts
 - `contracts/` — shared schemas and public internal contracts

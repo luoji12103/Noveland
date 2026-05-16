@@ -2419,3 +2419,15 @@
 - Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 8 on a feature branch. Keep package contracts safe, admin-scoped, response-only, and free of resolved secrets, storage paths, raw prompts/outputs, provider calls, daemon jobs, marketplace behavior, and runtime plugin installation.
+
+## v0.8.8 Plugin/Provider Package Contract implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/plugin-provider-package-contract
+- Scope: v0.8 Public Experience & Ecosystem Phase 8 backend/API package contract validation.
+- Summary: Added a dedicated `package_contracts` package and `package_contracts.py` router for response-only package metadata validation and safe provider config export. The implementation validates plugin declarations against the builtin plugin registry, validates provider declarations against provider adapter/capability concepts, exports only sanitized provider config summaries with opaque `auth_ref`, and does not persist package reviews, install plugins, execute providers, create marketplace state, add Web UI, or touch `worlds.py`.
+- Files changed: `/backend/packages/package_contracts/**`, `/backend/services/api/src/noveland/services/api/package_contracts.py`, backend workspace metadata, `/backend/tests/test_api_package_contracts.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: package contract API tests for valid metadata, registry/secret issues, safe provider config export, ACL, existing provider route compatibility, and workspace imports.
+- Docs updated: OpenSpec task status, task board, active handoff, file inventory, project index, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for package contract files, targeted pytest (`37 passed`), and the full local gate: backend ruff, backend mypy (`277 source files`), backend pytest (`435 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
+- Follow-up notes: Fast-forward merge Phase 8 back to local `main` if the branch remains clean.

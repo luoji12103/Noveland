@@ -25,6 +25,7 @@ dependencies = [
   "noveland-narrative-quality",
   "noveland-multimodal-eval",
   "noveland-observability",
+  "noveland-package-contracts",
   "noveland-player-privacy",
   "noveland-plugins",
   "noveland-providers",
@@ -61,6 +62,7 @@ noveland-narrative = { workspace = true }
 noveland-narrative-quality = { workspace = true }
 noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
+noveland-package-contracts = { workspace = true }
 noveland-player-privacy = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }

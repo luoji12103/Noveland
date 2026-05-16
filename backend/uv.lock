@@ -21,6 +21,7 @@ members = [
     "noveland-narrative",
     "noveland-narrative-quality",
     "noveland-observability",
+    "noveland-package-contracts",
     "noveland-player-privacy",
     "noveland-plugins",
     "noveland-providers",
@@ -636,6 +637,7 @@ dependencies = [
     { name = "noveland-narrative" },
     { name = "noveland-narrative-quality" },
     { name = "noveland-observability" },
+    { name = "noveland-package-contracts" },
     { name = "noveland-player-privacy" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
@@ -679,6 +681,7 @@ requires-dist = [
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-narrative-quality", editable = "packages/narrative_quality" },
     { name = "noveland-observability", editable = "packages/observability" },
+    { name = "noveland-package-contracts", editable = "packages/package_contracts" },
     { name = "noveland-player-privacy", editable = "packages/player_privacy" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },
@@ -980,6 +983,25 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-package-contracts"
+version = "0.1.0"
+source = { editable = "packages/package_contracts" }
+dependencies = [
+    { name = "noveland-plugins" },
+    { name = "noveland-providers" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-plugins", editable = "packages/plugins" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-player-privacy"
 version = "0.1.0"
 source = { editable = "packages/player_privacy" }
@@ -1093,6 +1115,7 @@ dependencies = [
     { name = "noveland-narrative" },
     { name = "noveland-narrative-quality" },
     { name = "noveland-observability" },
+    { name = "noveland-package-contracts" },
     { name = "noveland-player-privacy" },
     { name = "noveland-plugins" },
     { name = "noveland-providers" },
@@ -1128,6 +1151,7 @@ requires-dist = [
     { name = "noveland-narrative", editable = "packages/narrative" },
     { name = "noveland-narrative-quality", editable = "packages/narrative_quality" },
     { name = "noveland-observability", editable = "packages/observability" },
+    { name = "noveland-package-contracts", editable = "packages/package_contracts" },
     { name = "noveland-player-privacy", editable = "packages/player_privacy" },
     { name = "noveland-plugins", editable = "packages/plugins" },
     { name = "noveland-providers", editable = "packages/providers" },

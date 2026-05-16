@@ -90,11 +90,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## Phase 8 — Plugin/Provider Package Contract
 
 - [x] Write docs-only phase planning checkpoint.
-- [ ] Define package metadata, capability, config export, and safety review contracts.
-- [ ] Implement contract validation without marketplace or untrusted-code installation.
-- [ ] Add plugin/provider governance and secret-redaction tests.
-- [ ] Run targeted tests.
-- [ ] Run full local gate.
+- [x] Define package metadata, capability, config export, and safety review contracts.
+- [x] Implement contract validation without marketplace or untrusted-code installation.
+- [x] Add plugin/provider governance and secret-redaction tests.
+- [x] Run targeted tests.
+- [x] Run full local gate.
 - [ ] Fast-forward merge to local main.
 - [ ] Update OpenSpec tasks and harness docs.
 

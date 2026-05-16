@@ -21,6 +21,7 @@ dependencies = [
   "noveland-narrative-quality",
   "noveland-multimodal-eval",
   "noveland-observability",
+  "noveland-package-contracts",
   "noveland-player-privacy",
   "noveland-plugins",
   "noveland-providers",
@@ -66,6 +67,7 @@ members = [
   "packages/narrative_quality",
   "packages/multimodal_eval",
   "packages/observability",
+  "packages/package_contracts",
   "packages/player_privacy",
   "packages/plugins",
   "packages/providers",
@@ -96,6 +98,7 @@ noveland-narrative = { workspace = true }
 noveland-narrative-quality = { workspace = true }
 noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
+noveland-package-contracts = { workspace = true }
 noveland-player-privacy = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }
@@ -143,6 +146,7 @@ mypy_path = [
   "packages/narrative_quality/src",
   "packages/multimodal_eval/src",
   "packages/observability/src",
+  "packages/package_contracts/src",
   "packages/player_privacy/src",
   "packages/plugins/src",
   "packages/providers/src",
