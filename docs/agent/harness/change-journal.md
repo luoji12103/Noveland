@@ -2579,3 +2579,14 @@
 - Commit merged: `283433d feat(v0.8): add public launch readiness gate`
 - Summary: Fast-forward merged Phase 11 Public Launch Gate to local `main` after targeted checks, full local gate, and OpenSpec validation passed.
 - Follow-up notes: v0.8 Public Experience & Ecosystem is complete locally and ready for archive/release-note work if requested. No push performed.
+
+## v0.9 Self-use MVP Demo World Cut feasibility review entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.9 feasibility review only; no backend/Web implementation, migrations, API behavior, runtime behavior, or push.
+- Summary: Added the v0.9 feasibility review after reading the active v0.9 OpenSpec and current provider, media, authoring, memory/persona, visual, speech, asset-generation, packaging, and readiness boundaries. The review concludes v0.9 can proceed as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm a dedicated `visual_generation` package/router/schema boundary before implementation.
+- Files changed: `/docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`, `/openspec/changes/v0-9-self-use-mvp-demo-world-cut/tasks.md`, and harness docs.
+- Tests added/updated: N/A, documentation-only feasibility review.
+- Verification: OpenSpec strict changes validation, OpenSpec strict specs validation, and `git diff --check`.
+- Follow-up notes: Start v0.9 Phase 1 only after accepting the feasibility review and writing the Phase 1 planning checkpoint. Do not push unless explicitly requested.

@@ -70,6 +70,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md` — final v0.8 Public Experience & Ecosystem Phase 9 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md` — final v0.8 Public Experience & Ecosystem Phase 10 implementation plan.
 - `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md` — final v0.8 Public Experience & Ecosystem Phase 11 implementation plan.
+- `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md` — feasibility review for the proposed v0.9 Self-use MVP Demo World Cut after v0.8 completion and roadmap planning.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.

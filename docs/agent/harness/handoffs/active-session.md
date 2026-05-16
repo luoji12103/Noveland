@@ -21,6 +21,7 @@
 - Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
+- v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -106,7 +107,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Do not implement v0.9 before writing and accepting a v0.9 feasibility review against current `main`.
+- Do not implement v0.9 before the completed v0.9 feasibility review is accepted.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.

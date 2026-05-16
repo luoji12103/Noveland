@@ -5,7 +5,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 ## 1. Planning / Preflight
 
 - [ ] 1.1 Confirm v0.8 archived current specs and no active OpenSpec changes conflict with v0.9.
-- [ ] 1.2 Write v0.9 feasibility review before implementation begins.
+- [x] 1.2 Write v0.9 feasibility review before implementation begins.
 - [ ] 1.3 Confirm provider text/image execution, model discovery, and template ownership.
 - [ ] 1.4 Confirm Visual Generation Control Plane package/router/schema ownership before implementation.
 - [ ] 1.5 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
