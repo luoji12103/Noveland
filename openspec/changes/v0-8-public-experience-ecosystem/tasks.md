@@ -34,7 +34,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## Phase 3 — Player Interaction UI
 
-- [ ] Write docs-only phase planning checkpoint.
+- [x] Write docs-only phase planning checkpoint.
 - [ ] Map UI workflows to existing player choice, journal, notification, and intervention records.
 - [ ] Implement player interaction UI without a new player record framework.
 - [ ] Add UI, API, ACL, and spoiler/leak tests.

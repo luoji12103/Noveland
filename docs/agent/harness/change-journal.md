@@ -2188,3 +2188,14 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 3 from clean local `main`; use the `impeccable` skill before frontend implementation, and reuse existing player choice, intervention, journal, and notification records.
+
+## v0.8.3 Player Interaction UI planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 3 planning.
+- Summary: Added the Phase 3 checkpoint for a player/member-facing interaction surface that reuses existing player choices, interventions, journal entries, notifications, and safe route feedback records without creating a replacement player state model.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.3-player-interaction-ui-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implement Phase 3 on a feature branch. Journal, notifications, and interventions are already member-facing; player choice endpoints may need a narrow existing-route ACL adjustment, not broad new `worlds.py` routes.
