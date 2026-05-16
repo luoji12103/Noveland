@@ -2317,3 +2317,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`39 passed files`, `124 passed`), Web build, Web `check:next-env`, Web e2e (`19 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - Follow-up notes: Commit Phase 5 implementation, fast-forward merge `feat/scene-view-galgame` to local `main`, then record merge bookkeeping before starting Phase 6.
+
+## v0.8.5 Scene View / Galgame View merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 5 merge bookkeeping.
+- Summary: Fast-forward merged `feat/scene-view-galgame` into local `main`, marked Phase 5 complete in OpenSpec tasks, and moved harness handoff state to Phase 6 Player Privacy & Data Controls planning.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 6 from clean local `main`; preserve shared-world data safeguards and avoid destructive deletion of canonical records.
