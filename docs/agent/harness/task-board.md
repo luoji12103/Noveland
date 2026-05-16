@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v0.9 Phase 2 Visual Generation Control Plane planning checkpoint and implementation, after explicit start
+- v0.9 Phase 2 Visual Generation Control Plane implementation, after explicit start
 - v1.0 Private Beta MVP feasibility review, after v0.9 completion/archive
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
@@ -12,6 +12,7 @@
 - None
 
 ## Done
+- v0.9 Phase 2 Visual Generation Control Plane planning checkpoint
 - v0.9 Phase 1 MVP Provider Settings & Model Lab
 - Pre-build architecture and governance package drafted
 - Scaffold repository structure

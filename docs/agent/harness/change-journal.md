@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 2 Visual Generation Control Plane planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 2 planning checkpoint
+- Summary: Added the docs-only Phase 2 checkpoint for a dedicated Visual Generation Control Plane package/router/schema boundary. The plan assigns ownership to `backend/packages/visual_generation/` and `visual_generation.py`, expects a migration for workflow templates, visual model inventory, character/worldline visual generation profiles, and provider-neutral generation plans, and preserves the template/slot boundary that forbids runtime agents from executing arbitrary ComfyUI workflow JSON.
+- Files changed: `/docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`, `/docs/agent/harness/**`, `/openspec/changes/v0-9-self-use-mvp-demo-world-cut/tasks.md`
+- Tests added/updated: N/A
+- Docs updated: Phase 2 checkpoint, project index, file inventory, task board, active handoff, change journal, OpenSpec tasks
+- Follow-up notes: Implement Phase 2 on `feat/v0.9-visual-generation-control-plane`. Do not add Web UI unless minimal admin diagnostics are explicitly needed, and use `impeccable` first if Web work is included. Do not build a ComfyUI graph editor, do not add broad `worlds.py` routes, and do not run real providers by default.
+
 ## v0.9-v1.1 OpenSpec milestone roadmap entry
 
 - Date: 2026-05-16

@@ -3,7 +3,7 @@
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 1 MVP Provider Settings & Model Lab is complete locally after full validation and fast-forward merge. Phase 2 has not started.
+- Status: v0.9 Phase 1 MVP Provider Settings & Model Lab is complete locally after full validation and fast-forward merge. Phase 2 planning checkpoint is complete; implementation has not started.
 
 ## Current Context
 
@@ -24,6 +24,7 @@
 - v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.
 - v0.9 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md`. It confirms static/code-owned provider templates, server-side redacted model discovery, Phase 1 text adapter alignment, no real provider tests by default, and `impeccable` use before Web UI implementation.
 - v0.9 Phase 1 implementation adds static provider templates, redacted server-side model discovery, manual model-name fallback, OpenAI-compatible and Anthropic-compatible text adapters through `ProviderExecutionService`, and provider admin model lab UI. No migrations or persistent provider-template tables were added.
+- v0.9 Phase 2 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`. It confirms dedicated `backend/packages/visual_generation/` and `backend/services/api/src/noveland/services/api/visual_generation.py` ownership, expected migration tables, backend/API-first plus minimal admin diagnostics scope, strict worldline-scoped character visual profiles, provider-neutral visual generation plans, ComfyUI template/slot execution boundary, cross-provider mapping policy, and review/apply-only AI workflow/profile proposals.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -109,7 +110,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Continue v0.9 with Phase 2 Visual Generation Control Plane only when explicitly requested.
+- Continue v0.9 with Phase 2 Visual Generation Control Plane implementation only when explicitly requested, using `feat/v0.9-visual-generation-control-plane` and preserving the checkpoint decisions.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.

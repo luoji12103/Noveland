@@ -72,6 +72,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md` — final v0.8 Public Experience & Ecosystem Phase 11 implementation plan.
 - `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md` — feasibility review for the proposed v0.9 Self-use MVP Demo World Cut after v0.8 completion and roadmap planning.
 - `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md` — v0.9 Phase 1 checkpoint for provider settings/model lab implementation decisions.
+- `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md` — v0.9 Phase 2 checkpoint for dedicated visual generation package/router/schema ownership, workflow-template slot safety, model inventory, character visual profiles, provider-neutral plans, AI proposal policy, and backend/API-first implementation scope.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.

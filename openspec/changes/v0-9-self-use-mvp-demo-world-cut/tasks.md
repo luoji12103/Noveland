@@ -7,7 +7,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 1.1 Confirm v0.8 archived current specs and no active OpenSpec changes conflict with v0.9.
 - [x] 1.2 Write v0.9 feasibility review before implementation begins.
 - [x] 1.3 Confirm provider text/image execution, model discovery, and template ownership.
-- [ ] 1.4 Confirm Visual Generation Control Plane package/router/schema ownership before implementation.
+- [x] 1.4 Confirm Visual Generation Control Plane package/router/schema ownership before implementation.
 - [ ] 1.5 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
 - [x] 1.6 Confirm frontend phases will use `impeccable` before Web implementation.
 
@@ -23,8 +23,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 3. Phase 2 — Visual Generation Control Plane
 
-- [ ] 3.1 Write docs-only phase planning checkpoint.
-- [ ] 3.2 Decide visual generation package/router/schema ownership and migration need.
+- [x] 3.1 Write docs-only phase planning checkpoint.
+- [x] 3.2 Decide visual generation package/router/schema ownership and migration need.
 - [ ] 3.3 Implement workflow template registry with validated parameter slots.
 - [ ] 3.4 Implement visual model asset inventory for checkpoint, LoRA, VAE, embedding, ControlNet, IP-Adapter, workflow template, and prompt preset metadata.
 - [ ] 3.5 Implement character/worldline visual generation profiles.
