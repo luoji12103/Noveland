@@ -2328,3 +2328,15 @@
 - Tests added/updated: N/A, merge bookkeeping only.
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 6 from clean local `main`; preserve shared-world data safeguards and avoid destructive deletion of canonical records.
+
+## v0.8.6 Player Privacy & Data Controls planning entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 6 planning.
+- Summary: Added the Phase 6 checkpoint for authenticated player data export and reviewable deletion/redaction requests, with shared-world safeguards and no automatic deletion of shared canonical records.
+- Files changed: `/docs/agent/harness/feature-updates/v0.8.6-player-privacy-data-controls-plan.md`, `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: feature plan, OpenSpec task list, project index, file inventory, task board, active handoff, and change journal.
+- Verification: OpenSpec strict changes validation and `git diff --check`.
+- Follow-up notes: Implement Phase 6 on a feature branch. Keep privacy controls authenticated, deterministic, reviewable, and free of storage path, raw prompt/output, bytes/base64, or secret leaks.

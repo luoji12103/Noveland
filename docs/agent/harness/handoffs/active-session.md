@@ -3,7 +3,7 @@
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
 - Objective: v0.8 Public Experience & Ecosystem Phase 6 Player Privacy & Data Controls.
-- Status: Phase 5 fast-forward merge is complete; Phase 6 docs-only planning checkpoint is next.
+- Status: Phase 6 docs-only planning checkpoint is complete; Phase 6 implementation is next.
 
 ## Current Context
 
@@ -55,6 +55,8 @@
 - v0.8 Phase 5 implementation adds `/worlds/{world_id}/reader/conversations/{conversation_id}/scene`, `ConversationSceneView`, and shared `playback-media` helpers reused by playback and scene view.
 - v0.8 Phase 5 fast-forward merge to local `main` completed.
 - v0.8 Phase 6 must distinguish player-owned data from shared canonical world records. It must not destructively delete shared world/media/provider records.
+- v0.8 Phase 6 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.6-player-privacy-data-controls-plan.md`.
+- v0.8 Phase 6 implementation should add a narrow privacy boundary, deterministic sanitized export, and reviewable deletion/redaction requests without provider calls, daemon jobs, or automatic shared-record deletion.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -73,7 +75,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Start Phase 6 from clean local `main` with a docs-only planning checkpoint.
+- Start Phase 6 implementation from clean local `main` on a feature branch.
 - Use `impeccable` before Phase 6 frontend implementation work if Web UI is implemented.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
