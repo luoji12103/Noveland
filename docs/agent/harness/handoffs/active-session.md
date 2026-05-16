@@ -2,8 +2,8 @@
 
 - Date: 2026-05-16T00:00:00Z
 - Branch: main
-- Objective: v0.8 Public Experience & Ecosystem Phase 6 Player Privacy & Data Controls.
-- Status: Phase 6 implementation and targeted tests are complete; Phase 6 full local gate is next.
+- Objective: v0.8 Public Experience & Ecosystem Phase 7 World Packaging planning.
+- Status: Phase 6 Player Privacy & Data Controls passed the full local gate and fast-forward merged to local `main`; Phase 7 planning is next.
 
 ## Current Context
 
@@ -59,6 +59,8 @@
 - v0.8 Phase 6 implementation should add a narrow privacy boundary, deterministic sanitized export, and reviewable deletion/redaction requests without provider calls, daemon jobs, or automatic shared-record deletion.
 - v0.8 Phase 6 implementation adds `backend/packages/player_privacy/`, `player_privacy.py`, `player_privacy_requests`, and `/worlds/{world_id}/player/privacy/*` APIs for sanitized export preview/export request, delete request creation, request listing, and admin review.
 - v0.8 Phase 6 Web implementation adds `/worlds/{world_id}/player/privacy` and `PlayerPrivacyControls` for export records and deletion review requests over the safe privacy API.
+- v0.8 Phase 6 fast-forward merge to local `main` completed.
+- v0.8 Phase 7 World Packaging must implement safe manifest-based export/import preview/apply discipline without exporting secrets, raw prompt snapshots by default, direct storage paths, or public marketplace scope.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -77,8 +79,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Run the Phase 6 full local gate, then fast-forward merge back to local `main` if it stays green.
-- Use `impeccable` before Phase 6 frontend implementation work if Web UI is implemented.
+- Start Phase 7 World Packaging from clean local `main` with a docs-only planning checkpoint before code changes.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -209,3 +210,6 @@
 - v0.8 Phase 5 targeted checks passed: focused Web component tests for scene view and playback, focused scene view e2e, Web lint, Web typecheck, OpenSpec strict changes validation, and `git diff --check`.
 - v0.8 Phase 5 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`39 passed files`, `124 passed`), Web build, Web `check:next-env`, Web e2e (`19 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - v0.8 Phase 5 fast-forward merge to local `main` completed.
+- v0.8 Phase 6 targeted checks passed: backend ruff and mypy for player privacy files, targeted pytest (`31 passed` after Alembic head update), Web lint, Web typecheck, focused privacy component tests (`2 passed`), focused privacy e2e (`1 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
+- v0.8 Phase 6 full local gate passed: backend ruff, backend mypy (`267 source files`), backend pytest (`425 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`40 passed files`, `126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed` after fixing the serial-state privacy count assertion), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- v0.8 Phase 6 fast-forward merge to local `main` completed.

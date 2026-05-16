@@ -2352,3 +2352,26 @@
 - Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
 - Verification: Targeted checks passed with backend ruff and mypy for player privacy files, backend pytest (`28 passed`), Web lint, Web typecheck, focused privacy component tests (`2 passed`), focused privacy e2e (`1 passed`), and no forbidden storage/prompt/secret markers in tested responses/pages.
 - Follow-up notes: Run the full local gate, then fast-forward merge Phase 6 back to local `main` if it stays green.
+
+## v0.8.6 Player Privacy & Data Controls gate entry
+
+- Date: 2026-05-16
+- Branch: feat/player-privacy-controls
+- Scope: v0.8 Public Experience & Ecosystem Phase 6 full local gate.
+- Summary: Recorded the successful full local gate for authenticated player privacy export and reviewable delete-request workflows.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, gate bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Verification: Full local gate passed with backend ruff, backend mypy (`267 source files`), backend pytest (`425 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`40 passed files`, `126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed` after fixing the serial-state privacy count assertion), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 6 implementation, fast-forward merge `feat/player-privacy-controls` to local `main`, then record merge bookkeeping before starting Phase 7.
+
+## v0.8.6 Player Privacy & Data Controls merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 6 merge bookkeeping.
+- Summary: Fast-forward merged `feat/player-privacy-controls` into local `main`, marked Phase 6 complete in OpenSpec tasks, and moved harness handoff state to Phase 7 World Packaging planning.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 7 from clean local `main`; keep packaging manifest-safe and preview/apply-first, with no secret, storage path, or raw prompt export.

@@ -72,9 +72,9 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] Implement player data export/delete-request workflow only.
 - [x] Add privacy, ACL, export-redaction, and request-review tests.
 - [x] Run targeted tests.
-- [ ] Run full local gate.
-- [ ] Fast-forward merge to local main.
-- [ ] Update OpenSpec tasks and harness docs.
+- [x] Run full local gate.
+- [x] Fast-forward merge to local main.
+- [x] Update OpenSpec tasks and harness docs.
 
 ## Phase 7 — World Packaging
 
