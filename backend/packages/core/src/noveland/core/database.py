@@ -30,6 +30,7 @@ MODEL_MODULES = (
     "noveland.invocations.models",
     "noveland.memory.models",
     "noveland.media.models",
+    "noveland.moderation.models",
     "noveland.events.models",
     "noveland.narrative.models",
     "noveland.observability.models",

@@ -177,6 +177,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.conversations` — world-scoped conversation session, participant, transcript, stop, diagnostics, and conversation narrative router
   - `noveland.services.api.conversation_presentations` — backend-only turn presentation CRUD plus visual, speech, and transcription render orchestration
   - `noveland.services.api.observability` — platform-admin incident summary router over safe runtime/provider/media/eval evidence
+  - `noveland.services.api.moderation` — world-scoped report, moderation action, and incident workflow router with safe evidence refs and no automatic execution
   - `noveland.services.api.package_contracts` — world-admin package contract validation and safe provider config export router
   - `noveland.services.api.player_privacy` — world-scoped player privacy export, request listing, delete-request creation, and admin review router over sanitized player-owned/player-visible records
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
@@ -327,6 +328,10 @@ Fast orientation for a new coding session.
   - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, and retention DTOs, including conversation diagnostics
   - `noveland.observability.models` — runtime diagnostic event ORM model
   - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, and detail redaction
+- `backend/packages/moderation/`
+  - `noveland.moderation.contracts` — report, action, incident, target, severity, status, and action-kind DTOs
+  - `noveland.moderation.models` — persisted moderation report/action/incident workflow ORM models
+  - `noveland.moderation.service` — report/review/action/incident workflow service with safe evidence refs, audit summaries, and reader-delivery suppression checks
 - `backend/packages/player_privacy/`
   - `noveland.player_privacy.contracts` — player privacy export and request DTOs for sanitized data controls
   - `noveland.player_privacy.models` — `player_privacy_requests` ORM model for reviewable export/delete requests

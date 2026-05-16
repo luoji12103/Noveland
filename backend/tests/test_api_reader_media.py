@@ -16,6 +16,7 @@ from noveland.auth.services import hash_session_token
 from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
 from noveland.media.storage import LocalMediaObjectStorage
+from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import SESSION_COOKIE_NAME
@@ -322,6 +323,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
         cast(Table, MediaReference.__table__),
+        cast(Table, ModerationReport.__table__),
+        cast(Table, ModerationIncident.__table__),
+        cast(Table, ModerationAction.__table__),
     ):
         table.create(engine)
 

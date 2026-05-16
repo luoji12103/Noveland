@@ -556,6 +556,13 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/package_contracts/src/noveland/package_contracts/contracts.py`
 - `backend/packages/package_contracts/src/noveland/package_contracts/service.py`
 - `backend/services/api/src/noveland/services/api/package_contracts.py`
+- `backend/packages/moderation/`
+- `backend/packages/moderation/pyproject.toml`
+- `backend/packages/moderation/src/noveland/moderation/__init__.py`
+- `backend/packages/moderation/src/noveland/moderation/contracts.py`
+- `backend/packages/moderation/src/noveland/moderation/models.py`
+- `backend/packages/moderation/src/noveland/moderation/service.py`
+- `backend/services/api/src/noveland/services/api/moderation.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/packages/providers/src/noveland/providers/budget.py`
 - `backend/migrations/versions/20260515_0042_provider_budget_policies.py`
@@ -569,6 +576,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_api_world_packaging.py`
 - `backend/tests/test_api_package_contracts.py`
 - `backend/tests/test_sample_world_release_package.py`
+- `backend/tests/test_api_moderation.py`
 
 ## Update rule
 

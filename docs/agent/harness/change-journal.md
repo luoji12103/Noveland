@@ -2483,3 +2483,15 @@
 - Docs updated: feature plan, OpenSpec task list/design/phase plan, project index, file inventory, task board, active handoff, and change journal.
 - Verification: OpenSpec strict changes validation and `git diff --check`.
 - Follow-up notes: Implement Phase 10 on a feature branch. Do not add Web UI, automatic moderation, provider calls, daemon work, public unauthenticated access, duplicate observability/readiness framework, or broad `worlds.py` routes.
+
+## v0.8.10 Moderation & Incident Workflow implementation entry
+
+- Date: 2026-05-16
+- Branch: feat/moderation-incident-workflow
+- Scope: v0.8 Public Experience & Ecosystem Phase 10 backend/API moderation workflow.
+- Summary: Added a dedicated `moderation` package, `moderation.py` router, and migration `20260516_0044_moderation_incident_workflow.py` for persisted reports, actions, and incident workflow records. The implementation supports reader/member report creation, admin report review, bounded action audit records, incident grouping/review, safe evidence refs, and reader-delivery suppression for explicitly applied media/world takedown actions. It does not mutate provider/media rows for disable actions, write world events, execute providers, run daemons, add Web UI, or add routes to `worlds.py`.
+- Files changed: `/backend/packages/moderation/**`, `/backend/services/api/src/noveland/services/api/moderation.py`, `/backend/migrations/versions/20260516_0044_moderation_incident_workflow.py`, backend workspace metadata, reader delivery suppression hook, `/backend/tests/test_api_moderation.py`, schema/Alembic tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: moderation API coverage for report creation/review, ACL, cross-worldline rejection, evidence/metadata redaction, provider action audit, incident grouping, reader-media takedown suppression, reader media compatibility, schema metadata, Alembic head, and workspace imports.
+- Docs updated: OpenSpec task status, project index, file inventory, task board, active handoff, and change journal.
+- Verification: Targeted checks passed with backend ruff and mypy for moderation/API/reader-delivery/schema files, targeted pytest (`41 passed`), and the full local gate: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
+- Follow-up notes: Commit Phase 10 implementation and fast-forward merge to local `main` if the branch remains clean. Keep Phase 10 backend/API-only; no Web UI, automatic moderation, provider execution, daemon work, public unauthenticated access, duplicate readiness framework, or broad `worlds.py` routes.

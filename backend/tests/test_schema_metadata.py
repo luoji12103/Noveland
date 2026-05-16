@@ -103,6 +103,9 @@ def test_core_schema_tables_are_registered() -> None:
         "memory_retrieval_logs",
         "memory_write_jobs",
         "memory_write_logs",
+        "moderation_actions",
+        "moderation_incidents",
+        "moderation_reports",
         "narrative_continuity_reviews",
         "offscreen_event_queue",
         "organization_conflict_events",
@@ -1254,6 +1257,105 @@ def test_living_world_knowledge_player_guardrail_columns_are_registered() -> Non
     } <= constraint_names("player_privacy_requests", CheckConstraint)
     assert foreign_key_targets("player_privacy_requests") == {
         "users.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert {
+        "world_id",
+        "worldline_id",
+        "reporter_user_id",
+        "target_ref_kind",
+        "target_ref_id",
+        "category",
+        "severity",
+        "status",
+        "reason",
+        "reporter_note",
+        "evidence_refs",
+        "created_by_actor_ref",
+        "reviewed_by_actor_ref",
+        "reviewed_at",
+        "review_note",
+        "metadata",
+    } <= column_names("moderation_reports")
+    assert {
+        "world_id",
+        "worldline_id",
+        "status",
+        "severity",
+        "title",
+        "summary",
+        "report_ids",
+        "action_ids",
+        "evidence_refs",
+        "created_by_actor_ref",
+        "reviewed_by_actor_ref",
+        "reviewed_at",
+        "review_note",
+        "metadata",
+    } <= column_names("moderation_incidents")
+    assert {
+        "world_id",
+        "worldline_id",
+        "report_id",
+        "incident_id",
+        "action_kind",
+        "status",
+        "target_ref_kind",
+        "target_ref_id",
+        "reason",
+        "audit_summary",
+        "evidence_refs",
+        "created_by_actor_ref",
+        "reviewed_by_actor_ref",
+        "reviewed_at",
+        "review_note",
+        "metadata",
+    } <= column_names("moderation_actions")
+    assert {
+        "ix_moderation_reports_world_status",
+        "ix_moderation_reports_worldline_status",
+        "ix_moderation_reports_reporter",
+        "ix_moderation_reports_target",
+    } <= index_names("moderation_reports")
+    assert {
+        "ix_moderation_incidents_world_status",
+        "ix_moderation_incidents_worldline_status",
+    } <= index_names("moderation_incidents")
+    assert {
+        "ix_moderation_actions_world_status",
+        "ix_moderation_actions_worldline_status",
+        "ix_moderation_actions_target",
+        "ix_moderation_actions_report",
+        "ix_moderation_actions_incident",
+    } <= index_names("moderation_actions")
+    assert {
+        "ck_moderation_reports_category",
+        "ck_moderation_reports_severity",
+        "ck_moderation_reports_status",
+        "ck_moderation_reports_target_ref_kind",
+    } <= constraint_names("moderation_reports", CheckConstraint)
+    assert {
+        "ck_moderation_incidents_severity",
+        "ck_moderation_incidents_status",
+    } <= constraint_names("moderation_incidents", CheckConstraint)
+    assert {
+        "ck_moderation_actions_action_kind",
+        "ck_moderation_actions_status",
+        "ck_moderation_actions_target_ref_kind",
+    } <= constraint_names("moderation_actions", CheckConstraint)
+    assert foreign_key_targets("moderation_reports") == {
+        "users.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("moderation_incidents") == {
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("moderation_actions") == {
+        "moderation_incidents.id",
+        "moderation_reports.id",
         "worldlines.id",
         "worlds.id",
     }

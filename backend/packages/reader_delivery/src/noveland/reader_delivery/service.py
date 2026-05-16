@@ -6,6 +6,7 @@ from noveland.conversations.models import ConversationSession, ConversationTurn
 from noveland.media.contracts import MediaAssetStatus, MediaReferenceKind, MediaVisibility
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
 from noveland.media.storage import MediaObjectStorage
+from noveland.moderation import ModerationService, ModerationTargetKind
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.reader_delivery.contracts import (
     ReaderMediaDescriptor,
@@ -111,6 +112,8 @@ class ReaderMediaDeliveryService:
     def _descriptor_for_asset(self, asset: MediaAsset) -> ReaderMediaDescriptor | None:
         if not self._asset_is_reader_deliverable(asset):
             return None
+        if self._asset_is_moderation_suppressed(asset):
+            return None
         references = self._reader_visible_references(asset)
         if not references:
             return None
@@ -136,6 +139,14 @@ class ReaderMediaDeliveryService:
             references=tuple(references),
             created_at=asset.created_at,
             updated_at=asset.updated_at,
+        )
+
+    def _asset_is_moderation_suppressed(self, asset: MediaAsset) -> bool:
+        return ModerationService(self._session).target_is_suppressed(
+            asset.world_id,
+            ModerationTargetKind.MEDIA_ASSET,
+            asset.id,
+            worldline_id=asset.worldline_id,
         )
 
     def _asset_is_reader_deliverable(self, asset: MediaAsset) -> bool:

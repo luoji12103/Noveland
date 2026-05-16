@@ -12,6 +12,7 @@ from noveland.services.api.images import router as images_router
 from noveland.services.api.invocations import router as invocations_router
 from noveland.services.api.media import router as media_router
 from noveland.services.api.media import turn_media_router
+from noveland.services.api.moderation import router as moderation_router
 from noveland.services.api.multimodal_evals import router as multimodal_evals_router
 from noveland.services.api.narrative_quality import router as narrative_quality_router
 from noveland.services.api.observability import router as observability_router
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     api.include_router(invocations_router)
     api.include_router(providers_router)
     api.include_router(reader_media_router)
+    api.include_router(moderation_router)
     api.include_router(player_privacy_router)
     api.include_router(package_contracts_router)
     api.include_router(world_packaging_router)
