@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-16T00:00:00Z
-- Branch: feat/player-interaction-ui
-- Objective: v0.8 Public Experience & Ecosystem Phase 3 Player Interaction UI.
-- Status: Phase 3 full local gate is complete; implementation commit and fast-forward merge are next.
+- Branch: main
+- Objective: v0.8 Public Experience & Ecosystem Phase 4 Worldline Browser.
+- Status: Phase 3 fast-forward merge is complete; Phase 4 docs-only planning checkpoint is next.
 
 ## Current Context
 
@@ -43,6 +43,8 @@
 - v0.8 Phase 3 must reuse existing choices, journal, notifications, and intervention records. The current backend already exposes journal, notifications, and interventions to members, but player choice endpoints are admin-scoped and may need a narrow existing-route ACL adjustment.
 - v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
 - v0.8 Phase 3 implementation adds `/worlds/{world_id}/player`, `PlayerInteractions`, player data loading in the Web server helper, and a workspace Player nav link. The backend change is limited to existing player actor/choice route ACLs and current-user filtering, plus safer player choice/intervention event payload summaries.
+- v0.8 Phase 3 fast-forward merge to local `main` completed.
+- v0.8 Phase 4 must implement read-only worldline browsing/comparison only. Do not add rollback, merge, destructive branch operations, or unsafe raw event payload exposure.
 - v0.8 Public Launch Gate must build on the v0.7 internal production readiness service and must not replace it.
 - `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
 - `.opencode/` is ignored and must not be committed.
@@ -61,7 +63,8 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - Archive `v0-7-production-hardening` and write v0.7 release notes only if explicitly requested.
-- Commit Phase 3 implementation, fast-forward merge to local `main`, confirm `main` clean, and then start Phase 4 from clean local `main`.
+- Start Phase 4 from clean local `main` with a docs-only planning checkpoint.
+- Use `impeccable` before Phase 4 frontend implementation work.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
@@ -183,3 +186,4 @@
 - v0.8 Phase 2 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`36 passed`, `115 passed`), Web build, Web `check:next-env`, Web e2e (`14 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.8 Phase 3 targeted checks passed: backend pytest for the member-owned player interaction API/ACL regression, focused Web component tests for player interactions, Web typecheck, Web lint, focused player interaction e2e, targeted backend ruff for changed Phase 3 backend files, and `git diff --check`.
 - v0.8 Phase 3 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`421 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`37 passed files`, `118 passed`), Web build, Web `check:next-env`, Web e2e (`16 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
+- v0.8 Phase 3 fast-forward merge to local `main` completed.

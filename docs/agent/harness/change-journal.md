@@ -2223,3 +2223,14 @@
 - Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
 - Verification: Full local gate passed with backend ruff, backend mypy (`261 source files`), backend pytest (`421 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`37 passed files`, `118 passed`), Web build, Web `check:next-env`, Web e2e (`16 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
 - Follow-up notes: Commit Phase 3 implementation, fast-forward merge `feat/player-interaction-ui` to local `main`, then record merge bookkeeping before starting Phase 4.
+
+## v0.8.3 Player Interaction UI merge entry
+
+- Date: 2026-05-16
+- Branch: main
+- Scope: v0.8 Public Experience & Ecosystem Phase 3 merge bookkeeping.
+- Summary: Fast-forward merged `feat/player-interaction-ui` into local `main`, marked Phase 3 complete in OpenSpec tasks, and moved harness handoff state to Phase 4 Worldline Browser planning.
+- Files changed: `/openspec/changes/v0-8-public-experience-ecosystem/tasks.md`, `/docs/agent/harness/{task-board,handoffs/active-session,change-journal}.md`
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec tasks, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 4 from clean local `main`; use the `impeccable` skill before frontend implementation, and keep worldline browsing read-only.
