@@ -112,7 +112,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 11.3 Validate 30-minute play evidence, resume behavior, visual generation readiness, provider failure messaging, and admin inspection links.
 - [x] 11.4 Add gate pass/fail, persistence, memory, visual generation, provider/media diagnostics, ACL, and no-leak tests.
 - [x] 11.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 11.6 Fast-forward merge to local main and update harness docs.
+- [x] 11.6 Fast-forward merge to local main and update harness docs.
 
 ## 12. Closeout
 

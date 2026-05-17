@@ -5,7 +5,7 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 10 30-Minute Self-use MVP Gate fast-forward merge
+- None
 
 ## Blocked
 - None
@@ -15,6 +15,7 @@
 - v0.9 Phase 10 30-Minute Self-use MVP Gate implementation
 - v0.9 Phase 10 30-Minute Self-use MVP Gate targeted tests
 - v0.9 Phase 10 30-Minute Self-use MVP Gate full backend gate
+- v0.9 Phase 10 30-Minute Self-use MVP Gate fast-forward merge
 - v0.9 Phase 9 Demo World Assembly planning checkpoint
 - v0.9 Phase 9 Demo World Assembly implementation
 - v0.9 Phase 9 Demo World Assembly targeted tests
