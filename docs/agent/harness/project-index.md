@@ -84,8 +84,9 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
-- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.6/v0.7/v0.8 changes, and active v0.9/v1.0/v1.1 milestone roadmap changes.
-- `openspec/changes/v0-9-self-use-mvp-demo-world-cut/` — active OpenSpec roadmap for a self-use playable demo world: provider settings/model lab, visual generation control plane, provider lab worktree, galgame source intake, dialogue extraction, persona/memory distillation, visual/voice mapping, demo assembly, and a 30-minute self-use gate.
+- `docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md` — release notes for the completed v0.9 Self-use MVP Demo World Cut sequence.
+- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9 changes, and active v1.0/v1.1 milestone roadmap changes.
+- `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/` — archived v0.9 OpenSpec change for the self-use playable demo world.
 - `openspec/changes/v1-0-private-beta-mvp/` — active OpenSpec roadmap for invite-only private beta: onboarding, setup wizard, session stability, memory/persona QA, beta feedback, quota enforcement, repair loop, and private beta gate.
 - `openspec/changes/v1-1-normal-use-release-candidate/` — active OpenSpec roadmap for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
 - `docs/agent/harness/task-board.md` — current execution state only.

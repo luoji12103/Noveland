@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Self-use MVP Demo World Cut archive entry
+
+- Date: 2026-05-17
+- Branch: main
+- Scope: OpenSpec archive, v0.9 current specs, release notes, and harness bookkeeping.
+- Summary: Archived the completed v0.9 Self-use MVP Demo World Cut OpenSpec change, synced implemented v0.9 capabilities into current OpenSpec specs, and added v0.9 release notes.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/**`, `/docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md`, `/docs/agent/harness/**`
+- Tests added/updated: N/A
+- Docs updated: OpenSpec current specs, OpenSpec archive, v0.9 release notes, project index, file inventory, task board, active handoff.
+- Follow-up notes: v0.9 is closed locally. v1.0 Private Beta MVP feasibility review may start when explicitly requested. No backend/Web runtime behavior changed and no push was performed.
+
 ## v0.9 Phase 10 Self-use MVP Gate planning/implementation entry
 
 - Date: 2026-05-17

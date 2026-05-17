@@ -1,22 +1,22 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T11:24:45Z
+- Date: 2026-05-17T12:31:13Z
 - Branch: main
-- Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 10 30-Minute Self-use MVP Gate is complete and fast-forward merged to local `main`. v0.9 implementation phases are complete; do not archive until explicitly instructed.
+- Objective: v0.9 Self-use MVP Demo World Cut closeout.
+- Status: v0.9 is archived, release-noted, and represented in current OpenSpec specs. Next accepted work is v1.0 Private Beta MVP feasibility review only when explicitly requested.
 
 ## Current Context
 
 - `main` is ahead of `origin/main`; do not push unless explicitly requested.
 - Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
 - v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
-- Current Phase 3-13, v0.4, v0.5, v0.6, v0.7, and v0.8 implemented behavior is represented under `openspec/specs/`.
+- Current Phase 3-13, v0.4, v0.5, v0.6, v0.7, v0.8, and v0.9 implemented behavior is represented under `openspec/specs/`.
 - The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
 - The completed v0.5 change is archived under `openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/`.
 - The completed v0.6 change is archived under `openspec/changes/archive/2026-05-16-v0-6-runtime-narrative-quality/`.
 - The completed v0.7 change is archived under `openspec/changes/archive/2026-05-16-v0-7-production-hardening/`.
 - The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
-- Active v0.9 roadmap change: `openspec/changes/v0-9-self-use-mvp-demo-world-cut/`.
+- The completed v0.9 change is archived under `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/`.
 - Active v1.0 roadmap change: `openspec/changes/v1-0-private-beta-mvp/`.
 - Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
@@ -49,6 +49,7 @@
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
 - v0.8 release notes live at `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`.
+- v0.9 release notes live at `docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md`.
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
 - v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
 - v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
@@ -128,9 +129,9 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Wait for explicit instruction before archiving v0.9 or starting v1.0 feasibility review.
-- Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
+- OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
+- Start v1.0 feasibility review only when explicitly requested.
+- Do not implement v1.0 before its feasibility review is written and accepted.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
