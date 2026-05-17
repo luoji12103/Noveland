@@ -5,7 +5,7 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 6 Character Memory Distillation Agent fast-forward merge and harness closeout
+- v0.9 Phase 7 Visual Asset Mapping, after explicit branch start
 
 ## Blocked
 - None
@@ -15,6 +15,7 @@
 - v0.9 Phase 6 Character Memory Distillation Agent implementation
 - v0.9 Phase 6 Character Memory Distillation Agent targeted tests
 - v0.9 Phase 6 Character Memory Distillation Agent full backend gate
+- v0.9 Phase 6 Character Memory Distillation Agent fast-forward merge
 - v0.9 Phase 5 Script Dialogue Extraction planning checkpoint
 - v0.9 Phase 5 Script Dialogue Extraction implementation
 - v0.9 Phase 5 Script Dialogue Extraction targeted tests

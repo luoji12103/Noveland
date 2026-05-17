@@ -73,7 +73,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 7.4 Implement review/apply to persona and memory only after explicit approval.
 - [x] 7.5 Add invocation ledger, prompt redaction, source traceability, profile proposal, apply, and no-leak tests.
 - [x] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 7.7 Fast-forward merge to local main and update harness docs.
+- [x] 7.7 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — Visual Asset Mapping
 

@@ -20,7 +20,7 @@
 - Files changed: `backend/packages/authoring/**`, `backend/services/api/src/noveland/services/api/authoring.py`, authoring service/API tests, OpenSpec tasks, and harness docs.
 - Tests added/updated: Authoring service/API coverage for provider invocation/prompt snapshot evidence, proposal-only distillation, visual profile recommendations as review-only proposals, explicit approval before persona/memory mutation, traceable applied persona and memory metadata, admin ACL, no storage/path/base64/raw prompt/raw output/prompt snapshot response leaks, and no `world_events` writes.
 - Docs updated: Phase 6 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
-- Follow-up notes: Phase 6 added no Web UI and no migration; `impeccable` was not needed. Phase 7 should reuse authoring asset-match proposals and existing visual records for reviewed visual asset mapping.
+- Follow-up notes: Commit `6d97262` fast-forward merged to local `main`; no push performed. Phase 6 added no Web UI and no migration; `impeccable` was not needed. Phase 7 should reuse authoring asset-match proposals and existing visual records for reviewed visual asset mapping.
 
 ## v0.9 Phase 4 Galgame Source Intake planning/implementation entry
 
