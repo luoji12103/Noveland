@@ -189,6 +189,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.9.8-voice-profile-mapping-plan.md`
 - `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`
 - `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`
+- `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/test_api_authoring.py`

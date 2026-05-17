@@ -9,17 +9,17 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 1.1 Confirm v0.9 is complete, archived, and represented in current specs.
 - [x] 1.2 Write v1.0 feasibility review before implementation begins.
 - [x] 1.3 Revise v1.0 phase order based on feasibility review.
-- [ ] 1.4 Confirm private beta invitation model and whether existing world memberships are sufficient.
+- [x] 1.4 Confirm private beta invitation model and whether existing world memberships are sufficient.
 - [ ] 1.5 Confirm player session/resume schema and package/router ownership.
 - [ ] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
 - [ ] 1.7 Confirm feedback ownership and whether moderation records can be reused.
 - [ ] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
-- [ ] 1.9 Confirm frontend phases will use `impeccable` before Web implementation.
+- [x] 1.9 Confirm frontend phases will use `impeccable` before Web implementation.
 
 ## 2. Phase 1 — Private Beta Onboarding & Access Model
 
-- [ ] 2.1 Write docs-only phase planning checkpoint for invite/access ownership.
-- [ ] 2.2 Decide dedicated invite/access records vs membership-only model.
+- [x] 2.1 Write docs-only phase planning checkpoint for invite/access ownership.
+- [x] 2.2 Decide dedicated invite/access records vs membership-only model.
 - [ ] 2.3 Implement invite-only beta eligibility and player profile setup.
 - [ ] 2.4 Implement onboarding UI only after using `impeccable`.
 - [ ] 2.5 Add invite, profile, authorization, expiration/revocation, and no-leak tests.

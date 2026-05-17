@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 1 Private Beta Onboarding & Access Model planning entry
+
+- Date: 2026-05-17
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 1 docs-only planning checkpoint; no backend/Web implementation, migrations, runtime behavior changes, API behavior changes, or push.
+- Summary: Confirmed that private beta onboarding must use a dedicated invite/access model rather than membership-only access. The checkpoint assigns ownership to planned `backend/packages/private_beta/` and app-level `private_beta.py`, keeps `WorldMembership` as the least-privilege enforcement layer after valid redemption, defines invite lifecycle states, plans the `private_beta_invites` first migration, requires hashed non-guessable invite tokens, and limits Phase 1 Web scope to API-first plus minimal redemption/onboarding flow after `impeccable`.
+- Files changed: `/docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`, `/openspec/changes/v1-0-private-beta-mvp/{design.md,phase-plan.md,tasks.md,specs/private-beta-onboarding/spec.md}`, and harness docs.
+- Tests added/updated: N/A, documentation-only planning checkpoint.
+- Docs updated: Phase 1 checkpoint, OpenSpec design/phase-plan/tasks/spec delta, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 1 implementation only after checkpoint acceptance. Do not add broad routes to `worlds.py`; do not store/log raw invite tokens; do not grant admin/provider/media/invocation privileges to testers. Use `impeccable` before any Web implementation. No push performed.
+
 ## v1.0 Private Beta MVP feasibility review entry
 
 - Date: 2026-05-17

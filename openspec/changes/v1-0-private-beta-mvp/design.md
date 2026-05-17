@@ -39,7 +39,25 @@ self-use demo evidence
 
 ### Private beta remains invite-only
 
-v1.0 should reuse existing auth/session/world membership/player records where possible and add only the minimum invitation or eligibility model needed. Public signup belongs later. The feasibility review found that existing `world_memberships` alone probably cannot represent invite expiry, redemption audit, revocation, and beta-limited access, so Phase 1 must decide whether to add a dedicated private beta invite/access model before implementation.
+v1.0 should reuse existing auth/session/world membership/player records where possible, but Phase 1
+has decided that `world_memberships` alone cannot represent invite expiry, redemption audit,
+revocation, waitlist, acceptance, and beta-limited access. Implementation should add a dedicated
+private beta invite/access model. Public signup belongs later. `WorldMembership` remains the
+least-privilege enforcement layer after valid redemption, not the invitation lifecycle source of
+truth.
+
+### Private beta routes stay outside worlds.py
+
+Phase 1 private beta onboarding should use `backend/packages/private_beta/` and
+`backend/services/api/src/noveland/services/api/private_beta.py`, registered at the app level.
+World-scoped paths are acceptable inside that router, but broad onboarding route growth in
+`worlds.py` is not.
+
+### Player profile setup follows access redemption
+
+Invite redemption should establish safe beta access first. Guided onboarding then creates or
+reuses `PlayerActorProfile` in a selected or invite-bound worldline. This preserves existing
+worldline-scoped player identity semantics and avoids manual database edits for testers.
 
 ### Phase order prioritizes beta safety foundations
 
@@ -79,6 +97,10 @@ Onboarding and admin setup UI should be calm, explicit, and task-focused. They m
 This roadmap does not add migrations yet. Expected migration pressure:
 
 - Onboarding likely needs invitation/beta eligibility records unless existing memberships can represent invite expiry, revocation, redemption, and audit safely.
+- Phase 1 now expects a first migration for `private_beta_invites`, with token-hash storage,
+  invite lifecycle status, world and optional worldline scope, invited email or user reference,
+  inviter/redeemer/revoker audit fields, expiration, least-privilege intended role, beta role,
+  safe metadata, and timestamps.
 - Player session stability likely needs player-owned session/resume records unless existing conversation/player records can safely carry current worldline/conversation/scene/presentation state.
 - Cost/quota enforcement may extend v0.7 cost/rate controls or add player/capability quota records.
 - Feedback likely needs persistent beta feedback records unless v0.8 moderation records are sufficient.
@@ -86,7 +108,6 @@ This roadmap does not add migrations yet. Expected migration pressure:
 
 ## Open Questions
 
-- Can existing world memberships represent private beta invites, or is a dedicated invite table needed?
 - Should session restore live under a dedicated player session package or inside private beta access/onboarding?
 - Should beta feedback extend moderation incident records or use a dedicated beta feedback package?
 - What is the minimum quota model for private beta: per world, per player, per provider, or all three?

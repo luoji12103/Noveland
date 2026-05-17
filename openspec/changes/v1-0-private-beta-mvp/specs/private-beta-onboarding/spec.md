@@ -4,20 +4,52 @@
 
 ### Requirement: Private beta access ownership is decided before implementation
 The system SHALL complete a docs-only phase checkpoint before implementing private beta onboarding.
-The checkpoint SHALL decide whether private beta access is represented by dedicated invite/access
-records or by existing world memberships.
+The checkpoint SHALL decide the private beta access package, router, schema, lifecycle, and
+least-privilege relationship to existing world memberships.
 
-#### Scenario: Checkpoint selects dedicated access records
-- **Given** existing world memberships cannot represent invite expiry, revocation, redemption, and audit safely
+#### Scenario: Checkpoint selects dedicated invite/access records
+- **Given** existing world memberships cannot represent invite expiry, revocation, waitlist, acceptance, redemption, and audit safely
 - **When** Phase 1 implementation begins
-- **Then** the implementation SHALL use a dedicated private beta access boundary
-- **And** it SHALL avoid broad route growth in `worlds.py`.
+- **Then** the implementation SHALL use a dedicated private beta invite/access boundary
+- **And** existing world memberships SHALL remain the enforcement layer after valid redemption
+- **And** the implementation SHALL avoid broad route growth in `worlds.py`.
 
-#### Scenario: Checkpoint selects membership-only access
-- **Given** the checkpoint selects existing world memberships
-- **When** implementation begins
-- **Then** the checkpoint SHALL document how invite eligibility, revocation, redemption, audit, and least privilege are represented
-- **And** implementation SHALL stop if those semantics cannot be preserved.
+### Requirement: Private beta invitations preserve lifecycle and audit
+The system SHALL represent private beta invitation lifecycle separately from world membership.
+
+#### Scenario: Admin creates an invite
+- **Given** an authorized world admin creates a private beta invite
+- **When** the invite is stored
+- **Then** the invite SHALL preserve world, optional worldline, inviter actor, invited email or user reference, intended beta role, expiration, status, and safe metadata
+- **And** the invite SHALL NOT store the raw token.
+
+#### Scenario: Invite is no longer redeemable
+- **Given** an invite is expired, revoked, or waitlisted
+- **When** a tester attempts redemption
+- **Then** the system SHALL reject redemption
+- **And** it SHALL NOT create or upgrade world membership.
+
+#### Scenario: Invite is redeemed
+- **Given** an invite is pending or accepted, unexpired, and valid for the requested world
+- **When** an authenticated tester redeems it
+- **Then** the system SHALL record redemption actor and timestamp
+- **And** it MAY create or update a least-privilege world membership
+- **And** repeated redemption SHALL be idempotent only when the same user and same invite make it safe.
+
+### Requirement: Invite tokens are protected
+The system SHALL handle private beta invite tokens as secrets.
+
+#### Scenario: Invite token is issued
+- **Given** an authorized admin creates an invite
+- **When** the token is generated
+- **Then** the token SHALL be non-guessable
+- **And** the system SHALL store only a hash or equivalent non-redeemable verifier.
+
+#### Scenario: Invite data is returned
+- **Given** invite records are listed, inspected, redeemed, or used for onboarding
+- **When** an API response is produced
+- **Then** it SHALL NOT include the raw token
+- **And** the token SHALL NOT appear in logs, prompt snapshots, model invocations, `world_events.payload`, reader APIs, player APIs, or member APIs.
 
 ### Requirement: Private beta onboarding is invite-only
 The system SHALL restrict private beta onboarding to invited or explicitly eligible testers.
@@ -35,7 +67,13 @@ The system SHALL let eligible testers create or select a player profile, select 
 - **Given** an eligible tester selects an allowed world
 - **When** they complete profile and identity setup
 - **Then** the system SHALL create player-scoped records using existing player boundaries
-- **And** all records SHALL be scoped to the authorized world and player.
+- **And** all records SHALL be scoped to the authorized world, worldline, and player.
+
+#### Scenario: Invite is redeemed before profile setup
+- **Given** an authenticated tester has redeemed a valid invite
+- **When** they have not completed guided player identity setup
+- **Then** the system SHALL grant only safe onboarding access
+- **And** it SHALL require a worldline-scoped player profile before player session use.
 
 ### Requirement: Onboarding preserves least privilege
 The system SHALL grant private beta testers only the minimum permissions required for beta play.
@@ -45,6 +83,12 @@ The system SHALL grant private beta testers only the minimum permissions require
 - **When** their access is created
 - **Then** the resulting access SHALL NOT grant platform-admin, world-admin, provider-admin, media-admin, invocation-ledger admin, or setup-wizard permissions
 - **And** any world membership SHALL remain bounded to the selected private beta world.
+
+#### Scenario: Tester calls admin routes
+- **Given** an invited tester has redeemed access as a beta tester
+- **When** they request admin, provider, invocation-ledger admin, or media-admin routes
+- **Then** the system SHALL reject the request
+- **And** it SHALL NOT expose provider configuration, resolved secrets, prompt snapshot internals, hidden assets, developer-only assets, storage paths, raw prompts, or raw outputs.
 
 ### Requirement: First-run guidance is player-safe
 The system SHALL provide first-run guidance without exposing admin-only diagnostics, raw prompts, raw outputs, storage paths, or secrets.

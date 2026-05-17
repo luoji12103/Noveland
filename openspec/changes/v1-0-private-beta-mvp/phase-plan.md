@@ -58,8 +58,12 @@ first-run guidance while preserving deny-by-default access.
 ### Scope
 
 - Docs-only checkpoint deciding invite/access schema and router ownership.
-- Invite-only eligibility, including expiration, revocation, redemption, and audit if a dedicated
-  invite model is approved.
+- Dedicated private beta invite/access model; do not use membership-only access.
+- Invite-only eligibility, including pending, waitlisted, accepted, redeemed, expired, revoked,
+  expiration, revocation, redemption, and audit.
+- Planned `backend/packages/private_beta/` package and app-level
+  `backend/services/api/src/noveland/services/api/private_beta.py` router.
+- `WorldMembership` remains the least-privilege enforcement layer after valid redemption.
 - Player profile setup.
 - World selection for eligible testers.
 - Player identity setup through existing player boundaries.
@@ -93,6 +97,8 @@ first-run guidance while preserving deny-by-default access.
 - Public signup is required.
 - Existing auth/membership model cannot represent private beta safely and no migration checkpoint
   is approved.
+- Invite tokens would be stored or logged in plaintext.
+- Implementation requires broad onboarding route growth in `worlds.py`.
 - Tester onboarding requires admin/provider privileges.
 
 ## Phase 2 — Player Session Stability

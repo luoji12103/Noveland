@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T12:31:13Z
+- Date: 2026-05-17T15:54:00Z
 - Branch: main
-- Objective: v1.0 Private Beta MVP feasibility review.
-- Status: v1.0 feasibility review is written and OpenSpec is revised to front-load access, session, and quota decisions before setup/gate implementation. Next accepted work is v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint after review acceptance.
+- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint.
+- Status: v1.0 Phase 1 checkpoint is written. It confirms a dedicated private beta invite/access model, planned `private_beta` package/router ownership, first migration scope, least-privilege membership bootstrap, API-first plus minimal Web redemption scope, token safety rules, tests, and stop conditions. Next accepted work is Phase 1 implementation after checkpoint acceptance.
 
 ## Current Context
 
@@ -47,6 +47,7 @@
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.0 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`. Conclusion: **C. v1.0 phase order must be revised before implementation.** v0.9 provides the content/provider foundation, but private beta needs front-loaded decisions for invite/access ownership, player session restore, per-player/capability quota enforcement, feedback ownership, and readiness/gate ownership.
 - Revised v1.0 phase order: Phase 1 Private Beta Onboarding & Access Model; Phase 2 Player Session Stability; Phase 3 Cost & Quota Real Enforcement; Phase 4 World Setup Wizard; Phase 5 Memory & Persona QA; Phase 6 Beta Feedback System; Phase 7 Beta Content Iteration Loop; Phase 8 Private Beta Gate.
+- v1.0 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`. It decides that private beta must use a dedicated invite/access table instead of membership-only access. Planned ownership is `backend/packages/private_beta/` plus app-level `backend/services/api/src/noveland/services/api/private_beta.py`; `WorldMembership` remains the least-privilege enforcement layer after valid redemption. The first migration is expected to add `private_beta_invites` with hashed token storage, lifecycle state, world and optional worldline scope, inviter/redeemer/revoker audit fields, expiration, beta role, and safe metadata. Phase 1 Web scope should be API-first plus minimal redemption/onboarding and must use `impeccable` before implementation.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
@@ -132,8 +133,9 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
-- v1.0 feasibility review is complete; wait for acceptance before implementation.
-- Start v1.0 Phase 1 Private Beta Onboarding & Access Model with a docs-only invite/access checkpoint when explicitly requested.
+- v1.0 feasibility review and Phase 1 planning checkpoint are complete; wait for checkpoint acceptance before implementation.
+- Start v1.0 Phase 1 implementation only when explicitly requested.
+- Phase 1 implementation should add the `private_beta` package/router and `private_beta_invites` migration; do not use membership-only access, broad `worlds.py` routes, public signup, plaintext invite tokens, or tester admin/provider/media/invocation privileges.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
