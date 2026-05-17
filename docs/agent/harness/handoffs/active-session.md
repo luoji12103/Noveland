@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T09:05:00Z
+- Date: 2026-05-17T09:55:00Z
 - Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 6 Character Memory Distillation Agent is complete and fast-forward merged to local `main`. Start Phase 7 Visual Asset Mapping from clean local `main`.
+- Status: v0.9 Phase 7 Visual Asset Mapping is complete and fast-forward merged to local `main`. Start Phase 8 Voice Profile Mapping from clean local `main`.
 
 ## Current Context
 
@@ -36,6 +36,8 @@
 - v0.9 Phase 5 implementation enhances the existing deterministic authoring parser with dialogue `line_text`, emotion hints, relationship hints, and manual-label proposals for unknown script lines. It remains proposal-only and adds no provider calls, prompt snapshots, invocation ledger writes, Web UI, migration, canon mutation, memory writes, or world events.
 - v0.9 Phase 6 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.6-character-memory-distillation-agent-plan.md`.
 - v0.9 Phase 6 implementation adds provider-backed character memory distillation to authoring. It uses `ProviderExecutionService` for invocation ledger and prompt snapshot evidence, creates reviewable persona, memory, and visual generation profile recommendation proposals, and writes `AgentPersona`, `Agent.character_profile`, and `AgentMemoryItem` only after explicit approval/apply. It adds no Web UI, migration, canon mutation, visual/voice binding mutation, `MemoryWriteJob.source_kind` widening, or world events.
+- v0.9 Phase 7 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.7-visual-asset-mapping-plan.md`.
+- v0.9 Phase 7 implementation extends authoring apply for reviewed `sprite_asset_match`, `background_asset_match`, and `cg_asset_match` proposals. Sprites/backgrounds use existing `VisualAssetService`, `CharacterSpriteSet`, `CharacterSpriteVariant`, and `SceneBackgroundProfile`; CGs use safe traceable media metadata because no first-class CG binding table exists. Approved visual media becomes generation-reference candidates. The phase adds no Web UI, migration, provider calls, broad routes, or world events.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -121,7 +123,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Start Phase 7 Visual Asset Mapping from clean local `main`.
+- Start Phase 8 Voice Profile Mapping from clean local `main`.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
@@ -169,6 +171,9 @@
 - v0.9 Phase 6 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py -q` (`24 passed`).
 - v0.9 Phase 6 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`487 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.9 Phase 6 commit `6d97262` fast-forward merged to local `main`; no push performed.
+- v0.9 Phase 7 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_visual_service.py tests/test_api_visual.py -q` (`33 passed`).
+- v0.9 Phase 7 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`488 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v0.9 Phase 7 commit `f9ee434` fast-forward merged to local `main`; no push performed.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

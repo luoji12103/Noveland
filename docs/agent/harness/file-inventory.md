@@ -185,6 +185,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/parser.py`
 - `backend/packages/authoring/src/noveland/authoring/service.py`
 - `docs/agent/harness/feature-updates/v0.9.6-character-memory-distillation-agent-plan.md`
+- `docs/agent/harness/feature-updates/v0.9.7-visual-asset-mapping-plan.md`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/test_api_authoring.py`

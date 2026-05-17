@@ -5,12 +5,17 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 7 Visual Asset Mapping, after explicit branch start
+- v0.9 Phase 8 Voice Profile Mapping, after Phase 7 merge
 
 ## Blocked
 - None
 
 ## Done
+- v0.9 Phase 7 Visual Asset Mapping planning checkpoint
+- v0.9 Phase 7 Visual Asset Mapping implementation
+- v0.9 Phase 7 Visual Asset Mapping targeted tests
+- v0.9 Phase 7 Visual Asset Mapping full backend gate
+- v0.9 Phase 7 Visual Asset Mapping fast-forward merge
 - v0.9 Phase 6 Character Memory Distillation Agent planning checkpoint
 - v0.9 Phase 6 Character Memory Distillation Agent implementation
 - v0.9 Phase 6 Character Memory Distillation Agent targeted tests

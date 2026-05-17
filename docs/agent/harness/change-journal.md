@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 7 Visual Asset Mapping planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-visual-asset-mapping
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 7 only.
+- Summary: Added reviewed apply support for imported visual asset mapping proposals. Approved sprite matches create or reuse `CharacterSpriteSet` records and create `CharacterSpriteVariant` bindings through `VisualAssetService`; approved background matches create `SceneBackgroundProfile` bindings; approved CG matches are recorded as safe media metadata/generation-reference candidates because there is no first-class CG binding table yet. The phase preserves source traceability, worldline isolation, restricted-media rejection, and no `world_events` writes.
+- Files changed: `backend/packages/authoring/**`, authoring service tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring service/API/visual tests cover reviewed sprite/background/CG apply, fallback/default sprite/background behavior, generation-reference metadata, cross-worldline rejection, restricted media behavior through existing matching rules, no storage/path/base64/raw prompt/raw output leaks, and no world-event writes.
+- Docs updated: Phase 7 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: Commit `f9ee434` fast-forward merged to local `main`; no push performed. Phase 7 added no Web UI and no migration; `impeccable` was not needed. Phase 8 should reuse speech voice profiles, agent voice bindings, and style mappings for reviewed voice profile mapping.
+
 ## v0.9 Phase 6 Character Memory Distillation Agent planning/implementation entry
 
 - Date: 2026-05-17

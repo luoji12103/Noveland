@@ -83,8 +83,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 8.4 Support approved imported assets as visual generation reference assets where appropriate.
 - [x] 8.5 Add visual mapping UI only after using `impeccable` if Web scope is approved.
 - [x] 8.6 Add mapping, fallback, reference-asset, worldline isolation, ACL, and no-leak tests.
-- [ ] 8.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 8.8 Fast-forward merge to local main and update harness docs.
+- [x] 8.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 8.8 Fast-forward merge to local main and update harness docs.
 
 ## 9. Phase 8 — Voice Profile Mapping
 
