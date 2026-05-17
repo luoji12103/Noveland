@@ -10,6 +10,7 @@ from noveland.auth.models import User
 from noveland.authoring import AuthoringService
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
+    AuthoringApplyResult,
     AuthoringAssetMatchRequest,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterMemoryDistillRequest,
@@ -30,6 +31,7 @@ from noveland.authoring.contracts import (
     AuthoringSourceBatchCreate,
     AuthoringSourceFragmentCreate,
     AuthoringSourceFragmentKind,
+    DemoWorldAssemblyRequest,
     GalgameSourceIntakeApplyRequest,
     GalgameSourceIntakePreviewRequest,
 )
@@ -44,6 +46,12 @@ from noveland.authoring.models import (
     AuthoringSourceTraceability,
 )
 from noveland.authoring.service import AuthoringValidationError
+from noveland.conversations.models import (
+    ConversationParticipant,
+    ConversationSession,
+    ConversationTurn,
+    ConversationTurnPresentation,
+)
 from noveland.events.models import WorldEventModel
 from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject
@@ -70,6 +78,14 @@ from noveland.visual.models import (
     CharacterSpriteSet,
     CharacterSpriteVariant,
     SceneBackgroundProfile,
+)
+from noveland.visual_generation.models import (
+    CharacterVisualGenerationProfile,
+    VisualGenerationPlan,
+    VisualGenerationPlanReference,
+    VisualModelAsset,
+    VisualWorkflowTemplate,
+    VisualWorkflowTemplateVersion,
 )
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
@@ -1603,6 +1619,348 @@ def test_voice_asset_mapping_rejects_non_audio_payload() -> None:
             )
 
 
+def test_demo_world_assembly_creates_reviewable_entry_session() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    alice_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    bob_id = _seed_agent(engine, graph.world_id, "bob", "Bob")
+    alice_sprite_media_id = graph.media_asset_id
+    bob_sprite_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    background_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="image",
+        asset_role="scene_background",
+    )
+    alice_voice_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+    bob_voice_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="demo-assembly",
+                display_name="Demo Assembly",
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.SCRIPT,
+                source_label="demo.ks",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="opening",
+                fragment_kind=AuthoringSourceFragmentKind.DIALOGUE,
+                sequence=1,
+                excerpt_text="Alice: We can start here.\nBob: I remember the gate.",
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        dialogue = service.parse_script(
+            graph.world_id,
+            run.id,
+            AuthoringScriptParseRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(fragment.id,),
+            ),
+        )
+        dialogue_ids = tuple(
+            proposal.id
+            for proposal in dialogue.run.proposals
+            if proposal.target_ref_kind == "dialogue_candidate"
+        )
+        for proposal_id in dialogue_ids:
+            service.review_proposal(
+                graph.world_id,
+                proposal_id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
+        apply_ids = _create_demo_applied_evidence(
+            service,
+            graph.world_id,
+            graph.worldline_id,
+            run.id,
+            fragment.id,
+            {
+                alice_id: {
+                    "name": "Alice",
+                    "sprite_media_id": alice_sprite_media_id,
+                    "voice_media_id": alice_voice_media_id,
+                },
+                bob_id: {
+                    "name": "Bob",
+                    "sprite_media_id": bob_sprite_media_id,
+                    "voice_media_id": bob_voice_media_id,
+                },
+            },
+            background_media_id=background_media_id,
+        )
+        for proposal_id in apply_ids:
+            service.review_proposal(
+                graph.world_id,
+                proposal_id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
+        applied = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(worldline_id=graph.worldline_id, proposal_ids=apply_ids),
+        )
+        profile = CharacterVisualGenerationProfile(
+            id=uuid.uuid4(),
+            world_id=graph.world_id,
+            worldline_id=graph.worldline_id,
+            agent_id=alice_id,
+            preferred_checkpoint_id=None,
+            allowed_lora_ids_json=[],
+            default_lora_ids_json=[],
+            banned_lora_ids_json=[],
+            prompt_fragments_json={"subject": ["Alice"]},
+            negative_prompt_fragments_json={},
+            reference_asset_ids_json=[],
+            default_workflow_template_id=None,
+            expression_workflow_template_id=None,
+            cg_workflow_template_id=None,
+            outfit_policy_json={},
+            pose_policy_json={},
+            review_status="approved",
+            visibility="world_admin",
+        )
+        session.add(profile)
+        session.flush()
+        assembly = service.assemble_demo_world(
+            graph.world_id,
+            run.id,
+            DemoWorldAssemblyRequest(
+                worldline_id=graph.worldline_id,
+                agent_ids=(alice_id, bob_id),
+                dialogue_proposal_ids=dialogue_ids,
+                persona_proposal_ids=_applied_ids_for_kind(
+                    applied,
+                    "agent_persona",
+                ),
+                memory_proposal_ids=_applied_ids_for_kind(
+                    applied,
+                    "agent_memory_item",
+                ),
+                visual_proposal_ids=_target_ids_for_kind(
+                    applied,
+                    {
+                        "sprite_asset_match",
+                        "background_asset_match",
+                    },
+                ),
+                voice_proposal_ids=_target_ids_for_kind(applied, {"voice_asset_match"}),
+                visual_profile_proposal_ids=_target_ids_for_kind(
+                    applied,
+                    {"visual_generation_profile_recommendation"},
+                ),
+                visual_generation_profile_ids=(profile.id,),
+            ),
+        )
+        with pytest.raises(AuthoringValidationError, match="approved"):
+            service.apply(
+                graph.world_id,
+                run.id,
+                AuthoringApplyRequest(
+                    worldline_id=graph.worldline_id,
+                    proposal_ids=(assembly.proposal.id,),
+                ),
+            )
+        service.review_proposal(
+            graph.world_id,
+            assembly.proposal.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        assembly_apply = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=(assembly.proposal.id,),
+            ),
+        )
+        session.commit()
+
+    assert assembly.proposal.target_ref_kind == "demo_world_assembly"
+    assert assembly.report_json["entry_supported"] is True
+    assert assembly.report_json["provider_execution"] is False
+    assert "storage_uri" not in assembly.model_dump_json().lower()
+    assert "base64" not in assembly.model_dump_json().lower()
+    assert len(assembly_apply.applied_proposals) == 1
+    assert assembly_apply.blocked_proposals == []
+
+    with Session(engine) as session:
+        conversation = session.scalars(select(ConversationSession)).one()
+        participants = session.scalars(select(ConversationParticipant)).all()
+        turn = session.scalars(select(ConversationTurn)).one()
+        presentation = session.scalars(select(ConversationTurnPresentation)).one()
+        assert conversation.worldline_id == graph.worldline_id
+        assert conversation.mode == "manual_chain"
+        assert conversation.status == "draft"
+        assert len(participants) == 2
+        assert turn.output_text is not None
+        assert turn.output_text.startswith("alice:")
+        assert presentation.sprite_variant_id is not None
+        assert presentation.background_asset_id == background_media_id
+        assert presentation.voice_profile_id is not None
+        assert "storage_uri" not in str(presentation.presentation_json).lower()
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_demo_world_assembly_blocks_missing_memory_evidence() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    alice_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    bob_id = _seed_agent(engine, graph.world_id, "bob", "Bob")
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="demo-missing",
+                display_name="Demo Missing",
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_label="demo.ks",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="opening",
+                fragment_kind=AuthoringSourceFragmentKind.DIALOGUE,
+                sequence=1,
+                excerpt_text="Alice: ready",
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        dialogue = service.parse_script(
+            graph.world_id,
+            run.id,
+            AuthoringScriptParseRequest(
+                worldline_id=graph.worldline_id,
+                source_fragment_ids=(fragment.id,),
+            ),
+        )
+        dialogue_ids = tuple(
+            proposal.id
+            for proposal in dialogue.run.proposals
+            if proposal.target_ref_kind == "dialogue_candidate"
+        )
+        for proposal_id in dialogue_ids:
+            service.review_proposal(
+                graph.world_id,
+                proposal_id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
+        persona_ids = tuple(
+            service.create_proposal(
+                AuthoringProposalCreate(
+                    world_id=graph.world_id,
+                    worldline_id=graph.worldline_id,
+                    run_id=run.id,
+                    source_fragment_id=fragment.id,
+                    proposal_kind=AuthoringProposalKind.CHARACTER,
+                    target_ref_kind="agent_persona_candidate",
+                    target_ref_id=agent_id,
+                    title=f"{name} persona",
+                    summary="Traceable persona.",
+                    proposed_payload_json={
+                        "agent_id": str(agent_id),
+                        "persona_text": f"{name} is ready.",
+                    },
+                )
+            ).id
+            for agent_id, name in ((alice_id, "Alice"), (bob_id, "Bob"))
+        )
+        for proposal_id in persona_ids:
+            service.review_proposal(
+                graph.world_id,
+                proposal_id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
+        applied_persona = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=persona_ids,
+            ),
+        )
+        with pytest.raises(AuthoringValidationError, match="memory"):
+            service.assemble_demo_world(
+                graph.world_id,
+                run.id,
+                DemoWorldAssemblyRequest(
+                    worldline_id=graph.worldline_id,
+                    agent_ids=(alice_id, bob_id),
+                    dialogue_proposal_ids=dialogue_ids,
+                    persona_proposal_ids=_applied_ids_for_kind(
+                        applied_persona,
+                        "agent_persona",
+                    ),
+                ),
+            )
+
+
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
@@ -1666,6 +2024,160 @@ def _draft(
     )
 
 
+def _create_demo_applied_evidence(
+    service: AuthoringService,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    run_id: uuid.UUID,
+    fragment_id: uuid.UUID,
+    agents: dict[uuid.UUID, dict[str, object]],
+    *,
+    background_media_id: uuid.UUID,
+) -> tuple[uuid.UUID, ...]:
+    proposal_ids: list[uuid.UUID] = []
+    for agent_id, data in agents.items():
+        name = str(data["name"])
+        sprite_media_id = cast(uuid.UUID, data["sprite_media_id"])
+        voice_media_id = cast(uuid.UUID, data["voice_media_id"])
+        proposal_ids.extend(
+            [
+                service.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run_id,
+                        source_fragment_id=fragment_id,
+                        proposal_kind=AuthoringProposalKind.CHARACTER,
+                        target_ref_kind="agent_persona_candidate",
+                        target_ref_id=agent_id,
+                        title=f"{name} persona",
+                        summary="Traceable persona.",
+                        proposed_payload_json={
+                            "agent_id": str(agent_id),
+                            "persona_text": f"{name} is ready for demo play.",
+                            "behavior_policy": {"source": "test"},
+                            "character_profile": {"speech_style": "calm"},
+                        },
+                    )
+                ).id,
+                service.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run_id,
+                        source_fragment_id=fragment_id,
+                        proposal_kind=AuthoringProposalKind.MEMORY,
+                        target_ref_kind="memory_candidate",
+                        target_ref_id=agent_id,
+                        title=f"{name} memory",
+                        summary="Traceable memory.",
+                        proposed_payload_json={
+                            "source_kind": "authoring_distillation",
+                            "agent_id": str(agent_id),
+                            "content": f"{name} remembers the opening scene.",
+                            "memory_kind": "fact",
+                        },
+                    )
+                ).id,
+                service.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run_id,
+                        source_fragment_id=fragment_id,
+                        proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                        target_ref_kind="sprite_asset_match",
+                        title=f"{name} sprite",
+                        summary="Traceable sprite.",
+                        proposed_payload_json={
+                            "media_asset_id": str(sprite_media_id),
+                            "agent_id": str(agent_id),
+                            "character_label": name,
+                            "expression_key": "neutral",
+                        },
+                    )
+                ).id,
+                service.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run_id,
+                        source_fragment_id=fragment_id,
+                        proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                        target_ref_kind="voice_asset_match",
+                        title=f"{name} voice",
+                        summary="Traceable voice.",
+                        proposed_payload_json={
+                            "media_asset_id": str(voice_media_id),
+                            "agent_id": str(agent_id),
+                            "speaker_label": name,
+                            "voice_label": "default",
+                        },
+                    )
+                ).id,
+                service.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run_id,
+                        source_fragment_id=fragment_id,
+                        proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                        target_ref_kind="visual_generation_profile_recommendation",
+                        target_ref_id=agent_id,
+                        title=f"{name} visual generation profile",
+                        summary="Traceable visual generation profile recommendation.",
+                        proposed_payload_json={
+                            "agent_id": str(agent_id),
+                            "review_only": True,
+                            "recommended_prompt_fragments": [name],
+                        },
+                    )
+                ).id,
+            ]
+        )
+    proposal_ids.append(
+        service.create_proposal(
+            AuthoringProposalCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                run_id=run_id,
+                source_fragment_id=fragment_id,
+                proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                target_ref_kind="background_asset_match",
+                title="Opening background",
+                summary="Traceable background.",
+                proposed_payload_json={
+                    "media_asset_id": str(background_media_id),
+                    "location_key": "opening",
+                },
+            )
+        ).id
+    )
+    return tuple(proposal_ids)
+
+
+def _applied_ids_for_kind(
+    result: AuthoringApplyResult,
+    applied_ref_kind: str,
+) -> tuple[uuid.UUID, ...]:
+    return tuple(
+        proposal.id
+        for proposal in result.applied_proposals
+        if proposal.applied_ref_json.get("applied_ref_kind") == applied_ref_kind
+    )
+
+
+def _target_ids_for_kind(
+    result: AuthoringApplyResult,
+    target_ref_kinds: set[str],
+) -> tuple[uuid.UUID, ...]:
+    return tuple(
+        proposal.id
+        for proposal in result.applied_proposals
+        if proposal.target_ref_kind in target_ref_kinds
+    )
+
+
 class _Graph:
     def __init__(
         self,
@@ -1699,6 +2211,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationParticipant.__table__),
+        cast(Table, ConversationTurn.__table__),
+        cast(Table, ConversationTurnPresentation.__table__),
         cast(Table, CharacterSpriteSet.__table__),
         cast(Table, CharacterSpriteVariant.__table__),
         cast(Table, SceneBackgroundProfile.__table__),
@@ -1712,6 +2228,12 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptSnapshot.__table__),
+        cast(Table, VisualWorkflowTemplate.__table__),
+        cast(Table, VisualWorkflowTemplateVersion.__table__),
+        cast(Table, VisualModelAsset.__table__),
+        cast(Table, CharacterVisualGenerationProfile.__table__),
+        cast(Table, VisualGenerationPlan.__table__),
+        cast(Table, VisualGenerationPlanReference.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),

@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T10:25:00Z
-- Branch: main
+- Date: 2026-05-17T10:25:38Z
+- Branch: feat/v0.9-demo-world-assembly
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 8 Voice Profile Mapping is complete and fast-forward merged to local `main`. Start Phase 9 Demo World Assembly from clean local `main`.
+- Status: v0.9 Phase 9 Demo World Assembly is implemented on `feat/v0.9-demo-world-assembly`; targeted and full backend/OpenSpec gates passed. Commit and fast-forward merge are pending before Phase 10 starts.
 
 ## Current Context
 
@@ -40,6 +40,8 @@
 - v0.9 Phase 7 implementation extends authoring apply for reviewed `sprite_asset_match`, `background_asset_match`, and `cg_asset_match` proposals. Sprites/backgrounds use existing `VisualAssetService`, `CharacterSpriteSet`, `CharacterSpriteVariant`, and `SceneBackgroundProfile`; CGs use safe traceable media metadata because no first-class CG binding table exists. Approved visual media becomes generation-reference candidates. The phase adds no Web UI, migration, provider calls, broad routes, or world events.
 - v0.9 Phase 8 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.8-voice-profile-mapping-plan.md`.
 - v0.9 Phase 8 implementation extends authoring apply for reviewed `voice_asset_match` proposals. It creates or reuses `VoiceProfile` records, creates `AgentVoiceProfileBinding` records through `VoiceProfileService`, preserves optional provider/provider voice IDs without secret resolution, carries style/emotion hints into binding overrides, and marks approved audio media as voice-reference candidates. It adds no Web UI, migration, provider calls during authoring apply, broad routes, or world events.
+- v0.9 Phase 9 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`.
+- v0.9 Phase 9 implementation adds a backend/API-first demo world assembly path under authoring. `POST /worlds/{world_id}/authoring/import-runs/{run_id}/assemble-demo-world` creates a reviewable `demo_world_assembly` proposal from reviewed dialogue plus applied persona, memory, visual, voice, and visual generation profile evidence. Existing authoring review/apply then creates a manual-chain conversation session, participants, seed turn, and initial turn presentation references. It adds no Web UI, migration, provider calls, broad `worlds.py` routes, direct canon/global launch mutation, or world events.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -179,6 +181,8 @@
 - v0.9 Phase 8 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_speech_service.py tests/test_voice_profiles.py tests/test_provider_lab_harness.py -q` (`41 passed, 1 skipped`).
 - v0.9 Phase 8 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`490 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.9 Phase 8 commit `568061b` fast-forward merged to local `main`; no push performed.
+- v0.9 Phase 9 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_conversation_presentation_service.py tests/test_api_conversation_presentations.py -q` (`33 passed`).
+- v0.9 Phase 9 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`493 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

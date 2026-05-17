@@ -68,6 +68,8 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
     AuthoringTraceKind,
+    DemoWorldAssemblyRequest,
+    DemoWorldAssemblyResult,
 )
 from noveland.authoring.lore_extractor import (
     ExtractedLoreCandidate,
@@ -96,6 +98,27 @@ from noveland.authoring.models import (
     AuthoringSourceTraceability,
 )
 from noveland.authoring.parser import ParsedScriptCandidate, parse_fragment
+from noveland.conversations.contracts import (
+    ConversationErrorPolicy,
+    ConversationMemoryConfig,
+    ConversationMode,
+    ConversationParticipantDefinition,
+    ConversationPolicyConfig,
+    ConversationPresentationRenderState,
+    ConversationScopeType,
+    ConversationSeed,
+    ConversationSessionCreate,
+    ConversationSpeakerPolicyMode,
+    ConversationTurnPresentationRecord,
+    ConversationTurnPresentationUpsert,
+    ConversationWriterConfig,
+)
+from noveland.conversations.errors import (
+    ConversationStateError,
+    ConversationValidationError,
+)
+from noveland.conversations.presentation import ConversationPresentationService
+from noveland.conversations.services import ConversationService
 from noveland.media.models import MediaAsset
 from noveland.memory.models import AgentMemoryItem
 from noveland.memory.utils import deterministic_embedding
@@ -125,6 +148,7 @@ from noveland.visual.models import (
     SceneBackgroundProfile,
 )
 from noveland.visual.service import VisualAssetService, VisualValidationError
+from noveland.visual_generation.models import CharacterVisualGenerationProfile
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -148,6 +172,7 @@ SPRITE_ASSET_MATCH_TARGET = "sprite_asset_match"
 BACKGROUND_ASSET_MATCH_TARGET = "background_asset_match"
 CG_ASSET_MATCH_TARGET = "cg_asset_match"
 VOICE_ASSET_MATCH_TARGET = "voice_asset_match"
+DEMO_WORLD_ASSEMBLY_TARGET = "demo_world_assembly"
 
 
 class AuthoringService:
@@ -1140,6 +1165,79 @@ class AuthoringService:
             blocked_count=summary_counts["blocked_count"],
         )
 
+    def assemble_demo_world(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: DemoWorldAssemblyRequest,
+    ) -> DemoWorldAssemblyResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError("demo assembly run must belong to request worldline")
+        report = self._demo_assembly_report(world_id, worldline_id, run.id, request)
+        proposal = self.create_proposal(
+            AuthoringProposalCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                run_id=run.id,
+                source_fragment_id=_first_source_fragment_id(report),
+                proposal_kind=AuthoringProposalKind.OTHER,
+                target_ref_kind=DEMO_WORLD_ASSEMBLY_TARGET,
+                target_ref_id=None,
+                title=request.title,
+                summary=(
+                    "Reviewable self-use MVP demo assembly from applied persona, memory, "
+                    "visual, voice, visual generation, and dialogue evidence."
+                ),
+                proposed_payload_json={
+                    "assembly_mode": request.assembly_mode.value,
+                    "title": request.title,
+                    "session_key": request.session_key
+                    or _demo_session_key(run.id, request.agent_ids),
+                    "opening_prompt": request.opening_prompt,
+                    "objective": request.objective,
+                    "max_turns": request.max_turns,
+                    "agent_ids": [str(agent_id) for agent_id in request.agent_ids],
+                    "dialogue_proposal_ids": [
+                        str(proposal_id) for proposal_id in request.dialogue_proposal_ids
+                    ],
+                    "evidence": report,
+                    "metadata": request.metadata_json,
+                    "review_apply_required": True,
+                    "provider_execution": False,
+                    "canon_mutation": False,
+                },
+                evidence_json={
+                    "evidence_kind": "demo_world_assembly",
+                    "source_fragment_ids": report["source_fragment_ids"],
+                    "proposal_ids": report["proposal_ids"],
+                    "applied_ref_counts": report["applied_ref_counts"],
+                    "provider_execution": False,
+                },
+                confidence=0.7,
+                priority=100,
+            )
+        )
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "demo_world_assembly_mode": request.assembly_mode.value,
+            "provider_execution": False,
+            "created_proposal_count": 1,
+            "demo_agent_count": len(request.agent_ids),
+            "dialogue_count": len(request.dialogue_proposal_ids),
+            "assembly_ready": True,
+        }
+        self._session.flush()
+        return DemoWorldAssemblyResult(
+            run=self.get_import_run(world_id, run.id),
+            proposal=proposal,
+            report_json=report,
+            created_proposal_count=1,
+            provider_execution=False,
+        )
+
     def review_proposal(
         self,
         world_id: uuid.UUID,
@@ -1769,6 +1867,402 @@ class AuthoringService:
             fragments.append(fragment)
         return fragments
 
+    def _demo_assembly_report(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: DemoWorldAssemblyRequest,
+    ) -> dict[str, Any]:
+        agents = [self._agent_required(world_id, agent_id) for agent_id in request.agent_ids]
+        dialogue = self._approved_proposals_for_demo(
+            run_id,
+            request.dialogue_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={"dialogue_candidate"},
+            require_applied=False,
+        )
+        persona = self._approved_proposals_for_demo(
+            run_id,
+            request.persona_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={PERSONA_PROPOSAL_TARGET},
+            require_applied=True,
+        )
+        memory = self._approved_proposals_for_demo(
+            run_id,
+            request.memory_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={MEMORY_PROPOSAL_TARGET},
+            require_applied=True,
+        )
+        visual = self._approved_proposals_for_demo(
+            run_id,
+            request.visual_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={
+                SPRITE_ASSET_MATCH_TARGET,
+                BACKGROUND_ASSET_MATCH_TARGET,
+                CG_ASSET_MATCH_TARGET,
+            },
+            require_applied=True,
+        )
+        voice = self._approved_proposals_for_demo(
+            run_id,
+            request.voice_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={VOICE_ASSET_MATCH_TARGET},
+            require_applied=True,
+        )
+        visual_profile_proposals = self._approved_proposals_for_demo(
+            run_id,
+            request.visual_profile_proposal_ids,
+            world_id=world_id,
+            worldline_id=worldline_id,
+            allowed_target_ref_kinds={VISUAL_PROFILE_RECOMMENDATION_TARGET},
+            require_applied=True,
+        )
+        visual_profile_ids = self._validated_visual_generation_profile_ids(
+            world_id,
+            worldline_id,
+            request.visual_generation_profile_ids,
+            request.agent_ids,
+        )
+        self._validate_demo_coverage(
+            agent_ids=request.agent_ids,
+            persona=persona,
+            memory=memory,
+            visual=visual,
+            voice=voice,
+            dialogue=dialogue,
+            visual_profile_proposals=visual_profile_proposals,
+            visual_profile_ids=visual_profile_ids,
+        )
+        first_sprite = _first_applied_ref(visual, "character_sprite_variant")
+        first_background_asset_id = _first_background_asset_id(visual)
+        first_voice_profile_id = _first_voice_profile_id(voice)
+        source_fragment_ids = sorted(
+            {
+                str(proposal.source_fragment_id)
+                for group in (
+                    dialogue,
+                    persona,
+                    memory,
+                    visual,
+                    voice,
+                    visual_profile_proposals,
+                )
+                for proposal in group
+                if proposal.source_fragment_id is not None
+            }
+        )
+        proposal_ids = [
+            str(proposal.id)
+            for group in (
+                dialogue,
+                persona,
+                memory,
+                visual,
+                voice,
+                visual_profile_proposals,
+            )
+            for proposal in group
+        ]
+        return {
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "run_id": str(run_id),
+            "agent_ids": [str(agent.id) for agent in agents],
+            "agent_labels": [agent.display_name for agent in agents],
+            "dialogue_preview": _dialogue_preview(dialogue),
+            "source_fragment_ids": source_fragment_ids,
+            "proposal_ids": proposal_ids,
+            "applied_ref_counts": {
+                "persona": len(persona),
+                "memory": len(memory),
+                "visual": len(visual),
+                "voice": len(voice),
+                "visual_generation_profile_recommendations": len(
+                    visual_profile_proposals
+                ),
+                "visual_generation_profiles": len(visual_profile_ids),
+            },
+            "presentation_seed": {
+                "speaker_agent_id": str(agents[0].id),
+                "sprite_set_id": (
+                    None if first_sprite is None else first_sprite.get("sprite_set_id")
+                ),
+                "sprite_variant_id": None
+                if first_sprite is None
+                else first_sprite.get("applied_ref_id"),
+                "background_asset_id": first_background_asset_id,
+                "voice_profile_id": first_voice_profile_id,
+            },
+            "entry_supported": True,
+            "provider_execution": False,
+            "canon_mutation": False,
+            "review_apply_required": True,
+        }
+
+    def _approved_proposals_for_demo(
+        self,
+        run_id: uuid.UUID,
+        proposal_ids: tuple[uuid.UUID, ...],
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        allowed_target_ref_kinds: set[str],
+        require_applied: bool,
+    ) -> list[AuthoringImportProposal]:
+        proposals = self._proposals_for_apply(run_id, proposal_ids)
+        allowed_statuses = {AuthoringProposalStatus.APPROVED.value}
+        if require_applied:
+            allowed_statuses.add(AuthoringProposalStatus.APPLIED.value)
+        for proposal in proposals:
+            if proposal.world_id != world_id or proposal.worldline_id != worldline_id:
+                raise AuthoringValidationError("demo assembly proposal worldline mismatch")
+            if proposal.target_ref_kind not in allowed_target_ref_kinds:
+                raise AuthoringValidationError("unsupported demo assembly proposal kind")
+            if proposal.status not in allowed_statuses:
+                raise AuthoringValidationError(
+                    "demo assembly proposals must be reviewed or applied as required"
+                )
+            if require_applied and proposal.status != AuthoringProposalStatus.APPLIED.value:
+                raise AuthoringValidationError("demo assembly requires applied evidence")
+        return proposals
+
+    def _validated_visual_generation_profile_ids(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        profile_ids: tuple[uuid.UUID, ...],
+        agent_ids: tuple[uuid.UUID, ...],
+    ) -> tuple[uuid.UUID, ...]:
+        valid: list[uuid.UUID] = []
+        allowed_agents = set(agent_ids)
+        for profile_id in profile_ids:
+            profile = self._session.get(CharacterVisualGenerationProfile, profile_id)
+            if (
+                profile is None
+                or profile.world_id != world_id
+                or profile.worldline_id != worldline_id
+                or profile.agent_id not in allowed_agents
+                or profile.review_status not in {"approved", "applied"}
+            ):
+                raise AuthoringValidationError(
+                    "visual generation profile must be approved for demo worldline"
+                )
+            valid.append(profile.id)
+        return tuple(valid)
+
+    def _validate_demo_coverage(
+        self,
+        *,
+        agent_ids: tuple[uuid.UUID, ...],
+        persona: list[AuthoringImportProposal],
+        memory: list[AuthoringImportProposal],
+        visual: list[AuthoringImportProposal],
+        voice: list[AuthoringImportProposal],
+        dialogue: list[AuthoringImportProposal],
+        visual_profile_proposals: list[AuthoringImportProposal],
+        visual_profile_ids: tuple[uuid.UUID, ...],
+    ) -> None:
+        required_agents = set(agent_ids)
+        persona_agents = _proposal_agent_ids(persona)
+        memory_agents = _proposal_agent_ids(memory)
+        sprite_agents = _proposal_agent_ids(
+            [
+                proposal
+                for proposal in visual
+                if proposal.target_ref_kind == SPRITE_ASSET_MATCH_TARGET
+            ],
+            include_applied=True,
+        )
+        voice_agents = _proposal_agent_ids(voice, include_applied=True)
+        if not required_agents.issubset(persona_agents):
+            raise AuthoringValidationError("demo assembly requires applied persona per agent")
+        if not required_agents.issubset(memory_agents):
+            raise AuthoringValidationError("demo assembly requires applied memory per agent")
+        if not required_agents.issubset(sprite_agents):
+            raise AuthoringValidationError("demo assembly requires sprite mapping per agent")
+        if not required_agents.issubset(voice_agents):
+            raise AuthoringValidationError("demo assembly requires voice mapping per agent")
+        has_background = any(
+            proposal.target_ref_kind == BACKGROUND_ASSET_MATCH_TARGET for proposal in visual
+        )
+        if not has_background:
+            raise AuthoringValidationError("demo assembly requires a background mapping")
+        dialogue_speakers = {
+            _label_key(str(proposal.proposed_payload_json.get("speaker_label") or ""))
+            for proposal in dialogue
+        }
+        agent_keys = {
+            _label_key(agent.agent_key)
+            for agent in self._session.scalars(
+                select(Agent).where(Agent.id.in_(agent_ids))
+            ).all()
+        }
+        agent_names = {
+            _label_key(agent.display_name)
+            for agent in self._session.scalars(
+                select(Agent).where(Agent.id.in_(agent_ids))
+            ).all()
+        }
+        if dialogue_speakers.isdisjoint(agent_keys.union(agent_names)):
+            raise AuthoringValidationError("demo assembly requires dialogue for a selected agent")
+        if not visual_profile_ids and not visual_profile_proposals:
+            raise AuthoringValidationError(
+                "demo assembly requires visual generation profile evidence"
+            )
+
+    def _apply_demo_world_assembly(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        payload = proposal.proposed_payload_json
+        evidence = _dict_or_empty(payload.get("evidence"))
+        agent_ids = tuple(_uuids_from_strings(payload.get("agent_ids")))
+        if not 2 <= len(agent_ids) <= 3:
+            raise AuthoringValidationError("demo assembly apply requires 2-3 agents")
+        for agent_id in agent_ids:
+            self._agent_required(world_id, agent_id)
+        conversation = ConversationService(self._session, actor_ref="system:authoring-demo")
+        try:
+            session_record = conversation.create_session(
+                ConversationSessionCreate(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    session_key=str(payload.get("session_key") or _demo_session_key(
+                        proposal.run_id,
+                        agent_ids,
+                    )),
+                    title=str(payload.get("title") or "Self-use MVP Demo World")[:160],
+                    scope_type=ConversationScopeType.WORLD,
+                    mode=ConversationMode.MANUAL_CHAIN,
+                    objective=str(payload.get("objective") or "")[:4000],
+                    opening_prompt=str(payload.get("opening_prompt") or "")[:4000],
+                    max_turns=int(payload.get("max_turns") or 48),
+                    policy=ConversationPolicyConfig(
+                        error_policy=ConversationErrorPolicy.RETRY_ONCE_THEN_SKIP,
+                        max_consecutive_failed_turns=3,
+                        loop_guard_window=4,
+                        repeat_output_threshold=3,
+                        speaker_policy=ConversationSpeakerPolicyMode.ROUND_ROBIN,
+                        participant_repeat_cooldown=1,
+                        min_enabled_participants=2,
+                        max_turn_budget=int(payload.get("max_turns") or 48),
+                    ),
+                    writer_config=ConversationWriterConfig(
+                        auto_generate_on_complete=False,
+                        source_constraints="Use reviewed v0.9 demo assembly source evidence.",
+                        include_prompt_preview=False,
+                    ),
+                    memory_config=ConversationMemoryConfig(
+                        write_turn_memory=True,
+                        retrieve_memory=True,
+                        include_recent_turns=True,
+                        include_agent_observations=True,
+                    ),
+                )
+            )
+            participants = conversation.replace_participants(
+                world_id,
+                session_record.id,
+                [
+                    ConversationParticipantDefinition(
+                        agent_id=agent_id,
+                        turn_order=index,
+                        is_enabled=True,
+                    )
+                    for index, agent_id in enumerate(agent_ids)
+                ],
+            )
+            seed = conversation.seed_session(
+                world_id,
+                session_record.id,
+                ConversationSeed(input_text=_assembly_seed_text(payload)),
+            )
+            presentation = self._create_demo_seed_presentation(
+                world_id,
+                session_record.id,
+                seed.id,
+                evidence,
+            )
+        except (ConversationStateError, ConversationValidationError, ValueError) as exc:
+            raise AuthoringValidationError(str(exc)) from exc
+        report = {
+            "conversation_id": str(session_record.id),
+            "seed_turn_id": str(seed.id),
+            "participant_agent_ids": [str(participant.agent_id) for participant in participants],
+            "presentation_id": None if presentation is None else str(presentation.id),
+            "presentation_status": (
+                "missing" if presentation is None else presentation.render_state.value
+            ),
+            "entry_supported": True,
+            "provider_execution": False,
+            "canon_mutation": False,
+            "source_fragment_ids": list(evidence.get("source_fragment_ids") or []),
+            "proposal_ids": list(evidence.get("proposal_ids") or []),
+        }
+        return {
+            "applied_ref_kind": "conversation_session",
+            "applied_ref_id": str(session_record.id),
+            "conversation_id": str(session_record.id),
+            "seed_turn_id": str(seed.id),
+            "presentation_id": None if presentation is None else str(presentation.id),
+            "agent_ids": [str(agent_id) for agent_id in agent_ids],
+            "assembly_report": report,
+            "canonical_mutation": False,
+            "demo_world_assembly": True,
+        }
+
+    def _create_demo_seed_presentation(
+        self,
+        world_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+        turn_id: uuid.UUID,
+        evidence: dict[str, Any],
+    ) -> ConversationTurnPresentationRecord | None:
+        presentation_seed = _dict_or_empty(evidence.get("presentation_seed"))
+        sprite_set_id = _uuid_from_payload(presentation_seed.get("sprite_set_id"))
+        sprite_variant_id = _uuid_from_payload(presentation_seed.get("sprite_variant_id"))
+        background_asset_id = _uuid_from_payload(presentation_seed.get("background_asset_id"))
+        voice_profile_id = _uuid_from_payload(presentation_seed.get("voice_profile_id"))
+        speaker_agent_id = _uuid_from_payload(presentation_seed.get("speaker_agent_id"))
+        if sprite_set_id is None and sprite_variant_id is None and background_asset_id is None:
+            return None
+        try:
+            return ConversationPresentationService(self._session).put_presentation(
+                world_id,
+                conversation_id,
+                turn_id,
+                ConversationTurnPresentationUpsert(
+                    speaker_agent_id=speaker_agent_id,
+                    emotion_key="neutral",
+                    emotion_intensity=1.0,
+                    sprite_set_id=sprite_set_id,
+                    sprite_variant_id=sprite_variant_id,
+                    voice_profile_id=voice_profile_id,
+                    background_asset_id=background_asset_id,
+                    presentation_json={
+                        "source": "demo_world_assembly",
+                        "source_fragment_ids": list(evidence.get("source_fragment_ids") or []),
+                        "proposal_ids": list(evidence.get("proposal_ids") or []),
+                    },
+                    render_state=ConversationPresentationRenderState.VISUAL_RENDERED,
+                ),
+            )
+        except ConversationValidationError as exc:
+            raise AuthoringValidationError(str(exc)) from exc
+
     def _apply_supported_proposal(
         self,
         proposal: AuthoringImportProposal,
@@ -1834,6 +2328,15 @@ class AuthoringService:
             and proposal.target_ref_kind == VOICE_ASSET_MATCH_TARGET
         ):
             return self._apply_voice_asset_match(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.OTHER.value
+            and proposal.target_ref_kind == DEMO_WORLD_ASSEMBLY_TARGET
+        ):
+            return self._apply_demo_world_assembly(
                 proposal,
                 world_id=world_id,
                 worldline_id=worldline_id,
@@ -2702,6 +3205,110 @@ def _voice_style_overrides(
     if emotion_key is not None:
         overrides["emotion"] = emotion_key
     return overrides
+
+
+def _first_source_fragment_id(report: dict[str, Any]) -> uuid.UUID | None:
+    source_fragment_ids = report.get("source_fragment_ids")
+    if not isinstance(source_fragment_ids, list) or not source_fragment_ids:
+        return None
+    return _uuid_from_payload(source_fragment_ids[0])
+
+
+def _demo_session_key(run_id: uuid.UUID, agent_ids: tuple[uuid.UUID, ...]) -> str:
+    suffix = "-".join(agent.hex[:6] for agent in agent_ids[:3])
+    return f"demo-{run_id.hex[:12]}-{suffix}"[:80].strip("-")
+
+
+def _first_applied_ref(
+    proposals: list[AuthoringImportProposal],
+    applied_ref_kind: str,
+) -> dict[str, Any] | None:
+    for proposal in proposals:
+        if proposal.applied_ref_json.get("applied_ref_kind") == applied_ref_kind:
+            return proposal.applied_ref_json
+    return None
+
+
+def _first_background_asset_id(proposals: list[AuthoringImportProposal]) -> str | None:
+    for proposal in proposals:
+        if proposal.target_ref_kind != BACKGROUND_ASSET_MATCH_TARGET:
+            continue
+        media_asset_id = proposal.applied_ref_json.get("media_asset_id")
+        if isinstance(media_asset_id, str):
+            return media_asset_id
+    return None
+
+
+def _first_voice_profile_id(proposals: list[AuthoringImportProposal]) -> str | None:
+    for proposal in proposals:
+        if proposal.target_ref_kind != VOICE_ASSET_MATCH_TARGET:
+            continue
+        voice_profile_id = proposal.applied_ref_json.get("voice_profile_id")
+        if isinstance(voice_profile_id, str):
+            return voice_profile_id
+    return None
+
+
+def _dialogue_preview(proposals: list[AuthoringImportProposal]) -> list[dict[str, str]]:
+    preview: list[dict[str, str]] = []
+    for proposal in proposals[:6]:
+        payload = proposal.proposed_payload_json
+        speaker = str(payload.get("speaker_label") or "unknown")[:80]
+        line = str(payload.get("line_text") or payload.get("line_excerpt") or "")[:240]
+        preview.append(
+            {
+                "proposal_id": str(proposal.id),
+                "speaker_label": speaker,
+                "line_text": line,
+            }
+        )
+    return preview
+
+
+def _proposal_agent_ids(
+    proposals: list[AuthoringImportProposal],
+    *,
+    include_applied: bool = False,
+) -> set[uuid.UUID]:
+    result: set[uuid.UUID] = set()
+    for proposal in proposals:
+        agent_id = proposal.target_ref_id or _uuid_from_payload(
+            proposal.proposed_payload_json.get("agent_id")
+        )
+        if agent_id is None and include_applied:
+            agent_id = _uuid_from_payload(proposal.applied_ref_json.get("agent_id"))
+        if agent_id is not None:
+            result.add(agent_id)
+    return result
+
+
+def _uuids_from_strings(value: object) -> list[uuid.UUID]:
+    if not isinstance(value, list | tuple):
+        return []
+    result: list[uuid.UUID] = []
+    for item in value:
+        parsed = _uuid_from_payload(item)
+        if parsed is not None:
+            result.append(parsed)
+    return result
+
+
+def _assembly_seed_text(payload: dict[str, Any]) -> str:
+    evidence = _dict_or_empty(payload.get("evidence"))
+    dialogue = evidence.get("dialogue_preview")
+    if isinstance(dialogue, list) and dialogue:
+        lines: list[str] = []
+        for item in dialogue[:3]:
+            if not isinstance(item, dict):
+                continue
+            speaker = str(item.get("speaker_label") or "operator").strip()
+            line = str(item.get("line_text") or "").strip()
+            if line:
+                lines.append(f"{speaker}: {line}")
+        if lines:
+            return "\n".join(lines)[:12_000]
+    opening = str(payload.get("opening_prompt") or "").strip()
+    return opening[:12_000] or "Begin the self-use MVP demo world conversation."
 
 
 def _label_key(value: str) -> str:

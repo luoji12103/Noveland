@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 9 Demo World Assembly planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-demo-world-assembly
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 9 only.
+- Summary: Added backend/API-first demo world assembly under the existing authoring review/apply boundary. The new assembly endpoint creates a reviewable `demo_world_assembly` proposal from applied persona, memory, visual, voice, visual generation profile, and reviewed dialogue evidence; approved apply creates a manual-chain conversation session, participants, seed turn, and initial presentation references without provider calls, canon mutation, broad `worlds.py` routes, or world-event writes.
+- Files changed: `backend/packages/authoring/**`, `backend/services/api/src/noveland/services/api/authoring.py`, authoring service/API tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring service/API and conversation presentation coverage for reviewable assembly creation, approval-before-apply enforcement, missing evidence blocking, admin ACL/member rejection, source traceability preservation, manual-chain conversation entry, presentation seed refs, and no storage/path/base64/raw prompt/raw output leaks.
+- Docs updated: Phase 9 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: No Web UI and no migration were added; `impeccable` was not needed. Full gate and fast-forward merge are pending before Phase 10 Self-use MVP Gate starts.
+
 ## v0.9 Phase 8 Voice Profile Mapping planning/implementation entry
 
 - Date: 2026-05-17

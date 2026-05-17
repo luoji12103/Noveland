@@ -22,6 +22,12 @@ from noveland.authoring.models import (
     AuthoringSourceFragment,
     AuthoringSourceTraceability,
 )
+from noveland.conversations.models import (
+    ConversationParticipant,
+    ConversationSession,
+    ConversationTurn,
+    ConversationTurnPresentation,
+)
 from noveland.events.models import WorldEventModel
 from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject
@@ -39,6 +45,25 @@ from noveland.services.api.app import create_app
 from noveland.services.api.authoring import _authoring_media_storage
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
+from noveland.speech.models import (
+    AgentVoiceProfileBinding,
+    SpeechStyleMapping,
+    SpeechTranscript,
+    VoiceProfile,
+)
+from noveland.visual.models import (
+    CharacterSpriteSet,
+    CharacterSpriteVariant,
+    SceneBackgroundProfile,
+)
+from noveland.visual_generation.models import (
+    CharacterVisualGenerationProfile,
+    VisualGenerationPlan,
+    VisualGenerationPlanReference,
+    VisualModelAsset,
+    VisualWorkflowTemplate,
+    VisualWorkflowTemplateVersion,
+)
 from noveland.worlds.models import World, Worldline, WorldMembership
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -863,6 +888,221 @@ def test_authoring_api_asset_matching_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_demo_world_assembly_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    alice_id = _seed_agent(engine, world_id, "alice", "Alice")
+    bob_id = _seed_agent(engine, world_id, "bob", "Bob")
+    alice_sprite_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    bob_sprite_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    background_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="image",
+        asset_role="scene_background",
+    )
+    alice_voice_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+    bob_voice_id = _add_media_asset(
+        engine,
+        world_id,
+        worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "demo-assembly",
+            "display_name": "Demo Assembly",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_label": "demo.ks",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "opening",
+            "fragment_kind": "dialogue",
+            "sequence": 1,
+            "excerpt_text": "Alice: start\nBob: continue",
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    parsed = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/parse-script",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+        },
+    )
+    dialogue_ids = [
+        proposal["id"]
+        for proposal in parsed.json()["run"]["proposals"]
+        if proposal["target_ref_kind"] == "dialogue_candidate"
+    ]
+    for proposal_id in dialogue_ids:
+        reviewed = client.post(
+            f"/worlds/{world_id}/authoring/proposals/{proposal_id}/review",
+            json={"decision": "approve"},
+        )
+        assert reviewed.status_code == 201
+    apply_ids = _create_demo_api_evidence(
+        client,
+        world_id,
+        run.json()["id"],
+        fragment.json()["id"],
+        {
+            str(alice_id): {
+                "name": "Alice",
+                "sprite_media_id": str(alice_sprite_id),
+                "voice_media_id": str(alice_voice_id),
+            },
+            str(bob_id): {
+                "name": "Bob",
+                "sprite_media_id": str(bob_sprite_id),
+                "voice_media_id": str(bob_voice_id),
+            },
+        },
+        background_media_id=str(background_id),
+    )
+    for proposal_id in apply_ids:
+        reviewed = client.post(
+            f"/worlds/{world_id}/authoring/proposals/{proposal_id}/review",
+            json={"decision": "approve"},
+        )
+        assert reviewed.status_code == 201
+    applied = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/apply",
+        json={"worldline_id": str(worldline_id), "proposal_ids": apply_ids},
+    )
+    with Session(engine) as session:
+        profile_id = uuid.uuid4()
+        session.add(
+            CharacterVisualGenerationProfile(
+                id=profile_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=alice_id,
+                preferred_checkpoint_id=None,
+                allowed_lora_ids_json=[],
+                default_lora_ids_json=[],
+                banned_lora_ids_json=[],
+                prompt_fragments_json={},
+                negative_prompt_fragments_json={},
+                reference_asset_ids_json=[],
+                default_workflow_template_id=None,
+                expression_workflow_template_id=None,
+                cg_workflow_template_id=None,
+                outfit_policy_json={},
+                pose_policy_json={},
+                review_status="approved",
+                visibility="world_admin",
+            )
+        )
+        session.commit()
+
+    persona_ids = _applied_json_ids(applied.json(), "agent_persona")
+    memory_ids = _applied_json_ids(applied.json(), "agent_memory_item")
+    visual_ids = _target_json_ids(
+        applied.json(),
+        {"sprite_asset_match", "background_asset_match"},
+    )
+    voice_ids = _target_json_ids(applied.json(), {"voice_asset_match"})
+    visual_profile_ids = _target_json_ids(
+        applied.json(),
+        {"visual_generation_profile_recommendation"},
+    )
+    assembly_body = {
+        "worldline_id": str(worldline_id),
+        "agent_ids": [str(alice_id), str(bob_id)],
+        "dialogue_proposal_ids": dialogue_ids,
+        "persona_proposal_ids": persona_ids,
+        "memory_proposal_ids": memory_ids,
+        "visual_proposal_ids": visual_ids,
+        "voice_proposal_ids": voice_ids,
+        "visual_profile_proposal_ids": visual_profile_ids,
+        "visual_generation_profile_ids": [str(profile_id)],
+    }
+    _authenticate(client, member_token)
+    forbidden = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/assemble-demo-world",
+        json=assembly_body,
+    )
+    _authenticate(client, owner_token)
+    assembly = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/assemble-demo-world",
+        json=assembly_body,
+    )
+    proposal_id = assembly.json()["proposal"]["id"]
+    reviewed = client.post(
+        f"/worlds/{world_id}/authoring/proposals/{proposal_id}/review",
+        json={"decision": "approve"},
+    )
+    assembly_apply = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/apply",
+        json={"worldline_id": str(worldline_id), "proposal_ids": [proposal_id]},
+    )
+
+    assert forbidden.status_code == 403
+    assert assembly.status_code == 201
+    assert reviewed.status_code == 201
+    assert assembly.json()["proposal"]["target_ref_kind"] == "demo_world_assembly"
+    assert assembly.json()["report_json"]["entry_supported"] is True
+    assert assembly_apply.status_code == 201
+    assert assembly_apply.json()["applied_proposals"][0]["applied_ref_json"][
+        "applied_ref_kind"
+    ] == "conversation_session"
+    for marker in ("storage_uri", "file://", "local://", "base64", "raw_prompt", "raw_output"):
+        assert marker not in _json_text(assembly.json())
+        assert marker not in _json_text(assembly_apply.json())
+
+    with Session(engine) as session:
+        assert session.scalars(select(ConversationSession)).one()
+        assert len(session.scalars(select(ConversationParticipant)).all()) == 2
+        assert session.scalars(select(ConversationTurn)).one()
+        assert session.scalars(select(ConversationTurnPresentation)).one()
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -905,12 +1145,29 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, ConversationSession.__table__),
+        cast(Table, ConversationParticipant.__table__),
+        cast(Table, ConversationTurn.__table__),
+        cast(Table, ConversationTurnPresentation.__table__),
+        cast(Table, CharacterSpriteSet.__table__),
+        cast(Table, CharacterSpriteVariant.__table__),
+        cast(Table, SceneBackgroundProfile.__table__),
+        cast(Table, VoiceProfile.__table__),
+        cast(Table, AgentVoiceProfileBinding.__table__),
+        cast(Table, SpeechTranscript.__table__),
+        cast(Table, SpeechStyleMapping.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
         cast(Table, ProviderBudgetPolicy.__table__),
         cast(Table, ModelInvocation.__table__),
         cast(Table, PromptSnapshot.__table__),
+        cast(Table, VisualWorkflowTemplate.__table__),
+        cast(Table, VisualWorkflowTemplateVersion.__table__),
+        cast(Table, VisualModelAsset.__table__),
+        cast(Table, CharacterVisualGenerationProfile.__table__),
+        cast(Table, VisualGenerationPlan.__table__),
+        cast(Table, VisualGenerationPlanReference.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -1048,6 +1305,137 @@ def _add_media_asset(
         )
         session.commit()
     return media_asset_id
+
+
+def _create_demo_api_evidence(
+    client: TestClient,
+    world_id: uuid.UUID,
+    run_id: str,
+    fragment_id: str,
+    agents: dict[str, dict[str, str]],
+    *,
+    background_media_id: str,
+) -> list[str]:
+    proposal_ids: list[str] = []
+    for agent_id, data in agents.items():
+        name = data["name"]
+        drafts = [
+            {
+                "source_fragment_id": fragment_id,
+                "proposal_kind": "character",
+                "target_ref_kind": "agent_persona_candidate",
+                "target_ref_id": agent_id,
+                "title": f"{name} persona",
+                "summary": "Traceable persona.",
+                "proposed_payload_json": {
+                    "agent_id": agent_id,
+                    "persona_text": f"{name} is ready.",
+                    "behavior_policy": {"source": "api-test"},
+                    "character_profile": {"speech_style": "calm"},
+                },
+            },
+            {
+                "source_fragment_id": fragment_id,
+                "proposal_kind": "memory",
+                "target_ref_kind": "memory_candidate",
+                "target_ref_id": agent_id,
+                "title": f"{name} memory",
+                "summary": "Traceable memory.",
+                "proposed_payload_json": {
+                    "source_kind": "authoring_distillation",
+                    "agent_id": agent_id,
+                    "content": f"{name} remembers the opening.",
+                    "memory_kind": "fact",
+                },
+            },
+            {
+                "source_fragment_id": fragment_id,
+                "proposal_kind": "asset_match",
+                "target_ref_kind": "sprite_asset_match",
+                "title": f"{name} sprite",
+                "summary": "Traceable sprite.",
+                "proposed_payload_json": {
+                    "media_asset_id": data["sprite_media_id"],
+                    "agent_id": agent_id,
+                    "character_label": name,
+                    "expression_key": "neutral",
+                },
+            },
+            {
+                "source_fragment_id": fragment_id,
+                "proposal_kind": "asset_match",
+                "target_ref_kind": "voice_asset_match",
+                "title": f"{name} voice",
+                "summary": "Traceable voice.",
+                "proposed_payload_json": {
+                    "media_asset_id": data["voice_media_id"],
+                    "agent_id": agent_id,
+                    "speaker_label": name,
+                    "voice_label": "default",
+                },
+            },
+            {
+                "source_fragment_id": fragment_id,
+                "proposal_kind": "asset_match",
+                "target_ref_kind": "visual_generation_profile_recommendation",
+                "target_ref_id": agent_id,
+                "title": f"{name} visual profile",
+                "summary": "Traceable visual profile.",
+                "proposed_payload_json": {
+                    "agent_id": agent_id,
+                    "review_only": True,
+                    "recommended_prompt_fragments": [name],
+                },
+            },
+        ]
+        for draft in drafts:
+            created = client.post(
+                f"/worlds/{world_id}/authoring/import-runs/{run_id}/proposals",
+                json=draft,
+            )
+            assert created.status_code == 201
+            proposal_ids.append(created.json()["id"])
+    background = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run_id}/proposals",
+        json={
+            "source_fragment_id": fragment_id,
+            "proposal_kind": "asset_match",
+            "target_ref_kind": "background_asset_match",
+            "title": "Opening background",
+            "summary": "Traceable background.",
+            "proposed_payload_json": {
+                "media_asset_id": background_media_id,
+                "location_key": "opening",
+            },
+        },
+    )
+    assert background.status_code == 201
+    proposal_ids.append(background.json()["id"])
+    return proposal_ids
+
+
+def _applied_json_ids(body: dict[str, object], applied_ref_kind: str) -> list[str]:
+    proposals = body.get("applied_proposals")
+    if not isinstance(proposals, list):
+        return []
+    return [
+        str(proposal["id"])
+        for proposal in proposals
+        if isinstance(proposal, dict)
+        and isinstance(proposal.get("applied_ref_json"), dict)
+        and proposal["applied_ref_json"].get("applied_ref_kind") == applied_ref_kind
+    ]
+
+
+def _target_json_ids(body: dict[str, object], target_ref_kinds: set[str]) -> list[str]:
+    proposals = body.get("applied_proposals")
+    if not isinstance(proposals, list):
+        return []
+    return [
+        str(proposal["id"])
+        for proposal in proposals
+        if isinstance(proposal, dict) and proposal.get("target_ref_kind") in target_ref_kinds
+    ]
 
 
 def _authenticate(client: TestClient, token: str) -> None:

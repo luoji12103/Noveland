@@ -103,6 +103,18 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringCharacterMemoryDistillationMode",
     ),
+    "DemoWorldAssemblyRequest": (
+        "noveland.authoring.contracts",
+        "DemoWorldAssemblyRequest",
+    ),
+    "DemoWorldAssemblyResult": (
+        "noveland.authoring.contracts",
+        "DemoWorldAssemblyResult",
+    ),
+    "DemoWorldAssemblyMode": (
+        "noveland.authoring.contracts",
+        "DemoWorldAssemblyMode",
+    ),
     "AuthoringScriptParseRequest": (
         "noveland.authoring.contracts",
         "AuthoringScriptParseRequest",

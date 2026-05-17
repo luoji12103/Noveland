@@ -42,6 +42,8 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentKind,
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
+    DemoWorldAssemblyRequest,
+    DemoWorldAssemblyResult,
     GalgameSourceIntakeApplyRequest,
     GalgameSourceIntakeApplyResult,
     GalgameSourceIntakePreviewRequest,
@@ -122,6 +124,24 @@ class GalgameSourceIntakePreviewBody(BaseModel):
 
 class GalgameSourceIntakeApplyBody(GalgameSourceIntakePreviewBody):
     confirm_already_unpacked_user_provided: bool = False
+
+
+class DemoWorldAssemblyBody(BaseModel):
+    worldline_id: uuid.UUID
+    agent_ids: list[uuid.UUID] = Field(min_length=2, max_length=3)
+    dialogue_proposal_ids: list[uuid.UUID] = Field(min_length=1)
+    persona_proposal_ids: list[uuid.UUID] = Field(default_factory=list)
+    memory_proposal_ids: list[uuid.UUID] = Field(default_factory=list)
+    visual_proposal_ids: list[uuid.UUID] = Field(default_factory=list)
+    voice_proposal_ids: list[uuid.UUID] = Field(default_factory=list)
+    visual_profile_proposal_ids: list[uuid.UUID] = Field(default_factory=list)
+    visual_generation_profile_ids: list[uuid.UUID] = Field(default_factory=list)
+    title: str = Field(default="Self-use MVP Demo World", min_length=1, max_length=160)
+    session_key: str | None = Field(default=None, min_length=3, max_length=80)
+    opening_prompt: str = Field(default="Begin the demo world conversation.", max_length=4000)
+    objective: str = Field(default="Play a source-grounded self-use demo world.", max_length=4000)
+    max_turns: int = Field(default=48, ge=2, le=200)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post(
@@ -519,6 +539,47 @@ def match_authoring_assets(
 ) -> AuthoringAssetMatchResult:
     try:
         return AuthoringService(db_session).match_assets(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/assemble-demo-world",
+    response_model=DemoWorldAssemblyResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def assemble_authoring_demo_world(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: DemoWorldAssemblyBody,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> DemoWorldAssemblyResult:
+    try:
+        return AuthoringService(db_session).assemble_demo_world(
+            world_id,
+            run_id,
+            DemoWorldAssemblyRequest(
+                worldline_id=request.worldline_id,
+                agent_ids=tuple(request.agent_ids),
+                dialogue_proposal_ids=tuple(request.dialogue_proposal_ids),
+                persona_proposal_ids=tuple(request.persona_proposal_ids),
+                memory_proposal_ids=tuple(request.memory_proposal_ids),
+                visual_proposal_ids=tuple(request.visual_proposal_ids),
+                voice_proposal_ids=tuple(request.voice_proposal_ids),
+                visual_profile_proposal_ids=tuple(request.visual_profile_proposal_ids),
+                visual_generation_profile_ids=tuple(request.visual_generation_profile_ids),
+                title=request.title,
+                session_key=request.session_key,
+                opening_prompt=request.opening_prompt,
+                objective=request.objective,
+                max_turns=request.max_turns,
+                metadata_json=request.metadata_json,
+            ),
+        )
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

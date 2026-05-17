@@ -101,6 +101,10 @@ class AuthoringCharacterMemoryDistillationMode(StrEnum):
     PROVIDER_BACKED = "provider_backed"
 
 
+class DemoWorldAssemblyMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+
+
 class GalgameSourceIntakeFileStatus(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -622,6 +626,49 @@ class AuthoringAssetMatchResult(_FrozenContract):
     cg_match_count: int
     voice_match_count: int
     blocked_count: int
+
+
+class DemoWorldAssemblyRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    agent_ids: tuple[uuid.UUID, ...]
+    dialogue_proposal_ids: tuple[uuid.UUID, ...]
+    persona_proposal_ids: tuple[uuid.UUID, ...] = ()
+    memory_proposal_ids: tuple[uuid.UUID, ...] = ()
+    visual_proposal_ids: tuple[uuid.UUID, ...] = ()
+    voice_proposal_ids: tuple[uuid.UUID, ...] = ()
+    visual_profile_proposal_ids: tuple[uuid.UUID, ...] = ()
+    visual_generation_profile_ids: tuple[uuid.UUID, ...] = ()
+    title: str = Field(default="Self-use MVP Demo World", min_length=1, max_length=160)
+    session_key: str | None = Field(default=None, min_length=3, max_length=80)
+    opening_prompt: str = Field(default="Begin the demo world conversation.", max_length=4000)
+    objective: str = Field(default="Play a source-grounded self-use demo world.", max_length=4000)
+    max_turns: int = Field(default=48, ge=2, le=200)
+    assembly_mode: DemoWorldAssemblyMode = DemoWorldAssemblyMode.DETERMINISTIC
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata_json", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value, "demo assembly metadata")
+        return value
+
+    @model_validator(mode="after")
+    def validate_request(self) -> DemoWorldAssemblyRequest:
+        if not 2 <= len(self.agent_ids) <= 3:
+            raise ValueError("demo assembly requires 2-3 agents")
+        if len(set(self.agent_ids)) != len(self.agent_ids):
+            raise ValueError("demo assembly agents must be unique")
+        if not self.dialogue_proposal_ids:
+            raise ValueError("dialogue_proposal_ids is required")
+        return self
+
+
+class DemoWorldAssemblyResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    proposal: AuthoringProposalRead
+    report_json: dict[str, Any]
+    created_proposal_count: int = 1
+    provider_execution: bool = False
 
 
 class GalgameSourceIntakePreviewRequest(_FrozenContract):

@@ -5,12 +5,16 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 9 Demo World Assembly, after Phase 8 merge
+- v0.9 Phase 9 Demo World Assembly merge
 
 ## Blocked
 - None
 
 ## Done
+- v0.9 Phase 9 Demo World Assembly planning checkpoint
+- v0.9 Phase 9 Demo World Assembly implementation
+- v0.9 Phase 9 Demo World Assembly targeted tests
+- v0.9 Phase 9 Demo World Assembly full backend gate
 - v0.9 Phase 8 Voice Profile Mapping planning checkpoint
 - v0.9 Phase 8 Voice Profile Mapping implementation
 - v0.9 Phase 8 Voice Profile Mapping targeted tests

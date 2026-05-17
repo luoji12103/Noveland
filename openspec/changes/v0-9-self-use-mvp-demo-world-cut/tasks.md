@@ -98,11 +98,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 10. Phase 9 — Demo World Assembly
 
-- [ ] 10.1 Write docs-only phase planning checkpoint.
-- [ ] 10.2 Implement reviewed demo assembly from applied import/persona/memory/visual generation profile/visual/voice/dialogue proposals.
-- [ ] 10.3 Add demo-world setup UI only after using `impeccable` if Web scope is approved.
-- [ ] 10.4 Add assembly, source traceability, visual profile, playback, scene, memory, and no-leak tests.
-- [ ] 10.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 10.1 Write docs-only phase planning checkpoint.
+- [x] 10.2 Implement reviewed demo assembly from applied import/persona/memory/visual generation profile/visual/voice/dialogue proposals.
+- [x] 10.3 Add demo-world setup UI only after using `impeccable` if Web scope is approved.
+- [x] 10.4 Add assembly, source traceability, visual profile, playback, scene, memory, and no-leak tests.
+- [x] 10.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 10.6 Fast-forward merge to local main and update harness docs.
 
 ## 11. Phase 10 — 30-Minute Self-use MVP Gate
