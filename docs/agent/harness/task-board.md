@@ -1,12 +1,11 @@
 # Task Board
 
 ## Open
-- v0.9 Phase 5 Script Dialogue Extraction, after Phase 4 merge
 - v1.0 Private Beta MVP feasibility review, after v0.9 completion/archive
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 4 Galgame Source Intake fast-forward merge
+- v0.9 Phase 5 Script Dialogue Extraction, after explicit branch start
 
 ## Blocked
 - None
@@ -16,6 +15,7 @@
 - v0.9 Phase 4 Galgame Source Intake implementation
 - v0.9 Phase 4 Galgame Source Intake targeted tests
 - v0.9 Phase 4 Galgame Source Intake full local gate
+- v0.9 Phase 4 Galgame Source Intake fast-forward merge
 - v0.9 Phase 3 Provider Worktree Integration Test Harness implementation
 - v0.9 Phase 3 Provider Worktree Integration Test Harness targeted tests
 - v0.9 Phase 3 Provider Worktree Integration Test Harness full local gate

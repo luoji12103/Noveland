@@ -54,7 +54,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 5.5 Add source intake UI only after using `impeccable` if Web scope is approved.
 - [x] 5.6 Add intake, source traceability, media import, generation reference, ACL, and leak tests.
 - [x] 5.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 5.8 Fast-forward merge to local main and update harness docs.
+- [x] 5.8 Fast-forward merge to local main and update harness docs.
 
 ## 6. Phase 5 — Script Dialogue Extraction
 
