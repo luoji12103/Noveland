@@ -262,6 +262,9 @@ def test_authoring_api_script_parse_endpoint() -> None:
                 "-> stay\n"
                 "[route: branch_a]\n"
                 "[event: encounter]\n"
+                "[emotion: happy]\n"
+                "[relationship: Hero -> Alice: trust]\n"
+                "@unknown_macro heroine pose=smile\n"
             ),
         },
     )
@@ -281,22 +284,42 @@ def test_authoring_api_script_parse_endpoint() -> None:
     )
 
     assert parsed.status_code == 201
-    assert parsed.json()["created_proposal_count"] == 7
+    assert parsed.json()["created_proposal_count"] == 10
     assert parsed.json()["dialogue_count"] == 2
     assert parsed.json()["scene_count"] == 1
     assert parsed.json()["choice_count"] == 2
     assert parsed.json()["route_count"] == 1
     assert parsed.json()["event_count"] == 1
-    assert parsed.json()["unresolved_speaker_count"] == 1
+    assert parsed.json()["emotion_hint_count"] == 1
+    assert parsed.json()["relationship_hint_count"] == 1
+    assert parsed.json()["manual_label_count"] == 1
+    assert parsed.json()["unresolved_speaker_count"] == 2
     assert parsed.json()["run"]["summary_json"]["provider_execution"] is False
     assert all(
         proposal["source_fragment_id"] == fragment.json()["id"]
         for proposal in parsed.json()["run"]["proposals"]
     )
+    proposals_by_kind = {
+        proposal["target_ref_kind"]: proposal
+        for proposal in parsed.json()["run"]["proposals"]
+    }
+    dialogue = next(
+        proposal
+        for proposal in parsed.json()["run"]["proposals"]
+        if proposal["target_ref_kind"] == "dialogue_candidate"
+        and proposal["proposed_payload_json"].get("speaker_label") == "hero"
+    )
+    assert dialogue["proposed_payload_json"]["line_text"] == "hello"
+    assert (
+        proposals_by_kind["manual_label_candidate"]["proposed_payload_json"][
+            "label_status"
+        ]
+        == "needs_review"
+    )
     assert "storage_uri" not in _json_text(parsed.json())
 
     with Session(engine) as session:
-        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 7
+        assert len(session.scalars(select(AuthoringSourceTraceability)).all()) == 10
         assert session.scalars(select(WorldEventModel)).all() == []
 
 

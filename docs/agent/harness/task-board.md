@@ -5,12 +5,16 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 5 Script Dialogue Extraction, after explicit branch start
+- v0.9 Phase 5 Script Dialogue Extraction fast-forward merge
 
 ## Blocked
 - None
 
 ## Done
+- v0.9 Phase 5 Script Dialogue Extraction planning checkpoint
+- v0.9 Phase 5 Script Dialogue Extraction implementation
+- v0.9 Phase 5 Script Dialogue Extraction targeted tests
+- v0.9 Phase 5 Script Dialogue Extraction full local gate
 - v0.9 Phase 4 Galgame Source Intake planning checkpoint
 - v0.9 Phase 4 Galgame Source Intake implementation
 - v0.9 Phase 4 Galgame Source Intake targeted tests

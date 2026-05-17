@@ -299,18 +299,21 @@ def test_script_parser_creates_traceable_proposals_from_excerpt_text() -> None:
                 worldline_id=graph.worldline_id,
                 source_asset_id=source_asset.id,
                 fragment_key="scene-1",
-                fragment_kind=AuthoringSourceFragmentKind.SCENE,
-                sequence=1,
-                excerpt_text=(
-                    "Hero: hello\n"
-                    "「whispered line」\n"
-                    "[scene: schoolyard]\n"
-                    "choice: leave with him\n"
-                    "-> stay\n"
-                    "[route: branch_a]\n"
-                    "[event: encounter]\n"
-                ),
-            )
+            fragment_kind=AuthoringSourceFragmentKind.SCENE,
+            sequence=1,
+            excerpt_text=(
+                "Hero: hello\n"
+                "「whispered line」\n"
+                "[scene: schoolyard]\n"
+                "choice: leave with him\n"
+                "-> stay\n"
+                "[route: branch_a]\n"
+                "[event: encounter]\n"
+                "[emotion: happy]\n"
+                "[relationship: Hero -> Alice: trust]\n"
+                "@unknown_macro heroine pose=smile\n"
+            ),
+        )
         )
         run = service.create_import_run(
             AuthoringImportRunCreate(
@@ -332,20 +335,52 @@ def test_script_parser_creates_traceable_proposals_from_excerpt_text() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
         session.commit()
 
-    assert result.created_proposal_count == 7
+    assert result.created_proposal_count == 10
     assert result.dialogue_count == 2
     assert result.scene_count == 1
     assert result.choice_count == 2
     assert result.route_count == 1
     assert result.event_count == 1
-    assert result.unresolved_speaker_count == 1
+    assert result.emotion_hint_count == 1
+    assert result.relationship_hint_count == 1
+    assert result.manual_label_count == 1
+    assert result.unresolved_speaker_count == 2
     assert result.run.summary_json["parser_mode"] == "deterministic"
     assert result.run.summary_json["provider_execution"] is False
     assert all(
         proposal.source_fragment_id == fragment.id for proposal in result.run.proposals
     )
+    proposals_by_kind = {
+        proposal.target_ref_kind: proposal for proposal in result.run.proposals
+    }
+    dialogue = next(
+        proposal
+        for proposal in result.run.proposals
+        if proposal.target_ref_kind == "dialogue_candidate"
+        and proposal.proposed_payload_json.get("speaker_label") == "hero"
+    )
+    assert dialogue.proposed_payload_json["line_text"] == "hello"
+    assert (
+        proposals_by_kind["emotion_hint_candidate"].proposed_payload_json["emotion_key"]
+        == "happy"
+    )
+    assert (
+        proposals_by_kind["relationship_hint_candidate"].proposed_payload_json[
+            "relationship_hint"
+        ]
+        == "Hero -> Alice: trust"
+    )
+    assert (
+        proposals_by_kind["manual_label_candidate"].proposed_payload_json[
+            "label_status"
+        ]
+        == "needs_review"
+    )
+    assert "@unknown_macro" in proposals_by_kind[
+        "manual_label_candidate"
+    ].proposed_payload_json["line_excerpt"]
     assert all(proposal.status == "proposed" for proposal in result.run.proposals)
-    assert trace_count == 7
+    assert trace_count == 10
 
 
 def test_character_extractor_creates_traceable_character_relationship_proposals() -> None:

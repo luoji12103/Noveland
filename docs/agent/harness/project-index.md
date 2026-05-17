@@ -75,6 +75,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md` — v0.9 Phase 2 checkpoint for dedicated visual generation package/router/schema ownership, workflow-template slot safety, model inventory, character visual profiles, provider-neutral plans, AI proposal policy, and backend/API-first implementation scope.
 - `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md` — v0.9 Phase 3 checkpoint for opt-in real-provider testing in a separate provider lab worktree, fake/mocked default tests, and safe provider lab evidence.
 - `docs/agent/harness/feature-updates/v0.9.4-galgame-source-intake-plan.md` — v0.9 Phase 4 checkpoint for already-unpacked galgame source directory intake through authoring/media without unpacking, raw path leaks, canon mutation, or Web UI.
+- `docs/agent/harness/feature-updates/v0.9.5-script-dialogue-extraction-plan.md` — v0.9 Phase 5 checkpoint for deterministic script dialogue extraction with line text, emotion/relationship hints, and manual-label proposals without provider calls or direct canon/memory writes.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.

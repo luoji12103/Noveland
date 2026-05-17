@@ -462,6 +462,9 @@ class AuthoringScriptParseResult(_FrozenContract):
     choice_count: int
     route_count: int
     event_count: int
+    emotion_hint_count: int = 0
+    relationship_hint_count: int = 0
+    manual_label_count: int = 0
     unresolved_speaker_count: int
 
 

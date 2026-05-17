@@ -58,11 +58,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 6. Phase 5 — Script Dialogue Extraction
 
-- [ ] 6.1 Write docs-only phase planning checkpoint.
-- [ ] 6.2 Implement deterministic extraction for selected sample formats and manual-label fallback.
-- [ ] 6.3 Keep provider extraction optional and ledger-backed if included.
-- [ ] 6.4 Add parser, proposal, speaker mapping, uncertainty, ACL, and leak tests.
-- [ ] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 6.1 Write docs-only phase planning checkpoint.
+- [x] 6.2 Implement deterministic extraction for selected sample formats and manual-label fallback.
+- [x] 6.3 Keep provider extraction optional and ledger-backed if included.
+- [x] 6.4 Add parser, proposal, speaker mapping, uncertainty, ACL, and leak tests.
+- [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Character Memory Distillation Agent

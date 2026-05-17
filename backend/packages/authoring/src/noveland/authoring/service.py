@@ -420,6 +420,17 @@ class AuthoringService:
             "event_count": sum(
                 1 for candidate in candidates if candidate.candidate_kind == "event"
             ),
+            "emotion_hint_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "emotion_hint"
+            ),
+            "relationship_hint_count": sum(
+                1
+                for candidate in candidates
+                if candidate.candidate_kind == "relationship_hint"
+            ),
+            "manual_label_count": sum(
+                1 for candidate in candidates if candidate.candidate_kind == "manual_label"
+            ),
             "unresolved_speaker_count": sum(
                 1 for candidate in candidates if candidate.unresolved_speaker
             ),
@@ -433,6 +444,9 @@ class AuthoringService:
             choice_count=int(run.summary_json["choice_count"]),
             route_count=int(run.summary_json["route_count"]),
             event_count=int(run.summary_json["event_count"]),
+            emotion_hint_count=int(run.summary_json["emotion_hint_count"]),
+            relationship_hint_count=int(run.summary_json["relationship_hint_count"]),
+            manual_label_count=int(run.summary_json["manual_label_count"]),
             unresolved_speaker_count=int(run.summary_json["unresolved_speaker_count"]),
         )
 

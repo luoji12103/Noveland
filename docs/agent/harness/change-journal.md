@@ -22,6 +22,17 @@
 - Docs updated: Phase 4 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
 - Follow-up notes: Commit `9d7e985` fast-forward merged to local `main`; no push performed. Phase 5 should reuse source fragments from this intake for deterministic script dialogue extraction. Phase 4 added no Web UI and no migration; `impeccable` was not needed.
 
+## v0.9 Phase 5 Script Dialogue Extraction planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-script-dialogue-extraction
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 5 only.
+- Summary: Enhanced the existing deterministic authoring parser so script fragments produce reviewable proposals with dialogue line text, emotion hints, relationship hints, and manual-label candidates for unknown script lines. Provider-backed extraction remains out of scope for Phase 5, so there are no model calls, provider spend, prompt snapshots, or invocation ledger writes.
+- Files changed: `backend/packages/authoring/src/noveland/authoring/parser.py`, authoring contracts/service result counts, authoring service/API tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring service/API/regression fixture coverage for enriched dialogue proposals, emotion/relationship/manual-label counts, source traceability, ACL through existing authoring API, no world-event writes, and no storage leak markers.
+- Docs updated: Phase 5 checkpoint, task board, active handoff, project index, change journal, OpenSpec tasks.
+- Follow-up notes: Phase 6 can consume reviewed dialogue and manual-label proposals. Phase 5 added no Web UI and no migration; `impeccable` was not needed.
+
 ## v0.9 Phase 3 Provider Worktree Integration Test Harness planning/implementation entry
 
 - Date: 2026-05-17
