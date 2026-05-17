@@ -67,12 +67,12 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 7. Phase 6 — Character Memory Distillation Agent
 
-- [ ] 7.1 Write docs-only phase planning checkpoint.
-- [ ] 7.2 Implement provider-backed persona card and memory candidate generation through `ProviderExecutionService`.
-- [ ] 7.3 Implement optional visual generation profile recommendations as proposals only.
-- [ ] 7.4 Implement review/apply to persona and memory only after explicit approval.
-- [ ] 7.5 Add invocation ledger, prompt redaction, source traceability, profile proposal, apply, and no-leak tests.
-- [ ] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 7.1 Write docs-only phase planning checkpoint.
+- [x] 7.2 Implement provider-backed persona card and memory candidate generation through `ProviderExecutionService`.
+- [x] 7.3 Implement optional visual generation profile recommendations as proposals only.
+- [x] 7.4 Implement review/apply to persona and memory only after explicit approval.
+- [x] 7.5 Add invocation ledger, prompt redaction, source traceability, profile proposal, apply, and no-leak tests.
+- [x] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 7.7 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — Visual Asset Mapping

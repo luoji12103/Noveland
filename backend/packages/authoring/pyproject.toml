@@ -8,16 +8,22 @@ version = "0.1.0"
 description = "Authoring import source registry and proposal review foundation for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "noveland-agents",
   "noveland-core",
+  "noveland-memory",
   "noveland-media",
+  "noveland-providers",
   "noveland-worlds",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
 
 [tool.uv.sources]
+noveland-agents = { workspace = true }
 noveland-core = { workspace = true }
+noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
+noveland-providers = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

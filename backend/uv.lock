@@ -601,8 +601,11 @@ name = "noveland-authoring"
 version = "0.1.0"
 source = { editable = "packages/authoring" }
 dependencies = [
+    { name = "noveland-agents" },
     { name = "noveland-core" },
     { name = "noveland-media" },
+    { name = "noveland-memory" },
+    { name = "noveland-providers" },
     { name = "noveland-worlds" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
@@ -610,8 +613,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-memory", editable = "packages/memory" },
+    { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },

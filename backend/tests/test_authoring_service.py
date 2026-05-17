@@ -5,12 +5,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from noveland.agents.models import Agent, AgentPersona
 from noveland.auth.models import User
 from noveland.authoring import AuthoringService
 from noveland.authoring.contracts import (
     AuthoringApplyRequest,
     AuthoringAssetMatchRequest,
     AuthoringCharacterExtractRequest,
+    AuthoringCharacterMemoryDistillRequest,
     AuthoringConflictReviewRequest,
     AuthoringImportRunCreate,
     AuthoringLoreExtractRequest,
@@ -42,8 +44,18 @@ from noveland.authoring.models import (
 )
 from noveland.authoring.service import AuthoringValidationError
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject
 from noveland.media.storage import LocalMediaObjectStorage
+from noveland.memory.models import AgentMemoryItem
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import ProviderBudgetPolicy, ProviderCapability, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -858,6 +870,206 @@ def test_memory_migration_creates_proposal_only_memory_candidates() -> None:
     assert "storage_uri" not in str(result.run.model_dump()).lower()
 
 
+def test_character_memory_distillation_creates_reviewable_proposals() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    with Session(engine) as session:
+        provider_id = _seed_text_provider(session, graph.world_id)
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="alice-source",
+                display_name="Alice Source",
+                source_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+                source_label="alice.md",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="alice",
+                fragment_kind=AuthoringSourceFragmentKind.CHARACTER,
+                sequence=1,
+                excerpt_text=(
+                    "Alice: I trust Bob.\n"
+                    "emotion: Alice = guarded\n"
+                    "secret: Alice hides the old key\n"
+                    "route: alice\n"
+                    "preference: Alice likes tea\n"
+                ),
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.distill_character_memory(
+            graph.world_id,
+            run.id,
+            AuthoringCharacterMemoryDistillRequest(
+                worldline_id=graph.worldline_id,
+                agent_id=agent_id,
+                source_fragment_ids=(fragment.id,),
+                provider_id=provider_id,
+            ),
+            actor_ref="test",
+        )
+        proposals = result.run.proposals
+        persona = next(
+            proposal
+            for proposal in proposals
+            if proposal.target_ref_kind == "agent_persona_candidate"
+        )
+        memory = next(
+            proposal for proposal in proposals if proposal.target_ref_kind == "memory_candidate"
+        )
+        visual = next(
+            proposal
+            for proposal in proposals
+            if proposal.target_ref_kind == "visual_generation_profile_recommendation"
+        )
+        assert result.created_proposal_count >= 3
+        assert result.persona_proposal_count == 1
+        assert result.memory_candidate_count >= 1
+        assert result.visual_profile_recommendation_count == 1
+        assert result.provider_execution is True
+        assert result.run.summary_json["provider_execution"] is True
+        assert persona.proposed_payload_json["agent_id"] == str(agent_id)
+        assert memory.proposed_payload_json["source_kind"] == "authoring_distillation"
+        assert visual.proposed_payload_json["review_only"] is True
+        assert session.scalars(select(AgentPersona)).all() == []
+        assert session.scalars(select(AgentMemoryItem)).all() == []
+        assert len(session.scalars(select(ModelInvocation)).all()) == 1
+        assert len(session.scalars(select(PromptSnapshot)).all()) == 1
+        assert session.scalars(select(WorldEventModel)).all() == []
+        assert "raw_output" not in str(result.run.model_dump()).lower()
+        assert "storage_uri" not in str(result.run.model_dump()).lower()
+        assert "base64" not in str(result.run.model_dump()).lower()
+        session.commit()
+
+
+def test_character_memory_distillation_apply_writes_traceable_state() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    with Session(engine) as session:
+        provider_id = _seed_text_provider(session, graph.world_id)
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="alice-source",
+                display_name="Alice Source",
+                source_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+            ),
+            actor_ref="test",
+        )
+        source_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                source_asset_kind=AuthoringSourceAssetKind.CHARACTER_SHEET,
+                source_label="alice.md",
+            )
+        )
+        fragment = service.add_source_fragment(
+            AuthoringSourceFragmentCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_asset_id=source_asset.id,
+                fragment_key="alice",
+                fragment_kind=AuthoringSourceFragmentKind.CHARACTER,
+                sequence=1,
+                excerpt_text="Alice: I trust Bob.\npreference: Alice likes tea",
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.distill_character_memory(
+            graph.world_id,
+            run.id,
+            AuthoringCharacterMemoryDistillRequest(
+                worldline_id=graph.worldline_id,
+                agent_id=agent_id,
+                source_fragment_ids=(fragment.id,),
+                provider_id=provider_id,
+                include_visual_profile_recommendation=False,
+            ),
+            actor_ref="test",
+        )
+        proposal_ids = tuple(proposal.id for proposal in result.run.proposals)
+        with pytest.raises(AuthoringValidationError, match="approved"):
+            service.apply(
+                graph.world_id,
+                run.id,
+                AuthoringApplyRequest(
+                    worldline_id=graph.worldline_id,
+                    proposal_ids=proposal_ids,
+                ),
+            )
+        for proposal in result.run.proposals:
+            service.review_proposal(
+                graph.world_id,
+                proposal.id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
+        applied = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=proposal_ids,
+            ),
+        )
+        assert len(applied.applied_proposals) == len(proposal_ids)
+        assert applied.blocked_proposals == []
+        session.commit()
+
+    with Session(engine) as session:
+        persona = session.scalars(select(AgentPersona)).one()
+        memory = session.scalars(select(AgentMemoryItem)).first()
+        agent = session.get(Agent, agent_id)
+        traces = session.scalars(select(AuthoringSourceTraceability)).all()
+        assert agent is not None
+        assert persona.persona_text
+        assert persona.policy_plugin_config["authoring"]["source_kind"] == (
+            "character_memory_distillation"
+        )
+        assert memory is not None
+        assert memory.metadata_json["source_kind"] == "authoring_distillation"
+        assert memory.metadata_json["proposal_id"]
+        assert agent.character_profile["distilled_persona_source"]["model_invocation_id"]
+        assert len([trace for trace in traces if trace.trace_kind == "proposal_applied"]) >= 2
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def test_asset_matching_creates_proposal_only_media_candidates() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
@@ -1189,10 +1401,18 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, User.__table__),
         cast(Table, World.__table__),
         cast(Table, Worldline.__table__),
+        cast(Table, Agent.__table__),
+        cast(Table, AgentPersona.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, AgentMemoryItem.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptSnapshot.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -1229,6 +1449,43 @@ def _seed_graph(engine: Engine) -> _Graph:
         media_asset_id = _add_media_asset(session, world_id, worldline_id)
         session.commit()
     return _Graph(world_id=world_id, worldline_id=worldline_id, media_asset_id=media_asset_id)
+
+
+def _seed_agent(
+    engine: Engine,
+    world_id: uuid.UUID,
+    agent_key: str,
+    display_name: str,
+) -> uuid.UUID:
+    agent_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=agent_id,
+                world_id=world_id,
+                agent_key=agent_key,
+                display_name=display_name,
+                kind="role_agent",
+                character_profile={},
+                config={},
+            )
+        )
+        session.commit()
+    return agent_id
+
+
+def _seed_text_provider(session: Session, world_id: uuid.UUID) -> uuid.UUID:
+    provider = ProviderRegistryService(session).create_provider(
+        ProviderIntegrationCreate(
+            world_id=world_id,
+            scope_kind=ProviderScopeKind.WORLD,
+            provider_kind=ProviderKind.TEXT_GENERATION,
+            adapter_kind=ProviderAdapterKind.FAKE,
+            provider_key=f"fake-text-{uuid.uuid4().hex[:8]}",
+            display_name="Fake Text",
+        )
+    )
+    return provider.id
 
 
 def _seed_fork(engine: Engine, world_id: uuid.UUID, parent_worldline_id: uuid.UUID) -> uuid.UUID:

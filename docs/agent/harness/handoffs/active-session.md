@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T07:35:00Z
-- Branch: main
+- Date: 2026-05-17T08:55:00Z
+- Branch: feat/v0.9-character-memory-distillation
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 5 Script Dialogue Extraction is complete and fast-forward merged to local `main`. Start Phase 6 Character Memory Distillation Agent from clean local `main`.
+- Status: v0.9 Phase 6 Character Memory Distillation Agent implementation and validation are complete on branch; commit and fast-forward merge to local `main`, then start Phase 7 Visual Asset Mapping from clean local `main`.
 
 ## Current Context
 
@@ -34,6 +34,8 @@
 - v0.9 Phase 4 implementation adds a migration-free already-unpacked galgame source intake service under `backend/packages/authoring/`, with admin-only authoring API routes for preview/apply. It rejects packed/archive/executable-like files, stores accepted image/audio files through media as private `imported_original` assets/objects, stores text as bounded source fragments, preserves source traceability through authoring records, adds future generation-reference candidate metadata for visual assets, and does not mutate canon, memory, visual/voice bindings, world state, or world events.
 - v0.9 Phase 5 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.5-script-dialogue-extraction-plan.md`.
 - v0.9 Phase 5 implementation enhances the existing deterministic authoring parser with dialogue `line_text`, emotion hints, relationship hints, and manual-label proposals for unknown script lines. It remains proposal-only and adds no provider calls, prompt snapshots, invocation ledger writes, Web UI, migration, canon mutation, memory writes, or world events.
+- v0.9 Phase 6 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.6-character-memory-distillation-agent-plan.md`.
+- v0.9 Phase 6 implementation adds provider-backed character memory distillation to authoring. It uses `ProviderExecutionService` for invocation ledger and prompt snapshot evidence, creates reviewable persona, memory, and visual generation profile recommendation proposals, and writes `AgentPersona`, `Agent.character_profile`, and `AgentMemoryItem` only after explicit approval/apply. It adds no Web UI, migration, canon mutation, visual/voice binding mutation, `MemoryWriteJob.source_kind` widening, or world events.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -119,7 +121,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Start Phase 6 Character Memory Distillation Agent from clean local `main`.
+- Commit and fast-forward merge Phase 6 to local `main`, then start Phase 7 Visual Asset Mapping from clean local `main`.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
@@ -164,6 +166,8 @@
 - v0.9 Phase 5 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_authoring_regression_fixture.py -q` (`25 passed`).
 - v0.9 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`484 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.9 Phase 5 commit `b688247` fast-forward merged to local `main`; no push performed.
+- v0.9 Phase 6 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py -q` (`24 passed`).
+- v0.9 Phase 6 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`487 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

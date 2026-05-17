@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import cast
 
 from fastapi.testclient import TestClient
+from noveland.agents.models import Agent, AgentPersona
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -22,8 +23,18 @@ from noveland.authoring.models import (
     AuthoringSourceTraceability,
 )
 from noveland.events.models import WorldEventModel
+from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject
 from noveland.media.storage import LocalMediaObjectStorage
+from noveland.memory.models import AgentMemoryItem
+from noveland.providers.contracts import (
+    ProviderAdapterKind,
+    ProviderIntegrationCreate,
+    ProviderKind,
+    ProviderScopeKind,
+)
+from noveland.providers.models import ProviderBudgetPolicy, ProviderCapability, ProviderIntegration
+from noveland.providers.registry import ProviderRegistryService
 from noveland.services.api.app import create_app
 from noveland.services.api.authoring import _authoring_media_storage
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -649,6 +660,122 @@ def test_authoring_api_memory_migration_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_character_memory_distillation_endpoint() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    agent_id = _seed_agent(engine, world_id, "alice", "Alice")
+    provider_id = _seed_text_provider(engine, world_id)
+
+    _authenticate(client, owner_token)
+    batch = client.post(
+        f"/worlds/{world_id}/authoring/source-batches",
+        json={
+            "worldline_id": str(worldline_id),
+            "batch_key": "alice",
+            "display_name": "Alice",
+            "source_kind": "character_sheet",
+        },
+    )
+    asset = client.post(
+        f"/worlds/{world_id}/authoring/source-batches/{batch.json()['id']}/assets",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_asset_kind": "character_sheet",
+            "source_label": "alice.md",
+        },
+    )
+    fragment = client.post(
+        f"/worlds/{world_id}/authoring/source-assets/{asset.json()['id']}/fragments",
+        json={
+            "worldline_id": str(worldline_id),
+            "fragment_key": "alice",
+            "fragment_kind": "character",
+            "sequence": 1,
+            "excerpt_text": "Alice: I trust Bob.\npreference: Alice likes tea",
+        },
+    )
+    run = client.post(
+        f"/worlds/{world_id}/authoring/import-runs",
+        json={
+            "worldline_id": str(worldline_id),
+            "source_batch_id": batch.json()["id"],
+        },
+    )
+    _authenticate(client, member_token)
+    forbidden = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/distill-character-memory",
+        json={
+            "worldline_id": str(worldline_id),
+            "agent_id": str(agent_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+            "provider_id": str(provider_id),
+        },
+    )
+    _authenticate(client, owner_token)
+    distilled = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/distill-character-memory",
+        json={
+            "worldline_id": str(worldline_id),
+            "agent_id": str(agent_id),
+            "source_fragment_ids": [fragment.json()["id"]],
+            "provider_id": str(provider_id),
+            "include_visual_profile_recommendation": True,
+        },
+    )
+
+    assert forbidden.status_code == 403
+    assert distilled.status_code == 201
+    assert distilled.json()["provider_execution"] is True
+    assert distilled.json()["persona_proposal_count"] == 1
+    assert distilled.json()["memory_candidate_count"] >= 1
+    assert distilled.json()["visual_profile_recommendation_count"] == 1
+    response_text = _json_text(distilled.json())
+    for forbidden_marker in (
+        "storage_uri",
+        "file://",
+        "local://",
+        "base64",
+        "raw_prompt",
+        "raw_output",
+        "prompt_snapshot",
+    ):
+        assert forbidden_marker not in response_text
+
+    proposals = distilled.json()["run"]["proposals"]
+    proposal_ids = [
+        proposal["id"]
+        for proposal in proposals
+        if proposal["target_ref_kind"]
+        in {"agent_persona_candidate", "memory_candidate"}
+    ]
+    for proposal_id in proposal_ids:
+        reviewed = client.post(
+            f"/worlds/{world_id}/authoring/proposals/{proposal_id}/review",
+            json={"decision": "approve", "reason": "phase 6 apply"},
+        )
+        assert reviewed.status_code == 201
+    applied = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{run.json()['id']}/apply",
+        json={"worldline_id": str(worldline_id), "proposal_ids": proposal_ids},
+    )
+    assert applied.status_code == 201
+    assert len(applied.json()["applied_proposals"]) == len(proposal_ids)
+    assert applied.json()["blocked_proposals"] == []
+    assert "storage_uri" not in _json_text(applied.json())
+
+    with Session(engine) as session:
+        assert len(session.scalars(select(ModelInvocation)).all()) == 1
+        assert len(session.scalars(select(PromptSnapshot)).all()) == 1
+        assert session.scalars(select(AgentPersona)).one().persona_text
+        assert session.scalars(select(AgentMemoryItem)).first() is not None
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
 def test_authoring_api_asset_matching_endpoint() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -772,10 +899,18 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, World.__table__),
         cast(Table, Worldline.__table__),
         cast(Table, WorldMembership.__table__),
+        cast(Table, Agent.__table__),
+        cast(Table, AgentPersona.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, AgentMemoryItem.__table__),
+        cast(Table, ProviderIntegration.__table__),
+        cast(Table, ProviderCapability.__table__),
+        cast(Table, ProviderBudgetPolicy.__table__),
+        cast(Table, ModelInvocation.__table__),
+        cast(Table, PromptSnapshot.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -826,6 +961,45 @@ def _seed_worldline(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
         primary = ensure_primary_worldline(session, world_id)
         session.commit()
         return primary.id
+
+
+def _seed_agent(
+    engine: Engine,
+    world_id: uuid.UUID,
+    agent_key: str,
+    display_name: str,
+) -> uuid.UUID:
+    agent_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=agent_id,
+                world_id=world_id,
+                agent_key=agent_key,
+                display_name=display_name,
+                kind="role_agent",
+                character_profile={},
+                config={},
+            )
+        )
+        session.commit()
+    return agent_id
+
+
+def _seed_text_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key=f"fake-text-{uuid.uuid4().hex[:8]}",
+                display_name="Fake Text",
+            )
+        )
+        session.commit()
+        return provider.id
 
 
 def _add_membership(

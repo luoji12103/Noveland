@@ -12,6 +12,8 @@ from noveland.authoring.contracts import (
     AuthoringAssetMatchResult,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterExtractResult,
+    AuthoringCharacterMemoryDistillRequest,
+    AuthoringCharacterMemoryDistillResult,
     AuthoringConflictReviewRequest,
     AuthoringConflictReviewResult,
     AuthoringImportRunCreate,
@@ -469,6 +471,33 @@ def migrate_authoring_memory(
 ) -> AuthoringMemoryMigrateResult:
     try:
         return AuthoringService(db_session).migrate_memory(world_id, run_id, request)
+    except AuthoringNotFoundError as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/import-runs/{run_id}/distill-character-memory",
+    response_model=AuthoringCharacterMemoryDistillResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def distill_authoring_character_memory(
+    world_id: uuid.UUID,
+    run_id: uuid.UUID,
+    request: AuthoringCharacterMemoryDistillRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> AuthoringCharacterMemoryDistillResult:
+    try:
+        return AuthoringService(db_session).distill_character_memory(
+            world_id,
+            run_id,
+            request,
+            actor_ref=f"user:{subject.user_id}",
+        )
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:

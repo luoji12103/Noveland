@@ -97,6 +97,10 @@ class AuthoringAssetMatchingMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class AuthoringCharacterMemoryDistillationMode(StrEnum):
+    PROVIDER_BACKED = "provider_backed"
+
+
 class GalgameSourceIntakeFileStatus(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -564,6 +568,34 @@ class AuthoringMemoryMigrateResult(_FrozenContract):
     relationship_count: int
     preference_count: int
     style_count: int
+
+
+class AuthoringCharacterMemoryDistillRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    agent_id: uuid.UUID
+    source_fragment_ids: tuple[uuid.UUID, ...]
+    provider_id: uuid.UUID
+    model_name: str | None = Field(default=None, min_length=1, max_length=200)
+    distillation_mode: AuthoringCharacterMemoryDistillationMode = (
+        AuthoringCharacterMemoryDistillationMode.PROVIDER_BACKED
+    )
+    include_visual_profile_recommendation: bool = True
+
+    @model_validator(mode="after")
+    def validate_fragments(self) -> AuthoringCharacterMemoryDistillRequest:
+        if not self.source_fragment_ids:
+            raise ValueError("source_fragment_ids is required")
+        return self
+
+
+class AuthoringCharacterMemoryDistillResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    created_proposal_count: int
+    persona_proposal_count: int
+    memory_candidate_count: int
+    visual_profile_recommendation_count: int
+    model_invocation_id: uuid.UUID
+    provider_execution: bool = True
 
 
 class AuthoringAssetMatchRequest(_FrozenContract):

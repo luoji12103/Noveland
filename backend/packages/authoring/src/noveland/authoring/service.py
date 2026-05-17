@@ -3,6 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from noveland.agents.contracts import AgentPersonaUpsert
+from noveland.agents.models import Agent
+from noveland.agents.services import AgentPersonaService
 from noveland.authoring.asset_matching import (
     AssetMatchCandidate,
     AssetMatchInput,
@@ -30,6 +33,8 @@ from noveland.authoring.contracts import (
     AuthoringAssetMatchResult,
     AuthoringCharacterExtractRequest,
     AuthoringCharacterExtractResult,
+    AuthoringCharacterMemoryDistillRequest,
+    AuthoringCharacterMemoryDistillResult,
     AuthoringConflictReviewRequest,
     AuthoringConflictReviewResult,
     AuthoringImportRunCreate,
@@ -91,6 +96,10 @@ from noveland.authoring.models import (
 )
 from noveland.authoring.parser import ParsedScriptCandidate, parse_fragment
 from noveland.media.models import MediaAsset
+from noveland.memory.models import AgentMemoryItem
+from noveland.memory.utils import deterministic_embedding
+from noveland.providers.contracts import ProviderExecutionRequest, ProviderKind
+from noveland.providers.service import ProviderExecutionService
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -107,6 +116,9 @@ class AuthoringNotFoundError(LookupError):
 
 SUPPORTED_TRACE_ONLY_APPLY_KINDS = {AuthoringProposalKind.OTHER.value}
 RESTRICTED_MEDIA_VISIBILITIES = {"developer_only", "hidden"}
+PERSONA_PROPOSAL_TARGET = "agent_persona_candidate"
+MEMORY_PROPOSAL_TARGET = "memory_candidate"
+VISUAL_PROFILE_RECOMMENDATION_TARGET = "visual_generation_profile_recommendation"
 
 
 class AuthoringService:
@@ -845,6 +857,172 @@ class AuthoringService:
             style_count=summary_counts["style_count"],
         )
 
+    def distill_character_memory(
+        self,
+        world_id: uuid.UUID,
+        run_id: uuid.UUID,
+        request: AuthoringCharacterMemoryDistillRequest,
+        *,
+        actor_ref: str,
+    ) -> AuthoringCharacterMemoryDistillResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        run = self._run_required(world_id, run_id)
+        if run.worldline_id != worldline_id:
+            raise AuthoringValidationError(
+                "character memory distillation run must belong to request worldline"
+            )
+        agent = self._agent_required(world_id, request.agent_id)
+        fragments = self._distillation_fragments(
+            world_id,
+            worldline_id,
+            request.source_fragment_ids,
+        )
+        source_refs = [str(fragment.id) for fragment in fragments]
+        prompt_text = _distillation_prompt(agent, fragments)
+        provider_result = ProviderExecutionService(self._session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=request.provider_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                input_text=prompt_text,
+                input_json={
+                    "task": "character_memory_distillation",
+                    "agent_id": str(agent.id),
+                    "source_fragment_ids": source_refs,
+                },
+                request_json={
+                    "distillation_mode": request.distillation_mode.value,
+                    "output_contract": "persona_and_initial_memory_candidates",
+                },
+                model_name=request.model_name,
+                actor_ref=actor_ref,
+            )
+        )
+        persona_payload = _persona_payload(
+            agent=agent,
+            fragments=fragments,
+            model_invocation_id=provider_result.invocation.id,
+        )
+        memory_payloads = _memory_payloads(
+            agent=agent,
+            fragments=fragments,
+            model_invocation_id=provider_result.invocation.id,
+        )
+        visual_payload = _visual_profile_payload(
+            agent=agent,
+            fragments=fragments,
+            model_invocation_id=provider_result.invocation.id,
+        )
+
+        created: list[AuthoringProposalRead] = []
+        first_fragment_id = fragments[0].id
+        created.append(
+            self.create_proposal(
+                AuthoringProposalCreate(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    run_id=run.id,
+                    source_fragment_id=first_fragment_id,
+                    proposal_kind=AuthoringProposalKind.CHARACTER,
+                    target_ref_kind=PERSONA_PROPOSAL_TARGET,
+                    target_ref_id=agent.id,
+                    title=f"Persona card for {agent.display_name}",
+                    summary=(
+                        f"Provider-backed persona card candidate for {agent.display_name}."
+                    ),
+                    proposed_payload_json=persona_payload,
+                    evidence_json=_distillation_evidence(
+                        source_refs=source_refs,
+                        model_invocation_id=provider_result.invocation.id,
+                        evidence_kind="persona_card",
+                    ),
+                    confidence=0.72,
+                    priority=10,
+                )
+            )
+        )
+        for index, memory_payload in enumerate(memory_payloads, start=1):
+            source_fragment_id = _uuid_from_payload(
+                memory_payload.get("source_fragment_id"),
+            ) or first_fragment_id
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=source_fragment_id,
+                        proposal_kind=AuthoringProposalKind.MEMORY,
+                        target_ref_kind=MEMORY_PROPOSAL_TARGET,
+                        target_ref_id=agent.id,
+                        title=f"Initial memory {index} for {agent.display_name}",
+                        summary=str(memory_payload["content"])[:200],
+                        proposed_payload_json=memory_payload,
+                        evidence_json=_distillation_evidence(
+                            source_refs=[str(source_fragment_id)],
+                            model_invocation_id=provider_result.invocation.id,
+                            evidence_kind="memory_candidate",
+                        ),
+                        confidence=0.68,
+                        priority=20 + index,
+                    )
+                )
+            )
+        visual_count = 0
+        if request.include_visual_profile_recommendation:
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=first_fragment_id,
+                        proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                        target_ref_kind=VISUAL_PROFILE_RECOMMENDATION_TARGET,
+                        target_ref_id=agent.id,
+                        title=f"Visual generation profile recommendation for {agent.display_name}",
+                        summary=(
+                            "Review-only visual generation profile recommendations derived "
+                            "from character source fragments."
+                        ),
+                        proposed_payload_json=visual_payload,
+                        evidence_json=_distillation_evidence(
+                            source_refs=source_refs,
+                            model_invocation_id=provider_result.invocation.id,
+                            evidence_kind="visual_generation_profile_recommendation",
+                        ),
+                        confidence=0.55,
+                        priority=90,
+                    )
+                )
+            )
+            visual_count = 1
+
+        summary_counts = {
+            "created_proposal_count": len(created),
+            "persona_proposal_count": 1,
+            "memory_candidate_count": len(memory_payloads),
+            "visual_profile_recommendation_count": visual_count,
+        }
+        run.status = AuthoringImportRunStatus.PREVIEWED.value
+        run.summary_json = {
+            **run.summary_json,
+            "character_memory_distillation_mode": request.distillation_mode.value,
+            "agent_id": str(agent.id),
+            "provider_execution": True,
+            "model_invocation_id": str(provider_result.invocation.id),
+            "source_fragment_count": len(fragments),
+            **summary_counts,
+        }
+        self._session.flush()
+        return AuthoringCharacterMemoryDistillResult(
+            run=self.get_import_run(world_id, run.id),
+            model_invocation_id=provider_result.invocation.id,
+            provider_execution=True,
+            **summary_counts,
+        )
+
     def match_assets(
         self,
         world_id: uuid.UUID,
@@ -985,11 +1163,17 @@ class AuthoringService:
                 raise AuthoringValidationError("proposal must belong to apply worldline")
             if proposal.status != AuthoringProposalStatus.APPROVED.value:
                 raise AuthoringValidationError("proposal must be approved before apply")
-            if proposal.proposal_kind not in SUPPORTED_TRACE_ONLY_APPLY_KINDS:
+            applied_ref_json = self._apply_supported_proposal(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+            if applied_ref_json is None:
                 proposal.status = AuthoringProposalStatus.BLOCKED.value
                 proposal.applied_ref_json = {
                     "blocked_reason": "unsupported_proposal_kind",
                     "proposal_kind": proposal.proposal_kind,
+                    "target_ref_kind": proposal.target_ref_kind,
                 }
                 if proposal.source_fragment_id is not None:
                     self._add_trace(
@@ -1003,11 +1187,7 @@ class AuthoringService:
                 blocked.append(proposal)
                 continue
             proposal.status = AuthoringProposalStatus.APPLIED.value
-            proposal.applied_ref_json = {
-                "applied_ref_kind": "authoring_import_proposal",
-                "applied_ref_id": str(proposal.id),
-                "canonical_mutation": False,
-            }
+            proposal.applied_ref_json = applied_ref_json
             if proposal.source_fragment_id is not None:
                 self._add_trace(
                     world_id=world_id,
@@ -1015,9 +1195,14 @@ class AuthoringService:
                     source_fragment_id=proposal.source_fragment_id,
                     proposal_id=proposal.id,
                     trace_kind=AuthoringTraceKind.PROPOSAL_APPLIED,
-                    applied_ref_kind="authoring_import_proposal",
-                    applied_ref_id=proposal.id,
-                    metadata={"canonical_mutation": False},
+                    applied_ref_kind=str(applied_ref_json["applied_ref_kind"]),
+                    applied_ref_id=_uuid_from_payload(applied_ref_json["applied_ref_id"]),
+                    metadata={
+                        "canonical_mutation": bool(
+                            applied_ref_json.get("canonical_mutation", False)
+                        ),
+                        "target_ref_kind": proposal.target_ref_kind,
+                    },
                 )
             applied.append(proposal)
         run.status = AuthoringImportRunStatus.APPLIED.value
@@ -1083,6 +1268,12 @@ class AuthoringService:
         if proposal is None or proposal.world_id != world_id:
             raise AuthoringNotFoundError("authoring import proposal not found")
         return proposal
+
+    def _agent_required(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> Agent:
+        agent = self._session.get(Agent, agent_id)
+        if agent is None or agent.world_id != world_id:
+            raise AuthoringValidationError("target agent not found")
+        return agent
 
     def _validate_media_asset(
         self,
@@ -1237,6 +1428,172 @@ class AuthoringService:
             )
         return media_asset
 
+    def _distillation_fragments(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        source_fragment_ids: tuple[uuid.UUID, ...],
+    ) -> list[AuthoringSourceFragment]:
+        fragments: list[AuthoringSourceFragment] = []
+        for fragment_id in source_fragment_ids:
+            fragment = self._fragment_required(world_id, fragment_id)
+            if fragment.worldline_id != worldline_id:
+                raise AuthoringValidationError(
+                    "source fragment must belong to character distillation worldline"
+                )
+            if not (fragment.excerpt_text or "").strip():
+                raise AuthoringValidationError(
+                    "character distillation source fragments require excerpt text"
+                )
+            fragments.append(fragment)
+        return fragments
+
+    def _apply_supported_proposal(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any] | None:
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.CHARACTER.value
+            and proposal.target_ref_kind == PERSONA_PROPOSAL_TARGET
+        ):
+            return self._apply_persona_candidate(proposal, world_id=world_id)
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.MEMORY.value
+            and proposal.target_ref_kind == MEMORY_PROPOSAL_TARGET
+            and proposal.target_ref_id is not None
+            and proposal.proposed_payload_json.get("source_kind") == "authoring_distillation"
+        ):
+            return self._apply_memory_candidate(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.ASSET_MATCH.value
+            and proposal.target_ref_kind == VISUAL_PROFILE_RECOMMENDATION_TARGET
+        ):
+            return {
+                "applied_ref_kind": "visual_generation_profile_recommendation",
+                "applied_ref_id": str(proposal.id),
+                "canonical_mutation": False,
+                "profile_mutation": False,
+            }
+        if proposal.proposal_kind in SUPPORTED_TRACE_ONLY_APPLY_KINDS:
+            return {
+                "applied_ref_kind": "authoring_import_proposal",
+                "applied_ref_id": str(proposal.id),
+                "canonical_mutation": False,
+            }
+        return None
+
+    def _apply_persona_candidate(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        agent_id = proposal.target_ref_id or _uuid_from_payload(
+            proposal.proposed_payload_json.get("agent_id")
+        )
+        if agent_id is None:
+            raise AuthoringValidationError("persona proposal requires target agent")
+        agent = self._agent_required(world_id, agent_id)
+        payload = proposal.proposed_payload_json
+        persona_text = str(payload.get("persona_text") or "").strip()
+        if not persona_text:
+            raise AuthoringValidationError("persona proposal requires persona_text")
+        behavior_policy = _dict_or_empty(payload.get("behavior_policy"))
+        policy_config = {
+            "authoring": {
+                "source_kind": "character_memory_distillation",
+                "proposal_id": str(proposal.id),
+                "run_id": str(proposal.run_id),
+                "source_fragment_id": None
+                if proposal.source_fragment_id is None
+                else str(proposal.source_fragment_id),
+                "model_invocation_id": payload.get("model_invocation_id"),
+            }
+        }
+        persona = AgentPersonaService(self._session).upsert(
+            AgentPersonaUpsert(
+                world_id=world_id,
+                agent_id=agent.id,
+                persona_text=persona_text,
+                behavior_policy=behavior_policy,
+                policy_plugin_config=policy_config,
+                is_enabled=True,
+            )
+        )
+        structured_profile = _dict_or_empty(payload.get("character_profile"))
+        agent.character_profile = {
+            **agent.character_profile,
+            "distilled_persona": structured_profile,
+            "distilled_persona_source": {
+                "proposal_id": str(proposal.id),
+                "run_id": str(proposal.run_id),
+                "model_invocation_id": payload.get("model_invocation_id"),
+            },
+        }
+        self._session.flush()
+        return {
+            "applied_ref_kind": "agent_persona",
+            "applied_ref_id": str(persona.id),
+            "agent_id": str(agent.id),
+            "canonical_mutation": False,
+            "persona_mutation": True,
+        }
+
+    def _apply_memory_candidate(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        if proposal.target_ref_id is None:
+            raise AuthoringValidationError("memory proposal requires target agent")
+        agent = self._agent_required(world_id, proposal.target_ref_id)
+        payload = proposal.proposed_payload_json
+        content = str(payload.get("content") or "").strip()
+        if not content:
+            raise AuthoringValidationError("memory proposal requires content")
+        memory = AgentMemoryItem(
+            id=uuid.uuid4(),
+            world_id=world_id,
+            worldline_id=worldline_id,
+            agent_id=agent.id,
+            source_event_id=None,
+            content=content,
+            metadata_json={
+                "source_kind": "authoring_distillation",
+                "proposal_id": str(proposal.id),
+                "run_id": str(proposal.run_id),
+                "source_fragment_id": None
+                if proposal.source_fragment_id is None
+                else str(proposal.source_fragment_id),
+                "memory_kind": payload.get("memory_kind", "fact"),
+                "route_key": payload.get("route_key"),
+                "confidence": proposal.confidence,
+                "model_invocation_id": payload.get("model_invocation_id"),
+                "source_evidence": _dict_or_empty(payload.get("source_evidence")),
+            },
+            embedding=deterministic_embedding(content),
+            visibility="private",
+            is_active=True,
+        )
+        self._session.add(memory)
+        self._session.flush()
+        return {
+            "applied_ref_kind": "agent_memory_item",
+            "applied_ref_id": str(memory.id),
+            "agent_id": str(agent.id),
+            "canonical_mutation": False,
+            "memory_mutation": True,
+        }
+
     def _dialogue_speaker_candidates(
         self,
         run_id: uuid.UUID,
@@ -1303,6 +1660,284 @@ def _status_for_review_decision(
     if decision in {AuthoringReviewDecisionKind.REJECT, AuthoringReviewDecisionKind.DISMISS}:
         return AuthoringProposalStatus.REJECTED
     return AuthoringProposalStatus.REVIEWED
+
+
+def _distillation_prompt(
+    agent: Agent,
+    fragments: list[AuthoringSourceFragment],
+) -> str:
+    excerpts = "\n".join(
+        f"- fragment {index}: {fragment.excerpt_text.strip()[:700]}"
+        for index, fragment in enumerate(fragments, start=1)
+        if fragment.excerpt_text is not None
+    )
+    return (
+        "Summarize the following traceable character source excerpts into a persona card, "
+        "speech style, relationship summary, key initial memories, emotional baseline, "
+        "taboo or secret knowledge, route-specific facts, sample dialogue style, and "
+        "uncertainty notes. Return concise structured JSON only; do not mutate runtime state.\n"
+        f"Character: {agent.display_name}\n"
+        f"Source excerpts:\n{excerpts}"
+    )
+
+
+def _persona_payload(
+    *,
+    agent: Agent,
+    fragments: list[AuthoringSourceFragment],
+    model_invocation_id: uuid.UUID,
+) -> dict[str, Any]:
+    text = _combined_excerpt(fragments)
+    speech_style = _infer_speech_style(text)
+    emotional_baseline = _infer_emotional_baseline(text)
+    key_memories = _initial_memory_texts(fragments)[:5]
+    persona_text = (
+        f"{agent.display_name} is initialized from reviewed source fragments. "
+        f"Speech style: {speech_style}. Emotional baseline: {emotional_baseline}. "
+        f"Key evidence: {'; '.join(key_memories[:3]) or 'source evidence pending review'}."
+    )
+    return {
+        "source_kind": "authoring_distillation",
+        "agent_id": str(agent.id),
+        "model_invocation_id": str(model_invocation_id),
+        "persona_text": persona_text[:4000],
+        "speech_style": speech_style,
+        "relationship_summary": _relationship_summary(text),
+        "key_memories": key_memories,
+        "emotional_baseline": emotional_baseline,
+        "taboo_secret_knowledge": _secret_notes(text),
+        "route_specific_facts": _route_facts(text),
+        "sample_dialogue_style": _sample_dialogue_style(text),
+        "uncertainty_conflict_notes": _uncertainty_notes(text),
+        "behavior_policy": {
+            "source": "authoring_distillation",
+            "review_required": True,
+            "preserve_character_voice": True,
+        },
+        "character_profile": {
+            "speech_style": speech_style,
+            "relationship_summary": _relationship_summary(text),
+            "emotional_baseline": emotional_baseline,
+            "route_specific_facts": _route_facts(text),
+            "uncertainty_conflict_notes": _uncertainty_notes(text),
+        },
+        "source_evidence": _source_evidence(fragments),
+    }
+
+
+def _memory_payloads(
+    *,
+    agent: Agent,
+    fragments: list[AuthoringSourceFragment],
+    model_invocation_id: uuid.UUID,
+) -> list[dict[str, Any]]:
+    memory_texts = _initial_memory_texts(fragments)
+    if not memory_texts:
+        memory_texts = [f"{agent.display_name} has reviewed source evidence for initial play."]
+    payloads: list[dict[str, Any]] = []
+    for index, content in enumerate(memory_texts[:8], start=1):
+        fragment = fragments[min(index - 1, len(fragments) - 1)]
+        payloads.append(
+            {
+                "source_kind": "authoring_distillation",
+                "agent_id": str(agent.id),
+                "source_fragment_id": str(fragment.id),
+                "model_invocation_id": str(model_invocation_id),
+                "memory_kind": _memory_kind(content),
+                "content": content[:1000],
+                "route_key": _first_marker_value(content, ("route:", "[route:")),
+                "source_evidence": {
+                    "fragment_id": str(fragment.id),
+                    "fragment_key": fragment.fragment_key,
+                    "sequence": fragment.sequence,
+                },
+            }
+        )
+    return payloads
+
+
+def _visual_profile_payload(
+    *,
+    agent: Agent,
+    fragments: list[AuthoringSourceFragment],
+    model_invocation_id: uuid.UUID,
+) -> dict[str, Any]:
+    text = _combined_excerpt(fragments)
+    return {
+        "source_kind": "authoring_distillation",
+        "agent_id": str(agent.id),
+        "model_invocation_id": str(model_invocation_id),
+        "review_only": True,
+        "recommended_prompt_fragments": [
+            agent.display_name,
+            _infer_emotional_baseline(text),
+            _infer_speech_style(text),
+        ],
+        "negative_prompt_fragments": [],
+        "reference_asset_ids": [],
+        "workflow_binding_recommendation": {
+            "default_workflow_template": None,
+            "expression_workflow_template": None,
+            "cg_workflow_template": None,
+        },
+        "source_evidence": _source_evidence(fragments),
+    }
+
+
+def _distillation_evidence(
+    *,
+    source_refs: list[str],
+    model_invocation_id: uuid.UUID,
+    evidence_kind: str,
+) -> dict[str, Any]:
+    return {
+        "evidence_kind": evidence_kind,
+        "source_fragment_ids": source_refs,
+        "model_invocation_id": str(model_invocation_id),
+        "provider_execution": True,
+    }
+
+
+def _combined_excerpt(fragments: list[AuthoringSourceFragment]) -> str:
+    return "\n".join(
+        (fragment.excerpt_text or "").strip()
+        for fragment in fragments
+        if (fragment.excerpt_text or "").strip()
+    )
+
+
+def _source_evidence(fragments: list[AuthoringSourceFragment]) -> list[dict[str, Any]]:
+    return [
+        {
+            "fragment_id": str(fragment.id),
+            "fragment_key": fragment.fragment_key,
+            "fragment_kind": fragment.fragment_kind,
+            "sequence": fragment.sequence,
+        }
+        for fragment in fragments
+    ]
+
+
+def _initial_memory_texts(fragments: list[AuthoringSourceFragment]) -> list[str]:
+    memories: list[str] = []
+    for fragment in fragments:
+        for line in (fragment.excerpt_text or "").splitlines():
+            normalized = line.strip()
+            if not normalized:
+                continue
+            lower = normalized.lower()
+            if lower.startswith(("fact:", "episode:", "episodic:", "memory:", "preference:")):
+                memories.append(normalized.split(":", 1)[1].strip())
+            elif ":" in normalized and len(normalized) <= 220:
+                memories.append(normalized)
+            elif len(normalized) <= 160:
+                memories.append(normalized)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for memory in memories:
+        key = memory.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(memory)
+    return deduped
+
+
+def _infer_speech_style(text: str) -> str:
+    lowered = text.lower()
+    if "whisper" in lowered or "quiet" in lowered:
+        return "quiet and restrained"
+    if "!" in text:
+        return "expressive and energetic"
+    if "formal" in lowered or "council" in lowered:
+        return "polite and formal"
+    return "grounded and conversational"
+
+
+def _infer_emotional_baseline(text: str) -> str:
+    lowered = text.lower()
+    if "guarded" in lowered or "secret" in lowered:
+        return "guarded"
+    if "happy" in lowered or "curious" in lowered:
+        return "curious"
+    if "sad" in lowered or "lonely" in lowered:
+        return "melancholic"
+    return "neutral"
+
+
+def _relationship_summary(text: str) -> str:
+    for line in text.splitlines():
+        lowered = line.lower()
+        if "relationship" in lowered or "trust" in lowered or "friend" in lowered:
+            return line.strip()[:500]
+    return "No explicit relationship summary; keep interactions source-grounded."
+
+
+def _secret_notes(text: str) -> list[str]:
+    return [
+        line.strip()[:500]
+        for line in text.splitlines()
+        if "secret" in line.lower() or "taboo" in line.lower()
+    ][:5]
+
+
+def _route_facts(text: str) -> list[str]:
+    return [
+        line.strip()[:500]
+        for line in text.splitlines()
+        if "route" in line.lower() or "choice" in line.lower()
+    ][:5]
+
+
+def _sample_dialogue_style(text: str) -> str:
+    for line in text.splitlines():
+        if ":" in line and len(line.strip()) <= 240:
+            return line.strip()
+    return "Use short, source-grounded dialogue."
+
+
+def _uncertainty_notes(text: str) -> list[str]:
+    return [
+        line.strip()[:500]
+        for line in text.splitlines()
+        if "uncertain" in line.lower() or "maybe" in line.lower() or "conflict" in line.lower()
+    ][:5]
+
+
+def _memory_kind(content: str) -> str:
+    lowered = content.lower()
+    if "trust" in lowered or "friend" in lowered or "relationship" in lowered:
+        return "relationship"
+    if "like" in lowered or "prefer" in lowered:
+        return "preference"
+    if "met " in lowered or "episode" in lowered:
+        return "episodic"
+    return "fact"
+
+
+def _first_marker_value(text: str, markers: tuple[str, ...]) -> str | None:
+    lowered = text.lower()
+    for marker in markers:
+        index = lowered.find(marker)
+        if index >= 0:
+            return text[index + len(marker) :].strip(" ]")[:80] or None
+    return None
+
+
+def _uuid_from_payload(value: object) -> uuid.UUID | None:
+    if isinstance(value, uuid.UUID):
+        return value
+    if not isinstance(value, str):
+        return None
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
+
+
+def _dict_or_empty(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
 
 
 def _batch_record(model: AuthoringSourceBatch) -> AuthoringSourceBatchRead:
