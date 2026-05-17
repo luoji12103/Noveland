@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 4 Galgame Source Intake planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-galgame-source-intake
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 4 only.
+- Summary: Added a migration-free galgame source intake path that previews and applies user-provided already-unpacked source directories through existing authoring and media boundaries. The implementation rejects packed/archive/executable-like inputs, does not unpack/decrypt/crack/bypass DRM, stores accepted media as private imported-original media assets/objects, stores script/profile/route text as bounded source fragments, and returns safe source refs and filenames without raw filesystem paths or storage URIs.
+- Files changed: `backend/packages/authoring/src/noveland/authoring/galgame_intake.py`, authoring contracts/API, media upload source-kind support, authoring service/API tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring service/API coverage for preview inventory, apply import records, source traceability, media objects, generation reference candidate metadata, archive rejection, confirmation requirement, admin ACL, no storage/path/base64/raw-prompt response leaks, and no `world_events` writes.
+- Docs updated: Phase 4 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: Phase 5 should reuse source fragments from this intake for deterministic script dialogue extraction. Phase 4 added no Web UI and no migration; `impeccable` was not needed.
+
 ## v0.9 Phase 3 Provider Worktree Integration Test Harness planning/implementation entry
 
 - Date: 2026-05-17

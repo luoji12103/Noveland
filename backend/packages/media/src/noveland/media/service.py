@@ -157,7 +157,7 @@ class MediaService:
             worldline_id=worldline_id,
             asset_kind=upload.asset_kind.value,
             asset_role=upload.asset_role.value,
-            source_kind=MediaSourceKind.MANUAL_UPLOAD.value,
+            source_kind=upload.source_kind.value,
             status=MediaAssetStatus.AVAILABLE.value,
             visibility=upload.visibility.value,
             storage_uri=stored.uri,

@@ -8,7 +8,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 1.2 Write v0.9 feasibility review before implementation begins.
 - [x] 1.3 Confirm provider text/image execution, model discovery, and template ownership.
 - [x] 1.4 Confirm Visual Generation Control Plane package/router/schema ownership before implementation.
-- [ ] 1.5 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
+- [x] 1.5 Confirm galgame source intake legal/technical boundary: already-unpacked user-provided inputs only.
 - [x] 1.6 Confirm frontend phases will use `impeccable` before Web implementation.
 
 ## 2. Phase 1 — MVP Provider Settings & Model Lab
@@ -47,13 +47,13 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 5. Phase 4 — Galgame Source Intake
 
-- [ ] 5.1 Write docs-only phase planning checkpoint.
-- [ ] 5.2 Confirm authoring source registry reuse and any migration need.
-- [ ] 5.3 Implement already-unpacked source directory intake and preview inventory.
-- [ ] 5.4 Support reviewed imported visual assets as future generation reference candidates.
-- [ ] 5.5 Add source intake UI only after using `impeccable` if Web scope is approved.
-- [ ] 5.6 Add intake, source traceability, media import, generation reference, ACL, and leak tests.
-- [ ] 5.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 5.1 Write docs-only phase planning checkpoint.
+- [x] 5.2 Confirm authoring source registry reuse and any migration need.
+- [x] 5.3 Implement already-unpacked source directory intake and preview inventory.
+- [x] 5.4 Support reviewed imported visual assets as future generation reference candidates.
+- [x] 5.5 Add source intake UI only after using `impeccable` if Web scope is approved.
+- [x] 5.6 Add intake, source traceability, media import, generation reference, ACL, and leak tests.
+- [x] 5.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 5.8 Fast-forward merge to local main and update harness docs.
 
 ## 6. Phase 5 — Script Dialogue Extraction

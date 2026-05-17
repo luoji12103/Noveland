@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import cast
 
 from fastapi.testclient import TestClient
@@ -20,8 +22,10 @@ from noveland.authoring.models import (
     AuthoringSourceTraceability,
 )
 from noveland.events.models import WorldEventModel
-from noveland.media.models import MediaAsset, MediaJob
+from noveland.media.models import MediaAsset, MediaJob, MediaObject
+from noveland.media.storage import LocalMediaObjectStorage
 from noveland.services.api.app import create_app
+from noveland.services.api.authoring import _authoring_media_storage
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import World, Worldline, WorldMembership
@@ -30,6 +34,10 @@ from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+
+
+class _AuthoringApiClient(TestClient):
+    authoring_storage: LocalMediaObjectStorage
 
 
 def test_authoring_api_source_preview_review_and_apply() -> None:
@@ -141,6 +149,76 @@ def test_authoring_api_source_preview_review_and_apply() -> None:
     assert "storage_uri" not in str(apply.json()).lower()
 
     with Session(engine) as session:
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_authoring_api_galgame_source_intake_preview_and_apply(
+    tmp_path: Path,
+) -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    source_dir = _galgame_source_dir(tmp_path)
+
+    body = {
+        "worldline_id": str(worldline_id),
+        "source_directory": str(source_dir),
+        "batch_key": "demo-galgame",
+        "display_name": "Demo Galgame",
+        "max_text_fragment_chars": 200,
+    }
+    _authenticate(client, member_token)
+    forbidden = client.post(
+        f"/worlds/{world_id}/authoring/galgame-source-intake/preview",
+        json=body,
+    )
+    _authenticate(client, owner_token)
+    preview = client.post(
+        f"/worlds/{world_id}/authoring/galgame-source-intake/preview",
+        json=body,
+    )
+    missing_confirmation = client.post(
+        f"/worlds/{world_id}/authoring/galgame-source-intake/apply",
+        json=body,
+    )
+    apply = client.post(
+        f"/worlds/{world_id}/authoring/galgame-source-intake/apply",
+        json={**body, "confirm_already_unpacked_user_provided": True},
+    )
+
+    assert forbidden.status_code == 403
+    assert preview.status_code == 201
+    assert preview.json()["accepted_count"] == 9
+    assert preview.json()["rejected_count"] == 2
+    assert preview.json()["media_file_count"] == 6
+    assert preview.json()["text_file_count"] == 3
+    assert preview.json()["provider_execution"] is False
+    assert preview.json()["canon_mutation"] is False
+    assert missing_confirmation.status_code == 422
+    assert apply.status_code == 201
+    assert len(apply.json()["media_asset_ids"]) == 6
+    assert len(apply.json()["source_assets"]) == 9
+    assert apply.json()["batch"]["metadata_json"]["source_type"] == "already_unpacked_galgame"
+    assert apply.json()["run"]["summary_json"]["canon_mutation"] is False
+    assert str(source_dir) not in _json_text(preview.json())
+    assert str(source_dir) not in _json_text(apply.json())
+    for forbidden_marker in ("storage_uri", "file://", "local://", "base64", "raw_prompt"):
+        assert forbidden_marker not in _json_text(preview.json())
+        assert forbidden_marker not in _json_text(apply.json())
+
+    with Session(engine) as session:
+        imported = session.scalars(
+            select(MediaAsset).where(MediaAsset.source_kind == "imported_original")
+        ).all()
+        assert len(imported) == 6
+        assert len(session.scalars(select(MediaObject)).all()) == 6
+        assert len(session.scalars(select(AuthoringSourceBatch)).all()) == 1
+        assert len(session.scalars(select(AuthoringSourceAsset)).all()) == 9
+        assert len(session.scalars(select(AuthoringSourceFragment)).all()) >= 3
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
@@ -654,7 +732,13 @@ def _client_with_database() -> tuple[TestClient, Engine]:
                 raise
 
     app.dependency_overrides[get_db_session] = override_get_db_session
-    return TestClient(app), engine
+    storage_tmp = TemporaryDirectory()
+    storage = LocalMediaObjectStorage(Path(storage_tmp.name) / "media")
+    app.dependency_overrides[_authoring_media_storage] = lambda: storage
+    app.state._authoring_storage_tmp = storage_tmp
+    client = _AuthoringApiClient(app)
+    client.authoring_storage = storage
+    return client, engine
 
 
 def _create_tables(engine: Engine) -> None:
@@ -668,6 +752,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -776,3 +861,36 @@ def _authenticate(client: TestClient, token: str) -> None:
 
 def _json_text(value: object) -> str:
     return str(value).lower()
+
+
+def _galgame_source_dir(tmp_path: Path) -> Path:
+    root = tmp_path / "already-unpacked-demo"
+    (root / "sprites" / "alice").mkdir(parents=True)
+    (root / "backgrounds").mkdir(parents=True)
+    (root / "cg").mkdir(parents=True)
+    (root / "voice" / "alice").mkdir(parents=True)
+    (root / "scripts").mkdir(parents=True)
+    (root / "profiles").mkdir(parents=True)
+    (root / "routes").mkdir(parents=True)
+    (root / ".hidden").mkdir()
+    (root / "sprites" / "alice" / "alice_neutral.png").write_bytes(b"sprite")
+    (root / "sprites" / "alice" / "alice_happy_face.png").write_bytes(b"expression")
+    (root / "backgrounds" / "school_bg.jpg").write_bytes(b"background")
+    (root / "cg" / "event_cg.webp").write_bytes(b"cg")
+    (root / "voice" / "alice" / "alice_line.wav").write_bytes(b"voice")
+    (root / "voice" / "bgm_theme.ogg").write_bytes(b"bgm")
+    (root / "scripts" / "scene1.ks").write_text(
+        "\n".join(f"Alice: line {index}" for index in range(120)),
+        encoding="utf-8",
+    )
+    (root / "profiles" / "alice_profile.md").write_text(
+        "character: Alice\nkind and curious",
+        encoding="utf-8",
+    )
+    (root / "routes" / "alice_route_choice.txt").write_text(
+        "choice: walk home with Alice\nroute: alice",
+        encoding="utf-8",
+    )
+    (root / "archive.zip").write_bytes(b"packed")
+    (root / ".hidden" / "secret.txt").write_text("hidden", encoding="utf-8")
+    return root

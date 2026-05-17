@@ -40,12 +40,19 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentKind,
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
+    GalgameSourceIntakeApplyRequest,
+    GalgameSourceIntakeApplyResult,
+    GalgameSourceIntakePreviewRequest,
+    GalgameSourceIntakePreviewResult,
 )
+from noveland.authoring.galgame_intake import GalgameSourceIntakeService
 from noveland.authoring.service import (
     AuthoringNotFoundError,
     AuthoringService,
     AuthoringValidationError,
 )
+from noveland.core.settings import load_settings
+from noveland.media.storage import LocalMediaObjectStorage
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
@@ -57,6 +64,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/worlds/{world_id}/authoring", tags=["authoring"])
+
+
+def _authoring_media_storage() -> LocalMediaObjectStorage:
+    return LocalMediaObjectStorage(load_settings().object_storage_root / "media")
 
 
 class AuthoringSourceBatchCreateRequest(BaseModel):
@@ -95,6 +106,63 @@ class AuthoringImportRunCreateRequest(BaseModel):
     source_batch_id: uuid.UUID | None = None
     run_kind: AuthoringImportRunKind = AuthoringImportRunKind.PREVIEW
     summary_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class GalgameSourceIntakePreviewBody(BaseModel):
+    worldline_id: uuid.UUID
+    source_directory: str = Field(min_length=1, max_length=1000)
+    batch_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    max_text_fragment_chars: int = Field(default=2000, ge=200, le=4000)
+    max_files: int = Field(default=500, ge=1, le=5000)
+
+
+class GalgameSourceIntakeApplyBody(GalgameSourceIntakePreviewBody):
+    confirm_already_unpacked_user_provided: bool = False
+
+
+@router.post(
+    "/galgame-source-intake/preview",
+    response_model=GalgameSourceIntakePreviewResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def preview_galgame_source_intake(
+    world_id: uuid.UUID,
+    request: GalgameSourceIntakePreviewBody,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> GalgameSourceIntakePreviewResult:
+    try:
+        return GalgameSourceIntakeService(db_session).preview(
+            GalgameSourceIntakePreviewRequest(world_id=world_id, **request.model_dump())
+        )
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/galgame-source-intake/apply",
+    response_model=GalgameSourceIntakeApplyResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def apply_galgame_source_intake(
+    world_id: uuid.UUID,
+    request: GalgameSourceIntakeApplyBody,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    storage: Annotated[LocalMediaObjectStorage, Depends(_authoring_media_storage)],
+) -> GalgameSourceIntakeApplyResult:
+    try:
+        return GalgameSourceIntakeService(db_session, storage).apply(
+            GalgameSourceIntakeApplyRequest(world_id=world_id, **request.model_dump()),
+            actor_ref=f"user:{subject.user_id}",
+        )
+    except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("/source-batches", response_model=list[AuthoringSourceBatchRead])

@@ -178,6 +178,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/authoring/src/noveland/authoring/character_extractor.py`
 - `backend/packages/authoring/src/noveland/authoring/conflict_review.py`
 - `backend/packages/authoring/src/noveland/authoring/contracts.py`
+- `backend/packages/authoring/src/noveland/authoring/galgame_intake.py`
 - `backend/packages/authoring/src/noveland/authoring/lore_extractor.py`
 - `backend/packages/authoring/src/noveland/authoring/memory_migration.py`
 - `backend/packages/authoring/src/noveland/authoring/models.py`

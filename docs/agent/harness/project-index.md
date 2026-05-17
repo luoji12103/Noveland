@@ -74,6 +74,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md` — v0.9 Phase 1 checkpoint for provider settings/model lab implementation decisions.
 - `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md` — v0.9 Phase 2 checkpoint for dedicated visual generation package/router/schema ownership, workflow-template slot safety, model inventory, character visual profiles, provider-neutral plans, AI proposal policy, and backend/API-first implementation scope.
 - `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md` — v0.9 Phase 3 checkpoint for opt-in real-provider testing in a separate provider lab worktree, fake/mocked default tests, and safe provider lab evidence.
+- `docs/agent/harness/feature-updates/v0.9.4-galgame-source-intake-plan.md` — v0.9 Phase 4 checkpoint for already-unpacked galgame source directory intake through authoring/media without unpacking, raw path leaks, canon mutation, or Web UI.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -199,7 +200,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
   - `noveland.services.api.visual_generation` — world-admin visual generation control-plane router for workflow templates, model inventory, character visual profiles, plan validation, and dry-run mapping without provider execution
   - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
-  - `noveland.services.api.authoring` — world-scoped authoring source registry, import run, proposal, review decision, preview, and selective trace-only apply router
+  - `noveland.services.api.authoring` — world-scoped authoring source registry, already-unpacked galgame source intake, import run, proposal, review decision, preview, and selective trace-only apply router
   - `noveland.services.api.narrative_quality` — world-scoped admin-only v0.6 narrative quality context preview and diagnostics router
   - `noveland.services.api.worlds` — worlds, scenes, memberships, agents, calendar, schedule preview, memory, persona/observations, clock transition audit, replay, snapshot integrity, event audit, diagnostics, agent runs, living-world beta readiness, and filtered narrative artifact router
 - `backend/services/runtime/` — long-running runtime host

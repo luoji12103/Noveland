@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -26,7 +27,10 @@ from noveland.authoring.contracts import (
     AuthoringSourceBatchCreate,
     AuthoringSourceFragmentCreate,
     AuthoringSourceFragmentKind,
+    GalgameSourceIntakeApplyRequest,
+    GalgameSourceIntakePreviewRequest,
 )
+from noveland.authoring.galgame_intake import GalgameSourceIntakeService
 from noveland.authoring.models import (
     AuthoringImportProposal,
     AuthoringImportRun,
@@ -38,7 +42,8 @@ from noveland.authoring.models import (
 )
 from noveland.authoring.service import AuthoringValidationError
 from noveland.events.models import WorldEventModel
-from noveland.media.models import MediaAsset, MediaJob
+from noveland.media.models import MediaAsset, MediaJob, MediaObject
+from noveland.media.storage import LocalMediaObjectStorage
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -144,6 +149,124 @@ def test_source_registry_preview_review_and_apply_are_trace_only() -> None:
         assert len(session.scalars(select(AuthoringSourceTraceability)).all()) >= 4
         assert session.scalars(select(MediaJob)).all() == []
         assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_galgame_source_intake_preview_and_apply_imports_safe_sources(
+    tmp_path: Path,
+) -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    source_dir = _galgame_source_dir(tmp_path)
+
+    with Session(engine) as session:
+        service = GalgameSourceIntakeService(session, LocalMediaObjectStorage(tmp_path / "media"))
+        request = GalgameSourceIntakeApplyRequest(
+            world_id=graph.world_id,
+            worldline_id=graph.worldline_id,
+            source_directory=str(source_dir),
+            batch_key="demo-galgame",
+            display_name="Demo Galgame",
+            max_text_fragment_chars=200,
+            confirm_already_unpacked_user_provided=True,
+        )
+        preview = service.preview(request)
+        result = service.apply(request, actor_ref="test")
+        session.commit()
+
+    assert preview.accepted_count == 9
+    assert preview.rejected_count == 2
+    assert preview.media_file_count == 6
+    assert preview.text_file_count == 3
+    assert preview.root_label == source_dir.name
+    assert all(str(source_dir) not in item.model_dump_json() for item in preview.files)
+    assert any(item.asset_role == "character_sprite" for item in preview.files)
+    assert any(item.asset_role == "expression_variant" for item in preview.files)
+    assert any(item.asset_role == "background" for item in preview.files)
+    assert any(item.asset_role == "cg" for item in preview.files)
+    assert any(item.asset_role == "voice_reference" for item in preview.files)
+    assert any(
+        item.reason == "archive, executable, or packed container is not accepted"
+        for item in preview.files
+    )
+    assert result.batch.metadata_json["source_type"] == "already_unpacked_galgame"
+    assert result.run.summary_json["provider_execution"] is False
+    assert result.run.summary_json["canon_mutation"] is False
+    assert len(result.media_asset_ids) == 6
+    assert len(result.source_fragments) >= 3
+    assert "storage_uri" not in result.model_dump_json().lower()
+    assert str(source_dir) not in result.model_dump_json()
+
+    with Session(engine) as session:
+        media_assets = session.scalars(select(MediaAsset)).all()
+        imported = [asset for asset in media_assets if asset.source_kind == "imported_original"]
+        assert len(imported) == 6
+        assert all(asset.visibility == "private" for asset in imported)
+        assert any(
+            asset.metadata_json.get("generation_reference_candidate") is True
+            for asset in imported
+            if asset.asset_kind == "image"
+        )
+        assert len(session.scalars(select(MediaObject)).all()) == 6
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_galgame_source_intake_requires_confirmation_and_existing_directory(
+    tmp_path: Path,
+) -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    source_dir = _galgame_source_dir(tmp_path)
+
+    with Session(engine) as session:
+        service = GalgameSourceIntakeService(session, LocalMediaObjectStorage(tmp_path / "media"))
+        with pytest.raises(ValueError, match="confirmation"):
+            GalgameSourceIntakeApplyRequest(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_directory=str(source_dir),
+                batch_key="demo-galgame",
+                display_name="Demo Galgame",
+            )
+        with pytest.raises(AuthoringValidationError, match="existing directory"):
+            service.preview(
+                GalgameSourceIntakePreviewRequest(
+                    world_id=graph.world_id,
+                    worldline_id=graph.worldline_id,
+                    source_directory=str(source_dir / "missing"),
+                    batch_key="demo-galgame",
+                    display_name="Demo Galgame",
+                )
+            )
+
+
+def test_galgame_source_intake_does_not_extract_packed_sources(tmp_path: Path) -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    source_dir = tmp_path / "packed"
+    source_dir.mkdir()
+    (source_dir / "game.xp3").write_bytes(b"packed")
+    (source_dir / "archive.zip").write_bytes(b"packed")
+
+    with Session(engine) as session:
+        service = GalgameSourceIntakeService(session, LocalMediaObjectStorage(tmp_path / "media"))
+        request = GalgameSourceIntakeApplyRequest(
+            world_id=graph.world_id,
+            worldline_id=graph.worldline_id,
+            source_directory=str(source_dir),
+            batch_key="packed",
+            display_name="Packed",
+            confirm_already_unpacked_user_provided=True,
+        )
+        preview = service.preview(request)
+        with pytest.raises(AuthoringValidationError, match="no accepted files"):
+            service.apply(request, actor_ref="test")
+
+    assert preview.accepted_count == 0
+    assert preview.rejected_count == 2
+    assert all(
+        item.reason == "archive, executable, or packed container is not accepted"
+        for item in preview.files
+    )
 
 
 def test_script_parser_creates_traceable_proposals_from_excerpt_text() -> None:
@@ -1034,6 +1157,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, WorldEventModel.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
         cast(Table, AuthoringSourceBatch.__table__),
         cast(Table, AuthoringSourceAsset.__table__),
         cast(Table, AuthoringSourceFragment.__table__),
@@ -1140,3 +1264,36 @@ def _add_media_asset(
         )
     )
     return media_asset_id
+
+
+def _galgame_source_dir(tmp_path: Path) -> Path:
+    root = tmp_path / "already-unpacked-demo"
+    (root / "sprites" / "alice").mkdir(parents=True)
+    (root / "backgrounds").mkdir(parents=True)
+    (root / "cg").mkdir(parents=True)
+    (root / "voice" / "alice").mkdir(parents=True)
+    (root / "scripts").mkdir(parents=True)
+    (root / "profiles").mkdir(parents=True)
+    (root / "routes").mkdir(parents=True)
+    (root / ".hidden").mkdir()
+    (root / "sprites" / "alice" / "alice_neutral.png").write_bytes(b"sprite")
+    (root / "sprites" / "alice" / "alice_happy_face.png").write_bytes(b"expression")
+    (root / "backgrounds" / "school_bg.jpg").write_bytes(b"background")
+    (root / "cg" / "event_cg.webp").write_bytes(b"cg")
+    (root / "voice" / "alice" / "alice_line.wav").write_bytes(b"voice")
+    (root / "voice" / "bgm_theme.ogg").write_bytes(b"bgm")
+    (root / "scripts" / "scene1.ks").write_text(
+        "\n".join(f"Alice: line {index}" for index in range(120)),
+        encoding="utf-8",
+    )
+    (root / "profiles" / "alice_profile.md").write_text(
+        "character: Alice\nkind and curious",
+        encoding="utf-8",
+    )
+    (root / "routes" / "alice_route_choice.txt").write_text(
+        "choice: walk home with Alice\nroute: alice",
+        encoding="utf-8",
+    )
+    (root / "archive.zip").write_bytes(b"packed")
+    (root / ".hidden" / "secret.txt").write_text("hidden", encoding="utf-8")
+    return root

@@ -97,6 +97,26 @@ class AuthoringAssetMatchingMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class GalgameSourceIntakeFileStatus(StrEnum):
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    SKIPPED = "skipped"
+
+
+class GalgameSourceIntakeAssetRole(StrEnum):
+    CHARACTER_SPRITE = "character_sprite"
+    EXPRESSION_VARIANT = "expression_variant"
+    BACKGROUND = "background"
+    CG = "cg"
+    VOICE_REFERENCE = "voice_reference"
+    BGM = "bgm"
+    SOUND_EFFECT = "sound_effect"
+    SCRIPT_DIALOGUE = "script_dialogue"
+    CHARACTER_PROFILE = "character_profile"
+    ROUTE_CHOICE = "route_choice"
+    OTHER = "other"
+
+
 class AuthoringProposalKind(StrEnum):
     DIALOGUE = "dialogue"
     CHARACTER = "character"
@@ -567,6 +587,72 @@ class AuthoringAssetMatchResult(_FrozenContract):
     cg_match_count: int
     voice_match_count: int
     blocked_count: int
+
+
+class GalgameSourceIntakePreviewRequest(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    source_directory: str = Field(min_length=1, max_length=1000)
+    batch_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    max_text_fragment_chars: int = Field(default=2000, ge=200, le=4000)
+    max_files: int = Field(default=500, ge=1, le=5000)
+
+    @field_validator("batch_key", mode="after")
+    @classmethod
+    def normalize_key(cls, value: str) -> str:
+        return _normalize_key(value, "batch_key")
+
+
+class GalgameSourceIntakeApplyRequest(GalgameSourceIntakePreviewRequest):
+    confirm_already_unpacked_user_provided: bool = False
+
+    @model_validator(mode="after")
+    def validate_confirmation(self) -> GalgameSourceIntakeApplyRequest:
+        if not self.confirm_already_unpacked_user_provided:
+            raise ValueError("already-unpacked user-provided confirmation is required")
+        return self
+
+
+class GalgameSourceIntakeFilePreview(_FrozenContract):
+    source_ref: str
+    file_name: str
+    status: GalgameSourceIntakeFileStatus
+    asset_role: GalgameSourceIntakeAssetRole
+    source_asset_kind: AuthoringSourceAssetKind
+    media_asset_kind: str | None = None
+    media_asset_role: str | None = None
+    mime_type: str | None = None
+    size_bytes: int = Field(ge=0)
+    fragment_count: int = Field(default=0, ge=0)
+    reason: str | None = None
+
+
+class GalgameSourceIntakePreviewResult(_FrozenContract):
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    batch_key: str
+    display_name: str
+    root_label: str
+    accepted_count: int = Field(ge=0)
+    rejected_count: int = Field(ge=0)
+    skipped_count: int = Field(ge=0)
+    media_file_count: int = Field(ge=0)
+    text_file_count: int = Field(ge=0)
+    fragment_count: int = Field(ge=0)
+    provider_execution: bool = False
+    canon_mutation: bool = False
+    files: tuple[GalgameSourceIntakeFilePreview, ...]
+
+
+class GalgameSourceIntakeApplyResult(_FrozenContract):
+    preview: GalgameSourceIntakePreviewResult
+    batch: AuthoringSourceBatchRead
+    run: AuthoringImportRunRead
+    source_assets: tuple[AuthoringSourceAssetRead, ...]
+    source_fragments: tuple[AuthoringSourceFragmentRead, ...]
+    media_asset_ids: tuple[uuid.UUID, ...]
 
 
 class AuthoringApplyRequest(_FrozenContract):

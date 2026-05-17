@@ -3,7 +3,7 @@
 - Date: 2026-05-17T07:35:00Z
 - Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 3 Provider Worktree Integration Test Harness is complete locally after targeted tests, full backend gate, OpenSpec validation, and fast-forward merge. Start Phase 4 Galgame Source Intake from clean local `main`.
+- Status: v0.9 Phase 4 Galgame Source Intake is in progress on `feat/v0.9-galgame-source-intake`. Targeted tests and full backend/OpenSpec gate pass; commit and fast-forward merge are pending.
 
 ## Current Context
 
@@ -30,6 +30,8 @@
 - v0.9 Phase 3 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md`.
 - v0.9 Phase 3 provider lab operating docs are recorded at `docs/agent/operations/provider-lab.md`.
 - v0.9 Phase 3 implementation adds a strict backend `real_provider` pytest marker, `NOVELAND_RUN_REAL_PROVIDER_TESTS=1` opt-in convention, default-skipped real-provider examples, and fake/mock provider contract tests covering OpenAI-compatible LLM, Anthropic-compatible LLM, MiMo TTS/ASR, Z-Image, GPT Image, ComfyUI, OpenAI-compatible image, and generic/custom HTTP. It adds no migrations, Web UI, API route changes, runtime behavior changes, or default external calls.
+- v0.9 Phase 4 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.4-galgame-source-intake-plan.md`.
+- v0.9 Phase 4 implementation adds a migration-free already-unpacked galgame source intake service under `backend/packages/authoring/`, with admin-only authoring API routes for preview/apply. It rejects packed/archive/executable-like files, stores accepted image/audio files through media as private `imported_original` assets/objects, stores text as bounded source fragments, preserves source traceability through authoring records, adds future generation-reference candidate metadata for visual assets, and does not mutate canon, memory, visual/voice bindings, world state, or world events.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -115,10 +117,10 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Start Phase 4 Galgame Source Intake from clean local `main`.
+- Commit Phase 4, fast-forward merge to local `main`, then start Phase 5 Script Dialogue Extraction.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
-- Use the `impeccable` skill before additional v0.8 frontend implementation work.
+- Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.
 - Preserve the authenticated-only reader media model unless OpenSpec is updated first.
@@ -154,6 +156,8 @@
 - v0.5 Phase 8 targeted tests passed: `25 passed`.
 - v0.5 Phase 8 full local gate passed: backend ruff, backend mypy, backend pytest (`315 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
 - v0.5 Phase 8 fast-forward merge to local `main` completed.
+- v0.9 Phase 4 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py -q` (`21 passed`).
+- v0.9 Phase 4 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`484 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

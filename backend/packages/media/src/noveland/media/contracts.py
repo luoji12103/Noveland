@@ -699,6 +699,7 @@ class MediaAssetUploadRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     asset_kind: MediaAssetKind
     asset_role: MediaAssetRole
+    source_kind: MediaSourceKind = MediaSourceKind.MANUAL_UPLOAD
     visibility: MediaVisibility = MediaVisibility.PRIVATE
     title: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = None
