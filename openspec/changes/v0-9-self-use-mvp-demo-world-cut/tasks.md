@@ -77,12 +77,12 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 8. Phase 7 — Visual Asset Mapping
 
-- [ ] 8.1 Write docs-only phase planning checkpoint.
-- [ ] 8.2 Implement sprite/background/CG mapping proposals and reviewed apply.
-- [ ] 8.3 Reuse visual resolver and reader-safe media delivery.
-- [ ] 8.4 Support approved imported assets as visual generation reference assets where appropriate.
-- [ ] 8.5 Add visual mapping UI only after using `impeccable` if Web scope is approved.
-- [ ] 8.6 Add mapping, fallback, reference-asset, worldline isolation, ACL, and no-leak tests.
+- [x] 8.1 Write docs-only phase planning checkpoint.
+- [x] 8.2 Implement sprite/background/CG mapping proposals and reviewed apply.
+- [x] 8.3 Reuse visual resolver and reader-safe media delivery.
+- [x] 8.4 Support approved imported assets as visual generation reference assets where appropriate.
+- [x] 8.5 Add visual mapping UI only after using `impeccable` if Web scope is approved.
+- [x] 8.6 Add mapping, fallback, reference-asset, worldline isolation, ACL, and no-leak tests.
 - [ ] 8.7 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 8.8 Fast-forward merge to local main and update harness docs.
 

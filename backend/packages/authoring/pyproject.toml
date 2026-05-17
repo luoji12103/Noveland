@@ -13,6 +13,7 @@ dependencies = [
   "noveland-memory",
   "noveland-media",
   "noveland-providers",
+  "noveland-visual",
   "noveland-worlds",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
@@ -24,6 +25,7 @@ noveland-core = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
 noveland-providers = { workspace = true }
+noveland-visual = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

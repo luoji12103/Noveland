@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -100,6 +101,19 @@ from noveland.memory.models import AgentMemoryItem
 from noveland.memory.utils import deterministic_embedding
 from noveland.providers.contracts import ProviderExecutionRequest, ProviderKind
 from noveland.providers.service import ProviderExecutionService
+from noveland.visual.contracts import (
+    BackgroundVisibility,
+    SceneBackgroundCreate,
+    SpriteBindingVisibility,
+    SpriteSetCreate,
+    SpriteVariantCreate,
+)
+from noveland.visual.models import (
+    CharacterSpriteSet,
+    CharacterSpriteVariant,
+    SceneBackgroundProfile,
+)
+from noveland.visual.service import VisualAssetService, VisualValidationError
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -119,6 +133,9 @@ RESTRICTED_MEDIA_VISIBILITIES = {"developer_only", "hidden"}
 PERSONA_PROPOSAL_TARGET = "agent_persona_candidate"
 MEMORY_PROPOSAL_TARGET = "memory_candidate"
 VISUAL_PROFILE_RECOMMENDATION_TARGET = "visual_generation_profile_recommendation"
+SPRITE_ASSET_MATCH_TARGET = "sprite_asset_match"
+BACKGROUND_ASSET_MATCH_TARGET = "background_asset_match"
+CG_ASSET_MATCH_TARGET = "cg_asset_match"
 
 
 class AuthoringService:
@@ -1289,6 +1306,24 @@ class AuthoringService:
         if asset.worldline_id != worldline_id:
             raise AuthoringValidationError("source media asset must belong to source worldline")
 
+    def _media_asset_required(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_asset_id: uuid.UUID,
+    ) -> MediaAsset:
+        asset = self._session.get(MediaAsset, media_asset_id)
+        if (
+            asset is None
+            or asset.world_id != world_id
+            or asset.worldline_id != worldline_id
+            or asset.status != "available"
+        ):
+            raise AuthoringValidationError("media asset must belong to apply worldline")
+        if asset.visibility in RESTRICTED_MEDIA_VISIBILITIES:
+            raise AuthoringValidationError("restricted media asset cannot be applied")
+        return asset
+
     def _proposals_for_apply(
         self,
         run_id: uuid.UUID,
@@ -1428,6 +1463,179 @@ class AuthoringService:
             )
         return media_asset
 
+    def _asset_match_media_asset_id(self, payload: dict[str, Any]) -> uuid.UUID:
+        media_asset_id = _uuid_from_payload(payload.get("media_asset_id"))
+        if media_asset_id is None:
+            raise AuthoringValidationError("asset match proposal requires media_asset_id")
+        return media_asset_id
+
+    def _agent_for_sprite_payload(self, world_id: uuid.UUID, payload: dict[str, Any]) -> Agent:
+        agent_id = _uuid_from_payload(payload.get("agent_id"))
+        if agent_id is not None:
+            return self._agent_required(world_id, agent_id)
+        character_label = str(
+            payload.get("character_label") or payload.get("speaker_label") or ""
+        ).strip()
+        if not character_label:
+            raise AuthoringValidationError(
+                "sprite asset match requires agent_id or character_label"
+            )
+        normalized = _label_key(character_label)
+        agent = self._session.scalars(
+            select(Agent).where(
+                Agent.world_id == world_id,
+                (Agent.agent_key == normalized) | (Agent.display_name == character_label),
+            )
+        ).first()
+        if agent is not None:
+            return agent
+        agents = self._session.scalars(select(Agent).where(Agent.world_id == world_id)).all()
+        for candidate in agents:
+            if _label_key(candidate.display_name) == normalized:
+                return candidate
+        raise AuthoringValidationError("sprite asset match target agent not found")
+
+    def _find_sprite_set(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        style_key: str,
+    ) -> CharacterSpriteSet | None:
+        return self._session.scalars(
+            select(CharacterSpriteSet).where(
+                CharacterSpriteSet.world_id == world_id,
+                CharacterSpriteSet.worldline_id == worldline_id,
+                CharacterSpriteSet.agent_id == agent_id,
+                CharacterSpriteSet.style_key == style_key,
+                CharacterSpriteSet.status != "deleted",
+            )
+        ).first()
+
+    def _find_sprite_variant(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        sprite_set_id: uuid.UUID,
+        media_asset_id: uuid.UUID,
+        expression_key: str,
+        pose_key: str | None,
+        outfit_key: str | None,
+    ) -> CharacterSpriteVariant | None:
+        return self._session.scalars(
+            select(CharacterSpriteVariant).where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.worldline_id == worldline_id,
+                CharacterSpriteVariant.sprite_set_id == sprite_set_id,
+                CharacterSpriteVariant.asset_id == media_asset_id,
+                CharacterSpriteVariant.expression_key == expression_key,
+                CharacterSpriteVariant.pose_key.is_(None)
+                if pose_key is None
+                else CharacterSpriteVariant.pose_key == pose_key,
+                CharacterSpriteVariant.outfit_key.is_(None)
+                if outfit_key is None
+                else CharacterSpriteVariant.outfit_key == outfit_key,
+                CharacterSpriteVariant.status != "deleted",
+            )
+        ).first()
+
+    def _find_background(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_asset_id: uuid.UUID,
+        scene_id: uuid.UUID | None,
+        location_key: str,
+        time_of_day: str | None,
+        weather_key: str | None,
+    ) -> SceneBackgroundProfile | None:
+        return self._session.scalars(
+            select(SceneBackgroundProfile).where(
+                SceneBackgroundProfile.world_id == world_id,
+                SceneBackgroundProfile.worldline_id == worldline_id,
+                SceneBackgroundProfile.asset_id == media_asset_id,
+                SceneBackgroundProfile.scene_id.is_(None)
+                if scene_id is None
+                else SceneBackgroundProfile.scene_id == scene_id,
+                SceneBackgroundProfile.location_key == location_key,
+                SceneBackgroundProfile.time_of_day.is_(None)
+                if time_of_day is None
+                else SceneBackgroundProfile.time_of_day == time_of_day,
+                SceneBackgroundProfile.weather_key.is_(None)
+                if weather_key is None
+                else SceneBackgroundProfile.weather_key == weather_key,
+                SceneBackgroundProfile.status != "deleted",
+            )
+        ).first()
+
+    def _should_default_sprite_variant(
+        self,
+        world_id: uuid.UUID,
+        sprite_set_id: uuid.UUID,
+        expression_key: str,
+    ) -> bool:
+        existing_default = self._session.scalars(
+            select(CharacterSpriteVariant).where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.sprite_set_id == sprite_set_id,
+                CharacterSpriteVariant.status != "deleted",
+                CharacterSpriteVariant.is_default.is_(True),
+            )
+        ).first()
+        if existing_default is not None:
+            return False
+        existing_variant = self._session.scalars(
+            select(CharacterSpriteVariant).where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.sprite_set_id == sprite_set_id,
+                CharacterSpriteVariant.status != "deleted",
+            )
+        ).first()
+        return existing_variant is None or expression_key == "neutral"
+
+    def _should_default_background(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        scene_id: uuid.UUID | None,
+        location_key: str,
+    ) -> bool:
+        existing_default = self._session.scalars(
+            select(SceneBackgroundProfile).where(
+                SceneBackgroundProfile.world_id == world_id,
+                SceneBackgroundProfile.worldline_id == worldline_id,
+                SceneBackgroundProfile.scene_id.is_(None)
+                if scene_id is None
+                else SceneBackgroundProfile.scene_id == scene_id,
+                SceneBackgroundProfile.location_key == location_key,
+                SceneBackgroundProfile.status != "deleted",
+                SceneBackgroundProfile.is_default.is_(True),
+            )
+        ).first()
+        return existing_default is None
+
+    def _mark_media_generation_reference_candidate(
+        self,
+        media_asset_id: uuid.UUID,
+        proposal: AuthoringImportProposal,
+        *,
+        reference_role: str,
+    ) -> None:
+        media_asset = self._session.get(MediaAsset, media_asset_id)
+        if media_asset is None:
+            raise AuthoringValidationError("media asset not found")
+        metadata = dict(media_asset.metadata_json)
+        metadata["generation_reference_candidate"] = True
+        roles = set(_string_list(metadata.get("generation_reference_roles")))
+        roles.add(reference_role)
+        metadata["generation_reference_roles"] = sorted(roles)
+        applied = list(metadata.get("authoring_visual_mapping_proposals", []))
+        entry = {"proposal_id": str(proposal.id), "run_id": str(proposal.run_id)}
+        if entry not in applied:
+            applied.append(entry)
+        metadata["authoring_visual_mapping_proposals"] = applied
+        media_asset.metadata_json = metadata
+
     def _distillation_fragments(
         self,
         world_id: uuid.UUID,
@@ -1481,6 +1689,33 @@ class AuthoringService:
                 "canonical_mutation": False,
                 "profile_mutation": False,
             }
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.ASSET_MATCH.value
+            and proposal.target_ref_kind == SPRITE_ASSET_MATCH_TARGET
+        ):
+            return self._apply_sprite_asset_match(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.ASSET_MATCH.value
+            and proposal.target_ref_kind == BACKGROUND_ASSET_MATCH_TARGET
+        ):
+            return self._apply_background_asset_match(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.ASSET_MATCH.value
+            and proposal.target_ref_kind == CG_ASSET_MATCH_TARGET
+        ):
+            return self._apply_cg_asset_match(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
         if proposal.proposal_kind in SUPPORTED_TRACE_ONLY_APPLY_KINDS:
             return {
                 "applied_ref_kind": "authoring_import_proposal",
@@ -1592,6 +1827,232 @@ class AuthoringService:
             "agent_id": str(agent.id),
             "canonical_mutation": False,
             "memory_mutation": True,
+        }
+
+    def _apply_sprite_asset_match(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        payload = proposal.proposed_payload_json
+        media_asset_id = self._asset_match_media_asset_id(payload)
+        source_asset_id = _uuid_from_payload(payload.get("source_asset_id"))
+        agent = self._agent_for_sprite_payload(world_id, payload)
+        style_key = _safe_key(str(payload.get("style_key") or "galgame-import"), "galgame-import")
+        expression_key = _safe_key(str(payload.get("expression_key") or "neutral"), "neutral")
+        pose_key = _optional_safe_key(payload.get("pose_key"))
+        outfit_key = _optional_safe_key(payload.get("outfit_key"))
+        mood_tags = tuple(_string_list(payload.get("mood_tags")))
+        visual = VisualAssetService(self._session)
+        sprite_set = self._find_sprite_set(world_id, worldline_id, agent.id, style_key)
+        created_sprite_set = False
+        if sprite_set is None:
+            try:
+                created = visual.create_sprite_set(
+                    SpriteSetCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        agent_id=agent.id,
+                        style_key=style_key,
+                        display_name=f"{agent.display_name} imported sprites",
+                        visibility=SpriteBindingVisibility.WORLD_ADMIN,
+                        metadata_json=_visual_mapping_metadata(
+                            proposal,
+                            source_asset_id=source_asset_id,
+                            media_asset_id=media_asset_id,
+                            mapping_kind="sprite_set",
+                        ),
+                    )
+                )
+            except VisualValidationError as exc:
+                raise AuthoringValidationError(str(exc)) from exc
+            sprite_set = self._find_sprite_set(world_id, worldline_id, agent.id, created.style_key)
+            created_sprite_set = True
+        if sprite_set is None:
+            raise AuthoringValidationError("sprite set apply failed")
+        existing_variant = self._find_sprite_variant(
+            world_id,
+            worldline_id,
+            sprite_set.id,
+            media_asset_id,
+            expression_key,
+            pose_key,
+            outfit_key,
+        )
+        if existing_variant is not None:
+            variant_id = existing_variant.id
+            reused_variant = True
+        else:
+            try:
+                variant = visual.create_sprite_variant(
+                    SpriteVariantCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        sprite_set_id=sprite_set.id,
+                        asset_id=media_asset_id,
+                        expression_key=expression_key,
+                        pose_key=pose_key,
+                        outfit_key=outfit_key,
+                        mood_tags=mood_tags,
+                        is_default=self._should_default_sprite_variant(
+                            world_id,
+                            sprite_set.id,
+                            expression_key,
+                        ),
+                        visibility=SpriteBindingVisibility.WORLD_ADMIN,
+                        metadata_json=_visual_mapping_metadata(
+                            proposal,
+                            source_asset_id=source_asset_id,
+                            media_asset_id=media_asset_id,
+                            mapping_kind="sprite_variant",
+                        ),
+                    )
+                )
+            except VisualValidationError as exc:
+                raise AuthoringValidationError(str(exc)) from exc
+            variant_id = variant.id
+            reused_variant = False
+        self._mark_media_generation_reference_candidate(
+            media_asset_id,
+            proposal,
+            reference_role="character_reference",
+        )
+        return {
+            "applied_ref_kind": "character_sprite_variant",
+            "applied_ref_id": str(variant_id),
+            "sprite_set_id": str(sprite_set.id),
+            "agent_id": str(agent.id),
+            "media_asset_id": str(media_asset_id),
+            "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+            "created_sprite_set": created_sprite_set,
+            "reused_variant": reused_variant,
+            "canonical_mutation": False,
+            "visual_binding_mutation": True,
+            "generation_reference_candidate": True,
+        }
+
+    def _apply_background_asset_match(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        payload = proposal.proposed_payload_json
+        media_asset_id = self._asset_match_media_asset_id(payload)
+        source_asset_id = _uuid_from_payload(payload.get("source_asset_id"))
+        scene_id = _uuid_from_payload(payload.get("scene_id"))
+        location_key = _safe_key(
+            str(payload.get("location_key") or payload.get("cg_key") or "imported"),
+            "imported",
+        )
+        time_of_day = _optional_safe_key(payload.get("time_of_day"))
+        weather_key = _optional_safe_key(payload.get("weather_key"))
+        existing = self._find_background(
+            world_id,
+            worldline_id,
+            media_asset_id,
+            scene_id,
+            location_key,
+            time_of_day,
+            weather_key,
+        )
+        if existing is not None:
+            background_id = existing.id
+            reused_background = True
+        else:
+            visual = VisualAssetService(self._session)
+            try:
+                background = visual.create_background(
+                    SceneBackgroundCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        scene_id=scene_id,
+                        location_key=location_key,
+                        time_of_day=time_of_day,
+                        weather_key=weather_key,
+                        asset_id=media_asset_id,
+                        is_default=self._should_default_background(
+                            world_id,
+                            worldline_id,
+                            scene_id,
+                            location_key,
+                        ),
+                        visibility=BackgroundVisibility.WORLD_ADMIN,
+                        metadata_json=_visual_mapping_metadata(
+                            proposal,
+                            source_asset_id=source_asset_id,
+                            media_asset_id=media_asset_id,
+                            mapping_kind="scene_background",
+                        ),
+                    )
+                )
+            except VisualValidationError as exc:
+                raise AuthoringValidationError(str(exc)) from exc
+            background_id = background.id
+            reused_background = False
+        self._mark_media_generation_reference_candidate(
+            media_asset_id,
+            proposal,
+            reference_role="style_reference",
+        )
+        return {
+            "applied_ref_kind": "scene_background_profile",
+            "applied_ref_id": str(background_id),
+            "media_asset_id": str(media_asset_id),
+            "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+            "reused_background": reused_background,
+            "canonical_mutation": False,
+            "visual_binding_mutation": True,
+            "generation_reference_candidate": True,
+        }
+
+    def _apply_cg_asset_match(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        payload = proposal.proposed_payload_json
+        media_asset_id = self._asset_match_media_asset_id(payload)
+        source_asset_id = _uuid_from_payload(payload.get("source_asset_id"))
+        media_asset = self._media_asset_required(world_id, worldline_id, media_asset_id)
+        if media_asset.asset_kind != "image":
+            raise AuthoringValidationError("CG asset match requires image media")
+        metadata = dict(media_asset.metadata_json)
+        bindings = list(metadata.get("galgame_cg_bindings", []))
+        binding = {
+            "proposal_id": str(proposal.id),
+            "run_id": str(proposal.run_id),
+            "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+            "cg_key": _safe_key(str(payload.get("cg_key") or "imported-cg"), "imported-cg"),
+            "route_key": _optional_safe_key(payload.get("route_key")),
+            "scene_id": str(_uuid_from_payload(payload.get("scene_id")))
+            if _uuid_from_payload(payload.get("scene_id")) is not None
+            else None,
+            "reference_role": "style_reference",
+        }
+        if binding not in bindings:
+            bindings.append(binding)
+        metadata["galgame_cg_bindings"] = bindings
+        metadata["generation_reference_candidate"] = True
+        metadata["generation_reference_roles"] = sorted(
+            set(_string_list(metadata.get("generation_reference_roles")) + ["style_reference"])
+        )
+        media_asset.metadata_json = metadata
+        self._session.flush()
+        return {
+            "applied_ref_kind": "media_asset",
+            "applied_ref_id": str(media_asset.id),
+            "media_asset_id": str(media_asset.id),
+            "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+            "cg_binding": binding,
+            "canonical_mutation": False,
+            "visual_binding_mutation": False,
+            "generation_reference_candidate": True,
         }
 
     def _dialogue_speaker_candidates(
@@ -1938,6 +2399,55 @@ def _dict_or_empty(value: object) -> dict[str, Any]:
     if isinstance(value, dict):
         return value
     return {}
+
+
+def _visual_mapping_metadata(
+    proposal: AuthoringImportProposal,
+    *,
+    source_asset_id: uuid.UUID | None,
+    media_asset_id: uuid.UUID,
+    mapping_kind: str,
+) -> dict[str, Any]:
+    return {
+        "source_kind": "galgame_visual_asset_mapping",
+        "proposal_id": str(proposal.id),
+        "run_id": str(proposal.run_id),
+        "source_fragment_id": None
+        if proposal.source_fragment_id is None
+        else str(proposal.source_fragment_id),
+        "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+        "media_asset_id": str(media_asset_id),
+        "mapping_kind": mapping_kind,
+        "review_apply": True,
+    }
+
+
+def _label_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+
+
+def _safe_key(value: str, fallback: str) -> str:
+    normalized = _label_key(value)
+    return normalized or fallback
+
+
+def _optional_safe_key(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = _label_key(value)
+    return normalized or None
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list | tuple | set):
+        return []
+    return sorted(
+        {
+            item.strip().lower()
+            for item in value
+            if isinstance(item, str) and item.strip()
+        }
+    )
 
 
 def _batch_record(model: AuthoringSourceBatch) -> AuthoringSourceBatchRead:

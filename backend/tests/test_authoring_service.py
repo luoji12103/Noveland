@@ -18,6 +18,7 @@ from noveland.authoring.contracts import (
     AuthoringLoreExtractRequest,
     AuthoringMemoryMigrateRequest,
     AuthoringPreviewRequest,
+    AuthoringProposalCreate,
     AuthoringProposalDraft,
     AuthoringProposalKind,
     AuthoringProposalStatus,
@@ -56,6 +57,11 @@ from noveland.providers.contracts import (
 )
 from noveland.providers.models import ProviderBudgetPolicy, ProviderCapability, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
+from noveland.visual.models import (
+    CharacterSpriteSet,
+    CharacterSpriteVariant,
+    SceneBackgroundProfile,
+)
 from noveland.worlds.models import World, Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import Table, create_engine, select
@@ -1070,9 +1076,10 @@ def test_character_memory_distillation_apply_writes_traceable_state() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
-def test_asset_matching_creates_proposal_only_media_candidates() -> None:
+def test_asset_matching_applies_reviewed_visual_candidates() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
     sprite_media_id = graph.media_asset_id
     background_media_id = _seed_media_asset(
         engine,
@@ -1205,23 +1212,25 @@ def test_asset_matching_creates_proposal_only_media_candidates() -> None:
                 ),
             ),
         )
-        first_asset_match = [
+        visual_matches = [
             proposal
             for proposal in result.run.proposals
-            if proposal.target_ref_kind == "sprite_asset_match"
-        ][0]
-        service.review_proposal(
-            graph.world_id,
-            first_asset_match.id,
-            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
-            actor_ref="test",
-        )
+            if proposal.target_ref_kind
+            in {"sprite_asset_match", "background_asset_match", "cg_asset_match"}
+        ]
+        for proposal in visual_matches:
+            service.review_proposal(
+                graph.world_id,
+                proposal.id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="test",
+            )
         apply_result = service.apply(
             graph.world_id,
             run.id,
             AuthoringApplyRequest(
                 worldline_id=graph.worldline_id,
-                proposal_ids=(first_asset_match.id,),
+                proposal_ids=tuple(proposal.id for proposal in visual_matches),
             ),
         )
         assert session.scalars(select(MediaJob)).all() == []
@@ -1243,11 +1252,36 @@ def test_asset_matching_creates_proposal_only_media_candidates() -> None:
         "cg_asset_match",
         "voice_asset_match",
     }.issubset(target_ref_kinds)
-    assert apply_result.applied_proposals == []
-    assert apply_result.blocked_proposals[0].applied_ref_json["blocked_reason"] == (
-        "unsupported_proposal_kind"
-    )
+    assert len(apply_result.applied_proposals) == 3
+    assert apply_result.blocked_proposals == []
     assert "storage_uri" not in str(result.run.model_dump()).lower()
+
+    with Session(engine) as session:
+        sprite_set = session.scalars(select(CharacterSpriteSet)).one()
+        variant = session.scalars(select(CharacterSpriteVariant)).one()
+        background = session.scalars(select(SceneBackgroundProfile)).one()
+        sprite_media = session.get(MediaAsset, sprite_media_id)
+        background_media = session.get(MediaAsset, background_media_id)
+        cg_media = session.get(MediaAsset, cg_media_id)
+        assert sprite_set.agent_id == agent_id
+        assert sprite_set.worldline_id == graph.worldline_id
+        assert variant.expression_key == "happy"
+        assert variant.pose_key == "standing"
+        assert variant.outfit_key == "uniform"
+        assert variant.asset_id == sprite_media_id
+        assert background.location_key == "schoolyard"
+        assert background.asset_id == background_media_id
+        assert sprite_media is not None
+        assert background_media is not None
+        assert cg_media is not None
+        assert sprite_media.metadata_json["generation_reference_candidate"] is True
+        assert background_media.metadata_json["generation_reference_candidate"] is True
+        assert cg_media.metadata_json["generation_reference_candidate"] is True
+        assert cg_media.metadata_json["galgame_cg_bindings"][0]["cg_key"] == "opening"
+        assert "storage_uri" not in str(sprite_set.metadata_json).lower()
+        assert "storage_uri" not in str(variant.metadata_json).lower()
+        assert "storage_uri" not in str(background.metadata_json).lower()
+        assert session.scalars(select(WorldEventModel)).all() == []
 
 
 def test_asset_matching_rejects_cross_worldline_source_asset() -> None:
@@ -1307,6 +1341,72 @@ def test_asset_matching_rejects_cross_worldline_source_asset() -> None:
                 AuthoringAssetMatchRequest(
                     worldline_id=graph.worldline_id,
                     source_asset_ids=(fork_asset.id,),
+                ),
+            )
+
+
+def test_visual_asset_mapping_apply_rejects_cross_worldline_media_payload() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    _seed_agent(engine, graph.world_id, "alice", "Alice")
+    fork_id = _seed_fork(engine, graph.world_id, graph.worldline_id)
+    fork_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        fork_id,
+        asset_kind="image",
+        asset_role="character_sprite",
+    )
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="visual-cross",
+                display_name="Visual Cross",
+            ),
+            actor_ref="test",
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        proposal = service.create_proposal(
+            AuthoringProposalCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                run_id=run.id,
+                proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                target_ref_kind="sprite_asset_match",
+                title="Cross-worldline sprite",
+                summary="Should not apply.",
+                proposed_payload_json={
+                    "candidate_kind": "asset_match",
+                    "match_kind": "sprite",
+                    "media_asset_id": str(fork_media_id),
+                    "character_label": "Alice",
+                    "expression_key": "neutral",
+                },
+            )
+        )
+        service.review_proposal(
+            graph.world_id,
+            proposal.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        with pytest.raises(AuthoringValidationError, match="worldline"):
+            service.apply(
+                graph.world_id,
+                run.id,
+                AuthoringApplyRequest(
+                    worldline_id=graph.worldline_id,
+                    proposal_ids=(proposal.id,),
                 ),
             )
 
@@ -1407,6 +1507,9 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, CharacterSpriteSet.__table__),
+        cast(Table, CharacterSpriteVariant.__table__),
+        cast(Table, SceneBackgroundProfile.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
