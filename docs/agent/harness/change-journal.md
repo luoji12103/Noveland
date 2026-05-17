@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 8 Voice Profile Mapping planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-voice-profile-mapping
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 8 only.
+- Summary: Added reviewed apply support for imported voice-reference proposals. Approved voice matches create or reuse `VoiceProfile` records, bind them to agents through `VoiceProfileService`, preserve provider/provider voice IDs without secret resolution, carry style/emotion hints into binding overrides, mark approved audio as voice-reference candidates, and leave TTS/STT execution on existing speech/provider paths.
+- Files changed: `backend/packages/authoring/**`, authoring service tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: Authoring/speech/provider lab tests cover reviewed voice apply, fake TTS smoke through the applied agent binding, MiMo/custom gateway template reuse without hardcoded endpoints, provider voice ID propagation without secret leakage, audio-only validation, no storage/path/base64/raw prompt/raw output leaks, and no world-event writes.
+- Docs updated: Phase 8 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: Commit `568061b` fast-forward merged to local `main`; no push performed. Phase 8 added no Web UI and no migration; `impeccable` was not needed. Phase 9 should assemble a minimal demo world from reviewed/applied authoring, persona/memory, visual, voice, and dialogue outputs.
+
 ## v0.9 Phase 7 Visual Asset Mapping planning/implementation entry
 
 - Date: 2026-05-17

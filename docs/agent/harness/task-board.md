@@ -5,12 +5,17 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 8 Voice Profile Mapping, after Phase 7 merge
+- v0.9 Phase 9 Demo World Assembly, after Phase 8 merge
 
 ## Blocked
 - None
 
 ## Done
+- v0.9 Phase 8 Voice Profile Mapping planning checkpoint
+- v0.9 Phase 8 Voice Profile Mapping implementation
+- v0.9 Phase 8 Voice Profile Mapping targeted tests
+- v0.9 Phase 8 Voice Profile Mapping full backend gate
+- v0.9 Phase 8 Voice Profile Mapping fast-forward merge
 - v0.9 Phase 7 Visual Asset Mapping planning checkpoint
 - v0.9 Phase 7 Visual Asset Mapping implementation
 - v0.9 Phase 7 Visual Asset Mapping targeted tests

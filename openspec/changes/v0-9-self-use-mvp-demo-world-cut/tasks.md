@@ -93,8 +93,8 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 9.3 Implement MiMo/generic speech provider settings usage without hardcoded endpoints.
 - [x] 9.4 Add voice mapping UI only after using `impeccable` if Web scope is approved.
 - [x] 9.5 Add TTS smoke, binding, style mapping, ACL, and no-secret tests.
-- [ ] 9.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 9.7 Fast-forward merge to local main and update harness docs.
+- [x] 9.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 9.7 Fast-forward merge to local main and update harness docs.
 
 ## 10. Phase 9 — Demo World Assembly
 
