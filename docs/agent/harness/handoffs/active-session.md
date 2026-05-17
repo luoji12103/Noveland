@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T07:15:00Z
-- Branch: feat/v0.9-provider-worktree-harness
+- Date: 2026-05-17T07:35:00Z
+- Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 3 Provider Worktree Integration Test Harness implementation is in validation. Targeted Phase 3 tests passed locally; full gate and fast-forward merge are pending.
+- Status: v0.9 Phase 3 Provider Worktree Integration Test Harness is complete locally after targeted tests, full backend gate, OpenSpec validation, and fast-forward merge. Start Phase 4 Galgame Source Intake from clean local `main`.
 
 ## Current Context
 
@@ -115,7 +115,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Finish Phase 3 validation and fast-forward merge to local `main` before starting Phase 4 Galgame Source Intake.
+- Start Phase 4 Galgame Source Intake from clean local `main`.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.

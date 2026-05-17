@@ -1,12 +1,12 @@
 # Task Board
 
 ## Open
-- v0.9 Phase 4 Galgame Source Intake, after Phase 3 validation and fast-forward merge
+- v0.9 Phase 4 Galgame Source Intake, after explicit branch start
 - v1.0 Private Beta MVP feasibility review, after v0.9 completion/archive
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v0.9 Phase 3 Provider Worktree Integration Test Harness validation
+- None
 
 ## Blocked
 - None
@@ -14,6 +14,8 @@
 ## Done
 - v0.9 Phase 3 Provider Worktree Integration Test Harness implementation
 - v0.9 Phase 3 Provider Worktree Integration Test Harness targeted tests
+- v0.9 Phase 3 Provider Worktree Integration Test Harness full local gate
+- v0.9 Phase 3 Provider Worktree Integration Test Harness fast-forward merge
 - v0.9 Phase 2 Visual Generation Control Plane implementation
 - v0.9 Phase 2 Visual Generation Control Plane targeted tests
 - v0.9 Phase 2 Visual Generation Control Plane full local gate
