@@ -2,6 +2,17 @@
 
 ## ADDED Requirements
 
+### Requirement: Quota ownership is decided before implementation
+The system SHALL complete a docs-only checkpoint before implementing private beta quota enforcement.
+The checkpoint SHALL decide whether player/capability quotas extend provider budget policy JSON or
+require dedicated quota policy records.
+
+#### Scenario: Quota checkpoint runs
+- **Given** v1.0 Phase 3 is selected for implementation
+- **When** the checkpoint is written
+- **Then** it SHALL map all runtime/provider/media/speech/image spend paths that must be guarded
+- **And** it SHALL define how world, player, provider, and capability scopes are evaluated before provider execution.
+
 ### Requirement: Quotas limit provider spend by scope
 The system SHALL enforce quotas for provider calls by world, player, provider, and capability where configured.
 
@@ -10,6 +21,15 @@ The system SHALL enforce quotas for provider calls by world, player, provider, a
 - **When** another image generation would be requested
 - **Then** the system SHALL block or degrade the request with a safe explanation
 - **And** it SHALL NOT execute hidden provider spend.
+
+### Requirement: Per-player quota isolation is enforced
+The system SHALL isolate quota usage between private beta testers when player-scoped quota is configured.
+
+#### Scenario: One tester exhausts quota
+- **Given** tester A has reached a configured player image quota
+- **When** tester B requests image generation within their own quota
+- **Then** tester B's request SHALL be evaluated independently
+- **And** tester A's exhausted quota SHALL NOT block tester B unless a world/provider/capability limit is also exhausted.
 
 ### Requirement: Quota failures produce safe audit evidence
 The system SHALL record safe quota-block evidence suitable for admin inspection.

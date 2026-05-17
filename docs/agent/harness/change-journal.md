@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Private Beta MVP feasibility review entry
+
+- Date: 2026-05-17
+- Branch: main
+- Scope: v1.0 Private Beta MVP feasibility review and OpenSpec plan revision only; no backend/Web implementation, migrations, runtime behavior changes, API behavior changes, or push.
+- Summary: Reviewed the active v1.0 OpenSpec and current v0.9-complete repository against the private beta requirement for 1-3 invited testers. The review concludes v0.9 provides the content/provider foundation but v1.0 cannot start as-is: access, player session restore, per-player/capability quota, feedback ownership, and readiness ownership decisions must be front-loaded. Revised the v1.0 phase order to Private Beta Onboarding & Access Model, Player Session Stability, Cost & Quota Real Enforcement, World Setup Wizard, Memory & Persona QA, Beta Feedback System, Beta Content Iteration Loop, and Private Beta Gate.
+- Files changed: `/docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`, `/openspec/changes/v1-0-private-beta-mvp/{proposal.md,design.md,phase-plan.md,tasks.md,specs/**/spec.md}`, and harness docs.
+- Tests added/updated: N/A, documentation-only feasibility review.
+- Docs updated: v1.0 feasibility review, OpenSpec proposal/design/phase-plan/tasks/spec deltas, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Do not implement v1.0 until the feasibility review is accepted. The next implementation entry is Phase 1 Private Beta Onboarding & Access Model, starting with a docs-only checkpoint for invite/access ownership. Use `impeccable` before any Web implementation. No push performed.
+
 ## v0.9 Self-use MVP Demo World Cut archive entry
 
 - Date: 2026-05-17

@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.0 Private Beta MVP feasibility review, when explicitly requested
+- v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint, after feasibility review acceptance
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
@@ -11,6 +11,7 @@
 - None
 
 ## Done
+- v1.0 Private Beta MVP feasibility review and OpenSpec phase-order revision
 - v0.9 Self-use MVP Demo World Cut OpenSpec archive and release notes
 - v0.9 Phase 10 30-Minute Self-use MVP Gate planning checkpoint
 - v0.9 Phase 10 30-Minute Self-use MVP Gate implementation

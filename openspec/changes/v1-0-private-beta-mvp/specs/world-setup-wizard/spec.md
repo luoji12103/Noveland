@@ -2,13 +2,30 @@
 
 ## ADDED Requirements
 
+### Requirement: Setup wizard extends readiness rather than duplicating it
+The system SHALL implement the setup wizard as an aggregation over existing readiness,
+diagnostics, provider, media, visual, speech, memory, authoring, private beta access, session,
+quota, and self-use evidence unless a checkpoint explicitly approves a persistent signoff record.
+
+#### Scenario: Setup wizard checkpoint runs
+- **Given** v1.0 Phase 4 is selected for implementation
+- **When** the checkpoint is written
+- **Then** it SHALL confirm observability/readiness ownership
+- **And** it SHALL reject a duplicate readiness framework.
+
 ### Requirement: Setup wizard validates beta world completeness
-The system SHALL aggregate setup evidence for provider readiness, media availability, voice bindings, persona/memory readiness, visual mappings, scene/playback readiness, and prior self-use evidence.
+The system SHALL aggregate setup evidence for provider readiness, media availability, voice bindings, persona/memory readiness, visual mappings, scene/playback readiness, beta access, player session restore, quota enforcement, and prior self-use evidence.
 
 #### Scenario: World is incomplete
 - **Given** a beta world lacks a required voice binding or persona memory
 - **When** an admin runs the setup wizard
 - **Then** the wizard SHALL report a blocker with actionable remediation
+- **And** it SHALL NOT mark the world beta-ready.
+
+#### Scenario: Session or quota evidence is missing
+- **Given** a beta world has provider and content evidence but lacks session restore or quota evidence
+- **When** an admin runs the setup wizard
+- **Then** the wizard SHALL report a blocker
 - **And** it SHALL NOT mark the world beta-ready.
 
 ### Requirement: Setup wizard reuses readiness evidence

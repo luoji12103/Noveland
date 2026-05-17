@@ -2,6 +2,18 @@
 
 ## ADDED Requirements
 
+### Requirement: Player session ownership is decided before implementation
+The system SHALL complete a docs-only checkpoint before implementing player session restore.
+The checkpoint SHALL decide whether resume state is owned by a dedicated player session package,
+by private beta access records, or by an explicit extension of existing conversation/player
+records.
+
+#### Scenario: Session checkpoint runs
+- **Given** v1.0 Phase 2 is selected for implementation
+- **When** the checkpoint is written
+- **Then** it SHALL define the canonical owner for current worldline, current conversation, current scene, current presentation, and recovery status
+- **And** it SHALL define whether a migration is required.
+
 ### Requirement: Player sessions resume safely
 The system SHALL restore current player conversation, worldline, scene, presentation, and playback state after interruption.
 
@@ -10,6 +22,15 @@ The system SHALL restore current player conversation, worldline, scene, presenta
 - **When** they return after closing the browser
 - **Then** the system SHALL restore the current conversation and scene state
 - **And** it SHALL validate world, worldline, player, and membership scope.
+
+### Requirement: Player sessions are isolated per tester
+The system SHALL prevent one tester from reading or mutating another tester's private beta session state.
+
+#### Scenario: Tester requests another tester's resume state
+- **Given** a private beta player has a session in a worldline
+- **When** another tester requests that session
+- **Then** the system SHALL reject the request
+- **And** it SHALL NOT reveal conversation, scene, presentation, media, or provider failure details for the other tester.
 
 ### Requirement: Missing media has safe fallback
 The system SHALL show safe fallback states when image, sprite, background, audio, or presentation data is missing or unavailable.

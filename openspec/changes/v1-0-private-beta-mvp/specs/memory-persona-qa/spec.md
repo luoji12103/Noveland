@@ -2,6 +2,17 @@
 
 ## ADDED Requirements
 
+### Requirement: Memory and persona QA ownership is decided before implementation
+The system SHALL complete a docs-only checkpoint before implementing memory/persona QA.
+The checkpoint SHALL decide whether QA uses existing narrative quality diagnostics/eval records,
+authoring proposal evidence, or dedicated QA run records.
+
+#### Scenario: QA checkpoint runs
+- **Given** v1.0 Phase 5 is selected for implementation
+- **When** the checkpoint is written
+- **Then** it SHALL define where QA findings, safe evidence refs, and repair suggestions are represented
+- **And** it SHALL stop implementation if the path would expose raw prompts or outputs to non-admin users.
+
 ### Requirement: QA detects memory and persona drift
 The system SHALL provide admin diagnostics for memory contamination, persona drift, dialogue style drift, and worldline contamination.
 
