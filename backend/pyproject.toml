@@ -32,6 +32,7 @@ dependencies = [
   "noveland-speech",
   "noveland-storage",
   "noveland-visual",
+  "noveland-visual-generation",
   "noveland-world-packaging",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
@@ -77,6 +78,7 @@ members = [
   "packages/speech",
   "packages/storage",
   "packages/visual",
+  "packages/visual_generation",
   "packages/world_packaging",
   "packages/worlds",
   "services/api",
@@ -111,6 +113,7 @@ noveland-service-runtime = { workspace = true }
 noveland-speech = { workspace = true }
 noveland-storage = { workspace = true }
 noveland-visual = { workspace = true }
+noveland-visual-generation = { workspace = true }
 noveland-world-packaging = { workspace = true }
 noveland-worlds = { workspace = true }
 
@@ -158,6 +161,7 @@ mypy_path = [
   "packages/speech/src",
   "packages/storage/src",
   "packages/visual/src",
+  "packages/visual_generation/src",
   "packages/world_packaging/src",
   "packages/worlds/src",
   "services/api/src",

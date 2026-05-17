@@ -146,6 +146,11 @@ def test_core_schema_tables_are_registered() -> None:
         "user_credentials",
         "users",
         "voice_profiles",
+        "visual_generation_plan_references",
+        "visual_generation_plans",
+        "visual_model_assets",
+        "visual_workflow_template_versions",
+        "visual_workflow_templates",
         "world_events",
         "world_clock_states",
         "world_clock_transitions",
@@ -564,6 +569,181 @@ def test_visual_asset_system_tables_are_registered() -> None:
     assert foreign_key_targets("scene_background_profiles") == {
         "media_assets.id",
         "scenes.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+
+
+def test_visual_generation_control_plane_tables_are_registered() -> None:
+    assert {
+        "world_id",
+        "provider_id",
+        "provider_kind",
+        "adapter_kind",
+        "workflow_key",
+        "display_name",
+        "intent",
+        "status",
+        "visibility",
+    } <= column_names("visual_workflow_templates")
+    assert {
+        "template_id",
+        "version",
+        "parameter_schema",
+        "required_capabilities",
+        "allowed_asset_roles",
+        "safety_constraints",
+        "template_payload",
+        "validation_status",
+        "validation_error",
+    } <= column_names("visual_workflow_template_versions")
+    assert {
+        "world_id",
+        "worldline_id",
+        "provider_id",
+        "inventory_kind",
+        "display_name",
+        "provider_model_name",
+        "file_name",
+        "trigger_words",
+        "compatible_base_models",
+        "recommended_weight",
+        "style_tags",
+        "character_tags",
+        "visibility",
+        "source_note",
+        "metadata",
+    } <= column_names("visual_model_assets")
+    assert {
+        "world_id",
+        "worldline_id",
+        "agent_id",
+        "preferred_checkpoint_id",
+        "allowed_lora_ids",
+        "default_lora_ids",
+        "banned_lora_ids",
+        "prompt_fragments",
+        "negative_prompt_fragments",
+        "reference_asset_ids",
+        "default_workflow_template_id",
+        "expression_workflow_template_id",
+        "cg_workflow_template_id",
+        "outfit_policy",
+        "pose_policy",
+        "review_status",
+        "visibility",
+    } <= column_names("character_visual_generation_profiles")
+    assert {
+        "world_id",
+        "worldline_id",
+        "intent",
+        "provider_id",
+        "workflow_template_id",
+        "workflow_template_version_id",
+        "status",
+        "character_ids",
+        "scene_id",
+        "prompt_plan",
+        "model_plan",
+        "output_plan",
+        "validation_results",
+        "source_context",
+        "model_invocation_id",
+        "media_job_id",
+        "output_media_asset_id",
+    } <= column_names("visual_generation_plans")
+    assert {
+        "world_id",
+        "worldline_id",
+        "plan_id",
+        "reference_kind",
+        "reference_id",
+        "reference_role",
+        "display_order",
+        "metadata",
+    } <= column_names("visual_generation_plan_references")
+    assert Base.metadata.tables[
+        "character_visual_generation_profiles"
+    ].c.worldline_id.nullable is False
+    assert Base.metadata.tables["visual_generation_plans"].c.worldline_id.nullable is False
+    assert Base.metadata.tables[
+        "visual_generation_plan_references"
+    ].c.worldline_id.nullable is False
+    assert {
+        "ix_visual_workflow_templates_world_status",
+        "ix_visual_workflow_templates_provider",
+        "ix_visual_workflow_templates_intent",
+    } <= index_names("visual_workflow_templates")
+    assert {
+        "ix_visual_workflow_template_versions_template",
+        "ix_visual_workflow_template_versions_status",
+    } <= index_names("visual_workflow_template_versions")
+    assert {
+        "ix_visual_model_assets_world_kind",
+        "ix_visual_model_assets_worldline_kind",
+        "ix_visual_model_assets_provider_kind",
+        "ix_visual_model_assets_visibility",
+    } <= index_names("visual_model_assets")
+    assert {
+        "ix_character_visual_generation_profiles_worldline_agent",
+        "ix_character_visual_generation_profiles_review",
+    } <= index_names("character_visual_generation_profiles")
+    assert {
+        "ix_visual_generation_plans_worldline_status",
+        "ix_visual_generation_plans_provider",
+        "ix_visual_generation_plans_template",
+        "ix_visual_generation_plans_invocation",
+        "ix_visual_generation_plans_media_job",
+        "ix_visual_generation_plans_output_asset",
+    } <= index_names("visual_generation_plans")
+    assert {
+        "ix_visual_generation_plan_references_plan",
+        "ix_visual_generation_plan_references_worldline",
+    } <= index_names("visual_generation_plan_references")
+    assert "uq_visual_workflow_templates_world_key" in constraint_names(
+        "visual_workflow_templates",
+        UniqueConstraint,
+    )
+    assert "uq_visual_workflow_template_versions_version" in constraint_names(
+        "visual_workflow_template_versions",
+        UniqueConstraint,
+    )
+    assert "uq_character_visual_generation_profiles_agent" in constraint_names(
+        "character_visual_generation_profiles",
+        UniqueConstraint,
+    )
+    assert foreign_key_targets("visual_workflow_templates") == {
+        "provider_integrations.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("visual_workflow_template_versions") == {
+        "visual_workflow_templates.id"
+    }
+    assert foreign_key_targets("visual_model_assets") == {
+        "provider_integrations.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("character_visual_generation_profiles") == {
+        "agents.id",
+        "visual_model_assets.id",
+        "visual_workflow_templates.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("visual_generation_plans") == {
+        "media_assets.id",
+        "media_jobs.id",
+        "model_invocations.id",
+        "provider_integrations.id",
+        "scenes.id",
+        "visual_workflow_template_versions.id",
+        "visual_workflow_templates.id",
+        "worldlines.id",
+        "worlds.id",
+    }
+    assert foreign_key_targets("visual_generation_plan_references") == {
+        "visual_generation_plans.id",
         "worldlines.id",
         "worlds.id",
     }

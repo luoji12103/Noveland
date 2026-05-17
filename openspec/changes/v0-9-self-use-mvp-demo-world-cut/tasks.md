@@ -25,16 +25,16 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 - [x] 3.1 Write docs-only phase planning checkpoint.
 - [x] 3.2 Decide visual generation package/router/schema ownership and migration need.
-- [ ] 3.3 Implement workflow template registry with validated parameter slots.
-- [ ] 3.4 Implement visual model asset inventory for checkpoint, LoRA, VAE, embedding, ControlNet, IP-Adapter, workflow template, and prompt preset metadata.
-- [ ] 3.5 Implement character/worldline visual generation profiles.
-- [ ] 3.6 Implement provider-neutral visual generation plan DTOs and validation.
-- [ ] 3.7 Implement ComfyUI slot mapping validator and raw workflow JSON rejection.
-- [ ] 3.8 Implement AI-assisted workflow binding/profile proposals and workflow variant proposals as review/apply only.
-- [ ] 3.9 Add UI only after using `impeccable` if Web scope is approved.
-- [ ] 3.10 Add template, slot, model inventory, LoRA compatibility, profile, plan, adapter mapping, ACL, worldline, media, ledger, and no-leak tests.
-- [ ] 3.11 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 3.12 Fast-forward merge to local main and update harness docs.
+- [x] 3.3 Implement workflow template registry with validated parameter slots.
+- [x] 3.4 Implement visual model asset inventory for checkpoint, LoRA, VAE, embedding, ControlNet, IP-Adapter, workflow template, and prompt preset metadata.
+- [x] 3.5 Implement character/worldline visual generation profiles.
+- [x] 3.6 Implement provider-neutral visual generation plan DTOs and validation.
+- [x] 3.7 Implement ComfyUI slot mapping validator and raw workflow JSON rejection.
+- [x] 3.8 Implement AI-assisted workflow binding/profile proposals and workflow variant proposals as review/apply only.
+- [x] 3.9 Add UI only after using `impeccable` if Web scope is approved.
+- [x] 3.10 Add template, slot, model inventory, LoRA compatibility, profile, plan, adapter mapping, ACL, worldline, media, ledger, and no-leak tests.
+- [x] 3.11 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 3.12 Fast-forward merge to local main and update harness docs.
 
 ## 4. Phase 3 — Provider Worktree Integration Test Harness
 

@@ -195,6 +195,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.reader_media` — authenticated reader/member/player/admin media descriptor and application-mediated object download router with safe visibility policy
   - `noveland.services.api.speech` — world-scoped voice profile, agent voice binding, TTS/STT, transcript, and speech style mapping router
   - `noveland.services.api.visual` — world-scoped sprite set, sprite variant, scene background, resolver, and compose-scene router
+  - `noveland.services.api.visual_generation` — world-admin visual generation control-plane router for workflow templates, model inventory, character visual profiles, plan validation, and dry-run mapping without provider execution
   - `noveland.services.api.asset_generation` — world-scoped admin-reviewed asset generation policy, preview, apply, reprioritize, and cancel-superseded router
   - `noveland.services.api.authoring` — world-scoped authoring source registry, import run, proposal, review decision, preview, and selective trace-only apply router
   - `noveland.services.api.narrative_quality` — world-scoped admin-only v0.6 narrative quality context preview and diagnostics router
@@ -314,6 +315,14 @@ Fast orientation for a new coding session.
   - `noveland.visual.service` — visual CRUD and same-world/same-worldline media asset validation service
   - `noveland.visual.resolver` — deterministic sprite/background resolver with exact, neutral/default fallback, and restricted asset suppression
   - `noveland.visual.composition` — compose-scene wrapper that reuses `ImageService.compose_image()`
+- `backend/packages/visual_generation/`
+  - `noveland.visual_generation.contracts` — workflow template, visual model inventory, character visual profile, generation plan, validation, and dry-run DTOs
+  - `noveland.visual_generation.models` — workflow template/version, visual model asset, character visual profile, visual generation plan, and plan-reference ORM models
+  - `noveland.visual_generation.service` — admin-scoped control-plane service for template/version CRUD, inventory/profile validation, provider-neutral plan validation, and dry-run mapping without real provider calls
+  - `noveland.visual_generation.validators` — slot whitelist, raw workflow rejection, provider/adapter compatibility, safe metadata, and no-leak validation helpers
+  - `noveland.visual_generation.mapping` — ComfyUI, Z-Image, OpenAI/GPT image, OpenAI-compatible image, and generic custom HTTP mapping stubs for validation/dry-run
+  - `noveland.visual_generation.planning` — provider-neutral plan slot extraction helpers
+  - `noveland.visual_generation.diagnostics` — validation issue JSON formatting helper
 - `backend/packages/asset_generation/`
   - `noveland.asset_generation.contracts` — strict-worldline asset generation policy, preview, proposal, apply, reprioritize, and cancel DTOs
   - `noveland.asset_generation.models` — asset generation policy, run, and proposal ORM models

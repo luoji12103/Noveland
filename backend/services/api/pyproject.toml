@@ -33,6 +33,7 @@ dependencies = [
   "noveland-service-runtime",
   "noveland-speech",
   "noveland-visual",
+  "noveland-visual-generation",
   "noveland-world-packaging",
   "noveland-worlds",
   "psycopg[binary]>=3.2,<4",
@@ -70,6 +71,7 @@ noveland-reader-delivery = { workspace = true }
 noveland-service-runtime = { workspace = true }
 noveland-speech = { workspace = true }
 noveland-visual = { workspace = true }
+noveland-visual-generation = { workspace = true }
 noveland-world-packaging = { workspace = true }
 noveland-worlds = { workspace = true }
 

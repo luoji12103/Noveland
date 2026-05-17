@@ -137,6 +137,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/realtime.py`
 - `backend/services/api/src/noveland/services/api/speech.py`
 - `backend/services/api/src/noveland/services/api/visual.py`
+- `backend/services/api/src/noveland/services/api/visual_generation.py`
 - `backend/services/api/src/noveland/services/api/worlds.py`
 - `backend/services/runtime/`
 - `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
@@ -257,6 +258,16 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/visual/src/noveland/visual/models.py`
 - `backend/packages/visual/src/noveland/visual/resolver.py`
 - `backend/packages/visual/src/noveland/visual/service.py`
+- `backend/packages/visual_generation/`
+- `backend/packages/visual_generation/pyproject.toml`
+- `backend/packages/visual_generation/src/noveland/visual_generation/__init__.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/contracts.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/diagnostics.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/mapping.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/models.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/planning.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/service.py`
+- `backend/packages/visual_generation/src/noveland/visual_generation/validators.py`
 - `backend/packages/asset_generation/`
 - `backend/packages/asset_generation/pyproject.toml`
 - `backend/packages/asset_generation/src/noveland/asset_generation/__init__.py`
@@ -625,6 +636,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/providers/src/noveland/providers/model_discovery.py`
 - `backend/packages/providers/src/noveland/providers/adapters/openai_text.py`
 - `backend/packages/providers/src/noveland/providers/adapters/anthropic_text.py`
+- `backend/migrations/versions/20260517_0045_visual_generation_control_plane.py`
 - `backend/migrations/versions/20260515_0042_provider_budget_policies.py`
 - `backend/tests/test_authoring_service.py`
 - `backend/tests/test_api_authoring.py`
@@ -637,6 +649,8 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_api_package_contracts.py`
 - `backend/tests/test_sample_world_release_package.py`
 - `backend/tests/test_api_moderation.py`
+- `backend/tests/test_visual_generation_service.py`
+- `backend/tests/test_api_visual_generation.py`
 
 ## Update rule
 

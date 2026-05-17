@@ -25,6 +25,7 @@ from noveland.services.api.runtime import router as runtime_router
 from noveland.services.api.speech import agent_voice_router
 from noveland.services.api.speech import router as speech_router
 from noveland.services.api.visual import router as visual_router
+from noveland.services.api.visual_generation import router as visual_generation_router
 from noveland.services.api.world_packaging import router as world_packaging_router
 from noveland.services.api.worlds import root_router as worlds_root_router
 from noveland.services.api.worlds import router as worlds_router
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     api.include_router(speech_router)
     api.include_router(agent_voice_router)
     api.include_router(visual_router)
+    api.include_router(visual_generation_router)
     api.include_router(asset_generation_router)
     api.include_router(asset_generation_jobs_router)
     api.include_router(authoring_router)

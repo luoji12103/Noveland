@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-16T00:00:00Z
+- Date: 2026-05-17T06:30:27Z
 - Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 1 MVP Provider Settings & Model Lab is complete locally after full validation and fast-forward merge. Phase 2 planning checkpoint is complete; implementation has not started.
+- Status: v0.9 Phase 2 Visual Generation Control Plane implementation is complete locally after targeted tests, full local gate, and fast-forward merge. Do not start Phase 3 unless explicitly requested.
 
 ## Current Context
 
@@ -25,6 +25,8 @@
 - v0.9 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md`. It confirms static/code-owned provider templates, server-side redacted model discovery, Phase 1 text adapter alignment, no real provider tests by default, and `impeccable` use before Web UI implementation.
 - v0.9 Phase 1 implementation adds static provider templates, redacted server-side model discovery, manual model-name fallback, OpenAI-compatible and Anthropic-compatible text adapters through `ProviderExecutionService`, and provider admin model lab UI. No migrations or persistent provider-template tables were added.
 - v0.9 Phase 2 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`. It confirms dedicated `backend/packages/visual_generation/` and `backend/services/api/src/noveland/services/api/visual_generation.py` ownership, expected migration tables, backend/API-first plus minimal admin diagnostics scope, strict worldline-scoped character visual profiles, provider-neutral visual generation plans, ComfyUI template/slot execution boundary, cross-provider mapping policy, and review/apply-only AI workflow/profile proposals.
+- v0.9 Phase 2 implementation adds `backend/packages/visual_generation/`, app-level `visual_generation.py`, migration `20260517_0045_visual_generation_control_plane.py`, and admin-scoped APIs for workflow templates/versions, model inventory, character visual generation profiles, visual generation plans, validation, and dry-run. It is backend/API-first only: no Web UI, no `worlds.py` routes, no real provider calls by default, no arbitrary runtime ComfyUI workflow execution, and no reader/player/member exposure of local paths, storage refs, raw prompts/outputs, bytes/base64, or secrets.
+- v0.9 Phase 2 targeted service/API tests cover slot validation, missing/non-whitelisted slots, malformed model IDs, checkpoint/LoRA base-model mismatch, allowed/default/banned LoRA policy, cross-worldline reference rejection, hidden/developer-only suppression, safe reference metadata, provider-neutral mapping dry-runs, no world-event pollution, and no invocation writes.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -110,7 +112,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Continue v0.9 with Phase 2 Visual Generation Control Plane implementation only when explicitly requested, using `feat/v0.9-visual-generation-control-plane` and preserving the checkpoint decisions.
+- Continue v0.9 with Phase 3 Provider Worktree Integration Test Harness only when explicitly requested. Do not start Phase 3 in the Phase 2 implementation turn.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.
@@ -222,6 +224,9 @@
 - v0.7 Phase 7 full local gate passed: backend ruff, backend mypy (`255 source files`), backend pytest (`411 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.9 Phase 1 full local gate passed: backend ruff, backend mypy (`289 source files`), backend pytest (`453 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`128 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed` after rerun), docker compose config, OpenSpec strict changes/specs validation, and `git diff --check`.
 - Flaky note: the first v0.9 Phase 1 full Web e2e run timed out on the existing broad conversation participants scenario; the isolated scenario and subsequent full e2e run passed.
+- v0.9 Phase 2 targeted checks passed: targeted schema/Alembic/workspace/service/API pytest (`40 passed`), focused service/API pytest (`12 passed`), and focused hardening service pytest (`8 passed`).
+- v0.9 Phase 2 full local gate passed: backend ruff, backend mypy (`300 source files`), backend pytest (`466 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`128 passed`), Web build, Web `check:next-env`, docker compose config, OpenSpec strict changes/specs validation, and `git diff --check`.
+- v0.9 Phase 2 Web e2e was not run because no Web files were touched.
 - v0.7 Phase 7 fast-forward merge to local `main` completed.
 - v0.7 Phase 8 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.8-production-readiness-gate-plan.md`.
 - v0.7 Phase 8 targeted checks passed: backend ruff for observability readiness code/API/tests, backend mypy for the same files, and targeted pytest (`14 passed`).

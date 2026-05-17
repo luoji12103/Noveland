@@ -22,6 +22,17 @@
 - Docs updated: Phase 2 checkpoint, project index, file inventory, task board, active handoff, change journal, OpenSpec tasks
 - Follow-up notes: Implement Phase 2 on `feat/v0.9-visual-generation-control-plane`. Do not add Web UI unless minimal admin diagnostics are explicitly needed, and use `impeccable` first if Web work is included. Do not build a ComfyUI graph editor, do not add broad `worlds.py` routes, and do not run real providers by default.
 
+## v0.9.2 Visual Generation Control Plane implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-visual-generation-control-plane
+- Scope: v0.9 Phase 2 backend/API-first Visual Generation Control Plane only.
+- Summary: Added dedicated `visual_generation` package and app-level visual-generation router for workflow templates, workflow template versions, visual model inventory, strict-worldline character visual generation profiles, provider-neutral visual generation plans, reference records, slot validation, and validation-only/dry-run provider mapping across ComfyUI, Z-Image, GPT/OpenAI-compatible image, and generic custom HTTP providers. Phase 2 performs no real provider calls by default, adds no Web UI, does not touch `worlds.py`, does not execute arbitrary runtime ComfyUI workflow JSON, and keeps AI-assisted profile/workflow changes review/apply-only through profile review state and safe plan source context.
+- Files changed: `backend/packages/visual_generation/**`, `backend/services/api/src/noveland/services/api/visual_generation.py`, API app registration, backend workspace/package metadata, migration `20260517_0045_visual_generation_control_plane.py`, schema/import tests, targeted service/API tests, OpenSpec tasks, and harness docs.
+- Tests added/updated: visual generation service and API tests for template/version CRUD, slot validation, model inventory filtering, strict worldline profiles, LoRA allowed/banned/base-model checks, provider-neutral plan validation, ComfyUI/Z-Image/OpenAI/generic dry-run mapping, raw workflow rejection, cross-worldline reference rejection, restricted inventory suppression, no-leak payload/reference metadata validation, no world-event pollution, and no provider invocation writes.
+- Verification: Targeted Phase 2 tests passed (`40 passed`; focused service/API rerun `12 passed`, then service-only hardening rerun `8 passed`). Full backend gate passed after hardening: ruff, mypy (`300 source files`), and pytest (`466 passed, 7 skipped`). Web was not touched; Web lint/typecheck/unit/build/check:next-env passed (`128 passed`). Docker compose config, OpenSpec strict changes/specs validation, and `git diff --check` passed.
+- Follow-up notes: Fast-forward merge Phase 2 to local `main` after validation. Next accepted v0.9 work is Phase 3 Provider Worktree Integration Test Harness only when explicitly requested. Web e2e was not required because Phase 2 touched no Web files; no push performed.
+
 ## v0.9-v1.1 OpenSpec milestone roadmap entry
 
 - Date: 2026-05-16

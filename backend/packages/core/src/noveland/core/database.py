@@ -38,6 +38,7 @@ MODEL_MODULES = (
     "noveland.providers.models",
     "noveland.speech.models",
     "noveland.visual.models",
+    "noveland.visual_generation.models",
 )
 
 
