@@ -38,11 +38,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 4. Phase 3 — Provider Worktree Integration Test Harness
 
-- [ ] 4.1 Write docs-only phase planning checkpoint.
-- [ ] 4.2 Document provider lab worktree setup and opt-in env variables.
-- [ ] 4.3 Add real-provider test markers/profile with default skip behavior.
-- [ ] 4.4 Add fake-provider parity tests and opt-in smoke examples, including optional ComfyUI dry-run/mock workflow checks.
-- [ ] 4.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 4.1 Write docs-only phase planning checkpoint.
+- [x] 4.2 Document provider lab worktree setup and opt-in env variables.
+- [x] 4.3 Add real-provider test markers/profile with default skip behavior.
+- [x] 4.4 Add fake-provider parity tests and opt-in smoke examples, including optional ComfyUI dry-run/mock workflow checks.
+- [x] 4.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 4.6 Fast-forward merge to local main and update harness docs.
 
 ## 5. Phase 4 — Galgame Source Intake

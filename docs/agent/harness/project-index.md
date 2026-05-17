@@ -73,6 +73,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md` — feasibility review for the proposed v0.9 Self-use MVP Demo World Cut after v0.8 completion and roadmap planning.
 - `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md` — v0.9 Phase 1 checkpoint for provider settings/model lab implementation decisions.
 - `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md` — v0.9 Phase 2 checkpoint for dedicated visual generation package/router/schema ownership, workflow-template slot safety, model inventory, character visual profiles, provider-neutral plans, AI proposal policy, and backend/API-first implementation scope.
+- `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md` — v0.9 Phase 3 checkpoint for opt-in real-provider testing in a separate provider lab worktree, fake/mocked default tests, and safe provider lab evidence.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -92,6 +93,7 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/external-tool-policy.md` — policy-only external tool allow/deny boundary; no execution path.
 - `docs/agent/operations/scale-readiness.md` — derived scale-readiness report interpretation.
 - `docs/agent/operations/living-world-release-profile.md` — living-world release profile and beta checklist operator workflow.
+- `docs/agent/operations/provider-lab.md` — opt-in provider lab worktree workflow and real-provider test evidence rules.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 - `docs/agent/architecture/current-system-contracts.md` — frozen Phase 3-12 architecture boundary contracts for provider, invocation, media, visual, speech, presentation, asset generation, and eval layers.
 - `docs/agent/architecture/permission-matrix.md` — v0.7 baseline permission matrix for platform-admin, world-admin, world-member, reader, and player route expectations.

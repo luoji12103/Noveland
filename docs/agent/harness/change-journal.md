@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 3 Provider Worktree Integration Test Harness planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-provider-worktree-harness
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 3 only.
+- Summary: Added a provider lab checkpoint, operator worktree instructions, a strict `real_provider` pytest marker, default-skip opt-in convention through `NOVELAND_RUN_REAL_PROVIDER_TESTS=1`, and fake/mock provider contract tests for the required LLM, speech, image, ComfyUI, and generic provider families. No migrations, Web UI, API route changes, runtime behavior changes, or default real provider calls were added.
+- Files changed: `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md`, `docs/agent/operations/provider-lab.md`, `backend/pyproject.toml`, `backend/tests/test_provider_lab_harness.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: `backend/tests/test_provider_lab_harness.py` covers required provider templates, model discovery manual fallback, fake provider parity, OpenAI-compatible and Anthropic-compatible dry-run text execution, MiMo TTS/ASR dry-run execution, visual generation mapping for ComfyUI/Z-Image/GPT/OpenAI-compatible/generic image providers, and default-skipped real-provider examples.
+- Docs updated: Provider lab operation doc, Phase 3 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: Phase 4 Galgame Source Intake should start from clean local `main` after Phase 3 validation and fast-forward merge. Keep accepting only user-provided already-unpacked assets; no cracking, unpacking, DRM bypass, or raw path/source leakage.
+
 ## v0.9 Phase 2 Visual Generation Control Plane planning entry
 
 - Date: 2026-05-16

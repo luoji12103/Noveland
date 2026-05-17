@@ -386,6 +386,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_api_visual.py`
 - `backend/tests/test_api_speech.py`
 - `backend/tests/test_api_providers.py`
+- `backend/tests/test_provider_lab_harness.py`
 - `backend/tests/test_api_images.py`
 - `backend/tests/test_api_media.py`
 - `backend/tests/test_api_media_catalog.py`

@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T06:30:27Z
-- Branch: main
+- Date: 2026-05-17T07:15:00Z
+- Branch: feat/v0.9-provider-worktree-harness
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 2 Visual Generation Control Plane implementation is complete locally after targeted tests, full local gate, and fast-forward merge. Do not start Phase 3 unless explicitly requested.
+- Status: v0.9 Phase 3 Provider Worktree Integration Test Harness implementation is in validation. Targeted Phase 3 tests passed locally; full gate and fast-forward merge are pending.
 
 ## Current Context
 
@@ -27,6 +27,9 @@
 - v0.9 Phase 2 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`. It confirms dedicated `backend/packages/visual_generation/` and `backend/services/api/src/noveland/services/api/visual_generation.py` ownership, expected migration tables, backend/API-first plus minimal admin diagnostics scope, strict worldline-scoped character visual profiles, provider-neutral visual generation plans, ComfyUI template/slot execution boundary, cross-provider mapping policy, and review/apply-only AI workflow/profile proposals.
 - v0.9 Phase 2 implementation adds `backend/packages/visual_generation/`, app-level `visual_generation.py`, migration `20260517_0045_visual_generation_control_plane.py`, and admin-scoped APIs for workflow templates/versions, model inventory, character visual generation profiles, visual generation plans, validation, and dry-run. It is backend/API-first only: no Web UI, no `worlds.py` routes, no real provider calls by default, no arbitrary runtime ComfyUI workflow execution, and no reader/player/member exposure of local paths, storage refs, raw prompts/outputs, bytes/base64, or secrets.
 - v0.9 Phase 2 targeted service/API tests cover slot validation, missing/non-whitelisted slots, malformed model IDs, checkpoint/LoRA base-model mismatch, allowed/default/banned LoRA policy, cross-worldline reference rejection, hidden/developer-only suppression, safe reference metadata, provider-neutral mapping dry-runs, no world-event pollution, and no invocation writes.
+- v0.9 Phase 3 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md`.
+- v0.9 Phase 3 provider lab operating docs are recorded at `docs/agent/operations/provider-lab.md`.
+- v0.9 Phase 3 implementation adds a strict backend `real_provider` pytest marker, `NOVELAND_RUN_REAL_PROVIDER_TESTS=1` opt-in convention, default-skipped real-provider examples, and fake/mock provider contract tests covering OpenAI-compatible LLM, Anthropic-compatible LLM, MiMo TTS/ASR, Z-Image, GPT Image, ComfyUI, OpenAI-compatible image, and generic/custom HTTP. It adds no migrations, Web UI, API route changes, runtime behavior changes, or default external calls.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -112,7 +115,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Continue v0.9 with Phase 3 Provider Worktree Integration Test Harness only when explicitly requested. Do not start Phase 3 in the Phase 2 implementation turn.
+- Finish Phase 3 validation and fast-forward merge to local `main` before starting Phase 4 Galgame Source Intake.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before additional v0.8 frontend implementation work.

@@ -120,6 +120,9 @@ noveland-worlds = { workspace = true }
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-config", "--strict-markers"]
+markers = [
+  "real_provider: opt-in tests that may call external provider APIs; skipped unless NOVELAND_RUN_REAL_PROVIDER_TESTS=1",
+]
 
 [tool.ruff]
 line-length = 100
