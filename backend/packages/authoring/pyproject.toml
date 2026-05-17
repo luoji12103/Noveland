@@ -13,6 +13,7 @@ dependencies = [
   "noveland-memory",
   "noveland-media",
   "noveland-providers",
+  "noveland-speech",
   "noveland-visual",
   "noveland-worlds",
   "pydantic>=2.13,<3",
@@ -25,6 +26,7 @@ noveland-core = { workspace = true }
 noveland-memory = { workspace = true }
 noveland-media = { workspace = true }
 noveland-providers = { workspace = true }
+noveland-speech = { workspace = true }
 noveland-visual = { workspace = true }
 noveland-worlds = { workspace = true }
 

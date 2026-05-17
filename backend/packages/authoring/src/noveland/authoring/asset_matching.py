@@ -187,15 +187,22 @@ def _merged_hints(
         "style_key",
         "cg_key",
         "route_key",
+        "provider_id",
+        "provider_voice_id",
+        "voice_id",
+        "language",
     ):
         value = fragment_metadata_json.get(key, source_metadata_json.get(key))
         if isinstance(value, str) and value.strip():
             merged[key] = _normalize_text(value)
-    value = fragment_metadata_json.get("mood_tags", source_metadata_json.get("mood_tags"))
-    if isinstance(value, list):
-        tags = [_normalize_key(item) for item in value if isinstance(item, str) and item.strip()]
-        if tags:
-            merged["mood_tags"] = tags
+    for list_key in ("mood_tags", "supported_languages"):
+        value = fragment_metadata_json.get(list_key, source_metadata_json.get(list_key))
+        if isinstance(value, list):
+            tags = [
+                _normalize_key(item) for item in value if isinstance(item, str) and item.strip()
+            ]
+            if tags:
+                merged[list_key] = tags
     return merged
 
 
@@ -239,6 +246,11 @@ def _voice_payload(source_label: str, hints: dict[str, str | list[str]]) -> dict
             "voice_label",
             "emotion_key",
             "style_key",
+            "provider_id",
+            "provider_voice_id",
+            "voice_id",
+            "language",
+            "supported_languages",
         ),
     )
     if "voice_label" not in payload:
@@ -288,6 +300,11 @@ def _target_hint_key(payload: dict[str, Any]) -> str:
         "style_key",
         "cg_key",
         "route_key",
+        "provider_id",
+        "provider_voice_id",
+        "voice_id",
+        "language",
+        "supported_languages",
     ):
         value = payload.get(key)
         if isinstance(value, str):

@@ -101,6 +101,17 @@ from noveland.memory.models import AgentMemoryItem
 from noveland.memory.utils import deterministic_embedding
 from noveland.providers.contracts import ProviderExecutionRequest, ProviderKind
 from noveland.providers.service import ProviderExecutionService
+from noveland.speech.contracts import (
+    AgentVoiceProfileBindingCreate,
+    VoiceBindingRole,
+    VoiceConsentStatus,
+    VoiceKind,
+    VoiceProfileCreate,
+    VoiceProfileOwnerKind,
+    VoiceProfileVisibility,
+)
+from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
+from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
 from noveland.visual.contracts import (
     BackgroundVisibility,
     SceneBackgroundCreate,
@@ -136,6 +147,7 @@ VISUAL_PROFILE_RECOMMENDATION_TARGET = "visual_generation_profile_recommendation
 SPRITE_ASSET_MATCH_TARGET = "sprite_asset_match"
 BACKGROUND_ASSET_MATCH_TARGET = "background_asset_match"
 CG_ASSET_MATCH_TARGET = "cg_asset_match"
+VOICE_ASSET_MATCH_TARGET = "voice_asset_match"
 
 
 class AuthoringService:
@@ -1495,6 +1507,33 @@ class AuthoringService:
                 return candidate
         raise AuthoringValidationError("sprite asset match target agent not found")
 
+    def _agent_for_voice_payload(self, world_id: uuid.UUID, payload: dict[str, Any]) -> Agent:
+        agent_id = _uuid_from_payload(payload.get("agent_id"))
+        if agent_id is not None:
+            return self._agent_required(world_id, agent_id)
+        speaker_label = str(
+            payload.get("speaker_label")
+            or payload.get("character_label")
+            or payload.get("voice_label")
+            or ""
+        ).strip()
+        if not speaker_label:
+            raise AuthoringValidationError("voice asset match requires agent_id or speaker_label")
+        normalized = _label_key(speaker_label)
+        agent = self._session.scalars(
+            select(Agent).where(
+                Agent.world_id == world_id,
+                (Agent.agent_key == normalized) | (Agent.display_name == speaker_label),
+            )
+        ).first()
+        if agent is not None:
+            return agent
+        agents = self._session.scalars(select(Agent).where(Agent.world_id == world_id)).all()
+        for candidate in agents:
+            if _label_key(candidate.display_name) == normalized:
+                return candidate
+        raise AuthoringValidationError("voice asset match target agent not found")
+
     def _find_sprite_set(
         self,
         world_id: uuid.UUID,
@@ -1636,6 +1675,80 @@ class AuthoringService:
         metadata["authoring_visual_mapping_proposals"] = applied
         media_asset.metadata_json = metadata
 
+    def _find_voice_profile(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        profile_key: str,
+    ) -> VoiceProfile | None:
+        return self._session.scalars(
+            select(VoiceProfile).where(
+                VoiceProfile.world_id == world_id,
+                VoiceProfile.worldline_id == worldline_id,
+                VoiceProfile.profile_key == profile_key,
+                VoiceProfile.status != "deleted",
+            )
+        ).first()
+
+    def _find_voice_binding(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        voice_profile_id: uuid.UUID,
+        binding_role: str,
+    ) -> AgentVoiceProfileBinding | None:
+        return self._session.scalars(
+            select(AgentVoiceProfileBinding).where(
+                AgentVoiceProfileBinding.world_id == world_id,
+                AgentVoiceProfileBinding.worldline_id == worldline_id,
+                AgentVoiceProfileBinding.agent_id == agent_id,
+                AgentVoiceProfileBinding.voice_profile_id == voice_profile_id,
+                AgentVoiceProfileBinding.binding_role == binding_role,
+            )
+        ).first()
+
+    def _should_default_voice_binding(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+    ) -> bool:
+        existing_default = self._session.scalars(
+            select(AgentVoiceProfileBinding).where(
+                AgentVoiceProfileBinding.world_id == world_id,
+                AgentVoiceProfileBinding.worldline_id == worldline_id,
+                AgentVoiceProfileBinding.agent_id == agent_id,
+                AgentVoiceProfileBinding.is_default.is_(True),
+            )
+        ).first()
+        return existing_default is None
+
+    def _mark_media_voice_reference(
+        self,
+        media_asset_id: uuid.UUID,
+        proposal: AuthoringImportProposal,
+        *,
+        agent_id: uuid.UUID,
+        voice_profile_id: uuid.UUID,
+    ) -> None:
+        media_asset = self._session.get(MediaAsset, media_asset_id)
+        if media_asset is None:
+            raise AuthoringValidationError("media asset not found")
+        metadata = dict(media_asset.metadata_json)
+        metadata["voice_reference_candidate"] = True
+        mappings = list(metadata.get("authoring_voice_mapping_proposals", []))
+        entry = {
+            "proposal_id": str(proposal.id),
+            "run_id": str(proposal.run_id),
+            "agent_id": str(agent_id),
+            "voice_profile_id": str(voice_profile_id),
+        }
+        if entry not in mappings:
+            mappings.append(entry)
+        metadata["authoring_voice_mapping_proposals"] = mappings
+        media_asset.metadata_json = metadata
+
     def _distillation_fragments(
         self,
         world_id: uuid.UUID,
@@ -1712,6 +1825,15 @@ class AuthoringService:
             and proposal.target_ref_kind == CG_ASSET_MATCH_TARGET
         ):
             return self._apply_cg_asset_match(
+                proposal,
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+        if (
+            proposal.proposal_kind == AuthoringProposalKind.ASSET_MATCH.value
+            and proposal.target_ref_kind == VOICE_ASSET_MATCH_TARGET
+        ):
+            return self._apply_voice_asset_match(
                 proposal,
                 world_id=world_id,
                 worldline_id=worldline_id,
@@ -2053,6 +2175,130 @@ class AuthoringService:
             "canonical_mutation": False,
             "visual_binding_mutation": False,
             "generation_reference_candidate": True,
+        }
+
+    def _apply_voice_asset_match(
+        self,
+        proposal: AuthoringImportProposal,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        payload = proposal.proposed_payload_json
+        media_asset_id = self._asset_match_media_asset_id(payload)
+        source_asset_id = _uuid_from_payload(payload.get("source_asset_id"))
+        media_asset = self._media_asset_required(world_id, worldline_id, media_asset_id)
+        if media_asset.asset_kind != "audio":
+            raise AuthoringValidationError("voice asset match requires audio media")
+        agent = self._agent_for_voice_payload(world_id, payload)
+        voice_label = _safe_key(
+            str(payload.get("voice_label") or payload.get("speaker_label") or agent.agent_key),
+            agent.agent_key,
+        )
+        profile_key = _safe_key(f"{agent.agent_key}-{voice_label}", agent.agent_key)
+        provider_id = _uuid_from_payload(payload.get("provider_id"))
+        provider_voice_id = _optional_text(payload.get("provider_voice_id")) or _optional_text(
+            payload.get("voice_id")
+        )
+        style_key = _optional_safe_key(payload.get("style_key"))
+        emotion_key = _optional_safe_key(payload.get("emotion_key"))
+        speech = VoiceProfileService(self._session)
+        profile = self._find_voice_profile(world_id, worldline_id, profile_key)
+        created_profile = False
+        if profile is None:
+            try:
+                created = speech.create_profile(
+                    VoiceProfileCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        profile_key=profile_key,
+                        display_name=f"{agent.display_name} imported voice",
+                        description="Reviewed galgame voice reference mapping.",
+                        visibility=VoiceProfileVisibility.WORLD_ADMIN,
+                        owner_kind=VoiceProfileOwnerKind.AGENT,
+                        owner_agent_id=agent.id,
+                        provider_integration_id=provider_id,
+                        provider_voice_id=provider_voice_id,
+                        default_language=_optional_text(payload.get("language")),
+                        supported_languages=_string_list(payload.get("supported_languages")),
+                        voice_kind=VoiceKind.IMPORTED
+                        if provider_voice_id is None
+                        else VoiceKind.EXTERNAL_PROVIDER,
+                        reference_asset_id=media_asset.id,
+                        consent_status=VoiceConsentStatus.ADMIN_AUTHORIZED,
+                        usage_policy_json={
+                            "source": "reviewed_galgame_import",
+                            "review_apply_required": True,
+                            "allow_tts_reference": True,
+                        },
+                        metadata_json=_voice_mapping_metadata(
+                            proposal,
+                            source_asset_id=source_asset_id,
+                            media_asset_id=media_asset.id,
+                            style_key=style_key,
+                            emotion_key=emotion_key,
+                        ),
+                    )
+                )
+            except SpeechValidationError as exc:
+                raise AuthoringValidationError(str(exc)) from exc
+            profile = self._session.get(VoiceProfile, created.id)
+            created_profile = True
+        if profile is None:
+            raise AuthoringValidationError("voice profile apply failed")
+        binding = self._find_voice_binding(
+            world_id,
+            worldline_id,
+            agent.id,
+            profile.id,
+            VoiceBindingRole.DEFAULT.value,
+        )
+        created_binding = False
+        if binding is None:
+            try:
+                created_binding_record = speech.bind_agent_voice(
+                    AgentVoiceProfileBindingCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        agent_id=agent.id,
+                        voice_profile_id=profile.id,
+                        binding_role=VoiceBindingRole.DEFAULT,
+                        is_default=self._should_default_voice_binding(
+                            world_id,
+                            worldline_id,
+                            agent.id,
+                        ),
+                        style_overrides_json=_voice_style_overrides(
+                            style_key=style_key,
+                            emotion_key=emotion_key,
+                        ),
+                    )
+                )
+            except SpeechValidationError as exc:
+                raise AuthoringValidationError(str(exc)) from exc
+            binding_id = created_binding_record.id
+            created_binding = True
+        else:
+            binding_id = binding.id
+        self._mark_media_voice_reference(
+            media_asset.id,
+            proposal,
+            agent_id=agent.id,
+            voice_profile_id=profile.id,
+        )
+        return {
+            "applied_ref_kind": "agent_voice_profile_binding",
+            "applied_ref_id": str(binding_id),
+            "voice_profile_id": str(profile.id),
+            "agent_id": str(agent.id),
+            "media_asset_id": str(media_asset.id),
+            "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+            "provider_id": None if provider_id is None else str(provider_id),
+            "provider_voice_id": provider_voice_id,
+            "created_voice_profile": created_profile,
+            "created_binding": created_binding,
+            "canonical_mutation": False,
+            "voice_binding_mutation": True,
         }
 
     def _dialogue_speaker_candidates(
@@ -2422,6 +2668,42 @@ def _visual_mapping_metadata(
     }
 
 
+def _voice_mapping_metadata(
+    proposal: AuthoringImportProposal,
+    *,
+    source_asset_id: uuid.UUID | None,
+    media_asset_id: uuid.UUID,
+    style_key: str | None,
+    emotion_key: str | None,
+) -> dict[str, Any]:
+    return {
+        "source_kind": "galgame_voice_profile_mapping",
+        "proposal_id": str(proposal.id),
+        "run_id": str(proposal.run_id),
+        "source_fragment_id": None
+        if proposal.source_fragment_id is None
+        else str(proposal.source_fragment_id),
+        "source_asset_id": None if source_asset_id is None else str(source_asset_id),
+        "media_asset_id": str(media_asset_id),
+        "style_key": style_key,
+        "emotion_key": emotion_key,
+        "review_apply": True,
+    }
+
+
+def _voice_style_overrides(
+    *,
+    style_key: str | None,
+    emotion_key: str | None,
+) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    if style_key is not None:
+        overrides["style_key"] = style_key
+    if emotion_key is not None:
+        overrides["emotion"] = emotion_key
+    return overrides
+
+
 def _label_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
 
@@ -2435,6 +2717,13 @@ def _optional_safe_key(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     normalized = _label_key(value)
+    return normalized or None
+
+
+def _optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
     return normalized or None
 
 

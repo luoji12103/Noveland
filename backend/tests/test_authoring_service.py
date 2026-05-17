@@ -51,12 +51,21 @@ from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import AgentMemoryItem
 from noveland.providers.contracts import (
     ProviderAdapterKind,
+    ProviderCapabilityCreate,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
 )
 from noveland.providers.models import ProviderBudgetPolicy, ProviderCapability, ProviderIntegration
 from noveland.providers.registry import ProviderRegistryService
+from noveland.speech.contracts import TTSRequest
+from noveland.speech.models import (
+    AgentVoiceProfileBinding,
+    SpeechStyleMapping,
+    SpeechTranscript,
+    VoiceProfile,
+)
+from noveland.speech.service import SpeechService
 from noveland.visual.models import (
     CharacterSpriteSet,
     CharacterSpriteVariant,
@@ -1411,6 +1420,189 @@ def test_visual_asset_mapping_apply_rejects_cross_worldline_media_payload() -> N
             )
 
 
+def test_voice_asset_mapping_applies_reviewed_voice_reference_and_tts_smoke(
+    tmp_path: Path,
+) -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    voice_media_id = _seed_media_asset(
+        engine,
+        graph.world_id,
+        graph.worldline_id,
+        asset_kind="audio",
+        asset_role="voice_sample",
+    )
+    with Session(engine) as session:
+        tts_provider_id = _seed_speech_provider(session, graph.world_id)
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="voices",
+                display_name="Voices",
+                source_kind=AuthoringSourceAssetKind.AUDIO,
+            ),
+            actor_ref="test",
+        )
+        voice_asset = service.add_source_asset(
+            AuthoringSourceAssetCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_id=batch.id,
+                media_asset_id=voice_media_id,
+                source_asset_kind=AuthoringSourceAssetKind.AUDIO,
+                source_label="alice-soft",
+                metadata_json={
+                    "speaker_label": "Alice",
+                    "voice_label": "soft",
+                    "style_key": "gentle",
+                    "emotion_key": "happy",
+                    "provider_id": str(tts_provider_id),
+                    "provider_voice_id": "alice_gateway_voice",
+                    "supported_languages": ["ja", "zh"],
+                },
+            )
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        result = service.match_assets(
+            graph.world_id,
+            run.id,
+            AuthoringAssetMatchRequest(
+                worldline_id=graph.worldline_id,
+                source_asset_ids=(voice_asset.id,),
+            ),
+        )
+        voice_match = result.run.proposals[0]
+        service.review_proposal(
+            graph.world_id,
+            voice_match.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        applied = service.apply(
+            graph.world_id,
+            run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=(voice_match.id,),
+            ),
+        )
+        tts = SpeechService(session, LocalMediaObjectStorage(tmp_path / "speech")).text_to_speech(
+            graph.world_id,
+            TTSRequest(
+                worldline_id=graph.worldline_id,
+                provider_id=tts_provider_id,
+                agent_id=agent_id,
+                text="voice smoke",
+                emotion="happy",
+            ),
+            actor_ref="test",
+        )
+        assert session.scalars(select(WorldEventModel)).all() == []
+        session.commit()
+
+    assert result.created_proposal_count == 1
+    assert result.voice_match_count == 1
+    assert len(applied.applied_proposals) == 1
+    assert applied.blocked_proposals == []
+    assert "storage_uri" not in str(applied.model_dump()).lower()
+    assert "mimo-secret" not in str(applied.model_dump()).lower()
+
+    with Session(engine) as session:
+        profile = session.scalars(select(VoiceProfile)).one()
+        binding = session.scalars(select(AgentVoiceProfileBinding)).one()
+        voice_media = session.get(MediaAsset, voice_media_id)
+        invocation = session.get(ModelInvocation, tts.model_invocation_id)
+        assert profile.worldline_id == graph.worldline_id
+        assert profile.owner_agent_id == agent_id
+        assert profile.reference_asset_id == voice_media_id
+        assert profile.provider_integration_id == tts_provider_id
+        assert profile.provider_voice_id == "alice_gateway_voice"
+        assert profile.supported_languages_json == ["ja", "zh"]
+        assert profile.metadata_json["style_key"] == "gentle"
+        assert profile.metadata_json["emotion_key"] == "happy"
+        assert binding.agent_id == agent_id
+        assert binding.voice_profile_id == profile.id
+        assert binding.is_default is True
+        assert binding.style_overrides_json == {"style_key": "gentle", "emotion": "happy"}
+        assert voice_media is not None
+        assert voice_media.metadata_json["voice_reference_candidate"] is True
+        assert invocation is not None
+        assert invocation.invocation_kind == "text_to_speech"
+        assert invocation.request_params_json is not None
+        assert invocation.request_params_json["request"]["provider_voice_id"] == (
+            "alice_gateway_voice"
+        )
+        assert "mimo-secret" not in str(invocation.request_params_json).lower()
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_voice_asset_mapping_rejects_non_audio_payload() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    _seed_agent(engine, graph.world_id, "alice", "Alice")
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        batch = service.create_source_batch(
+            AuthoringSourceBatchCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                batch_key="bad-voice",
+                display_name="Bad Voice",
+            ),
+            actor_ref="test",
+        )
+        run = service.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                source_batch_id=batch.id,
+            ),
+            actor_ref="test",
+        )
+        proposal = service.create_proposal(
+            AuthoringProposalCreate(
+                world_id=graph.world_id,
+                worldline_id=graph.worldline_id,
+                run_id=run.id,
+                proposal_kind=AuthoringProposalKind.ASSET_MATCH,
+                target_ref_kind="voice_asset_match",
+                title="Bad voice",
+                summary="Should not apply.",
+                proposed_payload_json={
+                    "candidate_kind": "asset_match",
+                    "match_kind": "voice",
+                    "media_asset_id": str(graph.media_asset_id),
+                    "speaker_label": "Alice",
+                },
+            )
+        )
+        service.review_proposal(
+            graph.world_id,
+            proposal.id,
+            AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+            actor_ref="test",
+        )
+        with pytest.raises(AuthoringValidationError, match="audio"):
+            service.apply(
+                graph.world_id,
+                run.id,
+                AuthoringApplyRequest(
+                    worldline_id=graph.worldline_id,
+                    proposal_ids=(proposal.id,),
+                ),
+            )
+
+
 def test_source_asset_rejects_cross_worldline_media_asset() -> None:
     engine = _engine()
     graph = _seed_graph(engine)
@@ -1510,6 +1702,10 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, CharacterSpriteSet.__table__),
         cast(Table, CharacterSpriteVariant.__table__),
         cast(Table, SceneBackgroundProfile.__table__),
+        cast(Table, VoiceProfile.__table__),
+        cast(Table, AgentVoiceProfileBinding.__table__),
+        cast(Table, SpeechTranscript.__table__),
+        cast(Table, SpeechStyleMapping.__table__),
         cast(Table, AgentMemoryItem.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),
@@ -1586,6 +1782,30 @@ def _seed_text_provider(session: Session, world_id: uuid.UUID) -> uuid.UUID:
             adapter_kind=ProviderAdapterKind.FAKE,
             provider_key=f"fake-text-{uuid.uuid4().hex[:8]}",
             display_name="Fake Text",
+        )
+    )
+    return provider.id
+
+
+def _seed_speech_provider(session: Session, world_id: uuid.UUID) -> uuid.UUID:
+    provider = ProviderRegistryService(session).create_provider(
+        ProviderIntegrationCreate(
+            world_id=world_id,
+            scope_kind=ProviderScopeKind.WORLD,
+            provider_kind=ProviderKind.TEXT_TO_SPEECH,
+            adapter_kind=ProviderAdapterKind.FAKE,
+            provider_key=f"fake-tts-{uuid.uuid4().hex[:8]}",
+            display_name="Fake TTS",
+            base_url="https://gateway.example",
+            auth_ref="env:MIMO_SECRET",
+            config_json={"dry_run": True},
+            default_params_json={"model_name": "mimo-voice-model"},
+            capabilities=(
+                ProviderCapabilityCreate(
+                    capability_key="supports_tts",
+                    capability_json={"value": True},
+                ),
+            ),
         )
     )
     return provider.id
