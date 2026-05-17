@@ -7,18 +7,29 @@ from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from fastapi.testclient import TestClient
+from noveland.agents.models import Agent, AgentPersona
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.authoring.models import (
+    AuthoringImportProposal,
+    AuthoringImportRun,
+    AuthoringSourceAsset,
+    AuthoringSourceBatch,
+    AuthoringSourceFragment,
+    AuthoringSourceTraceability,
+)
 from noveland.conversations.models import (
+    ConversationParticipant,
     ConversationSession,
     ConversationTurn,
     ConversationTurnPresentation,
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
-from noveland.invocations.models import ModelInvocation
+from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
+from noveland.memory.models import AgentMemoryItem, MemoryWriteJob
 from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import (
@@ -38,6 +49,25 @@ from noveland.providers.models import (
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
+from noveland.speech.models import (
+    AgentVoiceProfileBinding,
+    SpeechStyleMapping,
+    SpeechTranscript,
+    VoiceProfile,
+)
+from noveland.visual.models import (
+    CharacterSpriteSet,
+    CharacterSpriteVariant,
+    SceneBackgroundProfile,
+)
+from noveland.visual_generation.models import (
+    CharacterVisualGenerationProfile,
+    VisualGenerationPlan,
+    VisualGenerationPlanReference,
+    VisualModelAsset,
+    VisualWorkflowTemplate,
+    VisualWorkflowTemplateVersion,
+)
 from noveland.worlds.models import (
     BetaChecklistItem,
     BetaChecklistRun,
@@ -304,6 +334,137 @@ def test_public_launch_readiness_does_not_create_duplicate_framework_tables() ->
     assert "public_launch_readiness_reports" not in table_names
 
 
+def test_self_use_mvp_gate_passes_with_demo_evidence_and_manual_checklist() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        before_counts = _framework_counts(session)
+        report = ProductionReadinessGateService(session).self_use_mvp_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=30,
+            resume_verified=True,
+            failure_notes_recorded=True,
+        )
+        after_counts = _framework_counts(session)
+
+    sections = {section.section_key: section for section in report.sections}
+    checklist = {item.item_key: item for item in report.manual_checklist}
+    assert report.status == "ok"
+    assert report.readiness_kind == "self_use_mvp_gate"
+    assert report.conversation_id == conversation_id
+    assert report.blocker_count == 0
+    assert sections["demo_entry"].status == "ok"
+    assert sections["conversation_continuity"].status == "ok"
+    assert sections["persona_memory"].status == "ok"
+    assert sections["visual_playback_generation"].status == "ok"
+    assert sections["voice_playback"].status == "ok"
+    assert sections["provider_model_lab"].status == "ok"
+    assert sections["source_traceability"].status == "ok"
+    assert checklist["manual_30_minute_play_session"].status == "ok"
+    assert checklist["resume_behavior_verified"].status == "ok"
+    assert "private_beta_readiness" in report.non_goals
+    assert "public_launch_readiness" in report.non_goals
+    assert before_counts == after_counts
+
+
+def test_self_use_mvp_gate_blocks_missing_evidence_safely() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(
+        engine,
+        world_id,
+        worldline_id,
+        include_memory=False,
+        include_visual_plan=False,
+        include_voice=False,
+        include_required_providers=False,
+        include_invocation=False,
+        include_traceability=False,
+        include_agent_turn=False,
+    )
+    _seed_leaky_world_event(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).self_use_mvp_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=12,
+            resume_verified=False,
+            failure_notes_recorded=False,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    checklist = {item.item_key: item for item in report.manual_checklist}
+    assert report.status == "blocked"
+    assert report.blocker_count >= 1
+    assert sections["persona_memory"].status == "blocked"
+    assert sections["visual_playback_generation"].status == "blocked"
+    assert sections["voice_playback"].status == "blocked"
+    assert sections["provider_model_lab"].status == "blocked"
+    assert sections["invocation_ledger"].status == "watch"
+    assert sections["source_traceability"].status == "blocked"
+    assert sections["world_event_leak_check"].status == "blocked"
+    assert checklist["manual_30_minute_play_session"].status == "blocked"
+    assert checklist["resume_behavior_verified"].status == "blocked"
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_self_use_mvp_endpoint_is_platform_admin_only_and_safe() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-self-use@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _authenticate(client, platform_token)
+
+    response = client.get(
+        "/observability/readiness/self-use-mvp",
+        params={
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "manual_play_minutes": "30",
+            "resume_verified": "true",
+            "failure_notes_recorded": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["readiness_kind"] == "self_use_mvp_gate"
+    assert response.json()["status"] == "ok"
+    assert response.json()["world_id"] == str(world_id)
+    assert response.json()["conversation_id"] == str(conversation_id)
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in response.text
+
+    _member_id, member_token = _seed_user(engine, "member-self-use@example.test", False)
+    _authenticate(client, member_token)
+    forbidden = client.get(
+        "/observability/readiness/self-use-mvp",
+        params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
+    )
+    assert forbidden.status_code == 403
+
+
+def test_self_use_mvp_gate_does_not_create_duplicate_framework_tables() -> None:
+    table_names = {
+        "beta_checklist_runs",
+        "long_run_eval_runs",
+        "living_world_release_profiles",
+    }
+    assert "self_use_mvp_gate_runs" not in table_names
+    assert "self_use_mvp_gate_reports" not in table_names
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -316,10 +477,19 @@ def _engine() -> Engine:
         PlatformRoleAssignment.__table__,
         World.__table__,
         Worldline.__table__,
+        Agent.__table__,
+        AgentPersona.__table__,
         WorldEventModel.__table__,
         WorldSnapshotModel.__table__,
         ConversationSession.__table__,
+        ConversationParticipant.__table__,
         ConversationTurn.__table__,
+        AuthoringSourceBatch.__table__,
+        AuthoringSourceAsset.__table__,
+        AuthoringSourceFragment.__table__,
+        AuthoringImportRun.__table__,
+        AuthoringImportProposal.__table__,
+        AuthoringSourceTraceability.__table__,
         MediaAsset.__table__,
         MediaObject.__table__,
         MediaReference.__table__,
@@ -332,10 +502,26 @@ def _engine() -> Engine:
         ModerationAction.__table__,
         MediaJob.__table__,
         ModelInvocation.__table__,
+        PromptSnapshot.__table__,
+        AgentMemoryItem.__table__,
+        MemoryWriteJob.__table__,
         RuntimeDiagnosticEvent.__table__,
         ProviderIntegration.__table__,
         ProviderHealthCheck.__table__,
         ProviderBudgetPolicy.__table__,
+        CharacterSpriteSet.__table__,
+        CharacterSpriteVariant.__table__,
+        SceneBackgroundProfile.__table__,
+        VoiceProfile.__table__,
+        AgentVoiceProfileBinding.__table__,
+        SpeechTranscript.__table__,
+        SpeechStyleMapping.__table__,
+        VisualWorkflowTemplate.__table__,
+        VisualWorkflowTemplateVersion.__table__,
+        VisualModelAsset.__table__,
+        CharacterVisualGenerationProfile.__table__,
+        VisualGenerationPlan.__table__,
+        VisualGenerationPlanReference.__table__,
         LongRunEvalRun.__table__,
         LivingWorldReleaseProfile.__table__,
         BetaChecklistRun.__table__,
@@ -803,6 +989,566 @@ def _seed_public_launch_evidence(
                 review_note="applied",
                 metadata_json={},
             ),
+        )
+        session.commit()
+
+
+def _seed_self_use_demo_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    include_memory: bool = True,
+    include_visual_plan: bool = True,
+    include_voice: bool = True,
+    include_required_providers: bool = True,
+    include_invocation: bool = True,
+    include_traceability: bool = True,
+    include_agent_turn: bool = True,
+) -> uuid.UUID:
+    now = datetime.now(UTC)
+    alice_id = uuid.uuid4()
+    bob_id = uuid.uuid4()
+    conversation_id = uuid.uuid4()
+    operator_turn_id = uuid.uuid4()
+    agent_turn_id = uuid.uuid4()
+    background_asset_id = uuid.uuid4()
+    sprite_asset_id = uuid.uuid4()
+    bob_sprite_asset_id = uuid.uuid4()
+    voice_asset_id = uuid.uuid4()
+    sprite_set_id = uuid.uuid4()
+    sprite_variant_id = uuid.uuid4()
+    bob_sprite_set_id = uuid.uuid4()
+    bob_sprite_variant_id = uuid.uuid4()
+    voice_profile_id = uuid.uuid4()
+    provider_ids = {
+        "text_generation": uuid.uuid4(),
+        "image_generation": uuid.uuid4(),
+        "text_to_speech": uuid.uuid4(),
+        "speech_to_text": uuid.uuid4(),
+    }
+    with Session(engine) as session:
+        session.add_all(
+            [
+                Agent(
+                    id=alice_id,
+                    world_id=world_id,
+                    agent_key="alice",
+                    display_name="Alice",
+                    kind="role_agent",
+                    character_profile={},
+                    config={},
+                    is_enabled=True,
+                ),
+                Agent(
+                    id=bob_id,
+                    world_id=world_id,
+                    agent_key="bob",
+                    display_name="Bob",
+                    kind="role_agent",
+                    character_profile={},
+                    config={},
+                    is_enabled=True,
+                ),
+                AgentPersona(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    agent_id=alice_id,
+                    persona_text="Alice is prepared for the self-use demo.",
+                    behavior_policy={},
+                    policy_plugin_identifier="builtin.default_persona_policy",
+                    policy_plugin_config={},
+                    is_enabled=True,
+                ),
+                AgentPersona(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    agent_id=bob_id,
+                    persona_text="Bob is prepared for the self-use demo.",
+                    behavior_policy={},
+                    policy_plugin_identifier="builtin.default_persona_policy",
+                    policy_plugin_config={},
+                    is_enabled=True,
+                ),
+            ]
+        )
+        if include_memory:
+            for agent_id, content in (
+                (alice_id, "Alice remembers the opening classroom."),
+                (bob_id, "Bob remembers Alice at the gate."),
+            ):
+                session.add(
+                    AgentMemoryItem(
+                        id=uuid.uuid4(),
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        agent_id=agent_id,
+                        source_event_id=None,
+                        content=content,
+                        metadata_json={"source": "authoring_distillation"},
+                        embedding=[0.1] * 1536,
+                        visibility="private",
+                        is_active=True,
+                    )
+                )
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                scene_id=None,
+                session_key=f"demo-{conversation_id.hex[:8]}",
+                title="Self-use MVP Demo",
+                scope_type="world",
+                mode="manual_chain",
+                status="running",
+                objective="Self-use MVP gate fixture",
+                opening_prompt="Begin the safe demo.",
+                max_turns=48,
+                next_turn_index=2 if include_agent_turn else 1,
+                policy_config={},
+                writer_config={"include_prompt_preview": False},
+                memory_config={"retrieve_memory": True, "write_turn_memory": True},
+            )
+        )
+        session.add_all(
+            [
+                ConversationParticipant(
+                    id=uuid.uuid4(),
+                    session_id=conversation_id,
+                    agent_id=alice_id,
+                    turn_order=0,
+                    is_enabled=True,
+                ),
+                ConversationParticipant(
+                    id=uuid.uuid4(),
+                    session_id=conversation_id,
+                    agent_id=bob_id,
+                    turn_order=1,
+                    is_enabled=True,
+                ),
+                ConversationTurn(
+                    id=operator_turn_id,
+                    session_id=conversation_id,
+                    turn_index=0,
+                    speaker_kind="operator",
+                    speaker_agent_id=None,
+                    input_text="Safe operator prompt",
+                    output_text="Alice: ready",
+                    status="succeeded",
+                ),
+            ]
+        )
+        if include_agent_turn:
+            session.add(
+                ConversationTurn(
+                    id=agent_turn_id,
+                    session_id=conversation_id,
+                    turn_index=1,
+                    speaker_kind="agent",
+                    speaker_agent_id=alice_id,
+                    input_text="Safe agent input",
+                    output_text="Alice continues safely.",
+                    status="succeeded",
+                )
+            )
+        for asset_id, role, kind in (
+            (background_asset_id, "scene_background", "image"),
+            (sprite_asset_id, "character_sprite", "image"),
+            (bob_sprite_asset_id, "character_sprite", "image"),
+            (voice_asset_id, "voice_sample", "audio"),
+        ):
+            session.add(
+                MediaAsset(
+                    id=asset_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    asset_kind=kind,
+                    asset_role=role,
+                    source_kind="test_fixture",
+                    status="available",
+                    visibility="world_admin",
+                    mime_type="audio/wav" if kind == "audio" else "image/png",
+                    size_bytes=16,
+                    checksum_sha256="b" * 64,
+                    created_by_actor_ref="system:test",
+                    metadata_json={"safe": True},
+                )
+            )
+        session.add(
+            CharacterSpriteSet(
+                id=sprite_set_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=alice_id,
+                style_key="default",
+                display_name="Alice Default",
+                default_variant_id=sprite_variant_id,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteSet(
+                id=bob_sprite_set_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=bob_id,
+                style_key="default",
+                display_name="Bob Default",
+                default_variant_id=bob_sprite_variant_id,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteVariant(
+                id=sprite_variant_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sprite_set_id=sprite_set_id,
+                asset_id=sprite_asset_id,
+                expression_key="neutral",
+                mood_tags_json=["neutral"],
+                priority=100,
+                is_default=True,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            CharacterSpriteVariant(
+                id=bob_sprite_variant_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sprite_set_id=bob_sprite_set_id,
+                asset_id=bob_sprite_asset_id,
+                expression_key="neutral",
+                mood_tags_json=["neutral"],
+                priority=100,
+                is_default=True,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        session.add(
+            SceneBackgroundProfile(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                scene_id=None,
+                location_key="opening",
+                asset_id=background_asset_id,
+                priority=100,
+                is_default=True,
+                status="active",
+                visibility="world_admin",
+                metadata_json={},
+            )
+        )
+        if include_voice:
+            session.add(
+                VoiceProfile(
+                    id=voice_profile_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    profile_key="alice-default",
+                    display_name="Alice Default Voice",
+                    status="active",
+                    visibility="world_admin",
+                    owner_kind="agent",
+                    owner_agent_id=alice_id,
+                    provider_integration_id=None,
+                    provider_voice_id="alice-voice",
+                    voice_kind="imported",
+                    reference_asset_id=voice_asset_id,
+                    consent_status="admin_authorized",
+                    usage_policy_json={},
+                    metadata_json={},
+                )
+            )
+            for agent_id in (alice_id, bob_id):
+                session.add(
+                    AgentVoiceProfileBinding(
+                        id=uuid.uuid4(),
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        agent_id=agent_id,
+                        voice_profile_id=voice_profile_id,
+                        binding_role="default",
+                        priority=100,
+                        is_default=True,
+                        style_overrides_json={"emotion": "neutral"},
+                    )
+                )
+        session.add(
+            ConversationTurnPresentation(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=operator_turn_id,
+                speaker_agent_id=alice_id,
+                emotion_key="neutral",
+                emotion_intensity=1.0,
+                sprite_set_id=sprite_set_id,
+                sprite_variant_id=sprite_variant_id,
+                voice_profile_id=voice_profile_id if include_voice else None,
+                background_asset_id=background_asset_id,
+                presentation_json={"source": "demo_world_assembly"},
+                render_state="speech_rendered" if include_voice else "visual_rendered",
+            )
+        )
+        if include_required_providers:
+            for kind, provider_id in provider_ids.items():
+                session.add(
+                    ProviderIntegration(
+                        id=provider_id,
+                        world_id=world_id,
+                        scope_kind="world",
+                        scope_key=str(world_id),
+                        provider_kind=kind,
+                        adapter_kind="fake",
+                        provider_key=f"self-use-{kind}",
+                        display_name=f"Self-use {kind}",
+                        base_url=None,
+                        auth_ref="env:SAFE_PROVIDER_KEY",
+                        config_json={"available_models": ["safe-model"]},
+                        default_params_json={"model": "safe-model"},
+                        status="active",
+                        visibility="world_admin",
+                    )
+                )
+                session.add(
+                    ProviderHealthCheck(
+                        id=uuid.uuid4(),
+                        provider_integration_id=provider_id,
+                        status="healthy",
+                        latency_ms=10,
+                        checked_at=now,
+                        metadata_json={"smoke_test": True},
+                    )
+                )
+        if include_visual_plan:
+            session.add(
+                CharacterVisualGenerationProfile(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    agent_id=alice_id,
+                    preferred_checkpoint_id=None,
+                    allowed_lora_ids_json=[],
+                    default_lora_ids_json=[],
+                    banned_lora_ids_json=[],
+                    prompt_fragments_json={"subject": ["Alice"]},
+                    negative_prompt_fragments_json={},
+                    reference_asset_ids_json=[str(sprite_asset_id)],
+                    default_workflow_template_id=None,
+                    expression_workflow_template_id=None,
+                    cg_workflow_template_id=None,
+                    outfit_policy_json={},
+                    pose_policy_json={},
+                    review_status="approved",
+                    visibility="world_admin",
+                )
+            )
+            session.add(
+                CharacterVisualGenerationProfile(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    agent_id=bob_id,
+                    preferred_checkpoint_id=None,
+                    allowed_lora_ids_json=[],
+                    default_lora_ids_json=[],
+                    banned_lora_ids_json=[],
+                    prompt_fragments_json={"subject": ["Bob"]},
+                    negative_prompt_fragments_json={},
+                    reference_asset_ids_json=[],
+                    default_workflow_template_id=None,
+                    expression_workflow_template_id=None,
+                    cg_workflow_template_id=None,
+                    outfit_policy_json={},
+                    pose_policy_json={},
+                    review_status="approved",
+                    visibility="world_admin",
+                )
+            )
+            session.add(
+                VisualGenerationPlan(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    intent="expression_variant",
+                    provider_id=provider_ids["image_generation"],
+                    workflow_template_id=None,
+                    workflow_template_version_id=None,
+                    status="validated",
+                    character_ids_json=[str(alice_id)],
+                    prompt_plan_json={"subject": "Alice"},
+                    model_plan_json={},
+                    output_plan_json={"asset_kind": "character_expression"},
+                    validation_results_json={"valid": True},
+                    source_context_json={"safe": True},
+                )
+            )
+        session.add(
+            MediaJob(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                turn_id=operator_turn_id,
+                agent_id=alice_id,
+                job_kind="composition",
+                provider_kind="fake",
+                status="succeeded",
+                priority=100,
+                provider_config_json={},
+                request_json={"safe": True},
+                result_json={"safe": True},
+                created_by_actor_ref="system:test",
+                finished_at=now,
+            )
+        )
+        if include_invocation:
+            invocation_id = uuid.uuid4()
+            session.add(
+                ModelInvocation(
+                    id=invocation_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    trace_id=uuid.uuid4(),
+                    invocation_kind="conversation_turn",
+                    actor_kind="agent",
+                    actor_ref="agent:alice",
+                    agent_id=alice_id,
+                    conversation_id=conversation_id,
+                    turn_id=agent_turn_id if include_agent_turn else operator_turn_id,
+                    provider_kind="local_stub",
+                    model_name="safe-model",
+                    input_json={"redacted": True},
+                    output_json={"redacted": True},
+                    usage_json={},
+                    latency_ms=20,
+                    estimated_cost=0,
+                    status="succeeded",
+                    visibility="world_admin",
+                    redaction_status="redacted",
+                    retention_policy="local_debug",
+                    contains_sensitive_context=False,
+                )
+            )
+        if include_traceability:
+            batch_id = uuid.uuid4()
+            source_asset_id = uuid.uuid4()
+            fragment_id = uuid.uuid4()
+            run_id = uuid.uuid4()
+            assembly_proposal_id = uuid.uuid4()
+            session.add(
+                AuthoringSourceBatch(
+                    id=batch_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    batch_key="self-use-demo",
+                    display_name="Self-use Demo Source",
+                    source_kind="script",
+                    status="active",
+                    visibility="private",
+                    metadata_json={},
+                    created_by_actor_ref="system:test",
+                )
+            )
+            session.add(
+                AuthoringSourceAsset(
+                    id=source_asset_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    batch_id=batch_id,
+                    media_asset_id=None,
+                    source_asset_kind="script",
+                    source_label="opening.ks",
+                    status="active",
+                    metadata_json={},
+                )
+            )
+            session.add(
+                AuthoringSourceFragment(
+                    id=fragment_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    source_asset_id=source_asset_id,
+                    fragment_key="opening",
+                    fragment_kind="dialogue",
+                    sequence=1,
+                    excerpt_text="Alice: ready",
+                    locator_json={"line": 1},
+                    metadata_json={},
+                )
+            )
+            session.add(
+                AuthoringImportRun(
+                    id=run_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    source_batch_id=batch_id,
+                    run_kind="manual",
+                    status="applied",
+                    summary_json={"assembly_ready": True},
+                    created_by_actor_ref="system:test",
+                )
+            )
+            session.add(
+                AuthoringImportProposal(
+                    id=assembly_proposal_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    run_id=run_id,
+                    source_fragment_id=fragment_id,
+                    proposal_kind="other",
+                    target_ref_kind="demo_world_assembly",
+                    title="Self-use MVP Demo Assembly",
+                    summary="Safe demo assembly evidence.",
+                    proposed_payload_json={"review_apply_required": True},
+                    evidence_json={"source_fragment_ids": [str(fragment_id)]},
+                    confidence=0.9,
+                    priority=100,
+                    status="applied",
+                    applied_ref_json={
+                        "applied_ref_kind": "conversation_session",
+                        "applied_ref_id": str(conversation_id),
+                    },
+                )
+            )
+        session.commit()
+    return conversation_id
+
+
+def _seed_leaky_world_event(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        session.add(
+            WorldEventModel(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                sequence=1,
+                event_name="self_use.leak_check",
+                importance="system",
+                payload={
+                    "storage_uri": "media://private-object/hidden",
+                    "authorization": "Bearer sk-live-secret",
+                },
+                wall_time=datetime.now(UTC),
+                actor_ref="system:test",
+            )
         )
         session.commit()
 

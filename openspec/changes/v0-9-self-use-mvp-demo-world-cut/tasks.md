@@ -107,11 +107,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 11. Phase 10 — 30-Minute Self-use MVP Gate
 
-- [ ] 11.1 Write docs-only phase planning checkpoint.
-- [ ] 11.2 Implement self-use MVP gate evidence aggregation or checklist.
-- [ ] 11.3 Validate 30-minute play evidence, resume behavior, visual generation readiness, provider failure messaging, and admin inspection links.
-- [ ] 11.4 Add gate pass/fail, persistence, memory, visual generation, provider/media diagnostics, ACL, and no-leak tests.
-- [ ] 11.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 11.1 Write docs-only phase planning checkpoint.
+- [x] 11.2 Implement self-use MVP gate evidence aggregation or checklist.
+- [x] 11.3 Validate 30-minute play evidence, resume behavior, visual generation readiness, provider failure messaging, and admin inspection links.
+- [x] 11.4 Add gate pass/fail, persistence, memory, visual generation, provider/media diagnostics, ACL, and no-leak tests.
+- [x] 11.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 11.6 Fast-forward merge to local main and update harness docs.
 
 ## 12. Closeout

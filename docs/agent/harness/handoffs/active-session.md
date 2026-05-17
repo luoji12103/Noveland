@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T10:25:38Z
-- Branch: main
+- Date: 2026-05-17T11:12:14Z
+- Branch: feat/v0.9-self-use-mvp-gate
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 9 Demo World Assembly is complete and fast-forward merged to local `main`. Start Phase 10 30-Minute Self-use MVP Gate from clean local `main`.
+- Status: v0.9 Phase 10 30-Minute Self-use MVP Gate is implemented on the phase branch with full backend/OpenSpec gate passing; commit and fast-forward merge are pending.
 
 ## Current Context
 
@@ -42,6 +42,8 @@
 - v0.9 Phase 8 implementation extends authoring apply for reviewed `voice_asset_match` proposals. It creates or reuses `VoiceProfile` records, creates `AgentVoiceProfileBinding` records through `VoiceProfileService`, preserves optional provider/provider voice IDs without secret resolution, carries style/emotion hints into binding overrides, and marks approved audio media as voice-reference candidates. It adds no Web UI, migration, provider calls during authoring apply, broad routes, or world events.
 - v0.9 Phase 9 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`.
 - v0.9 Phase 9 implementation adds a backend/API-first demo world assembly path under authoring. `POST /worlds/{world_id}/authoring/import-runs/{run_id}/assemble-demo-world` creates a reviewable `demo_world_assembly` proposal from reviewed dialogue plus applied persona, memory, visual, voice, and visual generation profile evidence. Existing authoring review/apply then creates a manual-chain conversation session, participants, seed turn, and initial turn presentation references. It adds no Web UI, migration, provider calls, broad `worlds.py` routes, direct canon/global launch mutation, or world events.
+- v0.9 Phase 10 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`.
+- v0.9 Phase 10 implementation extends the existing observability readiness boundary with platform-admin-only `GET /observability/readiness/self-use-mvp`. The report is read-only and aggregates safe self-use evidence for demo entry, conversation continuity, persona/memory, visual playback and visual generation readiness, voice playback, provider/model lab setup, media jobs, invocation ledger, source traceability, recent world-event leak markers, and manual 30-minute play/resume/failure-note checklist items. It adds no Web UI, migration, provider calls, broad `worlds.py` routes, duplicate readiness framework, or world events.
 - v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
@@ -127,7 +129,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Start Phase 9 Demo World Assembly from clean local `main`.
+- Commit the Phase 10 branch, fast-forward merge to local `main`, and update merge bookkeeping.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
@@ -184,6 +186,8 @@
 - v0.9 Phase 9 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_conversation_presentation_service.py tests/test_api_conversation_presentations.py -q` (`33 passed`).
 - v0.9 Phase 9 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`493 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.9 Phase 9 commit `2833233` fast-forward merged to local `main`; no push performed.
+- v0.9 Phase 10 targeted checks passed so far: ruff for observability service/API/test files, mypy for observability service/API/test files, and `cd backend && uv run pytest tests/test_production_readiness_gate.py -q` (`13 passed`).
+- v0.9 Phase 10 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`497 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

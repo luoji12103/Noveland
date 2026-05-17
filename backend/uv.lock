@@ -1005,10 +1005,16 @@ name = "noveland-observability"
 version = "0.1.0"
 source = { editable = "packages/observability" }
 dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-authoring" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-invocations" },
     { name = "noveland-media" },
     { name = "noveland-providers" },
+    { name = "noveland-speech" },
+    { name = "noveland-visual" },
+    { name = "noveland-visual-generation" },
     { name = "noveland-worlds" },
     { name = "pydantic" },
     { name = "sqlalchemy" },
@@ -1016,10 +1022,16 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-authoring", editable = "packages/authoring" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-invocations", editable = "packages/invocations" },
     { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-speech", editable = "packages/speech" },
+    { name = "noveland-visual", editable = "packages/visual" },
+    { name = "noveland-visual-generation", editable = "packages/visual_generation" },
     { name = "noveland-worlds", editable = "packages/worlds" },
     { name = "pydantic", specifier = ">=2.13,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },

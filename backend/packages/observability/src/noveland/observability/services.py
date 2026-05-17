@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import builtins
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from noveland.agents.models import AgentPersona
+from noveland.authoring.models import AuthoringImportProposal, AuthoringSourceFragment
+from noveland.conversations.models import (
+    ConversationParticipant,
+    ConversationSession,
+    ConversationTurn,
+    ConversationTurnPresentation,
+)
 from noveland.core.database import Base
+from noveland.events.models import WorldEventModel
 from noveland.invocations.models import ModelInvocation
 from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
+from noveland.memory.models import AgentMemoryItem, MemoryWriteJob
 from noveland.observability.contracts import (
     DiagnosticComponent,
     DiagnosticRetentionDryRun,
@@ -23,15 +34,24 @@ from noveland.observability.contracts import (
     PublicLaunchReadinessReport,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
+    SelfUseMvpGateReport,
+    SelfUseMvpManualChecklistItem,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.providers.models import ProviderBudgetPolicy, ProviderHealthCheck, ProviderIntegration
+from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
+from noveland.visual.models import CharacterSpriteVariant, SceneBackgroundProfile
+from noveland.visual_generation.models import (
+    CharacterVisualGenerationProfile,
+    VisualGenerationPlan,
+)
 from noveland.worlds.models import (
     BetaChecklistItem,
     BetaChecklistRun,
     LivingWorldReleaseProfile,
     LongRunEvalRun,
 )
+from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import Select, distinct, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -45,6 +65,19 @@ SENSITIVE_KEY_FRAGMENTS = (
     "secret",
     "session",
     "token",
+)
+SELF_USE_FORBIDDEN_EVENT_MARKERS = (
+    "storage_uri",
+    "preview_uri",
+    "thumbnail_uri",
+    "file://",
+    "local://",
+    "base64",
+    "raw_prompt",
+    "raw_output",
+    "resolved_secret",
+    "authorization",
+    "bearer ",
 )
 
 
@@ -559,6 +592,137 @@ class ProductionReadinessGateService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def self_use_mvp_report(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+        conversation_id: uuid.UUID | None = None,
+        evidence_limit_per_section: int = 5,
+        manual_play_minutes: int = 0,
+        resume_verified: bool = False,
+        failure_notes_recorded: bool = False,
+    ) -> SelfUseMvpGateReport:
+        safe_limit = max(1, min(evidence_limit_per_section, 20))
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        session_record = self._self_use_conversation(
+            world_id,
+            worldline.id,
+            conversation_id,
+        )
+        selected_conversation_id = None if session_record is None else session_record.id
+        participant_agent_ids = self._conversation_participant_agent_ids(selected_conversation_id)
+        sections = [
+            self._self_use_entry_section(
+                world_id,
+                worldline.id,
+                session_record,
+                participant_agent_ids,
+            ),
+            self._self_use_conversation_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                safe_limit,
+            ),
+            self._self_use_persona_memory_section(
+                world_id,
+                worldline.id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_visual_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_voice_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_provider_section(world_id, worldline.id, safe_limit),
+            self._self_use_media_job_section(world_id, worldline.id, safe_limit),
+            self._self_use_invocation_ledger_section(world_id, worldline.id, safe_limit),
+            self._self_use_traceability_section(world_id, worldline.id, safe_limit),
+            self._self_use_no_world_event_leak_section(world_id, worldline.id, safe_limit),
+        ]
+        manual_checklist = _self_use_manual_checklist(
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+        )
+        evidence_count = sum(section.evidence_count for section in sections)
+        blocker_count = sum(section.blocker_count for section in sections)
+        warning_count = sum(section.warning_count for section in sections)
+        status = _readiness_status(sections)
+        manual_blocker_count = sum(
+            1
+            for item in manual_checklist
+            if item.required_for_pass and item.status == IncidentStatus.BLOCKED
+        )
+        if manual_blocker_count:
+            blocker_count += manual_blocker_count
+            status = IncidentStatus.BLOCKED
+        if any(
+            not item.required_for_pass and item.status == IncidentStatus.WATCH
+            for item in manual_checklist
+        ):
+            warning_count += 1
+        if any(
+            item.required_for_pass and item.status == IncidentStatus.BLOCKED
+            for item in manual_checklist
+        ):
+            status = IncidentStatus.BLOCKED
+        return SelfUseMvpGateReport(
+            status=status,
+            generated_at=datetime.now(UTC),
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=selected_conversation_id,
+            section_count=len(sections),
+            evidence_count=evidence_count,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            sections=sections,
+            manual_checklist=manual_checklist,
+            suppressed_fields=[
+                "credential_values",
+                "credential_headers",
+                "resolved_secrets",
+                "prompt_snapshot_bodies",
+                "prompt_bodies",
+                "provider_result_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "object_locator_values",
+                "filesystem_paths",
+                "binary_payloads",
+                "inline_binary_payloads",
+                "world_event_payload_snapshots",
+                "raw_source_fragments",
+                "local_model_paths",
+                "raw_workflow_json",
+            ],
+            non_goals=[
+                "private_beta_readiness",
+                "public_launch_readiness",
+                "production_readiness_replacement",
+                "automated_provider_spend",
+                "automated_content_quality_acceptance",
+            ],
+            archive_recommendation=(
+                "Archive v0.9 only after status is ok and the manual 30-minute play "
+                "session evidence has been reviewed."
+                if status == IncidentStatus.OK
+                else "Fix self-use MVP blockers before archiving v0.9."
+            ),
+        )
+
     def report(
         self,
         *,
@@ -696,6 +860,849 @@ class ProductionReadinessGateService:
                 "provider_marketplace",
                 "runtime_daemon_execution",
             ],
+        )
+
+    def _self_use_conversation(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+    ) -> ConversationSession | None:
+        statement = select(ConversationSession).where(
+            ConversationSession.world_id == world_id,
+            ConversationSession.worldline_id == worldline_id,
+        )
+        if conversation_id is not None:
+            statement = statement.where(ConversationSession.id == conversation_id)
+        else:
+            statement = statement.order_by(ConversationSession.updated_at.desc()).limit(1)
+        return self._session.scalars(statement).one_or_none()
+
+    def _conversation_participant_agent_ids(
+        self,
+        conversation_id: uuid.UUID | None,
+    ) -> list[uuid.UUID]:
+        if conversation_id is None:
+            return []
+        rows = self._session.scalars(
+            select(ConversationParticipant)
+            .where(
+                ConversationParticipant.session_id == conversation_id,
+                ConversationParticipant.is_enabled.is_(True),
+            )
+            .order_by(ConversationParticipant.turn_order),
+        ).all()
+        return [row.agent_id for row in rows]
+
+    def _self_use_entry_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        session_record: ConversationSession | None,
+        participant_agent_ids: list[uuid.UUID],
+    ) -> ProductionReadinessSection:
+        blockers: list[str] = []
+        if session_record is None:
+            blockers.append("No assembled demo conversation session exists.")
+        if len(participant_agent_ids) < 2:
+            blockers.append("Demo conversation needs at least two enabled participants.")
+        if len(participant_agent_ids) > 3:
+            blockers.append("Self-use MVP demo should stay within 2-3 participants.")
+        refs: list[IncidentEvidenceRef] = []
+        if session_record is not None:
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="conversation_session",
+                    id=str(session_record.id),
+                    component="self_use_entry",
+                    status=session_record.status,
+                    reason_code="demo_entry_session",
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    occurred_at=session_record.updated_at,
+                )
+            )
+        refs.extend(
+            IncidentEvidenceRef(
+                kind="agent",
+                id=str(agent_id),
+                component="self_use_entry",
+                status="enabled",
+                reason_code="demo_participant",
+                world_id=world_id,
+                worldline_id=worldline_id,
+            )
+            for agent_id in participant_agent_ids[:3]
+        )
+        return _readiness_section(
+            "demo_entry",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                "Demo entry has "
+                f"{0 if session_record is None else 1} session and "
+                f"{len(participant_agent_ids)} enabled participants."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Apply a reviewed demo_world_assembly proposal before running the gate."],
+        )
+
+    def _self_use_conversation_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        if conversation_id is None:
+            return _readiness_section(
+                "conversation_continuity",
+                status=IncidentStatus.BLOCKED,
+                summary="No conversation was selected for continuity evidence.",
+                blockers=["Demo conversation evidence is missing."],
+                recommendations=["Assemble and enter the demo conversation."],
+            )
+        conditions = [ConversationTurn.session_id == conversation_id]
+        turn_count = self._count(ConversationTurn, *conditions)
+        failed_count = self._count(
+            ConversationTurn,
+            *conditions,
+            ConversationTurn.status == "failed",
+        )
+        agent_turn_count = self._count(
+            ConversationTurn,
+            *conditions,
+            ConversationTurn.speaker_kind == "agent",
+        )
+        turns = self._session.scalars(
+            select(ConversationTurn)
+            .where(*conditions)
+            .order_by(ConversationTurn.turn_index.desc())
+            .limit(limit),
+        ).all()
+        blockers: list[str] = []
+        if turn_count == 0:
+            blockers.append("Conversation has no turns.")
+        if failed_count:
+            blockers.append("Conversation contains failed turns.")
+        warning_count = 0 if agent_turn_count else 1
+        recommendations = []
+        if not agent_turn_count:
+            recommendations.append("Continue the demo until at least one agent turn exists.")
+        if blockers:
+            recommendations.append("Resolve failed or missing conversation turns.")
+        return _readiness_section(
+            "conversation_continuity",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{turn_count} turns, {agent_turn_count} agent turns, "
+                f"{failed_count} failed turns."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="conversation_turn",
+                    id=str(turn.id),
+                    component="conversation_continuity",
+                    status=turn.status,
+                    reason_code=f"turn_{turn.speaker_kind}",
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    occurred_at=turn.updated_at,
+                )
+                for turn in turns
+            ],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=recommendations,
+        )
+
+    def _self_use_persona_memory_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        participant_agent_ids: list[uuid.UUID],
+        limit: int,
+    ) -> ProductionReadinessSection:
+        if not participant_agent_ids:
+            return _readiness_section(
+                "persona_memory",
+                status=IncidentStatus.BLOCKED,
+                summary="No participant agents are available for persona/memory checks.",
+                blockers=["Participant agents are missing."],
+                recommendations=["Assemble a demo conversation with 2-3 agents."],
+            )
+        persona_count = self._count(
+            AgentPersona,
+            AgentPersona.world_id == world_id,
+            AgentPersona.agent_id.in_(participant_agent_ids),
+            AgentPersona.is_enabled.is_(True),
+            AgentPersona.persona_text != "",
+        )
+        memory_count = self._count(
+            AgentMemoryItem,
+            AgentMemoryItem.world_id == world_id,
+            AgentMemoryItem.worldline_id == worldline_id,
+            AgentMemoryItem.agent_id.in_(participant_agent_ids),
+            AgentMemoryItem.is_active.is_(True),
+        )
+        missing_persona = max(0, len(participant_agent_ids) - persona_count)
+        blockers: list[str] = []
+        if missing_persona:
+            blockers.append("One or more demo agents lack applied persona cards.")
+        if memory_count < len(participant_agent_ids):
+            blockers.append("One or more demo agents lack initial active memory.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="agent_persona",
+                id=str(persona.id),
+                component="persona_memory",
+                status="enabled" if persona.is_enabled else "disabled",
+                reason_code="applied_persona",
+                world_id=world_id,
+                worldline_id=worldline_id,
+                occurred_at=persona.updated_at,
+            )
+            for persona in self._session.scalars(
+                select(AgentPersona)
+                .where(
+                    AgentPersona.world_id == world_id,
+                    AgentPersona.agent_id.in_(participant_agent_ids),
+                )
+                .order_by(AgentPersona.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        refs.extend(
+            IncidentEvidenceRef(
+                kind="agent_memory_item",
+                id=str(memory.id),
+                component="persona_memory",
+                status="active" if memory.is_active else "inactive",
+                reason_code="initial_memory",
+                world_id=world_id,
+                worldline_id=memory.worldline_id,
+                occurred_at=memory.updated_at,
+            )
+            for memory in self._session.scalars(
+                select(AgentMemoryItem)
+                .where(
+                    AgentMemoryItem.world_id == world_id,
+                    AgentMemoryItem.worldline_id == worldline_id,
+                    AgentMemoryItem.agent_id.in_(participant_agent_ids),
+                )
+                .order_by(AgentMemoryItem.updated_at.desc())
+                .limit(limit),
+            ).all()
+        )
+        memory_job_failures = self._count(
+            MemoryWriteJob,
+            MemoryWriteJob.world_id == world_id,
+            MemoryWriteJob.worldline_id == worldline_id,
+            MemoryWriteJob.status == "failed",
+        )
+        warning_count = 1 if memory_job_failures else 0
+        recommendations = []
+        if blockers:
+            recommendations.append("Apply persona and memory proposals for each demo agent.")
+        if memory_job_failures:
+            recommendations.append("Inspect failed memory write jobs before archive.")
+        return _readiness_section(
+            "persona_memory",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{persona_count}/{len(participant_agent_ids)} personas and "
+                f"{memory_count} active worldline memories."
+            ),
+            evidence_refs=refs[:limit],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=recommendations,
+        )
+
+    def _self_use_visual_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        participant_agent_ids: list[uuid.UUID],
+        limit: int,
+    ) -> ProductionReadinessSection:
+        sprite_count = self._count(
+            CharacterSpriteVariant,
+            CharacterSpriteVariant.world_id == world_id,
+            CharacterSpriteVariant.worldline_id == worldline_id,
+            CharacterSpriteVariant.status == "active",
+        )
+        background_count = self._count(
+            SceneBackgroundProfile,
+            SceneBackgroundProfile.world_id == world_id,
+            SceneBackgroundProfile.worldline_id == worldline_id,
+            SceneBackgroundProfile.status == "active",
+        )
+        profile_count = self._count(
+            CharacterVisualGenerationProfile,
+            CharacterVisualGenerationProfile.world_id == world_id,
+            CharacterVisualGenerationProfile.worldline_id == worldline_id,
+            CharacterVisualGenerationProfile.agent_id.in_(participant_agent_ids or [uuid.uuid4()]),
+            CharacterVisualGenerationProfile.review_status.in_(("approved", "applied")),
+        )
+        presentation_count = 0
+        if conversation_id is not None:
+            presentation_count = self._count(
+                ConversationTurnPresentation,
+                ConversationTurnPresentation.world_id == world_id,
+                ConversationTurnPresentation.worldline_id == worldline_id,
+                ConversationTurnPresentation.conversation_id == conversation_id,
+                or_(
+                    ConversationTurnPresentation.sprite_variant_id.is_not(None),
+                    ConversationTurnPresentation.background_asset_id.is_not(None),
+                    ConversationTurnPresentation.composite_scene_asset_id.is_not(None),
+                ),
+            )
+        plan_count = self._count(
+            VisualGenerationPlan,
+            VisualGenerationPlan.world_id == world_id,
+            VisualGenerationPlan.worldline_id == worldline_id,
+            VisualGenerationPlan.status.in_(
+                ("validated", "dry_run_succeeded", "queued", "executed")
+            ),
+        )
+        blockers: list[str] = []
+        if sprite_count < max(1, len(participant_agent_ids)):
+            blockers.append("Not every demo agent has an active sprite variant.")
+        if background_count == 0:
+            blockers.append("No active scene background profile exists.")
+        if profile_count < max(1, len(participant_agent_ids)):
+            blockers.append("Not every demo agent has approved visual generation profile evidence.")
+        if presentation_count == 0:
+            blockers.append("No conversation presentation references visual scene evidence.")
+        warning_count = 0 if plan_count else 1
+        refs = self._visual_refs(world_id, worldline_id, conversation_id, limit)
+        return _readiness_section(
+            "visual_playback_generation",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{sprite_count} sprite variants, {background_count} backgrounds, "
+                f"{profile_count} visual profiles, {presentation_count} presentations, "
+                f"{plan_count} ready visual generation plans."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Complete visual mappings and at least one validated/dry-run image plan."],
+        )
+
+    def _visual_refs(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        limit: int,
+    ) -> list[IncidentEvidenceRef]:
+        refs: list[IncidentEvidenceRef] = []
+        for variant in self._session.scalars(
+            select(CharacterSpriteVariant)
+            .where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.worldline_id == worldline_id,
+            )
+            .order_by(CharacterSpriteVariant.updated_at.desc())
+            .limit(limit),
+        ).all():
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="character_sprite_variant",
+                    id=str(variant.id),
+                    component="visual_playback_generation",
+                    status=variant.status,
+                    reason_code="sprite_variant",
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    occurred_at=variant.updated_at,
+                )
+            )
+            if len(refs) >= limit:
+                return refs
+        for background in self._session.scalars(
+            select(SceneBackgroundProfile)
+            .where(
+                SceneBackgroundProfile.world_id == world_id,
+                SceneBackgroundProfile.worldline_id == worldline_id,
+            )
+            .order_by(SceneBackgroundProfile.updated_at.desc())
+            .limit(limit),
+        ).all():
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="scene_background_profile",
+                    id=str(background.id),
+                    component="visual_playback_generation",
+                    status=background.status,
+                    reason_code="background_profile",
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    occurred_at=background.updated_at,
+                )
+            )
+            if len(refs) >= limit:
+                return refs
+        if conversation_id is not None:
+            for presentation in self._session.scalars(
+                select(ConversationTurnPresentation)
+                .where(
+                    ConversationTurnPresentation.world_id == world_id,
+                    ConversationTurnPresentation.worldline_id == worldline_id,
+                    ConversationTurnPresentation.conversation_id == conversation_id,
+                )
+                .order_by(ConversationTurnPresentation.updated_at.desc())
+                .limit(limit),
+            ).all():
+                refs.append(
+                    IncidentEvidenceRef(
+                        kind="conversation_turn_presentation",
+                        id=str(presentation.id),
+                        component="visual_playback_generation",
+                        status=presentation.render_state,
+                        reason_code="presentation_visual_ref",
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        occurred_at=presentation.updated_at,
+                    )
+                )
+                if len(refs) >= limit:
+                    return refs
+        return refs[:limit]
+
+    def _self_use_voice_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        participant_agent_ids: list[uuid.UUID],
+        limit: int,
+    ) -> ProductionReadinessSection:
+        binding_count = self._count(
+            AgentVoiceProfileBinding,
+            AgentVoiceProfileBinding.world_id == world_id,
+            AgentVoiceProfileBinding.worldline_id == worldline_id,
+            AgentVoiceProfileBinding.agent_id.in_(participant_agent_ids or [uuid.uuid4()]),
+        )
+        voice_count = self._count(
+            VoiceProfile,
+            VoiceProfile.world_id == world_id,
+            VoiceProfile.worldline_id == worldline_id,
+            VoiceProfile.status == "active",
+        )
+        presentation_count = 0
+        if conversation_id is not None:
+            presentation_count = self._count(
+                ConversationTurnPresentation,
+                ConversationTurnPresentation.world_id == world_id,
+                ConversationTurnPresentation.worldline_id == worldline_id,
+                ConversationTurnPresentation.conversation_id == conversation_id,
+                or_(
+                    ConversationTurnPresentation.voice_profile_id.is_not(None),
+                    ConversationTurnPresentation.tts_media_asset_id.is_not(None),
+                ),
+            )
+        blockers: list[str] = []
+        if binding_count < max(1, len(participant_agent_ids)):
+            blockers.append("Not every demo agent has a voice profile binding.")
+        if voice_count == 0:
+            blockers.append("No active voice profile exists for the demo worldline.")
+        if presentation_count == 0:
+            blockers.append("No conversation presentation references voice or TTS evidence.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="agent_voice_profile_binding",
+                id=str(binding.id),
+                component="voice_playback",
+                status="default" if binding.is_default else "bound",
+                reason_code="voice_binding",
+                world_id=world_id,
+                worldline_id=worldline_id,
+                occurred_at=binding.updated_at,
+            )
+            for binding in self._session.scalars(
+                select(AgentVoiceProfileBinding)
+                .where(
+                    AgentVoiceProfileBinding.world_id == world_id,
+                    AgentVoiceProfileBinding.worldline_id == worldline_id,
+                )
+                .order_by(AgentVoiceProfileBinding.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        return _readiness_section(
+            "voice_playback",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{binding_count} bindings, {voice_count} active profiles, "
+                f"{presentation_count} voice presentations."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            recommendations=[] if not blockers else ["Apply voice mappings for each demo agent."],
+        )
+
+    def _self_use_provider_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        del worldline_id
+        active_count = self._count(
+            ProviderIntegration,
+            ProviderIntegration.world_id == world_id,
+            ProviderIntegration.status == "active",
+        )
+        required_kinds = {
+            "text_generation": "text provider",
+            "image_generation": "image provider",
+            "text_to_speech": "TTS provider",
+            "speech_to_text": "ASR provider",
+        }
+        blockers = [
+            f"Missing active {label}."
+            for provider_kind, label in required_kinds.items()
+            if self._count(
+                ProviderIntegration,
+                ProviderIntegration.world_id == world_id,
+                ProviderIntegration.status == "active",
+                ProviderIntegration.provider_kind == provider_kind,
+            )
+            == 0
+        ]
+        unhealthy_count = int(
+            self._session.scalar(
+                select(func.count(ProviderHealthCheck.id))
+                .join(
+                    ProviderIntegration,
+                    ProviderIntegration.id == ProviderHealthCheck.provider_integration_id,
+                )
+                .where(
+                    ProviderIntegration.world_id == world_id,
+                    ProviderHealthCheck.status == "unhealthy",
+                )
+            )
+            or 0
+        )
+        if unhealthy_count:
+            blockers.append("Unhealthy provider smoke/health checks are present.")
+        degraded_count = int(
+            self._session.scalar(
+                select(func.count(ProviderHealthCheck.id))
+                .join(
+                    ProviderIntegration,
+                    ProviderIntegration.id == ProviderHealthCheck.provider_integration_id,
+                )
+                .where(
+                    ProviderIntegration.world_id == world_id,
+                    ProviderHealthCheck.status == "degraded",
+                )
+            )
+            or 0
+        )
+        warning_count = degraded_count
+        provider_refs = [
+            IncidentEvidenceRef(
+                kind="provider_integration",
+                id=str(provider.id),
+                component="provider_model_lab",
+                status=provider.status,
+                reason_code=f"{provider.provider_kind}_{provider.adapter_kind}",
+                world_id=provider.world_id,
+                occurred_at=provider.updated_at,
+            )
+            for provider in self._session.scalars(
+                select(ProviderIntegration)
+                .where(
+                    ProviderIntegration.world_id == world_id,
+                    ProviderIntegration.status == "active",
+                )
+                .order_by(ProviderIntegration.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        return _readiness_section(
+            "provider_model_lab",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{active_count} active providers, {unhealthy_count} unhealthy checks, "
+                f"{degraded_count} degraded checks."
+            ),
+            evidence_refs=provider_refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Configure and smoke-check required providers in the model lab."],
+        )
+
+    def _self_use_media_job_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        failed_count = self._count(
+            MediaJob,
+            MediaJob.world_id == world_id,
+            MediaJob.worldline_id == worldline_id,
+            MediaJob.status == "failed",
+        )
+        active_count = self._count(
+            MediaJob,
+            MediaJob.world_id == world_id,
+            MediaJob.worldline_id == worldline_id,
+            MediaJob.status.in_(("queued", "running")),
+        )
+        output_count = self._count(
+            MediaAsset,
+            MediaAsset.world_id == world_id,
+            MediaAsset.worldline_id == worldline_id,
+            MediaAsset.status == "available",
+            MediaAsset.asset_role.in_(
+                (
+                    "scene_background",
+                    "character_sprite",
+                    "character_expression",
+                    "speech_audio",
+                    "voice_sample",
+                    "event_cg",
+                )
+            ),
+        )
+        blockers = ["Failed media jobs are present."] if failed_count else []
+        warning_count = 1 if active_count else 0
+        if output_count == 0:
+            blockers.append("No available demo media assets exist.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="media_job",
+                id=str(job.id),
+                component="media_jobs",
+                status=job.status,
+                reason_code=f"media_job_{job.job_kind}",
+                world_id=world_id,
+                worldline_id=worldline_id,
+                occurred_at=job.updated_at,
+            )
+            for job in self._session.scalars(
+                select(MediaJob)
+                .where(MediaJob.world_id == world_id, MediaJob.worldline_id == worldline_id)
+                .order_by(MediaJob.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        return _readiness_section(
+            "media_jobs",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{output_count} available demo media assets, {active_count} queued/running "
+                f"jobs, {failed_count} failed jobs."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[] if not blockers else ["Repair or retry failed media jobs."],
+        )
+
+    def _self_use_invocation_ledger_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        invocation_count = self._count(
+            ModelInvocation,
+            ModelInvocation.world_id == world_id,
+            ModelInvocation.worldline_id == worldline_id,
+        )
+        failed_count = self._count(
+            ModelInvocation,
+            ModelInvocation.world_id == world_id,
+            ModelInvocation.worldline_id == worldline_id,
+            ModelInvocation.status == "failed",
+        )
+        blockers = ["Failed provider invocations are present."] if failed_count else []
+        warning_count = 0 if invocation_count else 1
+        refs = [
+            IncidentEvidenceRef(
+                kind="model_invocation",
+                id=str(invocation.id),
+                component="invocation_ledger",
+                status=invocation.status,
+                reason_code=f"invocation_{invocation.invocation_kind}",
+                world_id=world_id,
+                worldline_id=worldline_id,
+                occurred_at=invocation.updated_at,
+            )
+            for invocation in self._session.scalars(
+                select(ModelInvocation)
+                .where(
+                    ModelInvocation.world_id == world_id,
+                    ModelInvocation.worldline_id == worldline_id,
+                )
+                .order_by(ModelInvocation.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        return _readiness_section(
+            "invocation_ledger",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=f"{invocation_count} invocation records, {failed_count} failed records.",
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Run provider-backed demo actions or review failed invocations."],
+        )
+
+    def _self_use_traceability_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        fragment_count = self._count(
+            AuthoringSourceFragment,
+            AuthoringSourceFragment.world_id == world_id,
+            AuthoringSourceFragment.worldline_id == worldline_id,
+        )
+        applied_count = self._count(
+            AuthoringImportProposal,
+            AuthoringImportProposal.world_id == world_id,
+            AuthoringImportProposal.worldline_id == worldline_id,
+            AuthoringImportProposal.status == "applied",
+        )
+        assembly_count = self._count(
+            AuthoringImportProposal,
+            AuthoringImportProposal.world_id == world_id,
+            AuthoringImportProposal.worldline_id == worldline_id,
+            AuthoringImportProposal.status == "applied",
+            AuthoringImportProposal.target_ref_kind == "demo_world_assembly",
+        )
+        blockers: list[str] = []
+        if fragment_count == 0:
+            blockers.append("No source fragments exist for traceability evidence.")
+        if applied_count == 0:
+            blockers.append("No applied authoring proposals exist for traceability evidence.")
+        if assembly_count == 0:
+            blockers.append("No applied demo_world_assembly proposal exists.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="authoring_import_proposal",
+                id=str(proposal.id),
+                component="source_traceability",
+                status=proposal.status,
+                reason_code=str(proposal.target_ref_kind or proposal.proposal_kind),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                occurred_at=proposal.updated_at,
+            )
+            for proposal in self._session.scalars(
+                select(AuthoringImportProposal)
+                .where(
+                    AuthoringImportProposal.world_id == world_id,
+                    AuthoringImportProposal.worldline_id == worldline_id,
+                    AuthoringImportProposal.status == "applied",
+                )
+                .order_by(AuthoringImportProposal.updated_at.desc())
+                .limit(limit),
+            ).all()
+        ]
+        return _readiness_section(
+            "source_traceability",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{fragment_count} source fragments, {applied_count} applied proposals, "
+                f"{assembly_count} applied demo assemblies."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Preserve source fragments and apply reviewed demo assembly evidence."],
+        )
+
+    def _self_use_no_world_event_leak_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        events = self._session.scalars(
+            select(WorldEventModel)
+            .where(
+                WorldEventModel.world_id == world_id,
+                or_(
+                    WorldEventModel.worldline_id == worldline_id,
+                    WorldEventModel.worldline_id.is_(None),
+                ),
+            )
+            .order_by(WorldEventModel.sequence.desc())
+            .limit(limit),
+        ).all()
+        leaky_event_ids: list[str] = []
+        for event in events:
+            payload_text = json.dumps(event.payload, default=str).lower()
+            if any(marker in payload_text for marker in SELF_USE_FORBIDDEN_EVENT_MARKERS):
+                leaky_event_ids.append(str(event.id))
+        blockers = (
+            ["World event payloads contain forbidden storage/path/prompt/secret markers."]
+            if leaky_event_ids
+            else []
+        )
+        return _readiness_section(
+            "world_event_leak_check",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=f"Checked {len(events)} recent world events for forbidden payload markers.",
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="world_event",
+                    id=str(event.id),
+                    component="world_event_leak_check",
+                    status="safe" if str(event.id) not in leaky_event_ids else "blocked",
+                    reason_code=event.event_name,
+                    world_id=world_id,
+                    worldline_id=event.worldline_id,
+                    occurred_at=event.wall_time,
+                )
+                for event in events
+            ],
+            blockers=blockers,
+            recommendations=[] if not blockers else ["Remove unsafe world event payload content."],
         )
 
     def _internal_production_readiness_section(
@@ -1815,6 +2822,62 @@ def _readiness_status(sections: list[ProductionReadinessSection]) -> IncidentSta
     if any(section.status == IncidentStatus.WATCH for section in sections):
         return IncidentStatus.WATCH
     return IncidentStatus.OK
+
+
+def _self_use_manual_checklist(
+    *,
+    manual_play_minutes: int,
+    resume_verified: bool,
+    failure_notes_recorded: bool,
+) -> list[SelfUseMvpManualChecklistItem]:
+    play_status = (
+        IncidentStatus.OK if manual_play_minutes >= 30 else IncidentStatus.BLOCKED
+    )
+    return [
+        SelfUseMvpManualChecklistItem(
+            item_key="manual_30_minute_play_session",
+            title="30-minute self-use play session",
+            status=play_status,
+            evidence_hint=(
+                f"Manual play evidence records {manual_play_minutes} minutes; "
+                "at least 30 minutes are required."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="resume_behavior_verified",
+            title="Resume behavior checked",
+            status=IncidentStatus.OK if resume_verified else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Operator confirmed the same demo conversation can be resumed after leaving "
+                "and re-entering."
+                if resume_verified
+                else "Operator must leave and resume the demo conversation once."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="failure_notes_recorded",
+            title="Failure notes recorded",
+            status=IncidentStatus.OK if failure_notes_recorded else IncidentStatus.WATCH,
+            evidence_hint=(
+                "Operator recorded self-use failure notes or confirmed none were found."
+                if failure_notes_recorded
+                else "Record provider/media/memory/content failure notes before release notes."
+            ),
+            required_for_pass=False,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="beta_readiness_not_implied",
+            title="Beta readiness not implied",
+            status=IncidentStatus.OK,
+            evidence_hint=(
+                "Self-use MVP gate evidence is not private beta, production, or public launch "
+                "readiness."
+            ),
+            required_for_pass=True,
+        ),
+    ]
 
 
 def _record(model: RuntimeDiagnosticEvent) -> RuntimeDiagnosticRecord:

@@ -13,6 +13,8 @@ from noveland.observability.contracts import (
     PublicLaunchReadinessReport,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
+    SelfUseMvpGateReport,
+    SelfUseMvpManualChecklistItem,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.observability.services import (
@@ -44,5 +46,7 @@ __all__ = [
     "RuntimeDiagnosticEvent",
     "RuntimeDiagnosticRecord",
     "RuntimeDiagnosticsService",
+    "SelfUseMvpGateReport",
+    "SelfUseMvpManualChecklistItem",
     "redact_diagnostic_details",
 ]

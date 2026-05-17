@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v0.9 Phase 10 Self-use MVP Gate planning/implementation entry
+
+- Date: 2026-05-17
+- Branch: feat/v0.9-self-use-mvp-gate
+- Scope: v0.9 Self-use MVP Demo World Cut Phase 10 only.
+- Summary: Added a backend/API-only self-use MVP gate under the existing observability readiness boundary. The platform-admin report aggregates safe evidence for demo entry, conversation continuity, persona/memory, visual playback and visual generation readiness, voice playback, provider/model lab setup, media jobs, invocation ledger, source traceability, recent world-event leak markers, and manual 30-minute play/resume/failure-note checklist items. It is read-only, does not persist a duplicate readiness framework, does not run providers, and does not imply private beta or public launch readiness.
+- Files changed: `backend/packages/observability/**`, `backend/services/api/src/noveland/services/api/observability.py`, `backend/tests/test_production_readiness_gate.py`, OpenSpec tasks, and harness docs.
+- Tests added/updated: Production readiness gate tests now cover self-use MVP pass/block reports, manual checklist blocking, provider/media/memory/visual/voice/invocation/source-traceability diagnostics, platform-admin API ACL, safe no-leak response behavior, and no duplicate framework persistence.
+- Docs updated: Phase 10 checkpoint, task board, project index, file inventory, change journal, OpenSpec tasks.
+- Follow-up notes: Full Phase 10 backend/OpenSpec gate passed; fast-forward merge is still pending. No Web UI, migration, provider calls, broad `worlds.py` routes, or push were added.
+
 ## v0.9 Phase 9 Demo World Assembly planning/implementation entry
 
 - Date: 2026-05-17

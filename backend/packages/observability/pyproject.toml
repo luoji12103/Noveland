@@ -8,20 +8,32 @@ version = "0.1.0"
 description = "Structured logging and observability helpers package for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "noveland-agents",
+  "noveland-authoring",
+  "noveland-conversations",
   "noveland-core",
   "noveland-invocations",
   "noveland-media",
   "noveland-providers",
+  "noveland-speech",
+  "noveland-visual",
+  "noveland-visual-generation",
   "noveland-worlds",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
 
 [tool.uv.sources]
+noveland-agents = { workspace = true }
+noveland-authoring = { workspace = true }
+noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-invocations = { workspace = true }
 noveland-media = { workspace = true }
 noveland-providers = { workspace = true }
+noveland-speech = { workspace = true }
+noveland-visual = { workspace = true }
+noveland-visual-generation = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

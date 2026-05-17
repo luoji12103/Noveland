@@ -175,6 +175,39 @@ class ProductionReadinessSection(_FrozenContract):
     recommendations: list[str] = Field(default_factory=list)
 
 
+class SelfUseMvpManualChecklistItem(_FrozenContract):
+    item_key: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    status: IncidentStatus
+    evidence_hint: str = Field(min_length=1, max_length=500)
+    required_for_pass: bool = True
+
+
+class SelfUseMvpGateReport(_FrozenContract):
+    status: IncidentStatus
+    generated_at: datetime
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID | None = None
+    readiness_kind: str = Field(default="self_use_mvp_gate", min_length=1)
+    section_count: int = Field(ge=0)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    sections: list[ProductionReadinessSection] = Field(default_factory=list)
+    manual_checklist: list[SelfUseMvpManualChecklistItem] = Field(default_factory=list)
+    suppressed_fields: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+    archive_recommendation: str = Field(min_length=1, max_length=500)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
 class ProductionReadinessReport(_FrozenContract):
     status: IncidentStatus
     generated_at: datetime
