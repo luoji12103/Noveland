@@ -103,7 +103,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 10.3 Add demo-world setup UI only after using `impeccable` if Web scope is approved.
 - [x] 10.4 Add assembly, source traceability, visual profile, playback, scene, memory, and no-leak tests.
 - [x] 10.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 10.6 Fast-forward merge to local main and update harness docs.
+- [x] 10.6 Fast-forward merge to local main and update harness docs.
 
 ## 11. Phase 10 — 30-Minute Self-use MVP Gate
 

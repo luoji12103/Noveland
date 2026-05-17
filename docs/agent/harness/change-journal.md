@@ -20,7 +20,7 @@
 - Files changed: `backend/packages/authoring/**`, `backend/services/api/src/noveland/services/api/authoring.py`, authoring service/API tests, OpenSpec tasks, and harness docs.
 - Tests added/updated: Authoring service/API and conversation presentation coverage for reviewable assembly creation, approval-before-apply enforcement, missing evidence blocking, admin ACL/member rejection, source traceability preservation, manual-chain conversation entry, presentation seed refs, and no storage/path/base64/raw prompt/raw output leaks.
 - Docs updated: Phase 9 checkpoint, task board, active handoff, project index, file inventory, change journal, OpenSpec tasks.
-- Follow-up notes: No Web UI and no migration were added; `impeccable` was not needed. Full gate and fast-forward merge are pending before Phase 10 Self-use MVP Gate starts.
+- Follow-up notes: Commit `2833233` fast-forward merged to local `main`; no push performed. No Web UI and no migration were added; `impeccable` was not needed. Phase 10 should add the self-use MVP gate evidence/checklist without replacing v1.0 beta readiness.
 
 ## v0.9 Phase 8 Voice Profile Mapping planning/implementation entry
 

@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-17T10:25:38Z
-- Branch: feat/v0.9-demo-world-assembly
+- Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 9 Demo World Assembly is implemented on `feat/v0.9-demo-world-assembly`; targeted and full backend/OpenSpec gates passed. Commit and fast-forward merge are pending before Phase 10 starts.
+- Status: v0.9 Phase 9 Demo World Assembly is complete and fast-forward merged to local `main`. Start Phase 10 30-Minute Self-use MVP Gate from clean local `main`.
 
 ## Current Context
 
@@ -183,6 +183,7 @@
 - v0.9 Phase 8 commit `568061b` fast-forward merged to local `main`; no push performed.
 - v0.9 Phase 9 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_conversation_presentation_service.py tests/test_api_conversation_presentations.py -q` (`33 passed`).
 - v0.9 Phase 9 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`493 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v0.9 Phase 9 commit `2833233` fast-forward merged to local `main`; no push performed.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.
