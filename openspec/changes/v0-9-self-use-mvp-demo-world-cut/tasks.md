@@ -63,7 +63,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 6.3 Keep provider extraction optional and ledger-backed if included.
 - [x] 6.4 Add parser, proposal, speaker mapping, uncertainty, ACL, and leak tests.
 - [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 6.6 Fast-forward merge to local main and update harness docs.
+- [x] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Character Memory Distillation Agent
 

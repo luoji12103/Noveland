@@ -31,7 +31,7 @@
 - Files changed: `backend/packages/authoring/src/noveland/authoring/parser.py`, authoring contracts/service result counts, authoring service/API tests, OpenSpec tasks, and harness docs.
 - Tests added/updated: Authoring service/API/regression fixture coverage for enriched dialogue proposals, emotion/relationship/manual-label counts, source traceability, ACL through existing authoring API, no world-event writes, and no storage leak markers.
 - Docs updated: Phase 5 checkpoint, task board, active handoff, project index, change journal, OpenSpec tasks.
-- Follow-up notes: Phase 6 can consume reviewed dialogue and manual-label proposals. Phase 5 added no Web UI and no migration; `impeccable` was not needed.
+- Follow-up notes: Commit `b688247` fast-forward merged to local `main`; no push performed. Phase 6 can consume reviewed dialogue and manual-label proposals. Phase 5 added no Web UI and no migration; `impeccable` was not needed.
 
 ## v0.9 Phase 3 Provider Worktree Integration Test Harness planning/implementation entry
 

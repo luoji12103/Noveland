@@ -3,7 +3,7 @@
 - Date: 2026-05-17T07:35:00Z
 - Branch: main
 - Objective: v0.9 Self-use MVP Demo World Cut implementation.
-- Status: v0.9 Phase 5 Script Dialogue Extraction is in progress on `feat/v0.9-script-dialogue-extraction`. Targeted tests and full backend/OpenSpec gate pass; commit and fast-forward merge are pending.
+- Status: v0.9 Phase 5 Script Dialogue Extraction is complete and fast-forward merged to local `main`. Start Phase 6 Character Memory Distillation Agent from clean local `main`.
 
 ## Current Context
 
@@ -119,7 +119,7 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v0.9, v1.0, and v1.1 milestone roadmaps.
-- Commit Phase 5, fast-forward merge to local `main`, then start Phase 6 Character Memory Distillation Agent.
+- Start Phase 6 Character Memory Distillation Agent from clean local `main`.
 - Do not implement v1.0 before v0.9 is complete, archived, and represented in current specs.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
@@ -163,6 +163,7 @@
 - v0.9 Phase 4 commit `9d7e985` fast-forward merged to local `main`; no push performed.
 - v0.9 Phase 5 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_authoring_regression_fixture.py -q` (`25 passed`).
 - v0.9 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`484 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v0.9 Phase 5 commit `b688247` fast-forward merged to local `main`; no push performed.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.
