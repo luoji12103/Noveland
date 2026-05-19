@@ -5,12 +5,14 @@
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 1 Private Beta Onboarding & Access Model full local gate and fast-forward merge
+- None
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 1 Private Beta Onboarding & Access Model fast-forward merge
+- v1.0 Phase 1 Private Beta Onboarding & Access Model full local gate
 - v1.0 Phase 1 Private Beta Onboarding & Access Model implementation
 - v1.0 Phase 1 Private Beta Onboarding & Access Model targeted tests
 - v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint

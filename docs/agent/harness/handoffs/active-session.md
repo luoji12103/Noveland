@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T16:45:00Z
-- Branch: feature/v1.0-1-private-beta-access
-- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model implementation and validation.
-- Status: Phase 1 implementation is complete on a short-lived feature branch. The dedicated `private_beta` package/router, `private_beta_invites` migration, hashed token lifecycle, least-privilege membership bootstrap, player profile setup, and minimal `/private-beta` Web onboarding flow are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` pass; commit and fast-forward merge are pending.
+- Date: 2026-05-17T17:20:00Z
+- Branch: main
+- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model closeout.
+- Status: Phase 1 implementation is committed and fast-forward merged to local `main`. The dedicated `private_beta` package/router, `private_beta_invites` migration, hashed token lifecycle, least-privilege membership bootstrap, player profile setup, and minimal `/private-beta` Web onboarding flow are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` passed. Pause before Phase 2.
 
 ## Current Context
 
@@ -134,8 +134,8 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
-- v1.0 Phase 1 implementation and full gate are complete; commit and fast-forward merge to local `main` before starting Phase 2.
-- Start v1.0 Phase 2 Player Session Stability only after Phase 1 validation and merge pass.
+- v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
+- Start v1.0 Phase 2 Player Session Stability only after explicit continuation; begin with the docs-only player session/resume ownership checkpoint.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
@@ -197,6 +197,7 @@
 - v1.0 Phase 1 targeted backend checks passed: `cd backend && uv run pytest tests/test_api_private_beta.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`31 passed`), targeted backend ruff for private beta/schema/import/alembic files, and targeted backend mypy for the same scope.
 - v1.0 Phase 1 targeted Web checks passed: `cd web && npm run test -- private-beta-onboarding.test.tsx` (`2 passed`) and `cd web && npm run typecheck`.
 - v1.0 Phase 1 full local gate passed: backend ruff, backend mypy (`309 source files`), backend pytest (`499 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`130 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v1.0 Phase 1 commit `8f29967` fast-forward merged to local `main`; no push performed.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

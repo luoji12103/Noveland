@@ -24,7 +24,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 2.4 Implement onboarding UI only after using `impeccable`.
 - [x] 2.5 Add invite, profile, authorization, expiration/revocation, and no-leak tests.
 - [x] 2.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 2.7 Fast-forward merge to local main and update harness docs.
+- [x] 2.7 Fast-forward merge to local main and update harness docs.
 
 ## 3. Phase 2 — Player Session Stability
 

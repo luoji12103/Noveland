@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 1 Private Beta Onboarding & Access Model merge entry
+
+- Date: 2026-05-17
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 1 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-1-private-beta-access` into local `main`, marked Phase 1 complete in OpenSpec tasks, and moved harness handoff state to a pause before Phase 2 Player Session Stability.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec task `2.7`, task board, active handoff, and change journal.
+- Follow-up notes: Pause before Phase 2. The next accepted v1.0 step is the Player Session Stability docs-only planning checkpoint; no push performed.
+
 ## v1.0 Phase 1 Private Beta Onboarding & Access Model implementation entry
 
 - Date: 2026-05-17
