@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 1 Private Beta Onboarding & Access Model implementation entry
+
+- Date: 2026-05-17
+- Branch: feature/v1.0-1-private-beta-access
+- Scope: v1.0 Private Beta MVP Phase 1 implementation only.
+- Summary: Added the dedicated private beta access boundary with hashed invite tokens, invite lifecycle/audit, least-privilege `human_user` membership bootstrap after redemption, worldline-scoped player profile setup, and a minimal authenticated Web onboarding surface for invite redemption and player identity creation. The router is app-level only and no broad `worlds.py` routes, public signup, provider/admin/media/invocation privileges, resolved secrets, raw tokens, storage paths, raw prompts/outputs, or world-event writes were added.
+- Files changed: `backend/packages/private_beta/**`, `backend/services/api/src/noveland/services/api/private_beta.py`, migration `20260517_0046_private_beta_invites.py`, API app/package metadata, schema/import tests, `web/app/private-beta/page.tsx`, `web/app/api/private-beta/[...privateBetaPath]/route.ts`, `web/features/private-beta/**`, `web/lib/private-beta/**`, and private beta CSS.
+- Tests added/updated: Backend API/schema/import/alembic coverage for invite create/list/detail/revoke, token hash-only storage, valid/idempotent redemption, expired/revoked/waitlisted rejection, cross-worldline validation, least-privilege membership/profile bootstrap, admin-route rejection, no forbidden marker leaks, and no `world_events` writes. Web unit coverage verifies invite redemption, player identity creation, guidance rendering, and no invite-token leak in rendered content. Full Phase 1 gate passed: backend ruff, backend mypy, backend pytest (`499 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`130 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: OpenSpec Phase 1 tasks and harness docs.
+- Follow-up notes: Commit Phase 1 and fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 2. No push performed.
+
 ## v1.0 Phase 1 Private Beta Onboarding & Access Model planning entry
 
 - Date: 2026-05-17

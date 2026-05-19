@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T15:54:00Z
-- Branch: main
-- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint.
-- Status: v1.0 Phase 1 checkpoint is written. It confirms a dedicated private beta invite/access model, planned `private_beta` package/router ownership, first migration scope, least-privilege membership bootstrap, API-first plus minimal Web redemption scope, token safety rules, tests, and stop conditions. Next accepted work is Phase 1 implementation after checkpoint acceptance.
+- Date: 2026-05-17T16:45:00Z
+- Branch: feature/v1.0-1-private-beta-access
+- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model implementation and validation.
+- Status: Phase 1 implementation is complete on a short-lived feature branch. The dedicated `private_beta` package/router, `private_beta_invites` migration, hashed token lifecycle, least-privilege membership bootstrap, player profile setup, and minimal `/private-beta` Web onboarding flow are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` pass; commit and fast-forward merge are pending.
 
 ## Current Context
 
@@ -48,6 +48,7 @@
 - v1.0 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`. Conclusion: **C. v1.0 phase order must be revised before implementation.** v0.9 provides the content/provider foundation, but private beta needs front-loaded decisions for invite/access ownership, player session restore, per-player/capability quota enforcement, feedback ownership, and readiness/gate ownership.
 - Revised v1.0 phase order: Phase 1 Private Beta Onboarding & Access Model; Phase 2 Player Session Stability; Phase 3 Cost & Quota Real Enforcement; Phase 4 World Setup Wizard; Phase 5 Memory & Persona QA; Phase 6 Beta Feedback System; Phase 7 Beta Content Iteration Loop; Phase 8 Private Beta Gate.
 - v1.0 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`. It decides that private beta must use a dedicated invite/access table instead of membership-only access. Planned ownership is `backend/packages/private_beta/` plus app-level `backend/services/api/src/noveland/services/api/private_beta.py`; `WorldMembership` remains the least-privilege enforcement layer after valid redemption. The first migration is expected to add `private_beta_invites` with hashed token storage, lifecycle state, world and optional worldline scope, inviter/redeemer/revoker audit fields, expiration, beta role, and safe metadata. Phase 1 Web scope should be API-first plus minimal redemption/onboarding and must use `impeccable` before implementation.
+- v1.0 Phase 1 implementation adds `backend/packages/private_beta/`, app-level `backend/services/api/src/noveland/services/api/private_beta.py`, migration `20260517_0046_private_beta_invites.py`, hashed token-only persistence, pending/accepted/waitlisted/redeemed/expired/revoked lifecycle handling, admin invite create/list/detail/revoke APIs, tester invite redemption, least-privilege `human_user` membership bootstrap, worldline-scoped `PlayerActorProfile` setup, and minimal authenticated `/private-beta` Web onboarding. It adds no public signup, broad `worlds.py` route growth, tester provider/admin/media/invocation privileges, raw token persistence, world-event writes, or provider calls.
 - v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
 - v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
@@ -133,9 +134,8 @@
 
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
-- v1.0 feasibility review and Phase 1 planning checkpoint are complete; wait for checkpoint acceptance before implementation.
-- Start v1.0 Phase 1 implementation only when explicitly requested.
-- Phase 1 implementation should add the `private_beta` package/router and `private_beta_invites` migration; do not use membership-only access, broad `worlds.py` routes, public signup, plaintext invite tokens, or tester admin/provider/media/invocation privileges.
+- v1.0 Phase 1 implementation and full gate are complete; commit and fast-forward merge to local `main` before starting Phase 2.
+- Start v1.0 Phase 2 Player Session Stability only after Phase 1 validation and merge pass.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
@@ -194,6 +194,9 @@
 - v0.9 Phase 10 targeted checks passed so far: ruff for observability service/API/test files, mypy for observability service/API/test files, and `cd backend && uv run pytest tests/test_production_readiness_gate.py -q` (`13 passed`).
 - v0.9 Phase 10 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`497 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.9 Phase 10 commit `fe4aaee` fast-forward merged to local `main`; no push performed.
+- v1.0 Phase 1 targeted backend checks passed: `cd backend && uv run pytest tests/test_api_private_beta.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`31 passed`), targeted backend ruff for private beta/schema/import/alembic files, and targeted backend mypy for the same scope.
+- v1.0 Phase 1 targeted Web checks passed: `cd web && npm run test -- private-beta-onboarding.test.tsx` (`2 passed`) and `cd web && npm run typecheck`.
+- v1.0 Phase 1 full local gate passed: backend ruff, backend mypy (`309 source files`), backend pytest (`499 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`130 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
 - v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
 - v0.6 Phase 1 fast-forward merge to local `main` completed.

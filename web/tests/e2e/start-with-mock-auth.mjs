@@ -6101,6 +6101,7 @@ async function handleWorldCompositionImport(request, response) {
     is_active: composition.world.is_active,
   };
   worlds.push(world);
+  worldlines.push(primaryWorldlineFor(world.id));
   memberships.push(membership(randomUUID(), world.id, owner.id, "world_admin"));
   clocks.set(world.id, clockForWorld(world.id));
   replaySequences.set(world.id, 0);

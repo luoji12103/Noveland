@@ -1,16 +1,18 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 1 Private Beta Onboarding & Access Model implementation, after planning checkpoint acceptance
+- v1.0 Phase 2 Player Session Stability planning checkpoint and implementation, after Phase 1 validation and fast-forward merge
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- None
+- v1.0 Phase 1 Private Beta Onboarding & Access Model full local gate and fast-forward merge
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 1 Private Beta Onboarding & Access Model implementation
+- v1.0 Phase 1 Private Beta Onboarding & Access Model targeted tests
 - v1.0 Phase 1 Private Beta Onboarding & Access Model planning checkpoint
 - v1.0 Private Beta MVP feasibility review and OpenSpec phase-order revision
 - v0.9 Self-use MVP Demo World Cut OpenSpec archive and release notes

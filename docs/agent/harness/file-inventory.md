@@ -31,6 +31,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/worlds/[worldId]/player/`
 - `web/app/worlds/[worldId]/player/privacy/`
 - `web/app/worlds/[worldId]/worldlines/`
+- `web/app/private-beta/`
+- `web/app/private-beta/page.tsx`
 - `web/app/admin/`
 - `web/app/admin/memory-backends/`
 - `web/app/admin/presets/`
@@ -51,6 +53,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/app/api/plugins/bindings/`
 - `web/app/api/provider-profiles/`
 - `web/app/api/provider-profiles/[profileId]/test-call/`
+- `web/app/api/private-beta/`
+- `web/app/api/private-beta/[...privateBetaPath]/route.ts`
 - `web/app/api/worlds/[worldId]/stream/`
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/`
 - `web/features/`
@@ -72,6 +76,9 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/admin/preset-admin.tsx`
 - `web/features/plugins/`
 - `web/features/plugins/plugin-config-fields.tsx`
+- `web/features/private-beta/`
+- `web/features/private-beta/private-beta-onboarding.tsx`
+- `web/features/private-beta/private-beta-onboarding.test.tsx`
 - `web/features/agents/`
 - `web/features/agents/agent-builder.test.tsx`
 - `web/features/agents/agent-list.test.tsx`
@@ -106,6 +113,11 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/realtime/`
 - `web/lib/realtime.ts`
 - `web/lib/runtime/`
+- `web/lib/private-beta/`
+- `web/lib/private-beta/client.ts`
+- `web/lib/private-beta/proxy.ts`
+- `web/lib/private-beta/server.ts`
+- `web/lib/private-beta/types.ts`
 - `web/lib/worlds/`
 - `web/lib/worlds/diagnostics.test.ts`
 - `web/lib/worlds/diagnostics.ts`
@@ -132,6 +144,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/media.py`
 - `backend/services/api/src/noveland/services/api/narrative_quality.py`
 - `backend/services/api/src/noveland/services/api/providers.py`
+- `backend/services/api/src/noveland/services/api/private_beta.py`
 - `backend/services/api/src/noveland/services/api/reader_media.py`
 - `backend/services/api/src/noveland/services/api/runtime.py`
 - `backend/services/api/src/noveland/services/api/realtime.py`
@@ -155,6 +168,13 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/auth/src/noveland/auth/models.py`
 - `backend/packages/auth/src/noveland/auth/seed_admin.py`
 - `backend/packages/auth/src/noveland/auth/services.py`
+- `backend/packages/private_beta/`
+- `backend/packages/private_beta/pyproject.toml`
+- `backend/packages/private_beta/src/noveland/private_beta/__init__.py`
+- `backend/packages/private_beta/src/noveland/private_beta/contracts.py`
+- `backend/packages/private_beta/src/noveland/private_beta/models.py`
+- `backend/packages/private_beta/src/noveland/private_beta/service.py`
+- `backend/packages/private_beta/src/noveland/private_beta/tokens.py`
 - `backend/packages/worlds/`
 - `backend/packages/worlds/src/noveland/worlds/clock.py`
 - `backend/packages/worlds/src/noveland/worlds/clock_service.py`
@@ -190,6 +210,8 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`
 - `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`
+- `backend/migrations/versions/20260517_0046_private_beta_invites.py`
+- `backend/tests/test_api_private_beta.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/test_api_authoring.py`

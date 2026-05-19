@@ -18,6 +18,7 @@ from noveland.services.api.narrative_quality import router as narrative_quality_
 from noveland.services.api.observability import router as observability_router
 from noveland.services.api.package_contracts import router as package_contracts_router
 from noveland.services.api.player_privacy import router as player_privacy_router
+from noveland.services.api.private_beta import router as private_beta_router
 from noveland.services.api.providers import router as providers_router
 from noveland.services.api.reader_media import router as reader_media_router
 from noveland.services.api.realtime import router as realtime_router
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     api.include_router(reader_media_router)
     api.include_router(moderation_router)
     api.include_router(player_privacy_router)
+    api.include_router(private_beta_router)
     api.include_router(package_contracts_router)
     api.include_router(world_packaging_router)
     api.include_router(conversations_router)

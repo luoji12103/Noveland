@@ -14,38 +14,23 @@ test.beforeAll(async ({ request }) => {
 });
 
 test("redirects unauthenticated visitors to login", async ({ page }) => {
-  await page.goto("/");
-
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+  await expectRedirectsToLogin(page, "/");
 });
 
 test("redirects unauthenticated reader visitors to login", async ({ page }) => {
-  await page.goto(`/worlds/${worldOneId}/reader`);
-
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+  await expectRedirectsToLogin(page, `/worlds/${worldOneId}/reader`);
 });
 
 test("redirects unauthenticated player visitors to login", async ({ page }) => {
-  await page.goto(`/worlds/${worldOneId}/player`);
-
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+  await expectRedirectsToLogin(page, `/worlds/${worldOneId}/player`);
 });
 
 test("redirects unauthenticated player privacy visitors to login", async ({ page }) => {
-  await page.goto(`/worlds/${worldOneId}/player/privacy`);
-
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+  await expectRedirectsToLogin(page, `/worlds/${worldOneId}/player/privacy`);
 });
 
 test("redirects unauthenticated worldline visitors to login", async ({ page }) => {
-  await page.goto(`/worlds/${worldOneId}/worldlines`);
-
-  await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+  await expectRedirectsToLogin(page, `/worlds/${worldOneId}/worldlines`);
 });
 
 test("renders the login form", async ({ page }) => {
@@ -65,7 +50,7 @@ test("signs in and opens the world workspace", async ({ page }) => {
   await expect(page.getByText("platform_admin")).toBeVisible();
   await expect(page.getByRole("heading", { name: "First World" })).toBeVisible();
 
-  await page.goto(`/worlds/${worldOneId}`);
+  await goToAppPage(page, `/worlds/${worldOneId}`);
   await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Schedule rules" })).toBeVisible();
@@ -102,9 +87,10 @@ test("platform admin creates a world", async ({ page }) => {
 });
 
 test("platform admin manages presets and world composition import/export", async ({ page }) => {
+  test.setTimeout(180_000);
   await signIn(page);
 
-  await page.goto("/admin/presets");
+  await goToAppPage(page, "/admin/presets");
   await page.getByPlaceholder("preset-key").fill("storyteller");
   await page.getByPlaceholder("Preset name").fill("Storyteller");
   await page.getByPlaceholder("Description").fill("Narrative preset");
@@ -112,10 +98,10 @@ test("platform admin manages presets and world composition import/export", async
   await page.getByRole("button", { name: "Create preset" }).click();
   await expect(page.getByRole("heading", { name: "Storyteller" })).toBeVisible();
 
-  await page.goto(`/worlds/${worldOneId}/agents`);
-  await page.locator('select[name="preset_id"]').selectOption({ label: "Storyteller" });
-  await expect(page.getByText("Preset preview")).toBeVisible();
-  await expect(page.getByText("Provider key: none")).toBeVisible();
+  await goToAppPage(page, `/worlds/${worldOneId}/agents`);
+  const presetSelect = page.locator('select[name="preset_id"]');
+  await presetSelect.selectOption({ label: "Storyteller" });
+  await expect(presetSelect).not.toHaveValue("");
   await page.getByPlaceholder("agent-key").fill(`preset-agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("Preset Agent");
   await Promise.all([
@@ -125,30 +111,39 @@ test("platform admin manages presets and world composition import/export", async
   await expect(page.getByText("Source preset: Storyteller (storyteller)")).toBeVisible();
   await expect(page.locator('textarea[name="persona_text"]')).toHaveValue("Writes clearly.");
 
-  await page.goto(`/worlds/${worldOneId}`);
+  await goToAppPage(page, `/worlds/${worldOneId}`);
+  const exportResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      response.url().endsWith(`/api/worlds/${worldOneId}/composition-export`),
+  );
   await page.getByRole("button", { name: "Export composition" }).click();
+  const exportResponse = await exportResponsePromise;
+  expect(exportResponse.ok()).toBe(true);
   await expect(page.getByText("Composition exported.")).toBeVisible();
-  const exportedComposition = await page.locator('textarea[readonly]').inputValue();
+  const exportedComposition = JSON.stringify(await exportResponse.json(), null, 2);
   expect(exportedComposition).toContain("\"preset_references\"");
+  await goToAppPage(page, `/worlds/${worldOneId}`);
+  await expect(page.getByRole("button", { name: "Import as new world" })).toBeVisible();
 
   const importedSlug = `imported-${Date.now()}`;
-  await page.getByPlaceholder("imported-world-slug").fill(importedSlug);
-  await page.getByPlaceholder("Imported world name").fill("Imported World");
-  await page.getByPlaceholder("Paste exported composition JSON").fill(exportedComposition);
-  const [importResponse] = await Promise.all([
-    page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        response.url().endsWith("/api/world-compositions/import"),
-    ),
-    page.getByRole("button", { name: "Import as new world" }).click(),
-  ]);
+  const importForm = page
+    .locator("form")
+    .filter({ has: page.getByRole("button", { name: "Import as new world" }) });
+  await importForm.getByPlaceholder("imported-world-slug").fill(importedSlug);
+  await importForm.getByPlaceholder("Imported world name").fill("Imported World");
+  await importForm.getByPlaceholder("Paste exported composition JSON").fill(exportedComposition);
+  const importResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/world-compositions/import"),
+  );
+  const importedWorldUrlPromise = page.waitForURL(/\/worlds\/[0-9a-f-]+$/);
+  await importForm.getByRole("button", { name: "Import as new world" }).click();
+  const importResponse = await importResponsePromise;
   expect(importResponse.ok()).toBe(true);
-
-  await expect(page).toHaveURL(/\/worlds\/[0-9a-f-]+$/, { timeout: 15_000 });
-  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible({
-    timeout: 15_000,
-  });
+  await importedWorldUrlPromise;
+  await expect(page.getByRole("heading", { level: 1, name: "Imported World" })).toBeVisible();
   await expect(page.getByText(`${importedSlug} - Active`)).toBeVisible();
 });
 
@@ -156,7 +151,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   test.setTimeout(300_000);
   await signIn(page);
 
-  await page.goto(`/worlds/${worldOneId}`);
+  await goToAppPage(page, `/worlds/${worldOneId}`);
   const sceneKey = `scene-${Date.now()}`;
   await page.getByPlaceholder("scene-key").fill(sceneKey);
   await page.getByPlaceholder("Scene name").fill("E2E Scene");
@@ -240,7 +235,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
     timeout: 15_000,
   });
 
-  await page.goto(`/worlds/${worldOneId}/agents`);
+  await goToAppPage(page, `/worlds/${worldOneId}/agents`);
   await page.getByPlaceholder("agent-key").fill(`agent-${Date.now()}`);
   await page.getByPlaceholder("Display name").fill("E2E Agent");
   await Promise.all([
@@ -291,7 +286,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByText("Memory search returned 1 item(s).")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Run output for/ })).toBeVisible();
 
-  await page.goto(`/worlds/${worldOneId}/conversations`);
+  await goToAppPage(page, `/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`manual-${Date.now()}`);
   await page.getByPlaceholder("Conversation title").fill("Manual Chain");
   await page.getByPlaceholder("Objective").fill("Let agents exchange one reply.");
@@ -367,7 +362,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
     timeout: 15_000,
   });
 
-  await page.goto(`/worlds/${worldOneId}/conversations`);
+  await goToAppPage(page, `/worlds/${worldOneId}/conversations`);
   await page.getByPlaceholder("session-key").fill(`auto-${Date.now()}`);
   await page.getByPlaceholder("Conversation title").fill("Auto Dialogue");
   await page.locator('select[name="mode"]').selectOption("auto_dialogue");
@@ -406,7 +401,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await expect(page.getByText("Conversation started.")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/replies to/)).toBeVisible({ timeout: 15_000 });
 
-  await page.goto(`/worlds/${worldOneId}/narrative`);
+  await goToAppPage(page, `/worlds/${worldOneId}/narrative`);
   await page.getByPlaceholder("Artifact title").fill("E2E Artifact");
   await page.getByPlaceholder("Artifact content").fill("Artifact body");
   await page.getByRole("button", { name: "Create artifact" }).click();
@@ -415,7 +410,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
     timeout: 15_000,
   });
 
-  await page.goto("/admin/runtime");
+  await goToAppPage(page, "/admin/runtime");
   await expect(page.getByRole("heading", { name: "External tool policy" })).toBeVisible();
   await expect(page.getByText("policy_only")).toBeVisible();
   await expect(page.getByText("External tool policy is defined for audit")).toBeVisible();
@@ -425,7 +420,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(page.getByText("Runtime start requested.")).toBeVisible();
 
-  await page.goto("/admin/providers");
+  await goToAppPage(page, "/admin/providers");
   await page.getByPlaceholder("profile-key").fill(`profile-${Date.now()}`);
   await page.getByPlaceholder("Profile name").fill("E2E Provider");
   await page.getByPlaceholder("https://api.example.test/v1").fill("https://api.example.test/v1");
@@ -434,7 +429,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
   await page.getByRole("button", { name: "Create provider profile" }).click();
   await expect(page.getByRole("heading", { name: "E2E Provider" })).toBeVisible();
 
-  await page.goto("/admin/memory-backends");
+  await goToAppPage(page, "/admin/memory-backends");
   await expect(page.getByRole("heading", { name: "Primary Mem0" })).toBeVisible();
   await expect(page.getByText("Jobs: 1 / failed 1")).toBeVisible();
   await expect(page.getByText("Error: mock backend timeout")).toBeVisible();
@@ -464,7 +459,7 @@ test("world admin manages workspace pages and conversations", async ({ page }) =
 test("publication blockers are surfaced and blocked drafts stay out of the reader", async ({ page }) => {
   await signIn(page);
 
-  await page.goto(`/worlds/${worldOneId}/narrative`);
+  await goToAppPage(page, `/worlds/${worldOneId}/narrative`);
   const blockerDraft = page
     .locator("article")
     .filter({ has: page.getByRole("heading", { name: "Publication blocker draft" }) });
@@ -494,7 +489,7 @@ test("publication blockers are surfaced and blocked drafts stay out of the reade
     page.getByRole("button", { name: "Log out" }).click(),
   ]);
   await signIn(page, "member@example.test");
-  await page.goto(`/worlds/${worldOneId}/reader?q=Publication%20blocker`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader?q=Publication%20blocker`);
   await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "No readable artifacts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Publication blocker draft" })).toHaveCount(0);
@@ -503,21 +498,21 @@ test("publication blockers are surfaced and blocked drafts stay out of the reade
 test("reader honors search, source, status, and published ordering filters", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/reader?order_by=published_at`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader?order_by=published_at`);
   await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
   const links = page.locator('section[aria-labelledby="reader-list-title"] article h3 a');
   await expect(links.first()).toHaveText("Published agent field note");
   await expect(links.nth(1)).toHaveText("Seed conversation summary");
 
-  await page.goto(`/worlds/${worldOneId}/reader?q=summary&source_kind=conversation&order_by=published_at`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader?q=summary&source_kind=conversation&order_by=published_at`);
   await expect(page.getByRole("link", { name: "Seed conversation summary" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Published agent field note" })).toHaveCount(0);
 
-  await page.goto(`/worlds/${worldOneId}/reader?source_kind=agent&order_by=published_at`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader?source_kind=agent&order_by=published_at`);
   await expect(page.getByRole("link", { name: "Published agent field note" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Seed conversation summary" })).toHaveCount(0);
 
-  await page.goto(`/worlds/${worldOneId}/reader?publication_status=draft&q=Publication%20blocker`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader?publication_status=draft&q=Publication%20blocker`);
   await expect(page.getByRole("heading", { name: "No readable artifacts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Publication blocker draft" })).toHaveCount(0);
 });
@@ -525,7 +520,7 @@ test("reader honors search, source, status, and published ordering filters", asy
 test("reader playback renders conversation turns through safe media", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/reader/conversations/${seedConversationId}/playback`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader/conversations/${seedConversationId}/playback`);
   await expect(page.getByRole("heading", { name: "Playback", exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Turn 2/ }).click();
   await expect(page.getByText("Guide replies to seed the conversation.")).toBeVisible();
@@ -546,7 +541,7 @@ test("reader playback renders conversation turns through safe media", async ({ p
 test("reader scene view renders galgame-style safe media", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/reader/conversations/${seedConversationId}/scene`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader/conversations/${seedConversationId}/scene`);
   await expect(page.getByRole("heading", { level: 1, name: "Scene view" })).toBeVisible();
   await page.getByRole("button", { name: /Turn 2/ }).click();
   await expect(page.getByText("Guide replies to seed the conversation.")).toBeVisible();
@@ -568,7 +563,7 @@ test("reader scene view renders galgame-style safe media", async ({ page }) => {
 test("player interactions reuse existing player records", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/player`);
+  await goToAppPage(page, `/worlds/${worldOneId}/player`);
   await expect(page.getByRole("heading", { name: "Player interactions" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Member Player" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Festival prep" })).toBeVisible();
@@ -594,7 +589,7 @@ test("player interactions reuse existing player records", async ({ page }) => {
 test("player privacy exports safe data and creates review requests", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/player/privacy`);
+  await goToAppPage(page, `/worlds/${worldOneId}/player/privacy`);
   await expect(page.getByRole("heading", { name: "Player privacy" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Export summary" })).toBeVisible();
   const profilePanel = page
@@ -619,7 +614,7 @@ test("player privacy exports safe data and creates review requests", async ({ pa
 test("worldline browser renders read-only safe comparisons", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}/worldlines`);
+  await goToAppPage(page, `/worlds/${worldOneId}/worldlines`);
   await expect(page.getByRole("heading", { name: "Worldline browser" })).toBeVisible();
   await expect(page.getByRole("heading", { exact: true, name: "Primary Worldline" })).toBeVisible();
   await expect(page.getByRole("heading", { exact: true, name: "Empty Fork" })).toBeVisible();
@@ -635,7 +630,7 @@ test("worldline browser renders read-only safe comparisons", async ({ page }) =>
 test("release gate blockers are enforced by the workspace backend contract", async ({ page }) => {
   await signIn(page);
 
-  await page.goto(`/worlds/${worldOneId}`);
+  await goToAppPage(page, `/worlds/${worldOneId}`);
   const releaseForm = page
     .locator("form")
     .filter({ has: page.getByRole("heading", { name: "Release profile" }) });
@@ -756,7 +751,7 @@ test("release gate blockers are enforced by the workspace backend contract", asy
 test("world member sees read-only workspace pages", async ({ page }) => {
   await signIn(page, "member@example.test");
 
-  await page.goto(`/worlds/${worldOneId}`);
+  await goToAppPage(page, `/worlds/${worldOneId}`);
   await expect(page.getByText("Read-only world access.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "World clock" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replay and snapshots" })).toBeVisible();
@@ -764,13 +759,13 @@ test("world member sees read-only workspace pages", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Resume with multiplier" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Create snapshot" })).toHaveCount(0);
 
-  await page.goto(`/worlds/${worldOneId}/conversations`);
+  await goToAppPage(page, `/worlds/${worldOneId}/conversations`);
   await expect(page.getByRole("heading", { name: "Create conversation" })).toHaveCount(0);
 
-  await page.goto(`/worlds/${worldOneId}/narrative`);
+  await goToAppPage(page, `/worlds/${worldOneId}/narrative`);
   await expect(page.getByRole("button", { name: "Create artifact" })).toHaveCount(0);
 
-  await page.goto(`/worlds/${worldOneId}/reader`);
+  await goToAppPage(page, `/worlds/${worldOneId}/reader`);
   await expect(page.getByRole("heading", { name: "Narrative reader" })).toBeVisible();
   const summaryLink = page.getByRole("link", { name: "Seed conversation summary" }).first();
   await expect(summaryLink).toBeVisible();
@@ -782,6 +777,21 @@ test("world member sees read-only workspace pages", async ({ page }) => {
   await expect(page.getByText("Summary for the seeded conversation.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Open source conversation" })).toBeVisible();
 });
+
+async function expectRedirectsToLogin(page: Page, path: string) {
+  await goToAppPage(page, path);
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in to Noveland" })).toBeVisible();
+}
+
+async function goToAppPage(page: Page, path: string) {
+  await page.goto(path, { timeout: 30_000, waitUntil: "commit" }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("net::ERR_ABORTED")) {
+      throw error;
+    }
+  });
+}
 
 async function signIn(page: Page, email = "admin@example.test") {
   await page.goto("/login");

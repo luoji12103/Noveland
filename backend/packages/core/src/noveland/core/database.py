@@ -35,6 +35,7 @@ MODEL_MODULES = (
     "noveland.narrative.models",
     "noveland.observability.models",
     "noveland.player_privacy.models",
+    "noveland.private_beta.models",
     "noveland.providers.models",
     "noveland.speech.models",
     "noveland.visual.models",

@@ -115,6 +115,7 @@ def test_core_schema_tables_are_registered() -> None:
         "player_intervention_records",
         "player_journal_entries",
         "player_privacy_requests",
+        "private_beta_invites",
         "platform_settings",
         "plot_threads",
         "platform_role_assignments",

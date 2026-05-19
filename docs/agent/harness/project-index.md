@@ -83,6 +83,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md` — v0.9 Phase 10 checkpoint for a backend/API-only, platform-admin self-use MVP gate over existing observability evidence, manual 30-minute checklist items, resume confirmation, and no-leak diagnostics without Web UI or migrations.
 - `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md` — feasibility review for v1.0 Private Beta MVP after v0.9 archive; concludes v1.0 needs phase-order revision and front-loaded decisions for invite/access ownership, player session restore, per-player/capability quota, feedback ownership, and readiness ownership before implementation.
 - `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md` — v1.0 Phase 1 checkpoint for a dedicated private beta invite/access model, planned `private_beta` package/router ownership, `private_beta_invites` migration scope, least-privilege membership bootstrap, token safety, minimal Web redemption scope, and stop conditions.
+- v1.0 Phase 1 implementation adds `backend/packages/private_beta/`, app-level `noveland.services.api.private_beta`, migration `20260517_0046_private_beta_invites.py`, hashed invite-token lifecycle/audit, least-privilege membership bootstrap, worldline-scoped player profile creation, and a minimal authenticated `/private-beta` Web onboarding flow. It does not add public signup, broad `worlds.py` routes, provider/admin/media/invocation tester privileges, raw token persistence, world-event writes, or provider calls.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -124,6 +125,7 @@ Fast orientation for a new coding session.
 - `web/app/worlds/[worldId]/player/` — authenticated player/member interaction surface over existing player choices, interventions, journal entries, notifications, and spoiler-safe summaries
 - `web/app/worlds/[worldId]/player/privacy/` — authenticated player privacy controls for sanitized export records and reviewable deletion requests
 - `web/app/worlds/[worldId]/worldlines/` — authenticated read-only worldline browser over safe branch metadata and aggregate comparison counts
+- `web/app/private-beta/` — authenticated private beta invite redemption and player identity onboarding page
 - `web/app/worlds/[worldId]/diagnostics/` — world-scoped multimodal diagnostics dashboard
 - `web/app/worlds/[worldId]/media/` — world-scoped media asset admin console
 - `web/app/worlds/[worldId]/invocations/` — world-scoped invocation ledger browser
@@ -144,6 +146,7 @@ Fast orientation for a new coding session.
 - `web/app/api/plugins/catalog/` — same-origin plugin catalog proxy route handler
 - `web/app/api/plugins/bindings/` — same-origin plugin binding validation proxy route handler
 - `web/app/api/provider-profiles/` — same-origin provider profile and test-call proxy route handlers
+- `web/app/api/private-beta/` — same-origin private beta onboarding proxy route handlers
 - `web/app/api/worlds/[worldId]/stream/` — same-origin world SSE proxy route
 - `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/` — same-origin conversation SSE proxy route
 - `web/features/` — feature-oriented UI logic
@@ -158,6 +161,7 @@ Fast orientation for a new coding session.
   - `web/features/admin/speech-admin.tsx` — world-scoped voice profile, binding, transcript, and speech test console
   - `web/features/admin/visual-admin.tsx` — world-scoped strict-worldline sprite/background resolver and compose admin console
   - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
+  - `web/features/private-beta/` — minimal private beta invite redemption, invited-world list, player identity setup, and first-run guidance
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
@@ -184,6 +188,7 @@ Fast orientation for a new coding session.
   - `web/lib/worlds/speech.ts` — speech voice profile, binding, style mapping, transcript, TTS, and STT client helpers
   - `web/lib/worlds/visual.ts` — visual sprite, variant, background, resolver, and compose-scene client helpers
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
+  - `web/lib/private-beta/` — private beta Web DTOs, client actions, server loader, and proxy helper
 - `web/package.json` — frontend scripts and dependency manifest
 
 ### Backend services
@@ -200,6 +205,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.moderation` — world-scoped report, moderation action, and incident workflow router with safe evidence refs and no automatic execution
   - `noveland.services.api.package_contracts` — world-admin package contract validation and safe provider config export router
   - `noveland.services.api.player_privacy` — world-scoped player privacy export, request listing, delete-request creation, and admin review router over sanitized player-owned/player-visible records
+  - `noveland.services.api.private_beta` — app-level private beta invite, redemption, onboarding status, and player profile bootstrap router
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
@@ -260,6 +266,11 @@ Fast orientation for a new coding session.
   - `noveland.auth.models` — user identity, credential, session, and platform role ORM models
   - `noveland.auth.seed_admin` — local operator command for seeding a platform admin
   - `noveland.auth.services` — password credential and opaque session service helpers
+- `backend/packages/private_beta/`
+  - `noveland.private_beta.contracts` — invite lifecycle, access, redemption, onboarding status, and player profile DTOs
+  - `noveland.private_beta.models` — `private_beta_invites` ORM model with token hash, lifecycle, audit, world/worldline scope, beta role, and safe metadata
+  - `noveland.private_beta.service` — invite creation/list/detail/revoke, safe redemption, least-privilege membership bootstrap, onboarding status, and player profile setup
+  - `noveland.private_beta.tokens` — non-guessable invite token generation plus hash/fingerprint helpers
 - `backend/packages/memory/`
   - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, backfill, queue-readiness, and backend contracts
   - `noveland.memory.errors` — typed long-term memory validation and execution errors

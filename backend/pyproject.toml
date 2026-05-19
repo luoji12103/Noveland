@@ -24,6 +24,7 @@ dependencies = [
   "noveland-observability",
   "noveland-package-contracts",
   "noveland-player-privacy",
+  "noveland-private-beta",
   "noveland-plugins",
   "noveland-providers",
   "noveland-reader-delivery",
@@ -72,6 +73,7 @@ members = [
   "packages/observability",
   "packages/package_contracts",
   "packages/player_privacy",
+  "packages/private_beta",
   "packages/plugins",
   "packages/providers",
   "packages/reader_delivery",
@@ -105,6 +107,7 @@ noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-package-contracts = { workspace = true }
 noveland-player-privacy = { workspace = true }
+noveland-private-beta = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }
 noveland-reader-delivery = { workspace = true }
@@ -158,6 +161,7 @@ mypy_path = [
   "packages/observability/src",
   "packages/package_contracts/src",
   "packages/player_privacy/src",
+  "packages/private_beta/src",
   "packages/plugins/src",
   "packages/providers/src",
   "packages/reader_delivery/src",

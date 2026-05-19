@@ -25,6 +25,7 @@ members = [
     "noveland-package-contracts",
     "noveland-player-privacy",
     "noveland-plugins",
+    "noveland-private-beta",
     "noveland-providers",
     "noveland-reader-delivery",
     "noveland-service-api",
@@ -657,6 +658,7 @@ dependencies = [
     { name = "noveland-package-contracts" },
     { name = "noveland-player-privacy" },
     { name = "noveland-plugins" },
+    { name = "noveland-private-beta" },
     { name = "noveland-providers" },
     { name = "noveland-reader-delivery" },
     { name = "noveland-service-api" },
@@ -703,6 +705,7 @@ requires-dist = [
     { name = "noveland-package-contracts", editable = "packages/package_contracts" },
     { name = "noveland-player-privacy", editable = "packages/player_privacy" },
     { name = "noveland-plugins", editable = "packages/plugins" },
+    { name = "noveland-private-beta", editable = "packages/private_beta" },
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-reader-delivery", editable = "packages/reader_delivery" },
     { name = "noveland-service-api", editable = "services/api" },
@@ -1103,6 +1106,27 @@ requires-dist = [
 ]
 
 [[package]]
+name = "noveland-private-beta"
+version = "0.1.0"
+source = { editable = "packages/private_beta" }
+dependencies = [
+    { name = "noveland-auth" },
+    { name = "noveland-core" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-auth", editable = "packages/auth" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
+]
+
+[[package]]
 name = "noveland-providers"
 version = "0.1.0"
 source = { editable = "packages/providers" }
@@ -1175,6 +1199,7 @@ dependencies = [
     { name = "noveland-package-contracts" },
     { name = "noveland-player-privacy" },
     { name = "noveland-plugins" },
+    { name = "noveland-private-beta" },
     { name = "noveland-providers" },
     { name = "noveland-reader-delivery" },
     { name = "noveland-service-runtime" },
@@ -1212,6 +1237,7 @@ requires-dist = [
     { name = "noveland-package-contracts", editable = "packages/package_contracts" },
     { name = "noveland-player-privacy", editable = "packages/player_privacy" },
     { name = "noveland-plugins", editable = "packages/plugins" },
+    { name = "noveland-private-beta", editable = "packages/private_beta" },
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-reader-delivery", editable = "packages/reader_delivery" },
     { name = "noveland-service-runtime", editable = "services/runtime" },

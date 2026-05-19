@@ -578,6 +578,36 @@ a {
   grid-column: 1 / -1;
 }
 
+.private-beta-form,
+.private-beta-inline-form {
+  display: grid;
+  gap: 10px;
+}
+
+.private-beta-form {
+  max-width: 560px;
+}
+
+.private-beta-inline-form {
+  min-width: min(320px, 100%);
+}
+
+.private-beta-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.private-beta-actions p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.private-beta-access-row {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.45fr);
+}
+
 .compact-list {
   display: flex;
   flex-wrap: wrap;
