@@ -2859,6 +2859,14 @@
 - Verification: Targeted ruff/mypy passed for observability/API/test files; targeted pytest passed for readiness gate (`22 passed`) and workspace import smoke (`1 passed`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`529 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - Follow-up notes: Commit Phase 8, fast-forward merge to local `main`, and stop without archiving v1.0 unless explicitly instructed. No Web gate was run because Phase 8 touched no Web files.
 
+## v1.0.8 Private Beta Gate merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Commit merged: `6f370ba feat(v1.0): add private beta readiness gate`
+- Summary: Fast-forward merged Phase 8 Private Beta Gate to local `main` after targeted checks, full backend/OpenSpec gate, OpenSpec validation, and `git diff --check` passed.
+- Follow-up notes: v1.0 implementation phases are complete locally. Do not archive v1.0 or push unless explicitly requested.
+
 ## v1.0.7 Beta Content Iteration Loop planning entry
 
 - Date: 2026-05-20

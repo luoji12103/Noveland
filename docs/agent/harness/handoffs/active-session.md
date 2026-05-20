@@ -2,8 +2,8 @@
 
 - Date: 2026-05-20T00:00:00Z
 - Branch: main
-- Objective: implement v1.0 Phase 8 Private Beta Gate.
-- Status: Phase 8 implementation and backend/OpenSpec gate are complete on the phase branch. Commit the phase, fast-forward merge to local `main`, and stop without archiving v1.0 unless explicitly instructed.
+- Objective: report v1.0 Private Beta MVP implementation status after Phase 8 merge.
+- Status: v1.0 Phase 1 through Phase 8 are complete and fast-forward merged to local `main`. Phase 8 Private Beta Gate implementation, targeted tests, full backend/OpenSpec gate, OpenSpec validation, and merge bookkeeping are complete. Do not archive v1.0 unless explicitly instructed.
 
 ## Current Context
 
@@ -153,7 +153,7 @@
 - v1.0 Phase 6 targeted checks passed: focused ruff, focused mypy, `cd backend && uv run pytest tests/test_api_beta_feedback.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`35 passed`), `cd web && npm run test -- beta-feedback-panel.test.tsx` (`2 passed`), and `cd web && npm run typecheck`.
 - v1.0 Phase 6 full gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v1.0 Phase 6 commit `0cb4a7f` fast-forward merged to local `main`; no push performed.
-- Commit Phase 8 Private Beta Gate on `feature/v1.0-8-private-beta-gate`, fast-forward merge to local `main`, update merge bookkeeping, and report final v1.0 implementation status. Do not archive v1.0 automatically.
+- Report final v1.0 implementation status from clean local `main`. Do not archive v1.0, start v1.1, or push unless explicitly requested.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

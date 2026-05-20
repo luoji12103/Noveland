@@ -89,7 +89,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 9.3 Add readiness UI only after using `impeccable` if Web scope is approved.
 - [x] 9.4 Add gate pass/fail, onboarding/session/quota/feedback, leak fixture, and report-redaction tests.
 - [x] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 9.6 Fast-forward merge to local main and update harness docs.
+- [x] 9.6 Fast-forward merge to local main and update harness docs.
 
 ## 10. Closeout
 

@@ -1,16 +1,17 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 8 Private Beta Gate fast-forward merge
+- v1.0 OpenSpec archive and release notes, after acceptance
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 8 Private Beta Gate fast-forward merge
+- None
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 8 Private Beta Gate fast-forward merge
 - v1.0 Phase 8 Private Beta Gate full backend/OpenSpec gate
 - v1.0 Phase 8 Private Beta Gate targeted tests
 - v1.0 Phase 8 Private Beta Gate implementation
