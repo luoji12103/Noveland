@@ -2859,6 +2859,14 @@
 - Verification: Targeted ruff passed for modified backend files; targeted pytest passed for authoring/API (`34 passed`) and beta feedback/import smoke (`5 passed`); targeted mypy passed (`18 source files`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`524 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - Follow-up notes: Commit Phase 7, fast-forward merge to local `main`, then start Phase 8 Private Beta Gate from clean `main`. No Web gate was run because Phase 7 touched no Web files.
 
+## v1.0.7 Beta Content Iteration Loop merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Commit merged: `fb77ee2 feat(v1.0): add beta content iteration loop`
+- Summary: Fast-forward merged Phase 7 Beta Content Iteration Loop to local `main` after targeted checks, full backend/OpenSpec gate, OpenSpec validation, and `git diff --check` passed.
+- Follow-up notes: Start Phase 8 Private Beta Gate from clean local `main` on `feature/v1.0-8-private-beta-gate`. Do not archive v1.0 or push until Phase 8 is complete and accepted.
+
 ## v0.8.10 Moderation & Incident Workflow merge entry
 
 - Date: 2026-05-16

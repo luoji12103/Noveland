@@ -80,7 +80,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 8.3 Implement repair review UI only after using `impeccable` if Web scope is approved.
 - [x] 8.4 Add persona/memory/asset/voice/provider-profile repair, audit, worldline, and no-leak tests.
 - [x] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 8.6 Fast-forward merge to local main and update harness docs.
+- [x] 8.6 Fast-forward merge to local main and update harness docs.
 
 ## 9. Phase 8 — Private Beta Gate
 
