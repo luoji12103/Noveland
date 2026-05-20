@@ -33,7 +33,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 3.3 Implement player-safe loading/error/fallback UI only after using `impeccable`.
 - [x] 3.4 Add resume, fallback, cross-player, worldline, ACL, and no-leak tests.
 - [x] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 3.6 Fast-forward merge to local main and update harness docs.
+- [x] 3.6 Fast-forward merge to local main and update harness docs.
 
 ## 4. Phase 3 — Cost & Quota Real Enforcement
 

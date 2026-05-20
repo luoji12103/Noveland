@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 2 Player Session Stability merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 2 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-2-player-session-stability` into local `main`, marked Phase 2 complete in OpenSpec tasks, and moved harness handoff state to Phase 3 Cost & Quota Real Enforcement.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec task `3.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 3 on `feature/v1.0-3-cost-quota-enforcement` from clean local `main` with a docs-only quota ownership/checkpoint before implementation. No push performed.
+
 ## v1.0 Phase 2 Player Session Stability implementation entry
 
 - Date: 2026-05-20

@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: feature/v1.0-2-player-session-stability
-- Objective: v1.0 Phase 2 Player Session Stability implementation.
-- Status: Phase 2 implementation and full gate are complete on the feature branch. The dedicated `player_sessions` package/router, `player_sessions` migration, player-owned resume contract, safe fallback statuses, and player surface resume UI are implemented. Commit Phase 2, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 3.
+- Branch: main
+- Objective: v1.0 Phase 2 Player Session Stability closeout.
+- Status: Phase 2 implementation is committed and fast-forward merged to local `main`. The dedicated `player_sessions` package/router, `player_sessions` migration, player-owned resume contract, safe fallback statuses, and player surface resume UI are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` passed. Start Phase 3 on a new feature branch.
 
 ## Current Context
 
@@ -135,7 +135,8 @@
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
 - v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
-- v1.0 Phase 2 Player Session Stability is complete on `feature/v1.0-2-player-session-stability`; commit, fast-forward merge, and record merge bookkeeping before Phase 3.
+- v1.0 Phase 2 Player Session Stability is complete and fast-forward merged to local `main`.
+- Start v1.0 Phase 3 Cost & Quota Real Enforcement on `feature/v1.0-3-cost-quota-enforcement`; begin with the docs-only quota ownership and spend-path coverage checkpoint.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
