@@ -71,6 +71,12 @@ The world setup wizard should not duplicate readiness systems. It must aggregate
 
 Private beta testers should be able to close the browser and return to a stable conversation, scene/presentation state, and fallback status. The design should prefer explicit recoverable states over hidden retries or silent reset.
 
+Phase 2 assigns this ownership to a dedicated `player_sessions` package and app-level
+`player_sessions.py` router. Resume state is not stored on private beta invite records and is not
+folded into conversation history. The first implementation uses a `player_sessions` table scoped by
+world, worldline, current user, and player actor, with optional current conversation, scene, last
+turn, last presentation, safe route/resume JSON, recovery status, and last-seen timestamps.
+
 ### Feedback is linked evidence, not a forum
 
 Feedback records should point to turn, conversation, presentation, media, invocation, route, worldline, and player context through safe refs. v1.0 should not build public forums or social features. The feasibility review found that existing moderation records are reusable evidence infrastructure but may be semantically too heavy for beta issue triage; Phase 6 must decide whether to add a dedicated beta feedback package or extend moderation.
@@ -102,6 +108,8 @@ This roadmap does not add migrations yet. Expected migration pressure:
   inviter/redeemer/revoker audit fields, expiration, least-privilege intended role, beta role,
   safe metadata, and timestamps.
 - Player session stability likely needs player-owned session/resume records unless existing conversation/player records can safely carry current worldline/conversation/scene/presentation state.
+- Phase 2 now expects a `player_sessions` migration because existing conversation/player records do
+  not own browser interruption and recovery status cleanly.
 - Cost/quota enforcement may extend v0.7 cost/rate controls or add player/capability quota records.
 - Feedback likely needs persistent beta feedback records unless v0.8 moderation records are sufficient.
 - Setup wizard and private beta gate should start as read-only observability aggregation unless a specific signoff record is approved.

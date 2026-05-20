@@ -883,6 +883,50 @@ export type PlayerActor = {
   updated_at: string;
 };
 
+export type PlayerRecoveryStatus =
+  | "ready"
+  | "stale_conversation"
+  | "missing_media"
+  | "provider_failure"
+  | "media_failure"
+  | "presentation_unavailable";
+
+export type PlayerSessionStatus = "active" | "paused" | "closed";
+
+export type PlayerSessionResume = {
+  id: string;
+  world_id: string;
+  worldline_id: string;
+  user_id: string;
+  player_actor_id: string;
+  conversation_session_id: string | null;
+  scene_id: string | null;
+  last_turn_id: string | null;
+  last_presentation_id: string | null;
+  route_state: Record<string, unknown>;
+  resume_state: Record<string, unknown>;
+  recovery_status: PlayerRecoveryStatus;
+  recovery_label: string;
+  available_actions: string[];
+  status: PlayerSessionStatus;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PlayerSessionResumeInput = {
+  worldline_id: string;
+  player_actor_id: string;
+  conversation_session_id?: string | null;
+  scene_id?: string | null;
+  last_turn_id?: string | null;
+  last_presentation_id?: string | null;
+  route_state?: Record<string, unknown>;
+  resume_state?: Record<string, unknown>;
+  recovery_status?: PlayerRecoveryStatus;
+  status?: PlayerSessionStatus;
+};
+
 export type PlayerChoiceKind = "dialogue" | "travel" | "contact" | "intervention" | "route";
 
 export type PlayerChoice = {

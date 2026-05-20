@@ -132,6 +132,8 @@ import type {
   PlayerChoiceCreateInput,
   PlayerInterventionRecord,
   PlayerJournalEntry,
+  PlayerSessionResume,
+  PlayerSessionResumeInput,
   PlayerPrivacyExport,
   PlayerPrivacyRequest,
   PlayerPrivacyRequestCreateInput,
@@ -438,6 +440,17 @@ export function bindPlayerActor(
 ): Promise<PlayerActor> {
   return worldRequest<PlayerActor>(`/api/worlds/${worldId}/player-actors`, {
     method: "PUT",
+    body: input,
+    csrf: true,
+  });
+}
+
+export function upsertPlayerSessionResume(
+  worldId: string,
+  input: PlayerSessionResumeInput,
+): Promise<PlayerSessionResume> {
+  return worldRequest<PlayerSessionResume>(`/api/worlds/${worldId}/player-sessions/resume`, {
+    method: "POST",
     body: input,
     csrf: true,
   });

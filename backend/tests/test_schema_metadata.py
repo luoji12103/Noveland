@@ -115,6 +115,7 @@ def test_core_schema_tables_are_registered() -> None:
         "player_intervention_records",
         "player_journal_entries",
         "player_privacy_requests",
+        "player_sessions",
         "private_beta_invites",
         "platform_settings",
         "plot_threads",
@@ -168,6 +169,29 @@ def test_core_schema_tables_are_registered() -> None:
 def test_agent_preset_version_columns_are_registered() -> None:
     assert "source_preset_version" in column_names("agents")
     assert "version" in column_names("agent_presets")
+
+
+def test_player_session_resume_schema_is_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "user_id",
+        "player_actor_id",
+        "conversation_session_id",
+        "scene_id",
+        "last_turn_id",
+        "last_presentation_id",
+        "route_state",
+        "resume_state",
+        "recovery_status",
+        "status",
+        "last_seen_at",
+    } <= column_names("player_sessions")
+    assert "uq_player_sessions_scope_user_actor" in constraint_names(
+        "player_sessions",
+        UniqueConstraint,
+    )
+    assert "ix_player_sessions_worldline_user" in index_names("player_sessions")
 
 
 def test_living_world_character_foundation_columns_are_registered() -> None:

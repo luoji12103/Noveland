@@ -7,6 +7,7 @@ import {
   createIntervention,
   previewPlayerChoiceConsequences,
   recordPlayerChoice,
+  upsertPlayerSessionResume,
 } from "@/lib/worlds/client";
 import type { PlayerInteractionData } from "@/lib/worlds/server";
 
@@ -24,6 +25,7 @@ vi.mock("@/lib/worlds/client", async () => {
     createIntervention: vi.fn(),
     previewPlayerChoiceConsequences: vi.fn(),
     recordPlayerChoice: vi.fn(),
+    upsertPlayerSessionResume: vi.fn(),
   };
 });
 
@@ -35,6 +37,8 @@ describe("PlayerInteractions", () => {
     expect(screen.getAllByText("Member Player").length).toBeGreaterThan(0);
     expect(screen.getByText("Festival prep")).toBeVisible();
     expect(screen.getByText("Club room notice")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Resume" })).toBeVisible();
+    expect(screen.getByText("Ready to resume.")).toBeVisible();
     expect(screen.getByText("0 relationship update(s)")).toBeVisible();
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
@@ -116,6 +120,29 @@ describe("PlayerInteractions", () => {
         expect.objectContaining({ display_name: "New Player", worldline_id: "worldline-1" }),
       );
     });
+  });
+
+  it("saves server-owned resume state without leaking hidden evidence", async () => {
+    vi.mocked(upsertPlayerSessionResume).mockResolvedValue(playerData.resume!);
+    render(<PlayerInteractions worldId="world-1" data={playerData} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Conversation id"), {
+      target: { value: "conversation-2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save resume" }));
+
+    await waitFor(() => {
+      expect(upsertPlayerSessionResume).toHaveBeenCalledWith(
+        "world-1",
+        expect.objectContaining({
+          worldline_id: "worldline-1",
+          player_actor_id: "actor-1",
+          conversation_session_id: "conversation-2",
+          recovery_status: "ready",
+        }),
+      );
+    });
+    expect(serializedDocument()).not.toMatch(/storage_uri|raw_prompt|raw_output|prompt_snapshot|secret/i);
   });
 });
 
@@ -243,6 +270,26 @@ const playerData: PlayerInteractionData = {
       updated_at: "2026-04-17T00:00:00.000Z",
     },
   ],
+  resume: {
+    id: "resume-1",
+    world_id: "world-1",
+    worldline_id: "worldline-1",
+    user_id: "user-1",
+    player_actor_id: "actor-1",
+    conversation_session_id: "conversation-1",
+    scene_id: "scene-1",
+    last_turn_id: "turn-1",
+    last_presentation_id: "presentation-1",
+    route_state: { source: "player_resume_panel" },
+    resume_state: { surface: "player" },
+    recovery_status: "ready",
+    recovery_label: "Ready to resume.",
+    available_actions: ["open_player_surface", "open_reader_playback"],
+    status: "active",
+    last_seen_at: "2026-04-17T00:00:00.000Z",
+    created_at: "2026-04-17T00:00:00.000Z",
+    updated_at: "2026-04-17T00:00:00.000Z",
+  },
   scenes: [
     {
       id: "scene-1",

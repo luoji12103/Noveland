@@ -210,8 +210,13 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`
 - `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`
+- `docs/agent/harness/feature-updates/v1.0.2-player-session-stability-plan.md`
 - `backend/migrations/versions/20260517_0046_private_beta_invites.py`
 - `backend/tests/test_api_private_beta.py`
+- `backend/migrations/versions/20260517_0047_player_sessions.py`
+- `backend/packages/player_sessions/`
+- `backend/services/api/src/noveland/services/api/player_sessions.py`
+- `backend/tests/test_api_player_sessions.py`
 - `backend/migrations/versions/20260514_0040_authoring_import_core.py`
 - `backend/tests/fixtures/authoring_sample_import.py`
 - `backend/tests/test_api_authoring.py`

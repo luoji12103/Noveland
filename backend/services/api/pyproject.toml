@@ -27,6 +27,7 @@ dependencies = [
   "noveland-observability",
   "noveland-package-contracts",
   "noveland-player-privacy",
+  "noveland-player-sessions",
   "noveland-private-beta",
   "noveland-plugins",
   "noveland-providers",
@@ -66,6 +67,7 @@ noveland-multimodal-eval = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-package-contracts = { workspace = true }
 noveland-player-privacy = { workspace = true }
+noveland-player-sessions = { workspace = true }
 noveland-private-beta = { workspace = true }
 noveland-plugins = { workspace = true }
 noveland-providers = { workspace = true }

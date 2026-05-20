@@ -11,6 +11,28 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 2 Player Session Stability implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-2-player-session-stability
+- Scope: v1.0 Private Beta MVP Phase 2 implementation only.
+- Summary: Added a dedicated player session stability boundary with `backend/packages/player_sessions/`, app-level `player_sessions.py`, migration `20260517_0047_player_sessions.py`, player-owned resume records scoped by world, worldline, current user, and player actor, safe recovery status calculation for stale conversation, missing media, provider, media, and presentation failures, and player-safe resume/restore UI on the existing player surface. The implementation adds no broad `worlds.py` routes, no admin diagnostics in tester DTOs, no raw event payload access, no provider calls, and no storage path, base64, bytes, raw prompt/output, prompt snapshot, secret, or invite-token exposure.
+- Files changed: `backend/packages/player_sessions/**`, `backend/services/api/src/noveland/services/api/player_sessions.py`, migration `20260517_0047_player_sessions.py`, API app/package metadata, schema/import/alembic tests, `web/features/worlds/player-interactions.tsx`, `web/lib/worlds/{client,server,types}.ts`, and Phase 2 OpenSpec/harness docs.
+- Tests added/updated: Backend API/schema/import/alembic coverage for resume round trip, cross-player isolation, cross-world/worldline rejection, stale conversation and provider/media/presentation fallback, no forbidden marker leaks, and workspace import/schema metadata. Web unit coverage verifies resume panel rendering and fallback copy. Full Phase 2 gate passed: backend ruff, backend mypy, backend pytest (`503 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`131 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: OpenSpec Phase 2 task `3.5`, Phase 2 design/spec/task deltas, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 2, fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 3 Cost & Quota Real Enforcement. No push performed.
+
+## v1.0 Phase 2 Player Session Stability planning entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-2-player-session-stability
+- Scope: v1.0 Private Beta MVP Phase 2 docs-only planning checkpoint before implementation.
+- Summary: Confirmed that player resume state should use a dedicated `player_sessions` package and app-level router rather than private beta invite records or overloaded conversation history. The first migration will add `player_sessions` scoped by world, worldline, user, and player actor, with optional conversation, scene, last turn, last presentation, safe route/resume JSON, recovery status, status, and last-seen timestamps.
+- Files changed: `docs/agent/harness/feature-updates/v1.0.2-player-session-stability-plan.md`, OpenSpec design/spec/tasks, and harness docs.
+- Tests added/updated: N/A, planning checkpoint.
+- Docs updated: Phase 2 checkpoint, OpenSpec design/spec/tasks, project index, file inventory, task board, and change journal.
+- Follow-up notes: Implement Phase 2 on this branch with no broad `worlds.py` routes, no browser-only resume state, no admin diagnostics in tester/player DTOs, and no raw event/prompt/output/storage/secret leaks.
+
 ## v1.0 Phase 1 Private Beta Onboarding & Access Model merge entry
 
 - Date: 2026-05-17

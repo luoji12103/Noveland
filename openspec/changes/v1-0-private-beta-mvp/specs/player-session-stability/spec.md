@@ -14,6 +14,14 @@ records.
 - **Then** it SHALL define the canonical owner for current worldline, current conversation, current scene, current presentation, and recovery status
 - **And** it SHALL define whether a migration is required.
 
+#### Scenario: Checkpoint selects dedicated player sessions
+- **Given** private beta invite records should not carry browser recovery state
+- **And** conversation history should not be overloaded with per-tester route state
+- **When** Phase 2 implementation begins
+- **Then** the implementation SHALL add a dedicated `player_sessions` package and app-level router
+- **And** it SHALL persist resume state in a `player_sessions` table scoped by world, worldline, user, and player actor
+- **And** it SHALL avoid broad route growth in `worlds.py`.
+
 ### Requirement: Player sessions resume safely
 The system SHALL restore current player conversation, worldline, scene, presentation, and playback state after interruption.
 

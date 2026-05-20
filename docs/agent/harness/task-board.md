@@ -1,7 +1,8 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 2 Player Session Stability planning checkpoint and implementation, after Phase 1 validation and fast-forward merge
+- v1.0 Phase 2 Player Session Stability fast-forward merge bookkeeping
+- v1.0 Phase 3 Cost & Quota Real Enforcement planning checkpoint and implementation, after Phase 2 fast-forward merge
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
@@ -11,6 +12,10 @@
 - None
 
 ## Done
+- v1.0 Phase 2 Player Session Stability full local gate
+- v1.0 Phase 2 Player Session Stability targeted tests
+- v1.0 Phase 2 Player Session Stability implementation
+- v1.0 Phase 2 Player Session Stability planning checkpoint
 - v1.0 Phase 1 Private Beta Onboarding & Access Model fast-forward merge
 - v1.0 Phase 1 Private Beta Onboarding & Access Model full local gate
 - v1.0 Phase 1 Private Beta Onboarding & Access Model implementation

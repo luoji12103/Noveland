@@ -10,7 +10,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 1.2 Write v1.0 feasibility review before implementation begins.
 - [x] 1.3 Revise v1.0 phase order based on feasibility review.
 - [x] 1.4 Confirm private beta invitation model and whether existing world memberships are sufficient.
-- [ ] 1.5 Confirm player session/resume schema and package/router ownership.
+- [x] 1.5 Confirm player session/resume schema and package/router ownership.
 - [ ] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
 - [ ] 1.7 Confirm feedback ownership and whether moderation records can be reused.
 - [ ] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
@@ -28,11 +28,11 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 3. Phase 2 — Player Session Stability
 
-- [ ] 3.1 Write docs-only phase planning checkpoint for player session/resume ownership.
-- [ ] 3.2 Implement session resume and presentation restore.
-- [ ] 3.3 Implement player-safe loading/error/fallback UI only after using `impeccable`.
-- [ ] 3.4 Add resume, fallback, cross-player, worldline, ACL, and no-leak tests.
-- [ ] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 3.1 Write docs-only phase planning checkpoint for player session/resume ownership.
+- [x] 3.2 Implement session resume and presentation restore.
+- [x] 3.3 Implement player-safe loading/error/fallback UI only after using `impeccable`.
+- [x] 3.4 Add resume, fallback, cross-player, worldline, ACL, and no-leak tests.
+- [x] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 3.6 Fast-forward merge to local main and update harness docs.
 
 ## 4. Phase 3 — Cost & Quota Real Enforcement

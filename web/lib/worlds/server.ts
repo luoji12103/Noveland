@@ -58,6 +58,7 @@ import type {
   PlayerJournalEntry,
   PlayerPrivacyExport,
   PlayerPrivacyRequest,
+  PlayerSessionResume,
   PlotThread,
   RelationshipEventSuggestion,
   RelationshipRepairRecord,
@@ -260,6 +261,7 @@ export type PlayerInteractionData = {
   playerJournal: PlayerJournalEntry[];
   notifications: InWorldNotification[];
   interventions: PlayerInterventionRecord[];
+  resume: PlayerSessionResume | null;
   scenes: Scene[];
   agents: Agent[];
   selectedWorldlineId: string | null;
@@ -1185,6 +1187,16 @@ export async function getPlayerInteractionData(
         apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
         apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
       ]);
+    const activeActor = playerActors?.[0] ?? null;
+    const resume =
+      selectedWorldlineId === null || activeActor === null
+        ? null
+        : await apiFetchOptional<PlayerSessionResume>(
+            `/worlds/${worldId}/player-sessions/resume?worldline_id=${encodeURIComponent(
+              selectedWorldlineId,
+            )}&player_actor_id=${encodeURIComponent(activeActor.id)}`,
+            cookies,
+          );
 
     return {
       worlds,
@@ -1195,6 +1207,7 @@ export async function getPlayerInteractionData(
       playerJournal: playerJournal ?? [],
       notifications: (notifications ?? []).filter((notification) => notification.user_id === userId),
       interventions: interventions ?? [],
+      resume,
       scenes,
       agents,
       selectedWorldlineId,
@@ -2151,6 +2164,7 @@ function emptyPlayerInteractionData(
     playerJournal: [],
     notifications: [],
     interventions: [],
+    resume: null,
     scenes: [],
     agents: [],
     selectedWorldlineId: null,

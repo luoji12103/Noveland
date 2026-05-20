@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-17T17:20:00Z
-- Branch: main
-- Objective: v1.0 Phase 1 Private Beta Onboarding & Access Model closeout.
-- Status: Phase 1 implementation is committed and fast-forward merged to local `main`. The dedicated `private_beta` package/router, `private_beta_invites` migration, hashed token lifecycle, least-privilege membership bootstrap, player profile setup, and minimal `/private-beta` Web onboarding flow are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` passed. Pause before Phase 2.
+- Date: 2026-05-20T00:00:00Z
+- Branch: feature/v1.0-2-player-session-stability
+- Objective: v1.0 Phase 2 Player Session Stability implementation.
+- Status: Phase 2 implementation and full gate are complete on the feature branch. The dedicated `player_sessions` package/router, `player_sessions` migration, player-owned resume contract, safe fallback statuses, and player surface resume UI are implemented. Commit Phase 2, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 3.
 
 ## Current Context
 
@@ -135,7 +135,7 @@
 - Keep `main` clean and do not push unless explicitly requested.
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
 - v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
-- Start v1.0 Phase 2 Player Session Stability only after explicit continuation; begin with the docs-only player session/resume ownership checkpoint.
+- v1.0 Phase 2 Player Session Stability is complete on `feature/v1.0-2-player-session-stability`; commit, fast-forward merge, and record merge bookkeeping before Phase 3.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

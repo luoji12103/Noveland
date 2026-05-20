@@ -9,9 +9,14 @@ import {
   createIntervention,
   previewPlayerChoiceConsequences,
   recordPlayerChoice,
+  upsertPlayerSessionResume,
 } from "@/lib/worlds/client";
 import type { PlayerInteractionData } from "@/lib/worlds/server";
-import type { ChoiceConsequencePreview, PlayerChoiceCreateInput } from "@/lib/worlds/types";
+import type {
+  ChoiceConsequencePreview,
+  PlayerChoiceCreateInput,
+  PlayerRecoveryStatus,
+} from "@/lib/worlds/types";
 import { formString, messageForError, optionalFormString } from "@/features/workspace/form-utils";
 
 type PlayerInteractionsProps = {
@@ -29,6 +34,7 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
   const activeActor = data.playerActors[0] ?? null;
   const latestRouteChoice =
     data.playerChoices.find((choice) => choice.choice_kind === "route") ?? data.playerChoices[0] ?? null;
+  const activeConversationId = data.resume?.conversation_session_id ?? "";
   const routeDiagnostics = useMemo(
     () => safeDiagnostics(preview, latestRouteChoice?.consequence_preview ?? null),
     [latestRouteChoice, preview],
@@ -71,6 +77,27 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
       });
       formElement.reset();
     }, activeActor === null ? "Player actor bound." : "Player actor updated.");
+  }
+
+  async function handleResume(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (activeActor === null || data.selectedWorldlineId === null) {
+      setNotice({ message: "Bind a player actor before saving resume state.", tone: "error" });
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const worldlineId = data.selectedWorldlineId;
+    await runAction(async () => {
+      await upsertPlayerSessionResume(worldId, {
+        worldline_id: worldlineId,
+        player_actor_id: activeActor.id,
+        conversation_session_id: optionalFormString(form, "conversation_session_id"),
+        scene_id: optionalFormString(form, "scene_id"),
+        recovery_status: formString(form, "recovery_status") as PlayerRecoveryStatus,
+        route_state: { source: "player_resume_panel" },
+        resume_state: { surface: "player" },
+      });
+    }, "Resume state saved.");
   }
 
   async function handleChoice(event: FormEvent<HTMLFormElement>) {
@@ -179,6 +206,71 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
             </select>
             <button className="primary-button" type="submit" disabled={isBusy}>
               {activeActor === null ? "Bind player actor" : "Update player actor"}
+            </button>
+          </form>
+        </section>
+
+        <section className="management-panel" aria-labelledby="player-resume-title">
+          <div className="admin-section-header">
+            <div>
+              <h2 className="section-title" id="player-resume-title">
+                Resume
+              </h2>
+              <p className="admin-section-copy">
+                Server-owned restore state for this player identity.
+              </p>
+            </div>
+            {data.resume?.conversation_session_id ? (
+              <Link
+                className="secondary-button"
+                href={`/worlds/${worldId}/reader/conversations/${data.resume.conversation_session_id}/scene`}
+              >
+                Restore scene
+              </Link>
+            ) : null}
+          </div>
+          {activeActor === null ? (
+            <p className="management-notice" data-tone="warning">
+              Bind a player actor before storing resume state.
+            </p>
+          ) : data.resume === null ? (
+            <p className="management-notice">No resume state stored yet.</p>
+          ) : (
+            <article className="resource-row">
+              <div>
+                <h3>{data.resume.recovery_label}</h3>
+                <p>
+                  {data.resume.status} · last seen {dateLabel(data.resume.last_seen_at)}
+                </p>
+                <p>{resumePointerLabel(data)}</p>
+              </div>
+            </article>
+          )}
+          <form className="player-form" onSubmit={handleResume}>
+            <input
+              className="text-input"
+              name="conversation_session_id"
+              placeholder="Conversation id"
+              defaultValue={activeConversationId}
+            />
+            <select className="text-input" name="scene_id" defaultValue={data.resume?.scene_id ?? activeActor?.current_scene_id ?? ""}>
+              <option value="">No current scene</option>
+              {data.scenes.map((scene) => (
+                <option key={scene.id} value={scene.id}>
+                  {scene.name}
+                </option>
+              ))}
+            </select>
+            <select className="text-input" name="recovery_status" defaultValue={data.resume?.recovery_status ?? "ready"}>
+              <option value="ready">Ready</option>
+              <option value="stale_conversation">Stale conversation</option>
+              <option value="missing_media">Missing media</option>
+              <option value="provider_failure">Provider failure</option>
+              <option value="media_failure">Media failure</option>
+              <option value="presentation_unavailable">Presentation unavailable</option>
+            </select>
+            <button className="primary-button" type="submit" disabled={isBusy || activeActor === null}>
+              Save resume
             </button>
           </form>
         </section>
@@ -323,6 +415,18 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
       </section>
     </section>
   );
+}
+
+function resumePointerLabel(data: PlayerInteractionData): string {
+  if (data.resume === null) {
+    return "No pointers saved.";
+  }
+  const parts = [
+    data.resume.conversation_session_id === null ? "No conversation" : `Conversation ${data.resume.conversation_session_id}`,
+    data.resume.scene_id === null ? "No scene" : `Scene ${data.resume.scene_id}`,
+    data.resume.last_turn_id === null ? "No turn" : `Turn ${data.resume.last_turn_id}`,
+  ];
+  return parts.join(" · ");
 }
 
 function ActorSelect({
