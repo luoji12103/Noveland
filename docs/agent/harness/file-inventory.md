@@ -549,6 +549,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`
 - `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`
+- `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`

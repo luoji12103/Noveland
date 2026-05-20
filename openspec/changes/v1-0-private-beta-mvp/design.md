@@ -92,6 +92,16 @@ implementation proves the JSON policy insufficient. Provider execution requests 
 `player_actor_id` and `capability_key` so runtime spend can be evaluated by world, provider,
 player, and capability before secret resolution and adapter execution.
 
+### Memory/persona QA reuses narrative quality diagnostics
+
+Phase 5 keeps memory/persona QA inside `backend/packages/narrative_quality/` and the existing
+app-level narrative quality router. The first implementation is response-only and deterministic:
+it inspects `AgentPersona`, `Agent.character_profile`, active `AgentMemoryItem` rows, recent
+conversation turns, and v0.9 authoring traceability metadata to produce admin-scoped findings. It
+adds no migration, persisted QA run table, Web UI, provider execution, direct repair mutation, or
+new eval framework. Repair output is limited to proposal-type hints such as persona, memory,
+dialogue-style, and relationship repairs.
+
 ### Feedback is linked evidence, not a forum
 
 Feedback records should point to turn, conversation, presentation, media, invocation, route, worldline, and player context through safe refs. v1.0 should not build public forums or social features. The feasibility review found that existing moderation records are reusable evidence infrastructure but may be semantically too heavy for beta issue triage; Phase 6 must decide whether to add a dedicated beta feedback package or extend moderation.

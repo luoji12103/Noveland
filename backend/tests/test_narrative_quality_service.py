@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import Agent, AgentRelationshipEdge, AgentRuntimeRun
+from noveland.agents.models import Agent, AgentPersona, AgentRelationshipEdge, AgentRuntimeRun
 from noveland.asset_generation.models import (
     AssetGenerationPolicy,
     AssetGenerationProposal,
@@ -53,6 +53,7 @@ from noveland.memory.models import (
 from noveland.narrative.contracts import NarrativeArtifactKind
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.narrative_quality.contracts import (
+    MemoryPersonaQARequest,
     NarrativeQualityContextKind,
     NarrativeQualityContextPreviewRequest,
     NarrativeQualityContinuityReviewRequest,
@@ -1365,6 +1366,142 @@ def test_route_relationship_progression_review_sanitizes_response() -> None:
     assert any(finding.code == "unsafe_progression_event_payload" for finding in result.findings)
 
 
+def test_memory_persona_qa_reports_ok_with_traceable_persona_and_memory() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    _seed_persona_and_memory(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        persona_text="Alice speaks in concise, careful lines.",
+        memory_content="Alice keeps the quiet lantern safe.",
+        persona_policy={"required_style_markers": ["lantern"]},
+    )
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="I will keep the lantern safe.",
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).run_memory_persona_qa(
+            world_id,
+            MemoryPersonaQARequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                agent_ids=[agent_id],
+            ),
+        )
+
+    serialized = result.model_dump_json()
+    assert result.status == "ok"
+    assert result.finding_count == 0
+    assert result.checked_agent_count == 1
+    assert result.mutation_count == 0
+    assert result.repair_policy == "proposal_only"
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+    assert "storage_uri" not in serialized
+    assert "Alice keeps" not in serialized
+
+
+def test_memory_persona_qa_detects_contamination_and_drift_without_mutation() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    other_worldline_id = uuid.uuid4()
+    memory_id = _seed_persona_and_memory(
+        engine,
+        world_id,
+        worldline_id,
+        agent_id,
+        persona_text="Alice avoids forbidden phrasing.",
+        memory_content="[contaminated] trust suddenly reversed",
+        persona_policy={"forbidden_terms": ["forbidden"]},
+        memory_metadata={
+            "memory_contamination": True,
+            "source_worldline_id": str(other_worldline_id),
+        },
+    )
+    conversation_id = _seed_conversation(engine, world_id, worldline_id, agent_id)
+    _seed_agent_turn(
+        engine,
+        conversation_id,
+        agent_id,
+        output_text="[OOC] forbidden relationship_drift",
+    )
+
+    with Session(engine) as session:
+        before_memory = session.get(AgentMemoryItem, memory_id)
+        assert before_memory is not None
+        before_content = before_memory.content
+        result = NarrativeQualityService(session).run_memory_persona_qa(
+            world_id,
+            MemoryPersonaQARequest(
+                worldline_id=worldline_id,
+                conversation_id=conversation_id,
+                agent_ids=[agent_id],
+            ),
+        )
+        after_memory = session.get(AgentMemoryItem, memory_id)
+        world_event_count = session.scalar(select(func.count(WorldEventModel.id)))
+
+    codes = {finding.code for finding in result.findings}
+    serialized = result.model_dump_json()
+    assert result.status == "blocked"
+    assert {
+        "memory_contamination",
+        "worldline_contamination",
+        "persona_drift",
+        "dialogue_style_drift",
+        "relationship_drift",
+    }.issubset(codes)
+    assert any(
+        "memory_repair" in finding.suggested_repair_proposal_types
+        for finding in result.findings
+    )
+    assert after_memory is not None
+    assert after_memory.content == before_content
+    assert world_event_count == 0
+    assert "raw_prompt" not in serialized
+    assert "raw_output" not in serialized
+    assert "storage_uri" not in serialized
+    assert "[contaminated]" not in serialized
+
+
+def test_memory_persona_qa_rejects_cross_worldline_conversation() -> None:
+    engine = _engine()
+    world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    fork_worldline_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Worldline(
+                id=fork_worldline_id,
+                world_id=world_id,
+                worldline_key="fork",
+                name="Fork",
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+    conversation_id = _seed_conversation(engine, world_id, fork_worldline_id, agent_id)
+
+    with Session(engine) as session:
+        with pytest.raises(NarrativeQualityValidationError, match="conversation not found"):
+            NarrativeQualityService(session).run_memory_persona_qa(
+                world_id,
+                MemoryPersonaQARequest(
+                    worldline_id=worldline_id,
+                    conversation_id=conversation_id,
+                    agent_ids=[agent_id],
+                ),
+            )
+
+
 def test_long_living_world_eval_reuses_long_run_eval_records() -> None:
     engine = _engine()
     world_id, worldline_id, agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
@@ -1640,6 +1777,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, Worldline.__table__),
         cast(Table, Scene.__table__),
         cast(Table, Agent.__table__),
+        cast(Table, AgentPersona.__table__),
         cast(Table, WorldOrganization.__table__),
         cast(Table, OrganizationMembership.__table__),
         cast(Table, FactionProgressTrack.__table__),
@@ -1818,6 +1956,70 @@ def _seed_agent_turn(
         )
         session.commit()
         return turn_id
+
+
+def _seed_persona_and_memory(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    *,
+    persona_text: str,
+    memory_content: str,
+    persona_policy: dict[str, Any] | None = None,
+    memory_metadata: dict[str, Any] | None = None,
+) -> uuid.UUID:
+    memory_id = uuid.uuid4()
+    proposal_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    source_fragment_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            AgentPersona(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                agent_id=agent_id,
+                persona_text=persona_text,
+                behavior_policy={
+                    **(persona_policy or {}),
+                    "authoring": {
+                        "proposal_id": str(proposal_id),
+                        "run_id": str(run_id),
+                        "source_fragment_id": str(source_fragment_id),
+                    },
+                },
+                policy_plugin_config={
+                    "authoring": {
+                        "proposal_id": str(proposal_id),
+                        "run_id": str(run_id),
+                        "source_fragment_id": str(source_fragment_id),
+                    }
+                },
+                is_enabled=True,
+            )
+        )
+        session.add(
+            AgentMemoryItem(
+                id=memory_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+                source_event_id=None,
+                content=memory_content,
+                metadata_json={
+                    "source_kind": "authoring_distillation",
+                    "proposal_id": str(proposal_id),
+                    "run_id": str(run_id),
+                    "source_fragment_id": str(source_fragment_id),
+                    **(memory_metadata or {}),
+                },
+                embedding=[0.1] * 1536,
+                visibility="private",
+                is_active=True,
+            )
+        )
+        session.commit()
+    return memory_id
 
 
 def _seed_aligned_presentation(

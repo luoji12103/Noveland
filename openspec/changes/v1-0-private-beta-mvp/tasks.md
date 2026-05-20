@@ -56,11 +56,11 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 6. Phase 5 — Memory & Persona QA
 
-- [ ] 6.1 Write docs-only phase planning checkpoint for QA diagnostics ownership.
-- [ ] 6.2 Implement admin diagnostics for memory contamination and persona drift.
-- [ ] 6.3 Add QA UI only after using `impeccable` if Web scope is approved.
-- [ ] 6.4 Add contamination, drift, worldline, redaction, and repair-proposal tests.
-- [ ] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 6.1 Write docs-only phase planning checkpoint for QA diagnostics ownership.
+- [x] 6.2 Implement admin diagnostics for memory contamination and persona drift.
+- [x] 6.3 Add QA UI only after using `impeccable` if Web scope is approved.
+- [x] 6.4 Add contamination, drift, worldline, redaction, and repair-proposal tests.
+- [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Beta Feedback System

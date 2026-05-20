@@ -406,6 +406,55 @@ class NarrativeQualityRepairSuggestion(_FrozenContract):
         return value
 
 
+class MemoryPersonaQARequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID | None = None
+    agent_ids: list[uuid.UUID] = Field(default_factory=list)
+    recent_turn_limit: int = Field(default=20, ge=1, le=100)
+    agent_limit: int = Field(default=10, ge=1, le=50)
+
+
+class MemoryPersonaQAFinding(_FrozenContract):
+    code: str = Field(min_length=1, max_length=120)
+    severity: str = Field(min_length=1, max_length=40)
+    summary: str = Field(min_length=1, max_length=400)
+    agent_id: uuid.UUID | None = None
+    evidence_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    source_traceability_refs: list[NarrativeQualityEvidenceRef] = Field(default_factory=list)
+    suggested_repair_proposal_types: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_metadata_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "metadata")
+        return value
+
+
+class MemoryPersonaQAReport(_FrozenContract):
+    run_id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    status: str = Field(min_length=1, max_length=40)
+    generated_at: datetime
+    finding_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    checked_agent_count: int = Field(ge=0)
+    mutation_count: int = Field(default=0, ge=0)
+    repair_policy: str = Field(default="proposal_only", min_length=1, max_length=80)
+    findings: list[MemoryPersonaQAFinding] = Field(default_factory=list)
+    suppressed_fields: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
 class NarrativeQualityContinuityReviewResult(_FrozenContract):
     world_id: uuid.UUID
     worldline_id: uuid.UUID

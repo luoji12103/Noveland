@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 5 Memory & Persona QA implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-5-memory-persona-qa
+- Scope: v1.0 Private Beta MVP Phase 5 implementation only.
+- Summary: Added the Phase 5 planning checkpoint and extended the existing narrative quality boundary with response-only memory/persona QA DTOs, deterministic `NarrativeQualityService.run_memory_persona_qa()`, and world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`. The report detects missing persona/memory, memory contamination, persona drift, dialogue style drift, relationship drift, traceability gaps, and worldline contamination using safe evidence refs and proposal-only repair suggestion types. Phase 5 adds no migration, Web UI, provider execution, direct persona/memory mutation, duplicate eval framework, broad `worlds.py` routes, or world-event writes.
+- Files changed: `backend/packages/narrative_quality/src/noveland/narrative_quality/{contracts.py,service.py}`, `backend/services/api/src/noveland/services/api/narrative_quality.py`, `backend/tests/test_narrative_quality_service.py`, `backend/tests/test_api_narrative_quality.py`, Phase 5 OpenSpec docs/tasks, the Phase 5 checkpoint, and harness docs.
+- Tests added/updated: Narrative quality service/API tests now cover traceable QA success, memory contamination, persona/style/relationship drift, cross-worldline conversation rejection, admin-only API ACL, proposal-only repair suggestions, no direct memory/persona/world-event mutation, and no forbidden response leaks. Targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_narrative_quality_service.py tests/test_api_narrative_quality.py -q` (`75 passed`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`515 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 5 checkpoint, OpenSpec design/phase-plan/tasks through `6.5`, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 5 and fast-forward merge to local `main` if the branch stays clean. No Web UI was added in Phase 5, so no new `impeccable` UI work was required.
+
 ## v1.0 Phase 4 World Setup Wizard merge entry
 
 - Date: 2026-05-20

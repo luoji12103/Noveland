@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from noveland.agents.models import Agent, AgentRelationshipEdge
+from noveland.agents.models import Agent, AgentPersona, AgentRelationshipEdge
 from noveland.asset_generation.models import (
     AssetGenerationPolicy,
     AssetGenerationProposal,
@@ -13,6 +13,7 @@ from noveland.asset_generation.models import (
 from noveland.conversations import ConversationService
 from noveland.conversations.contracts import ConversationSessionRecord, ConversationTurnRecord
 from noveland.conversations.models import (
+    ConversationParticipant,
     ConversationSession,
     ConversationTurn,
     ConversationTurnPresentation,
@@ -21,6 +22,7 @@ from noveland.conversations.presentation import ConversationPresentationService
 from noveland.events.models import WorldEventModel
 from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaJob
+from noveland.memory.models import AgentMemoryItem
 from noveland.narrative.contracts import NarrativeArtifactCreate
 from noveland.narrative.models import NarrativeArtifact
 from noveland.narrative.services import NarrativeArtifactService
@@ -60,6 +62,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .contracts import (
+    MemoryPersonaQAFinding,
+    MemoryPersonaQAReport,
+    MemoryPersonaQARequest,
     NarrativeQualityAlignmentFinding,
     NarrativeQualityConflictReport,
     NarrativeQualityContextKind,
@@ -1291,6 +1296,353 @@ class NarrativeQualityService:
             ),
             generated_at=datetime.now(UTC),
         )
+
+    def run_memory_persona_qa(
+        self,
+        world_id: uuid.UUID,
+        request: MemoryPersonaQARequest,
+    ) -> MemoryPersonaQAReport:
+        worldline = worldline_or_404(self._session, world_id, request.worldline_id)
+        conversation = self._qa_conversation(world_id, worldline.id, request.conversation_id)
+        agents = self._qa_agents(
+            world_id,
+            conversation_id=None if conversation is None else conversation.id,
+            requested_agent_ids=request.agent_ids,
+            limit=request.agent_limit,
+        )
+        findings: list[MemoryPersonaQAFinding] = []
+        if not agents:
+            findings.append(
+                MemoryPersonaQAFinding(
+                    code="no_agents_available",
+                    severity="blocked",
+                    summary="No enabled agents are available for memory/persona QA.",
+                    suggested_repair_proposal_types=["persona_repair", "memory_repair"],
+                    metadata={"checked_agent_count": 0},
+                )
+            )
+        for agent in agents:
+            findings.extend(
+                self._qa_agent_findings(
+                    world_id,
+                    worldline.id,
+                    agent,
+                    conversation_id=None if conversation is None else conversation.id,
+                    recent_turn_limit=request.recent_turn_limit,
+                )
+            )
+        blocker_count = sum(1 for finding in findings if finding.severity == "blocked")
+        warning_count = sum(1 for finding in findings if finding.severity == "warning")
+        status_text = "blocked" if blocker_count else "watch" if warning_count else "ok"
+        return MemoryPersonaQAReport(
+            run_id=uuid.uuid4(),
+            world_id=world_id,
+            worldline_id=worldline.id,
+            status=status_text,
+            generated_at=datetime.now(UTC),
+            finding_count=len(findings),
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            checked_agent_count=len(agents),
+            findings=findings,
+            suppressed_fields=[
+                "turn_text_bodies",
+                "memory_content_bodies",
+                "persona_text_bodies",
+                "prompt_bodies",
+                "provider_output_bodies",
+                "prompt_snapshot_details",
+                "provider_payloads",
+                "storage_paths",
+                "resolved_secrets",
+            ],
+            non_goals=[
+                "automatic_persona_mutation",
+                "automatic_memory_mutation",
+                "reader_player_diagnostics",
+                "duplicate_eval_framework",
+            ],
+        )
+
+    def _qa_conversation(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+    ) -> ConversationSession | None:
+        if conversation_id is None:
+            return None
+        conversation = self._session.get(ConversationSession, conversation_id)
+        if (
+            conversation is None
+            or conversation.world_id != world_id
+            or conversation.worldline_id != worldline_id
+        ):
+            raise NarrativeQualityValidationError("conversation not found in worldline")
+        return conversation
+
+    def _qa_agents(
+        self,
+        world_id: uuid.UUID,
+        *,
+        conversation_id: uuid.UUID | None,
+        requested_agent_ids: list[uuid.UUID],
+        limit: int,
+    ) -> list[Agent]:
+        if requested_agent_ids:
+            agents: list[Agent] = []
+            for agent_id in requested_agent_ids:
+                agent = self._session.get(Agent, agent_id)
+                if agent is None or agent.world_id != world_id:
+                    raise NarrativeQualityValidationError("agent not found in world")
+                agents.append(agent)
+            return agents[:limit]
+        if conversation_id is not None:
+            participants = self._session.scalars(
+                select(ConversationParticipant)
+                .where(
+                    ConversationParticipant.session_id == conversation_id,
+                    ConversationParticipant.is_enabled.is_(True),
+                )
+                .order_by(ConversationParticipant.turn_order)
+                .limit(limit)
+            ).all()
+            participant_ids = [participant.agent_id for participant in participants]
+            if participant_ids:
+                return list(
+                    self._session.scalars(
+                        select(Agent)
+                        .where(Agent.world_id == world_id, Agent.id.in_(participant_ids))
+                        .order_by(Agent.agent_key)
+                    ).all()
+                )
+        return list(
+            self._session.scalars(
+                select(Agent)
+                .where(Agent.world_id == world_id, Agent.is_enabled.is_(True))
+                .order_by(Agent.agent_key)
+                .limit(limit)
+            ).all()
+        )
+
+    def _qa_agent_findings(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent: Agent,
+        *,
+        conversation_id: uuid.UUID | None,
+        recent_turn_limit: int,
+    ) -> list[MemoryPersonaQAFinding]:
+        persona = self._latest_persona(world_id, agent.id)
+        memories = self._agent_memories(world_id, worldline_id, agent.id)
+        turns = self._agent_recent_turns(
+            world_id,
+            worldline_id,
+            agent.id,
+            conversation_id=conversation_id,
+            limit=recent_turn_limit,
+        )
+        findings: list[MemoryPersonaQAFinding] = []
+        if persona is None:
+            findings.append(
+                _qa_finding(
+                    code="persona_missing",
+                    severity="blocked",
+                    summary="Agent is missing an enabled persona card.",
+                    agent_id=agent.id,
+                    evidence_refs=[NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id))],
+                    suggested_repair_proposal_types=["persona_repair"],
+                )
+            )
+        if not memories:
+            findings.append(
+                _qa_finding(
+                    code="initial_memory_missing",
+                    severity="blocked",
+                    summary="Agent has no active memory in the selected worldline.",
+                    agent_id=agent.id,
+                    evidence_refs=[NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id))],
+                    suggested_repair_proposal_types=["memory_repair"],
+                )
+            )
+        source_refs = _qa_persona_source_refs(persona)
+        for memory in memories:
+            source_refs.extend(_qa_memory_source_refs(memory))
+        if not source_refs:
+            findings.append(
+                _qa_finding(
+                    code="source_traceability_missing",
+                    severity="warning",
+                    summary="Persona and memory evidence lack source traceability references.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id)),
+                    ],
+                    suggested_repair_proposal_types=["persona_repair", "memory_repair"],
+                )
+            )
+        contaminated_memories = [
+            memory for memory in memories if _memory_contamination_detected(memory)
+        ]
+        if contaminated_memories:
+            findings.append(
+                _qa_finding(
+                    code="memory_contamination",
+                    severity="blocked",
+                    summary="Active memory contains contamination markers or QA flags.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="agent_memory_item", id=str(memory.id))
+                        for memory in contaminated_memories[:5]
+                    ],
+                    source_traceability_refs=_dedupe_refs(
+                        [
+                            ref
+                            for memory in contaminated_memories
+                            for ref in _qa_memory_source_refs(memory)
+                        ]
+                    ),
+                    suggested_repair_proposal_types=["memory_repair"],
+                    metadata={"affected_memory_count": len(contaminated_memories)},
+                )
+            )
+        worldline_contamination = [
+            memory
+            for memory in memories
+            if _worldline_contamination_detected(memory, worldline_id)
+        ]
+        if worldline_contamination:
+            findings.append(
+                _qa_finding(
+                    code="worldline_contamination",
+                    severity="blocked",
+                    summary="Active memory references another worldline.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="agent_memory_item", id=str(memory.id))
+                        for memory in worldline_contamination[:5]
+                    ],
+                    source_traceability_refs=_dedupe_refs(
+                        [
+                            ref
+                            for memory in worldline_contamination
+                            for ref in _qa_memory_source_refs(memory)
+                        ]
+                    ),
+                    suggested_repair_proposal_types=["memory_repair"],
+                    metadata={"affected_memory_count": len(worldline_contamination)},
+                )
+            )
+        drift_turns = [turn for turn in turns if _turn_has_persona_drift_marker(turn)]
+        if persona is not None and drift_turns:
+            findings.append(
+                _qa_finding(
+                    code="persona_drift",
+                    severity="warning",
+                    summary="Recent dialogue includes persona drift markers.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="conversation_turn", id=str(turn.id))
+                        for turn in drift_turns[:5]
+                    ],
+                    source_traceability_refs=_dedupe_refs(source_refs),
+                    suggested_repair_proposal_types=["persona_repair", "dialogue_style_repair"],
+                    metadata={"affected_turn_count": len(drift_turns)},
+                )
+            )
+        style_turns = [
+            turn for turn in turns if persona is not None and _turn_has_style_drift(persona, turn)
+        ]
+        if style_turns:
+            findings.append(
+                _qa_finding(
+                    code="dialogue_style_drift",
+                    severity="warning",
+                    summary="Recent dialogue diverges from persona style constraints.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="conversation_turn", id=str(turn.id))
+                        for turn in style_turns[:5]
+                    ],
+                    source_traceability_refs=_dedupe_refs(source_refs),
+                    suggested_repair_proposal_types=["dialogue_style_repair"],
+                    metadata={"affected_turn_count": len(style_turns)},
+                )
+            )
+        relationship_drift = _relationship_drift_detected(memories, turns)
+        if relationship_drift:
+            findings.append(
+                _qa_finding(
+                    code="relationship_drift",
+                    severity="warning",
+                    summary="Memory or dialogue includes relationship drift markers.",
+                    agent_id=agent.id,
+                    evidence_refs=[
+                        NarrativeQualityEvidenceRef(kind="agent", id=str(agent.id)),
+                    ],
+                    source_traceability_refs=_dedupe_refs(source_refs),
+                    suggested_repair_proposal_types=["memory_repair", "relationship_repair"],
+                    metadata={"detected": True},
+                )
+            )
+        return findings
+
+    def _latest_persona(self, world_id: uuid.UUID, agent_id: uuid.UUID) -> AgentPersona | None:
+        return self._session.scalars(
+            select(AgentPersona)
+            .where(
+                AgentPersona.world_id == world_id,
+                AgentPersona.agent_id == agent_id,
+                AgentPersona.is_enabled.is_(True),
+                AgentPersona.persona_text != "",
+            )
+            .order_by(AgentPersona.updated_at.desc())
+            .limit(1)
+        ).one_or_none()
+
+    def _agent_memories(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+    ) -> list[AgentMemoryItem]:
+        return list(
+            self._session.scalars(
+                select(AgentMemoryItem)
+                .where(
+                    AgentMemoryItem.world_id == world_id,
+                    AgentMemoryItem.worldline_id == worldline_id,
+                    AgentMemoryItem.agent_id == agent_id,
+                    AgentMemoryItem.is_active.is_(True),
+                )
+                .order_by(AgentMemoryItem.updated_at.desc())
+            ).all()
+        )
+
+    def _agent_recent_turns(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        *,
+        conversation_id: uuid.UUID | None,
+        limit: int,
+    ) -> list[ConversationTurn]:
+        statement = (
+            select(ConversationTurn)
+            .join(ConversationSession, ConversationSession.id == ConversationTurn.session_id)
+            .where(
+                ConversationSession.world_id == world_id,
+                ConversationSession.worldline_id == worldline_id,
+                ConversationTurn.speaker_agent_id == agent_id,
+            )
+            .order_by(ConversationTurn.created_at.desc())
+            .limit(limit)
+        )
+        if conversation_id is not None:
+            statement = statement.where(ConversationTurn.session_id == conversation_id)
+        return list(self._session.scalars(statement).all())
 
     def _dashboard_provider_metrics(self, world_id: uuid.UUID) -> dict[str, Any]:
         providers = list(
@@ -4393,6 +4745,183 @@ def _turn_dialogue_text(turn: ConversationTurnRecord | None) -> str | None:
     if turn is None:
         return None
     return turn.output_text or turn.input_text
+
+
+def _qa_finding(
+    *,
+    code: str,
+    severity: str,
+    summary: str,
+    agent_id: uuid.UUID | None = None,
+    evidence_refs: list[NarrativeQualityEvidenceRef] | None = None,
+    source_traceability_refs: list[NarrativeQualityEvidenceRef] | None = None,
+    suggested_repair_proposal_types: list[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> MemoryPersonaQAFinding:
+    return MemoryPersonaQAFinding(
+        code=code,
+        severity=severity,
+        summary=summary,
+        agent_id=agent_id,
+        evidence_refs=[] if evidence_refs is None else _dedupe_refs(evidence_refs),
+        source_traceability_refs=[]
+        if source_traceability_refs is None
+        else _dedupe_refs(source_traceability_refs),
+        suggested_repair_proposal_types=[]
+        if suggested_repair_proposal_types is None
+        else list(dict.fromkeys(suggested_repair_proposal_types)),
+        metadata=_sanitize_json({} if metadata is None else metadata),
+    )
+
+
+def _qa_persona_source_refs(persona: AgentPersona | None) -> list[NarrativeQualityEvidenceRef]:
+    if persona is None:
+        return []
+    refs = [NarrativeQualityEvidenceRef(kind="agent_persona", id=str(persona.id))]
+    refs.extend(_source_refs_from_json(persona.behavior_policy.get("authoring")))
+    refs.extend(_source_refs_from_json(persona.policy_plugin_config.get("authoring")))
+    return _dedupe_refs(refs)
+
+
+def _qa_memory_source_refs(memory: AgentMemoryItem) -> list[NarrativeQualityEvidenceRef]:
+    refs = [NarrativeQualityEvidenceRef(kind="agent_memory_item", id=str(memory.id))]
+    refs.extend(_source_refs_from_json(memory.metadata_json))
+    if memory.source_event_id is not None:
+        refs.append(NarrativeQualityEvidenceRef(kind="world_event", id=str(memory.source_event_id)))
+    return _dedupe_refs(refs)
+
+
+def _source_refs_from_json(value: Any) -> list[NarrativeQualityEvidenceRef]:
+    if not isinstance(value, dict):
+        return []
+    candidates = (
+        ("proposal_id", "authoring_proposal"),
+        ("run_id", "authoring_import_run"),
+        ("source_fragment_id", "authoring_source_fragment"),
+        ("model_invocation_id", "model_invocation"),
+        ("source_event_id", "world_event"),
+    )
+    refs: list[NarrativeQualityEvidenceRef] = []
+    for key, kind in candidates:
+        raw_value = value.get(key)
+        if isinstance(raw_value, str) and raw_value:
+            refs.append(NarrativeQualityEvidenceRef(kind=kind, id=raw_value))
+    source_evidence = value.get("source_evidence")
+    if isinstance(source_evidence, dict):
+        refs.extend(_source_refs_from_json(source_evidence))
+    return _dedupe_refs(refs)
+
+
+def _memory_contamination_detected(memory: AgentMemoryItem) -> bool:
+    metadata = memory.metadata_json or {}
+    if _truthy_flag(metadata, "contaminated", "memory_contamination", "qa_contamination"):
+        return True
+    marker = str(metadata.get("qa_marker") or metadata.get("contamination_marker") or "")
+    if marker.strip():
+        return True
+    content = memory.content.lower()
+    return any(
+        token in content
+        for token in (
+            "[contaminated]",
+            "qa_contamination",
+            "memory_contamination",
+            "unsafe_memory_marker",
+            "ooc memory",
+        )
+    )
+
+
+def _worldline_contamination_detected(
+    memory: AgentMemoryItem,
+    worldline_id: uuid.UUID,
+) -> bool:
+    if memory.worldline_id is not None and memory.worldline_id != worldline_id:
+        return True
+    metadata = memory.metadata_json or {}
+    for key in ("worldline_id", "source_worldline_id", "reference_worldline_id"):
+        raw_value = metadata.get(key)
+        if isinstance(raw_value, str) and raw_value:
+            try:
+                if uuid.UUID(raw_value) != worldline_id:
+                    return True
+            except ValueError:
+                return True
+    return False
+
+
+def _turn_has_persona_drift_marker(turn: ConversationTurn) -> bool:
+    text = f"{turn.input_text or ''} {turn.output_text or ''}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "[ooc]",
+            "ooc_marker",
+            "persona_drift",
+            "out of character",
+            "generic chatbot",
+        )
+    )
+
+
+def _turn_has_style_drift(persona: AgentPersona, turn: ConversationTurn) -> bool:
+    text = f"{turn.input_text or ''} {turn.output_text or ''}".lower()
+    behavior_policy = persona.behavior_policy or {}
+    forbidden_terms = _json_string_list(behavior_policy.get("forbidden_terms"))
+    forbidden_terms.extend(_json_string_list(behavior_policy.get("style_forbidden_terms")))
+    if any(term.lower() in text for term in forbidden_terms):
+        return True
+    style_markers = _json_string_list(behavior_policy.get("required_style_markers"))
+    if style_markers and not any(marker.lower() in text for marker in style_markers):
+        return True
+    return "style_drift" in text or "voice_drift" in text
+
+
+def _relationship_drift_detected(
+    memories: list[AgentMemoryItem],
+    turns: list[ConversationTurn],
+) -> bool:
+    memory_text = " ".join(memory.content for memory in memories).lower()
+    turn_text = " ".join(f"{turn.input_text or ''} {turn.output_text or ''}" for turn in turns)
+    combined = f"{memory_text} {turn_text.lower()}"
+    return any(
+        marker in combined
+        for marker in (
+            "relationship_drift",
+            "relationship contradiction",
+            "trust suddenly reversed",
+            "affection suddenly reversed",
+        )
+    )
+
+
+def _truthy_flag(value: dict[str, Any], *keys: str) -> bool:
+    for key in keys:
+        flag = value.get(key)
+        if flag is True:
+            return True
+        if isinstance(flag, str) and flag.strip().lower() in {"true", "yes", "1", "blocked"}:
+            return True
+    return False
+
+
+def _json_string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _dedupe_refs(refs: list[NarrativeQualityEvidenceRef]) -> list[NarrativeQualityEvidenceRef]:
+    deduped: list[NarrativeQualityEvidenceRef] = []
+    seen: set[tuple[str, str]] = set()
+    for ref in refs:
+        key = (ref.kind, ref.id)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(ref)
+    return deduped
 
 
 def _dialogue_findings(

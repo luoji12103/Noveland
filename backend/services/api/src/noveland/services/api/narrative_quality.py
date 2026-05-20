@@ -6,6 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from noveland.auth import AuthenticatedSubject
 from noveland.narrative_quality.contracts import (
+    MemoryPersonaQAReport,
+    MemoryPersonaQARequest,
     NarrativeQualityContextPreview,
     NarrativeQualityContextPreviewRequest,
     NarrativeQualityContinuityReviewRequest,
@@ -230,6 +232,25 @@ def review_route_relationship_progression(
             world_id,
             request,
         )
+    except NarrativeQualityValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
+    except ValueError as exc:
+        raise _not_found(str(exc)) from exc
+
+
+@router.post(
+    "/memory-persona/qa",
+    response_model=MemoryPersonaQAReport,
+    dependencies=[Depends(require_csrf)],
+)
+def run_memory_persona_qa(
+    world_id: uuid.UUID,
+    request: MemoryPersonaQARequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> MemoryPersonaQAReport:
+    try:
+        return NarrativeQualityService(db_session).run_memory_persona_qa(world_id, request)
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
     except ValueError as exc:

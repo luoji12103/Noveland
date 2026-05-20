@@ -89,6 +89,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.0.3-cost-quota-real-enforcement-plan.md` — v1.0 Phase 3 checkpoint for provider-owned quota enforcement through `ProviderExecutionService`, safe `provider_budget_policies.limits_json` player/capability extensions, spend-path coverage, no default migration, and stop conditions.
 - `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md` — v1.0 Phase 4 checkpoint for backend/API-only private beta setup readiness aggregation through existing observability/readiness, with no new setup tables, Web UI, provider calls, or broad `worlds.py` routes.
 - v1.0 Phase 4 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta-setup`. The report reuses `ProductionReadinessGateService`, checks invite/access, player session restore, player/capability quota, providers, persona/memory, visual, voice, media, source traceability, self-use MVP evidence, and no-leak markers, and returns only safe readiness sections/evidence refs.
+- `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md` — v1.0 Phase 5 checkpoint for backend/API-only memory/persona QA in the existing narrative quality boundary, with no migration, Web UI, provider calls, direct mutation, or duplicate eval framework.
+- v1.0 Phase 5 implementation extends `backend/packages/narrative_quality/` and the existing app-level narrative quality router with world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`. The report inspects persona, active memory, recent turns, source traceability, and drift markers, returns only safe evidence refs plus proposal-only repair suggestion types, and does not mutate persona, memory, world events, or provider state.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -258,8 +260,8 @@ Fast orientation for a new coding session.
   - `noveland.narrative.models` — narrative artifact ORM model with optional source conversation linkage
   - `noveland.narrative.services` — narrative artifact create/list helpers and conversation-first writer pipeline
 - `backend/packages/narrative_quality/`
-  - `noveland.narrative_quality.contracts` — v0.6 narrative quality context, GM proposal, dialogue review, presentation alignment, writer, continuity review, pacing review, and progression review DTOs
-  - `noveland.narrative_quality.service` — admin-scoped runtime context, provider-backed GM proposal, dialogue/OOC review, presentation alignment, Narrative Writer v2, Continuity Review v2, runtime pacing diagnostics, and route/relationship progression diagnostics with worldline validation and response redaction
+  - `noveland.narrative_quality.contracts` — v0.6 narrative quality context, GM proposal, dialogue review, presentation alignment, writer, continuity review, pacing review, progression review, and v1.0 memory/persona QA DTOs
+  - `noveland.narrative_quality.service` — admin-scoped runtime context, provider-backed GM proposal, dialogue/OOC review, presentation alignment, Narrative Writer v2, Continuity Review v2, runtime pacing diagnostics, route/relationship progression diagnostics, and v1.0 memory/persona QA with worldline validation and response redaction
 - `backend/packages/events/`
   - `noveland.events` — event/snapshot contracts and store exports
   - `noveland.events.models` — world event log and snapshot metadata ORM models

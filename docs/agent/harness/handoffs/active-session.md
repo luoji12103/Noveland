@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: main
-- Objective: v1.0 Phase 4 World Setup Wizard closeout.
-- Status: Phase 4 implementation is committed and fast-forward merged to local `main`. The setup report reuses observability/readiness through platform-admin `GET /observability/readiness/private-beta-setup`, adds no migration or Web UI, and passed targeted readiness tests plus the full backend/OpenSpec gate. Start Phase 5 Memory & Persona QA from clean local `main`.
+- Branch: feature/v1.0-5-memory-persona-qa
+- Objective: v1.0 Phase 5 Memory & Persona QA validation and merge.
+- Status: Phase 5 checkpoint, backend/API implementation, targeted tests, and full backend/OpenSpec validation are complete on the phase branch. The implementation reuses narrative quality diagnostics through world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`, adds no migration or Web UI, and is ready to commit and fast-forward merge to local `main`.
 
 ## Current Context
 
@@ -142,6 +142,11 @@
 - v1.0 Phase 4 targeted checks passed: focused readiness pytest (`17 passed`), focused ruff, and focused mypy.
 - v1.0 Phase 4 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`510 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v1.0 Phase 4 commit `0059d89` fast-forward merged to local `main`; no push performed.
+- v1.0 Phase 5 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md`.
+- v1.0 Phase 5 implementation extends `backend/packages/narrative_quality/` and the app-level narrative quality router with world-admin memory/persona QA. The response-only report detects missing persona/memory, memory contamination, persona/style/relationship drift, source traceability gaps, and worldline contamination using safe evidence refs and proposal-only repair suggestion types. It adds no migration, Web UI, provider calls, direct mutation, duplicate eval framework, or world-event writes.
+- v1.0 Phase 5 targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_narrative_quality_service.py tests/test_api_narrative_quality.py -q` (`75 passed`).
+- v1.0 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`515 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Continue Phase 5 with commit, fast-forward merge to local `main`, and merge bookkeeping. Do not push.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

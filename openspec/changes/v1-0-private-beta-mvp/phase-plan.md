@@ -250,10 +250,11 @@ and worldline contamination.
 
 - Docs-only checkpoint deciding whether QA is read-only diagnostics over existing eval/authoring
   records or needs persisted QA runs.
-- Admin diagnostics.
-- Suggested repair proposals.
+- Backend/API-only admin diagnostics in the existing narrative quality boundary.
+- Proposal-only repair suggestion types; no automatic repair records or apply.
 - Evidence refs to source, memory, turns, and invocations.
 - No automatic destructive fix.
+- No migrations or persisted QA run tables in the first implementation.
 
 ### Non-Goals
 
@@ -268,6 +269,7 @@ and worldline contamination.
 - Invocation ledger.
 - Authoring proposals.
 - v0.9 persona/memory distillation evidence.
+- Conversation sessions and turns.
 
 ### Targeted Tests
 

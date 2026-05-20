@@ -1,16 +1,20 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 5 Memory & Persona QA planning checkpoint and implementation
+- v1.0 Phase 5 Memory & Persona QA fast-forward merge
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- None
+- v1.0 Phase 5 Memory & Persona QA commit and merge
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 5 Memory & Persona QA full backend/OpenSpec gate
+- v1.0 Phase 5 Memory & Persona QA targeted tests
+- v1.0 Phase 5 Memory & Persona QA implementation
+- v1.0 Phase 5 Memory & Persona QA planning checkpoint
 - v1.0 Phase 4 World Setup Wizard fast-forward merge
 - v1.0 Phase 4 World Setup Wizard full backend/OpenSpec gate
 - v1.0 Phase 4 World Setup Wizard targeted tests
