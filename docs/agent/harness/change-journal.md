@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 3 Cost & Quota Real Enforcement merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 3 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-3-cost-quota-enforcement` into local `main`, marked Phase 3 complete in OpenSpec tasks, and moved harness handoff state to Phase 4 World Setup Wizard.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec task `4.7`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 4 on `feature/v1.0-4-world-setup-wizard` from clean local `main` with a docs-only readiness aggregation checkpoint before implementation. No push performed.
+
 ## v1.0 Phase 3 Cost & Quota Real Enforcement implementation entry
 
 - Date: 2026-05-20

@@ -43,7 +43,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 4.4 Implement admin quota controls and tester quota fallback UI only after using `impeccable` if Web scope is approved.
 - [x] 4.5 Add limit, fallback, per-player isolation, override, audit, and no-hidden-spend tests.
 - [x] 4.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 4.7 Fast-forward merge to local main and update harness docs.
+- [x] 4.7 Fast-forward merge to local main and update harness docs.
 
 ## 5. Phase 4 — World Setup Wizard
 
