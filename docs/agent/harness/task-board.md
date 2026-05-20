@@ -1,18 +1,18 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 6 Beta Feedback System fast-forward merge
 - v1.0 Phase 7 Beta Content Iteration Loop planning checkpoint and implementation
 - v1.0 Phase 8 Private Beta Gate planning checkpoint and implementation
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 6 Beta Feedback System commit and merge bookkeeping
+- v1.0 Phase 7 Beta Content Iteration Loop planning checkpoint
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 6 Beta Feedback System fast-forward merge
 - v1.0 Phase 6 Beta Feedback System full local gate
 - v1.0 Phase 6 Beta Feedback System Web UI after `impeccable`
 - v1.0 Phase 6 Beta Feedback System targeted tests

@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 6 Beta Feedback System merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 6 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-6-beta-feedback` into local `main`, marked Phase 6 complete in OpenSpec tasks, and moved harness handoff state to Phase 7 Beta Content Iteration Loop.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 6 full gate.
+- Docs updated: OpenSpec task `7.7`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 7 on `feature/v1.0-7-beta-content-iteration` from clean local `main` with a docs-only repair proposal ownership checkpoint before implementation. No push performed.
+
 ## v1.0 Phase 6 Beta Feedback System implementation entry
 
 - Date: 2026-05-20

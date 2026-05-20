@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: feature/v1.0-6-beta-feedback
-- Objective: finish v1.0 Phase 6 Beta Feedback System validation, commit, and fast-forward merge.
-- Status: Phase 6 implementation and full gate are complete on the phase branch. The checkpoint selected a dedicated `beta_feedback` package/router rather than moderation as the primary record owner. Backend feedback records, app-level APIs, migration, minimal feedback/triage Web UI, targeted tests, backend full gate, Web full gate, OpenSpec validation, and `git diff --check` have passed; commit and merge bookkeeping remain.
+- Branch: main
+- Objective: start v1.0 Phase 7 Beta Content Iteration Loop from clean local `main`.
+- Status: Phase 6 Beta Feedback System is committed and fast-forward merged to local `main`. The dedicated `beta_feedback` package/router, migration, app-level APIs, feedback/triage Web surface, targeted tests, backend/Web full gate, OpenSpec validation, and merge bookkeeping are complete. Start Phase 7 from clean local `main`.
 
 ## Current Context
 
@@ -152,7 +152,8 @@
 - v1.0 Phase 6 Web implementation adds `/worlds/{worldId}/feedback` with tester submission and admin triage after using `impeccable`. The surface reuses workspace/admin form and list patterns and renders report summaries without raw evidence internals.
 - v1.0 Phase 6 targeted checks passed: focused ruff, focused mypy, `cd backend && uv run pytest tests/test_api_beta_feedback.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`35 passed`), `cd web && npm run test -- beta-feedback-panel.test.tsx` (`2 passed`), and `cd web && npm run typecheck`.
 - v1.0 Phase 6 full gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- Continue by committing `feat(v1.0): add beta feedback system`, fast-forward merging to `main`, and recording merge bookkeeping before starting Phase 7 on a fresh branch.
+- v1.0 Phase 6 commit `0cb4a7f` fast-forward merged to local `main`; no push performed.
+- Continue with Phase 7 Beta Content Iteration Loop on `feature/v1.0-7-beta-content-iteration` from clean local `main`. Start with the docs-only repair proposal ownership checkpoint and confirm repairs reuse authoring proposal/review/apply before implementation.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

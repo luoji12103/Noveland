@@ -71,7 +71,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 7.4 Implement tester feedback UI and admin triage UI only after using `impeccable`.
 - [x] 7.5 Add feedback, triage, reporter privacy, ACL, repair-link, and no-leak tests.
 - [x] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 7.7 Fast-forward merge to local main and update harness docs.
+- [x] 7.7 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — Beta Content Iteration Loop
 
