@@ -52,7 +52,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 5.3 Confirm no Phase 4 setup wizard UI is scoped; use `impeccable` before any later setup UI.
 - [x] 5.4 Add provider/media/visual/speech/persona/memory/onboarding/session/quota completeness tests.
 - [x] 5.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 5.6 Fast-forward merge to local main and update harness docs.
+- [x] 5.6 Fast-forward merge to local main and update harness docs.
 
 ## 6. Phase 5 — Memory & Persona QA
 

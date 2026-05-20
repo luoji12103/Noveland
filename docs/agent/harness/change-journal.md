@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 4 World Setup Wizard merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 4 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-4-world-setup-wizard` into local `main`, marked Phase 4 complete in OpenSpec tasks, and moved harness handoff state to Phase 5 Memory & Persona QA.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only.
+- Docs updated: OpenSpec task `5.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 5 on `feature/v1.0-5-memory-persona-qa` from clean local `main` with a docs-only QA diagnostics ownership checkpoint before implementation. No push performed.
+
 ## v1.0 Phase 4 World Setup Wizard implementation entry
 
 - Date: 2026-05-20
