@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: feature/v1.0-5-memory-persona-qa
-- Objective: v1.0 Phase 5 Memory & Persona QA validation and merge.
-- Status: Phase 5 checkpoint, backend/API implementation, targeted tests, and full backend/OpenSpec validation are complete on the phase branch. The implementation reuses narrative quality diagnostics through world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`, adds no migration or Web UI, and is ready to commit and fast-forward merge to local `main`.
+- Branch: main
+- Objective: v1.0 Phase 6 Beta Feedback System planning checkpoint.
+- Status: Phase 5 Memory & Persona QA is committed and fast-forward merged to local `main`. The QA report reuses narrative quality diagnostics through world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`, adds no migration or Web UI, and passed targeted narrative quality tests plus the full backend/OpenSpec gate. Start Phase 6 from clean local `main`.
 
 ## Current Context
 
@@ -146,7 +146,8 @@
 - v1.0 Phase 5 implementation extends `backend/packages/narrative_quality/` and the app-level narrative quality router with world-admin memory/persona QA. The response-only report detects missing persona/memory, memory contamination, persona/style/relationship drift, source traceability gaps, and worldline contamination using safe evidence refs and proposal-only repair suggestion types. It adds no migration, Web UI, provider calls, direct mutation, duplicate eval framework, or world-event writes.
 - v1.0 Phase 5 targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_narrative_quality_service.py tests/test_api_narrative_quality.py -q` (`75 passed`).
 - v1.0 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`515 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- Continue Phase 5 with commit, fast-forward merge to local `main`, and merge bookkeeping. Do not push.
+- v1.0 Phase 5 commit `abd88d2` fast-forward merged to local `main`; no push performed.
+- Continue with Phase 6 Beta Feedback System on `feature/v1.0-6-beta-feedback` from clean local `main`. Start with the docs-only feedback ownership checkpoint and decide dedicated `beta_feedback` package/router versus moderation extension before implementation.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

@@ -1,16 +1,17 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 5 Memory & Persona QA fast-forward merge
+- v1.0 Phase 6 Beta Feedback System planning checkpoint and implementation
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 5 Memory & Persona QA commit and merge
+- None
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 5 Memory & Persona QA fast-forward merge
 - v1.0 Phase 5 Memory & Persona QA full backend/OpenSpec gate
 - v1.0 Phase 5 Memory & Persona QA targeted tests
 - v1.0 Phase 5 Memory & Persona QA implementation

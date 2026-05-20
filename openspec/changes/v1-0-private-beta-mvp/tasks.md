@@ -61,7 +61,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 6.3 Add QA UI only after using `impeccable` if Web scope is approved.
 - [x] 6.4 Add contamination, drift, worldline, redaction, and repair-proposal tests.
 - [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 6.6 Fast-forward merge to local main and update harness docs.
+- [x] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Beta Feedback System
 

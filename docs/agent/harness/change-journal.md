@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 5 Memory & Persona QA merge entry
+
+- Date: 2026-05-20
+- Branch: main
+- Scope: v1.0 Private Beta MVP Phase 5 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.0-5-memory-persona-qa` into local `main`, marked Phase 5 complete in OpenSpec tasks, and moved harness handoff state to Phase 6 Beta Feedback System.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 5 gate.
+- Docs updated: OpenSpec task `6.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 6 on `feature/v1.0-6-beta-feedback` from clean local `main` with a docs-only feedback ownership checkpoint before implementation. No push performed.
+
 ## v1.0 Phase 5 Memory & Persona QA implementation entry
 
 - Date: 2026-05-20
