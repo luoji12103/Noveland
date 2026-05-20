@@ -45,6 +45,18 @@ The system SHALL reject repair proposals that mix worldlines or worlds.
 - **When** apply is requested
 - **Then** the system SHALL reject the apply action with a safe error.
 
+### Requirement: Repair bridge reuses authoring
+The system SHALL reuse authoring import runs, proposals, review decisions, and apply records for
+beta content repair instead of adding a duplicate repair framework.
+
+#### Scenario: Repair bridge creates an authoring run
+- **Given** an admin creates repair candidates from beta feedback
+- **When** the bridge persists the repair work
+- **Then** it SHALL create an authoring preview import run
+- **And** it SHALL create proposed authoring import proposals
+- **And** it SHALL link feedback reports to safe repair proposal refs
+- **And** it SHALL NOT mutate persona, memory, visual, speech, provider, or world state.
+
 ## Non-goals
 
 - Automatic repair apply.

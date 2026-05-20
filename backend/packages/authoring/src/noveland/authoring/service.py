@@ -68,6 +68,10 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
     AuthoringTraceKind,
+    BetaContentRepairImpact,
+    BetaContentRepairKind,
+    BetaContentRepairRequest,
+    BetaContentRepairResult,
     DemoWorldAssemblyRequest,
     DemoWorldAssemblyResult,
 )
@@ -173,6 +177,39 @@ BACKGROUND_ASSET_MATCH_TARGET = "background_asset_match"
 CG_ASSET_MATCH_TARGET = "cg_asset_match"
 VOICE_ASSET_MATCH_TARGET = "voice_asset_match"
 DEMO_WORLD_ASSEMBLY_TARGET = "demo_world_assembly"
+DIALOGUE_STYLE_REPAIR_TARGET = "dialogue_style_repair_candidate"
+PROVIDER_PROFILE_REPAIR_TARGET = "provider_profile_repair_candidate"
+ROUTE_REPAIR_TARGET = "route_repair_candidate"
+
+REPAIR_TARGETS: dict[BetaContentRepairKind, tuple[AuthoringProposalKind, str]] = {
+    BetaContentRepairKind.PERSONA: (AuthoringProposalKind.CHARACTER, PERSONA_PROPOSAL_TARGET),
+    BetaContentRepairKind.MEMORY: (AuthoringProposalKind.MEMORY, MEMORY_PROPOSAL_TARGET),
+    BetaContentRepairKind.DIALOGUE_STYLE: (
+        AuthoringProposalKind.OTHER,
+        DIALOGUE_STYLE_REPAIR_TARGET,
+    ),
+    BetaContentRepairKind.SPRITE_BINDING: (
+        AuthoringProposalKind.ASSET_MATCH,
+        SPRITE_ASSET_MATCH_TARGET,
+    ),
+    BetaContentRepairKind.VOICE_BINDING: (
+        AuthoringProposalKind.ASSET_MATCH,
+        VOICE_ASSET_MATCH_TARGET,
+    ),
+    BetaContentRepairKind.BACKGROUND_BINDING: (
+        AuthoringProposalKind.ASSET_MATCH,
+        BACKGROUND_ASSET_MATCH_TARGET,
+    ),
+    BetaContentRepairKind.PROVIDER_PROFILE: (
+        AuthoringProposalKind.OTHER,
+        PROVIDER_PROFILE_REPAIR_TARGET,
+    ),
+    BetaContentRepairKind.VISUAL_GENERATION_PROFILE: (
+        AuthoringProposalKind.ASSET_MATCH,
+        VISUAL_PROFILE_RECOMMENDATION_TARGET,
+    ),
+    BetaContentRepairKind.ROUTE: (AuthoringProposalKind.OTHER, ROUTE_REPAIR_TARGET),
+}
 
 
 class AuthoringService:
@@ -418,6 +455,134 @@ class AuthoringService:
         }
         self._session.flush()
         return AuthoringPreviewResult(run=self.get_import_run(world_id, run.id))
+
+    def create_beta_content_repairs(
+        self,
+        world_id: uuid.UUID,
+        request: BetaContentRepairRequest,
+        *,
+        actor_ref: str,
+    ) -> BetaContentRepairResult:
+        worldline_id = self._worldline_id(world_id, request.worldline_id)
+        feedback_report_ids = sorted(
+            {
+                report_id
+                for candidate in request.candidates
+                for report_id in candidate.feedback_report_ids
+            },
+            key=str,
+        )
+        repair_counts: dict[str, int] = {}
+        for candidate in request.candidates:
+            repair_counts[candidate.repair_kind.value] = (
+                repair_counts.get(candidate.repair_kind.value, 0) + 1
+            )
+
+        run = self.create_import_run(
+            AuthoringImportRunCreate(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                run_kind=AuthoringImportRunKind.PREVIEW,
+                summary_json={
+                    "source": "beta_content_iteration_loop",
+                    "feedback_report_ids": [str(report_id) for report_id in feedback_report_ids],
+                    "repair_counts": repair_counts,
+                    "provider_execution": False,
+                    "canonical_mutation": False,
+                    **request.metadata_json,
+                },
+            ),
+            actor_ref=actor_ref,
+        )
+
+        created: list[AuthoringProposalRead] = []
+        for candidate in request.candidates:
+            proposal_kind, target_ref_kind = REPAIR_TARGETS[candidate.repair_kind]
+            created.append(
+                self.create_proposal(
+                    AuthoringProposalCreate(
+                        world_id=world_id,
+                        worldline_id=worldline_id,
+                        run_id=run.id,
+                        source_fragment_id=candidate.source_fragment_id,
+                        proposal_kind=proposal_kind,
+                        target_ref_kind=target_ref_kind,
+                        target_ref_id=candidate.target_ref_id,
+                        title=candidate.title,
+                        summary=candidate.summary,
+                        proposed_payload_json=self._repair_payload(
+                            candidate.repair_kind,
+                            candidate.proposed_payload_json,
+                            candidate.target_ref_id,
+                        ),
+                        evidence_json={
+                            "source": "beta_content_iteration_loop",
+                            "repair_kind": candidate.repair_kind.value,
+                            "feedback_report_ids": [
+                                str(report_id) for report_id in candidate.feedback_report_ids
+                            ],
+                            "diagnostic_refs": list(candidate.diagnostic_refs),
+                            "candidate_evidence": candidate.evidence_json,
+                        },
+                        confidence=candidate.confidence,
+                        priority=candidate.priority,
+                    )
+                )
+            )
+
+        run_model = self._run_required(world_id, run.id)
+        run_model.status = AuthoringImportRunStatus.PREVIEWED.value
+        run_model.summary_json = {
+            **run_model.summary_json,
+            "preview_created_proposal_count": len(created),
+        }
+        self._session.flush()
+
+        impact = BetaContentRepairImpact(
+            proposal_count=len(created),
+            feedback_report_count=len(feedback_report_ids),
+            repair_counts=repair_counts,
+        )
+        report_json = {
+            "source": "beta_content_iteration_loop",
+            "run_id": str(run.id),
+            "proposal_ids": [str(proposal.id) for proposal in created],
+            "feedback_report_ids": [str(report_id) for report_id in feedback_report_ids],
+            "repair_counts": repair_counts,
+            "provider_execution": False,
+            "canonical_mutation": False,
+        }
+        return BetaContentRepairResult(
+            run=self.get_import_run(world_id, run.id),
+            proposals=tuple(created),
+            impact=impact,
+            report_json=report_json,
+        )
+
+    def _repair_payload(
+        self,
+        repair_kind: BetaContentRepairKind,
+        payload: dict[str, Any],
+        target_ref_id: uuid.UUID | None,
+    ) -> dict[str, Any]:
+        prepared = dict(payload)
+        if target_ref_id is not None and repair_kind in {
+            BetaContentRepairKind.PERSONA,
+            BetaContentRepairKind.MEMORY,
+            BetaContentRepairKind.VISUAL_GENERATION_PROFILE,
+        }:
+            prepared.setdefault("agent_id", str(target_ref_id))
+        if repair_kind == BetaContentRepairKind.MEMORY:
+            prepared.setdefault("source_kind", "authoring_distillation")
+        if repair_kind in {
+            BetaContentRepairKind.DIALOGUE_STYLE,
+            BetaContentRepairKind.PROVIDER_PROFILE,
+            BetaContentRepairKind.ROUTE,
+        }:
+            prepared.setdefault("review_only", True)
+        prepared.setdefault("repair_kind", repair_kind.value)
+        prepared.setdefault("source", "beta_content_iteration_loop")
+        return prepared
 
     def parse_script(
         self,

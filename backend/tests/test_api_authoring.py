@@ -22,6 +22,7 @@ from noveland.authoring.models import (
     AuthoringSourceFragment,
     AuthoringSourceTraceability,
 )
+from noveland.beta_feedback.models import BetaFeedbackReport
 from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
@@ -1103,6 +1104,164 @@ def test_authoring_api_demo_world_assembly_endpoint() -> None:
         assert session.scalars(select(WorldEventModel)).all() == []
 
 
+def test_authoring_api_beta_content_repairs_link_feedback_and_preserve_review_apply() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    agent_id = _seed_agent(engine, world_id, "alice", "Alice")
+    feedback_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            BetaFeedbackReport(
+                id=feedback_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                reporter_user_id=member_id,
+                player_actor_id=None,
+                issue_type="persona",
+                severity="medium",
+                status="triaged",
+                title="Alice sounded off",
+                description="Dialogue felt out of character.",
+                evidence_refs_json=[
+                    {
+                        "kind": "worldline",
+                        "id": str(worldline_id),
+                        "worldline_id": str(worldline_id),
+                    }
+                ],
+                repair_proposal_refs_json=[],
+                metadata_json={},
+            )
+        )
+        session.commit()
+
+    body = {
+        "worldline_id": str(worldline_id),
+        "candidates": [
+            {
+                "repair_kind": "persona",
+                "target_ref_id": str(agent_id),
+                "feedback_report_ids": [str(feedback_id)],
+                "title": "Repair Alice persona",
+                "summary": "Bring Alice back to source persona.",
+                "proposed_payload_json": {
+                    "persona_text": "Alice is grounded and direct.",
+                },
+                "evidence_json": {"issue_type": "persona"},
+            }
+        ],
+    }
+
+    _authenticate(client, member_token)
+    forbidden = client.post(f"/worlds/{world_id}/authoring/beta-content-repairs", json=body)
+    _authenticate(client, owner_token)
+    created = client.post(f"/worlds/{world_id}/authoring/beta-content-repairs", json=body)
+
+    assert forbidden.status_code == 403
+    assert created.status_code == 201
+    assert created.json()["impact"]["proposal_count"] == 1
+    assert created.json()["proposals"][0]["target_ref_kind"] == "agent_persona_candidate"
+    assert created.json()["proposals"][0]["status"] == "proposed"
+    assert "raw_prompt" not in _json_text(created.json())
+    assert "storage_uri" not in _json_text(created.json())
+    with Session(engine) as session:
+        feedback = session.get(BetaFeedbackReport, feedback_id)
+        assert feedback is not None
+        assert feedback.status == "linked_to_repair"
+        assert feedback.repair_proposal_refs_json[0]["proposal_id"] == created.json()[
+            "proposals"
+        ][0]["id"]
+        assert session.scalars(select(AgentPersona)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+    proposal_id = created.json()["proposals"][0]["id"]
+    reviewed = client.post(
+        f"/worlds/{world_id}/authoring/proposals/{proposal_id}/review",
+        json={"decision": "approve"},
+    )
+    applied = client.post(
+        f"/worlds/{world_id}/authoring/import-runs/{created.json()['run']['id']}/apply",
+        json={"worldline_id": str(worldline_id), "proposal_ids": [proposal_id]},
+    )
+    assert reviewed.status_code == 201
+    assert applied.status_code == 201
+    assert applied.json()["applied_proposals"][0]["applied_ref_json"][
+        "applied_ref_kind"
+    ] == "agent_persona"
+
+
+def test_authoring_api_beta_content_repairs_reject_cross_worldline_feedback() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, _member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    other_worldline_id = uuid.uuid4()
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    agent_id = _seed_agent(engine, world_id, "alice", "Alice")
+    feedback_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Worldline(
+                id=other_worldline_id,
+                world_id=world_id,
+                worldline_key=f"fork-{other_worldline_id.hex[:8]}",
+                name="Fork",
+                parent_worldline_id=worldline_id,
+                status="active",
+                created_by_actor_ref="test",
+                metadata_json={},
+            )
+        )
+        session.add(
+            BetaFeedbackReport(
+                id=feedback_id,
+                world_id=world_id,
+                worldline_id=other_worldline_id,
+                reporter_user_id=member_id,
+                player_actor_id=None,
+                issue_type="memory",
+                severity="medium",
+                status="triaged",
+                title="Wrong route memory",
+                description="Memory belongs to another branch.",
+                evidence_refs_json=[],
+                repair_proposal_refs_json=[],
+                metadata_json={},
+            )
+        )
+        session.commit()
+
+    _authenticate(client, owner_token)
+    rejected = client.post(
+        f"/worlds/{world_id}/authoring/beta-content-repairs",
+        json={
+            "worldline_id": str(worldline_id),
+            "candidates": [
+                {
+                    "repair_kind": "memory",
+                    "target_ref_id": str(agent_id),
+                    "feedback_report_ids": [str(feedback_id)],
+                    "title": "Repair wrong memory",
+                    "summary": "Should reject cross-worldline feedback.",
+                    "proposed_payload_json": {"content": "Alice remembers the right branch."},
+                }
+            ],
+        },
+    )
+
+    assert rejected.status_code == 422
+    assert "worldline" in rejected.json()["detail"]
+    with Session(engine) as session:
+        assert session.scalars(select(AuthoringImportProposal)).all() == []
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -1175,6 +1334,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, AuthoringImportProposal.__table__),
         cast(Table, AuthoringReviewDecision.__table__),
         cast(Table, AuthoringSourceTraceability.__table__),
+        cast(Table, BetaFeedbackReport.__table__),
     ):
         table.create(engine)
 

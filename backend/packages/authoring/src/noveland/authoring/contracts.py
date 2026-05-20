@@ -105,6 +105,18 @@ class DemoWorldAssemblyMode(StrEnum):
     DETERMINISTIC = "deterministic"
 
 
+class BetaContentRepairKind(StrEnum):
+    PERSONA = "persona"
+    MEMORY = "memory"
+    DIALOGUE_STYLE = "dialogue_style"
+    SPRITE_BINDING = "sprite_binding"
+    VOICE_BINDING = "voice_binding"
+    BACKGROUND_BINDING = "background_binding"
+    PROVIDER_PROFILE = "provider_profile"
+    VISUAL_GENERATION_PROFILE = "visual_generation_profile"
+    ROUTE = "route"
+
+
 class GalgameSourceIntakeFileStatus(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -669,6 +681,69 @@ class DemoWorldAssemblyResult(_FrozenContract):
     report_json: dict[str, Any]
     created_proposal_count: int = 1
     provider_execution: bool = False
+
+
+class BetaContentRepairCandidate(_FrozenContract):
+    repair_kind: BetaContentRepairKind
+    title: str = Field(min_length=1, max_length=160)
+    summary: str = Field(min_length=1, max_length=2000)
+    target_ref_id: uuid.UUID | None = None
+    source_fragment_id: uuid.UUID | None = None
+    feedback_report_ids: tuple[uuid.UUID, ...] = ()
+    diagnostic_refs: tuple[dict[str, Any], ...] = ()
+    proposed_payload_json: dict[str, Any] = Field(default_factory=dict)
+    evidence_json: dict[str, Any] = Field(default_factory=dict)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    priority: int = Field(default=100, ge=0)
+
+    @field_validator("proposed_payload_json", "evidence_json", mode="after")
+    @classmethod
+    def validate_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value, "beta repair JSON")
+        return value
+
+    @field_validator("diagnostic_refs", mode="after")
+    @classmethod
+    def validate_diagnostic_refs(
+        cls,
+        value: tuple[dict[str, Any], ...],
+    ) -> tuple[dict[str, Any], ...]:
+        for item in value:
+            _assert_safe_json(item, "beta repair diagnostic refs")
+        return value
+
+
+class BetaContentRepairRequest(_FrozenContract):
+    worldline_id: uuid.UUID
+    candidates: tuple[BetaContentRepairCandidate, ...]
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata_json", mode="after")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value, "beta repair metadata")
+        return value
+
+    @model_validator(mode="after")
+    def validate_candidates(self) -> BetaContentRepairRequest:
+        if not self.candidates:
+            raise ValueError("repair candidates are required")
+        return self
+
+
+class BetaContentRepairImpact(_FrozenContract):
+    proposal_count: int = 0
+    feedback_report_count: int = 0
+    repair_counts: dict[str, int] = Field(default_factory=dict)
+    provider_execution: bool = False
+    canonical_mutation: bool = False
+
+
+class BetaContentRepairResult(_FrozenContract):
+    run: AuthoringImportRunRead
+    proposals: tuple[AuthoringProposalRead, ...]
+    impact: BetaContentRepairImpact
+    report_json: dict[str, Any]
 
 
 class GalgameSourceIntakePreviewRequest(_FrozenContract):

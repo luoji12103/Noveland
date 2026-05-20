@@ -1,17 +1,21 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 7 Beta Content Iteration Loop planning checkpoint and implementation
+- v1.0 Phase 7 Beta Content Iteration Loop fast-forward merge
 - v1.0 Phase 8 Private Beta Gate planning checkpoint and implementation
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 7 Beta Content Iteration Loop planning checkpoint
+- v1.0 Phase 7 Beta Content Iteration Loop fast-forward merge
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 7 Beta Content Iteration Loop full backend/OpenSpec gate
+- v1.0 Phase 7 Beta Content Iteration Loop targeted tests
+- v1.0 Phase 7 Beta Content Iteration Loop implementation
+- v1.0 Phase 7 Beta Content Iteration Loop planning checkpoint
 - v1.0 Phase 6 Beta Feedback System fast-forward merge
 - v1.0 Phase 6 Beta Feedback System full local gate
 - v1.0 Phase 6 Beta Feedback System Web UI after `impeccable`

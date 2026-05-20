@@ -2837,6 +2837,28 @@
 - Verification: Targeted checks passed with backend ruff and mypy for moderation/API/reader-delivery/schema files, targeted pytest (`41 passed`), and the full local gate: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
 - Follow-up notes: Commit Phase 10 implementation and fast-forward merge to local `main` if the branch remains clean. Keep Phase 10 backend/API-only; no Web UI, automatic moderation, provider execution, daemon work, public unauthenticated access, duplicate readiness framework, or broad `worlds.py` routes.
 
+## v1.0.7 Beta Content Iteration Loop planning entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-7-beta-content-iteration
+- Scope: v1.0 Phase 7 planning checkpoint before implementation.
+- Summary: Added the Phase 7 checkpoint for beta content repair proposal ownership. The plan keeps repair ownership inside the existing authoring proposal/review/apply boundary, uses `beta_feedback_reports.repair_proposal_refs` for safe feedback linkage, adds no new repair package, migration, Web UI, or broad `worlds.py` routes, and maps first-version repair kinds onto existing persona, memory, asset-match, visual-generation-profile, and trace-only authoring proposal targets.
+- Files changed: `/docs/agent/harness/feature-updates/v1.0.7-beta-content-iteration-loop-plan.md`, `/openspec/changes/v1-0-private-beta-mvp/{design.md,phase-plan.md,tasks.md}`, `/openspec/changes/v1-0-private-beta-mvp/specs/beta-content-iteration-loop/spec.md`, and harness docs.
+- Tests added/updated: N/A for planning checkpoint.
+- Verification: pending with Phase 7 implementation gate.
+- Follow-up notes: Implement the backend/API repair bridge through the existing authoring router. Do not add duplicate repair tables, automatic mutation, Web UI, or provider calls.
+
+## v1.0.7 Beta Content Iteration Loop implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-7-beta-content-iteration
+- Scope: v1.0 Phase 7 backend/API beta content repair bridge.
+- Summary: Added authoring beta content repair contracts, service logic, and an admin-only `POST /worlds/{world_id}/authoring/beta-content-repairs` endpoint. The endpoint creates a preview authoring import run plus proposed repair records, maps persona/memory/sprite/voice/background/visual-generation/provider/dialogue-style repairs onto existing authoring proposal targets, links beta feedback reports to safe repair proposal refs, and keeps review/apply as the only mutation path. Phase 7 adds no migration, Web UI, provider execution, duplicate repair package, broad `worlds.py` routes, or world-event writes.
+- Files changed: `/backend/packages/authoring/src/noveland/authoring/{contracts.py,service.py,__init__.py}`, `/backend/packages/beta_feedback/src/noveland/beta_feedback/service.py`, `/backend/services/api/src/noveland/services/api/authoring.py`, `/backend/tests/test_authoring_service.py`, `/backend/tests/test_api_authoring.py`, OpenSpec tasks/spec docs, and harness docs.
+- Tests added/updated: service tests for proposal-only persona/provider-profile repair and reviewed persona/memory apply; API tests for admin-only repair creation, feedback repair-link persistence, no pre-apply mutation, reviewed apply, and cross-worldline feedback rejection.
+- Verification: Targeted ruff passed for modified backend files; targeted pytest passed for authoring/API (`34 passed`) and beta feedback/import smoke (`5 passed`); targeted mypy passed (`18 source files`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`524 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 7, fast-forward merge to local `main`, then start Phase 8 Private Beta Gate from clean `main`. No Web gate was run because Phase 7 touched no Web files.
+
 ## v0.8.10 Moderation & Incident Workflow merge entry
 
 - Date: 2026-05-16

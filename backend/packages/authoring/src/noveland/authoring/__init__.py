@@ -23,6 +23,26 @@ _EXPORTS = {
         "noveland.authoring.contracts",
         "AuthoringImportRunRead",
     ),
+    "BetaContentRepairCandidate": (
+        "noveland.authoring.contracts",
+        "BetaContentRepairCandidate",
+    ),
+    "BetaContentRepairImpact": (
+        "noveland.authoring.contracts",
+        "BetaContentRepairImpact",
+    ),
+    "BetaContentRepairKind": (
+        "noveland.authoring.contracts",
+        "BetaContentRepairKind",
+    ),
+    "BetaContentRepairRequest": (
+        "noveland.authoring.contracts",
+        "BetaContentRepairRequest",
+    ),
+    "BetaContentRepairResult": (
+        "noveland.authoring.contracts",
+        "BetaContentRepairResult",
+    ),
     "AuthoringPreviewRequest": (
         "noveland.authoring.contracts",
         "AuthoringPreviewRequest",

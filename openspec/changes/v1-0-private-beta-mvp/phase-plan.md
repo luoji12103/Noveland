@@ -342,6 +342,8 @@ Generate reviewable fixes from feedback and diagnostics without rewriting histor
 
 ### Scope
 
+- Docs-only checkpoint deciding repair proposal ownership and confirming authoring
+  proposal/review/apply reuse.
 - Persona repair proposals.
 - Memory repair proposals.
 - Asset mapping repair proposals.
@@ -349,12 +351,16 @@ Generate reviewable fixes from feedback and diagnostics without rewriting histor
 - Provider prompt/profile or visual generation profile repair proposals where review/apply supports
   them safely.
 - Audited apply.
+- Feedback report linkage to created repair proposal refs.
+- Backend/API-only first implementation through the existing authoring router.
 
 ### Non-Goals
 
 - Direct historical mutation.
 - Automatic repair apply.
 - Replacement authoring proposal system.
+- New repair package or repair tables.
+- Phase 7 Web UI unless a later checkpoint explicitly scopes it after `impeccable`.
 
 ### Reused Systems
 
@@ -377,6 +383,9 @@ Generate reviewable fixes from feedback and diagnostics without rewriting histor
 - Repair needs direct mutation outside review/apply.
 - Historical continuity is corrupted.
 - Feedback or source traceability is lost.
+- Safe repair evidence cannot avoid raw prompt/output, prompt snapshot internals, storage paths,
+  bytes/base64, resolved secrets, invite tokens, or raw source blobs.
+- Repair requires broad `worlds.py` route growth.
 
 ## Phase 8 — Private Beta Gate
 

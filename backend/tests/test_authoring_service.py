@@ -31,6 +31,9 @@ from noveland.authoring.contracts import (
     AuthoringSourceBatchCreate,
     AuthoringSourceFragmentCreate,
     AuthoringSourceFragmentKind,
+    BetaContentRepairCandidate,
+    BetaContentRepairKind,
+    BetaContentRepairRequest,
     DemoWorldAssemblyRequest,
     GalgameSourceIntakeApplyRequest,
     GalgameSourceIntakePreviewRequest,
@@ -2005,6 +2008,135 @@ def test_authoring_json_rejects_leaky_values() -> None:
             summary="Bad",
             evidence_json={"image": "data:image/png;base64,abc"},
         )
+
+
+def test_beta_content_repairs_create_reviewable_proposals_without_mutation() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+    feedback_id = uuid.uuid4()
+    diagnostic_id = uuid.uuid4()
+
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        result = service.create_beta_content_repairs(
+            graph.world_id,
+            BetaContentRepairRequest(
+                worldline_id=graph.worldline_id,
+                candidates=(
+                    BetaContentRepairCandidate(
+                        repair_kind=BetaContentRepairKind.PERSONA,
+                        target_ref_id=agent_id,
+                        feedback_report_ids=(feedback_id,),
+                        diagnostic_refs=(
+                            {
+                                "kind": "memory_persona_qa",
+                                "id": str(diagnostic_id),
+                                "label": "OOC drift",
+                            },
+                        ),
+                        title="Repair Alice persona",
+                        summary="Tune Alice back to source persona.",
+                        proposed_payload_json={
+                            "persona_text": "Alice is careful and source-grounded.",
+                        },
+                        evidence_json={"issue": "ooc"},
+                    ),
+                    BetaContentRepairCandidate(
+                        repair_kind=BetaContentRepairKind.PROVIDER_PROFILE,
+                        feedback_report_ids=(feedback_id,),
+                        title="Review provider prompt profile",
+                        summary="Provider profile needs admin review.",
+                        proposed_payload_json={"recommendation": "tighten style preset"},
+                    ),
+                ),
+            ),
+            actor_ref="test",
+        )
+
+        assert result.run.status.value == "previewed"
+        assert result.impact.proposal_count == 2
+        assert result.impact.feedback_report_count == 1
+        assert result.impact.repair_counts == {"persona": 1, "provider_profile": 1}
+        assert [proposal.status.value for proposal in result.proposals] == [
+            "proposed",
+            "proposed",
+        ]
+        assert result.proposals[0].target_ref_kind == "agent_persona_candidate"
+        assert result.proposals[0].evidence_json["feedback_report_ids"] == [str(feedback_id)]
+        assert result.proposals[1].target_ref_kind == "provider_profile_repair_candidate"
+        assert result.proposals[1].proposed_payload_json["review_only"] is True
+        assert session.scalars(select(AgentPersona)).all() == []
+        assert session.scalars(select(AgentMemoryItem)).all() == []
+        assert session.scalars(select(WorldEventModel)).all() == []
+
+
+def test_beta_content_repair_apply_uses_existing_review_apply_path() -> None:
+    engine = _engine()
+    graph = _seed_graph(engine)
+    agent_id = _seed_agent(engine, graph.world_id, "alice", "Alice")
+
+    with Session(engine) as session:
+        service = AuthoringService(session)
+        result = service.create_beta_content_repairs(
+            graph.world_id,
+            BetaContentRepairRequest(
+                worldline_id=graph.worldline_id,
+                candidates=(
+                    BetaContentRepairCandidate(
+                        repair_kind=BetaContentRepairKind.PERSONA,
+                        target_ref_id=agent_id,
+                        title="Repair Alice persona",
+                        summary="Update persona through review/apply.",
+                        proposed_payload_json={
+                            "persona_text": "Alice is calm under pressure.",
+                        },
+                    ),
+                    BetaContentRepairCandidate(
+                        repair_kind=BetaContentRepairKind.MEMORY,
+                        target_ref_id=agent_id,
+                        title="Repair Alice memory",
+                        summary="Add source-grounded beta repair memory.",
+                        proposed_payload_json={
+                            "content": "Alice remembers the beta opening scene.",
+                            "memory_kind": "fact",
+                        },
+                    ),
+                ),
+            ),
+            actor_ref="test",
+        )
+        proposal_ids = tuple(proposal.id for proposal in result.proposals)
+        for proposal_id in proposal_ids:
+            service.review_proposal(
+                graph.world_id,
+                proposal_id,
+                AuthoringReviewDecisionCreate(decision=AuthoringReviewDecisionKind.APPROVE),
+                actor_ref="reviewer",
+            )
+
+        applied = service.apply(
+            graph.world_id,
+            result.run.id,
+            AuthoringApplyRequest(
+                worldline_id=graph.worldline_id,
+                proposal_ids=proposal_ids,
+            ),
+        )
+
+        applied_ref_kinds = {
+            proposal.applied_ref_json["applied_ref_kind"]
+            for proposal in applied.applied_proposals
+        }
+        assert applied_ref_kinds == {
+            "agent_persona",
+            "agent_memory_item",
+        }
+        persona = session.scalars(select(AgentPersona)).one()
+        memory = session.scalars(select(AgentMemoryItem)).one()
+        assert "calm under pressure" in persona.persona_text
+        assert memory.worldline_id == graph.worldline_id
+        assert memory.metadata_json["source_kind"] == "authoring_distillation"
 
 
 def _draft(

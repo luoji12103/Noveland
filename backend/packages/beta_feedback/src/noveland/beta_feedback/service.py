@@ -225,6 +225,44 @@ class BetaFeedbackService:
         self._session.flush()
         return self._read(report)
 
+    def link_repair_proposals(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        report_refs: dict[uuid.UUID, tuple[BetaFeedbackRepairProposalRef, ...]],
+        *,
+        actor_ref: str,
+    ) -> list[BetaFeedbackReportRead]:
+        self._world_or_404(world_id)
+        self._worldline_or_404(world_id, worldline_id)
+        updated: list[BetaFeedbackReportRead] = []
+        for report_id, refs in report_refs.items():
+            report = self._report_or_404(world_id, report_id)
+            if report.worldline_id != worldline_id:
+                raise BetaFeedbackValidationError(
+                    "repair feedback report belongs to another worldline"
+                )
+            existing = list(
+                self._sanitize_json_array(
+                    report.repair_proposal_refs_json,
+                    "repair_proposal_refs",
+                )
+            )
+            seen = {str(item.get("proposal_id")) for item in existing}
+            for ref in refs:
+                safe_ref = self._safe_repair_ref(ref)
+                if str(safe_ref["proposal_id"]) not in seen:
+                    existing.append(safe_ref)
+                    seen.add(str(safe_ref["proposal_id"]))
+            report.repair_proposal_refs_json = existing
+            if existing:
+                report.status = BetaFeedbackReportStatus.LINKED_TO_REPAIR.value
+                report.triaged_by_actor_ref = actor_ref
+                report.triaged_at = datetime.now(UTC)
+            updated.append(self._read(report))
+        self._session.flush()
+        return updated
+
     def _safe_evidence_refs(
         self,
         world_id: uuid.UUID,

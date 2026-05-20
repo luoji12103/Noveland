@@ -42,6 +42,8 @@ from noveland.authoring.contracts import (
     AuthoringSourceFragmentKind,
     AuthoringSourceFragmentRead,
     AuthoringSourceVisibility,
+    BetaContentRepairRequest,
+    BetaContentRepairResult,
     DemoWorldAssemblyRequest,
     DemoWorldAssemblyResult,
     GalgameSourceIntakeApplyRequest,
@@ -54,6 +56,12 @@ from noveland.authoring.service import (
     AuthoringNotFoundError,
     AuthoringService,
     AuthoringValidationError,
+)
+from noveland.beta_feedback import (
+    BetaFeedbackNotFoundError,
+    BetaFeedbackRepairProposalRef,
+    BetaFeedbackService,
+    BetaFeedbackValidationError,
 )
 from noveland.core.settings import load_settings
 from noveland.media.storage import LocalMediaObjectStorage
@@ -583,6 +591,53 @@ def assemble_authoring_demo_world(
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc
     except (AuthoringValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/beta-content-repairs",
+    response_model=BetaContentRepairResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def create_beta_content_repairs(
+    world_id: uuid.UUID,
+    request: BetaContentRepairRequest,
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> BetaContentRepairResult:
+    try:
+        result = AuthoringService(db_session).create_beta_content_repairs(
+            world_id,
+            request,
+            actor_ref=f"user:{subject.user_id}",
+        )
+        report_refs: dict[uuid.UUID, list[BetaFeedbackRepairProposalRef]] = {}
+        for candidate, proposal in zip(request.candidates, result.proposals, strict=True):
+            repair_ref = BetaFeedbackRepairProposalRef(
+                proposal_id=proposal.id,
+                proposal_kind=candidate.repair_kind.value,
+                status=proposal.status.value,
+                metadata={
+                    "run_id": str(result.run.id),
+                    "target_ref_kind": proposal.target_ref_kind,
+                    "repair_kind": candidate.repair_kind.value,
+                },
+            )
+            for report_id in candidate.feedback_report_ids:
+                report_refs.setdefault(report_id, []).append(repair_ref)
+        if report_refs:
+            BetaFeedbackService(db_session).link_repair_proposals(
+                world_id,
+                request.worldline_id,
+                {report_id: tuple(refs) for report_id, refs in report_refs.items()},
+                actor_ref=f"user:{subject.user_id}",
+            )
+        return result
+    except (AuthoringNotFoundError, BetaFeedbackNotFoundError) as exc:
+        raise _not_found() from exc
+    except (AuthoringValidationError, BetaFeedbackValidationError, ValueError) as exc:
         raise _unprocessable(str(exc)) from exc
 
 

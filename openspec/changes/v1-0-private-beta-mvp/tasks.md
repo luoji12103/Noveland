@@ -75,11 +75,11 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 8. Phase 7 — Beta Content Iteration Loop
 
-- [ ] 8.1 Write docs-only phase planning checkpoint for repair proposal ownership.
-- [ ] 8.2 Implement feedback/diagnostic repair proposals and reviewed apply.
-- [ ] 8.3 Implement repair review UI only after using `impeccable` if Web scope is approved.
-- [ ] 8.4 Add persona/memory/asset/voice/provider-profile repair, audit, worldline, and no-leak tests.
-- [ ] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 8.1 Write docs-only phase planning checkpoint for repair proposal ownership.
+- [x] 8.2 Implement feedback/diagnostic repair proposals and reviewed apply.
+- [x] 8.3 Implement repair review UI only after using `impeccable` if Web scope is approved.
+- [x] 8.4 Add persona/memory/asset/voice/provider-profile repair, audit, worldline, and no-leak tests.
+- [x] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 8.6 Fast-forward merge to local main and update harness docs.
 
 ## 9. Phase 8 — Private Beta Gate

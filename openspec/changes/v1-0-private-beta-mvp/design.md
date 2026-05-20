@@ -118,6 +118,17 @@ provider/media/prompt evidence.
 
 Diagnostics and feedback may generate repair proposals for memory, persona, dialogue style, visual mapping, voice mapping, or route issues. They must not directly rewrite history or mutate canonical state without review.
 
+Phase 7 keeps repair ownership in `backend/packages/authoring/` and the app-level authoring
+router. It creates a beta-content repair bridge that turns safe feedback/diagnostic refs into
+existing authoring import proposals, then links feedback reports to those proposal refs. The first
+implementation adds no repair package, no migration, no Web UI, and no new apply framework.
+
+Repair kinds map to existing proposal targets where possible: persona repairs use
+`agent_persona_candidate`, memory repairs use `memory_candidate`, sprite/voice/background repairs
+use existing asset-match targets, visual generation profile repairs use
+`visual_generation_profile_recommendation`, and dialogue-style/provider-profile repairs remain
+trace-only until a later accepted target mutation is defined.
+
 ### Frontend surfaces must be operational
 
 Onboarding and admin setup UI should be calm, explicit, and task-focused. They must avoid decorative hero flows, hidden cost/spend, and vague AI demo language.
