@@ -1,7 +1,8 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 4 World Setup Wizard planning checkpoint and implementation
+- v1.0 Phase 4 World Setup Wizard fast-forward merge
+- v1.0 Phase 5 Memory & Persona QA planning checkpoint and implementation
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
@@ -11,6 +12,10 @@
 - None
 
 ## Done
+- v1.0 Phase 4 World Setup Wizard full backend/OpenSpec gate
+- v1.0 Phase 4 World Setup Wizard targeted tests
+- v1.0 Phase 4 World Setup Wizard implementation
+- v1.0 Phase 4 World Setup Wizard planning checkpoint
 - v1.0 Phase 3 Cost & Quota Real Enforcement fast-forward merge
 - v1.0 Phase 3 Cost & Quota Real Enforcement full local gate
 - v1.0 Phase 3 Cost & Quota Real Enforcement targeted tests

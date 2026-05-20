@@ -67,6 +67,12 @@ Private beta safety depends on access, player session restore, and quota before 
 
 The world setup wizard should not duplicate readiness systems. It must aggregate provider health, media/visual/speech completeness, persona/memory evidence, diagnostics, v0.9 self-use gate evidence, beta access, session restore evidence, quota evidence, and v0.8/v0.7 readiness where useful.
 
+Phase 4 implements this as a read-only `observability/readiness` report with
+`readiness_kind=private_beta_world_setup` and an app-level
+`GET /observability/readiness/private-beta-setup` endpoint. The report reuses
+`ProductionReadinessGateService`, `ProductionReadinessSection`, and existing evidence tables. It
+does not add setup-wizard tables, provider calls, Web UI, or broad `worlds.py` routes.
+
 ### Session stability is a product requirement
 
 Private beta testers should be able to close the browser and return to a stable conversation, scene/presentation state, and fallback status. The design should prefer explicit recoverable states over hidden retries or silent reset.

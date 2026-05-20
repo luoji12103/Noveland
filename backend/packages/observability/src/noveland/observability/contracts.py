@@ -251,3 +251,7 @@ class PublicLaunchReadinessReport(_FrozenContract):
         if value.tzinfo is None or value.utcoffset() is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+class PrivateBetaSetupReadinessReport(ProductionReadinessReport):
+    readiness_kind: str = Field(default="private_beta_world_setup", min_length=1)

@@ -38,6 +38,8 @@ from noveland.observability.contracts import (
     SelfUseMvpManualChecklistItem,
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
+from noveland.player_sessions.models import PlayerSession
+from noveland.private_beta.models import PrivateBetaInvite
 from noveland.providers.models import ProviderBudgetPolicy, ProviderHealthCheck, ProviderIntegration
 from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
 from noveland.visual.models import CharacterSpriteVariant, SceneBackgroundProfile
@@ -50,6 +52,8 @@ from noveland.worlds.models import (
     BetaChecklistRun,
     LivingWorldReleaseProfile,
     LongRunEvalRun,
+    PlayerActorProfile,
+    WorldMembership,
 )
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy import Select, distinct, func, or_, select
@@ -862,6 +866,120 @@ class ProductionReadinessGateService:
             ],
         )
 
+    def private_beta_setup_report(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+        conversation_id: uuid.UUID | None = None,
+        evidence_limit_per_section: int = 5,
+        manual_play_minutes: int = 0,
+        resume_verified: bool = False,
+        failure_notes_recorded: bool = False,
+    ) -> ProductionReadinessReport:
+        safe_limit = max(1, min(evidence_limit_per_section, 20))
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        session_record = self._self_use_conversation(
+            world_id,
+            worldline.id,
+            conversation_id,
+        )
+        selected_conversation_id = None if session_record is None else session_record.id
+        participant_agent_ids = self._conversation_participant_agent_ids(selected_conversation_id)
+        self_use_report = self.self_use_mvp_report(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=selected_conversation_id,
+            evidence_limit_per_section=safe_limit,
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+        )
+        sections = [
+            self._private_beta_access_section(world_id, worldline.id, safe_limit),
+            self._private_beta_session_restore_section(world_id, worldline.id, safe_limit),
+            self._private_beta_quota_section(world_id, safe_limit),
+            self._self_use_provider_section(world_id, worldline.id, safe_limit),
+            self._self_use_entry_section(
+                world_id,
+                worldline.id,
+                session_record,
+                participant_agent_ids,
+            ),
+            self._self_use_conversation_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                safe_limit,
+            ),
+            self._self_use_persona_memory_section(
+                world_id,
+                worldline.id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_visual_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_voice_section(
+                world_id,
+                worldline.id,
+                selected_conversation_id,
+                participant_agent_ids,
+                safe_limit,
+            ),
+            self._self_use_media_job_section(world_id, worldline.id, safe_limit),
+            self._self_use_traceability_section(world_id, worldline.id, safe_limit),
+            self._private_beta_self_use_gate_section(self_use_report, safe_limit),
+            self._self_use_no_world_event_leak_section(world_id, worldline.id, safe_limit),
+        ]
+        evidence_count = sum(section.evidence_count for section in sections)
+        blocker_count = sum(section.blocker_count for section in sections)
+        warning_count = sum(section.warning_count for section in sections)
+        return ProductionReadinessReport(
+            status=_readiness_status(sections),
+            generated_at=datetime.now(UTC),
+            world_id=world_id,
+            readiness_kind="private_beta_world_setup",
+            section_count=len(sections),
+            evidence_count=evidence_count,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            sections=sections,
+            suppressed_fields=[
+                "invite_tokens",
+                "invite_token_hashes",
+                "credential_values",
+                "credential_headers",
+                "resolved_secrets",
+                "prompt_snapshot_bodies",
+                "prompt_bodies",
+                "provider_result_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "object_locator_values",
+                "filesystem_paths",
+                "binary_payloads",
+                "inline_binary_payloads",
+                "world_event_payload_snapshots",
+                "raw_source_fragments",
+                "local_model_paths",
+                "raw_workflow_json",
+            ],
+            non_goals=[
+                "duplicate_readiness_framework",
+                "public_launch_readiness",
+                "automatic_setup_repair",
+                "tester_visible_admin_diagnostics",
+                "provider_execution",
+                "public_signup",
+            ],
+        )
+
     def _self_use_conversation(
         self,
         world_id: uuid.UUID,
@@ -877,6 +995,279 @@ class ProductionReadinessGateService:
         else:
             statement = statement.order_by(ConversationSession.updated_at.desc()).limit(1)
         return self._session.scalars(statement).one_or_none()
+
+    def _private_beta_access_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        viable_statuses = ("pending", "accepted", "redeemed")
+        invite_scope = or_(
+            PrivateBetaInvite.worldline_id == worldline_id,
+            PrivateBetaInvite.worldline_id.is_(None),
+        )
+        invite_count = self._count(
+            PrivateBetaInvite,
+            PrivateBetaInvite.world_id == world_id,
+            invite_scope,
+            PrivateBetaInvite.status.in_(viable_statuses),
+        )
+        redeemed_invites = self._session.scalars(
+            select(PrivateBetaInvite)
+            .where(
+                PrivateBetaInvite.world_id == world_id,
+                invite_scope,
+                PrivateBetaInvite.status == "redeemed",
+                PrivateBetaInvite.redeemed_by_user_id.is_not(None),
+            )
+            .order_by(PrivateBetaInvite.redeemed_at.desc(), PrivateBetaInvite.updated_at.desc())
+            .limit(limit),
+        ).all()
+        redeemed_user_ids = [
+            invite.redeemed_by_user_id
+            for invite in redeemed_invites
+            if invite.redeemed_by_user_id is not None
+        ]
+        member_count = 0
+        admin_role_count = 0
+        profile_count = 0
+        if redeemed_user_ids:
+            member_count = self._count(
+                WorldMembership,
+                WorldMembership.world_id == world_id,
+                WorldMembership.user_id.in_(redeemed_user_ids),
+                WorldMembership.role == "human_user",
+            )
+            admin_role_count = self._count(
+                WorldMembership,
+                WorldMembership.world_id == world_id,
+                WorldMembership.user_id.in_(redeemed_user_ids),
+                WorldMembership.role != "human_user",
+            )
+            profile_count = self._count(
+                PlayerActorProfile,
+                PlayerActorProfile.world_id == world_id,
+                PlayerActorProfile.worldline_id == worldline_id,
+                PlayerActorProfile.user_id.in_(redeemed_user_ids),
+                PlayerActorProfile.is_active.is_(True),
+            )
+        blockers: list[str] = []
+        if invite_count == 0:
+            blockers.append("No pending, accepted, or redeemed private beta invites exist.")
+        if not redeemed_user_ids:
+            blockers.append("No redeemed invite proves the onboarding path end to end.")
+        if redeemed_user_ids and member_count < len(redeemed_user_ids):
+            blockers.append("One or more redeemed testers lack least-privilege membership.")
+        if redeemed_user_ids and profile_count < len(redeemed_user_ids):
+            blockers.append("One or more redeemed testers lack an active player profile.")
+        if admin_role_count:
+            blockers.append("A redeemed tester has a non-player membership role.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="private_beta_invite",
+                id=str(invite.id),
+                component="private_beta_access",
+                status=invite.status,
+                reason_code="redeemed_invite",
+                world_id=invite.world_id,
+                worldline_id=invite.worldline_id,
+                occurred_at=invite.redeemed_at or invite.updated_at,
+            )
+            for invite in redeemed_invites
+        ]
+        return _readiness_section(
+            "private_beta_access",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{invite_count} viable invites, {len(redeemed_user_ids)} redeemed testers, "
+                f"{member_count} least-privilege memberships, {profile_count} player profiles."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Create and redeem a private beta invite through the onboarding flow."],
+        )
+
+    def _private_beta_session_restore_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        sessions = self._session.scalars(
+            select(PlayerSession)
+            .where(
+                PlayerSession.world_id == world_id,
+                PlayerSession.worldline_id == worldline_id,
+            )
+            .order_by(PlayerSession.last_seen_at.desc())
+            .limit(limit),
+        ).all()
+        session_count = self._count(
+            PlayerSession,
+            PlayerSession.world_id == world_id,
+            PlayerSession.worldline_id == worldline_id,
+        )
+        ready_count = self._count(
+            PlayerSession,
+            PlayerSession.world_id == world_id,
+            PlayerSession.worldline_id == worldline_id,
+            PlayerSession.status.in_(("active", "paused")),
+            PlayerSession.recovery_status == "ready",
+        )
+        recovery_block_count = self._count(
+            PlayerSession,
+            PlayerSession.world_id == world_id,
+            PlayerSession.worldline_id == worldline_id,
+            PlayerSession.recovery_status != "ready",
+        )
+        blockers: list[str] = []
+        if session_count == 0:
+            blockers.append("No player session resume evidence exists.")
+        if session_count and ready_count == 0:
+            blockers.append("No player session is ready for browser close/reopen recovery.")
+        if recovery_block_count:
+            blockers.append("One or more player sessions have unresolved recovery status.")
+        return _readiness_section(
+            "player_session_restore",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{session_count} player sessions, {ready_count} ready for resume, "
+                f"{recovery_block_count} with recovery blockers."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="player_session",
+                    id=str(session.id),
+                    component="player_session_restore",
+                    status=session.recovery_status,
+                    reason_code=f"session_{session.status}",
+                    world_id=session.world_id,
+                    worldline_id=session.worldline_id,
+                    occurred_at=session.last_seen_at,
+                )
+                for session in sessions
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Run the player resume flow and resolve stale media/provider/session states."],
+        )
+
+    def _private_beta_quota_section(
+        self,
+        world_id: uuid.UUID,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        policies = self._session.scalars(
+            select(ProviderBudgetPolicy)
+            .where(
+                ProviderBudgetPolicy.world_id == world_id,
+                ProviderBudgetPolicy.status == "active",
+            )
+            .order_by(ProviderBudgetPolicy.updated_at.desc())
+            .limit(limit),
+        ).all()
+        active_count = self._count(
+            ProviderBudgetPolicy,
+            ProviderBudgetPolicy.world_id == world_id,
+            ProviderBudgetPolicy.status == "active",
+        )
+        emergency_count = self._count(
+            ProviderBudgetPolicy,
+            ProviderBudgetPolicy.world_id == world_id,
+            ProviderBudgetPolicy.status == "active",
+            ProviderBudgetPolicy.emergency_stop_enabled.is_(True),
+        )
+        all_active_policies = self._session.scalars(
+            select(ProviderBudgetPolicy).where(
+                ProviderBudgetPolicy.world_id == world_id,
+                ProviderBudgetPolicy.status == "active",
+            )
+        ).all()
+        player_scoped_count = sum(
+            1
+            for policy in all_active_policies
+            if isinstance(policy.limits_json, dict)
+            and (
+                isinstance(policy.limits_json.get("default_player"), dict)
+                or isinstance(policy.limits_json.get("players"), dict)
+            )
+        )
+        capability_scoped_count = sum(
+            1
+            for policy in all_active_policies
+            if isinstance(policy.limits_json, dict)
+            and isinstance(policy.limits_json.get("capabilities"), dict)
+        )
+        blockers: list[str] = []
+        if active_count == 0:
+            blockers.append("No active provider quota policy exists for this world.")
+        if emergency_count:
+            blockers.append("Provider emergency stop is active.")
+        if active_count and player_scoped_count == 0:
+            blockers.append("No active quota policy defines player-scoped limits.")
+        if active_count and capability_scoped_count == 0:
+            blockers.append("No active quota policy defines capability-scoped limits.")
+        return _readiness_section(
+            "private_beta_quota_controls",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{active_count} active quota policies, {player_scoped_count} player-scoped, "
+                f"{capability_scoped_count} capability-scoped, {emergency_count} emergency stops."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="provider_budget_policy",
+                    id=str(policy.id),
+                    component="private_beta_quota_controls",
+                    status="blocked" if policy.emergency_stop_enabled else policy.status,
+                    reason_code="emergency_stop"
+                    if policy.emergency_stop_enabled
+                    else "player_capability_quota",
+                    world_id=policy.world_id,
+                    occurred_at=policy.updated_at,
+                )
+                for policy in policies
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Configure active per-player and per-capability provider quota limits."],
+        )
+
+    def _private_beta_self_use_gate_section(
+        self,
+        self_use_report: SelfUseMvpGateReport,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        refs: list[IncidentEvidenceRef] = []
+        for section in self_use_report.sections:
+            refs.extend(section.evidence_refs)
+            if len(refs) >= limit:
+                refs = refs[:limit]
+                break
+        blockers = []
+        if self_use_report.status == IncidentStatus.BLOCKED:
+            blockers.append("Self-use MVP gate still has blocking evidence.")
+        warning_count = 1 if self_use_report.status == IncidentStatus.WATCH else 0
+        return _readiness_section(
+            "self_use_mvp_evidence",
+            status=self_use_report.status,
+            summary=(
+                f"Self-use MVP gate is {self_use_report.status} with "
+                f"{self_use_report.blocker_count} blockers and "
+                f"{self_use_report.warning_count} warnings."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Resolve self-use MVP gate blockers before inviting beta testers."],
+        )
 
     def _conversation_participant_agent_ids(
         self,

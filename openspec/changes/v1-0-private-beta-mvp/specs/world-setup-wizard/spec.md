@@ -13,6 +13,13 @@ quota, and self-use evidence unless a checkpoint explicitly approves a persisten
 - **Then** it SHALL confirm observability/readiness ownership
 - **And** it SHALL reject a duplicate readiness framework.
 
+#### Scenario: Setup wizard report is requested
+- **Given** a platform admin requests private beta setup readiness for a world
+- **When** the report is generated
+- **Then** it SHALL return `readiness_kind=private_beta_world_setup`
+- **And** it SHALL reuse existing readiness section/evidence DTOs
+- **And** it SHALL NOT create setup wizard run/report tables.
+
 ### Requirement: Setup wizard validates beta world completeness
 The system SHALL aggregate setup evidence for provider readiness, media availability, voice bindings, persona/memory readiness, visual mappings, scene/playback readiness, beta access, player session restore, quota enforcement, and prior self-use evidence.
 
@@ -45,6 +52,17 @@ The system SHALL keep setup reports admin-scoped by default.
 - **When** authorization is evaluated
 - **Then** the system SHALL deny admin-only setup details
 - **And** it MAY return only player-safe readiness status if explicitly supported.
+
+### Requirement: Setup wizard evidence is redacted
+The system SHALL expose only safe setup evidence references and summaries.
+
+#### Scenario: Setup evidence contains internal fields
+- **Given** setup evidence is linked to invites, providers, media, prompt snapshots, source
+  fragments, or world events
+- **When** the setup report is returned
+- **Then** it SHALL suppress invite tokens, token hashes, resolved secrets, storage paths, object
+  paths, bytes, base64, raw prompts, raw outputs, prompt snapshot internals, raw source fragments,
+  local model paths, and raw workflow JSON.
 
 ## Non-goals
 

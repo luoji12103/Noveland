@@ -13,7 +13,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 1.5 Confirm player session/resume schema and package/router ownership.
 - [x] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
 - [ ] 1.7 Confirm feedback ownership and whether moderation records can be reused.
-- [ ] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
+- [x] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
 - [x] 1.9 Confirm frontend phases will use `impeccable` before Web implementation.
 
 ## 2. Phase 1 — Private Beta Onboarding & Access Model
@@ -47,11 +47,11 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 5. Phase 4 — World Setup Wizard
 
-- [ ] 5.1 Write docs-only phase planning checkpoint for readiness aggregation ownership.
-- [ ] 5.2 Implement setup wizard evidence aggregation and readiness report.
-- [ ] 5.3 Implement setup wizard UI only after using `impeccable`.
-- [ ] 5.4 Add provider/media/visual/speech/persona/memory/onboarding/session/quota completeness tests.
-- [ ] 5.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 5.1 Write docs-only phase planning checkpoint for readiness aggregation ownership.
+- [x] 5.2 Implement setup wizard evidence aggregation and readiness report.
+- [x] 5.3 Confirm no Phase 4 setup wizard UI is scoped; use `impeccable` before any later setup UI.
+- [x] 5.4 Add provider/media/visual/speech/persona/memory/onboarding/session/quota completeness tests.
+- [x] 5.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 5.6 Fast-forward merge to local main and update harness docs.
 
 ## 6. Phase 5 — Memory & Persona QA

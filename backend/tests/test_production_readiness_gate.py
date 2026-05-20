@@ -41,6 +41,8 @@ from noveland.observability import (
 )
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.player_privacy.models import PlayerPrivacyRequest
+from noveland.player_sessions.models import PlayerSession
+from noveland.private_beta.models import PrivateBetaInvite
 from noveland.providers.models import (
     ProviderBudgetPolicy,
     ProviderHealthCheck,
@@ -73,8 +75,10 @@ from noveland.worlds.models import (
     BetaChecklistRun,
     LivingWorldReleaseProfile,
     LongRunEvalRun,
+    PlayerActorProfile,
     World,
     Worldline,
+    WorldMembership,
 )
 from sqlalchemy import Table, create_engine, func, select
 from sqlalchemy.engine import Engine
@@ -465,6 +469,132 @@ def test_self_use_mvp_gate_does_not_create_duplicate_framework_tables() -> None:
     assert "self_use_mvp_gate_reports" not in table_names
 
 
+def test_private_beta_setup_readiness_passes_with_safe_beta_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+
+    with Session(engine) as session:
+        before_counts = _framework_counts(session)
+        report = ProductionReadinessGateService(session).private_beta_setup_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=30,
+            resume_verified=True,
+            failure_notes_recorded=True,
+        )
+        after_counts = _framework_counts(session)
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "ok"
+    assert report.readiness_kind == "private_beta_world_setup"
+    assert report.blocker_count == 0
+    assert sections["private_beta_access"].status == "ok"
+    assert sections["player_session_restore"].status == "ok"
+    assert sections["private_beta_quota_controls"].status == "ok"
+    assert sections["provider_model_lab"].status == "ok"
+    assert sections["persona_memory"].status == "ok"
+    assert sections["visual_playback_generation"].status == "ok"
+    assert sections["voice_playback"].status == "ok"
+    assert sections["self_use_mvp_evidence"].status == "ok"
+    assert "duplicate_readiness_framework" in report.non_goals
+    assert before_counts == after_counts
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_private_beta_setup_readiness_blocks_missing_access_session_quota_content_safely() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(
+        engine,
+        world_id,
+        worldline_id,
+        include_memory=False,
+        include_visual_plan=False,
+        include_voice=False,
+        include_required_providers=False,
+        include_traceability=False,
+    )
+    _seed_leaky_world_event(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).private_beta_setup_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=0,
+            resume_verified=False,
+            failure_notes_recorded=False,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert sections["private_beta_access"].status == "blocked"
+    assert sections["player_session_restore"].status == "blocked"
+    assert sections["private_beta_quota_controls"].status == "blocked"
+    assert sections["provider_model_lab"].status == "blocked"
+    assert sections["persona_memory"].status == "blocked"
+    assert sections["visual_playback_generation"].status == "blocked"
+    assert sections["voice_playback"].status == "blocked"
+    assert sections["world_event_leak_check"].status == "blocked"
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_private_beta_setup_endpoint_is_platform_admin_only_and_safe() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-beta-setup@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _authenticate(client, platform_token)
+
+    response = client.get(
+        "/observability/readiness/private-beta-setup",
+        params={
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "manual_play_minutes": "30",
+            "resume_verified": "true",
+            "failure_notes_recorded": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["readiness_kind"] == "private_beta_world_setup"
+    assert response.json()["status"] == "ok"
+    assert response.json()["world_id"] == str(world_id)
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in response.text
+
+    _member_id, member_token = _seed_user(engine, "member-beta-setup@example.test", False)
+    _authenticate(client, member_token)
+    forbidden = client.get(
+        "/observability/readiness/private-beta-setup",
+        params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
+    )
+    assert forbidden.status_code == 403
+
+
+def test_private_beta_setup_does_not_create_duplicate_framework_tables() -> None:
+    table_names = {
+        "beta_checklist_runs",
+        "long_run_eval_runs",
+        "living_world_release_profiles",
+    }
+    assert "private_beta_setup_runs" not in table_names
+    assert "private_beta_setup_reports" not in table_names
+    assert "world_setup_wizard_reports" not in table_names
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -477,6 +607,8 @@ def _engine() -> Engine:
         PlatformRoleAssignment.__table__,
         World.__table__,
         Worldline.__table__,
+        WorldMembership.__table__,
+        PlayerActorProfile.__table__,
         Agent.__table__,
         AgentPersona.__table__,
         WorldEventModel.__table__,
@@ -509,6 +641,8 @@ def _engine() -> Engine:
         ProviderIntegration.__table__,
         ProviderHealthCheck.__table__,
         ProviderBudgetPolicy.__table__,
+        PrivateBetaInvite.__table__,
+        PlayerSession.__table__,
         CharacterSpriteSet.__table__,
         CharacterSpriteVariant.__table__,
         SceneBackgroundProfile.__table__,
@@ -1548,6 +1682,107 @@ def _seed_leaky_world_event(
                 },
                 wall_time=datetime.now(UTC),
                 actor_ref="system:test",
+            )
+        )
+        session.commit()
+
+
+def _seed_private_beta_setup_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> None:
+    tester_id = uuid.uuid4()
+    actor_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id=tester_id,
+                email=f"tester-{tester_id.hex[:8]}@example.test",
+                display_name="Private Beta Tester",
+            )
+        )
+        session.add(
+            WorldMembership(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                user_id=tester_id,
+                role="human_user",
+            )
+        )
+        session.add(
+            PlayerActorProfile(
+                id=actor_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                user_id=tester_id,
+                actor_ref=f"player:{tester_id}",
+                display_name="Tester",
+                current_scene_id=None,
+                profile_json={"safe": True},
+                is_active=True,
+            )
+        )
+        session.add(
+            PrivateBetaInvite(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                invited_email="tester@example.test",
+                invited_user_id=None,
+                token_hash="a" * 64,
+                status="redeemed",
+                intended_world_role="human_user",
+                beta_role="tester",
+                expires_at=now + timedelta(days=7),
+                accepted_at=None,
+                redeemed_at=now,
+                redeemed_by_user_id=tester_id,
+                revoked_at=None,
+                revoked_by_actor_ref=None,
+                revocation_reason=None,
+                created_by_actor_ref="user:admin",
+                metadata_json={"safe": True},
+            )
+        )
+        session.add(
+            PlayerSession(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                user_id=tester_id,
+                player_actor_id=actor_id,
+                conversation_session_id=conversation_id,
+                scene_id=None,
+                last_turn_id=None,
+                last_presentation_id=None,
+                route_state_json={"route": "opening"},
+                resume_state_json={"safe": True},
+                recovery_status="ready",
+                status="active",
+                last_seen_at=now,
+            )
+        )
+        session.add(
+            ProviderBudgetPolicy(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                provider_id=None,
+                policy_key="private-beta-player-capability-quota",
+                status="active",
+                emergency_stop_enabled=False,
+                limits_json={
+                    "max_daily_invocations": 100,
+                    "default_player": {"max_daily_invocations": 20},
+                    "capabilities": {
+                        "text_generation": {"max_daily_invocations": 20},
+                        "image_generation": {"max_daily_invocations": 4},
+                        "text_to_speech": {"max_daily_media_jobs": 20},
+                    },
+                },
+                metadata_json={"safe": True},
             )
         )
         session.commit()

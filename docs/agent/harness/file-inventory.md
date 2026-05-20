@@ -212,6 +212,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.2-player-session-stability-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.3-cost-quota-real-enforcement-plan.md`
+- `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md`
 - `backend/migrations/versions/20260517_0046_private_beta_invites.py`
 - `backend/tests/test_api_private_beta.py`
 - `backend/migrations/versions/20260517_0047_player_sessions.py`
@@ -369,6 +370,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/storage/src/noveland/storage/backup.py`
 - `backend/packages/storage/src/noveland/storage/integrity.py`
 - `backend/packages/observability/`
+- `backend/packages/observability/pyproject.toml`
 - `backend/packages/observability/src/noveland/observability/contracts.py`
 - `backend/packages/observability/src/noveland/observability/models.py`
 - `backend/packages/observability/src/noveland/observability/services.py`

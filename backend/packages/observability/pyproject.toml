@@ -14,6 +14,8 @@ dependencies = [
   "noveland-core",
   "noveland-invocations",
   "noveland-media",
+  "noveland-player-sessions",
+  "noveland-private-beta",
   "noveland-providers",
   "noveland-speech",
   "noveland-visual",
@@ -30,6 +32,8 @@ noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-invocations = { workspace = true }
 noveland-media = { workspace = true }
+noveland-player-sessions = { workspace = true }
+noveland-private-beta = { workspace = true }
 noveland-providers = { workspace = true }
 noveland-speech = { workspace = true }
 noveland-visual = { workspace = true }

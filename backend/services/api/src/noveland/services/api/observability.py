@@ -10,6 +10,7 @@ from noveland.media.storage import LocalMediaObjectStorage
 from noveland.observability import (
     IncidentDiagnosticsService,
     IncidentSummary,
+    PrivateBetaSetupReadinessReport,
     ProductionReadinessGateService,
     ProductionReadinessReport,
     PublicLaunchReadinessReport,
@@ -117,3 +118,28 @@ def get_self_use_mvp_readiness(
         resume_verified=resume_verified,
         failure_notes_recorded=failure_notes_recorded,
     )
+
+
+@router.get("/readiness/private-beta-setup", response_model=PrivateBetaSetupReadinessReport)
+def get_private_beta_setup_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    world_id: Annotated[uuid.UUID, Query()],
+    worldline_id: Annotated[uuid.UUID | None, Query()] = None,
+    conversation_id: Annotated[uuid.UUID | None, Query()] = None,
+    evidence_limit_per_section: Annotated[int, Query(ge=1, le=20)] = 5,
+    manual_play_minutes: Annotated[int, Query(ge=0, le=1440)] = 0,
+    resume_verified: Annotated[bool, Query()] = False,
+    failure_notes_recorded: Annotated[bool, Query()] = False,
+) -> PrivateBetaSetupReadinessReport:
+    del subject
+    report = ProductionReadinessGateService(db_session).private_beta_setup_report(
+        world_id=world_id,
+        worldline_id=worldline_id,
+        conversation_id=conversation_id,
+        evidence_limit_per_section=evidence_limit_per_section,
+        manual_play_minutes=manual_play_minutes,
+        resume_verified=resume_verified,
+        failure_notes_recorded=failure_notes_recorded,
+    )
+    return PrivateBetaSetupReadinessReport.model_validate(report.model_dump())

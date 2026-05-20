@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: main
-- Objective: v1.0 Phase 3 Cost & Quota Real Enforcement closeout.
-- Status: Phase 3 implementation is committed and fast-forward merged to local `main`. Provider-owned quota enforcement now supports world, provider, capability, and optional player actor scope through `ProviderExecutionService` before secret resolution or adapter execution. Targeted checks, full backend gate, OpenSpec validation, and `git diff --check` passed. Start Phase 4 on a new feature branch.
+- Branch: feature/v1.0-4-world-setup-wizard
+- Objective: v1.0 Phase 4 World Setup Wizard implementation closeout.
+- Status: Phase 4 implementation is complete on the feature branch and ready to commit, fast-forward merge to local `main`, and record merge bookkeeping. The setup report reuses observability/readiness through platform-admin `GET /observability/readiness/private-beta-setup`, adds no migration or Web UI, and passed targeted readiness tests plus the full backend/OpenSpec gate.
 
 ## Current Context
 
@@ -137,7 +137,10 @@
 - v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
 - v1.0 Phase 2 Player Session Stability is complete and fast-forward merged to local `main`.
 - v1.0 Phase 3 Cost & Quota Real Enforcement is complete and fast-forward merged to local `main`.
-- Start v1.0 Phase 4 World Setup Wizard on `feature/v1.0-4-world-setup-wizard`; begin with the docs-only readiness aggregation ownership checkpoint.
+- v1.0 Phase 4 World Setup Wizard planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md`.
+- v1.0 Phase 4 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta-setup`. The report aggregates private beta invite/access, player session restore, player/capability quota, provider/model lab, persona/memory, visual, voice, media, source traceability, self-use MVP, and no-leak evidence through existing readiness DTOs. It adds no setup framework tables, migration, Web UI, provider calls, broad `worlds.py` routes, or tester-visible admin diagnostics.
+- v1.0 Phase 4 targeted checks passed: focused readiness pytest (`17 passed`), focused ruff, and focused mypy.
+- v1.0 Phase 4 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`510 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 4 World Setup Wizard implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-4-world-setup-wizard
+- Scope: v1.0 Private Beta MVP Phase 4 implementation only.
+- Summary: Added the Phase 4 planning checkpoint and extended the existing observability/readiness boundary with `PrivateBetaSetupReadinessReport`, `ProductionReadinessGateService.private_beta_setup_report()`, and platform-admin `GET /observability/readiness/private-beta-setup`. The report reuses existing readiness sections and safe evidence refs to validate private beta invite/access, least-privilege membership/profile bootstrap, player session restore, player/capability quota controls, provider/model lab readiness, persona/memory, visual, voice, media, source traceability, self-use MVP evidence, and recent world-event leak markers. Phase 4 adds no migration, setup framework tables, Web UI, provider execution, broad `worlds.py` routes, or tester-visible admin diagnostics.
+- Files changed: `backend/packages/observability/{pyproject.toml,src/noveland/observability/{__init__.py,contracts.py,services.py}}`, `backend/services/api/src/noveland/services/api/observability.py`, `backend/tests/test_production_readiness_gate.py`, `backend/uv.lock`, Phase 4 OpenSpec docs/tasks, the Phase 4 checkpoint, and harness docs.
+- Tests added/updated: Production readiness tests now cover complete private beta setup pass, missing access/session/quota/provider/persona/memory/visual/voice blockers, self-use evidence redaction, platform-admin-only endpoint ACL, no forbidden response leaks, and no duplicate setup/readiness framework tables. Targeted checks passed: focused readiness pytest (`17 passed`), focused ruff, and focused mypy. Full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`510 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 4 checkpoint, OpenSpec design/spec/tasks through `5.5`, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 4, fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 5 Memory & Persona QA. No Web UI was added in Phase 4, so `impeccable` was not required.
+
 ## v1.0 Phase 3 Cost & Quota Real Enforcement merge entry
 
 - Date: 2026-05-20

@@ -87,6 +87,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.0.2-player-session-stability-plan.md` — v1.0 Phase 2 checkpoint for dedicated `player_sessions` package/router ownership, `player_sessions` migration scope, player-owned resume state, safe recovery statuses, player surface resume UI, and stop conditions.
 - v1.0 Phase 2 implementation adds `backend/packages/player_sessions/`, app-level `noveland.services.api.player_sessions`, migration `20260517_0047_player_sessions.py`, player-owned resume records scoped by world, worldline, user, and player actor, safe recovery status calculation, and player surface resume/restore UI. It does not add broad `worlds.py` routes, raw event payload access, admin diagnostics in tester DTOs, provider calls, or storage path/base64/bytes/raw prompt/raw output/prompt snapshot/secret leaks.
 - `docs/agent/harness/feature-updates/v1.0.3-cost-quota-real-enforcement-plan.md` — v1.0 Phase 3 checkpoint for provider-owned quota enforcement through `ProviderExecutionService`, safe `provider_budget_policies.limits_json` player/capability extensions, spend-path coverage, no default migration, and stop conditions.
+- `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md` — v1.0 Phase 4 checkpoint for backend/API-only private beta setup readiness aggregation through existing observability/readiness, with no new setup tables, Web UI, provider calls, or broad `worlds.py` routes.
+- v1.0 Phase 4 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta-setup`. The report reuses `ProductionReadinessGateService`, checks invite/access, player session restore, player/capability quota, providers, persona/memory, visual, voice, media, source traceability, self-use MVP evidence, and no-leak markers, and returns only safe readiness sections/evidence refs.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -368,9 +370,9 @@ Fast orientation for a new coding session.
   - `noveland.storage.backup` — local backup verification command for database, migration head, object root, and snapshot payload readability checks
   - `noveland.storage.integrity` — safe media object and snapshot payload storage integrity audit service
 - `backend/packages/observability/`
-  - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, retention DTOs, internal production-readiness reports, and public launch readiness reports
+  - `noveland.observability.contracts` — diagnostic severity/component contracts, record DTOs, retention DTOs, internal production-readiness reports, public launch readiness reports, self-use MVP gate reports, and private beta setup readiness reports
   - `noveland.observability.models` — runtime diagnostic event ORM model
-  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, internal production readiness, public launch readiness aggregation, and detail redaction
+  - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, internal production readiness, public launch readiness, self-use MVP, and private beta setup readiness aggregation, plus detail redaction
 - `backend/packages/moderation/`
   - `noveland.moderation.contracts` — report, action, incident, target, severity, status, and action-kind DTOs
   - `noveland.moderation.models` — persisted moderation report/action/incident workflow ORM models
