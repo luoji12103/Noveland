@@ -254,6 +254,7 @@ class SpeechStyleMappingRead(SpeechStyleMappingCreate):
 class TTSRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     provider_id: uuid.UUID
+    player_actor_id: uuid.UUID | None = None
     voice_profile_id: uuid.UUID | None = None
     agent_id: uuid.UUID | None = None
     allow_provider_default_voice: bool = False
@@ -297,6 +298,7 @@ class TTSResult(_FrozenContract):
 class STTRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     provider_id: uuid.UUID
+    player_actor_id: uuid.UUID | None = None
     source_asset_id: uuid.UUID
     language: str | None = Field(default=None, min_length=1, max_length=40)
     diarization: bool = False

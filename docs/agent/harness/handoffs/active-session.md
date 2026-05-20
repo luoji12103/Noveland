@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: main
-- Objective: v1.0 Phase 2 Player Session Stability closeout.
-- Status: Phase 2 implementation is committed and fast-forward merged to local `main`. The dedicated `player_sessions` package/router, `player_sessions` migration, player-owned resume contract, safe fallback statuses, and player surface resume UI are implemented. Targeted checks, full local gate, OpenSpec validation, and `git diff --check` passed. Start Phase 3 on a new feature branch.
+- Branch: feature/v1.0-3-cost-quota-enforcement
+- Objective: v1.0 Phase 3 Cost & Quota Real Enforcement implementation.
+- Status: Phase 3 implementation and full backend gate are complete on the feature branch. Provider-owned quota enforcement now supports world, provider, capability, and optional player actor scope through `ProviderExecutionService` before secret resolution or adapter execution. Commit, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 4.
 
 ## Current Context
 
@@ -136,7 +136,7 @@
 - OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
 - v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
 - v1.0 Phase 2 Player Session Stability is complete and fast-forward merged to local `main`.
-- Start v1.0 Phase 3 Cost & Quota Real Enforcement on `feature/v1.0-3-cost-quota-enforcement`; begin with the docs-only quota ownership and spend-path coverage checkpoint.
+- v1.0 Phase 3 Cost & Quota Real Enforcement is in progress on `feature/v1.0-3-cost-quota-enforcement`; finish implementation, full gate, and fast-forward merge before Phase 4.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

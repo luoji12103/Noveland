@@ -88,6 +88,7 @@ class SpeechService:
                 worldline_id=worldline_id,
                 provider_id=request.provider_id,
                 provider_kind=ProviderKind.TEXT_TO_SPEECH,
+                capability_key="speech.tts",
                 input_text=request.text,
                 request_json={
                     "operation": "tts",
@@ -105,6 +106,7 @@ class SpeechService:
                     "metadata": {"conversation_id": _str_or_none(request.conversation_id)},
                 },
                 media_job_id=job.id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
             )
         )
@@ -166,6 +168,7 @@ class SpeechService:
                 worldline_id=worldline_id,
                 provider_id=request.provider_id,
                 provider_kind=ProviderKind.SPEECH_TO_TEXT,
+                capability_key="speech.asr",
                 request_json={
                     "operation": "stt",
                     "source_asset_id": str(request.source_asset_id),
@@ -176,6 +179,7 @@ class SpeechService:
                 },
                 media_job_id=job.id,
                 media_asset_id=request.source_asset_id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
             )
         )

@@ -11,6 +11,28 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 3 Cost & Quota Real Enforcement implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-3-cost-quota-enforcement
+- Scope: v1.0 Private Beta MVP Phase 3 implementation only.
+- Summary: Extended provider-owned quota enforcement so `ProviderExecutionService` evaluates world, provider, capability, and optional player actor scope before secret resolution or adapter execution. The existing `provider_budget_policies.limits_json` now supports safe `capabilities`, `players`, and `default_player` nested limits without a new migration. Provider quota status accepts safe admin filters for provider, player actor, and capability. Image and speech service requests now carry optional `player_actor_id` and explicit capability keys; admin smoke/test paths are also quota-guarded.
+- Files changed: provider budget/contracts/routing/service, provider API quota/status and smoke/test inputs, image and speech request/service contracts, provider execution/API tests, Phase 3 checkpoint, and OpenSpec/harness docs.
+- Tests added/updated: Provider execution and provider API tests now cover world/provider limits, emergency stop before secret resolution, capability-scoped blocking, per-player/default-player isolation, scoped quota status, safe quota evidence, smoke-test quota guarding, and no secret/path/raw prompt leak. Targeted checks passed: provider ruff, provider mypy, focused pytest (`24 passed`), and broader targeted provider/image/speech pytest (`36 passed`). Full Phase 3 backend gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`506 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: OpenSpec Phase 3 tasks through `4.6`, Phase 3 design/spec/task deltas, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 3 and fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 4. No Web UI was added in Phase 3, so no new `impeccable` UI work was required beyond the already loaded frontend policy.
+
+## v1.0 Phase 3 Cost & Quota Real Enforcement planning entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-3-cost-quota-enforcement
+- Scope: v1.0 Private Beta MVP Phase 3 docs-only planning checkpoint before implementation.
+- Summary: Confirmed that quota enforcement should stay inside the existing provider boundary so `ProviderExecutionService` remains the single pre-spend guard. Phase 3 will extend `provider_budget_policies.limits_json` with optional player and capability scopes, carry optional `player_actor_id` and `capability_key` on provider execution requests, and avoid a new migration unless the JSON policy proves insufficient.
+- Files changed: `docs/agent/harness/feature-updates/v1.0.3-cost-quota-real-enforcement-plan.md`, OpenSpec design/spec/tasks, and harness docs.
+- Tests added/updated: N/A, planning checkpoint.
+- Docs updated: Phase 3 checkpoint, OpenSpec design/spec/tasks, project index, file inventory, task board, and change journal.
+- Follow-up notes: Implement Phase 3 on this branch with no broad `worlds.py` routes, no tester provider/admin exposure, no real provider calls by default, no hidden retries after quota blocks, and no raw prompt/output/storage/secret leaks.
+
 ## v1.0 Phase 2 Player Session Stability merge entry
 
 - Date: 2026-05-20

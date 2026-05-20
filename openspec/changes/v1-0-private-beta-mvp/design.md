@@ -77,6 +77,15 @@ folded into conversation history. The first implementation uses a `player_sessio
 world, worldline, current user, and player actor, with optional current conversation, scene, last
 turn, last presentation, safe route/resume JSON, recovery status, and last-seen timestamps.
 
+### Cost and quota enforcement stays provider-owned
+
+Phase 3 keeps `ProviderExecutionService` as the single pre-spend guard. The existing
+`provider_budget_policies` table remains the first-version policy store; player and capability
+limits are represented as safe `limits_json` extensions rather than a new quota table unless
+implementation proves the JSON policy insufficient. Provider execution requests carry optional
+`player_actor_id` and `capability_key` so runtime spend can be evaluated by world, provider,
+player, and capability before secret resolution and adapter execution.
+
 ### Feedback is linked evidence, not a forum
 
 Feedback records should point to turn, conversation, presentation, media, invocation, route, worldline, and player context through safe refs. v1.0 should not build public forums or social features. The feasibility review found that existing moderation records are reusable evidence infrastructure but may be semantically too heavy for beta issue triage; Phase 6 must decide whether to add a dedicated beta feedback package or extend moderation.
@@ -110,7 +119,9 @@ This roadmap does not add migrations yet. Expected migration pressure:
 - Player session stability likely needs player-owned session/resume records unless existing conversation/player records can safely carry current worldline/conversation/scene/presentation state.
 - Phase 2 now expects a `player_sessions` migration because existing conversation/player records do
   not own browser interruption and recovery status cleanly.
-- Cost/quota enforcement may extend v0.7 cost/rate controls or add player/capability quota records.
+- Phase 3 expects no migration by default: cost/quota enforcement extends v0.7 provider-owned
+  budget policy JSON and request context, with a stop condition if dedicated records become
+  necessary.
 - Feedback likely needs persistent beta feedback records unless v0.8 moderation records are sufficient.
 - Setup wizard and private beta gate should start as read-only observability aggregation unless a specific signoff record is approved.
 
@@ -118,5 +129,6 @@ This roadmap does not add migrations yet. Expected migration pressure:
 
 - Should session restore live under a dedicated player session package or inside private beta access/onboarding?
 - Should beta feedback extend moderation incident records or use a dedicated beta feedback package?
-- What is the minimum quota model for private beta: per world, per player, per provider, or all three?
+- Should a later release replace JSON player/capability quota policy with first-class quota tables
+  after private beta usage patterns are known?
 - Should the private beta gate be implemented under existing readiness/eval systems or a dedicated beta readiness route?

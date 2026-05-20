@@ -81,6 +81,30 @@ def invocation_kind_for_provider(provider_kind: ProviderKind) -> InvocationKind:
     return InvocationKind.OTHER
 
 
+def capability_key_for_provider(provider_kind: ProviderKind) -> str:
+    if provider_kind == ProviderKind.TEXT_GENERATION:
+        return "text.generate"
+    if provider_kind == ProviderKind.IMAGE_GENERATION:
+        return "image.generate"
+    if provider_kind == ProviderKind.IMAGE_EDITING:
+        return "image.edit"
+    if provider_kind == ProviderKind.IMAGE_ANALYSIS:
+        return "image.analyze"
+    if provider_kind == ProviderKind.IMAGE_COMPOSITION:
+        return "image.compose"
+    if provider_kind == ProviderKind.TEXT_TO_SPEECH:
+        return "speech.tts"
+    if provider_kind == ProviderKind.SPEECH_TO_TEXT:
+        return "speech.asr"
+    if provider_kind == ProviderKind.WORKFLOW_ENGINE:
+        return "workflow.execute"
+    if provider_kind == ProviderKind.EMBEDDING:
+        return "text.embedding"
+    if provider_kind == ProviderKind.RERANKER:
+        return "text.rerank"
+    return provider_kind.value
+
+
 def invocation_provider_kind_for_adapter(
     provider_kind: ProviderKind,
     adapter_kind: ProviderAdapterKind,

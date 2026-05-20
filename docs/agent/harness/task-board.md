@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 3 Cost & Quota Real Enforcement planning checkpoint and implementation
+- v1.0 Phase 3 Cost & Quota Real Enforcement fast-forward merge bookkeeping
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
@@ -11,6 +11,10 @@
 - None
 
 ## Done
+- v1.0 Phase 3 Cost & Quota Real Enforcement full local gate
+- v1.0 Phase 3 Cost & Quota Real Enforcement targeted tests
+- v1.0 Phase 3 Cost & Quota Real Enforcement implementation
+- v1.0 Phase 3 Cost & Quota Real Enforcement planning checkpoint
 - v1.0 Phase 2 Player Session Stability fast-forward merge
 - v1.0 Phase 2 Player Session Stability full local gate
 - v1.0 Phase 2 Player Session Stability targeted tests

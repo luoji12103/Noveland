@@ -11,7 +11,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 1.3 Revise v1.0 phase order based on feasibility review.
 - [x] 1.4 Confirm private beta invitation model and whether existing world memberships are sufficient.
 - [x] 1.5 Confirm player session/resume schema and package/router ownership.
-- [ ] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
+- [x] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
 - [ ] 1.7 Confirm feedback ownership and whether moderation records can be reused.
 - [ ] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
 - [x] 1.9 Confirm frontend phases will use `impeccable` before Web implementation.
@@ -37,12 +37,12 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 4. Phase 3 — Cost & Quota Real Enforcement
 
-- [ ] 4.1 Write docs-only phase planning checkpoint for player/capability quota ownership.
-- [ ] 4.2 Audit all runtime/provider/media/speech/image spend paths for pre-call quota coverage.
-- [ ] 4.3 Implement world/player/provider/capability quota enforcement.
-- [ ] 4.4 Implement admin quota controls and tester quota fallback UI only after using `impeccable` if Web scope is approved.
-- [ ] 4.5 Add limit, fallback, per-player isolation, override, audit, and no-hidden-spend tests.
-- [ ] 4.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 4.1 Write docs-only phase planning checkpoint for player/capability quota ownership.
+- [x] 4.2 Audit all runtime/provider/media/speech/image spend paths for pre-call quota coverage.
+- [x] 4.3 Implement world/player/provider/capability quota enforcement.
+- [x] 4.4 Implement admin quota controls and tester quota fallback UI only after using `impeccable` if Web scope is approved.
+- [x] 4.5 Add limit, fallback, per-player isolation, override, audit, and no-hidden-spend tests.
+- [x] 4.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 4.7 Fast-forward merge to local main and update harness docs.
 
 ## 5. Phase 4 — World Setup Wizard

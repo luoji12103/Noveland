@@ -628,6 +628,87 @@ def test_provider_budget_policy_emergency_stop_blocks_smoke_and_reports_quota() 
     assert unblocked.json()["emergency_stop_enabled"] is False
 
 
+def test_provider_quota_status_supports_player_and_capability_filters() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    player_a = uuid.uuid4()
+    player_b = uuid.uuid4()
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+    created = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "fake",
+            "provider_key": "quota-image",
+            "display_name": "Quota Image",
+        },
+    )
+    provider_id = created.json()["id"]
+    policy = client.post(
+        f"/worlds/{world_id}/providers/budget-policies",
+        json={
+            "provider_id": provider_id,
+            "policy_key": "player-capability-limit",
+            "limits_json": {"default_player": {"max_daily_invocations": 1}},
+        },
+    )
+    first = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={
+            "worldline_id": str(worldline_id),
+            "capability_key": "image.generate",
+            "player_actor_id": str(player_a),
+            "input_text": "draw first",
+        },
+    )
+    blocked = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={
+            "worldline_id": str(worldline_id),
+            "capability_key": "image.generate",
+            "player_actor_id": str(player_a),
+            "input_text": "draw blocked",
+        },
+    )
+    other_player = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={
+            "worldline_id": str(worldline_id),
+            "capability_key": "image.generate",
+            "player_actor_id": str(player_b),
+            "input_text": "draw allowed",
+        },
+    )
+    quota = client.get(
+        f"/worlds/{world_id}/providers/quota-status",
+        params={
+            "provider_id": provider_id,
+            "player_actor_id": str(player_a),
+            "capability_key": "image.generate",
+        },
+    )
+
+    assert policy.status_code == 201
+    assert first.status_code == 201
+    assert first.json()["smoke_status"] == "succeeded"
+    assert blocked.status_code == 201
+    assert blocked.json()["smoke_status"] == "failed"
+    assert "daily_invocation_limit" in blocked.json()["invocation"]["error_text"]
+    assert other_player.status_code == 201
+    assert other_player.json()["smoke_status"] == "succeeded"
+    assert quota.status_code == 200
+    assert quota.json()["player_actor_id"] == str(player_a)
+    assert quota.json()["capability_key"] == "image.generate"
+    assert quota.json()["blocked_reasons"] == ["daily_invocation_limit"]
+    assert "storage_uri" not in quota.text
+    assert "raw_prompt" not in quota.text
+    assert "secret" not in quota.text
+
+
 class _ProviderApiClient(TestClient):
     media_storage: LocalMediaObjectStorage
 

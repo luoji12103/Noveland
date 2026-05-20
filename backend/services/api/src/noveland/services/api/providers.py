@@ -99,12 +99,14 @@ class ProviderIntegrationUpdateRequest(BaseModel):
 
 class ProviderSmokeTestRequestBody(BaseModel):
     worldline_id: uuid.UUID | None = None
+    capability_key: str | None = Field(default=None, min_length=1, max_length=120)
     input_text: str | None = None
     input_json: dict[str, Any] = Field(default_factory=dict)
     request_json: dict[str, Any] = Field(default_factory=dict)
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
 
 
 class ProviderBudgetPolicyCreateRequest(BaseModel):
@@ -313,8 +315,15 @@ def get_provider_quota_status(
     _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     provider_id: Annotated[uuid.UUID | None, Query()] = None,
+    player_actor_id: Annotated[uuid.UUID | None, Query()] = None,
+    capability_key: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
 ) -> ProviderQuotaStatusRead:
-    return ProviderBudgetService(db_session).quota_status(world_id, provider_id=provider_id)
+    return ProviderBudgetService(db_session).quota_status(
+        world_id,
+        provider_id=provider_id,
+        player_actor_id=player_actor_id,
+        capability_key=capability_key,
+    )
 
 
 @router.get("/{provider_id}", response_model=ProviderIntegrationRead)
@@ -495,12 +504,14 @@ def run_provider_smoke_test(
                 worldline_id=request.worldline_id,
                 provider_id=provider_id,
                 provider_kind=provider.provider_kind,
+                capability_key=request.capability_key,
                 input_text=request.input_text,
                 input_json=dict(request.input_json),
                 request_json=dict(request.request_json),
                 model_name=request.model_name,
                 media_job_id=request.media_job_id,
                 media_asset_id=request.media_asset_id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=(
                     "platform_admin"
                     if is_platform_admin(subject)
@@ -568,6 +579,7 @@ def run_provider_test_invocation(
                 model_name=request.model_name,
                 media_job_id=request.media_job_id,
                 media_asset_id=request.media_asset_id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=(
                     "platform_admin"
                     if is_platform_admin(subject)

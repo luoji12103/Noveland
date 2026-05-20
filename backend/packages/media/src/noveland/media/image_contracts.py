@@ -33,6 +33,7 @@ class _FrozenContract(BaseModel):
 class ImageGenerateRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     provider_id: uuid.UUID
+    player_actor_id: uuid.UUID | None = None
     prompt: str = Field(min_length=1)
     negative_prompt: str | None = Field(default=None, min_length=1)
     asset_role: MediaAssetRole = MediaAssetRole.ORIGINAL_IMAGE
@@ -55,6 +56,7 @@ class ImageGenerateRequest(_FrozenContract):
 class ImageEditRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     provider_id: uuid.UUID
+    player_actor_id: uuid.UUID | None = None
     prompt: str = Field(min_length=1)
     input_asset_ids: tuple[uuid.UUID, ...] = Field(min_length=1)
     mask_asset_id: uuid.UUID | None = None

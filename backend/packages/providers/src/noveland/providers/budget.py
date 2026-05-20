@@ -124,19 +124,35 @@ class ProviderBudgetService:
         world_id: uuid.UUID,
         *,
         provider_id: uuid.UUID | None = None,
+        player_actor_id: uuid.UUID | None = None,
+        capability_key: str | None = None,
     ) -> ProviderQuotaStatusRead:
         policies = self._matching_policies(world_id, provider_id=provider_id)
-        usage = self._usage(world_id, provider_id=provider_id)
-        limits = _merged_limits(policies)
+        normalized_capability = _normalize_key(capability_key)
+        usage = self._usage(
+            world_id,
+            provider_id=provider_id,
+            player_actor_id=player_actor_id,
+            capability_key=normalized_capability,
+        )
+        limits = _merged_limits(
+            policies,
+            player_actor_id=player_actor_id,
+            capability_key=normalized_capability,
+        )
         blocked_reasons = _blocked_reasons(
             policies,
             usage.daily_invocation_count,
             usage.daily_estimated_cost,
             usage.daily_media_job_count,
+            player_actor_id=player_actor_id,
+            capability_key=normalized_capability,
         )
         return ProviderQuotaStatusRead(
             world_id=world_id,
             provider_id=provider_id,
+            player_actor_id=player_actor_id,
+            capability_key=normalized_capability,
             emergency_stop_active=any(policy.emergency_stop_enabled for policy in policies),
             blocked_reasons=blocked_reasons,
             active_policy_ids=[policy.id for policy in policies],
@@ -150,8 +166,16 @@ class ProviderBudgetService:
         self,
         world_id: uuid.UUID,
         provider_id: uuid.UUID,
+        *,
+        player_actor_id: uuid.UUID | None = None,
+        capability_key: str | None = None,
     ) -> ProviderBudgetCheckResult:
-        quota = self.quota_status(world_id, provider_id=provider_id)
+        quota = self.quota_status(
+            world_id,
+            provider_id=provider_id,
+            player_actor_id=player_actor_id,
+            capability_key=capability_key,
+        )
         if quota.blocked_reasons:
             reason = quota.blocked_reasons[0]
             raise ProviderBudgetExceededError(f"provider budget blocked: {reason}")
@@ -178,6 +202,8 @@ class ProviderBudgetService:
         world_id: uuid.UUID,
         *,
         provider_id: uuid.UUID | None,
+        player_actor_id: uuid.UUID | None,
+        capability_key: str | None,
     ) -> _Usage:
         day_start = datetime.combine(datetime.now(UTC).date(), time.min, tzinfo=UTC)
         invocations = self._session.scalars(
@@ -193,10 +219,18 @@ class ProviderBudgetService:
             )
         ).all()
         filtered_invocations = [
-            item for item in invocations if _matches_provider(item.request_params_json, provider_id)
+            item
+            for item in invocations
+            if _matches_provider(item.request_params_json, provider_id)
+            and _matches_player(item.request_params_json, player_actor_id)
+            and _matches_capability(item.request_params_json, capability_key)
         ]
         filtered_jobs = [
-            item for item in media_jobs if _matches_provider(item.provider_config_json, provider_id)
+            item
+            for item in media_jobs
+            if _matches_provider(item.provider_config_json, provider_id)
+            and _matches_player(item.provider_config_json, player_actor_id)
+            and _matches_capability(item.provider_config_json, capability_key)
         ]
         estimated_cost = sum(
             float(item.estimated_cost or Decimal("0")) for item in filtered_invocations
@@ -263,10 +297,43 @@ def _matches_provider(payload: dict[str, Any] | None, provider_id: uuid.UUID | N
     return str(payload.get("provider_id")) == str(provider_id)
 
 
-def _merged_limits(policies: list[ProviderBudgetPolicy]) -> dict[str, Any]:
+def _matches_player(
+    payload: dict[str, Any] | None,
+    player_actor_id: uuid.UUID | None,
+) -> bool:
+    if player_actor_id is None:
+        return True
+    if not isinstance(payload, dict):
+        return False
+    return str(payload.get("player_actor_id")) == str(player_actor_id)
+
+
+def _matches_capability(payload: dict[str, Any] | None, capability_key: str | None) -> bool:
+    if capability_key is None:
+        return True
+    if not isinstance(payload, dict):
+        return False
+    return _normalize_key(payload.get("capability_key")) == capability_key
+
+
+def _merged_limits(
+    policies: list[ProviderBudgetPolicy],
+    *,
+    player_actor_id: uuid.UUID | None,
+    capability_key: str | None,
+) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     for key in ("max_daily_invocations", "max_daily_estimated_cost", "max_daily_media_jobs"):
-        values = [_numeric_limit(policy.limits_json.get(key)) for policy in policies]
+        values = [
+            _numeric_limit(limit_value)
+            for policy in policies
+            for limit_value in _candidate_limit_values(
+                policy.limits_json,
+                key,
+                player_actor_id=player_actor_id,
+                capability_key=capability_key,
+            )
+        ]
         concrete = [value for value in values if value is not None]
         if concrete:
             merged[key] = min(concrete)
@@ -278,11 +345,18 @@ def _blocked_reasons(
     daily_invocation_count: int,
     daily_estimated_cost: float,
     daily_media_job_count: int,
+    *,
+    player_actor_id: uuid.UUID | None,
+    capability_key: str | None,
 ) -> list[str]:
     reasons: list[str] = []
     if any(policy.emergency_stop_enabled for policy in policies):
         reasons.append("emergency_stop")
-    limits = _merged_limits(policies)
+    limits = _merged_limits(
+        policies,
+        player_actor_id=player_actor_id,
+        capability_key=capability_key,
+    )
     max_invocations = _numeric_limit(limits.get("max_daily_invocations"))
     if max_invocations is not None and daily_invocation_count >= max_invocations:
         reasons.append("daily_invocation_limit")
@@ -295,12 +369,55 @@ def _blocked_reasons(
     return reasons
 
 
+def _candidate_limit_values(
+    limits_json: dict[str, Any],
+    key: str,
+    *,
+    player_actor_id: uuid.UUID | None,
+    capability_key: str | None,
+) -> list[object]:
+    values: list[object] = [limits_json.get(key)]
+    if capability_key is not None:
+        capability_limits = _nested_limits(limits_json.get("capabilities"), capability_key)
+        if capability_limits is not None:
+            values.append(capability_limits.get(key))
+    if player_actor_id is not None:
+        default_player_limits = _mapping(limits_json.get("default_player"))
+        if default_player_limits is not None:
+            values.append(default_player_limits.get(key))
+        player_limits = _nested_limits(limits_json.get("players"), str(player_actor_id))
+        if player_limits is not None:
+            values.append(player_limits.get(key))
+    return values
+
+
+def _nested_limits(value: object, key: str) -> dict[str, Any] | None:
+    mapping = _mapping(value)
+    if mapping is None:
+        return None
+    nested = mapping.get(key)
+    if nested is None:
+        nested = mapping.get(key.lower())
+    return _mapping(nested)
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return value if isinstance(value, dict) else None
+
+
 def _numeric_limit(value: object) -> float | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
         return float(value)
     return None
+
+
+def _normalize_key(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
 
 
 def _first_leaky_path(value: Any, *, prefix: str = "") -> str | None:

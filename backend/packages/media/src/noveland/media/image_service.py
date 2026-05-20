@@ -93,6 +93,7 @@ class ImageService:
                 worldline_id=worldline_id,
                 provider_id=request.provider_id,
                 provider_kind=provider_kind,
+                capability_key="image.generate",
                 input_text=request.prompt,
                 request_json={
                     "prompt": request.prompt,
@@ -104,6 +105,7 @@ class ImageService:
                     "metadata": request.metadata,
                 },
                 media_job_id=job.id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
             )
         )
@@ -178,6 +180,7 @@ class ImageService:
                 worldline_id=worldline_id,
                 provider_id=request.provider_id,
                 provider_kind=provider_kind,
+                capability_key="image.edit",
                 input_text=request.prompt,
                 request_json={
                     "prompt": request.prompt,
@@ -191,6 +194,7 @@ class ImageService:
                     "metadata": request.metadata,
                 },
                 media_job_id=job.id,
+                player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
             )
         )

@@ -279,6 +279,8 @@ class ProviderBudgetPolicyRead(_FrozenContract):
 class ProviderQuotaStatusRead(_FrozenContract):
     world_id: uuid.UUID
     provider_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
+    capability_key: str | None = None
     emergency_stop_active: bool
     blocked_reasons: list[str] = Field(default_factory=list)
     active_policy_ids: list[uuid.UUID] = Field(default_factory=list)
@@ -300,6 +302,7 @@ class ProviderExecutionRequest(_FrozenContract):
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
     actor_ref: str | None = Field(default=None, min_length=1, max_length=160)
 
     @field_validator("input_json", "request_json", mode="after")
@@ -336,6 +339,7 @@ class ProviderTestInvocationRequest(_FrozenContract):
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
 
     @field_validator("input_json", "request_json", mode="after")
     @classmethod
@@ -350,12 +354,14 @@ class ProviderTestInvocationResult(ProviderExecutionResult):
 
 class ProviderSmokeTestRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
+    capability_key: str | None = Field(default=None, min_length=1, max_length=120)
     input_text: str | None = None
     input_json: dict[str, Any] = Field(default_factory=dict)
     request_json: dict[str, Any] = Field(default_factory=dict)
     model_name: str | None = Field(default=None, min_length=1, max_length=200)
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
+    player_actor_id: uuid.UUID | None = None
 
     @field_validator("input_json", "request_json", mode="after")
     @classmethod

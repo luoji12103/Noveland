@@ -66,6 +66,7 @@ from noveland.providers.registry import (
     ProviderValidationError,
 )
 from noveland.providers.routing import (
+    capability_key_for_provider,
     invocation_kind_for_provider,
     invocation_provider_kind_for_adapter,
     media_job_kind_for_provider,
@@ -129,6 +130,9 @@ class ProviderExecutionService:
             self._validate_media_asset(request.world_id, worldline_id, request.media_asset_id)
         reject_sensitive_config(request.input_json, field_name="input_json")
         reject_sensitive_config(request.request_json, field_name="request_json")
+        capability_key = request.capability_key or capability_key_for_provider(
+            provider.provider_kind
+        )
 
         inactive_reason = (
             None
@@ -142,6 +146,8 @@ class ProviderExecutionService:
                 quota = ProviderBudgetService(self._session).check_provider_execution(
                     request.world_id,
                     provider.id,
+                    player_actor_id=request.player_actor_id,
+                    capability_key=capability_key,
                 ).quota_status
                 budget_metadata = {
                     "budget_checked": True,
@@ -180,6 +186,12 @@ class ProviderExecutionService:
             "provider_key": provider.provider_key,
             "provider_kind": provider.provider_kind.value,
             "adapter_kind": provider.adapter_kind.value,
+            "capability_key": capability_key,
+            **(
+                {}
+                if request.player_actor_id is None
+                else {"player_actor_id": str(request.player_actor_id)}
+            ),
             "provider_status": model.status,
             **budget_metadata,
             **auth_metadata,

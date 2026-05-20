@@ -331,6 +331,143 @@ def test_daily_invocation_limit_blocks_after_limit_is_reached() -> None:
         assert invocations[-1].request_params_json["budget_block_reason"].endswith(
             "daily_invocation_limit"
         )
+        assert invocations[-1].request_params_json["capability_key"] == "text.generate"
+
+
+def test_capability_quota_blocks_matching_capability_only() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="capability-text-limit",
+                limits_json={"capabilities": {"text.generate": {"max_daily_invocations": 1}}},
+            )
+        )
+        first = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key="text.generate",
+                input_text="first text",
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="daily_invocation_limit"):
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    provider_kind=ProviderKind.TEXT_GENERATION,
+                    capability_key="text.generate",
+                    input_text="blocked text",
+                )
+            )
+        other_capability = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                capability_key="text.embedding",
+                input_text="embedding-like dry run",
+            )
+        )
+        quota = ProviderBudgetService(session).quota_status(
+            world_id,
+            provider_id=provider_id,
+            capability_key="text.generate",
+        )
+        session.commit()
+
+    assert first.invocation.status == "succeeded"
+    assert other_capability.invocation.status == "succeeded"
+    assert quota.blocked_reasons == ["daily_invocation_limit"]
+    assert quota.capability_key == "text.generate"
+    assert quota.limits_json == {"max_daily_invocations": 1.0}
+
+
+def test_per_player_quota_isolated_and_safe(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    player_a = uuid.uuid4()
+    player_b = uuid.uuid4()
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.IMAGE_GENERATION)
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=provider_id,
+                policy_key="player-image-limit",
+                limits_json={"default_player": {"max_daily_invocations": 1}},
+            )
+        )
+        first = ProviderExecutionService(session, LocalMediaObjectStorage(tmp_path)).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                provider_kind=ProviderKind.IMAGE_GENERATION,
+                capability_key="image.generate",
+                player_actor_id=player_a,
+                input_text="draw first",
+            )
+        )
+        with pytest.raises(ProviderExecutionError, match="daily_invocation_limit"):
+            ProviderExecutionService(session, LocalMediaObjectStorage(tmp_path)).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    provider_kind=ProviderKind.IMAGE_GENERATION,
+                    capability_key="image.generate",
+                    player_actor_id=player_a,
+                    input_text="draw blocked",
+                )
+            )
+        second_player = ProviderExecutionService(
+            session,
+            LocalMediaObjectStorage(tmp_path),
+        ).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=provider_id,
+                provider_kind=ProviderKind.IMAGE_GENERATION,
+                capability_key="image.generate",
+                player_actor_id=player_b,
+                input_text="draw allowed",
+            )
+        )
+        player_a_quota = ProviderBudgetService(session).quota_status(
+            world_id,
+            provider_id=provider_id,
+            player_actor_id=player_a,
+            capability_key="image.generate",
+        )
+        player_b_quota = ProviderBudgetService(session).quota_status(
+            world_id,
+            provider_id=provider_id,
+            player_actor_id=player_b,
+            capability_key="image.generate",
+        )
+        session.commit()
+
+    assert first.output_asset is not None
+    assert second_player.output_asset is not None
+    assert player_a_quota.blocked_reasons == ["daily_invocation_limit"]
+    assert player_b_quota.blocked_reasons == ["daily_invocation_limit"]
+    assert player_a_quota.player_actor_id == player_a
+    assert player_b_quota.player_actor_id == player_b
+    assert "storage_uri" not in str(player_a_quota.model_dump())
+    assert "raw_prompt" not in str(player_a_quota.model_dump())
 
 
 def test_resolved_secret_is_not_written_to_ledger(

@@ -13,6 +13,12 @@ require dedicated quota policy records.
 - **Then** it SHALL map all runtime/provider/media/speech/image spend paths that must be guarded
 - **And** it SHALL define how world, player, provider, and capability scopes are evaluated before provider execution.
 
+#### Scenario: Checkpoint selects provider-owned JSON policy extension
+- **Given** existing provider budget policies already guard provider execution before external calls
+- **When** Phase 3 implementation begins
+- **Then** the implementation SHALL keep enforcement in `ProviderExecutionService`
+- **And** it SHALL extend provider budget policy JSON with player and capability scopes before adding new quota tables.
+
 ### Requirement: Quotas limit provider spend by scope
 The system SHALL enforce quotas for provider calls by world, player, provider, and capability where configured.
 
