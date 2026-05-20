@@ -133,6 +133,15 @@ trace-only until a later accepted target mutation is defined.
 
 Onboarding and admin setup UI should be calm, explicit, and task-focused. They must avoid decorative hero flows, hidden cost/spend, and vague AI demo language.
 
+### Private beta gate extends observability/readiness
+
+Phase 8 implements private beta readiness under `backend/packages/observability/` and the existing
+app-level observability router. It adds a read-only platform-admin report with
+`readiness_kind=private_beta_gate`, reuses private beta setup readiness and existing evidence
+sections, and adds beta-specific feedback, memory/persona QA, repair-loop, and manual 1-2 hour
+tester-session checks. It adds no migration, Web UI, provider call, duplicate readiness framework,
+or public launch signoff.
+
 ## Risks / Trade-offs
 
 - Invitation scope can drift into public auth → Keep invite-only and stop if public signup becomes necessary.

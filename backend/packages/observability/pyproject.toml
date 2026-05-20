@@ -10,6 +10,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "noveland-agents",
   "noveland-authoring",
+  "noveland-beta-feedback",
   "noveland-conversations",
   "noveland-core",
   "noveland-invocations",
@@ -28,6 +29,7 @@ dependencies = [
 [tool.uv.sources]
 noveland-agents = { workspace = true }
 noveland-authoring = { workspace = true }
+noveland-beta-feedback = { workspace = true }
 noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
 noveland-invocations = { workspace = true }

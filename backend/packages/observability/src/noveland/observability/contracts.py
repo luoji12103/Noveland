@@ -255,3 +255,10 @@ class PublicLaunchReadinessReport(_FrozenContract):
 
 class PrivateBetaSetupReadinessReport(ProductionReadinessReport):
     readiness_kind: str = Field(default="private_beta_world_setup", min_length=1)
+
+
+class PrivateBetaGateReport(ProductionReadinessReport):
+    readiness_kind: str = Field(default="private_beta_gate", min_length=1)
+    private_beta_setup: PrivateBetaSetupReadinessReport
+    manual_checklist: list[SelfUseMvpManualChecklistItem] = Field(default_factory=list)
+    public_launch_ready: bool = False

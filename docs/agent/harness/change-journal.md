@@ -2837,6 +2837,28 @@
 - Verification: Targeted checks passed with backend ruff and mypy for moderation/API/reader-delivery/schema files, targeted pytest (`41 passed`), and the full local gate: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, `git diff --check`, and OpenSpec strict changes/specs validation.
 - Follow-up notes: Commit Phase 10 implementation and fast-forward merge to local `main` if the branch remains clean. Keep Phase 10 backend/API-only; no Web UI, automatic moderation, provider execution, daemon work, public unauthenticated access, duplicate readiness framework, or broad `worlds.py` routes.
 
+## v1.0.8 Private Beta Gate planning entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-8-private-beta-gate
+- Scope: v1.0 Phase 8 planning checkpoint before implementation.
+- Summary: Added the Phase 8 checkpoint for private beta gate ownership. The plan keeps the gate under existing observability/readiness, adds a platform-admin read-only report with `readiness_kind=private_beta_gate`, reuses setup/onboarding/session/quota/feedback/QA/repair/self-use evidence, adds no migration, Web UI, duplicate readiness framework, provider calls, public launch signoff, or broad `worlds.py` routes.
+- Files changed: `/docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`, `/openspec/changes/v1-0-private-beta-mvp/{design.md,phase-plan.md,tasks.md}`, `/openspec/changes/v1-0-private-beta-mvp/specs/private-beta-gate/spec.md`, and harness docs.
+- Tests added/updated: N/A for planning checkpoint.
+- Verification: pending with Phase 8 implementation gate.
+- Follow-up notes: Implement the backend/API gate in `backend/packages/observability/` and the app-level observability router. Do not add gate tables, Web UI, provider execution, or public launch semantics.
+
+## v1.0.8 Private Beta Gate implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-8-private-beta-gate
+- Scope: v1.0 Phase 8 backend/API private beta readiness gate.
+- Summary: Extended observability/readiness with `PrivateBetaGateReport`, `ProductionReadinessGateService.private_beta_gate_report()`, and platform-admin `GET /observability/readiness/private-beta`. The report reuses private beta setup readiness, checks feedback path evidence, memory/persona QA confirmation, beta repair-loop traceability, manual 1-2 hour tester-session checklist items, and world-event leak checks. It keeps `public_launch_ready=false` and adds no migration, Web UI, duplicate readiness framework, provider execution, public launch semantics, tester-visible diagnostics, or broad `worlds.py` routes.
+- Files changed: `/backend/packages/observability/src/noveland/observability/{contracts.py,services.py,__init__.py}`, `/backend/packages/observability/pyproject.toml`, `/backend/services/api/src/noveland/services/api/observability.py`, `/backend/tests/test_production_readiness_gate.py`, `/backend/uv.lock`, OpenSpec tasks/spec docs, and harness docs.
+- Tests added/updated: private beta gate pass/fail coverage for setup/feedback/QA/repair/manual evidence, leak fixture blocking, platform-admin-only endpoint ACL, public-launch distinction, no duplicate gate tables, response redaction, and workspace import smoke.
+- Verification: Targeted ruff/mypy passed for observability/API/test files; targeted pytest passed for readiness gate (`22 passed`) and workspace import smoke (`1 passed`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`529 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Follow-up notes: Commit Phase 8, fast-forward merge to local `main`, and stop without archiving v1.0 unless explicitly instructed. No Web gate was run because Phase 8 touched no Web files.
+
 ## v1.0.7 Beta Content Iteration Loop planning entry
 
 - Date: 2026-05-20

@@ -84,11 +84,11 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 9. Phase 8 — Private Beta Gate
 
-- [ ] 9.1 Write docs-only phase planning checkpoint for private beta readiness ownership.
-- [ ] 9.2 Implement private beta gate evidence aggregation.
-- [ ] 9.3 Add readiness UI only after using `impeccable` if Web scope is approved.
-- [ ] 9.4 Add gate pass/fail, onboarding/session/quota/feedback, leak fixture, and report-redaction tests.
-- [ ] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 9.1 Write docs-only phase planning checkpoint for private beta readiness ownership.
+- [x] 9.2 Implement private beta gate evidence aggregation.
+- [x] 9.3 Add readiness UI only after using `impeccable` if Web scope is approved.
+- [x] 9.4 Add gate pass/fail, onboarding/session/quota/feedback, leak fixture, and report-redaction tests.
+- [x] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 9.6 Fast-forward merge to local main and update harness docs.
 
 ## 10. Closeout

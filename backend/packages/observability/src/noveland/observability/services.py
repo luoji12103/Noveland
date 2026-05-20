@@ -8,6 +8,7 @@ from typing import Any
 
 from noveland.agents.models import AgentPersona
 from noveland.authoring.models import AuthoringImportProposal, AuthoringSourceFragment
+from noveland.beta_feedback.models import BetaFeedbackReport
 from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
@@ -29,6 +30,8 @@ from noveland.observability.contracts import (
     IncidentRetentionSummary,
     IncidentStatus,
     IncidentSummary,
+    PrivateBetaGateReport,
+    PrivateBetaSetupReadinessReport,
     ProductionReadinessReport,
     ProductionReadinessSection,
     PublicLaunchReadinessReport,
@@ -980,6 +983,116 @@ class ProductionReadinessGateService:
             ],
         )
 
+    def private_beta_gate_report(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+        conversation_id: uuid.UUID | None = None,
+        evidence_limit_per_section: int = 5,
+        manual_play_minutes: int = 0,
+        resume_verified: bool = False,
+        failure_notes_recorded: bool = False,
+        manual_tester_count: int = 0,
+        tester_session_completed: bool = False,
+        no_developer_intervention_verified: bool = False,
+        quota_reviewed: bool = False,
+        feedback_triage_verified: bool = False,
+        memory_persona_qa_reviewed: bool = False,
+        repair_loop_reviewed: bool = False,
+    ) -> PrivateBetaGateReport:
+        safe_limit = max(1, min(evidence_limit_per_section, 20))
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        setup = PrivateBetaSetupReadinessReport.model_validate(
+            self.private_beta_setup_report(
+                world_id=world_id,
+                worldline_id=worldline.id,
+                conversation_id=conversation_id,
+                evidence_limit_per_section=safe_limit,
+                manual_play_minutes=manual_play_minutes,
+                resume_verified=resume_verified,
+                failure_notes_recorded=failure_notes_recorded,
+            ).model_dump()
+        )
+        manual_checklist = _private_beta_manual_checklist(
+            manual_tester_count=manual_tester_count,
+            manual_play_minutes=manual_play_minutes,
+            tester_session_completed=tester_session_completed,
+            no_developer_intervention_verified=no_developer_intervention_verified,
+            quota_reviewed=quota_reviewed,
+            feedback_triage_verified=feedback_triage_verified,
+            memory_persona_qa_reviewed=memory_persona_qa_reviewed,
+            repair_loop_reviewed=repair_loop_reviewed,
+        )
+        sections = [
+            self._private_beta_setup_gate_section(setup, safe_limit),
+            self._private_beta_feedback_gate_section(
+                world_id,
+                worldline.id,
+                safe_limit,
+                feedback_triage_verified=feedback_triage_verified,
+            ),
+            self._private_beta_memory_persona_qa_gate_section(
+                setup,
+                memory_persona_qa_reviewed=memory_persona_qa_reviewed,
+                limit=safe_limit,
+            ),
+            self._private_beta_repair_loop_gate_section(
+                world_id,
+                worldline.id,
+                safe_limit,
+                repair_loop_reviewed=repair_loop_reviewed,
+            ),
+            self._private_beta_manual_session_section(manual_checklist),
+            self._self_use_no_world_event_leak_section(world_id, worldline.id, safe_limit),
+        ]
+        evidence_count = sum(section.evidence_count for section in sections)
+        blocker_count = sum(section.blocker_count for section in sections)
+        warning_count = sum(section.warning_count for section in sections)
+        return PrivateBetaGateReport(
+            status=_readiness_status(sections),
+            generated_at=datetime.now(UTC),
+            world_id=world_id,
+            readiness_kind="private_beta_gate",
+            section_count=len(sections),
+            evidence_count=evidence_count,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            sections=sections,
+            private_beta_setup=setup,
+            manual_checklist=manual_checklist,
+            public_launch_ready=False,
+            suppressed_fields=[
+                "invite_tokens",
+                "invite_token_hashes",
+                "credential_values",
+                "credential_headers",
+                "resolved_secrets",
+                "prompt_snapshot_bodies",
+                "prompt_bodies",
+                "provider_result_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "object_locator_values",
+                "filesystem_paths",
+                "binary_payloads",
+                "inline_binary_payloads",
+                "world_event_payload_snapshots",
+                "raw_source_fragments",
+                "local_model_paths",
+                "raw_workflow_json",
+                "feedback_reporter_private_notes",
+            ],
+            non_goals=[
+                "public_launch_readiness",
+                "release_candidate_readiness",
+                "duplicate_readiness_framework",
+                "automatic_public_launch",
+                "automated_provider_spend",
+                "tester_visible_admin_diagnostics",
+            ],
+        )
+
     def _self_use_conversation(
         self,
         world_id: uuid.UUID,
@@ -1267,6 +1380,231 @@ class ProductionReadinessGateService:
             recommendations=[]
             if not blockers and not warning_count
             else ["Resolve self-use MVP gate blockers before inviting beta testers."],
+        )
+
+    def _private_beta_setup_gate_section(
+        self,
+        setup: PrivateBetaSetupReadinessReport,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        refs: list[IncidentEvidenceRef] = []
+        for section in setup.sections:
+            refs.extend(section.evidence_refs)
+            if len(refs) >= limit:
+                refs = refs[:limit]
+                break
+        blockers = []
+        if setup.status == IncidentStatus.BLOCKED:
+            blockers.append("Private beta setup readiness still has blocking evidence.")
+        warning_count = 1 if setup.status == IncidentStatus.WATCH else 0
+        return _readiness_section(
+            "private_beta_setup_readiness",
+            status=setup.status,
+            summary=(
+                f"Private beta setup is {setup.status} with {setup.blocker_count} blockers "
+                f"and {setup.warning_count} warnings."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Resolve private beta setup blockers before inviting testers."],
+        )
+
+    def _private_beta_feedback_gate_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+        *,
+        feedback_triage_verified: bool,
+    ) -> ProductionReadinessSection:
+        reports = self._session.scalars(
+            select(BetaFeedbackReport)
+            .where(
+                BetaFeedbackReport.world_id == world_id,
+                BetaFeedbackReport.worldline_id == worldline_id,
+            )
+            .order_by(BetaFeedbackReport.updated_at.desc())
+            .limit(limit),
+        ).all()
+        report_count = self._count(
+            BetaFeedbackReport,
+            BetaFeedbackReport.world_id == world_id,
+            BetaFeedbackReport.worldline_id == worldline_id,
+        )
+        triaged_count = self._count(
+            BetaFeedbackReport,
+            BetaFeedbackReport.world_id == world_id,
+            BetaFeedbackReport.worldline_id == worldline_id,
+            BetaFeedbackReport.status.in_(("triaged", "linked_to_repair", "resolved")),
+        )
+        linked_count = sum(
+            1
+            for report in self._session.scalars(
+                select(BetaFeedbackReport).where(
+                    BetaFeedbackReport.world_id == world_id,
+                    BetaFeedbackReport.worldline_id == worldline_id,
+                )
+            ).all()
+            if report.repair_proposal_refs_json
+        )
+        blockers: list[str] = []
+        if report_count == 0:
+            blockers.append("No beta feedback reports prove the tester feedback path.")
+        if report_count and triaged_count == 0:
+            blockers.append("No beta feedback report has been triaged.")
+        if not feedback_triage_verified:
+            blockers.append("Manual feedback triage review is not confirmed.")
+        return _readiness_section(
+            "beta_feedback_path",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{report_count} beta feedback reports, {triaged_count} triaged/resolved, "
+                f"{linked_count} linked to repair proposals."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="beta_feedback_report",
+                    id=str(report.id),
+                    component="beta_feedback_path",
+                    status=report.status,
+                    reason_code=report.issue_type,
+                    world_id=report.world_id,
+                    worldline_id=report.worldline_id,
+                    occurred_at=report.updated_at,
+                )
+                for report in reports
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Submit and triage at least one contextual beta feedback report."],
+        )
+
+    def _private_beta_memory_persona_qa_gate_section(
+        self,
+        setup: PrivateBetaSetupReadinessReport,
+        *,
+        memory_persona_qa_reviewed: bool,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        persona_section = next(
+            (section for section in setup.sections if section.section_key == "persona_memory"),
+            None,
+        )
+        refs = [] if persona_section is None else persona_section.evidence_refs[:limit]
+        blockers: list[str] = []
+        warning_count = 0
+        if persona_section is None:
+            blockers.append("Persona/memory setup evidence is missing.")
+        elif persona_section.status == IncidentStatus.BLOCKED:
+            blockers.append("Persona/memory setup evidence still has blockers.")
+        elif persona_section.status == IncidentStatus.WATCH:
+            warning_count += 1
+        if not memory_persona_qa_reviewed:
+            blockers.append("Memory/persona QA review has not been confirmed.")
+        return _readiness_section(
+            "memory_persona_qa_gate",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                "Memory/persona QA review "
+                f"{'confirmed' if memory_persona_qa_reviewed else 'not confirmed'}."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers
+            else ["Run memory/persona QA and confirm no critical drift or contamination remains."],
+        )
+
+    def _private_beta_repair_loop_gate_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+        *,
+        repair_loop_reviewed: bool,
+    ) -> ProductionReadinessSection:
+        all_proposals = self._session.scalars(
+            select(AuthoringImportProposal)
+            .where(
+                AuthoringImportProposal.world_id == world_id,
+                AuthoringImportProposal.worldline_id == worldline_id,
+            )
+            .order_by(AuthoringImportProposal.updated_at.desc())
+        ).all()
+        repair_proposals = [
+            proposal
+            for proposal in all_proposals
+            if proposal.evidence_json.get("source") == "beta_content_iteration_loop"
+            or proposal.proposed_payload_json.get("source") == "beta_content_iteration_loop"
+        ]
+        applied_count = sum(1 for proposal in repair_proposals if proposal.status == "applied")
+        linked_feedback_count = sum(
+            1
+            for report in self._session.scalars(
+                select(BetaFeedbackReport).where(
+                    BetaFeedbackReport.world_id == world_id,
+                    BetaFeedbackReport.worldline_id == worldline_id,
+                )
+            ).all()
+            if report.repair_proposal_refs_json
+        )
+        blockers: list[str] = []
+        if not repair_proposals:
+            blockers.append("No beta content repair proposal evidence exists.")
+        if repair_proposals and linked_feedback_count == 0:
+            blockers.append("No beta feedback report is linked to repair proposals.")
+        if not repair_loop_reviewed:
+            blockers.append("Repair-loop review has not been confirmed.")
+        return _readiness_section(
+            "beta_content_repair_loop",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{len(repair_proposals)} beta repair proposals, {applied_count} applied, "
+                f"{linked_feedback_count} feedback reports linked."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="authoring_import_proposal",
+                    id=str(proposal.id),
+                    component="beta_content_repair_loop",
+                    status=proposal.status,
+                    reason_code=str(proposal.target_ref_kind or proposal.proposal_kind),
+                    world_id=proposal.world_id,
+                    worldline_id=proposal.worldline_id,
+                    occurred_at=proposal.updated_at,
+                )
+                for proposal in repair_proposals[:limit]
+            ],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Create and review repair proposals linked to beta feedback or QA diagnostics."],
+        )
+
+    def _private_beta_manual_session_section(
+        self,
+        checklist: list[SelfUseMvpManualChecklistItem],
+    ) -> ProductionReadinessSection:
+        blockers = [
+            item.title
+            for item in checklist
+            if item.required_for_pass and item.status == IncidentStatus.BLOCKED
+        ]
+        warning_count = sum(1 for item in checklist if item.status == IncidentStatus.WATCH)
+        return _readiness_section(
+            "manual_private_beta_session",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=f"{len(checklist) - len(blockers)} of {len(checklist)} manual checks pass.",
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers
+            else ["Complete the manual 1-2 hour private beta tester-session checklist."],
         )
 
     def _conversation_participant_agent_ids(
@@ -3265,6 +3603,114 @@ def _self_use_manual_checklist(
             evidence_hint=(
                 "Self-use MVP gate evidence is not private beta, production, or public launch "
                 "readiness."
+            ),
+            required_for_pass=True,
+        ),
+    ]
+
+
+def _private_beta_manual_checklist(
+    *,
+    manual_tester_count: int,
+    manual_play_minutes: int,
+    tester_session_completed: bool,
+    no_developer_intervention_verified: bool,
+    quota_reviewed: bool,
+    feedback_triage_verified: bool,
+    memory_persona_qa_reviewed: bool,
+    repair_loop_reviewed: bool,
+) -> list[SelfUseMvpManualChecklistItem]:
+    tester_status = (
+        IncidentStatus.OK if 1 <= manual_tester_count <= 3 else IncidentStatus.BLOCKED
+    )
+    duration_status = (
+        IncidentStatus.OK
+        if tester_session_completed and manual_play_minutes >= 60
+        else IncidentStatus.BLOCKED
+    )
+    return [
+        SelfUseMvpManualChecklistItem(
+            item_key="manual_private_beta_tester_count",
+            title="1-3 invited testers exercised the beta path",
+            status=tester_status,
+            evidence_hint=(
+                f"Manual evidence records {manual_tester_count} testers; 1-3 are required."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="manual_private_beta_session_duration",
+            title="1-2 hour private beta session completed",
+            status=duration_status,
+            evidence_hint=(
+                f"Manual session evidence records {manual_play_minutes} minutes; at least "
+                "60 minutes and explicit completion are required."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="no_developer_intervention_verified",
+            title="No developer intervention required",
+            status=IncidentStatus.OK
+            if no_developer_intervention_verified
+            else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Tester session completed without manual DB/provider/media rescue."
+                if no_developer_intervention_verified
+                else "Confirm testers can continue without developer hand-repair."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="quota_reviewed",
+            title="Quota and degraded-mode behavior reviewed",
+            status=IncidentStatus.OK if quota_reviewed else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Admin reviewed quota and degraded-mode evidence."
+                if quota_reviewed
+                else "Review quota controls and quota-exceeded player behavior."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="feedback_triage_reviewed",
+            title="Feedback submission and triage reviewed",
+            status=IncidentStatus.OK if feedback_triage_verified else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Admin reviewed feedback submission and triage evidence."
+                if feedback_triage_verified
+                else "Submit and triage at least one contextual beta feedback report."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="memory_persona_qa_reviewed",
+            title="Memory/persona QA reviewed",
+            status=IncidentStatus.OK if memory_persona_qa_reviewed else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Admin confirmed no critical memory/persona QA blocker remains."
+                if memory_persona_qa_reviewed
+                else "Run memory/persona QA and resolve critical blockers."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="repair_loop_reviewed",
+            title="Content repair loop reviewed",
+            status=IncidentStatus.OK if repair_loop_reviewed else IncidentStatus.BLOCKED,
+            evidence_hint=(
+                "Admin reviewed beta feedback to repair proposal traceability."
+                if repair_loop_reviewed
+                else "Review feedback-linked authoring repair proposals."
+            ),
+            required_for_pass=True,
+        ),
+        SelfUseMvpManualChecklistItem(
+            item_key="private_beta_not_public_launch",
+            title="Private beta is not public launch readiness",
+            status=IncidentStatus.OK,
+            evidence_hint=(
+                "Passing private beta readiness does not authorize public launch or normal-use RC."
             ),
             required_for_pass=True,
         ),

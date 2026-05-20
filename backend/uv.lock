@@ -1051,6 +1051,7 @@ source = { editable = "packages/observability" }
 dependencies = [
     { name = "noveland-agents" },
     { name = "noveland-authoring" },
+    { name = "noveland-beta-feedback" },
     { name = "noveland-conversations" },
     { name = "noveland-core" },
     { name = "noveland-invocations" },
@@ -1070,6 +1071,7 @@ dependencies = [
 requires-dist = [
     { name = "noveland-agents", editable = "packages/agents" },
     { name = "noveland-authoring", editable = "packages/authoring" },
+    { name = "noveland-beta-feedback", editable = "packages/beta_feedback" },
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
     { name = "noveland-invocations", editable = "packages/invocations" },

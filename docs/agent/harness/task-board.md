@@ -1,16 +1,20 @@
 # Task Board
 
 ## Open
-- v1.0 Phase 8 Private Beta Gate planning checkpoint and implementation
+- v1.0 Phase 8 Private Beta Gate fast-forward merge
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
-- v1.0 Phase 8 Private Beta Gate planning checkpoint
+- v1.0 Phase 8 Private Beta Gate fast-forward merge
 
 ## Blocked
 - None
 
 ## Done
+- v1.0 Phase 8 Private Beta Gate full backend/OpenSpec gate
+- v1.0 Phase 8 Private Beta Gate targeted tests
+- v1.0 Phase 8 Private Beta Gate implementation
+- v1.0 Phase 8 Private Beta Gate planning checkpoint
 - v1.0 Phase 7 Beta Content Iteration Loop fast-forward merge
 - v1.0 Phase 7 Beta Content Iteration Loop full backend/OpenSpec gate
 - v1.0 Phase 7 Beta Content Iteration Loop targeted tests

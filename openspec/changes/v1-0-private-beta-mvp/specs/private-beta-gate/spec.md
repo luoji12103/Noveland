@@ -49,6 +49,17 @@ The system SHALL distinguish private beta readiness from public launch readiness
 - **When** public launch readiness is requested
 - **Then** the system SHALL still require later public or release-candidate checks.
 
+### Requirement: Private beta gate reuses observability readiness
+The system SHALL implement private beta readiness as an observability/readiness report rather than
+as a duplicate gate framework.
+
+#### Scenario: Private beta gate report is requested
+- **Given** a platform admin requests private beta readiness
+- **When** the report is generated
+- **Then** it SHALL return `readiness_kind=private_beta_gate`
+- **And** it SHALL reuse existing readiness section/evidence DTOs
+- **And** it SHALL NOT create private beta gate run/report tables.
+
 ## Non-goals
 
 - Public launch gate.

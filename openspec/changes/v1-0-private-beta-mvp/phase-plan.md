@@ -396,17 +396,22 @@ session state, feedback, quota enforcement, and minimal developer intervention.
 
 ### Scope
 
+- Docs-only checkpoint confirming private beta gate ownership under existing
+  observability/readiness.
 - Gate report over onboarding, setup wizard, session stability, memory/persona QA, feedback, quota,
   and repair evidence.
 - Failure summary for crash, provider failure, character drift, cost, session recovery, feedback,
   and content quality.
 - Manual 1-2 hour tester-session checklist.
+- Platform-admin-only backend/API report with `readiness_kind=private_beta_gate`.
 
 ### Non-Goals
 
 - Public launch gate.
 - Normal-use RC gate.
 - Duplicate readiness framework.
+- New persistent gate tables or signoff framework.
+- Phase 8 Web UI unless a later checkpoint explicitly scopes it after `impeccable`.
 
 ### Reused Systems
 
@@ -430,3 +435,4 @@ session state, feedback, quota enforcement, and minimal developer intervention.
 - Gate implies public launch readiness.
 - Gate needs raw prompt/output, prompt snapshot internals, resolved secrets, bytes/base64, or
   storage paths.
+- Gate exposes admin diagnostics to testers or requires broad `worlds.py` routes.

@@ -20,6 +20,7 @@ from noveland.authoring.models import (
     AuthoringSourceFragment,
     AuthoringSourceTraceability,
 )
+from noveland.beta_feedback.models import BetaFeedbackReport
 from noveland.conversations.models import (
     ConversationParticipant,
     ConversationSession,
@@ -525,7 +526,7 @@ def test_private_beta_setup_readiness_blocks_missing_access_session_quota_conten
             world_id=world_id,
             worldline_id=worldline_id,
             conversation_id=conversation_id,
-            manual_play_minutes=0,
+            manual_play_minutes=30,
             resume_verified=False,
             failure_notes_recorded=False,
         )
@@ -595,6 +596,174 @@ def test_private_beta_setup_does_not_create_duplicate_framework_tables() -> None
     assert "world_setup_wizard_reports" not in table_names
 
 
+def test_private_beta_gate_passes_with_complete_beta_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        before_counts = _framework_counts(session)
+        report = ProductionReadinessGateService(session).private_beta_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=75,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=1,
+            tester_session_completed=True,
+            no_developer_intervention_verified=True,
+            quota_reviewed=True,
+            feedback_triage_verified=True,
+            memory_persona_qa_reviewed=True,
+            repair_loop_reviewed=True,
+        )
+        after_counts = _framework_counts(session)
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "ok"
+    assert report.readiness_kind == "private_beta_gate"
+    assert report.private_beta_setup.readiness_kind == "private_beta_world_setup"
+    assert report.public_launch_ready is False
+    assert sections["private_beta_setup_readiness"].status == "ok"
+    assert sections["beta_feedback_path"].status == "ok"
+    assert sections["memory_persona_qa_gate"].status == "ok"
+    assert sections["beta_content_repair_loop"].status == "ok"
+    assert sections["manual_private_beta_session"].status == "ok"
+    assert "public_launch_readiness" in report.non_goals
+    assert before_counts == after_counts
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_private_beta_gate_blocks_missing_feedback_qa_and_repair_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).private_beta_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=30,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=0,
+            tester_session_completed=False,
+            no_developer_intervention_verified=False,
+            quota_reviewed=False,
+            feedback_triage_verified=False,
+            memory_persona_qa_reviewed=False,
+            repair_loop_reviewed=False,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert sections["private_beta_setup_readiness"].status == "ok"
+    assert sections["beta_feedback_path"].status == "blocked"
+    assert sections["memory_persona_qa_gate"].status == "blocked"
+    assert sections["beta_content_repair_loop"].status == "blocked"
+    assert sections["manual_private_beta_session"].status == "blocked"
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_private_beta_gate_blocks_leak_fixture_safely() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+    _seed_leaky_world_event(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).private_beta_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            manual_play_minutes=75,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=1,
+            tester_session_completed=True,
+            no_developer_intervention_verified=True,
+            quota_reviewed=True,
+            feedback_triage_verified=True,
+            memory_persona_qa_reviewed=True,
+            repair_loop_reviewed=True,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert sections["world_event_leak_check"].status == "blocked"
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_private_beta_gate_endpoint_is_platform_admin_only_and_not_public_launch() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-beta-gate@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+    _authenticate(client, platform_token)
+
+    response = client.get(
+        "/observability/readiness/private-beta",
+        params={
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "manual_play_minutes": "75",
+            "resume_verified": "true",
+            "failure_notes_recorded": "true",
+            "manual_tester_count": "1",
+            "tester_session_completed": "true",
+            "no_developer_intervention_verified": "true",
+            "quota_reviewed": "true",
+            "feedback_triage_verified": "true",
+            "memory_persona_qa_reviewed": "true",
+            "repair_loop_reviewed": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["readiness_kind"] == "private_beta_gate"
+    assert response.json()["status"] == "ok"
+    assert response.json()["public_launch_ready"] is False
+    assert "public_launch_readiness" in response.json()["non_goals"]
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in response.text
+
+    _member_id, member_token = _seed_user(engine, "member-beta-gate@example.test", False)
+    _authenticate(client, member_token)
+    forbidden = client.get(
+        "/observability/readiness/private-beta",
+        params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
+    )
+    assert forbidden.status_code == 403
+
+
+def test_private_beta_gate_does_not_create_duplicate_framework_tables() -> None:
+    table_names = {
+        "beta_checklist_runs",
+        "long_run_eval_runs",
+        "living_world_release_profiles",
+    }
+    assert "private_beta_gate_runs" not in table_names
+    assert "private_beta_gate_reports" not in table_names
+    assert "private_beta_readiness_reports" not in table_names
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -622,6 +791,7 @@ def _engine() -> Engine:
         AuthoringImportRun.__table__,
         AuthoringImportProposal.__table__,
         AuthoringSourceTraceability.__table__,
+        BetaFeedbackReport.__table__,
         MediaAsset.__table__,
         MediaObject.__table__,
         MediaReference.__table__,
@@ -1782,6 +1952,117 @@ def _seed_private_beta_setup_evidence(
                         "text_to_speech": {"max_daily_media_jobs": 20},
                     },
                 },
+                metadata_json={"safe": True},
+            )
+        )
+        session.commit()
+
+
+def _seed_private_beta_gate_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> None:
+    reporter_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    proposal_id = uuid.uuid4()
+    feedback_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            User(
+                id=reporter_id,
+                email=f"feedback-{reporter_id.hex[:8]}@example.test",
+                display_name="Feedback Tester",
+            )
+        )
+        session.add(
+            WorldMembership(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                user_id=reporter_id,
+                role="human_user",
+            )
+        )
+        session.add(
+            AuthoringImportRun(
+                id=run_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                source_batch_id=None,
+                run_kind="preview",
+                status="previewed",
+                summary_json={
+                    "source": "beta_content_iteration_loop",
+                    "feedback_report_ids": [str(feedback_id)],
+                    "provider_execution": False,
+                    "canonical_mutation": False,
+                },
+                created_by_actor_ref="user:admin",
+            )
+        )
+        session.add(
+            AuthoringImportProposal(
+                id=proposal_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                run_id=run_id,
+                source_fragment_id=None,
+                proposal_kind="character",
+                target_ref_kind="agent_persona_candidate",
+                target_ref_id=None,
+                title="Persona repair",
+                summary="Feedback-linked persona repair.",
+                proposed_payload_json={
+                    "source": "beta_content_iteration_loop",
+                    "repair_kind": "persona",
+                    "persona_text": "Safe persona repair.",
+                },
+                evidence_json={
+                    "source": "beta_content_iteration_loop",
+                    "feedback_report_ids": [str(feedback_id)],
+                },
+                confidence=0.9,
+                priority=10,
+                status="applied",
+                applied_ref_json={
+                    "applied_ref_kind": "agent_persona",
+                    "applied_ref_id": str(uuid.uuid4()),
+                    "canonical_mutation": False,
+                },
+            )
+        )
+        session.add(
+            BetaFeedbackReport(
+                id=feedback_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                reporter_user_id=reporter_id,
+                player_actor_id=None,
+                issue_type="persona",
+                severity="medium",
+                status="linked_to_repair",
+                title="Persona drift",
+                description="Character drifted during beta play.",
+                reporter_note=None,
+                evidence_refs_json=[
+                    {
+                        "kind": "worldline",
+                        "id": str(worldline_id),
+                        "worldline_id": str(worldline_id),
+                    }
+                ],
+                repair_proposal_refs_json=[
+                    {
+                        "proposal_id": str(proposal_id),
+                        "proposal_kind": "persona",
+                        "status": "applied",
+                        "metadata": {"run_id": str(run_id)},
+                    }
+                ],
+                triage_note="Linked to repair proposal.",
+                triaged_by_actor_ref="user:admin",
+                triaged_at=now,
                 metadata_json={"safe": True},
             )
         )

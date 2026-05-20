@@ -229,6 +229,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.6-beta-feedback-system-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.7-beta-content-iteration-loop-plan.md`
+- `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `backend/migrations/versions/20260517_0046_private_beta_invites.py`
 - `backend/tests/test_api_private_beta.py`
 - `backend/migrations/versions/20260517_0047_player_sessions.py`
@@ -569,6 +570,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`
 - `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.7-beta-content-iteration-loop-plan.md`
+- `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
