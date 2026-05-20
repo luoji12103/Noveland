@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Phase 6 Beta Feedback System implementation entry
+
+- Date: 2026-05-20
+- Branch: feature/v1.0-6-beta-feedback
+- Scope: v1.0 Private Beta MVP Phase 6 implementation only.
+- Summary: Added the Phase 6 planning checkpoint and a dedicated beta feedback boundary with `backend/packages/beta_feedback/`, app-level `beta_feedback.py`, migration `20260520_0048_beta_feedback_reports.py`, member feedback submission, reporter-private list/read behavior, admin triage, safe evidence refs, and repair-proposal link refs for Phase 7. Added a minimal `/worlds/{worldId}/feedback` Web surface after using `impeccable`, with tester submission and admin triage forms. The phase adds no public forum/social features, moderation punishment, provider calls, automatic repair mutation, broad `worlds.py` routes, world-event writes, or raw prompt/output/storage/path/secret/invite-token exposure.
+- Files changed: `backend/packages/beta_feedback/**`, `backend/services/api/src/noveland/services/api/beta_feedback.py`, migration `20260520_0048_beta_feedback_reports.py`, API app/package metadata, schema/import/alembic tests, `web/app/worlds/[worldId]/feedback/page.tsx`, `web/features/private-beta/beta-feedback-panel.tsx`, `web/lib/beta-feedback/**`, workspace nav/CSS, Phase 6 OpenSpec docs/tasks, the Phase 6 checkpoint, and harness docs.
+- Tests added/updated: Backend API/schema/import/alembic coverage for feedback create/list/read, admin triage, reporter privacy, cross-world and cross-worldline evidence rejection, hidden/developer-only evidence suppression, repair-proposal safe refs, no world-event writes, and forbidden-marker leak checks. Web unit coverage verifies feedback submission, filtering, triage, and no rendered internal metadata leakage. Targeted checks passed: focused ruff, focused mypy, focused backend pytest (`35 passed`), focused Web unit test (`2 passed`), and Web typecheck. Full Phase 6 gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 6 checkpoint, OpenSpec design/phase-plan/spec/tasks through `7.6`, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 6, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 7. No push performed.
+
 ## v1.0 Phase 5 Memory & Persona QA merge entry
 
 - Date: 2026-05-20

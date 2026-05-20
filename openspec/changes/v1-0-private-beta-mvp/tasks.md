@@ -12,7 +12,7 @@ local gate, fast-forward merge, and harness updates are done.
 - [x] 1.4 Confirm private beta invitation model and whether existing world memberships are sufficient.
 - [x] 1.5 Confirm player session/resume schema and package/router ownership.
 - [x] 1.6 Confirm quota enforcement coverage across runtime/provider/media/speech/image paths.
-- [ ] 1.7 Confirm feedback ownership and whether moderation records can be reused.
+- [x] 1.7 Confirm feedback ownership and whether moderation records can be reused.
 - [x] 1.8 Confirm setup wizard and private beta gate reuse existing observability/readiness.
 - [x] 1.9 Confirm frontend phases will use `impeccable` before Web implementation.
 
@@ -65,12 +65,12 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 7. Phase 6 — Beta Feedback System
 
-- [ ] 7.1 Write docs-only phase planning checkpoint for feedback ownership.
-- [ ] 7.2 Decide dedicated beta feedback package/router vs moderation extension.
-- [ ] 7.3 Implement feedback submission and admin triage over safe refs.
-- [ ] 7.4 Implement tester feedback UI and admin triage UI only after using `impeccable`.
-- [ ] 7.5 Add feedback, triage, reporter privacy, ACL, repair-link, and no-leak tests.
-- [ ] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 7.1 Write docs-only phase planning checkpoint for feedback ownership.
+- [x] 7.2 Decide dedicated beta feedback package/router vs moderation extension.
+- [x] 7.3 Implement feedback submission and admin triage over safe refs.
+- [x] 7.4 Implement tester feedback UI and admin triage UI only after using `impeccable`.
+- [x] 7.5 Add feedback, triage, reporter privacy, ACL, repair-link, and no-leak tests.
+- [x] 7.6 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 7.7 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — Beta Content Iteration Loop

@@ -25,6 +25,7 @@ MODEL_MODULES = (
     "noveland.authoring.models",
     "noveland.asset_generation.models",
     "noveland.adapters.models",
+    "noveland.beta_feedback.models",
     "noveland.calendar.models",
     "noveland.conversations.models",
     "noveland.invocations.models",

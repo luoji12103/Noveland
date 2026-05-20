@@ -608,6 +608,37 @@ a {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 0.45fr);
 }
 
+.feedback-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.feedback-wide {
+  grid-column: 1 / -1;
+}
+
+.feedback-form textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.feedback-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.feedback-report-row {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+}
+
+.feedback-triage-form {
+  display: grid;
+  gap: 10px;
+}
+
 .compact-list {
   display: flex;
   flex-wrap: wrap;
@@ -1132,6 +1163,8 @@ a {
   }
 
   .management-form,
+  .feedback-evidence-grid,
+  .feedback-form,
   .player-form,
   .world-toolbar {
     grid-template-columns: 1fr;

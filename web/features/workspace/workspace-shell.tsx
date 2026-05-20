@@ -69,6 +69,7 @@ export function WorkspaceShell({
             <Link href={`/worlds/${worldId}/narrative`}>Narrative</Link>
             <Link href={`/worlds/${worldId}/reader`}>Reader</Link>
             <Link href={`/worlds/${worldId}/player`}>Player</Link>
+            <Link href={`/worlds/${worldId}/feedback`}>Feedback</Link>
             <Link href={`/worlds/${worldId}/worldlines`}>Worldlines</Link>
           </>
         ) : null}

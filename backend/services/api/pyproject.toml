@@ -14,6 +14,7 @@ dependencies = [
   "noveland-asset-generation",
   "noveland-authoring",
   "noveland-auth",
+  "noveland-beta-feedback",
   "noveland-calendar",
   "noveland-conversations",
   "noveland-core",
@@ -54,6 +55,7 @@ noveland-agents = { workspace = true }
 noveland-asset-generation = { workspace = true }
 noveland-authoring = { workspace = true }
 noveland-auth = { workspace = true }
+noveland-beta-feedback = { workspace = true }
 noveland-calendar = { workspace = true }
 noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }

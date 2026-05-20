@@ -91,6 +91,8 @@ Fast orientation for a new coding session.
 - v1.0 Phase 4 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta-setup`. The report reuses `ProductionReadinessGateService`, checks invite/access, player session restore, player/capability quota, providers, persona/memory, visual, voice, media, source traceability, self-use MVP evidence, and no-leak markers, and returns only safe readiness sections/evidence refs.
 - `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md` — v1.0 Phase 5 checkpoint for backend/API-only memory/persona QA in the existing narrative quality boundary, with no migration, Web UI, provider calls, direct mutation, or duplicate eval framework.
 - v1.0 Phase 5 implementation extends `backend/packages/narrative_quality/` and the existing app-level narrative quality router with world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`. The report inspects persona, active memory, recent turns, source traceability, and drift markers, returns only safe evidence refs plus proposal-only repair suggestion types, and does not mutate persona, memory, world events, or provider state.
+- `docs/agent/harness/feature-updates/v1.0.6-beta-feedback-system-plan.md` — v1.0 Phase 6 checkpoint for dedicated `beta_feedback` package/router ownership, private tester report lifecycle, safe contextual evidence refs, reporter privacy, admin triage, repair-proposal link refs, and minimal Web feedback/triage scope after `impeccable`.
+- v1.0 Phase 6 implementation adds `backend/packages/beta_feedback/`, app-level `noveland.services.api.beta_feedback`, migration `20260520_0048_beta_feedback_reports.py`, and `/worlds/{worldId}/feedback`. Feedback records are reporter-private for testers and world/platform-admin triageable, with safe refs for turn/conversation/presentation/media/invocation/persona/memory/visual/voice/provider/session/quota context and no public forum, automatic repair apply, provider calls, broad `worlds.py` routes, world-event writes, or forbidden internal-data leaks.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -168,7 +170,8 @@ Fast orientation for a new coding session.
   - `web/features/admin/speech-admin.tsx` — world-scoped voice profile, binding, transcript, and speech test console
   - `web/features/admin/visual-admin.tsx` — world-scoped strict-worldline sprite/background resolver and compose admin console
   - `web/features/plugins/` — schema-driven plugin config controls with raw JSON fallback
-  - `web/features/private-beta/` — minimal private beta invite redemption, invited-world list, player identity setup, and first-run guidance
+  - `web/features/private-beta/` — minimal private beta invite redemption, invited-world list, player identity setup, first-run guidance, and beta feedback/triage surfaces
+  - `web/features/private-beta/beta-feedback-panel.tsx` — private beta feedback submission, filtering, and admin triage surface over safe refs
   - `web/features/agents/` — agent list and focused agent builder pages with preset-aware creation and provenance display
   - `web/features/conversations/` — conversation list/detail pages, transcript controls, writer config, and narrative generation UI
   - `web/features/dashboard/` — protected world management, runtime, diagnostics, and narrative dashboard components
@@ -196,6 +199,7 @@ Fast orientation for a new coding session.
   - `web/lib/worlds/visual.ts` — visual sprite, variant, background, resolver, and compose-scene client helpers
   - `web/lib/runtime/` — runtime/provider proxy helper shared by Next route handlers
   - `web/lib/private-beta/` — private beta Web DTOs, client actions, server loader, and proxy helper
+  - `web/lib/beta-feedback/` — private beta feedback Web DTOs, client actions, and server loader
 - `web/package.json` — frontend scripts and dependency manifest
 
 ### Backend services
@@ -213,6 +217,7 @@ Fast orientation for a new coding session.
   - `noveland.services.api.package_contracts` — world-admin package contract validation and safe provider config export router
   - `noveland.services.api.player_privacy` — world-scoped player privacy export, request listing, delete-request creation, and admin review router over sanitized player-owned/player-visible records
   - `noveland.services.api.private_beta` — app-level private beta invite, redemption, onboarding status, and player profile bootstrap router
+  - `noveland.services.api.beta_feedback` — app-level private beta feedback report and admin triage router over safe evidence refs
   - `noveland.services.api.media` — world-scoped media asset, job, context, tag, collection, search, reference, and lineage router
   - `noveland.services.api.images` — world-scoped image generation, edit, deterministic compose, and image job convenience router
   - `noveland.services.api.invocations` — world-scoped model invocation ledger, prompt snapshot, tag, template, redaction, and search router
@@ -278,6 +283,10 @@ Fast orientation for a new coding session.
   - `noveland.private_beta.models` — `private_beta_invites` ORM model with token hash, lifecycle, audit, world/worldline scope, beta role, and safe metadata
   - `noveland.private_beta.service` — invite creation/list/detail/revoke, safe redemption, least-privilege membership bootstrap, onboarding status, and player profile setup
   - `noveland.private_beta.tokens` — non-guessable invite token generation plus hash/fingerprint helpers
+- `backend/packages/beta_feedback/`
+  - `noveland.beta_feedback.contracts` — issue taxonomy, severity/status, safe evidence refs, repair-proposal refs, and feedback DTOs
+  - `noveland.beta_feedback.models` — `beta_feedback_reports` ORM model with reporter privacy, evidence refs, triage state, repair-proposal refs, and safe metadata
+  - `noveland.beta_feedback.service` — feedback create/list/read, admin triage, same-world/worldline evidence validation, reporter privacy, restricted-asset suppression, and response redaction
 - `backend/packages/memory/`
   - `noveland.memory.contracts` — long-term memory profile, lookup, job, log, snapshot, eval, backfill, queue-readiness, and backend contracts
   - `noveland.memory.errors` — typed long-term memory validation and execution errors

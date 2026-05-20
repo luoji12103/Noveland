@@ -65,6 +65,7 @@ def test_core_schema_tables_are_registered() -> None:
         "auth_sessions",
         "authoring_import_jobs",
         "authoring_templates",
+        "beta_feedback_reports",
         "beta_checklist_items",
         "beta_checklist_runs",
         "conversation_participants",
@@ -192,6 +193,41 @@ def test_player_session_resume_schema_is_registered() -> None:
         UniqueConstraint,
     )
     assert "ix_player_sessions_worldline_user" in index_names("player_sessions")
+
+
+def test_beta_feedback_report_schema_is_registered() -> None:
+    assert {
+        "world_id",
+        "worldline_id",
+        "reporter_user_id",
+        "player_actor_id",
+        "issue_type",
+        "severity",
+        "status",
+        "title",
+        "description",
+        "reporter_note",
+        "evidence_refs",
+        "repair_proposal_refs",
+        "triage_note",
+        "triaged_by_actor_ref",
+        "triaged_at",
+        "moderation_report_id",
+        "metadata",
+    } <= column_names("beta_feedback_reports")
+    assert {
+        "ix_beta_feedback_reports_world_status",
+        "ix_beta_feedback_reports_worldline_status",
+        "ix_beta_feedback_reports_reporter",
+        "ix_beta_feedback_reports_issue_type",
+        "ix_beta_feedback_reports_created",
+    } <= index_names("beta_feedback_reports")
+    assert {
+        "player_actor_profiles.id",
+        "users.id",
+        "worldlines.id",
+        "worlds.id",
+    } <= foreign_key_targets("beta_feedback_reports")
 
 
 def test_living_world_character_foundation_columns_are_registered() -> None:

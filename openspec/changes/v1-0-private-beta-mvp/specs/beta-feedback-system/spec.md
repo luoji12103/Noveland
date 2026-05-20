@@ -13,6 +13,16 @@ dedicated beta feedback package/router.
 - **Then** it SHALL define feedback record ownership, issue taxonomy, safe evidence refs, reporter privacy, and repair linkage
 - **And** it SHALL stop implementation if feedback requires public forum or social features.
 
+### Requirement: Beta feedback has dedicated records
+The system SHALL store private beta issue reports in dedicated beta feedback records rather than
+using moderation reports as the primary beta issue table.
+
+#### Scenario: Feedback ownership is dedicated
+- **Given** a private beta tester submits feedback
+- **When** the report is persisted
+- **Then** it SHALL be stored in `beta_feedback_reports`
+- **And** moderation records SHALL only be used for later safety or abuse escalation when needed.
+
 ### Requirement: Testers can submit contextual feedback
 The system SHALL allow private beta testers to report scene, dialogue, character, voice, image, playback, and interaction issues.
 

@@ -106,6 +106,14 @@ dialogue-style, and relationship repairs.
 
 Feedback records should point to turn, conversation, presentation, media, invocation, route, worldline, and player context through safe refs. v1.0 should not build public forums or social features. The feasibility review found that existing moderation records are reusable evidence infrastructure but may be semantically too heavy for beta issue triage; Phase 6 must decide whether to add a dedicated beta feedback package or extend moderation.
 
+Phase 6 assigns primary ownership to a dedicated `backend/packages/beta_feedback/` package and an
+app-level `beta_feedback.py` router. Moderation remains available for later safety/abuse
+escalation, but beta feedback owns private tester reports, issue taxonomy, reporter privacy,
+admin triage, safe evidence refs, and repair-proposal linkage. The first implementation persists
+`beta_feedback_reports` only; it does not add public threads, attachments, forum behavior,
+automatic moderation punishment, direct repair mutation, broad `worlds.py` routes, or raw
+provider/media/prompt evidence.
+
 ### Repair uses proposal/review/apply
 
 Diagnostics and feedback may generate repair proposals for memory, persona, dialogue style, visual mapping, voice mapping, or route issues. They must not directly rewrite history or mutate canonical state without review.
@@ -139,6 +147,8 @@ This roadmap does not add migrations yet. Expected migration pressure:
   budget policy JSON and request context, with a stop condition if dedicated records become
   necessary.
 - Feedback likely needs persistent beta feedback records unless v0.8 moderation records are sufficient.
+- Phase 6 adds `beta_feedback_reports` because moderation reports are too broad for private beta
+  issue taxonomy, reporter privacy, and repair linkage.
 - Setup wizard and private beta gate should start as read-only observability aggregation unless a specific signoff record is approved.
 
 ## Open Questions

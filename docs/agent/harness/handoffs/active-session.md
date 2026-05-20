@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-20T00:00:00Z
-- Branch: main
-- Objective: v1.0 Phase 6 Beta Feedback System planning checkpoint.
-- Status: Phase 5 Memory & Persona QA is committed and fast-forward merged to local `main`. The QA report reuses narrative quality diagnostics through world-admin `POST /worlds/{world_id}/narrative-quality/memory-persona/qa`, adds no migration or Web UI, and passed targeted narrative quality tests plus the full backend/OpenSpec gate. Start Phase 6 from clean local `main`.
+- Branch: feature/v1.0-6-beta-feedback
+- Objective: finish v1.0 Phase 6 Beta Feedback System validation, commit, and fast-forward merge.
+- Status: Phase 6 implementation and full gate are complete on the phase branch. The checkpoint selected a dedicated `beta_feedback` package/router rather than moderation as the primary record owner. Backend feedback records, app-level APIs, migration, minimal feedback/triage Web UI, targeted tests, backend full gate, Web full gate, OpenSpec validation, and `git diff --check` have passed; commit and merge bookkeeping remain.
 
 ## Current Context
 
@@ -147,7 +147,12 @@
 - v1.0 Phase 5 targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_narrative_quality_service.py tests/test_api_narrative_quality.py -q` (`75 passed`).
 - v1.0 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`515 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v1.0 Phase 5 commit `abd88d2` fast-forward merged to local `main`; no push performed.
-- Continue with Phase 6 Beta Feedback System on `feature/v1.0-6-beta-feedback` from clean local `main`. Start with the docs-only feedback ownership checkpoint and decide dedicated `beta_feedback` package/router versus moderation extension before implementation.
+- v1.0 Phase 6 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.6-beta-feedback-system-plan.md`.
+- v1.0 Phase 6 implementation adds `backend/packages/beta_feedback/`, app-level `noveland.services.api.beta_feedback`, migration `20260520_0048_beta_feedback_reports.py`, member feedback submission/list/read for own reports, admin list/read/triage for all reports, safe evidence refs across conversation/media/invocation/persona/memory/visual/voice/provider/session/quota context, and safe repair-proposal refs for Phase 7 linkage. It adds no public forum/social features, moderation punishment, provider calls, automatic repair mutation, broad `worlds.py` routes, or world-event writes.
+- v1.0 Phase 6 Web implementation adds `/worlds/{worldId}/feedback` with tester submission and admin triage after using `impeccable`. The surface reuses workspace/admin form and list patterns and renders report summaries without raw evidence internals.
+- v1.0 Phase 6 targeted checks passed: focused ruff, focused mypy, `cd backend && uv run pytest tests/test_api_beta_feedback.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`35 passed`), `cd web && npm run test -- beta-feedback-panel.test.tsx` (`2 passed`), and `cd web && npm run typecheck`.
+- v1.0 Phase 6 full gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Continue by committing `feat(v1.0): add beta feedback system`, fast-forward merging to `main`, and recording merge bookkeeping before starting Phase 7 on a fresh branch.
 - Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.

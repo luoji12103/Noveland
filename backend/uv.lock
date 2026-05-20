@@ -10,6 +10,7 @@ members = [
     "noveland-auth",
     "noveland-authoring",
     "noveland-backend",
+    "noveland-beta-feedback",
     "noveland-calendar",
     "noveland-conversations",
     "noveland-core",
@@ -644,6 +645,7 @@ dependencies = [
     { name = "noveland-asset-generation" },
     { name = "noveland-auth" },
     { name = "noveland-authoring" },
+    { name = "noveland-beta-feedback" },
     { name = "noveland-calendar" },
     { name = "noveland-conversations" },
     { name = "noveland-core" },
@@ -692,6 +694,7 @@ requires-dist = [
     { name = "noveland-asset-generation", editable = "packages/asset_generation" },
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-authoring", editable = "packages/authoring" },
+    { name = "noveland-beta-feedback", editable = "packages/beta_feedback" },
     { name = "noveland-calendar", editable = "packages/calendar" },
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
@@ -730,6 +733,41 @@ dev = [
     { name = "mypy", specifier = ">=1.20,<2" },
     { name = "pytest", specifier = ">=9,<10" },
     { name = "ruff", specifier = ">=0.15,<0.16" },
+]
+
+[[package]]
+name = "noveland-beta-feedback"
+version = "0.1.0"
+source = { editable = "packages/beta_feedback" }
+dependencies = [
+    { name = "noveland-agents" },
+    { name = "noveland-conversations" },
+    { name = "noveland-core" },
+    { name = "noveland-invocations" },
+    { name = "noveland-media" },
+    { name = "noveland-memory" },
+    { name = "noveland-providers" },
+    { name = "noveland-speech" },
+    { name = "noveland-visual" },
+    { name = "noveland-worlds" },
+    { name = "pydantic" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "noveland-agents", editable = "packages/agents" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
+    { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-invocations", editable = "packages/invocations" },
+    { name = "noveland-media", editable = "packages/media" },
+    { name = "noveland-memory", editable = "packages/memory" },
+    { name = "noveland-providers", editable = "packages/providers" },
+    { name = "noveland-speech", editable = "packages/speech" },
+    { name = "noveland-visual", editable = "packages/visual" },
+    { name = "noveland-worlds", editable = "packages/worlds" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
 
 [[package]]
@@ -1215,6 +1253,7 @@ dependencies = [
     { name = "noveland-asset-generation" },
     { name = "noveland-auth" },
     { name = "noveland-authoring" },
+    { name = "noveland-beta-feedback" },
     { name = "noveland-calendar" },
     { name = "noveland-conversations" },
     { name = "noveland-core" },
@@ -1254,6 +1293,7 @@ requires-dist = [
     { name = "noveland-asset-generation", editable = "packages/asset_generation" },
     { name = "noveland-auth", editable = "packages/auth" },
     { name = "noveland-authoring", editable = "packages/authoring" },
+    { name = "noveland-beta-feedback", editable = "packages/beta_feedback" },
     { name = "noveland-calendar", editable = "packages/calendar" },
     { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },

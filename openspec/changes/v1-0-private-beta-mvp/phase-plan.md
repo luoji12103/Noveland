@@ -296,6 +296,9 @@ and UX issues and let admins triage them.
 
 - Docs-only checkpoint deciding whether to extend moderation or add a dedicated beta feedback
   package/router.
+- Dedicated `backend/packages/beta_feedback/` package and app-level `beta_feedback.py` router.
+- Persistent `beta_feedback_reports` records with issue taxonomy, reporter privacy, status,
+  safe evidence refs, and repair-proposal refs.
 - Player feedback submission.
 - Admin triage.
 - Links to turn, presentation, media, invocation, route, persona, memory, and worldline safe refs.
@@ -309,7 +312,7 @@ and UX issues and let admins triage them.
 
 ### Reused Systems
 
-- Moderation/incident workflow where suitable.
+- Moderation/incident workflow only for later safety/abuse escalation where suitable.
 - Conversation presentations.
 - Media references.
 - Invocation ledger safe refs.

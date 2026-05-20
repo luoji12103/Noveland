@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "noveland-beta-feedback"
+version = "0.1.0"
+description = "Private beta feedback reports and triage for Noveland."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "noveland-agents",
+  "noveland-conversations",
+  "noveland-core",
+  "noveland-invocations",
+  "noveland-media",
+  "noveland-memory",
+  "noveland-providers",
+  "noveland-speech",
+  "noveland-visual",
+  "noveland-worlds",
+  "pydantic>=2.13,<3",
+  "sqlalchemy>=2.0,<3",
+]
+
+[tool.uv.sources]
+noveland-agents = { workspace = true }
+noveland-conversations = { workspace = true }
+noveland-core = { workspace = true }
+noveland-invocations = { workspace = true }
+noveland-media = { workspace = true }
+noveland-memory = { workspace = true }
+noveland-providers = { workspace = true }
+noveland-speech = { workspace = true }
+noveland-visual = { workspace = true }
+noveland-worlds = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noveland"]
