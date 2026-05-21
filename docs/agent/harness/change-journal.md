@@ -11,6 +11,17 @@
 - Docs updated: Phase 5 checkpoint, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Full backend/OpenSpec gate passed: backend ruff, backend mypy (`325 source files`), backend pytest (`546 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 5, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 6. No Web UI was touched, so `impeccable` was not required for Phase 5.
 
+## v1.1 Phase 5 Import/Export Stability merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 5 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-5-import-export-stability` into local `main`, marked Phase 5 complete in OpenSpec tasks, and moved harness handoff state to Phase 6 Provider Reliability Layer.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 5 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `6.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 6 on `feature/v1.1-6-provider-reliability-layer` from clean local `main` with a docs-only provider reliability policy/profile checkpoint before implementation. No push performed.
+
 ## Entry format
 
 - Date:

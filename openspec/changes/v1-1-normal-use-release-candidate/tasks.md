@@ -53,7 +53,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 6.3 Add import/export UI improvements only after using `impeccable` if Web scope is approved.
 - [x] 6.4 Add roundtrip, sample package repeatability, no-secret, no-storage-path, and preview/apply tests.
 - [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 6.6 Fast-forward merge to local main and update harness docs.
+- [x] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Provider Reliability Layer
 

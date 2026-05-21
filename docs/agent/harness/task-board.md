@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 5 Import/Export Stability fast-forward merge
+- v1.1 Phase 6 Provider Reliability Layer planning checkpoint
 
 ## In Progress
 - None
@@ -14,6 +14,7 @@
 - v1.1 Phase 5 Import/Export Stability implementation
 - v1.1 Phase 5 Import/Export Stability targeted tests
 - v1.1 Phase 5 Import/Export Stability full backend/OpenSpec gate
+- v1.1 Phase 5 Import/Export Stability fast-forward merge
 - v1.1 Phase 4 Content Safety & Moderation Hardening planning checkpoint
 - v1.1 Phase 4 Content Safety & Moderation Hardening implementation
 - v1.1 Phase 4 Content Safety & Moderation Hardening targeted tests
