@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 4 Content Safety & Moderation Hardening fast-forward merge
+- v1.1 Phase 5 Import/Export Stability planning checkpoint
 
 ## In Progress
 - None
@@ -14,6 +14,7 @@
 - v1.1 Phase 4 Content Safety & Moderation Hardening implementation
 - v1.1 Phase 4 Content Safety & Moderation Hardening targeted tests
 - v1.1 Phase 4 Content Safety & Moderation Hardening full backend/OpenSpec gate
+- v1.1 Phase 4 Content Safety & Moderation Hardening fast-forward merge
 - v1.1 Phase 3 Multi-world / Multi-user Stress Test planning checkpoint
 - v1.1 Phase 3 Multi-world / Multi-user Stress Test implementation
 - v1.1 Phase 3 Multi-world / Multi-user Stress Test targeted tests

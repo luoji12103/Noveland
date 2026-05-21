@@ -22,6 +22,17 @@
 - Docs updated: Phase 4 checkpoint, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Run the full backend/OpenSpec gate, then commit Phase 4, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 5. No Web UI was touched, so `impeccable` was not required for Phase 4.
 
+## v1.1 Phase 4 Content Safety & Moderation Hardening merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 4 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-4-content-safety-moderation-hardening` into local `main`, marked Phase 4 complete in OpenSpec tasks, and moved harness handoff state to Phase 5 Import/Export Stability.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 4 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `5.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 5 on `feature/v1.1-5-import-export-stability` from clean local `main` with a docs-only import/export manifest and asset policy checkpoint before implementation. No push performed.
+
 ## v1.1 Phase 3 Multi-world / Multi-user Stress Test implementation entry
 
 - Date: 2026-05-21

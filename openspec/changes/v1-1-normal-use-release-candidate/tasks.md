@@ -44,7 +44,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 5.3 Add admin moderation UI improvements only after using `impeccable` if Web scope is approved.
 - [x] 5.4 Add takedown, reporter privacy, visibility, safety, ACL, and no-leak tests.
 - [x] 5.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 5.6 Fast-forward merge to local main and update harness docs.
+- [x] 5.6 Fast-forward merge to local main and update harness docs.
 
 ## 6. Phase 5 — Import/Export Stability
 
