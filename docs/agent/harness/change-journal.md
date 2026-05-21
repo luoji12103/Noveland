@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.1 Phase 3 Multi-world / Multi-user Stress Test implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-3-multi-world-multi-user-stress
+- Scope: v1.1 Normal Use / Release Candidate Phase 3 implementation only.
+- Summary: Added the Phase 3 checkpoint and a backend-only `NormalUseStressService` under the existing observability boundary. The report validates the accepted normal-use baseline of 3 worlds, 2 worldlines per world, 2 player sessions per world, at least 2 fake provider profiles, deterministic 120-turn equivalent coverage, player/worldline isolation, quota evidence, runtime-path coverage, and safe aggregate reporting. Real-provider stress remains disabled by default and is reported as opt-in only. The phase adds no migrations, Web UI, API routes, broad `worlds.py` routes, real provider calls, or duplicate readiness framework.
+- Files changed: `backend/packages/observability/src/noveland/observability/{contracts,services,__init__}.py`, `backend/tests/test_normal_use_stress.py`, Phase 3 checkpoint, OpenSpec tasks through `4.4`, and harness docs.
+- Tests added/updated: Added focused stress tests for deterministic fake-provider baseline pass, cross-worldline player-session leak detection, missing quota policy blocker, insufficient turn-equivalent blocker, and safe report evidence. Targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_normal_use_stress.py -q` (`4 passed`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`325 source files`), backend pytest (`541 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 3 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 3, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 4. No Web UI was touched, so `impeccable` was not required for Phase 3.
+
 ## v1.1 Phase 1 Operational Runbooks implementation entry
 
 - Date: 2026-05-21

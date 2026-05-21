@@ -30,11 +30,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 4. Phase 3 — Multi-world / Multi-user Stress Test
 
-- [ ] 4.1 Write docs-only phase planning checkpoint.
-- [ ] 4.2 Implement stress fixture/report with at least 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and deterministic 120-turn or equivalent long-session coverage by default.
-- [ ] 4.3 Add opt-in real-provider stress profile only if safe.
-- [ ] 4.4 Add isolation, quota, long-session, and safe-report tests.
-- [ ] 4.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 4.1 Write docs-only phase planning checkpoint.
+- [x] 4.2 Implement stress fixture/report with at least 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and deterministic 120-turn or equivalent long-session coverage by default.
+- [x] 4.3 Add opt-in real-provider stress profile only if safe.
+- [x] 4.4 Add isolation, quota, long-session, and safe-report tests.
+- [x] 4.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 4.6 Fast-forward merge to local main and update harness docs.
 
 ## 5. Phase 4 — Content Safety & Moderation Hardening

@@ -100,6 +100,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md` — feasibility review for v1.1 Normal Use / Release Candidate after v1.0 archive; concludes v1.1 can start after minor OpenSpec adjustments, keeps the phase order, and front-loads checkpoint decisions for restore target, stress baseline, moderation/feedback/privacy integration, import/export asset policy, manual-first provider reliability, `impeccable` UI polish, and RC gate evidence ownership.
 - `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md` — v1.1 Phase 1 checkpoint for docs-only normal-use operational runbooks, safe evidence collection, redaction rules, and consistency-test coverage.
 - `docs/agent/harness/feature-updates/v1.1.2-backup-restore-drill-plan.md` — v1.1 Phase 2 checkpoint for a fresh local/single-host backup restore drill verifier under storage/observability with safe evidence and no migrations.
+- `docs/agent/harness/feature-updates/v1.1.3-multi-world-multi-user-stress-plan.md` — v1.1 Phase 3 checkpoint for deterministic fake-provider normal-use stress reporting under observability with 3-world, 6-worldline, 6-player-session, 120-turn-equivalent coverage.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -124,6 +125,7 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/provider-lab.md` — opt-in provider lab worktree workflow and real-provider test evidence rules.
 - `docs/agent/operations/runbooks/` — v1.1 normal-use incident runbooks for provider outage, quota exhaustion, stuck media jobs, migration failure, backup/restore, rollback, worldline restore, secret rotation, private beta incidents, import/export recovery, and provider fallback/degraded mode.
 - `backend/packages/storage/src/noveland/storage/restore_drill.py` — v1.1 backup/restore drill verifier over restored database, media/checksum, provider config, OpenSpec provenance, and safe report boundaries.
+- `backend/packages/observability/src/noveland/observability/services.py` — includes v1.1 normal-use stress report aggregation through `NormalUseStressService` alongside existing readiness services.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 - `docs/agent/architecture/current-system-contracts.md` — frozen Phase 3-12 architecture boundary contracts for provider, invocation, media, visual, speech, presentation, asset generation, and eval layers.
 - `docs/agent/architecture/permission-matrix.md` — v0.7 baseline permission matrix for platform-admin, world-admin, world-member, reader, and player route expectations.

@@ -10,6 +10,8 @@ from noveland.observability.contracts import (
     IncidentRetentionSummary,
     IncidentStatus,
     IncidentSummary,
+    NormalUseStressCheck,
+    NormalUseStressReport,
     PrivateBetaGateReport,
     PrivateBetaSetupReadinessReport,
     ProductionReadinessReport,
@@ -23,6 +25,7 @@ from noveland.observability.contracts import (
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.observability.services import (
     IncidentDiagnosticsService,
+    NormalUseStressService,
     ProductionReadinessGateService,
     RuntimeDiagnosticsService,
     redact_diagnostic_details,
@@ -43,6 +46,9 @@ __all__ = [
     "IncidentRetentionSummary",
     "IncidentStatus",
     "IncidentSummary",
+    "NormalUseStressCheck",
+    "NormalUseStressReport",
+    "NormalUseStressService",
     "PACKAGE_NAME",
     "PrivateBetaGateReport",
     "PrivateBetaSetupReadinessReport",

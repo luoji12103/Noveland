@@ -1,15 +1,19 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 3 Multi-world / Multi-user Stress Test planning checkpoint, after Phase 2 merge
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test commit and fast-forward merge
 
 ## In Progress
-- None
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test
 
 ## Blocked
 - None
 
 ## Done
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test planning checkpoint
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test implementation
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test targeted tests
+- v1.1 Phase 3 Multi-world / Multi-user Stress Test full backend/OpenSpec gate
 - v1.1 Phase 1 Operational Runbooks planning checkpoint
 - v1.1 Phase 1 Operational Runbooks runbook docs
 - v1.1 Phase 1 Operational Runbooks docs consistency test

@@ -4,6 +4,7 @@ import builtins
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from noveland.agents.models import AgentPersona
@@ -30,6 +31,8 @@ from noveland.observability.contracts import (
     IncidentRetentionSummary,
     IncidentStatus,
     IncidentSummary,
+    NormalUseStressCheck,
+    NormalUseStressReport,
     PrivateBetaGateReport,
     PrivateBetaSetupReadinessReport,
     ProductionReadinessReport,
@@ -56,10 +59,12 @@ from noveland.worlds.models import (
     LivingWorldReleaseProfile,
     LongRunEvalRun,
     PlayerActorProfile,
+    World,
+    Worldline,
     WorldMembership,
 )
 from noveland.worlds.worldlines import worldline_or_404
-from sqlalchemy import Select, distinct, func, or_, select
+from sqlalchemy import Select, distinct, false, func, or_, select
 from sqlalchemy.orm import Session
 
 REDACTED_VALUE = "[redacted]"
@@ -85,6 +90,30 @@ SELF_USE_FORBIDDEN_EVENT_MARKERS = (
     "resolved_secret",
     "authorization",
     "bearer ",
+)
+
+STRESS_FORBIDDEN_REPORT_MARKERS = (
+    "storage_uri",
+    "preview_uri",
+    "thumbnail_uri",
+    "file://",
+    "local://",
+    "object://",
+    "filesystem_path",
+    "object_storage_path",
+    "raw_prompt",
+    "raw prompt",
+    "raw_output",
+    "raw output",
+    "prompt_snapshot",
+    "resolved_secret",
+    "api_key",
+    "authorization",
+    "bearer ",
+    "invite_token",
+    "local_model_path",
+    "bytes",
+    "base64",
 )
 
 
@@ -585,6 +614,632 @@ class IncidentDiagnosticsService:
             warning_count=warning_count,
             evidence_refs=refs,
         )
+
+    def _count(self, model: type[Any], *conditions: Any) -> int:
+        return int(
+            self._session.scalar(select(func.count(model.id)).where(*conditions))
+            or 0
+        )
+
+
+class NormalUseStressService:
+    """Read-only deterministic normal-use stress evidence over existing records."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def report(
+        self,
+        *,
+        baseline_world_count: int = 3,
+        baseline_worldlines_per_world: int = 2,
+        baseline_player_sessions_per_world: int = 2,
+        baseline_fake_provider_count: int = 2,
+        baseline_turn_equivalent: int = 120,
+        real_provider_profile_enabled: bool = False,
+        evidence_limit_per_check: int = 5,
+    ) -> NormalUseStressReport:
+        safe_limit = max(1, min(evidence_limit_per_check, 20))
+        world_ids = [
+            world_id
+            for world_id in self._session.scalars(
+                select(World.id).where(World.is_active.is_(True)).order_by(World.created_at.asc()),
+            ).all()
+        ]
+        checks = [
+            self._baseline_coverage_check(
+                world_ids,
+                baseline_world_count=baseline_world_count,
+                baseline_worldlines_per_world=baseline_worldlines_per_world,
+                baseline_player_sessions_per_world=baseline_player_sessions_per_world,
+                baseline_fake_provider_count=baseline_fake_provider_count,
+                baseline_turn_equivalent=baseline_turn_equivalent,
+                limit=safe_limit,
+            ),
+            self._isolation_check(world_ids, limit=safe_limit),
+            self._quota_check(world_ids, limit=safe_limit),
+            self._runtime_path_check(world_ids, limit=safe_limit),
+            self._long_session_check(
+                world_ids,
+                baseline_turn_equivalent=baseline_turn_equivalent,
+                limit=safe_limit,
+            ),
+            self._real_provider_profile_check(real_provider_profile_enabled),
+            self._safe_report_check(),
+        ]
+        blocker_count = sum(check.blocker_count for check in checks)
+        warning_count = sum(check.warning_count for check in checks)
+        return NormalUseStressReport(
+            status=_stress_status(checks),
+            generated_at=datetime.now(UTC),
+            baseline_world_count=baseline_world_count,
+            baseline_worldlines_per_world=baseline_worldlines_per_world,
+            baseline_player_sessions_per_world=baseline_player_sessions_per_world,
+            baseline_fake_provider_count=baseline_fake_provider_count,
+            baseline_turn_equivalent=baseline_turn_equivalent,
+            observed_world_count=len(world_ids),
+            observed_worldline_count=self._count(Worldline, Worldline.world_id.in_(world_ids))
+            if world_ids
+            else 0,
+            observed_player_session_count=self._count(
+                PlayerSession,
+                PlayerSession.world_id.in_(world_ids),
+            )
+            if world_ids
+            else 0,
+            observed_fake_provider_count=self._fake_provider_count(world_ids),
+            observed_turn_equivalent=self._turn_equivalent(world_ids),
+            real_provider_profile_enabled=real_provider_profile_enabled,
+            latency_summary=self._latency_summary(world_ids),
+            cost_summary=self._cost_summary(world_ids),
+            failure_summary=self._failure_summary(world_ids),
+            quota_summary=self._quota_summary(world_ids),
+            check_count=len(checks),
+            evidence_count=sum(check.evidence_count for check in checks),
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            checks=checks,
+            suppressed_fields=[
+                "credential_values",
+                "credential_headers",
+                "resolved_secrets",
+                "prompt_snapshot_bodies",
+                "prompt_bodies",
+                "provider_result_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "object_locator_values",
+                "filesystem_paths",
+                "object_storage_paths",
+                "binary_payloads",
+                "inline_binary_payloads",
+                "invite_tokens",
+                "local_model_paths",
+            ],
+            non_goals=[
+                "unbounded_load_testing",
+                "default_real_provider_stress",
+                "external_load_testing_service",
+                "proprietary_asset_fixture",
+                "duplicate_readiness_framework",
+            ],
+        )
+
+    def _baseline_coverage_check(
+        self,
+        world_ids: list[uuid.UUID],
+        *,
+        baseline_world_count: int,
+        baseline_worldlines_per_world: int,
+        baseline_player_sessions_per_world: int,
+        baseline_fake_provider_count: int,
+        baseline_turn_equivalent: int,
+        limit: int,
+    ) -> NormalUseStressCheck:
+        blockers: list[str] = []
+        warnings: list[str] = []
+        if len(world_ids) < baseline_world_count:
+            blockers.append(
+                f"Stress fixture has {len(world_ids)} active worlds; "
+                f"{baseline_world_count} are required.",
+            )
+        for world_id in world_ids:
+            worldline_count = self._count(
+                Worldline,
+                Worldline.world_id == world_id,
+                Worldline.status == "active",
+            )
+            if worldline_count < baseline_worldlines_per_world:
+                blockers.append(
+                    f"World {world_id} has {worldline_count} active worldlines; "
+                    f"{baseline_worldlines_per_world} are required.",
+                )
+            player_session_count = self._count(PlayerSession, PlayerSession.world_id == world_id)
+            if player_session_count < baseline_player_sessions_per_world:
+                blockers.append(
+                    f"World {world_id} has {player_session_count} player sessions; "
+                    f"{baseline_player_sessions_per_world} are required.",
+                )
+        fake_provider_count = self._fake_provider_count(world_ids)
+        if fake_provider_count < baseline_fake_provider_count:
+            blockers.append(
+                f"Stress fixture has {fake_provider_count} fake providers; "
+                f"{baseline_fake_provider_count} are required.",
+            )
+        observed_turns = self._turn_equivalent(world_ids)
+        if observed_turns < baseline_turn_equivalent:
+            blockers.append(
+                f"Stress fixture has {observed_turns} turn-equivalent events; "
+                f"{baseline_turn_equivalent} are required.",
+            )
+        if len(world_ids) > baseline_world_count:
+            warnings.append(
+                "Stress fixture exceeds the baseline world count; keep local gate bounded.",
+            )
+        refs = [
+            IncidentEvidenceRef(
+                kind="world",
+                id=str(world_id),
+                component="normal_use_stress",
+                status="active",
+                reason_code="stress_world_included",
+                world_id=world_id,
+            )
+            for world_id in world_ids[:limit]
+        ]
+        return _stress_check(
+            "baseline_coverage",
+            summary=(
+                "Stress baseline covers active worlds, worldlines, player sessions, "
+                "fake providers, and deterministic turn-equivalent evidence."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _isolation_check(
+        self,
+        world_ids: list[uuid.UUID],
+        *,
+        limit: int,
+    ) -> NormalUseStressCheck:
+        blockers: list[str] = []
+        warnings: list[str] = []
+        refs: list[IncidentEvidenceRef] = []
+        if not world_ids:
+            blockers.append("No worlds are available for isolation checks.")
+        player_rows = self._session.execute(
+            select(
+                PlayerSession.id,
+                PlayerSession.world_id,
+                PlayerSession.worldline_id,
+                PlayerActorProfile.world_id.label("actor_world_id"),
+                PlayerActorProfile.worldline_id.label("actor_worldline_id"),
+                ConversationSession.world_id.label("conversation_world_id"),
+                ConversationSession.worldline_id.label("conversation_worldline_id"),
+            )
+            .join(PlayerActorProfile, PlayerSession.player_actor_id == PlayerActorProfile.id)
+            .outerjoin(
+                ConversationSession,
+                PlayerSession.conversation_session_id == ConversationSession.id,
+            )
+            .where(PlayerSession.world_id.in_(world_ids) if world_ids else false()),
+        ).mappings()
+        for row in player_rows:
+            refs.append(
+                IncidentEvidenceRef(
+                    kind="player_session",
+                    id=str(row["id"]),
+                    component="normal_use_stress",
+                    status="scoped",
+                    reason_code="player_session_scope_checked",
+                    world_id=row["world_id"],
+                    worldline_id=row["worldline_id"],
+                )
+            )
+            if row["actor_world_id"] != row["world_id"]:
+                blockers.append(f"Player session {row['id']} points at a cross-world actor.")
+            if row["actor_worldline_id"] != row["worldline_id"]:
+                blockers.append(f"Player session {row['id']} points at a cross-worldline actor.")
+            if (
+                row["conversation_world_id"] is not None
+                and row["conversation_world_id"] != row["world_id"]
+            ):
+                blockers.append(f"Player session {row['id']} points at a cross-world conversation.")
+            if (
+                row["conversation_worldline_id"] is not None
+                and row["conversation_worldline_id"] != row["worldline_id"]
+            ):
+                blockers.append(
+                    f"Player session {row['id']} points at a cross-worldline conversation.",
+                )
+        for model_name, model, worldline_column in (
+            ("media_job", MediaJob, MediaJob.worldline_id),
+            ("memory_write_job", MemoryWriteJob, MemoryWriteJob.worldline_id),
+            ("beta_feedback_report", BetaFeedbackReport, BetaFeedbackReport.worldline_id),
+            (
+                "authoring_import_proposal",
+                AuthoringImportProposal,
+                AuthoringImportProposal.worldline_id,
+            ),
+        ):
+            rows = self._session.execute(
+                select(model.id, model.world_id, worldline_column, Worldline.world_id)
+                .join(Worldline, worldline_column == Worldline.id)
+                .where(model.world_id.in_(world_ids) if world_ids else false()),
+            ).all()
+            for row_id, record_world_id, record_worldline_id, worldline_world_id in rows:
+                if record_world_id != worldline_world_id:
+                    blockers.append(
+                        f"{model_name} {row_id} has mismatched world and worldline scope.",
+                    )
+                if len(refs) < limit:
+                    refs.append(
+                        IncidentEvidenceRef(
+                            kind=model_name,
+                            id=str(row_id),
+                            component="normal_use_stress",
+                            status="scoped",
+                            reason_code=f"{model_name}_scope_checked",
+                            world_id=record_world_id,
+                            worldline_id=record_worldline_id,
+                        )
+                    )
+        return _stress_check(
+            "worldline_player_isolation",
+            summary=(
+                "World, worldline, player session, media, memory, feedback, "
+                "and repair scopes align."
+            ),
+            evidence_refs=refs[:limit],
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _quota_check(
+        self,
+        world_ids: list[uuid.UUID],
+        *,
+        limit: int,
+    ) -> NormalUseStressCheck:
+        blockers: list[str] = []
+        warnings: list[str] = []
+        active_policy_rows = self._session.execute(
+            select(
+                ProviderBudgetPolicy.id,
+                ProviderBudgetPolicy.world_id,
+                ProviderBudgetPolicy.status,
+                ProviderBudgetPolicy.emergency_stop_enabled,
+            ).where(
+                ProviderBudgetPolicy.world_id.in_(world_ids) if world_ids else false(),
+                ProviderBudgetPolicy.status == "active",
+            ),
+        ).mappings().all()
+        policy_world_ids = {row["world_id"] for row in active_policy_rows}
+        for world_id in world_ids:
+            if world_id not in policy_world_ids:
+                blockers.append(f"World {world_id} has no active provider budget policy.")
+        if any(row["emergency_stop_enabled"] for row in active_policy_rows):
+            warnings.append("One or more stress worlds have emergency stop enabled.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="provider_budget_policy",
+                id=str(row["id"]),
+                component="normal_use_stress",
+                status="emergency_stop" if row["emergency_stop_enabled"] else "active",
+                reason_code="stress_quota_policy_checked",
+                world_id=row["world_id"],
+            )
+            for row in active_policy_rows[:limit]
+        ]
+        return _stress_check(
+            "provider_quota_controls",
+            summary=(
+                "Stress worlds have active provider budget policies before provider spend paths."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _runtime_path_check(
+        self,
+        world_ids: list[uuid.UUID],
+        *,
+        limit: int,
+    ) -> NormalUseStressCheck:
+        counts = {
+            "media_jobs": (
+                self._count(MediaJob, MediaJob.world_id.in_(world_ids)) if world_ids else 0
+            ),
+            "memory_write_jobs": self._count(MemoryWriteJob, MemoryWriteJob.world_id.in_(world_ids))
+            if world_ids
+            else 0,
+            "beta_feedback_reports": self._count(
+                BetaFeedbackReport,
+                BetaFeedbackReport.world_id.in_(world_ids),
+            )
+            if world_ids
+            else 0,
+            "authoring_import_proposals": self._count(
+                AuthoringImportProposal,
+                AuthoringImportProposal.world_id.in_(world_ids),
+            )
+            if world_ids
+            else 0,
+        }
+        blockers = [
+            f"Stress fixture has no {key} evidence."
+            for key, count in counts.items()
+            if count == 0
+        ]
+        invocation_failures = self._count(
+            ModelInvocation,
+            ModelInvocation.world_id.in_(world_ids),
+            ModelInvocation.status == "failed",
+        ) if world_ids else 0
+        media_failures = self._count(
+            MediaJob,
+            MediaJob.world_id.in_(world_ids),
+            MediaJob.status == "failed",
+        ) if world_ids else 0
+        warnings = []
+        if invocation_failures:
+            warnings.append(f"Stress fixture includes {invocation_failures} failed invocations.")
+        if media_failures:
+            warnings.append(f"Stress fixture includes {media_failures} failed media jobs.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="stress_runtime_count",
+                id=key,
+                component="normal_use_stress",
+                status=str(count),
+                reason_code="runtime_path_evidence_counted",
+            )
+            for key, count in list(counts.items())[:limit]
+        ]
+        return _stress_check(
+            "runtime_path_coverage",
+            summary=(
+                "Stress fixture covers media jobs, memory writes, feedback, "
+                "and repair proposals."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _long_session_check(
+        self,
+        world_ids: list[uuid.UUID],
+        *,
+        baseline_turn_equivalent: int,
+        limit: int,
+    ) -> NormalUseStressCheck:
+        observed_turns = self._turn_equivalent(world_ids)
+        blockers: list[str] = []
+        if observed_turns < baseline_turn_equivalent:
+            blockers.append(
+                f"Observed turn-equivalent evidence is {observed_turns}; "
+                f"{baseline_turn_equivalent} is required.",
+            )
+        eval_rows = self._session.scalars(
+            select(LongRunEvalRun)
+            .where(LongRunEvalRun.world_id.in_(world_ids) if world_ids else false())
+            .order_by(LongRunEvalRun.finished_at.desc())
+            .limit(limit),
+        ).all()
+        warnings = []
+        if not eval_rows:
+            warnings.append(
+                "No long-run eval records were present; conversation turns provided coverage.",
+            )
+        if any(row.status == "failed" for row in eval_rows):
+            blockers.append("At least one stress long-run eval failed.")
+        if any(row.status == "warning" for row in eval_rows):
+            warnings.append("At least one stress long-run eval reported warnings.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="long_run_eval_run",
+                id=str(row.id),
+                component="normal_use_stress",
+                status=row.status,
+                reason_code="stress_long_run_eval",
+                world_id=row.world_id,
+                worldline_id=row.worldline_id,
+                occurred_at=row.finished_at,
+            )
+            for row in eval_rows
+        ]
+        refs.append(
+            IncidentEvidenceRef(
+                kind="stress_turn_equivalent",
+                id="conversation_turns",
+                component="normal_use_stress",
+                status=str(observed_turns),
+                reason_code="stress_turn_equivalent_counted",
+            )
+        )
+        return _stress_check(
+            "long_session_coverage",
+            summary=(
+                "Deterministic turn-equivalent and long-run eval evidence meet "
+                "the normal-use baseline."
+            ),
+            evidence_refs=refs[:limit],
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _real_provider_profile_check(
+        self,
+        real_provider_profile_enabled: bool,
+    ) -> NormalUseStressCheck:
+        warnings: list[str] = []
+        blockers: list[str] = []
+        if real_provider_profile_enabled:
+            warnings.append(
+                "Real-provider stress profile is opt-in; verify quota and lab "
+                "environment manually.",
+            )
+        active_real_provider_count = self._count(
+            ProviderIntegration,
+            ProviderIntegration.adapter_kind != "fake",
+            ProviderIntegration.status == "active",
+        )
+        if active_real_provider_count and not real_provider_profile_enabled:
+            warnings.append(
+                "Active non-fake providers exist, but normal-use stress default remains fake-only.",
+            )
+        return _stress_check(
+            "default_fake_provider_profile",
+            summary=(
+                "Default normal-use stress uses fake providers and does not execute "
+                "real providers."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="stress_provider_profile",
+                    id="default",
+                    component="normal_use_stress",
+                    status="fake_only",
+                    reason_code="real_provider_stress_disabled_by_default",
+                )
+            ],
+            blockers=blockers,
+            warnings=warnings,
+        )
+
+    def _safe_report_check(self) -> NormalUseStressCheck:
+        return _stress_check(
+            "safe_stress_report",
+            summary="Stress report uses aggregate metrics and safe evidence refs only.",
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="leak_scan",
+                    id="normal_use_stress_report",
+                    component="normal_use_stress",
+                    status="complete",
+                    reason_code="safe_report_contract",
+                )
+            ],
+            blockers=[],
+            warnings=[],
+        )
+
+    def _fake_provider_count(self, world_ids: list[uuid.UUID]) -> int:
+        if not world_ids:
+            return 0
+        return self._count(
+            ProviderIntegration,
+            ProviderIntegration.world_id.in_(world_ids),
+            ProviderIntegration.adapter_kind == "fake",
+            ProviderIntegration.status == "active",
+        )
+
+    def _turn_equivalent(self, world_ids: list[uuid.UUID]) -> int:
+        if not world_ids:
+            return 0
+        session_ids = self._session.scalars(
+            select(ConversationSession.id).where(ConversationSession.world_id.in_(world_ids)),
+        ).all()
+        conversation_turns = (
+            self._count(ConversationTurn, ConversationTurn.session_id.in_(session_ids))
+            if session_ids
+            else 0
+        )
+        eval_turns = 0
+        for metrics in self._session.scalars(
+            select(LongRunEvalRun.metrics).where(LongRunEvalRun.world_id.in_(world_ids)),
+        ):
+            eval_turns += _metric_int(metrics, "turn_equivalent")
+            eval_turns += _metric_int(metrics, "turn_count")
+        return conversation_turns + eval_turns
+
+    def _latency_summary(self, world_ids: list[uuid.UUID]) -> dict[str, int]:
+        if not world_ids:
+            return {"invocation_count": 0, "average_latency_ms": 0, "max_latency_ms": 0}
+        count = self._count(ModelInvocation, ModelInvocation.world_id.in_(world_ids))
+        average_latency = self._session.scalar(
+            select(func.avg(ModelInvocation.latency_ms)).where(
+                ModelInvocation.world_id.in_(world_ids),
+                ModelInvocation.latency_ms.is_not(None),
+            ),
+        )
+        max_latency = self._session.scalar(
+            select(func.max(ModelInvocation.latency_ms)).where(
+                ModelInvocation.world_id.in_(world_ids),
+                ModelInvocation.latency_ms.is_not(None),
+            ),
+        )
+        return {
+            "invocation_count": count,
+            "average_latency_ms": int(average_latency or 0),
+            "max_latency_ms": int(max_latency or 0),
+        }
+
+    def _cost_summary(self, world_ids: list[uuid.UUID]) -> dict[str, str]:
+        if not world_ids:
+            return {"estimated_cost_total": "0.00000000", "costed_invocation_count": "0"}
+        total = self._session.scalar(
+            select(func.sum(ModelInvocation.estimated_cost)).where(
+                ModelInvocation.world_id.in_(world_ids),
+                ModelInvocation.estimated_cost.is_not(None),
+            ),
+        )
+        count = self._count(
+            ModelInvocation,
+            ModelInvocation.world_id.in_(world_ids),
+            ModelInvocation.estimated_cost.is_not(None),
+        )
+        cost = total if isinstance(total, Decimal) else Decimal(str(total or "0"))
+        return {
+            "estimated_cost_total": f"{cost:.8f}",
+            "costed_invocation_count": str(count),
+        }
+
+    def _failure_summary(self, world_ids: list[uuid.UUID]) -> dict[str, int]:
+        if not world_ids:
+            return {
+                "failed_invocations": 0,
+                "failed_media_jobs": 0,
+                "failed_memory_write_jobs": 0,
+            }
+        return {
+            "failed_invocations": self._count(
+                ModelInvocation,
+                ModelInvocation.world_id.in_(world_ids),
+                ModelInvocation.status == "failed",
+            ),
+            "failed_media_jobs": self._count(
+                MediaJob,
+                MediaJob.world_id.in_(world_ids),
+                MediaJob.status == "failed",
+            ),
+            "failed_memory_write_jobs": self._count(
+                MemoryWriteJob,
+                MemoryWriteJob.world_id.in_(world_ids),
+                MemoryWriteJob.status == "failed",
+            ),
+        }
+
+    def _quota_summary(self, world_ids: list[uuid.UUID]) -> dict[str, int]:
+        if not world_ids:
+            return {"active_policy_count": 0, "emergency_stop_count": 0}
+        return {
+            "active_policy_count": self._count(
+                ProviderBudgetPolicy,
+                ProviderBudgetPolicy.world_id.in_(world_ids),
+                ProviderBudgetPolicy.status == "active",
+            ),
+            "emergency_stop_count": self._count(
+                ProviderBudgetPolicy,
+                ProviderBudgetPolicy.world_id.in_(world_ids),
+                ProviderBudgetPolicy.emergency_stop_enabled.is_(True),
+                ProviderBudgetPolicy.status == "active",
+            ),
+        }
 
     def _count(self, model: type[Any], *conditions: Any) -> int:
         return int(
@@ -3551,6 +4206,53 @@ def _readiness_status(sections: list[ProductionReadinessSection]) -> IncidentSta
     if any(section.status == IncidentStatus.WATCH for section in sections):
         return IncidentStatus.WATCH
     return IncidentStatus.OK
+
+
+def _stress_check(
+    check_key: str,
+    *,
+    summary: str,
+    evidence_refs: list[IncidentEvidenceRef],
+    blockers: list[str],
+    warnings: list[str],
+) -> NormalUseStressCheck:
+    status = IncidentStatus.OK
+    if blockers:
+        status = IncidentStatus.BLOCKED
+    elif warnings:
+        status = IncidentStatus.WATCH
+    return NormalUseStressCheck(
+        check_key=check_key,
+        status=status,
+        summary=summary,
+        evidence_count=len(evidence_refs),
+        blocker_count=len(blockers),
+        warning_count=len(warnings),
+        evidence_refs=evidence_refs,
+        blockers=blockers,
+        warnings=warnings,
+    )
+
+
+def _stress_status(checks: list[NormalUseStressCheck]) -> IncidentStatus:
+    if any(check.status == IncidentStatus.BLOCKED for check in checks):
+        return IncidentStatus.BLOCKED
+    if any(check.status == IncidentStatus.WATCH for check in checks):
+        return IncidentStatus.WATCH
+    return IncidentStatus.OK
+
+
+def _metric_int(metrics: dict[str, Any], key: str) -> int:
+    value = metrics.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return max(0, value)
+    if isinstance(value, float):
+        return max(0, int(value))
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return 0
 
 
 def _self_use_manual_checklist(

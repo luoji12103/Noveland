@@ -295,3 +295,50 @@ class BackupRestoreDrillReport(_FrozenContract):
         if value.tzinfo is None or value.utcoffset() is None:
             return value.replace(tzinfo=UTC)
         return value.astimezone(UTC)
+
+
+class NormalUseStressCheck(_FrozenContract):
+    check_key: str = Field(min_length=1, max_length=120)
+    status: IncidentStatus
+    summary: str = Field(min_length=1, max_length=500)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    evidence_refs: list[IncidentEvidenceRef] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class NormalUseStressReport(_FrozenContract):
+    status: IncidentStatus
+    generated_at: datetime
+    readiness_kind: str = Field(default="normal_use_stress", min_length=1)
+    baseline_world_count: int = Field(ge=1)
+    baseline_worldlines_per_world: int = Field(ge=1)
+    baseline_player_sessions_per_world: int = Field(ge=1)
+    baseline_fake_provider_count: int = Field(ge=1)
+    baseline_turn_equivalent: int = Field(ge=1)
+    observed_world_count: int = Field(ge=0)
+    observed_worldline_count: int = Field(ge=0)
+    observed_player_session_count: int = Field(ge=0)
+    observed_fake_provider_count: int = Field(ge=0)
+    observed_turn_equivalent: int = Field(ge=0)
+    real_provider_profile_enabled: bool = False
+    latency_summary: dict[str, int] = Field(default_factory=dict)
+    cost_summary: dict[str, str] = Field(default_factory=dict)
+    failure_summary: dict[str, int] = Field(default_factory=dict)
+    quota_summary: dict[str, int] = Field(default_factory=dict)
+    check_count: int = Field(ge=0)
+    evidence_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    checks: list[NormalUseStressCheck] = Field(default_factory=list)
+    suppressed_fields: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+
+    @field_validator("generated_at", mode="after")
+    @classmethod
+    def normalize_generated_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
