@@ -1,15 +1,16 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 8 Release Candidate Gate fast-forward merge
+- v1.1 OpenSpec archive and release notes
 
 ## In Progress
-- v1.1 Phase 8 Release Candidate Gate fast-forward merge
+- None
 
 ## Blocked
 - None
 
 ## Done
+- v1.1 Phase 8 Release Candidate Gate fast-forward merge
 - v1.1 Phase 8 Release Candidate Gate full backend/OpenSpec gate
 - v1.1 Phase 8 Release Candidate Gate implementation
 - v1.1 Phase 8 Release Candidate Gate targeted tests

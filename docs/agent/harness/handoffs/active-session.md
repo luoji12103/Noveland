@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-21T00:00:00Z
-- Branch: feature/v1.1-8-release-candidate-gate
-- Objective: complete v1.1 Phase 8 Release Candidate Gate on the phase branch, then fast-forward merge to local main after gates pass.
-- Status: v1.1 Phase 8 implementation, targeted backend checks, and full backend/OpenSpec gate are complete on the phase branch. Commit and fast-forward merge to local main are next. No push performed.
+- Branch: main
+- Objective: v1.1 Phase 1-8 implementation is complete; await explicit closeout/archive instruction.
+- Status: v1.1 Phase 8 Release Candidate Gate is committed and fast-forward merged to local main. OpenSpec tasks are complete through `9.6`; closeout tasks remain open. No push performed.
 
 ## Current Context
 
@@ -42,6 +42,7 @@
 - v1.1 Phase 8 Release Candidate Gate checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.8-release-candidate-gate-plan.md`. The phase is backend/API-only under existing observability/readiness, with no migration, Web UI, duplicate readiness framework, public launch behavior, or provider calls.
 - v1.1 Phase 8 implementation adds `ReleaseCandidateGateReport`, `ProductionReadinessGateService.release_candidate_gate_report`, and platform-admin `GET /observability/readiness/release-candidate`. Targeted checks passed: focused readiness pytest (`27 passed`), focused ruff, and focused mypy.
 - v1.1 Phase 8 full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`555 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v1.1 Phase 8 commit `fbe6ce6` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `9.6`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
 - v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.

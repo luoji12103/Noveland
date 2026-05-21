@@ -1,5 +1,16 @@
 # Change Journal
 
+## v1.1 Phase 8 Release Candidate Gate merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 8 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-8-release-candidate-gate` into local `main`, marked Phase 8 complete in OpenSpec tasks, and left v1.1 closeout/archive tasks open for explicit acceptance.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 8 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `9.6`, task board, active handoff, and change journal.
+- Follow-up notes: v1.1 Phase 1-8 implementation is complete locally. Do not archive v1.1 until explicitly instructed. No push performed.
+
 ## v1.1 Phase 8 Release Candidate Gate planning entry
 
 - Date: 2026-05-21
