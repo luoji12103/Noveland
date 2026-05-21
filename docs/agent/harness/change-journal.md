@@ -22,6 +22,17 @@
 - Docs updated: Phase 7 checkpoint, task board, active handoff, project index, file inventory, and change journal.
 - Follow-up notes: Full Phase 7 Web/OpenSpec gate passed: Web lint, Web typecheck, Web unit tests (`134 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 7 and fast-forward merge to local `main`. Backend behavior was not changed.
 
+## v1.1 Phase 7 User-facing Polish merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 7 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-7-user-facing-polish` into local `main`, marked Phase 7 complete in OpenSpec tasks, and moved harness handoff state to Phase 8 Release Candidate Gate.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 7 Web/OpenSpec gate.
+- Docs updated: OpenSpec task `8.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 8 on `feature/v1.1-8-release-candidate-gate` from clean local `main` with a docs-only RC gate evidence ownership checkpoint before implementation. No push performed.
+
 ## v1.1 Phase 5 Import/Export Stability implementation entry
 
 - Date: 2026-05-21

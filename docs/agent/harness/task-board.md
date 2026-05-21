@@ -1,10 +1,10 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 7 User-facing Polish fast-forward merge
+- v1.1 Phase 8 Release Candidate Gate planning checkpoint
 
 ## In Progress
-- v1.1 Phase 7 User-facing Polish fast-forward merge
+- None
 
 ## Blocked
 - None
@@ -15,6 +15,7 @@
 - v1.1 Phase 7 User-facing Polish implementation
 - v1.1 Phase 7 User-facing Polish targeted tests
 - v1.1 Phase 7 User-facing Polish full Web/OpenSpec gate
+- v1.1 Phase 7 User-facing Polish fast-forward merge
 - v1.1 Phase 6 Provider Reliability Layer planning checkpoint
 - v1.1 Phase 6 Provider Reliability Layer implementation
 - v1.1 Phase 6 Provider Reliability Layer targeted tests

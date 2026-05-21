@@ -71,7 +71,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 8.3 Improve loading, error, mobile, playback, onboarding copy, feedback affordances, quota/degraded states, setup/readiness clarity, import/export clarity, provider status clarity, and accessibility as scoped.
 - [x] 8.4 Add Web unit/e2e/a11y/responsive checks as appropriate.
 - [x] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 8.6 Fast-forward merge to local main and update harness docs.
+- [x] 8.6 Fast-forward merge to local main and update harness docs.
 
 ## 9. Phase 8 — Release Candidate Gate
 
