@@ -220,6 +220,103 @@ class ProviderHealthCheckRead(_FrozenContract):
         return _utc(value)
 
 
+class ProviderReliabilityMode(StrEnum):
+    NORMAL = "normal"
+    AT_RISK = "at_risk"
+    DEGRADED = "degraded"
+    UNAVAILABLE = "unavailable"
+
+
+class ProviderFallbackMode(StrEnum):
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+
+
+class ProviderReliabilityProviderRef(_FrozenContract):
+    id: uuid.UUID
+    provider_key: str
+    provider_kind: ProviderKind
+    adapter_kind: ProviderAdapterKind
+    status: ProviderIntegrationStatus
+    auth_ref_configured: bool
+
+
+class ProviderReliabilityEvidenceRef(_FrozenContract):
+    evidence_kind: str = Field(min_length=1, max_length=80)
+    ref_id: uuid.UUID | None = None
+    status: str | None = Field(default=None, max_length=40)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata_json", mode="after")
+    @classmethod
+    def validate_json_values(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider reliability evidence JSON")
+        return value
+
+
+class ProviderReliabilityReportRead(_FrozenContract):
+    provider: ProviderReliabilityProviderRef
+    reliability_mode: ProviderReliabilityMode
+    degraded_mode_active: bool
+    recent_health_count: int = Field(ge=0)
+    recent_unhealthy_count: int = Field(ge=0)
+    recent_degraded_count: int = Field(ge=0)
+    recent_failed_invocation_count: int = Field(ge=0)
+    manual_fallback_enabled: bool
+    automatic_fallback_enabled: bool = False
+    fallback_provider_ids: tuple[uuid.UUID, ...] = Field(default_factory=tuple)
+    evidence_refs: tuple[ProviderReliabilityEvidenceRef, ...] = Field(default_factory=tuple)
+    blocked_reasons: tuple[str, ...] = Field(default_factory=tuple)
+
+
+class ProviderFallbackPlanRequest(_FrozenContract):
+    fallback_provider_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    capability_key: str | None = Field(default=None, min_length=1, max_length=120)
+    player_actor_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    reason: str | None = Field(default=None, min_length=1, max_length=240)
+
+
+class ProviderFallbackPlanRead(_FrozenContract):
+    allowed: bool
+    primary_provider: ProviderReliabilityProviderRef
+    fallback_provider: ProviderReliabilityProviderRef | None = None
+    fallback_mode: ProviderFallbackMode
+    capability_key: str
+    degraded_mode_active: bool
+    quota_checked: bool
+    auth_checked: bool
+    audit_required: bool = True
+    automatic_fallback_enabled: bool = False
+    blocked_reasons: tuple[str, ...] = Field(default_factory=tuple)
+    evidence_refs: tuple[ProviderReliabilityEvidenceRef, ...] = Field(default_factory=tuple)
+    audit_metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("audit_metadata", mode="after")
+    @classmethod
+    def validate_audit_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider fallback audit metadata")
+        return value
+
+
+class ProviderMediaJobRequeueRequest(_FrozenContract):
+    reason: str | None = Field(default=None, min_length=1, max_length=240)
+
+
+class ProviderMediaJobRequeueResult(_FrozenContract):
+    original_job: MediaJobRecord
+    requeued_job: MediaJobRecord
+    audit_metadata: dict[str, Any]
+    provider_execution: bool = False
+
+    @field_validator("audit_metadata", mode="after")
+    @classmethod
+    def validate_requeue_audit_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_json_serializable(value, "provider requeue audit metadata")
+        return value
+
+
 class ProviderBudgetPolicyCreate(_FrozenContract):
     world_id: uuid.UUID
     provider_id: uuid.UUID | None = None
@@ -304,6 +401,9 @@ class ProviderExecutionRequest(_FrozenContract):
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
     actor_ref: str | None = Field(default=None, min_length=1, max_length=160)
+    fallback_provider_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    fallback_reason: str | None = Field(default=None, min_length=1, max_length=240)
 
     @field_validator("input_json", "request_json", mode="after")
     @classmethod
@@ -340,6 +440,9 @@ class ProviderTestInvocationRequest(_FrozenContract):
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
+    fallback_provider_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    fallback_reason: str | None = Field(default=None, min_length=1, max_length=240)
 
     @field_validator("input_json", "request_json", mode="after")
     @classmethod
@@ -362,6 +465,9 @@ class ProviderSmokeTestRequest(_FrozenContract):
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
+    fallback_provider_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    fallback_reason: str | None = Field(default=None, min_length=1, max_length=240)
 
     @field_validator("input_json", "request_json", mode="after")
     @classmethod

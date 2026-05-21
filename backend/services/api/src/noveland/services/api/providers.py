@@ -20,6 +20,9 @@ from noveland.providers.contracts import (
     ProviderCapabilityRead,
     ProviderExecutionRequest,
     ProviderExecutionResult,
+    ProviderFallbackMode,
+    ProviderFallbackPlanRead,
+    ProviderFallbackPlanRequest,
     ProviderHealthCheckRead,
     ProviderHealthStatus,
     ProviderIntegrationCreate,
@@ -28,9 +31,11 @@ from noveland.providers.contracts import (
     ProviderIntegrationStatus,
     ProviderIntegrationUpdate,
     ProviderKind,
+    ProviderMediaJobRequeueResult,
     ProviderModelDiscoveryRead,
     ProviderModelDiscoveryRequest,
     ProviderQuotaStatusRead,
+    ProviderReliabilityReportRead,
     ProviderScopeKind,
     ProviderSmokeTestResult,
     ProviderTemplateRead,
@@ -44,6 +49,10 @@ from noveland.providers.registry import (
     ProviderNotFoundError,
     ProviderRegistryService,
     ProviderValidationError,
+)
+from noveland.providers.reliability import (
+    ProviderReliabilityError,
+    ProviderReliabilityService,
 )
 from noveland.providers.secrets import reject_sensitive_config
 from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
@@ -107,6 +116,9 @@ class ProviderSmokeTestRequestBody(BaseModel):
     media_job_id: uuid.UUID | None = None
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
+    fallback_provider_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    fallback_reason: str | None = Field(default=None, min_length=1, max_length=240)
 
 
 class ProviderBudgetPolicyCreateRequest(BaseModel):
@@ -123,6 +135,19 @@ class ProviderBudgetPolicyUpdateRequest(BaseModel):
     emergency_stop_enabled: bool | None = None
     limits_json: dict[str, Any] | None = None
     metadata_json: dict[str, Any] | None = None
+
+
+class ProviderFallbackPlanRequestBody(BaseModel):
+    fallback_provider_id: uuid.UUID
+    worldline_id: uuid.UUID | None = None
+    capability_key: str | None = Field(default=None, min_length=1, max_length=120)
+    player_actor_id: uuid.UUID | None = None
+    fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
+    reason: str | None = Field(default=None, min_length=1, max_length=240)
+
+
+class ProviderMediaJobRequeueRequestBody(BaseModel):
+    reason: str | None = Field(default=None, min_length=1, max_length=240)
 
 
 @router.get("/templates", response_model=list[ProviderTemplateRead])
@@ -473,6 +498,93 @@ def list_provider_health_checks(
         raise _not_found() from exc
 
 
+@router.get("/{provider_id}/reliability", response_model=ProviderReliabilityReportRead)
+def get_provider_reliability(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    window_hours: Annotated[int, Query(ge=1, le=168)] = 24,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> ProviderReliabilityReportRead:
+    try:
+        return ProviderReliabilityService(db_session).reliability_report(
+            world_id,
+            provider_id,
+            platform_admin=context.is_platform_admin,
+            window_hours=window_hours,
+            limit=limit,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.post(
+    "/{provider_id}/fallback-plan",
+    response_model=ProviderFallbackPlanRead,
+    dependencies=[Depends(require_csrf)],
+)
+def plan_provider_fallback(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    request: ProviderFallbackPlanRequestBody,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderFallbackPlanRead:
+    try:
+        return ProviderReliabilityService(db_session).fallback_plan(
+            world_id,
+            provider_id,
+            ProviderFallbackPlanRequest(
+                fallback_provider_id=request.fallback_provider_id,
+                worldline_id=request.worldline_id,
+                capability_key=request.capability_key,
+                player_actor_id=request.player_actor_id,
+                fallback_mode=request.fallback_mode,
+                reason=request.reason,
+            ),
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except (ProviderReliabilityError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
+@router.post(
+    "/{provider_id}/media-jobs/{job_id}/requeue",
+    response_model=ProviderMediaJobRequeueResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+def requeue_provider_media_job(
+    world_id: uuid.UUID,
+    provider_id: uuid.UUID,
+    job_id: uuid.UUID,
+    request: ProviderMediaJobRequeueRequestBody,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ProviderMediaJobRequeueResult:
+    try:
+        return ProviderReliabilityService(db_session).requeue_media_job(
+            world_id,
+            provider_id,
+            job_id,
+            actor_ref=(
+                "platform_admin"
+                if is_platform_admin(subject)
+                else f"world_admin:{subject.user_id}"
+            ),
+            reason=request.reason,
+            platform_admin=context.is_platform_admin,
+        )
+    except ProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except ProviderReliabilityError as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
 @router.post(
     "/{provider_id}/smoke-test",
     response_model=ProviderSmokeTestResult,
@@ -512,6 +624,9 @@ def run_provider_smoke_test(
                 media_job_id=request.media_job_id,
                 media_asset_id=request.media_asset_id,
                 player_actor_id=request.player_actor_id,
+                fallback_provider_id=request.fallback_provider_id,
+                fallback_mode=request.fallback_mode,
+                fallback_reason=request.fallback_reason,
                 actor_ref=(
                     "platform_admin"
                     if is_platform_admin(subject)
@@ -580,6 +695,9 @@ def run_provider_test_invocation(
                 media_job_id=request.media_job_id,
                 media_asset_id=request.media_asset_id,
                 player_actor_id=request.player_actor_id,
+                fallback_provider_id=request.fallback_provider_id,
+                fallback_mode=request.fallback_mode,
+                fallback_reason=request.fallback_reason,
                 actor_ref=(
                     "platform_admin"
                     if is_platform_admin(subject)

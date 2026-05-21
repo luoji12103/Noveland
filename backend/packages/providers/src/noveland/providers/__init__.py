@@ -8,6 +8,10 @@ PACKAGE_NAME = "providers"
 _EXPORTS = {
     "ProviderExecutionService": ("noveland.providers.service", "ProviderExecutionService"),
     "ProviderHealthService": ("noveland.providers.health", "ProviderHealthService"),
+    "ProviderReliabilityService": (
+        "noveland.providers.reliability",
+        "ProviderReliabilityService",
+    ),
     "ProviderRegistryService": ("noveland.providers.registry", "ProviderRegistryService"),
     "ProviderExecutionRequest": ("noveland.providers.contracts", "ProviderExecutionRequest"),
     "ProviderExecutionResult": ("noveland.providers.contracts", "ProviderExecutionResult"),

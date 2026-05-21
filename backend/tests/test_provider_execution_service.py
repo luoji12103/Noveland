@@ -36,6 +36,7 @@ from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderBudgetPolicyCreate,
     ProviderExecutionRequest,
+    ProviderFallbackPlanRequest,
     ProviderIntegrationCreate,
     ProviderKind,
     ProviderScopeKind,
@@ -47,6 +48,7 @@ from noveland.providers.models import (
     ProviderIntegration,
 )
 from noveland.providers.registry import ProviderRegistryService
+from noveland.providers.reliability import ProviderReliabilityService
 from noveland.providers.secrets import ProviderSecretResolver
 from noveland.providers.service import ProviderExecutionError, ProviderExecutionService
 from noveland.worlds.models import World, Worldline
@@ -470,6 +472,208 @@ def test_per_player_quota_isolated_and_safe(tmp_path: Path) -> None:
     assert "raw_prompt" not in str(player_a_quota.model_dump())
 
 
+def test_reliability_report_marks_degraded_from_health_and_failed_invocations() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        service = ProviderReliabilityService(session)
+        health = service._session  # keep test honest about using persisted evidence
+        assert health is session
+        for index in range(3):
+            session.add(
+                ProviderHealthCheck(
+                    id=uuid.uuid4(),
+                    provider_integration_id=provider_id,
+                    status="unhealthy",
+                    latency_ms=index,
+                    checked_at=datetime.now(UTC),
+                    error_text="failed",
+                    metadata_json={"reason": "provider_down"},
+                )
+            )
+        for index in range(3):
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text=f"ok-{index}",
+                )
+            )
+        provider = session.get(ProviderIntegration, provider_id)
+        assert provider is not None
+        provider.status = "disabled"
+        with pytest.raises(ProviderExecutionError):
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text="fails",
+                )
+            )
+        report = service.reliability_report(world_id, provider_id, platform_admin=True)
+        session.commit()
+
+    assert report.degraded_mode_active is True
+    assert report.reliability_mode == "degraded"
+    assert report.recent_unhealthy_count == 3
+    assert report.recent_failed_invocation_count == 1
+    assert {item.evidence_kind for item in report.evidence_refs} == {
+        "provider_health_check",
+        "model_invocation",
+    }
+    assert "storage_uri" not in str(report.model_dump())
+    assert "raw_prompt" not in str(report.model_dump())
+    assert "secret" not in str(report.model_dump()).lower()
+
+
+def test_manual_fallback_requires_opt_in_policy_and_quota() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        primary_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        fallback_id = _seed_provider(
+            session,
+            world_id,
+            ProviderKind.TEXT_GENERATION,
+            provider_key="fallback-text",
+        )
+        primary = session.get(ProviderIntegration, primary_id)
+        assert primary is not None
+        primary.config_json = {
+            "reliability": {
+                "manual_fallback_enabled": True,
+                "fallback_provider_ids": [str(fallback_id)],
+            }
+        }
+        for _ in range(3):
+            session.add(
+                ProviderHealthCheck(
+                    id=uuid.uuid4(),
+                    provider_integration_id=primary_id,
+                    status="unhealthy",
+                    checked_at=datetime.now(UTC),
+                    metadata_json={"reason": "timeout"},
+                )
+            )
+        ProviderBudgetService(session).create_policy(
+            ProviderBudgetPolicyCreate(
+                world_id=world_id,
+                provider_id=fallback_id,
+                policy_key="fallback-one-call",
+                limits_json={"max_daily_invocations": 1},
+            )
+        )
+        plan = ProviderReliabilityService(session).fallback_plan(
+            world_id,
+            primary_id,
+            ProviderFallbackPlanRequest(
+                fallback_provider_id=fallback_id,
+                worldline_id=worldline_id,
+                capability_key="text.generate",
+            ),
+            platform_admin=True,
+        )
+        first = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=primary_id,
+                fallback_provider_id=fallback_id,
+                capability_key="text.generate",
+                input_text="manual fallback",
+            )
+        )
+        blocked_plan = ProviderReliabilityService(session).fallback_plan(
+            world_id,
+            primary_id,
+            ProviderFallbackPlanRequest(
+                fallback_provider_id=fallback_id,
+                worldline_id=worldline_id,
+                capability_key="text.generate",
+            ),
+            platform_admin=True,
+        )
+        with pytest.raises(ProviderExecutionError, match="fallback_quota_blocked"):
+            ProviderExecutionService(session).execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=primary_id,
+                    fallback_provider_id=fallback_id,
+                    capability_key="text.generate",
+                    input_text="blocked fallback",
+                )
+            )
+        session.commit()
+
+    assert plan.allowed is True
+    assert plan.quota_checked is True
+    assert first.provider.id == fallback_id
+    first_metadata = first.invocation.request_params_json
+    assert first_metadata is not None
+    assert first_metadata["fallback_selected"] is True
+    assert first_metadata["primary_provider_id"] == str(primary_id)
+    assert first_metadata["fallback_provider_id"] == str(fallback_id)
+    assert blocked_plan.allowed is False
+    assert "fallback_quota_blocked" in blocked_plan.blocked_reasons
+    assert "storage_uri" not in str(first.invocation.request_params_json)
+
+
+def test_fallback_disabled_by_default_and_no_hidden_retry() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    with Session(engine) as session:
+        primary_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        fallback_id = _seed_provider(
+            session,
+            world_id,
+            ProviderKind.TEXT_GENERATION,
+            provider_key="fallback-text",
+        )
+        for _ in range(3):
+            session.add(
+                ProviderHealthCheck(
+                    id=uuid.uuid4(),
+                    provider_integration_id=primary_id,
+                    status="unhealthy",
+                    checked_at=datetime.now(UTC),
+                    metadata_json={"reason": "timeout"},
+                )
+            )
+        plan = ProviderReliabilityService(session).fallback_plan(
+            world_id,
+            primary_id,
+            ProviderFallbackPlanRequest(
+                fallback_provider_id=fallback_id,
+                worldline_id=worldline_id,
+                capability_key="text.generate",
+            ),
+            platform_admin=True,
+        )
+        result = ProviderExecutionService(session).execute(
+            ProviderExecutionRequest(
+                world_id=world_id,
+                worldline_id=worldline_id,
+                provider_id=primary_id,
+                input_text="no hidden fallback",
+            )
+        )
+        session.commit()
+
+    assert plan.allowed is False
+    assert "manual_fallback_not_enabled" in plan.blocked_reasons
+    assert result.provider.id == primary_id
+    result_metadata = result.invocation.request_params_json
+    assert result_metadata is not None
+    assert result_metadata["fallback_selected"] is False
+
+
 def test_resolved_secret_is_not_written_to_ledger(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -641,14 +845,20 @@ def _seed_world(engine: Engine) -> tuple[uuid.UUID, uuid.UUID]:
         return world_id, worldline.id
 
 
-def _seed_provider(session: Session, world_id: uuid.UUID, provider_kind: ProviderKind) -> uuid.UUID:
+def _seed_provider(
+    session: Session,
+    world_id: uuid.UUID,
+    provider_kind: ProviderKind,
+    *,
+    provider_key: str | None = None,
+) -> uuid.UUID:
     provider = ProviderRegistryService(session).create_provider(
         ProviderIntegrationCreate(
             world_id=world_id,
             scope_kind=ProviderScopeKind.WORLD,
             provider_kind=provider_kind,
             adapter_kind=ProviderAdapterKind.FAKE,
-            provider_key=f"fake-{provider_kind.value}",
+            provider_key=provider_key or f"fake-{provider_kind.value}",
             display_name=f"Fake {provider_kind.value}",
         )
     )

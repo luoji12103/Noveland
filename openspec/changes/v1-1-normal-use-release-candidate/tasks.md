@@ -57,11 +57,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 7. Phase 6 — Provider Reliability Layer
 
-- [ ] 7.1 Write docs-only phase planning checkpoint.
-- [ ] 7.2 Implement health trend, degraded mode, manual retry/requeue, and manual-first fallback/model switch policy with opt-in constrained automatic fallback only if approved.
-- [ ] 7.3 Add provider reliability UI only after using `impeccable` if Web scope is approved.
-- [ ] 7.4 Add degraded mode, retry, fallback, quota, audit, and no-hidden-spend tests.
-- [ ] 7.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 7.1 Write docs-only phase planning checkpoint.
+- [x] 7.2 Implement health trend, degraded mode, manual retry/requeue, and manual-first fallback/model switch policy with opt-in constrained automatic fallback only if approved.
+- [x] 7.3 Add provider reliability UI only after using `impeccable` if Web scope is approved.
+- [x] 7.4 Add degraded mode, retry, fallback, quota, audit, and no-hidden-spend tests.
+- [x] 7.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 7.6 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — User-facing Polish

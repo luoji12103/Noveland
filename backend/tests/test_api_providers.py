@@ -709,6 +709,130 @@ def test_provider_quota_status_supports_player_and_capability_filters() -> None:
     assert "secret" not in quota.text
 
 
+def test_provider_reliability_fallback_and_requeue_api_are_safe() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _authenticate(client, admin_token)
+    primary = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "fake",
+            "provider_key": "primary-image",
+            "display_name": "Primary Image",
+        },
+    )
+    fallback = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "world",
+            "provider_kind": "image_generation",
+            "adapter_kind": "fake",
+            "provider_key": "fallback-image",
+            "display_name": "Fallback Image",
+        },
+    )
+    primary_id = primary.json()["id"]
+    fallback_id = fallback.json()["id"]
+    configured = client.patch(
+        f"/worlds/{world_id}/providers/{primary_id}",
+        json={
+            "config_json": {
+                "reliability": {
+                    "manual_fallback_enabled": True,
+                    "fallback_provider_ids": [fallback_id],
+                }
+            }
+        },
+    )
+    with Session(engine) as session:
+        for _ in range(3):
+            session.add(
+                ProviderHealthCheck(
+                    id=uuid.uuid4(),
+                    provider_integration_id=uuid.UUID(primary_id),
+                    status="unhealthy",
+                    checked_at=datetime.now(UTC),
+                    metadata_json={"reason": "timeout"},
+                )
+            )
+        session.add(
+            MediaJob(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                job_kind="image_generation",
+                provider_kind="image_generation",
+                status="failed",
+                provider_config_json={"provider_id": fallback_id},
+                request_json={"prompt": "safe"},
+                result_json={},
+                error_text="timeout",
+                created_by_actor_ref="test",
+            )
+        )
+        job_id = session.scalar(select(MediaJob.id))
+        session.commit()
+    assert job_id is not None
+
+    _authenticate(client, member_token)
+    forbidden = client.get(f"/worlds/{world_id}/providers/{primary_id}/reliability")
+
+    _authenticate(client, admin_token)
+    report = client.get(f"/worlds/{world_id}/providers/{primary_id}/reliability")
+    plan = client.post(
+        f"/worlds/{world_id}/providers/{primary_id}/fallback-plan",
+        json={
+            "fallback_provider_id": fallback_id,
+            "worldline_id": str(worldline_id),
+            "capability_key": "image.generate",
+        },
+    )
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{primary_id}/smoke-test",
+        json={
+            "worldline_id": str(worldline_id),
+            "fallback_provider_id": fallback_id,
+            "fallback_reason": "manual provider outage",
+            "capability_key": "image.generate",
+            "input_text": "draw via fallback",
+        },
+    )
+    requeue = client.post(
+        f"/worlds/{world_id}/providers/{fallback_id}/media-jobs/{job_id}/requeue",
+        json={"reason": "manual requeue after provider recovery"},
+    )
+
+    assert configured.status_code == 200
+    assert forbidden.status_code == 403
+    assert report.status_code == 200
+    assert report.json()["degraded_mode_active"] is True
+    assert report.json()["manual_fallback_enabled"] is True
+    assert fallback_id in report.json()["fallback_provider_ids"]
+    assert plan.status_code == 200
+    assert plan.json()["allowed"] is True
+    assert plan.json()["automatic_fallback_enabled"] is False
+    assert smoke.status_code == 201
+    assert smoke.json()["smoke_status"] == "succeeded"
+    assert smoke.json()["provider"]["id"] == fallback_id
+    assert smoke.json()["invocation"]["request_params_json"]["fallback_selected"] is True
+    assert requeue.status_code == 201
+    assert requeue.json()["provider_execution"] is False
+    assert requeue.json()["requeued_job"]["status"] == "queued"
+    assert requeue.json()["requeued_job"]["provider_config_json"][
+        "provider_reliability_requeue"
+    ] is True
+    assert "storage_uri" not in report.text
+    assert "raw_prompt" not in plan.text
+    assert "secret" not in smoke.text
+
+
 class _ProviderApiClient(TestClient):
     media_storage: LocalMediaObjectStorage
 

@@ -22,6 +22,28 @@
 - Docs updated: OpenSpec task `6.6`, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 6 on `feature/v1.1-6-provider-reliability-layer` from clean local `main` with a docs-only provider reliability policy/profile checkpoint before implementation. No push performed.
 
+## v1.1 Phase 6 Provider Reliability Layer planning entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-6-provider-reliability-layer
+- Scope: v1.1 Normal Use / Release Candidate Phase 6 docs-only checkpoint before implementation.
+- Summary: Confirmed Phase 6 will stay inside the existing providers boundary and remain migration-free. Provider reliability will add health trend/degraded-mode reports, manual-first fallback/model-switch validation with opt-in policy in safe provider config, fallback audit metadata through `ProviderExecutionService`, and audited media-job requeue using existing media jobs. No Web UI is scoped for this phase.
+- Files changed: `docs/agent/harness/feature-updates/v1.1.6-provider-reliability-layer-plan.md`, OpenSpec task `7.1`, and harness docs.
+- Tests added/updated: N/A, planning checkpoint.
+- Docs updated: Phase 6 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Implement provider reliability service/contracts/router updates and focused provider/API tests. Preserve manual-first fallback, quota-before-execution, no hidden retries, and no unsafe evidence leaks.
+
+## v1.1 Phase 6 Provider Reliability Layer implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-6-provider-reliability-layer
+- Scope: v1.1 Normal Use / Release Candidate Phase 6 implementation only.
+- Summary: Added a migration-free provider reliability service under the existing providers package. The implementation adds health-trend reliability reports, degraded-mode status, manual-first fallback planning, explicit fallback execution metadata in `ProviderExecutionService`, and audited provider media-job requeue. Fallback remains disabled by default and can run only when explicitly requested and a safe opt-in policy validates primary degraded evidence, fallback provider ownership/status, capability compatibility, quota, auth availability, and audit metadata. The phase adds no Web UI, real-provider default tests, automatic hidden fallback, marketplace behavior, broad `worlds.py` routes, provider output world-state mutation, or unsafe evidence exposure.
+- Files changed: `backend/packages/providers/src/noveland/providers/{__init__,contracts,reliability,service}.py`, `backend/services/api/src/noveland/services/api/providers.py`, `backend/tests/test_provider_execution_service.py`, `backend/tests/test_api_providers.py`, Phase 6 checkpoint, OpenSpec tasks through `7.4`, and harness docs.
+- Tests added/updated: Added provider service/API coverage for degraded reports from health and invocation evidence, fallback disabled by default, manual fallback opt-in, capability/quota/auth/audit validation, no hidden fallback, explicit fallback invocation metadata, admin-only reliability endpoints, audited provider media-job requeue, and no secret/storage/raw prompt leak markers. Targeted checks passed: focused provider ruff, focused provider mypy, and `cd backend && uv run pytest tests/test_provider_execution_service.py tests/test_api_providers.py -q` (`28 passed`).
+- Docs updated: Phase 6 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`550 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 6, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 7. No Web UI was touched, so `impeccable` was not required for Phase 6.
+
 ## Entry format
 
 - Date:

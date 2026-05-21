@@ -234,6 +234,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.7-beta-content-iteration-loop-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.5-import-export-stability-plan.md`
+- `docs/agent/harness/feature-updates/v1.1.6-provider-reliability-layer-plan.md`
 - `backend/migrations/versions/20260517_0046_private_beta_invites.py`
 - `backend/tests/test_api_private_beta.py`
 - `backend/migrations/versions/20260517_0047_player_sessions.py`
@@ -365,6 +366,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/providers/src/noveland/providers/health.py`
 - `backend/packages/providers/src/noveland/providers/models.py`
 - `backend/packages/providers/src/noveland/providers/registry.py`
+- `backend/packages/providers/src/noveland/providers/reliability.py`
 - `backend/packages/providers/src/noveland/providers/routing.py`
 - `backend/packages/providers/src/noveland/providers/service.py`
 - `backend/packages/speech/`

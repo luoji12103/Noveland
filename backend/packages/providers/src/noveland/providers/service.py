@@ -54,6 +54,7 @@ from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderExecutionRequest,
     ProviderExecutionResult,
+    ProviderFallbackPlanRequest,
     ProviderIntegrationRead,
     ProviderIntegrationStatus,
     ProviderKind,
@@ -64,6 +65,10 @@ from noveland.providers.registry import (
     ProviderNotFoundError,
     ProviderRegistryService,
     ProviderValidationError,
+)
+from noveland.providers.reliability import (
+    ProviderReliabilityError,
+    ProviderReliabilityService,
 )
 from noveland.providers.routing import (
     capability_key_for_provider,
@@ -123,6 +128,15 @@ class ProviderExecutionService:
     def execute(self, request: ProviderExecutionRequest) -> ProviderExecutionResult:
         worldline_id = self._worldline_id(request.world_id, request.worldline_id)
         provider = self._resolve_provider(request)
+        reliability_metadata: dict[str, object] = {
+            "provider_reliability_checked": False,
+            "fallback_selected": False,
+        }
+        if request.fallback_provider_id is not None:
+            provider, reliability_metadata = self._resolve_fallback_provider(
+                request,
+                provider,
+            )
         model = self._provider_model(provider.id)
         if request.media_job_id is not None:
             self._validate_media_job(request.world_id, worldline_id, request.media_job_id)
@@ -195,6 +209,7 @@ class ProviderExecutionService:
             "provider_status": model.status,
             **budget_metadata,
             **auth_metadata,
+            **reliability_metadata,
         }
 
         invocation = InvocationLedgerService(self._session).record(
@@ -611,6 +626,45 @@ class ProviderExecutionService:
             capability_key=request.capability_key,
             provider_id=request.provider_id,
         )
+
+    def _resolve_fallback_provider(
+        self,
+        request: ProviderExecutionRequest,
+        primary_provider: ProviderIntegrationRead,
+    ) -> tuple[ProviderIntegrationRead, dict[str, object]]:
+        try:
+            fallback_model, audit_metadata = ProviderReliabilityService(
+                self._session,
+                self._secret_resolver,
+            ).require_fallback_provider(
+                request.world_id,
+                primary_provider.id,
+                ProviderFallbackPlanRequest(
+                    fallback_provider_id=request.fallback_provider_id
+                    or primary_provider.id,
+                    worldline_id=request.worldline_id,
+                    capability_key=request.capability_key
+                    or capability_key_for_provider(primary_provider.provider_kind),
+                    player_actor_id=request.player_actor_id,
+                    fallback_mode=request.fallback_mode,
+                    reason=request.fallback_reason,
+                ),
+                platform_admin=True,
+            )
+        except ProviderReliabilityError as exc:
+            raise ProviderExecutionError(str(exc)) from exc
+        fallback = ProviderRegistryService(self._session).get_provider(
+            request.world_id,
+            fallback_model.id,
+            platform_admin=True,
+            include_hidden=True,
+        )
+        if fallback is None:
+            raise ProviderExecutionError("provider fallback disappeared")
+        return fallback, {
+            "provider_reliability_checked": True,
+            **audit_metadata,
+        }
 
     def _provider_model(self, provider_id: uuid.UUID) -> ProviderIntegration:
         return ProviderRegistryService(self._session).internal_model(provider_id)
