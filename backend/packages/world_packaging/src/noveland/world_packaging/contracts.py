@@ -202,12 +202,121 @@ class WorldPackageMediaManifest(_FrozenContract):
         return value
 
 
+class WorldPackageProviderManifest(_FrozenContract):
+    provider_key: str = Field(min_length=1, max_length=120)
+    provider_kind: str = Field(min_length=1, max_length=40)
+    adapter_kind: str = Field(min_length=1, max_length=40)
+    display_name: str = Field(min_length=1, max_length=200)
+    auth_ref_configured: bool = False
+    config: dict[str, Any] = Field(default_factory=dict)
+    default_params: dict[str, Any] = Field(default_factory=dict)
+    capabilities: tuple[str, ...] = Field(default_factory=tuple)
+    status: str = Field(default="active", min_length=1, max_length=24)
+    visibility: str = Field(default="world_admin", min_length=1, max_length=32)
+
+    @field_validator("config", "default_params", mode="after")
+    @classmethod
+    def validate_provider_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
+class WorldPackagePersonaManifest(_FrozenContract):
+    agent_key: str = Field(min_length=1, max_length=80)
+    display_name: str = Field(min_length=1, max_length=120)
+    persona_summary: str | None = Field(default=None, max_length=500)
+    character_profile: dict[str, Any] = Field(default_factory=dict)
+    behavior_policy: dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+
+    @field_validator("character_profile", "behavior_policy", mode="after")
+    @classmethod
+    def validate_persona_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
+class WorldPackageMemoryManifest(_FrozenContract):
+    agent_key: str = Field(min_length=1, max_length=80)
+    worldline_key: str | None = Field(default=None, max_length=80)
+    memory_key: str = Field(min_length=1, max_length=160)
+    content_summary: str = Field(min_length=1, max_length=500)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    active: bool = True
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_memory_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
+class WorldPackageVisualMappingManifest(_FrozenContract):
+    mapping_kind: str = Field(min_length=1, max_length=40)
+    worldline_key: str = Field(min_length=1, max_length=80)
+    agent_key: str | None = Field(default=None, max_length=80)
+    scene_key: str | None = Field(default=None, max_length=80)
+    package_asset_key: str = Field(min_length=1, max_length=120)
+    role: str = Field(min_length=1, max_length=80)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_visual_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
+class WorldPackageVoiceMappingManifest(_FrozenContract):
+    worldline_key: str | None = Field(default=None, max_length=80)
+    agent_key: str | None = Field(default=None, max_length=80)
+    voice_profile_key: str = Field(min_length=1, max_length=120)
+    display_name: str = Field(min_length=1, max_length=200)
+    provider_key: str | None = Field(default=None, max_length=120)
+    provider_voice_id: str | None = Field(default=None, max_length=200)
+    binding_role: str | None = Field(default=None, max_length=32)
+    style_overrides: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("style_overrides", "metadata", mode="after")
+    @classmethod
+    def validate_voice_json(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
+class WorldPackageSourceTraceManifest(_FrozenContract):
+    worldline_key: str = Field(min_length=1, max_length=80)
+    source_kind: str = Field(min_length=1, max_length=40)
+    source_label: str = Field(min_length=1, max_length=160)
+    source_ref: str | None = Field(default=None, max_length=240)
+    trace_kind: str | None = Field(default=None, max_length=40)
+    applied_ref_kind: str | None = Field(default=None, max_length=60)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    excluded_from_public_sample: bool = False
+    exclusion_reason: str | None = Field(default=None, max_length=240)
+
+    @field_validator("metadata", mode="after")
+    @classmethod
+    def validate_source_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        _assert_safe_json(value)
+        return value
+
+
 class WorldPackageManifest(_FrozenContract):
     metadata: WorldPackageMetadata
     world: WorldPackageWorldManifest
     worldlines: tuple[WorldPackageWorldlineManifest, ...]
     scenes: tuple[WorldPackageSceneManifest, ...] = Field(default_factory=tuple)
     media: tuple[WorldPackageMediaManifest, ...] = Field(default_factory=tuple)
+    providers: tuple[WorldPackageProviderManifest, ...] = Field(default_factory=tuple)
+    personas: tuple[WorldPackagePersonaManifest, ...] = Field(default_factory=tuple)
+    memories: tuple[WorldPackageMemoryManifest, ...] = Field(default_factory=tuple)
+    visual_mappings: tuple[WorldPackageVisualMappingManifest, ...] = Field(default_factory=tuple)
+    voice_mappings: tuple[WorldPackageVoiceMappingManifest, ...] = Field(default_factory=tuple)
+    source_traceability: tuple[WorldPackageSourceTraceManifest, ...] = Field(
+        default_factory=tuple
+    )
 
     @model_validator(mode="after")
     def validate_manifest_shape(self) -> WorldPackageManifest:
@@ -222,6 +331,9 @@ class WorldPackageManifest(_FrozenContract):
         asset_keys = [asset.package_asset_key for asset in self.media]
         if len(asset_keys) != len(set(asset_keys)):
             raise ValueError("media asset package keys must be unique")
+        provider_keys = [provider.provider_key for provider in self.providers]
+        if len(provider_keys) != len(set(provider_keys)):
+            raise ValueError("provider keys must be unique")
         return self
 
 
@@ -229,6 +341,8 @@ class WorldPackageExportRequest(_FrozenContract):
     worldline_id: uuid.UUID | None = None
     package_key: str | None = Field(default=None, min_length=1, max_length=80)
     include_media: bool = True
+    include_extended_manifests: bool = True
+    public_sample: bool = False
 
 
 class WorldPackageImportPreviewRequest(_FrozenContract):
@@ -249,6 +363,12 @@ class WorldPackagePreviewResult(_FrozenContract):
     creates_world: bool
     creates_scene_count: int
     creates_media_asset_count: int
+    provider_manifest_count: int = 0
+    persona_manifest_count: int = 0
+    memory_manifest_count: int = 0
+    visual_mapping_count: int = 0
+    voice_mapping_count: int = 0
+    source_traceability_count: int = 0
     provider_execution: bool = False
     world_event_writes: bool = False
 

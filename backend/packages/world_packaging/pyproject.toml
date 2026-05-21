@@ -8,16 +8,28 @@ version = "0.1.0"
 description = "Safe world package manifest export and import discipline for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "noveland-agents",
+  "noveland-authoring",
   "noveland-core",
   "noveland-media",
+  "noveland-memory",
+  "noveland-providers",
+  "noveland-speech",
+  "noveland-visual",
   "noveland-worlds",
   "pydantic>=2.13,<3",
   "sqlalchemy>=2.0,<3",
 ]
 
 [tool.uv.sources]
+noveland-agents = { workspace = true }
+noveland-authoring = { workspace = true }
 noveland-core = { workspace = true }
 noveland-media = { workspace = true }
+noveland-memory = { workspace = true }
+noveland-providers = { workspace = true }
+noveland-speech = { workspace = true }
+noveland-visual = { workspace = true }
 noveland-worlds = { workspace = true }
 
 [tool.hatch.build.targets.wheel]

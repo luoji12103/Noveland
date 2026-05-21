@@ -1,5 +1,16 @@
 # Change Journal
 
+## v1.1 Phase 5 Import/Export Stability implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-5-import-export-stability
+- Scope: v1.1 Normal Use / Release Candidate Phase 5 implementation only.
+- Summary: Added the Phase 5 checkpoint and extended the existing `world_packaging` boundary with safe provider, persona, memory, visual mapping, voice mapping, and source traceability manifest sections. Export preview now supports public-sample exclusion for user-provided galgame media/source content as placeholder metadata, omits provider auth refs, strips unsafe JSON keys and values, and reports repeatable import duplicate warnings. Import apply remains explicit, creates only the existing world/worldline/scene/media placeholder records, and preserves specialized manifests as safe review/apply metadata for existing owners instead of directly mutating provider, persona, memory, visual, or voice records. The phase adds no migration, Web UI, broad `worlds.py` routes, marketplace behavior, provider calls, proprietary fixtures, provider execution, or world-event writes.
+- Files changed: `backend/packages/world_packaging/{pyproject.toml,src/noveland/world_packaging/{contracts,service}.py}`, `backend/tests/test_api_world_packaging.py`, `backend/uv.lock`, Phase 5 checkpoint, OpenSpec tasks through `6.4`, and harness docs.
+- Tests added/updated: Added world packaging API coverage for safe extended manifest export, public-sample galgame asset/source placeholder exclusion, repeatable duplicate-package import preview warnings, explicit apply preserving extended manifests as safe metadata, no direct specialized-record mutation, and forbidden-marker leak checks. Targeted checks passed before full gate: focused world packaging ruff, focused world packaging mypy, and `cd backend && uv run pytest tests/test_api_world_packaging.py tests/test_sample_world_release_package.py -q` (`12 passed`).
+- Docs updated: Phase 5 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Full backend/OpenSpec gate passed: backend ruff, backend mypy (`325 source files`), backend pytest (`546 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 5, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 6. No Web UI was touched, so `impeccable` was not required for Phase 5.
+
 ## Entry format
 
 - Date:

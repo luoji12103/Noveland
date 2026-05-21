@@ -48,11 +48,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 6. Phase 5 — Import/Export Stability
 
-- [ ] 6.1 Write docs-only phase planning checkpoint.
-- [ ] 6.2 Implement package export/import roundtrip stability, manifest validation, and proprietary/user-provided asset export policy.
-- [ ] 6.3 Add import/export UI improvements only after using `impeccable` if Web scope is approved.
-- [ ] 6.4 Add roundtrip, sample package repeatability, no-secret, no-storage-path, and preview/apply tests.
-- [ ] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 6.1 Write docs-only phase planning checkpoint.
+- [x] 6.2 Implement package export/import roundtrip stability, manifest validation, and proprietary/user-provided asset export policy.
+- [x] 6.3 Add import/export UI improvements only after using `impeccable` if Web scope is approved.
+- [x] 6.4 Add roundtrip, sample package repeatability, no-secret, no-storage-path, and preview/apply tests.
+- [x] 6.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 6.6 Fast-forward merge to local main and update harness docs.
 
 ## 7. Phase 6 — Provider Reliability Layer

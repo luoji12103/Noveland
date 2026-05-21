@@ -103,6 +103,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.1.3-multi-world-multi-user-stress-plan.md` — v1.1 Phase 3 checkpoint for deterministic fake-provider normal-use stress reporting under observability with 3-world, 6-worldline, 6-player-session, 120-turn-equivalent coverage.
 - `docs/agent/harness/feature-updates/v1.1.4-content-safety-moderation-hardening-plan.md` — v1.1 Phase 4 checkpoint for keeping moderation as the safety/action owner while linking beta feedback to moderation escalation with reporter privacy and safe evidence refs.
 - v1.1 Phase 4 implementation extends `backend/packages/moderation/` and the existing app-level moderation router with admin-only safety reviews and feedback escalation. It links `beta_feedback_reports.moderation_report_id`, preserves reporter-private tester feedback visibility, keeps moderation evidence admin-only, and adds no migration, Web UI, duplicate moderation framework, provider calls, broad `worlds.py` routes, or world-event writes.
+- `docs/agent/harness/feature-updates/v1.1.5-import-export-stability-plan.md` — v1.1 Phase 5 checkpoint for extending existing world packaging manifests with provider, persona, memory, visual, voice, and source traceability sections while keeping import apply explicit and specialized records review/apply-only.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -407,8 +408,8 @@ Fast orientation for a new coding session.
   - `noveland.player_privacy.models` — `player_privacy_requests` ORM model for reviewable export/delete requests
   - `noveland.player_privacy.service` — deterministic sanitized export, delete-request creation, request listing, and admin review service
 - `backend/packages/world_packaging/`
-  - `noveland.world_packaging.contracts` — safe world package manifest, preview, issue, and apply DTOs
-  - `noveland.world_packaging.service` — backend-only export preview, import preview, and explicit apply service without provider execution or storage path export
+  - `noveland.world_packaging.contracts` — safe world package manifest, preview, issue, extended provider/persona/memory/visual/voice/source-trace DTOs, and apply DTOs
+  - `noveland.world_packaging.service` — backend-only export preview, import preview, and explicit apply service without provider execution or storage path export; v1.1 extends it with safe extended manifests and public-sample user-provided asset exclusion
 - `backend/packages/package_contracts/`
   - `noveland.package_contracts.contracts` — plugin/provider package metadata, validation, issue, and safe provider config export DTOs
   - `noveland.package_contracts.service` — response-only package validation and provider config export service without marketplace, provider execution, or secret resolution

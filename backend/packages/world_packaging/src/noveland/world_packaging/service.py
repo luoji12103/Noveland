@@ -5,7 +5,22 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from noveland.agents.models import Agent, AgentPersona
+from noveland.authoring.models import (
+    AuthoringSourceAsset,
+    AuthoringSourceBatch,
+    AuthoringSourceFragment,
+    AuthoringSourceTraceability,
+)
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
+from noveland.memory.models import AgentMemoryItem
+from noveland.providers.models import ProviderCapability, ProviderIntegration
+from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
+from noveland.visual.models import (
+    CharacterSpriteSet,
+    CharacterSpriteVariant,
+    SceneBackgroundProfile,
+)
 from noveland.world_packaging.contracts import (
     FORBIDDEN_KEYS,
     FORBIDDEN_VALUE_MARKERS,
@@ -19,9 +34,15 @@ from noveland.world_packaging.contracts import (
     WorldPackageMediaManifest,
     WorldPackageMediaObjectManifest,
     WorldPackageMediaReferenceManifest,
+    WorldPackageMemoryManifest,
     WorldPackageMetadata,
+    WorldPackagePersonaManifest,
     WorldPackagePreviewResult,
+    WorldPackageProviderManifest,
     WorldPackageSceneManifest,
+    WorldPackageSourceTraceManifest,
+    WorldPackageVisualMappingManifest,
+    WorldPackageVoiceMappingManifest,
     WorldPackageWorldlineManifest,
     WorldPackageWorldManifest,
 )
@@ -81,7 +102,43 @@ class WorldPackagingService:
             ),
             scenes=tuple(self._export_scenes(world_id)),
             media=tuple(
-                self._export_media(world_id, worldline.id) if request.include_media else ()
+                self._export_media(
+                    world_id,
+                    worldline.id,
+                    public_sample=request.public_sample,
+                )
+                if request.include_media
+                else ()
+            ),
+            providers=tuple(
+                self._export_providers(world_id) if request.include_extended_manifests else ()
+            ),
+            personas=tuple(
+                self._export_personas(world_id) if request.include_extended_manifests else ()
+            ),
+            memories=tuple(
+                self._export_memories(world_id, worldline.id)
+                if request.include_extended_manifests
+                else ()
+            ),
+            visual_mappings=tuple(
+                self._export_visual_mappings(world_id, worldline.id)
+                if request.include_extended_manifests
+                else ()
+            ),
+            voice_mappings=tuple(
+                self._export_voice_mappings(world_id, worldline.id)
+                if request.include_extended_manifests
+                else ()
+            ),
+            source_traceability=tuple(
+                self._export_source_traceability(
+                    world_id,
+                    worldline.id,
+                    public_sample=request.public_sample,
+                )
+                if request.include_extended_manifests
+                else ()
             ),
         )
         return self.preview_import(manifest)
@@ -102,6 +159,12 @@ class WorldPackagingService:
             creates_world=True,
             creates_scene_count=len(manifest.scenes),
             creates_media_asset_count=len(manifest.media),
+            provider_manifest_count=len(manifest.providers),
+            persona_manifest_count=len(manifest.personas),
+            memory_manifest_count=len(manifest.memories),
+            visual_mapping_count=len(manifest.visual_mappings),
+            voice_mapping_count=len(manifest.voice_mappings),
+            source_traceability_count=len(manifest.source_traceability),
             provider_execution=False,
             world_event_writes=False,
         )
@@ -202,6 +265,38 @@ class WorldPackagingService:
             self._session.flush()
             media_asset_ids.append(asset.id)
 
+        if _has_extended_manifest_sections(request.manifest):
+            world.rules_config = {
+                **dict(world.rules_config),
+                "package_import_extended_manifests": {
+                    "providers": [
+                        provider.model_dump(mode="json")
+                        for provider in request.manifest.providers
+                    ],
+                    "personas": [
+                        persona.model_dump(mode="json")
+                        for persona in request.manifest.personas
+                    ],
+                    "memories": [
+                        memory.model_dump(mode="json") for memory in request.manifest.memories
+                    ],
+                    "visual_mappings": [
+                        mapping.model_dump(mode="json")
+                        for mapping in request.manifest.visual_mappings
+                    ],
+                    "voice_mappings": [
+                        mapping.model_dump(mode="json")
+                        for mapping in request.manifest.voice_mappings
+                    ],
+                    "source_traceability": [
+                        trace.model_dump(mode="json")
+                        for trace in request.manifest.source_traceability
+                    ],
+                    "apply_owner": "world_packaging_manifest_metadata",
+                    "review_apply_required_for_specialized_records": True,
+                },
+            }
+
         return WorldPackageApplyResult(
             preview=preview,
             applied=True,
@@ -249,6 +344,8 @@ class WorldPackagingService:
         self,
         world_id: uuid.UUID,
         worldline_id: uuid.UUID,
+        *,
+        public_sample: bool,
     ) -> list[WorldPackageMediaManifest]:
         assets = self._session.scalars(
             select(MediaAsset)
@@ -269,9 +366,27 @@ class WorldPackagingService:
                 checksum_sha256=asset.checksum_sha256,
                 title=asset.title,
                 description=asset.description,
-                objects=tuple(self._export_media_objects(asset)),
+                objects=tuple(
+                    () if _is_user_provided_media(asset) and public_sample
+                    else self._export_media_objects(asset)
+                ),
                 references=tuple(self._export_media_references(asset)),
-                metadata=_safe_json(asset.metadata_json),
+                metadata=_safe_json(
+                    {
+                        **dict(asset.metadata_json),
+                        **(
+                            {
+                                "public_sample_policy": "excluded_placeholder",
+                                "exclusion_reason": (
+                                    "user-provided galgame media is excluded from "
+                                    "public sample export"
+                                ),
+                            }
+                            if _is_user_provided_media(asset) and public_sample
+                            else {}
+                        ),
+                    }
+                ),
             )
             for asset in assets
             if asset.visibility not in {"hidden", "developer_only"}
@@ -323,6 +438,282 @@ class WorldPackagingService:
             for ref in refs
         ]
 
+    def _export_providers(self, world_id: uuid.UUID) -> list[WorldPackageProviderManifest]:
+        providers = self._session.scalars(
+            select(ProviderIntegration)
+            .where(
+                ProviderIntegration.world_id == world_id,
+                ProviderIntegration.visibility.notin_(("hidden", "developer_only")),
+            )
+            .order_by(ProviderIntegration.provider_key)
+        ).all()
+        return [
+            WorldPackageProviderManifest(
+                provider_key=provider.provider_key,
+                provider_kind=provider.provider_kind,
+                adapter_kind=provider.adapter_kind,
+                display_name=provider.display_name,
+                auth_ref_configured=provider.auth_ref is not None,
+                config=_safe_json(provider.config_json),
+                default_params=_safe_json(provider.default_params_json),
+                capabilities=tuple(self._provider_capabilities(provider.id)),
+                status=provider.status,
+                visibility=provider.visibility,
+            )
+            for provider in providers
+        ]
+
+    def _provider_capabilities(self, provider_id: uuid.UUID) -> list[str]:
+        return list(
+            self._session.scalars(
+                select(ProviderCapability.capability_key)
+                .where(ProviderCapability.provider_integration_id == provider_id)
+                .order_by(ProviderCapability.capability_key)
+            ).all()
+        )
+
+    def _export_personas(self, world_id: uuid.UUID) -> list[WorldPackagePersonaManifest]:
+        rows = self._session.execute(
+            select(Agent, AgentPersona)
+            .join(AgentPersona, AgentPersona.agent_id == Agent.id)
+            .where(Agent.world_id == world_id, AgentPersona.world_id == world_id)
+            .order_by(Agent.agent_key)
+        ).all()
+        return [
+            WorldPackagePersonaManifest(
+                agent_key=agent.agent_key,
+                display_name=agent.display_name,
+                persona_summary=_summarize_text(persona.persona_text),
+                character_profile=_safe_json(agent.character_profile),
+                behavior_policy=_safe_json(persona.behavior_policy),
+                enabled=persona.is_enabled,
+            )
+            for agent, persona in rows
+        ]
+
+    def _export_memories(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> list[WorldPackageMemoryManifest]:
+        rows = self._session.execute(
+            select(AgentMemoryItem, Agent, Worldline)
+            .join(Agent, Agent.id == AgentMemoryItem.agent_id)
+            .outerjoin(Worldline, Worldline.id == AgentMemoryItem.worldline_id)
+            .where(
+                AgentMemoryItem.world_id == world_id,
+                (
+                    (AgentMemoryItem.worldline_id.is_(None))
+                    | (AgentMemoryItem.worldline_id == worldline_id)
+                ),
+                AgentMemoryItem.is_active.is_(True),
+            )
+            .order_by(Agent.agent_key, AgentMemoryItem.created_at, AgentMemoryItem.id)
+        ).all()
+        return [
+            WorldPackageMemoryManifest(
+                agent_key=agent.agent_key,
+                worldline_key=worldline.worldline_key if worldline is not None else None,
+                memory_key=f"memory-{memory.id}",
+                content_summary=_summarize_text(memory.content),
+                metadata=_safe_json(memory.metadata_json),
+                active=memory.is_active,
+            )
+            for memory, agent, worldline in rows
+        ]
+
+    def _export_visual_mappings(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> list[WorldPackageVisualMappingManifest]:
+        mappings: list[WorldPackageVisualMappingManifest] = []
+        sprite_rows = self._session.execute(
+            select(CharacterSpriteVariant, CharacterSpriteSet, Agent, MediaAsset)
+            .join(CharacterSpriteSet, CharacterSpriteSet.id == CharacterSpriteVariant.sprite_set_id)
+            .join(Agent, Agent.id == CharacterSpriteSet.agent_id)
+            .join(MediaAsset, MediaAsset.id == CharacterSpriteVariant.asset_id)
+            .where(
+                CharacterSpriteVariant.world_id == world_id,
+                CharacterSpriteVariant.worldline_id == worldline_id,
+                CharacterSpriteVariant.visibility.notin_(("hidden", "developer_only")),
+                CharacterSpriteSet.visibility.notin_(("hidden", "developer_only")),
+                MediaAsset.visibility.notin_(("hidden", "developer_only")),
+            )
+            .order_by(Agent.agent_key, CharacterSpriteVariant.expression_key)
+        ).all()
+        for variant, sprite_set, agent, asset in sprite_rows:
+            mappings.append(
+                WorldPackageVisualMappingManifest(
+                    mapping_kind="character_sprite",
+                    worldline_key=self._worldline_key(variant.worldline_id),
+                    agent_key=agent.agent_key,
+                    package_asset_key=f"asset-{asset.id}",
+                    role=variant.expression_key,
+                    metadata=_safe_json(
+                        {
+                            "style_key": sprite_set.style_key,
+                            "pose_key": variant.pose_key,
+                            "outfit_key": variant.outfit_key,
+                            "mood_tags": variant.mood_tags_json,
+                            "is_default": variant.is_default,
+                        }
+                    ),
+                )
+            )
+        background_rows = self._session.execute(
+            select(SceneBackgroundProfile, Scene, MediaAsset)
+            .outerjoin(Scene, Scene.id == SceneBackgroundProfile.scene_id)
+            .join(MediaAsset, MediaAsset.id == SceneBackgroundProfile.asset_id)
+            .where(
+                SceneBackgroundProfile.world_id == world_id,
+                SceneBackgroundProfile.worldline_id == worldline_id,
+                SceneBackgroundProfile.visibility.notin_(("hidden", "developer_only")),
+                MediaAsset.visibility.notin_(("hidden", "developer_only")),
+            )
+            .order_by(SceneBackgroundProfile.location_key, SceneBackgroundProfile.priority)
+        ).all()
+        for background, scene, asset in background_rows:
+            mappings.append(
+                WorldPackageVisualMappingManifest(
+                    mapping_kind="scene_background",
+                    worldline_key=self._worldline_key(background.worldline_id),
+                    scene_key=scene.scene_key if scene is not None else None,
+                    package_asset_key=f"asset-{asset.id}",
+                    role=background.location_key,
+                    metadata=_safe_json(
+                        {
+                            "time_of_day": background.time_of_day,
+                            "weather_key": background.weather_key,
+                            "is_default": background.is_default,
+                        }
+                    ),
+                )
+            )
+        return mappings
+
+    def _export_voice_mappings(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+    ) -> list[WorldPackageVoiceMappingManifest]:
+        rows = self._session.execute(
+            select(VoiceProfile, AgentVoiceProfileBinding, Agent, ProviderIntegration)
+            .outerjoin(
+                AgentVoiceProfileBinding,
+                AgentVoiceProfileBinding.voice_profile_id == VoiceProfile.id,
+            )
+            .outerjoin(Agent, Agent.id == AgentVoiceProfileBinding.agent_id)
+            .outerjoin(
+                ProviderIntegration,
+                ProviderIntegration.id == VoiceProfile.provider_integration_id,
+            )
+            .where(
+                VoiceProfile.world_id == world_id,
+                (
+                    (VoiceProfile.worldline_id.is_(None))
+                    | (VoiceProfile.worldline_id == worldline_id)
+                ),
+                VoiceProfile.visibility.notin_(("hidden", "developer_only")),
+            )
+            .order_by(VoiceProfile.profile_key)
+        ).all()
+        return [
+            WorldPackageVoiceMappingManifest(
+                worldline_key=(
+                    self._worldline_key(voice.worldline_id)
+                    if voice.worldline_id is not None
+                    else None
+                ),
+                agent_key=agent.agent_key if agent is not None else None,
+                voice_profile_key=voice.profile_key,
+                display_name=voice.display_name,
+                provider_key=provider.provider_key if provider is not None else None,
+                provider_voice_id=voice.provider_voice_id,
+                binding_role=binding.binding_role if binding is not None else None,
+                style_overrides=(
+                    _safe_json(binding.style_overrides_json) if binding is not None else {}
+                ),
+                metadata=_safe_json(voice.metadata_json),
+            )
+            for voice, binding, agent, provider in rows
+        ]
+
+    def _export_source_traceability(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        *,
+        public_sample: bool,
+    ) -> list[WorldPackageSourceTraceManifest]:
+        rows = self._session.execute(
+            select(
+                AuthoringSourceBatch,
+                AuthoringSourceAsset,
+                AuthoringSourceFragment,
+                AuthoringSourceTraceability,
+                Worldline,
+            )
+            .join(AuthoringSourceAsset, AuthoringSourceAsset.batch_id == AuthoringSourceBatch.id)
+            .outerjoin(
+                AuthoringSourceFragment,
+                AuthoringSourceFragment.source_asset_id == AuthoringSourceAsset.id,
+            )
+            .outerjoin(
+                AuthoringSourceTraceability,
+                AuthoringSourceTraceability.source_fragment_id == AuthoringSourceFragment.id,
+            )
+            .join(Worldline, Worldline.id == AuthoringSourceBatch.worldline_id)
+            .where(
+                AuthoringSourceBatch.world_id == world_id,
+                AuthoringSourceBatch.worldline_id == worldline_id,
+                AuthoringSourceBatch.status == "active",
+            )
+            .order_by(AuthoringSourceBatch.batch_key, AuthoringSourceAsset.source_label)
+        ).all()
+        manifests: list[WorldPackageSourceTraceManifest] = []
+        seen: set[tuple[str, str, str | None, str | None]] = set()
+        for batch, asset, _fragment, trace, worldline in rows:
+            user_provided = _is_user_provided_source(batch, asset)
+            key = (
+                worldline.worldline_key,
+                asset.source_label,
+                asset.source_ref,
+                trace.trace_kind if trace is not None else None,
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            manifests.append(
+                WorldPackageSourceTraceManifest(
+                    worldline_key=worldline.worldline_key,
+                    source_kind=asset.source_asset_kind,
+                    source_label=asset.source_label,
+                    source_ref=asset.source_ref,
+                    trace_kind=trace.trace_kind if trace is not None else None,
+                    applied_ref_kind=trace.applied_ref_kind if trace is not None else None,
+                    metadata=_safe_json(
+                        {
+                            "batch_key": batch.batch_key,
+                            "source_type": batch.metadata_json.get("source_type")
+                            or asset.metadata_json.get("source_type"),
+                            "public_sample_policy": (
+                                "excluded_placeholder"
+                                if public_sample and user_provided
+                                else "safe_metadata_only"
+                            ),
+                        }
+                    ),
+                    excluded_from_public_sample=public_sample and user_provided,
+                    exclusion_reason=(
+                        "user-provided galgame source assets are excluded from public sample export"
+                        if public_sample and user_provided
+                        else None
+                    ),
+                )
+            )
+        return manifests
+
     def _validate_manifest(self, manifest: WorldPackageManifest) -> list[WorldPackageIssue]:
         issues: list[WorldPackageIssue] = []
         if manifest.metadata.manifest_version != SUPPORTED_MANIFEST_VERSION:
@@ -342,6 +733,10 @@ class WorldPackagingService:
                 )
             )
         worldline_keys = {worldline.worldline_key for worldline in manifest.worldlines}
+        provider_keys = {provider.provider_key for provider in manifest.providers}
+        agent_keys = {persona.agent_key for persona in manifest.personas}
+        asset_keys = {asset.package_asset_key for asset in manifest.media}
+        scene_keys = {scene.scene_key for scene in manifest.scenes}
         for index, asset in enumerate(manifest.media):
             if asset.worldline_key not in worldline_keys:
                 issues.append(
@@ -362,6 +757,102 @@ class WorldPackagingService:
                         ),
                     )
                 )
+        for index, memory in enumerate(manifest.memories):
+            if memory.worldline_key is not None and memory.worldline_key not in worldline_keys:
+                issues.append(
+                    _blocker(
+                        "unknown_worldline",
+                        f"memories[{index}].worldline_key",
+                        "Memory manifest references a worldline key not present in the manifest.",
+                    )
+                )
+            if agent_keys and memory.agent_key not in agent_keys:
+                issues.append(
+                    _warning(
+                        "memory_agent_not_in_persona_manifest",
+                        f"memories[{index}].agent_key",
+                        "Memory manifest references an agent without a persona manifest.",
+                    )
+                )
+        for index, mapping in enumerate(manifest.visual_mappings):
+            if mapping.worldline_key not in worldline_keys:
+                issues.append(
+                    _blocker(
+                        "unknown_worldline",
+                        f"visual_mappings[{index}].worldline_key",
+                        "Visual mapping references a worldline key not present in the manifest.",
+                    )
+                )
+            if mapping.package_asset_key not in asset_keys:
+                issues.append(
+                    _blocker(
+                        "unknown_media_asset",
+                        f"visual_mappings[{index}].package_asset_key",
+                        "Visual mapping references a media asset key not present in the manifest.",
+                    )
+                )
+            if mapping.scene_key is not None and mapping.scene_key not in scene_keys:
+                issues.append(
+                    _warning(
+                        "unknown_scene_reference",
+                        f"visual_mappings[{index}].scene_key",
+                        "Visual mapping references a scene key not present in the manifest.",
+                    )
+                )
+        for index, voice_mapping in enumerate(manifest.voice_mappings):
+            if (
+                voice_mapping.worldline_key is not None
+                and voice_mapping.worldline_key not in worldline_keys
+            ):
+                issues.append(
+                    _blocker(
+                        "unknown_worldline",
+                        f"voice_mappings[{index}].worldline_key",
+                        "Voice mapping references a worldline key not present in the manifest.",
+                    )
+                )
+            if (
+                voice_mapping.provider_key is not None
+                and voice_mapping.provider_key not in provider_keys
+            ):
+                issues.append(
+                    _warning(
+                        "voice_provider_not_in_manifest",
+                        f"voice_mappings[{index}].provider_key",
+                        "Voice mapping references a provider not present in the manifest.",
+                    )
+                )
+        for index, trace in enumerate(manifest.source_traceability):
+            if trace.worldline_key not in worldline_keys:
+                issues.append(
+                    _blocker(
+                        "unknown_worldline",
+                        f"source_traceability[{index}].worldline_key",
+                        (
+                            "Source traceability references a worldline key not present "
+                            "in the manifest."
+                        ),
+                    )
+                )
+            if trace.excluded_from_public_sample:
+                issues.append(
+                    _warning(
+                        "proprietary_source_excluded",
+                        f"source_traceability[{index}]",
+                        (
+                            "User-provided source content is represented by safe "
+                            "placeholder metadata only."
+                        ),
+                    )
+                )
+        if self._world_slug_exists(f"imported-{manifest.world.slug}"):
+            issues.append(
+                _warning(
+                    "duplicate_import_target",
+                    "world.slug",
+                    "A default imported slug already exists; apply should use an override slug.",
+                )
+            )
         issues.extend(_forbidden_marker_issues(manifest.model_dump(mode="json")))
         return issues
 
@@ -390,6 +881,50 @@ def _safe_value(value: Any) -> Any:
         if any(marker in normalized for marker in FORBIDDEN_VALUE_MARKERS):
             return "[redacted]"
     return value
+
+
+def _summarize_text(value: str, *, limit: int = 500) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 3].rstrip()}..."
+
+
+def _has_extended_manifest_sections(manifest: WorldPackageManifest) -> bool:
+    return any(
+        (
+            manifest.providers,
+            manifest.personas,
+            manifest.memories,
+            manifest.visual_mappings,
+            manifest.voice_mappings,
+            manifest.source_traceability,
+        )
+    )
+
+
+def _is_user_provided_source(
+    batch: AuthoringSourceBatch,
+    asset: AuthoringSourceAsset,
+) -> bool:
+    source_type = batch.metadata_json.get("source_type") or asset.metadata_json.get("source_type")
+    if source_type == "already_unpacked_galgame":
+        return True
+    return bool(
+        batch.metadata_json.get("user_provided")
+        or asset.metadata_json.get("user_provided")
+        or batch.metadata_json.get("proprietary")
+        or asset.metadata_json.get("proprietary")
+    )
+
+
+def _is_user_provided_media(asset: MediaAsset) -> bool:
+    source_type = asset.metadata_json.get("source_type")
+    return bool(
+        source_type == "already_unpacked_galgame"
+        or asset.metadata_json.get("user_provided")
+        or asset.metadata_json.get("proprietary")
+    )
 
 
 def _forbidden_marker_issues(value: Any, path: str = "$") -> list[WorldPackageIssue]:
