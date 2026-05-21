@@ -76,7 +76,10 @@ export function ConversationSceneView({ worldId, conversationId, data }: Convers
         <div className="scene-stage">
           {imageUrl === null ? (
             <div className="scene-fallback" role="img" aria-label="Missing scene media">
-              No reader-visible scene image for this turn.
+              <div className="media-fallback-copy">
+                <p>No reader-visible scene image for this turn.</p>
+                <p>Scene dialogue is still available. No media diagnostics are exposed here.</p>
+              </div>
             </div>
           ) : (
             <div
@@ -108,7 +111,9 @@ export function ConversationSceneView({ worldId, conversationId, data }: Convers
             <span>Media: {mediaSummary(activeMedia)}</span>
           </div>
           {audioUrl === null ? (
-            <p className="management-notice">Audio is not available for this turn.</p>
+            <p className="management-notice" data-tone="warning">
+              Audio is not available for this turn. Continue with the visible dialogue.
+            </p>
           ) : (
             <audio aria-label="Scene audio" className="playback-audio" controls preload="none" src={audioUrl}>
               Audio playback is unavailable in this browser.

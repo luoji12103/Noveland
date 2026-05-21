@@ -132,7 +132,7 @@ export function BetaFeedbackPanel({ worldId, data }: BetaFeedbackPanelProps) {
 
       <AdminSection
         title="Submit feedback"
-        description="Use this for scene, dialogue, persona, voice, image, provider, quota, session, or UX issues."
+        description="Use safe IDs to bind the report to scene, dialogue, persona, voice, image, provider, quota, session, or UX context."
       >
         {data.worldlines.length === 0 ? (
           <AdminState title="No worldlines">Feedback requires a worldline-scoped beta world.</AdminState>
@@ -180,14 +180,30 @@ export function BetaFeedbackPanel({ worldId, data }: BetaFeedbackPanelProps) {
               Reporter note
               <textarea className="text-input" name="reporter_note" rows={3} maxLength={1000} />
             </label>
+            <p className="inline-help feedback-wide">
+              Evidence fields accept safe object IDs only. Do not paste storage paths, prompt text, provider credentials,
+              or raw model output.
+            </p>
             <div className="feedback-evidence-grid feedback-wide">
-              <input className="text-input" name="conversation_id" placeholder="conversation id" />
-              <input className="text-input" name="turn_id" placeholder="turn id" />
-              <input className="text-input" name="presentation_id" placeholder="presentation id" />
-              <input className="text-input" name="media_asset_id" placeholder="media asset id" />
+              <label>
+                Conversation ID
+                <input className="text-input" name="conversation_id" placeholder="conversation id" />
+              </label>
+              <label>
+                Turn ID
+                <input className="text-input" name="turn_id" placeholder="turn id" />
+              </label>
+              <label>
+                Presentation ID
+                <input className="text-input" name="presentation_id" placeholder="presentation id" />
+              </label>
+              <label>
+                Media asset ID
+                <input className="text-input" name="media_asset_id" placeholder="media asset id" />
+              </label>
             </div>
             <button className="primary-button feedback-wide" type="submit" disabled={isBusy}>
-              Submit feedback
+              {isBusy ? "Submitting..." : "Submit feedback"}
             </button>
           </form>
         )}
@@ -254,11 +270,17 @@ type FeedbackReportRowProps = {
 function FeedbackReportRow({ report, canManage, isBusy, onTriage }: FeedbackReportRowProps) {
   return (
     <article className="resource-row feedback-report-row">
-      <div>
+      <div className="feedback-report-summary">
         <h3>{report.title}</h3>
-        <p>
-          {labelFor(report.issue_type)} · {labelFor(report.severity)} · {labelFor(report.status)}
-        </p>
+        <div className="status-pill-list" aria-label={`${report.title} feedback status`}>
+          <span className="status-pill">{labelFor(report.issue_type)}</span>
+          <span className="status-pill" data-tone={severityTone(report.severity)}>
+            {labelFor(report.severity)}
+          </span>
+          <span className="status-pill" data-tone={statusTone(report.status)}>
+            {labelFor(report.status)}
+          </span>
+        </div>
         <p>{report.description}</p>
         <p>
           Evidence: {report.evidence_refs.length} · Repairs: {report.repair_proposal_refs.length}
@@ -288,7 +310,7 @@ function FeedbackReportRow({ report, canManage, isBusy, onTriage }: FeedbackRepo
             rows={3}
           />
           <button className="secondary-button" type="submit" disabled={isBusy}>
-            Save triage
+            {isBusy ? "Saving..." : "Save triage"}
           </button>
         </form>
       ) : null}
@@ -318,4 +340,21 @@ function countBy<T extends Record<string, unknown>>(items: T[], key: keyof T): R
 
 function labelFor(value: string): string {
   return value.replaceAll("_", " ");
+}
+
+function severityTone(severity: BetaFeedbackSeverity): "success" | "warning" | "error" {
+  if (severity === "critical" || severity === "high") {
+    return "error";
+  }
+  if (severity === "medium") {
+    return "warning";
+  }
+  return "success";
+}
+
+function statusTone(status: BetaFeedbackReportStatus): "success" | "warning" | "error" {
+  if (status === "resolved") {
+    return "success";
+  }
+  return "warning";
 }

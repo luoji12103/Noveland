@@ -66,11 +66,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 8. Phase 7 — User-facing Polish
 
-- [ ] 8.1 Write docs-only phase planning checkpoint.
-- [ ] 8.2 Use `impeccable` to shape the approved polish scope before UI edits.
-- [ ] 8.3 Improve loading, error, mobile, playback, onboarding copy, feedback affordances, quota/degraded states, setup/readiness clarity, import/export clarity, provider status clarity, and accessibility as scoped.
-- [ ] 8.4 Add Web unit/e2e/a11y/responsive checks as appropriate.
-- [ ] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 8.1 Write docs-only phase planning checkpoint.
+- [x] 8.2 Use `impeccable` to shape the approved polish scope before UI edits.
+- [x] 8.3 Improve loading, error, mobile, playback, onboarding copy, feedback affordances, quota/degraded states, setup/readiness clarity, import/export clarity, provider status clarity, and accessibility as scoped.
+- [x] 8.4 Add Web unit/e2e/a11y/responsive checks as appropriate.
+- [x] 8.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 8.6 Fast-forward merge to local main and update harness docs.
 
 ## 9. Phase 8 — Release Candidate Gate

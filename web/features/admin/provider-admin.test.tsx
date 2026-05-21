@@ -21,8 +21,10 @@ describe("ProviderAdmin", () => {
 
     expect(screen.getByText("configuration_error")).toBeInTheDocument();
     expect(screen.getByText("missing")).toBeInTheDocument();
-    expect(screen.getByText("missing-ref")).toBeInTheDocument();
+    expect(screen.getByText("Reference: missing-ref")).toBeInTheDocument();
     expect(screen.getByText("`missing-ref` is not present in NOVELAND_PROVIDER_API_KEYS_JSON.")).toBeInTheDocument();
+    expect(screen.getByText("Fix configuration before provider execution.")).toBeInTheDocument();
+    expect(screen.getByText("Review diagnostics before normal use.")).toBeInTheDocument();
     expect(screen.getByText("Recent errors")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getAllByText("Plugin config")).toHaveLength(2);

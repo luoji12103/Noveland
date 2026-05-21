@@ -30,7 +30,8 @@ describe("ConversationSceneView", () => {
 
     expect(screen.getByText("Seed the conversation.")).toBeVisible();
     expect(screen.getByText("No reader-visible scene image for this turn.")).toBeVisible();
-    expect(screen.getByText("Audio is not available for this turn.")).toBeVisible();
+    expect(screen.getByText("Scene dialogue is still available. No media diagnostics are exposed here.")).toBeVisible();
+    expect(screen.getByText("Audio is not available for this turn. Continue with the visible dialogue.")).toBeVisible();
     expect(screen.queryByRole("button", { name: /edit|compose|generate/i })).toBeNull();
   });
 

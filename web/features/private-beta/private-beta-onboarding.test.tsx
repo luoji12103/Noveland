@@ -23,6 +23,8 @@ describe("PrivateBetaOnboarding", () => {
 
     expect(screen.getByRole("heading", { name: "Redeem invite" })).toBeVisible();
     expect(screen.getByText("Demo World")).toBeVisible();
+    expect(screen.getAllByText("redeemed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("tester").length).toBeGreaterThan(0);
     expect(screen.getByText("Use the player surface after identity setup.")).toBeVisible();
     expect(serializedDocument()).not.toMatch(/token-secret|storage_uri|raw_prompt|raw_output/i);
   });
@@ -51,7 +53,7 @@ describe("PrivateBetaOnboarding", () => {
       expect(redeemPrivateBetaInvite).toHaveBeenCalledWith("token-secret");
     });
 
-    fireEvent.change(screen.getByPlaceholderText("Player display name"), {
+    fireEvent.change(screen.getByLabelText("Player display name"), {
       target: { value: "Beta Tester" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create identity" }));

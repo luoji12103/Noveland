@@ -29,7 +29,8 @@ describe("ConversationPlayback", () => {
 
     expect(screen.getByText("Seed the conversation.")).toBeInTheDocument();
     expect(screen.getByText("No reader-visible image for this turn.")).toBeInTheDocument();
-    expect(screen.getByText("No reader-visible audio for this turn.")).toBeInTheDocument();
+    expect(screen.getByText("Dialogue remains available while media is missing or still rendering.")).toBeInTheDocument();
+    expect(screen.getByText("No reader-visible audio for this turn. Continue with text playback.")).toBeInTheDocument();
   });
 
   it("shows a safe empty state", () => {

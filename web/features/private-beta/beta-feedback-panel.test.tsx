@@ -26,7 +26,10 @@ describe("BetaFeedbackPanel", () => {
 
     expect(screen.getByRole("heading", { name: "Feedback overview" })).toBeVisible();
     expect(screen.getByText("OOC response")).toBeVisible();
-    expect(screen.getByText(/dialogue · medium · submitted/)).toBeVisible();
+    expect(screen.getAllByText("dialogue").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("medium").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("submitted").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Evidence fields accept safe object IDs only/)).toBeVisible();
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|raw_prompt|raw_output|prompt_snapshot|sk-live-secret|base64/i,
     );

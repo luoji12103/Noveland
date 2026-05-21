@@ -280,30 +280,66 @@ function ProviderHealthSummary({
   health: ProviderAdminData["providerHealth"][number] | undefined;
 }) {
   if (health === undefined) {
-    return <p>Health: unknown</p>;
+    return <p className="management-notice" data-tone="warning">Health is unknown. Run a provider test before relying on this profile.</p>;
   }
+  const tone = providerHealthTone(health.health);
   return (
-    <div className="dashboard-grid">
-      <div className="metric">
+    <div className="dashboard-grid" aria-label={`${health.name} provider status`}>
+      <div className="metric" data-tone={tone}>
         <p className="metric-label">Health</p>
         <p className="metric-value">{health.health}</p>
+        <p className="status-detail">{providerHealthAction(health.health)}</p>
       </div>
-      <div className="metric">
+      <div className="metric" data-tone={health.secret_ref_status === "configured" ? "ok" : "warning"}>
         <p className="metric-label">Secret ref</p>
         <p className="metric-value">{health.secret_ref_status}</p>
-        <p>{health.api_key_ref}</p>
+        <p className="status-detail">Reference: {health.api_key_ref}</p>
         {health.secret_ref_message !== null ? <p>{health.secret_ref_message}</p> : null}
       </div>
       <div className="metric">
         <p className="metric-label">Recent diagnostics</p>
         <p className="metric-value">{health.recent_diagnostic_count}</p>
       </div>
-      <div className="metric">
+      <div className="metric" data-tone={health.recent_error_count > 0 ? "error" : "neutral"}>
         <p className="metric-label">Recent errors</p>
         <p className="metric-value">{health.recent_error_count}</p>
+        <p className="status-detail">
+          {health.recent_error_count > 0 ? "Review diagnostics before normal use." : "No recent provider errors."}
+        </p>
       </div>
     </div>
   );
+}
+
+function providerHealthTone(
+  health: ProviderAdminData["providerHealth"][number]["health"],
+): "neutral" | "ok" | "warning" | "error" {
+  if (health === "ok") {
+    return "ok";
+  }
+  if (health === "configuration_error" || health === "disabled") {
+    return "error";
+  }
+  if (health === "degraded") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function providerHealthAction(health: ProviderAdminData["providerHealth"][number]["health"]): string {
+  if (health === "ok") {
+    return "Ready for configured capability checks.";
+  }
+  if (health === "degraded") {
+    return "Use degraded mode or manual fallback policy before spend.";
+  }
+  if (health === "configuration_error") {
+    return "Fix configuration before provider execution.";
+  }
+  if (health === "disabled") {
+    return "Enable only after quota and auth checks are ready.";
+  }
+  return "Run a provider test to establish readiness.";
 }
 
 function PluginBindingIssues({

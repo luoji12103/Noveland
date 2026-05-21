@@ -219,6 +219,14 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
               <p className="admin-section-copy">
                 Server-owned restore state for this player identity.
               </p>
+              {data.resume === null ? null : (
+                <div className="status-pill-list" aria-label="Resume recovery status">
+                  <span className="status-pill" data-tone={recoveryTone(data.resume.recovery_status)}>
+                    {data.resume.recovery_label}
+                  </span>
+                  <span className="status-pill">{data.resume.status}</span>
+                </div>
+              )}
             </div>
             {data.resume?.conversation_session_id ? (
               <Link
@@ -234,7 +242,9 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
               Bind a player actor before storing resume state.
             </p>
           ) : data.resume === null ? (
-            <p className="management-notice">No resume state stored yet.</p>
+            <p className="management-notice" data-tone="warning">
+              No resume state stored yet. Save a server-owned recovery point before external testing.
+            </p>
           ) : (
             <article className="resource-row">
               <div>
@@ -270,7 +280,7 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
               <option value="presentation_unavailable">Presentation unavailable</option>
             </select>
             <button className="primary-button" type="submit" disabled={isBusy || activeActor === null}>
-              Save resume
+              {isBusy ? "Saving..." : "Save resume"}
             </button>
           </form>
         </section>
@@ -488,6 +498,16 @@ function safeDiagnostics(
 
 function containsForbiddenEvidence(value: string): boolean {
   return /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i.test(value);
+}
+
+function recoveryTone(status: PlayerRecoveryStatus): "success" | "warning" | "error" {
+  if (status === "ready") {
+    return "success";
+  }
+  if (status === "provider_failure" || status === "media_failure") {
+    return "error";
+  }
+  return "warning";
 }
 
 function sceneName(data: PlayerInteractionData, sceneId: string | null): string {

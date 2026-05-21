@@ -3,13 +3,17 @@
 :root {
   --background: #f7faf8;
   --foreground: #1d1d1b;
+  --text: #1d1d1b;
+  --ink: #1d1d1b;
   --muted: #5a625c;
   --surface: #ffffff;
+  --panel: #ffffff;
   --border: #d7ddd8;
   --forest: #214d3a;
   --forest-dark: #163428;
   --aqua: #0f7a7a;
   --coral: #d64c3b;
+  --shadow: 0 10px 28px rgba(22, 52, 40, 0.08);
 }
 
 * {
@@ -132,6 +136,53 @@ a {
   color: #751d16;
   background: #fde9e6;
   border-color: #edb4ad;
+}
+
+.inline-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.status-pill {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  color: var(--forest-dark);
+  background: #eef6f2;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.status-pill[data-tone="success"] {
+  color: var(--forest-dark);
+  background: #e5f5ec;
+  border-color: #b6d8c4;
+}
+
+.status-pill[data-tone="warning"] {
+  color: #5f3d12;
+  background: #fff3da;
+  border-color: #e6c98c;
+}
+
+.status-pill[data-tone="error"] {
+  color: #751d16;
+  background: #fde9e6;
+  border-color: #edb4ad;
+}
+
+.status-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .world-toolbar {
@@ -442,6 +493,23 @@ a {
   text-align: center;
 }
 
+.media-fallback-copy {
+  display: grid;
+  gap: 6px;
+  max-width: 46ch;
+}
+
+.media-fallback-copy p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.media-fallback-copy p + p {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .playback-subtitle {
   display: grid;
   align-content: center;
@@ -519,6 +587,15 @@ a {
 
 .playback-turn-button small {
   color: var(--muted);
+}
+
+.playback-turn-button:focus-visible,
+.scene-turn-button:focus-visible,
+.workspace-nav a:focus-visible,
+.primary-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: 3px solid rgba(15, 122, 122, 0.28);
+  outline-offset: 2px;
 }
 
 .player-surface {
@@ -608,6 +685,11 @@ a {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 0.45fr);
 }
 
+.private-beta-access-summary {
+  display: grid;
+  gap: 8px;
+}
+
 .feedback-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -628,6 +710,19 @@ a {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+.feedback-evidence-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.feedback-report-summary {
+  display: grid;
+  gap: 8px;
 }
 
 .feedback-report-row {
@@ -842,6 +937,10 @@ a {
     oklch(28% 0.018 210deg);
   font-weight: 800;
   text-align: center;
+}
+
+.scene-fallback .media-fallback-copy p + p {
+  color: oklch(82% 0.012 210deg);
 }
 
 .scene-dialogue {
@@ -1112,6 +1211,12 @@ a {
   border-color: var(--aqua);
 }
 
+.text-input:disabled {
+  cursor: not-allowed;
+  background: #eef3f0;
+  color: var(--muted);
+}
+
 .primary-button,
 .secondary-button {
   min-height: 42px;
@@ -1138,6 +1243,14 @@ a {
 .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.primary-button:not(:disabled):hover,
+.secondary-button:not(:disabled):hover,
+.workspace-nav a:hover,
+.playback-turn-button:hover,
+.scene-turn-button:hover {
+  border-color: var(--aqua);
 }
 
 .form-error,
@@ -1192,6 +1305,14 @@ a {
 
   .button-row {
     justify-content: stretch;
+  }
+
+  .button-row > *,
+  .admin-action-bar > *,
+  .private-beta-actions,
+  .private-beta-actions > *,
+  .feedback-triage-form > button {
+    width: 100%;
   }
 
   .world-image {

@@ -75,7 +75,12 @@ export function ConversationPlayback({ worldId, conversationId, data }: Conversa
 
           <div className="playback-stage">
             {imageUrl === null ? (
-              <div className="playback-scene-empty">No reader-visible image for this turn.</div>
+              <div className="playback-scene-empty">
+                <div className="media-fallback-copy">
+                  <p>No reader-visible image for this turn.</p>
+                  <p>Dialogue remains available while media is missing or still rendering.</p>
+                </div>
+              </div>
             ) : (
               <div
                 aria-label="Reader-safe scene media"
@@ -105,7 +110,9 @@ export function ConversationPlayback({ worldId, conversationId, data }: Conversa
           </div>
 
           {audioUrl === null ? (
-            <p className="management-notice">No reader-visible audio for this turn.</p>
+            <p className="management-notice" data-tone="warning">
+              No reader-visible audio for this turn. Continue with text playback.
+            </p>
           ) : (
             <audio aria-label="Turn audio" className="playback-audio" controls preload="none" src={audioUrl}>
               Audio playback is unavailable in this browser.

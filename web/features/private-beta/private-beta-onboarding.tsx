@@ -93,9 +93,9 @@ export function PrivateBetaOnboarding({ data }: PrivateBetaOnboardingProps) {
             <h2 className="section-title" id="redeem-private-beta-title">
               Redeem invite
             </h2>
-            <p className="admin-section-copy">
-              Paste the invite token from the operator. The token is submitted once and is not shown in the access list.
-            </p>
+          <p className="admin-section-copy">
+            Paste the operator-provided token once. Redeemed access appears below, but the token is never shown again.
+          </p>
           </div>
         </div>
         <form className="private-beta-form" onSubmit={handleRedeem}>
@@ -107,10 +107,12 @@ export function PrivateBetaOnboarding({ data }: PrivateBetaOnboardingProps) {
             id="private-beta-token"
             name="token"
             autoComplete="off"
+            placeholder="Paste invite token"
             spellCheck={false}
+            disabled={isBusy}
           />
           <button className="primary-button" type="submit" disabled={isBusy}>
-            Redeem invite
+            {isBusy ? "Working..." : "Redeem invite"}
           </button>
         </form>
       </section>
@@ -125,19 +127,29 @@ export function PrivateBetaOnboarding({ data }: PrivateBetaOnboardingProps) {
           <div className="resource-list">
             {access.map((item) => (
               <article className="resource-row private-beta-access-row" key={item.invite_id}>
-                <div>
+                <div className="private-beta-access-summary">
                   <h3>{item.world_name}</h3>
-                  <p>
-                    {item.beta_role} · {item.status}
-                    {item.worldline_name === null ? "" : ` · ${item.worldline_name}`}
-                  </p>
+                  <div className="status-pill-list" aria-label={`${item.world_name} access state`}>
+                    <span className="status-pill" data-tone={toneForAccessStatus(item.status)}>
+                      {labelFor(item.beta_role)}
+                    </span>
+                    <span className="status-pill" data-tone={toneForAccessStatus(item.status)}>
+                      {labelFor(item.status)}
+                    </span>
+                    {item.worldline_name === null ? null : (
+                      <span className="status-pill">{item.worldline_name}</span>
+                    )}
+                  </div>
                   <p>Expires {dateLabel(item.expires_at)}</p>
                 </div>
                 {item.player_profile === null ? (
                   <form className="private-beta-inline-form" onSubmit={(event) => void handleProfile(event, item)}>
-                    <input className="text-input" name="display_name" placeholder="Player display name" />
+                    <label className="field-label">
+                      Player display name
+                      <input className="text-input" name="display_name" disabled={isBusy} required />
+                    </label>
                     <button className="primary-button" type="submit" disabled={isBusy}>
-                      Create identity
+                      {isBusy ? "Working..." : "Create identity"}
                     </button>
                   </form>
                 ) : (
@@ -175,4 +187,18 @@ function dateLabel(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function labelFor(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function toneForAccessStatus(status: PrivateBetaAccess["status"]): "success" | "warning" | "error" {
+  if (status === "redeemed" || status === "accepted") {
+    return "success";
+  }
+  if (status === "revoked" || status === "expired") {
+    return "error";
+  }
+  return "warning";
 }

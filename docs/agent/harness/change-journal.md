@@ -1,5 +1,27 @@
 # Change Journal
 
+## v1.1 Phase 7 User-facing Polish planning entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-7-user-facing-polish
+- Scope: v1.1 Normal Use / Release Candidate Phase 7 docs-only checkpoint before Web polish.
+- Summary: Confirmed Phase 7 is limited to existing Web surfaces for private beta onboarding, feedback, player resume, playback/scene fallbacks, provider status clarity, and shared responsive/accessibility polish. `impeccable` was loaded before Web edits; `PRODUCT.md` is present, `DESIGN.md` is absent, and the phase follows the product/polish references plus existing Noveland UI conventions.
+- Files changed: `docs/agent/harness/feature-updates/v1.1.7-user-facing-polish-plan.md`, OpenSpec tasks `8.1` and `8.2`, and harness docs.
+- Tests added/updated: N/A, planning checkpoint.
+- Docs updated: Phase 7 checkpoint, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Implement narrow Web polish only. Do not add backend behavior, migrations, API routes, new product flows, broad redesigns, or unsafe tester/player evidence.
+
+## v1.1 Phase 7 User-facing Polish implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-7-user-facing-polish
+- Scope: v1.1 Normal Use / Release Candidate Phase 7 Web polish only.
+- Summary: Polished existing private beta onboarding, beta feedback, player resume, playback/scene fallback, and provider status surfaces. The implementation adds safe helper/status copy, busy labels, responsive form/action behavior, visible focus states, and provider degraded/configuration guidance without backend contract changes, new routes, redesign scope, or unsafe evidence exposure.
+- Files changed: `web/app/globals.css`, `web/features/private-beta/{private-beta-onboarding,beta-feedback-panel}.tsx`, `web/features/worlds/{conversation-playback,conversation-scene-view,player-interactions}.tsx`, `web/features/admin/provider-admin.tsx`, focused Web tests, OpenSpec tasks through `8.4`, and harness docs.
+- Tests added/updated: Updated focused Web unit coverage for safe onboarding status, feedback safe-evidence guidance, playback/scene media fallbacks, player resume empty/recovery states, and provider health action copy. Targeted check passed: `cd web && npm run test -- private-beta-onboarding.test.tsx beta-feedback-panel.test.tsx conversation-playback.test.tsx conversation-scene-view.test.tsx player-interactions.test.tsx provider-admin.test.tsx` (`16 passed`).
+- Docs updated: Phase 7 checkpoint, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Full Phase 7 Web/OpenSpec gate passed: Web lint, Web typecheck, Web unit tests (`134 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 7 and fast-forward merge to local `main`. Backend behavior was not changed.
+
 ## v1.1 Phase 5 Import/Export Stability implementation entry
 
 - Date: 2026-05-21

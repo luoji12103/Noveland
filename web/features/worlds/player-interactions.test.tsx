@@ -38,7 +38,8 @@ describe("PlayerInteractions", () => {
     expect(screen.getByText("Festival prep")).toBeVisible();
     expect(screen.getByText("Club room notice")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Resume" })).toBeVisible();
-    expect(screen.getByText("Ready to resume.")).toBeVisible();
+    expect(screen.getAllByText("Ready to resume.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("active").length).toBeGreaterThan(0);
     expect(screen.getByText("0 relationship update(s)")).toBeVisible();
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
@@ -142,6 +143,15 @@ describe("PlayerInteractions", () => {
         }),
       );
     });
+    expect(serializedDocument()).not.toMatch(/storage_uri|raw_prompt|raw_output|prompt_snapshot|secret/i);
+  });
+
+  it("explains missing resume state without exposing diagnostics", () => {
+    render(<PlayerInteractions worldId="world-1" data={{ ...playerData, resume: null }} />);
+
+    expect(
+      screen.getByText("No resume state stored yet. Save a server-owned recovery point before external testing."),
+    ).toBeVisible();
     expect(serializedDocument()).not.toMatch(/storage_uri|raw_prompt|raw_output|prompt_snapshot|secret/i);
   });
 });

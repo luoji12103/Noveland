@@ -235,6 +235,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.5-import-export-stability-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.6-provider-reliability-layer-plan.md`
+- `docs/agent/harness/feature-updates/v1.1.7-user-facing-polish-plan.md`
 - `backend/migrations/versions/20260517_0046_private_beta_invites.py`
 - `backend/tests/test_api_private_beta.py`
 - `backend/migrations/versions/20260517_0047_player_sessions.py`
