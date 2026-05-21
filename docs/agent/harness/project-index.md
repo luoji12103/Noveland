@@ -98,6 +98,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md` — v1.0 Phase 8 checkpoint for a backend/API-only private beta gate under existing observability/readiness, with no new gate tables, Web UI, provider execution, public launch signoff, or broad `worlds.py` routes.
 - v1.0 Phase 8 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta`. The report reuses private beta setup readiness, checks feedback/QA/repair/manual tester-session evidence, keeps `public_launch_ready=false`, and adds no migration, Web UI, duplicate readiness framework, provider execution, public launch semantics, or broad `worlds.py` routes.
 - `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md` — feasibility review for v1.1 Normal Use / Release Candidate after v1.0 archive; concludes v1.1 can start after minor OpenSpec adjustments, keeps the phase order, and front-loads checkpoint decisions for restore target, stress baseline, moderation/feedback/privacy integration, import/export asset policy, manual-first provider reliability, `impeccable` UI polish, and RC gate evidence ownership.
+- `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md` — v1.1 Phase 1 checkpoint for docs-only normal-use operational runbooks, safe evidence collection, redaction rules, and consistency-test coverage.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -120,6 +121,7 @@ Fast orientation for a new coding session.
 - `docs/agent/operations/scale-readiness.md` — derived scale-readiness report interpretation.
 - `docs/agent/operations/living-world-release-profile.md` — living-world release profile and beta checklist operator workflow.
 - `docs/agent/operations/provider-lab.md` — opt-in provider lab worktree workflow and real-provider test evidence rules.
+- `docs/agent/operations/runbooks/` — v1.1 normal-use incident runbooks for provider outage, quota exhaustion, stuck media jobs, migration failure, backup/restore, rollback, worldline restore, secret rotation, private beta incidents, import/export recovery, and provider fallback/degraded mode.
 - `docs/agent/harness/v2-readiness-review.md` — evidence-based closeout review for the current 50-phase roadmap.
 - `docs/agent/architecture/current-system-contracts.md` — frozen Phase 3-12 architecture boundary contracts for provider, invocation, media, visual, speech, presentation, asset generation, and eval layers.
 - `docs/agent/architecture/permission-matrix.md` — v0.7 baseline permission matrix for platform-admin, world-admin, world-member, reader, and player route expectations.

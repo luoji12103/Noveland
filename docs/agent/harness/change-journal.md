@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.1 Phase 1 Operational Runbooks implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-1-operational-runbooks
+- Scope: v1.1 Normal Use / Release Candidate Phase 1 docs-only operational runbooks; no backend runtime behavior, Web UI, migrations, API routes, provider calls, or push.
+- Summary: Added the Phase 1 planning checkpoint and normal-use operator runbooks for provider outage, quota exhaustion, stuck media jobs, migration failure, backup/restore, rollback, worldline restore, secret rotation, private beta invite/session/feedback incidents, import/export recovery, and provider fallback/degraded mode. Each runbook references existing controls where possible and keeps evidence collection redacted.
+- Files changed: `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`, `docs/agent/operations/runbooks/**`, `backend/tests/test_operational_runbooks_docs.py`, OpenSpec tasks through `2.3`, and harness docs.
+- Tests added/updated: Added a docs consistency test to verify required runbook files, operator sections, redaction language, existing control references, and recovery boundaries. Targeted docs test passed (`4 passed`). Applicable backend/OpenSpec gate passed: backend ruff, backend mypy (`322 source files`), backend pytest (`533 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 1 checkpoint, operational runbooks, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 1 and fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 2. No Web UI was touched, so `impeccable` was not required for Phase 1.
+
 ## v1.1 Normal Use / Release Candidate feasibility review entry
 
 - Date: 2026-05-21

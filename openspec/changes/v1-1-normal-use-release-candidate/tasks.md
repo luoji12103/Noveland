@@ -13,10 +13,10 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 2. Phase 1 — Operational Runbooks
 
-- [ ] 2.1 Write docs-only phase planning checkpoint.
-- [ ] 2.2 Add provider outage, quota exhaustion, media/job recovery, migration failure, backup/restore, rollback, worldline restore, secret rotation, invite/session/feedback incident, and import/export recovery runbooks.
-- [ ] 2.3 Add lightweight docs consistency tests if useful.
-- [ ] 2.4 Run targeted docs checks, OpenSpec validation, full applicable gate, and `git diff --check`.
+- [x] 2.1 Write docs-only phase planning checkpoint.
+- [x] 2.2 Add provider outage, quota exhaustion, media/job recovery, migration failure, backup/restore, rollback, worldline restore, secret rotation, invite/session/feedback incident, and import/export recovery runbooks.
+- [x] 2.3 Add lightweight docs consistency tests if useful.
+- [x] 2.4 Run targeted docs checks, OpenSpec validation, full applicable gate, and `git diff --check`.
 - [ ] 2.5 Fast-forward merge to local main and update harness docs.
 
 ## 3. Phase 2 — Real Backup/Restore Drill

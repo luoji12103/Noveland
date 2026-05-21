@@ -1,9 +1,9 @@
 # Active Session Handoff
 
 - Date: 2026-05-21T00:00:00Z
-- Branch: main
-- Objective: report v1.1 Normal Use / Release Candidate feasibility review status.
-- Status: v1.1 feasibility review and OpenSpec adaptation are complete locally. Recommendation is B: v1.1 can start after minor OpenSpec adjustments, with phase order preserved. No backend/Web implementation, migrations, API route changes, runtime behavior changes, or push performed.
+- Branch: feature/v1.1-1-operational-runbooks
+- Objective: complete v1.1 Phase 1 Operational Runbooks and merge back to local main.
+- Status: v1.1 Phase 1 is in progress on a short-lived feature branch. The docs-only checkpoint, runbook set, consistency test, and applicable backend/OpenSpec gate are complete. Commit and fast-forward merge are next. No push performed.
 
 ## Current Context
 
@@ -21,6 +21,7 @@
 - Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
 - v1.1 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`. Recommendation: **B. v1.1 can start after minor OpenSpec adjustments.** The current phase order remains Operational Runbooks, Real Backup/Restore Drill, Multi-world / Multi-user Stress Test, Content Safety & Moderation Hardening, Import/Export Stability, Provider Reliability Layer, User-facing Polish, and Release Candidate Gate.
 - v1.1 review decisions: Phase 2 restore target is a fresh local/single-host profile with empty database and object storage root; Phase 3 first stress baseline is 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and deterministic 120-turn or equivalent coverage; Phase 6 provider reliability is manual-first with opt-in constrained automatic fallback only after checkpoint approval; Phase 7 Web work must use `impeccable`.
+- v1.1 Phase 1 Operational Runbooks checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`. The phase is docs-only and adds normal-use runbooks under `docs/agent/operations/runbooks/` plus `backend/tests/test_operational_runbooks_docs.py`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
 - v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.
