@@ -22,6 +22,17 @@
 - Docs updated: Phase 1 checkpoint, operational runbooks, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit Phase 1 and fast-forward merge to local `main`, then record merge bookkeeping before starting Phase 2. No Web UI was touched, so `impeccable` was not required for Phase 1.
 
+## v1.1 Phase 1 Operational Runbooks merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 1 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-1-operational-runbooks` into local `main`, marked Phase 1 complete in OpenSpec tasks, and moved harness handoff state to Phase 2 Real Backup/Restore Drill.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 1 docs/backend/OpenSpec gate.
+- Docs updated: OpenSpec task `2.5`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 2 on `feature/v1.1-2-backup-restore-drill` from clean local `main` with a docs-only fresh local restore drill checkpoint before implementation. No push performed.
+
 ## v1.1 Normal Use / Release Candidate feasibility review entry
 
 - Date: 2026-05-21

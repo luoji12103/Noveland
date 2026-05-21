@@ -17,7 +17,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 2.2 Add provider outage, quota exhaustion, media/job recovery, migration failure, backup/restore, rollback, worldline restore, secret rotation, invite/session/feedback incident, and import/export recovery runbooks.
 - [x] 2.3 Add lightweight docs consistency tests if useful.
 - [x] 2.4 Run targeted docs checks, OpenSpec validation, full applicable gate, and `git diff --check`.
-- [ ] 2.5 Fast-forward merge to local main and update harness docs.
+- [x] 2.5 Fast-forward merge to local main and update harness docs.
 
 ## 3. Phase 2 — Real Backup/Restore Drill
 
