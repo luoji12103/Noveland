@@ -93,6 +93,6 @@ local gate, fast-forward merge, and harness updates are done.
 
 ## 10. Closeout
 
-- [ ] 10.1 Archive the completed OpenSpec change only after all phases are accepted.
-- [ ] 10.2 Generate v1.0 release notes.
-- [ ] 10.3 Confirm main is clean and report ahead/behind origin.
+- [x] 10.1 Archive the completed OpenSpec change only after all phases are accepted.
+- [x] 10.2 Generate v1.0 release notes.
+- [x] 10.3 Confirm main is clean and report ahead/behind origin.

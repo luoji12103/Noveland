@@ -1,7 +1,6 @@
 # Task Board
 
 ## Open
-- v1.0 OpenSpec archive and release notes, after acceptance
 - v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
 
 ## In Progress
@@ -11,6 +10,7 @@
 - None
 
 ## Done
+- v1.0 Private Beta MVP OpenSpec archive and release notes
 - v1.0 Phase 8 Private Beta Gate fast-forward merge
 - v1.0 Phase 8 Private Beta Gate full backend/OpenSpec gate
 - v1.0 Phase 8 Private Beta Gate targeted tests
@@ -411,8 +411,8 @@
 - v0.7 Phase 6 Observability & Incident Diagnostics is complete.
 - v0.7 Phase 7 Security Regression Suite is complete.
 - v0.7 Phase 8 Production Readiness Gate is complete.
-- OpenSpec active changes now contain v1.0 and v1.1 milestone roadmap baselines. Do not start implementation from these changes until the relevant version feasibility review is written and accepted.
-- Start v1.0 Private Beta MVP feasibility review only when explicitly requested.
+- OpenSpec active changes now contain the v1.1 milestone roadmap baseline. Do not start implementation until the v1.1 feasibility review is explicitly requested, written, and accepted.
+- v1.0 Private Beta MVP is archived and closed locally.
 - V2 phases 1-50, the four recorded remediation bundles, acceptance contract
   hardening, and the follow-up release/beta/Web/Mem0 evidence hardening work are
   implemented locally.

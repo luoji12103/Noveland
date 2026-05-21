@@ -2,8 +2,8 @@
 
 - Date: 2026-05-20T00:00:00Z
 - Branch: main
-- Objective: report v1.0 Private Beta MVP implementation status after Phase 8 merge.
-- Status: v1.0 Phase 1 through Phase 8 are complete and fast-forward merged to local `main`. Phase 8 Private Beta Gate implementation, targeted tests, full backend/OpenSpec gate, OpenSpec validation, and merge bookkeeping are complete. Do not archive v1.0 unless explicitly instructed.
+- Objective: report v1.0 Private Beta MVP closeout status.
+- Status: v1.0 Phase 1 through Phase 8 are complete, current specs are synced, release notes are written, and the OpenSpec change is archived locally. No push performed.
 
 ## Current Context
 
@@ -17,7 +17,7 @@
 - The completed v0.7 change is archived under `openspec/changes/archive/2026-05-16-v0-7-production-hardening/`.
 - The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
 - The completed v0.9 change is archived under `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/`.
-- Active v1.0 roadmap change: `openspec/changes/v1-0-private-beta-mvp/`.
+- Archived v1.0 roadmap change: `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/`.
 - Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
@@ -54,6 +54,7 @@
 - v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
 - v0.8 release notes live at `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`.
 - v0.9 release notes live at `docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md`.
+- v1.0 release notes live at `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md`.
 - v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
 - v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
 - v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
@@ -133,7 +134,7 @@
 ## Required Next Steps
 
 - Keep `main` clean and do not push unless explicitly requested.
-- OpenSpec active changes now contain the v1.0 and v1.1 milestone roadmaps.
+- OpenSpec active changes now contain the v1.1 milestone roadmap.
 - v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
 - v1.0 Phase 2 Player Session Stability is complete and fast-forward merged to local `main`.
 - v1.0 Phase 3 Cost & Quota Real Enforcement is complete and fast-forward merged to local `main`.
@@ -153,8 +154,8 @@
 - v1.0 Phase 6 targeted checks passed: focused ruff, focused mypy, `cd backend && uv run pytest tests/test_api_beta_feedback.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`35 passed`), `cd web && npm run test -- beta-feedback-panel.test.tsx` (`2 passed`), and `cd web && npm run typecheck`.
 - v1.0 Phase 6 full gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v1.0 Phase 6 commit `0cb4a7f` fast-forward merged to local `main`; no push performed.
-- Report final v1.0 implementation status from clean local `main`. Do not archive v1.0, start v1.1, or push unless explicitly requested.
-- Do not implement v1.1 before v1.0 is complete, archived, and represented in current specs.
+- v1.0 is complete, archived, and represented in current specs.
+- Do not implement v1.1 until explicitly requested.
 - Use the `impeccable` skill before frontend implementation work.
 - Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
 - Continue using `impeccable` context for Web UI decisions.

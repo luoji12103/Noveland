@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.0 Private Beta MVP archive entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: OpenSpec archive, v1.0 current specs, release notes, and harness bookkeeping.
+- Summary: Archived the completed v1.0 Private Beta MVP OpenSpec change, synced implemented v1.0 capabilities into current OpenSpec specs, and added v1.0 release notes.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/**`, `/docs/agent/harness/release-notes/v1.0-private-beta-mvp.md`, and harness docs.
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec current specs, OpenSpec archive, v1.0 release notes, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: v1.0 is closed locally. v1.1 Normal Use / Release Candidate feasibility review may start when explicitly requested. No backend/Web runtime behavior changed and no push was performed.
+
 ## v1.0 Phase 6 Beta Feedback System merge entry
 
 - Date: 2026-05-20
