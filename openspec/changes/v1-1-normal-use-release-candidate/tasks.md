@@ -35,7 +35,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 4.3 Add opt-in real-provider stress profile only if safe.
 - [x] 4.4 Add isolation, quota, long-session, and safe-report tests.
 - [x] 4.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 4.6 Fast-forward merge to local main and update harness docs.
+- [x] 4.6 Fast-forward merge to local main and update harness docs.
 
 ## 5. Phase 4 — Content Safety & Moderation Hardening
 

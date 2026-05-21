@@ -22,6 +22,17 @@
 - Docs updated: Phase 3 checkpoint, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit Phase 3, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 4. No Web UI was touched, so `impeccable` was not required for Phase 3.
 
+## v1.1 Phase 3 Multi-world / Multi-user Stress Test merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 3 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-3-multi-world-multi-user-stress` into local `main`, marked Phase 3 complete in OpenSpec tasks, and moved harness handoff state to Phase 4 Content Safety & Moderation Hardening.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 3 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `4.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 4 on `feature/v1.1-4-content-safety-moderation-hardening` from clean local `main` with a docs-only moderation/feedback/privacy checkpoint before implementation. No push performed.
+
 ## v1.1 Phase 1 Operational Runbooks implementation entry
 
 - Date: 2026-05-21
