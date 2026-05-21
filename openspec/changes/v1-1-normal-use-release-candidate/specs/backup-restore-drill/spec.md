@@ -3,11 +3,11 @@
 ## ADDED Requirements
 
 ### Requirement: Backup restore drill verifies database and media state
-The system SHALL support a real backup/restore drill that verifies database records, media payloads, media checksums, worldlines, conversations, presentations, and memory state.
+The system SHALL support a real backup/restore drill against a fresh local/single-host target that verifies database records, media payloads, media checksums, worldlines, conversations, presentations, memory state, and OpenSpec/docs provenance.
 
 #### Scenario: Restore completes
 - **Given** a backup archive and media payload archive exist
-- **When** they are restored to the accepted target environment
+- **When** they are restored to a fresh target with empty database and object storage root
 - **Then** worldline, conversation, presentation, memory, media object, and checksum verification SHALL pass.
 
 ### Requirement: Provider config restore excludes secrets
@@ -31,5 +31,6 @@ The system SHALL produce safe restore reports for admin review.
 ## Non-goals
 
 - Cloud-specific backup product.
+- Staging restore unless a later checkpoint approves it.
 - Restoring resolved secrets.
 - Public restore report.

@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.1 Normal Use / Release Candidate feasibility review entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate feasibility review and OpenSpec plan adaptation only; no backend/Web implementation, migrations, runtime behavior changes, API behavior changes, or push.
+- Summary: Reviewed the active v1.1 OpenSpec and current v1.0-complete repository against normal-use/release-candidate readiness. The review concludes v1.1 can start after minor OpenSpec adjustments. The existing phase order remains valid, with explicit checkpoints for fresh local restore target, deterministic stress baseline, moderation/feedback/privacy integration, import/export asset policy, manual-first provider reliability, `impeccable`-shaped UI polish, and RC gate evidence ownership.
+- Files changed: `/docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`, `/openspec/changes/v1-1-normal-use-release-candidate/{proposal.md,design.md,phase-plan.md,tasks.md,specs/**/spec.md}`, and harness docs.
+- Tests added/updated: N/A, documentation-only feasibility review.
+- Docs updated: v1.1 feasibility review, OpenSpec proposal/design/phase-plan/tasks/spec deltas, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Phase 1 Operational Runbooks may start after review acceptance. Do not implement v1.1 backend/Web work until the relevant phase checkpoint is written and accepted. Use `impeccable` before any Web implementation. No push performed.
+
 ## v1.0 Private Beta MVP archive entry
 
 - Date: 2026-05-21

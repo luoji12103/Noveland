@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Runbooks cover normal-use incidents
-The system SHALL provide operator runbooks for provider failure, stuck media/jobs, worldline rollback review, backup/restore, and secret rotation.
+The system SHALL provide operator runbooks for provider outage, quota exhaustion, stuck media/jobs, migration failure, backup/restore, rollback, worldline restore, secret rotation, invite/session/feedback incidents, and import/export recovery.
 
 #### Scenario: Provider outage runbook
 - **Given** a provider is degraded or unavailable
@@ -19,6 +19,12 @@ The system SHALL reference existing routes, commands, diagnostics, and reports w
 - **When** an operator follows the media/job recovery runbook
 - **Then** the runbook SHALL point to existing media job inspection, cancel, reprioritize, or retry controls as applicable.
 
+#### Scenario: Import/export recovery is needed
+- **Given** a world package import or export fails validation
+- **When** an operator follows the import/export recovery runbook
+- **Then** the runbook SHALL point to existing package preview/apply, media manifest, provider config, and source traceability checks
+- **And** it SHALL NOT instruct operators to bypass preview/review/apply.
+
 ### Requirement: Runbooks are validation-friendly
 The system SHALL keep runbooks structured enough for lightweight documentation consistency checks.
 
@@ -32,3 +38,4 @@ The system SHALL keep runbooks structured enough for lightweight documentation c
 - External SRE platform.
 - Secret disclosure examples.
 - Runtime behavior changes by documentation alone.
+- Unsafe direct database mutation as the default recovery path.

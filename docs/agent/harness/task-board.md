@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.1 Normal Use / Release Candidate feasibility review, after v1.0 completion/archive
+- v1.1 Phase 1 Operational Runbooks planning checkpoint, after feasibility review acceptance
 
 ## In Progress
 - None
@@ -10,6 +10,7 @@
 - None
 
 ## Done
+- v1.1 Normal Use / Release Candidate feasibility review and OpenSpec adaptation
 - v1.0 Private Beta MVP OpenSpec archive and release notes
 - v1.0 Phase 8 Private Beta Gate fast-forward merge
 - v1.0 Phase 8 Private Beta Gate full backend/OpenSpec gate

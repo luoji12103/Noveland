@@ -12,7 +12,7 @@ The system SHALL track provider health trends and expose degraded-mode status fo
 - **And** admins SHALL receive safe evidence refs without secrets or raw prompts.
 
 ### Requirement: Retry and requeue are explicit and audited
-The system SHALL provide manual retry and requeue controls for eligible provider or media jobs.
+The system SHALL provide manual-first retry and requeue controls for eligible provider or media jobs.
 
 #### Scenario: Admin retries failed job
 - **Given** a failed provider-backed media job is eligible for retry
@@ -21,7 +21,7 @@ The system SHALL provide manual retry and requeue controls for eligible provider
 - **And** duplicate hidden spend SHALL NOT occur.
 
 ### Requirement: Fallback and model switch are controlled
-The system SHALL allow fallback or model switching only through configured policies with capability, quota, and audit checks.
+The system SHALL allow fallback or model switching only through configured opt-in policies with capability, quota, and audit checks. Automatic fallback SHALL remain disabled unless a checkpoint explicitly approves the policy and evidence model.
 
 #### Scenario: Fallback selected
 - **Given** a primary provider is degraded and a compatible fallback is configured
@@ -34,3 +34,4 @@ The system SHALL allow fallback or model switching only through configured polic
 - Provider marketplace.
 - Hidden fallback.
 - Provider execution outside provider kernel.
+- Silent retry that creates duplicate hidden spend.

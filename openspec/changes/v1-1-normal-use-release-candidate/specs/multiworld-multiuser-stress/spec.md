@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Stress tests cover multiple worlds and players
-The system SHALL provide controlled stress fixtures or evals for multiple worlds, multiple players, multiple provider profiles, and long sessions.
+The system SHALL provide controlled stress fixtures or evals for multiple worlds, multiple players, multiple provider profiles, and long sessions. The first normal-use baseline SHALL cover at least 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and a deterministic 120-turn or equivalent long-session run.
 
 #### Scenario: Multi-world stress run
 - **Given** a stress fixture creates multiple worlds and players
@@ -33,3 +33,4 @@ The system SHALL produce stress reports with aggregate metrics and safe evidence
 - Unbounded load testing.
 - Default real-provider spend.
 - External load testing service.
+- Proprietary or user-provided galgame asset fixtures.

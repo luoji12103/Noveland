@@ -6,6 +6,7 @@ v1.0 private beta should prove limited tester usage. v1.1 asks a different quest
 
 ```text
 private beta evidence
+  -> feasibility review and checkpoint decisions
   -> runbooks
   -> backup/restore drill
   -> stress evidence
@@ -45,21 +46,29 @@ private beta evidence
 
 Runbooks are necessary but not sufficient. Backup/restore, stress, provider failover, and readiness gates must produce testable evidence.
 
+### Phase order remains sequential
+
+The feasibility review keeps the original v1.1 order. Runbooks come first because they expose missing operational controls. Backup/restore comes before stress and release-candidate readiness because normal use cannot be recoverable without a restore drill. Stress precedes safety, packaging, reliability, and polish gate work because it exposes isolation and recovery gaps.
+
 ### Backup restore includes media and state
 
-A successful restore must verify media objects/checksums, worldlines, conversations, presentations, memory, and provider config without secrets. Restoring only the database is not enough.
+A successful restore must verify media objects/checksums, worldlines, conversations, presentations, memory, provider config without secrets, and OpenSpec/docs provenance. Restoring only the database is not enough. The first accepted target is a fresh local/single-host profile with an empty target database and empty object storage root; staging restore is deferred unless a later checkpoint approves it.
 
 ### Provider reliability cannot corrupt worlds
 
-Fallback, degraded mode, model switch, manual retry, and requeue must be explicit and auditable. They must not cause duplicate provider spend, cross-worldline writes, or hidden model changes that alter world state without evidence.
+Fallback, degraded mode, model switch, manual retry, and requeue must be explicit and auditable. They must not cause duplicate provider spend, cross-worldline writes, or hidden model changes that alter world state without evidence. v1.1 starts manual-first: constrained automatic fallback is opt-in only when policy, capability, quota, and audit checks are approved.
 
 ### Import/export stability extends packaging, not marketplace
 
-World packaging should become repeatable and safe for normal use, but v1.1 must not become a marketplace or public distribution channel.
+World packaging should become repeatable and safe for normal use, but v1.1 must not become a marketplace or public distribution channel. User-provided or proprietary galgame assets must not be committed to repository fixtures or included in public sample exports.
 
 ### Polish follows product context
 
 User-facing polish should remove friction, improve clarity, and support accessibility/responsiveness. It should not introduce decorative marketing surfaces or hide operational status.
+
+### RC gate extends readiness
+
+The release-candidate gate must extend existing observability/readiness aggregation. It must distinguish self-use MVP, private beta, normal use, release candidate, and public launch readiness, and it must not imply automatic public launch.
 
 ## Risks / Trade-offs
 
@@ -80,7 +89,5 @@ This roadmap does not add migrations. Expected migration pressure:
 
 ## Open Questions
 
-- What is the minimum acceptable backup/restore target environment for RC: fresh local stack, staging, or both?
-- How many concurrent worlds and players define the first normal-use stress baseline?
-- Should provider fallback be automatic within strict policies or manual/admin-triggered first?
+- Which implementation phase, if any, needs a persisted drill/stress/reliability record rather than response-only or file/report evidence?
 - Which user-facing polish issues are blocking RC versus deferred quality improvements?

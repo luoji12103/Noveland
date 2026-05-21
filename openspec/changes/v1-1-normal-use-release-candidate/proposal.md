@@ -6,13 +6,14 @@ After v1.0 private beta proves that a few invited testers can use Noveland with 
 
 ## What Changes
 
+- Complete a feasibility review before implementation and keep the existing v1.1 phase order.
 - Plan a v1.1 roadmap focused on long-running normal use and release-candidate readiness.
-- Add operational runbooks for provider failures, stuck media/jobs, worldline rollback, backup/restore, and secret rotation.
-- Require a real backup/restore drill that verifies database, media, checksums, worldlines, conversations, and memory in a new environment.
-- Add multi-world/multi-user stress testing and long-session evidence.
-- Harden content safety, moderation, public/private visibility, and player-visible output boundaries.
+- Add operational runbooks for provider outage, quota exhaustion, stuck media/jobs, migration failure, backup/restore, rollback, worldline restore, secret rotation, invite/session/feedback incidents, and import/export recovery.
+- Require a real backup/restore drill against a fresh local/single-host target that verifies database, media, checksums, worldlines, conversations, presentations, memory, provider config without secrets, and OpenSpec/docs provenance.
+- Add multi-world/multi-user stress testing and long-session evidence with fake/mocked providers by default.
+- Harden content safety, moderation, beta feedback escalation, player privacy, public/private visibility, and player-visible output boundaries.
 - Stabilize import/export for world packages, media manifests, persona/memory manifests, provider config without secrets, and repeatable sample package import.
-- Add provider reliability controls for fallback, degraded mode, health trends, model switching, retry, and requeue.
+- Add provider reliability controls for manual-first retry/requeue, degraded mode, health trends, and opt-in policy-driven fallback/model switching.
 - Add user-facing polish for key UI flows, loading/error states, mobile basics, audio/scene playback, and onboarding copy.
 - Add a release-candidate gate that aggregates operational, recovery, safety, stress, packaging, provider, UX, and readiness evidence.
 
@@ -38,3 +39,9 @@ After v1.0 private beta proves that a few invited testers can use Noveland with 
 - Future backend work will likely touch operations docs, backup/restore tooling, storage/media integrity, stress/eval diagnostics, moderation, world packaging, provider execution, provider health, quota controls, readiness gates, and observability.
 - Future Web work will likely touch operational dashboards, player-facing polish, onboarding, playback/scene UX, and admin readiness reports; implementation must use `impeccable` first.
 - Future implementation must not bypass v0.7/v0.8/v1.0 readiness, expose secrets/storage paths, or introduce automatic public launch.
+
+## Feasibility Review Result
+
+Recommendation: **B. v1.1 can start after minor OpenSpec adjustments.**
+
+The phase order remains valid. Phase 1 may start after review acceptance. Phases 2-8 must begin with docs-only checkpoints that confirm restore target, stress baseline, moderation ownership, import/export manifest policy, provider reliability policy, Web polish scope, and release-candidate gate evidence ownership.
