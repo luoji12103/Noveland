@@ -5,12 +5,16 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from noveland.beta_feedback.models import BetaFeedbackReport
+from noveland.conversations.models import ConversationSession, ConversationTurn
+from noveland.media.models import MediaAsset
 from noveland.moderation.contracts import (
     ModerationActionCreate,
     ModerationActionKind,
     ModerationActionRead,
     ModerationActionStatus,
     ModerationCategory,
+    ModerationFeedbackEscalationCreate,
     ModerationIncidentCreate,
     ModerationIncidentRead,
     ModerationIncidentReview,
@@ -19,6 +23,7 @@ from noveland.moderation.contracts import (
     ModerationReportRead,
     ModerationReportReview,
     ModerationReportStatus,
+    ModerationSafetyReviewCreate,
     ModerationSeverity,
     ModerationTargetKind,
 )
@@ -71,8 +76,6 @@ _APPLIED_SUPPRESSION_ACTIONS = {
     ModerationActionKind.DISABLE_WORLD.value,
     ModerationActionKind.TAKEDOWN_CONTENT.value,
 }
-
-
 class ModerationError(ValueError):
     pass
 
@@ -166,6 +169,113 @@ class ModerationService:
         report.reviewed_at = datetime.now(UTC)
         self._session.flush()
         return _report_read(report)
+
+    def create_safety_review_report(
+        self,
+        world_id: uuid.UUID,
+        reporter_user_id: uuid.UUID,
+        request: ModerationSafetyReviewCreate,
+        *,
+        actor_ref: str,
+    ) -> ModerationReportRead:
+        _validate_safe_text(request.policy_key, "policy_key")
+        _validate_safe_text(request.finding, "finding")
+        self._validate_target(
+            world_id,
+            request.target_ref_kind,
+            request.target_ref_id,
+            request.worldline_id,
+            actor_is_platform_admin=False,
+            action_kind=None,
+        )
+        evidence_refs = list(_safe_evidence_refs(request.evidence_refs))
+        evidence_refs.insert(
+            0,
+            IncidentEvidenceRef(
+                kind=request.target_ref_kind.value,
+                id=str(request.target_ref_id),
+                component="moderation_safety_review",
+                status="flagged",
+                reason_code=request.policy_key,
+                world_id=world_id,
+                worldline_id=request.worldline_id,
+            ).model_dump(mode="json", exclude_none=True),
+        )
+        model = ModerationReport(
+            world_id=world_id,
+            worldline_id=request.worldline_id,
+            reporter_user_id=reporter_user_id,
+            target_ref_kind=request.target_ref_kind.value,
+            target_ref_id=request.target_ref_id,
+            category=request.category.value,
+            severity=request.severity.value,
+            status=ModerationReportStatus.UNDER_REVIEW.value,
+            reason=request.finding,
+            reporter_note=None,
+            evidence_refs_json=evidence_refs,
+            created_by_actor_ref=actor_ref,
+            metadata_json={
+                "source": "safety_review",
+                "policy_key": _safe_text(request.policy_key),
+                **_sanitize_json(request.metadata),
+            },
+        )
+        self._session.add(model)
+        self._session.flush()
+        return _report_read(model)
+
+    def escalate_beta_feedback(
+        self,
+        world_id: uuid.UUID,
+        request: ModerationFeedbackEscalationCreate,
+        *,
+        actor_ref: str,
+    ) -> ModerationReportRead:
+        _validate_safe_text(request.reason, "reason")
+        feedback = self._session.get(BetaFeedbackReport, request.feedback_report_id)
+        if feedback is None or feedback.world_id != world_id:
+            raise ModerationNotFoundError("beta feedback report not found")
+        severity = request.severity.value if request.severity is not None else feedback.severity
+        evidence_refs = list(_safe_evidence_refs(request.evidence_refs))
+        evidence_refs.append(
+            IncidentEvidenceRef(
+                kind="beta_feedback_report",
+                id=str(feedback.id),
+                component="beta_feedback",
+                status=feedback.status,
+                reason_code=f"beta_feedback_{feedback.issue_type}",
+                world_id=feedback.world_id,
+                worldline_id=feedback.worldline_id,
+            ).model_dump(mode="json", exclude_none=True),
+        )
+        model = ModerationReport(
+            world_id=world_id,
+            worldline_id=feedback.worldline_id,
+            reporter_user_id=feedback.reporter_user_id,
+            target_ref_kind=ModerationTargetKind.OTHER.value,
+            target_ref_id=None,
+            category=request.category.value,
+            severity=severity,
+            status=ModerationReportStatus.ESCALATED.value,
+            reason=request.reason,
+            reporter_note=None,
+            evidence_refs_json=evidence_refs,
+            created_by_actor_ref=actor_ref,
+            metadata_json={
+                "source": "beta_feedback_escalation",
+                "feedback_report_id": str(feedback.id),
+                "feedback_issue_type": feedback.issue_type,
+                **_sanitize_json(request.metadata),
+            },
+        )
+        self._session.add(model)
+        self._session.flush()
+        feedback.moderation_report_id = model.id
+        feedback.status = "investigating"
+        feedback.triaged_by_actor_ref = actor_ref
+        feedback.triaged_at = datetime.now(UTC)
+        self._session.flush()
+        return _report_read(model)
 
     def create_action(
         self,
@@ -402,6 +512,35 @@ class ModerationService:
                 raise ModerationValidationError(
                     "platform admin is required for global provider moderation actions"
                 )
+        if target_kind == ModerationTargetKind.CONVERSATION_SESSION:
+            conversation = self._session.get(ConversationSession, target_id)
+            if (
+                target_id is None
+                or conversation is None
+                or conversation.world_id != world_id
+                or conversation.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("conversation not found")
+        if target_kind == ModerationTargetKind.CONVERSATION_TURN:
+            turn = self._session.get(ConversationTurn, target_id)
+            if target_id is None or turn is None:
+                raise ModerationNotFoundError("conversation turn not found")
+            conversation = self._session.get(ConversationSession, turn.session_id)
+            if (
+                conversation is None
+                or conversation.world_id != world_id
+                or conversation.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("conversation turn not found")
+        if target_kind == ModerationTargetKind.MEDIA_ASSET:
+            asset = self._session.get(MediaAsset, target_id)
+            if (
+                target_id is None
+                or asset is None
+                or asset.world_id != world_id
+                or asset.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("media asset not found")
 
     def _validate_worldline(
         self,

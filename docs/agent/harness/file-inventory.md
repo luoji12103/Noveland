@@ -588,6 +588,7 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.7-beta-content-iteration-loop-plan.md`
 - `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`
+- `docs/agent/harness/feature-updates/v1.1.4-content-safety-moderation-hardening-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.2-backup-restore-drill-plan.md`
 - `docs/agent/harness/feature-updates/v1.1.3-multi-world-multi-user-stress-plan.md`

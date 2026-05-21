@@ -205,6 +205,27 @@ class ModerationIncidentRead(_FrozenContract):
         return _normalize_datetime(value)
 
 
+class ModerationSafetyReviewCreate(_FrozenContract):
+    worldline_id: uuid.UUID
+    target_ref_kind: ModerationTargetKind
+    target_ref_id: uuid.UUID
+    category: ModerationCategory = ModerationCategory.SAFETY
+    severity: ModerationSeverity = ModerationSeverity.MEDIUM
+    policy_key: str = Field(min_length=1, max_length=120)
+    finding: str = Field(min_length=1, max_length=500)
+    evidence_refs: tuple[IncidentEvidenceRef, ...] = ()
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModerationFeedbackEscalationCreate(_FrozenContract):
+    feedback_report_id: uuid.UUID
+    category: ModerationCategory = ModerationCategory.SAFETY
+    severity: ModerationSeverity | None = None
+    reason: str = Field(min_length=1, max_length=500)
+    evidence_refs: tuple[IncidentEvidenceRef, ...] = ()
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None

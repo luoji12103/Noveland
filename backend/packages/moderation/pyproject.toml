@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Moderation reports, actions, and incident workflow for Noveland."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "noveland-beta-feedback",
+  "noveland-conversations",
   "noveland-core",
+  "noveland-media",
   "noveland-observability",
   "noveland-providers",
   "noveland-worlds",
@@ -17,7 +20,10 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+noveland-beta-feedback = { workspace = true }
+noveland-conversations = { workspace = true }
 noveland-core = { workspace = true }
+noveland-media = { workspace = true }
 noveland-observability = { workspace = true }
 noveland-providers = { workspace = true }
 noveland-worlds = { workspace = true }

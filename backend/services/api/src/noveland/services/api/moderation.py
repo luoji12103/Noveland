@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from noveland.moderation import (
     ModerationActionCreate,
     ModerationActionRead,
+    ModerationFeedbackEscalationCreate,
     ModerationIncidentCreate,
     ModerationIncidentRead,
     ModerationIncidentReview,
@@ -14,6 +15,7 @@ from noveland.moderation import (
     ModerationReportCreate,
     ModerationReportRead,
     ModerationReportReview,
+    ModerationSafetyReviewCreate,
     ModerationService,
     ModerationValidationError,
 )
@@ -84,6 +86,55 @@ def review_moderation_report(
         return ModerationService(db_session).review_report(
             context.world_id,
             report_id,
+            request,
+            actor_ref=_actor_ref(context),
+        )
+    except ModerationNotFoundError as exc:
+        raise _not_found() from exc
+    except ModerationValidationError as exc:
+        raise _bad_request(str(exc)) from exc
+
+
+@router.post(
+    "/safety-reviews",
+    response_model=ModerationReportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_moderation_safety_review(
+    world_id: uuid.UUID,
+    request: ModerationSafetyReviewCreate,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ModerationReportRead:
+    _ = world_id
+    try:
+        return ModerationService(db_session).create_safety_review_report(
+            context.world_id,
+            context.subject.user_id,
+            request,
+            actor_ref=_actor_ref(context),
+        )
+    except ModerationNotFoundError as exc:
+        raise _not_found() from exc
+    except ModerationValidationError as exc:
+        raise _bad_request(str(exc)) from exc
+
+
+@router.post(
+    "/feedback-escalations",
+    response_model=ModerationReportRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def escalate_feedback_to_moderation(
+    world_id: uuid.UUID,
+    request: ModerationFeedbackEscalationCreate,
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+) -> ModerationReportRead:
+    _ = world_id
+    try:
+        return ModerationService(db_session).escalate_beta_feedback(
+            context.world_id,
             request,
             actor_ref=_actor_ref(context),
         )

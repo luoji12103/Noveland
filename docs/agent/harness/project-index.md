@@ -101,6 +101,8 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md` — v1.1 Phase 1 checkpoint for docs-only normal-use operational runbooks, safe evidence collection, redaction rules, and consistency-test coverage.
 - `docs/agent/harness/feature-updates/v1.1.2-backup-restore-drill-plan.md` — v1.1 Phase 2 checkpoint for a fresh local/single-host backup restore drill verifier under storage/observability with safe evidence and no migrations.
 - `docs/agent/harness/feature-updates/v1.1.3-multi-world-multi-user-stress-plan.md` — v1.1 Phase 3 checkpoint for deterministic fake-provider normal-use stress reporting under observability with 3-world, 6-worldline, 6-player-session, 120-turn-equivalent coverage.
+- `docs/agent/harness/feature-updates/v1.1.4-content-safety-moderation-hardening-plan.md` — v1.1 Phase 4 checkpoint for keeping moderation as the safety/action owner while linking beta feedback to moderation escalation with reporter privacy and safe evidence refs.
+- v1.1 Phase 4 implementation extends `backend/packages/moderation/` and the existing app-level moderation router with admin-only safety reviews and feedback escalation. It links `beta_feedback_reports.moderation_report_id`, preserves reporter-private tester feedback visibility, keeps moderation evidence admin-only, and adds no migration, Web UI, duplicate moderation framework, provider calls, broad `worlds.py` routes, or world-event writes.
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md` — release notes for the completed v0.4 Operator/Admin UX sequence.
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md` — release notes for the completed v0.5 Authoring & Import Studio sequence.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
@@ -397,9 +399,9 @@ Fast orientation for a new coding session.
   - `noveland.observability.models` — runtime diagnostic event ORM model
   - `noveland.observability.services` — runtime diagnostic record/list service, retention dry-run/prune helpers, incident summary aggregation, internal production readiness, public launch readiness, self-use MVP, and private beta setup readiness aggregation, plus detail redaction
 - `backend/packages/moderation/`
-  - `noveland.moderation.contracts` — report, action, incident, target, severity, status, and action-kind DTOs
+  - `noveland.moderation.contracts` — report, safety review, feedback escalation, action, incident, target, severity, status, and action-kind DTOs
   - `noveland.moderation.models` — persisted moderation report/action/incident workflow ORM models
-  - `noveland.moderation.service` — report/review/action/incident workflow service with safe evidence refs, audit summaries, and reader-delivery suppression checks
+  - `noveland.moderation.service` — report/review/safety-review/feedback-escalation/action/incident workflow service with safe evidence refs, audit summaries, and reader-delivery suppression checks
 - `backend/packages/player_privacy/`
   - `noveland.player_privacy.contracts` — player privacy export and request DTOs for sanitized data controls
   - `noveland.player_privacy.models` — `player_privacy_requests` ORM model for reviewable export/delete requests

@@ -13,6 +13,7 @@ from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
 from noveland.auth.services import hash_session_token
+from noveland.beta_feedback.models import BetaFeedbackReport
 from noveland.conversations.models import ConversationSession
 from noveland.events.models import WorldEventModel
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
@@ -310,6 +311,140 @@ def test_applied_moderation_takedown_hides_reader_media_without_admin_route_chan
     assert admin_download.content == b"reader-image"
 
 
+def test_admin_flags_player_visible_output_with_safe_safety_review() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test", platform_admin=True)
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id = _seed_world_graph(engine, admin_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    conversation_id = _seed_conversation(engine, world_id, worldline_id)
+    before_events = _count_rows(engine, WorldEventModel)
+    payload = {
+        "worldline_id": str(worldline_id),
+        "target_ref_kind": "conversation_session",
+        "target_ref_id": str(conversation_id),
+        "category": "safety",
+        "severity": "high",
+        "policy_key": "player_visible_harm",
+        "finding": "Character output needs a player-visible safety review.",
+        "evidence_refs": [
+            {
+                "kind": "conversation_session",
+                "id": str(conversation_id),
+                "component": "reader_playback",
+                "status": "flagged",
+                "reason_code": "player_visible_harm",
+                "world_id": str(world_id),
+                "worldline_id": str(worldline_id),
+            }
+        ],
+        "metadata": {
+            "safe_note": "review transcript summary",
+            "storage_uri": "media://hidden",
+            "nested": {"raw_prompt": "hidden"},
+        },
+    }
+
+    _authenticate(client, member_token)
+    member_review = client.post(f"/worlds/{world_id}/moderation/safety-reviews", json=payload)
+
+    _authenticate(client, admin_token)
+    created = client.post(f"/worlds/{world_id}/moderation/safety-reviews", json=payload)
+
+    assert member_review.status_code == 403
+    assert created.status_code == 201
+    body = created.json()
+    assert body["status"] == "under_review"
+    assert body["reporter_user_id"] == str(admin_id)
+    assert body["created_by_actor_ref"] == f"user:{admin_id}"
+    assert body["target_ref_kind"] == "conversation_session"
+    assert body["metadata"] == {
+        "source": "safety_review",
+        "policy_key": "player_visible_harm",
+        "safe_note": "review transcript summary",
+        "nested": {},
+    }
+    assert body["evidence_refs"][0]["component"] == "moderation_safety_review"
+    assert body["evidence_refs"][0]["kind"] == "conversation_session"
+    assert _count_rows(engine, WorldEventModel) == before_events
+    _assert_no_forbidden_markers(body)
+
+
+def test_beta_feedback_escalates_to_moderation_without_reporter_leak_to_testers() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test", platform_admin=True)
+    reporter_id, reporter_token = _seed_user(engine, "reporter@example.test")
+    other_id, other_token = _seed_user(engine, "other@example.test")
+    world_id, worldline_id = _seed_world_graph(engine, admin_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, reporter_id, AuthRole.HUMAN_USER)
+    _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
+    feedback_id = _seed_beta_feedback(engine, world_id, worldline_id, reporter_id)
+    before_events = _count_rows(engine, WorldEventModel)
+
+    _authenticate(client, other_token)
+    other_feedback_list = client.get(f"/worlds/{world_id}/beta-feedback/reports")
+    other_feedback_detail = client.get(f"/worlds/{world_id}/beta-feedback/reports/{feedback_id}")
+    other_moderation_list = client.get(f"/worlds/{world_id}/moderation/reports")
+
+    _authenticate(client, reporter_token)
+    reporter_feedback_detail = client.get(f"/worlds/{world_id}/beta-feedback/reports/{feedback_id}")
+
+    _authenticate(client, admin_token)
+    escalated = client.post(
+        f"/worlds/{world_id}/moderation/feedback-escalations",
+        json={
+            "feedback_report_id": str(feedback_id),
+            "category": "safety",
+            "severity": "critical",
+            "reason": "Escalate player-visible harm report.",
+            "evidence_refs": [
+                {
+                    "kind": "beta_feedback_report",
+                    "id": str(feedback_id),
+                    "component": "beta_feedback",
+                    "status": "submitted",
+                    "reason_code": "player_visible_harm",
+                    "world_id": str(world_id),
+                    "worldline_id": str(worldline_id),
+                }
+            ],
+            "metadata": {
+                "safe_note": "triage with moderation",
+                "api_key": "secret-value",
+                "storage_uri": "media://hidden",
+            },
+        },
+    )
+    admin_reports = client.get(f"/worlds/{world_id}/moderation/reports")
+
+    assert other_feedback_list.status_code == 200
+    assert other_feedback_list.json() == []
+    assert other_feedback_detail.status_code == 404
+    assert other_moderation_list.status_code == 403
+    assert reporter_feedback_detail.status_code == 200
+    assert reporter_feedback_detail.json()["reporter_user_id"] == str(reporter_id)
+    assert escalated.status_code == 201
+    body = escalated.json()
+    assert body["status"] == "escalated"
+    assert body["reporter_user_id"] == str(reporter_id)
+    assert body["created_by_actor_ref"] == f"user:{admin_id}"
+    assert body["metadata"] == {
+        "source": "beta_feedback_escalation",
+        "feedback_report_id": str(feedback_id),
+        "feedback_issue_type": "playback",
+        "safe_note": "triage with moderation",
+    }
+    assert body["evidence_refs"][-1]["component"] == "beta_feedback"
+    assert admin_reports.status_code == 200
+    assert [item["id"] for item in admin_reports.json()] == [body["id"]]
+    _assert_feedback_linked_to_moderation(engine, feedback_id, uuid.UUID(body["id"]))
+    assert _count_rows(engine, WorldEventModel) == before_events
+    _assert_no_forbidden_markers(body)
+    _assert_no_forbidden_markers(admin_reports.json())
+
+
 def _report_payload(worldline_id: uuid.UUID, target_id: uuid.UUID) -> dict[str, Any]:
     return {
         "worldline_id": str(worldline_id),
@@ -384,6 +519,7 @@ def _create_required_tables(engine: Engine) -> None:
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
         cast(Table, MediaReference.__table__),
+        cast(Table, BetaFeedbackReport.__table__),
         cast(Table, ModerationReport.__table__),
         cast(Table, ModerationIncident.__table__),
         cast(Table, ModerationAction.__table__),
@@ -649,6 +785,43 @@ def _seed_reference(
         session.commit()
 
 
+def _seed_beta_feedback(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    reporter_id: uuid.UUID,
+) -> uuid.UUID:
+    feedback_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            BetaFeedbackReport(
+                id=feedback_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                reporter_user_id=reporter_id,
+                player_actor_id=None,
+                issue_type="playback",
+                severity="high",
+                status="submitted",
+                title="Unsafe playback moment",
+                description="Player-visible playback needs moderation review.",
+                reporter_note="Reporter private note.",
+                evidence_refs_json=[
+                    {
+                        "kind": "worldline",
+                        "id": str(worldline_id),
+                        "worldline_id": str(worldline_id),
+                        "label": "safe feedback ref",
+                    }
+                ],
+                repair_proposal_refs_json=[],
+                metadata_json={"safe": True},
+            )
+        )
+        session.commit()
+    return feedback_id
+
+
 def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.clear()
     client.headers.clear()
@@ -665,6 +838,20 @@ def _assert_provider_status(engine: Engine, provider_id: uuid.UUID, status: str)
         provider = session.get(ProviderIntegration, provider_id)
         assert provider is not None
         assert provider.status == status
+
+
+def _assert_feedback_linked_to_moderation(
+    engine: Engine,
+    feedback_id: uuid.UUID,
+    report_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        feedback = session.get(BetaFeedbackReport, feedback_id)
+        assert feedback is not None
+        assert feedback.moderation_report_id == report_id
+        assert feedback.status == "investigating"
+        assert feedback.triaged_by_actor_ref is not None
+        assert feedback.triaged_at is not None
 
 
 def _assert_no_forbidden_markers(value: object) -> None:

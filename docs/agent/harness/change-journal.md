@@ -11,6 +11,17 @@
 - Docs updated:
 - Follow-up notes:
 
+## v1.1 Phase 4 Content Safety & Moderation Hardening implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-4-content-safety-moderation-hardening
+- Scope: v1.1 Normal Use / Release Candidate Phase 4 implementation only.
+- Summary: Added the Phase 4 checkpoint and hardened the existing moderation boundary with admin-only safety-review reports for player-visible output findings plus explicit beta-feedback-to-moderation escalation. Escalation links the feedback report to a moderation report, moves the feedback into investigation, preserves reporter privacy for other testers, keeps moderation evidence admin-only, and sanitizes evidence/metadata. Existing applied moderation action suppression remains the reader/player visibility control. The phase adds no migrations, Web UI, broad `worlds.py` routes, duplicate moderation framework, public forum behavior, automatic punitive action, provider calls, or world-event writes.
+- Files changed: `backend/packages/moderation/{pyproject.toml,src/noveland/moderation/{__init__,contracts,service}.py}`, `backend/services/api/src/noveland/services/api/moderation.py`, `backend/tests/test_api_moderation.py`, `backend/uv.lock`, Phase 4 checkpoint, OpenSpec tasks through `5.4`, and harness docs.
+- Tests added/updated: Added moderation API coverage for admin-only safety review creation, safe evidence refs, sanitized metadata, feedback escalation privacy, feedback-to-moderation linking, unchanged reporter-private beta feedback visibility, admin-only moderation evidence, no world-event writes, and forbidden-marker leak checks. Targeted checks passed: focused moderation ruff, focused moderation mypy, and `cd backend && uv run pytest tests/test_api_moderation.py -q` (`7 passed`).
+- Docs updated: Phase 4 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Run the full backend/OpenSpec gate, then commit Phase 4, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 5. No Web UI was touched, so `impeccable` was not required for Phase 4.
+
 ## v1.1 Phase 3 Multi-world / Multi-user Stress Test implementation entry
 
 - Date: 2026-05-21

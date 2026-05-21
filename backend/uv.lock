@@ -939,7 +939,10 @@ name = "noveland-moderation"
 version = "0.1.0"
 source = { editable = "packages/moderation" }
 dependencies = [
+    { name = "noveland-beta-feedback" },
+    { name = "noveland-conversations" },
     { name = "noveland-core" },
+    { name = "noveland-media" },
     { name = "noveland-observability" },
     { name = "noveland-providers" },
     { name = "noveland-worlds" },
@@ -949,7 +952,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "noveland-beta-feedback", editable = "packages/beta_feedback" },
+    { name = "noveland-conversations", editable = "packages/conversations" },
     { name = "noveland-core", editable = "packages/core" },
+    { name = "noveland-media", editable = "packages/media" },
     { name = "noveland-observability", editable = "packages/observability" },
     { name = "noveland-providers", editable = "packages/providers" },
     { name = "noveland-worlds", editable = "packages/worlds" },
