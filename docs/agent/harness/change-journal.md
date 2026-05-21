@@ -1,5 +1,27 @@
 # Change Journal
 
+## v1.1 Phase 8 Release Candidate Gate planning entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-8-release-candidate-gate
+- Scope: v1.1 Normal Use / Release Candidate Phase 8 docs-only checkpoint before backend/API implementation.
+- Summary: Confirmed Phase 8 stays inside the existing observability/readiness boundary as a backend/API-only, platform-admin release-candidate gate. The report will aggregate v1.1 normal-use evidence plus prior readiness gates, distinguish RC from public launch, and avoid new readiness tables, Web UI, migrations, real provider calls, broad `worlds.py` routes, or unsafe evidence exposure.
+- Files changed: `docs/agent/harness/feature-updates/v1.1.8-release-candidate-gate-plan.md`, OpenSpec task `9.1`, and harness docs.
+- Tests added/updated: N/A, planning checkpoint.
+- Docs updated: Phase 8 checkpoint, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Implement `ReleaseCandidateGateReport`, service aggregation, admin-only observability endpoint, and focused backend tests. Mark the UI task complete as not applicable because no Web UI is scoped for Phase 8.
+
+## v1.1 Phase 8 Release Candidate Gate implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-8-release-candidate-gate
+- Scope: v1.1 Normal Use / Release Candidate Phase 8 implementation only.
+- Summary: Added a platform-admin release-candidate readiness report under the existing observability/readiness boundary. The report aggregates private beta gate evidence, supplied backup/restore drill evidence, deterministic normal-use stress evidence, content safety/moderation escalation evidence, import/export package metadata evidence, provider reliability evidence, user-facing polish review evidence, manual RC checklist items, and no-leak checks. It keeps `public_launch_ready=false`, adds no migrations, no Web UI, no provider execution, no duplicate readiness tables, no broad `worlds.py` routes, and no tester/player/member surface exposure.
+- Files changed: `backend/packages/observability/src/noveland/observability/{contracts,services,__init__}.py`, `backend/services/api/src/noveland/services/api/observability.py`, `backend/tests/test_production_readiness_gate.py`, Phase 8 checkpoint, OpenSpec tasks through `9.4`, and harness docs.
+- Tests added/updated: Added RC gate coverage for complete normal-use evidence pass, missing backup/stress/moderation/packaging/provider/UX/manual evidence failures, world-event leak blocking, admin-only endpoint access, public-launch distinction, duplicate-framework guard, and forbidden-marker response checks. Targeted checks passed: focused readiness pytest (`27 passed`), focused ruff, and focused mypy.
+- Docs updated: Phase 8 checkpoint, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`555 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 8, fast-forward merge to local `main`, and record merge bookkeeping. Phase 8 has no Web UI, so `impeccable` was not required.
+
 ## v1.1 Phase 7 User-facing Polish planning entry
 
 - Date: 2026-05-21

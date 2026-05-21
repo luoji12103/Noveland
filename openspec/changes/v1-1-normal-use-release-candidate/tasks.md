@@ -75,11 +75,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 9. Phase 8 — Release Candidate Gate
 
-- [ ] 9.1 Write docs-only phase planning checkpoint.
-- [ ] 9.2 Implement release-candidate evidence aggregation using existing readiness/eval frameworks.
-- [ ] 9.3 Add RC report UI only after using `impeccable` if Web scope is approved.
-- [ ] 9.4 Add pass/fail, backup, stress, moderation, packaging, provider reliability, UX evidence, and no-leak tests.
-- [ ] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 9.1 Write docs-only phase planning checkpoint.
+- [x] 9.2 Implement release-candidate evidence aggregation using existing readiness/eval frameworks.
+- [x] 9.3 Add RC report UI only after using `impeccable` if Web scope is approved.
+- [x] 9.4 Add pass/fail, backup, stress, moderation, packaging, provider reliability, UX evidence, and no-leak tests.
+- [x] 9.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 9.6 Fast-forward merge to local main and update harness docs.
 
 ## 10. Closeout

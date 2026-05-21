@@ -30,12 +30,17 @@ from noveland.conversations.models import (
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
 from noveland.invocations.models import ModelInvocation, PromptSnapshot
 from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
-from noveland.memory.models import AgentMemoryItem, MemoryWriteJob
+from noveland.memory.models import AgentMemoryItem, MemoryBackendProfile, MemoryWriteJob
 from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability import (
+    BackupRestoreDrillCheck,
+    BackupRestoreDrillReport,
     DiagnosticComponent,
     DiagnosticSeverity,
+    IncidentStatus,
+    NormalUseStressReport,
+    NormalUseStressService,
     ProductionReadinessGateService,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticsService,
@@ -764,6 +769,225 @@ def test_private_beta_gate_does_not_create_duplicate_framework_tables() -> None:
     assert "private_beta_readiness_reports" not in table_names
 
 
+def test_release_candidate_gate_passes_with_complete_normal_use_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+    _seed_release_candidate_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        stress_report = _normal_use_stress_report(session)
+        before_counts = _framework_counts(session)
+        report = ProductionReadinessGateService(session).release_candidate_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            backup_restore_drill=_backup_restore_report(),
+            normal_use_stress=stress_report,
+            manual_play_minutes=75,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=1,
+            tester_session_completed=True,
+            no_developer_intervention_verified=True,
+            quota_reviewed=True,
+            feedback_triage_verified=True,
+            memory_persona_qa_reviewed=True,
+            repair_loop_reviewed=True,
+            operational_runbooks_reviewed=True,
+            backup_restore_drill_reviewed=True,
+            normal_use_stress_reviewed=True,
+            content_safety_reviewed=True,
+            import_export_reviewed=True,
+            provider_reliability_reviewed=True,
+            user_facing_polish_reviewed=True,
+            normal_use_manual_checklist_reviewed=True,
+        )
+        after_counts = _framework_counts(session)
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "ok"
+    assert report.readiness_kind == "release_candidate_gate"
+    assert report.public_launch_ready is False
+    assert report.private_beta_gate.status == "ok"
+    assert report.backup_restore_drill is not None
+    assert report.normal_use_stress is not None
+    assert report.readiness_tiers["public_launch"] == "not_implied"
+    assert sections["private_beta_gate_readiness"].status == "ok"
+    assert sections["backup_restore_drill"].status == "ok"
+    assert sections["normal_use_stress"].status == "ok"
+    assert sections["content_safety_moderation"].status == "ok"
+    assert sections["import_export_stability"].status == "ok"
+    assert sections["provider_reliability"].status == "ok"
+    assert sections["user_facing_polish"].status == "ok"
+    assert sections["manual_normal_use_checklist"].status == "ok"
+    assert "automatic_public_launch" in report.non_goals
+    assert before_counts == after_counts
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_release_candidate_gate_blocks_missing_backup_stress_provider_and_manual_evidence() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).release_candidate_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            backup_restore_drill=None,
+            manual_play_minutes=75,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=1,
+            tester_session_completed=True,
+            no_developer_intervention_verified=True,
+            quota_reviewed=True,
+            feedback_triage_verified=True,
+            memory_persona_qa_reviewed=True,
+            repair_loop_reviewed=True,
+            operational_runbooks_reviewed=False,
+            backup_restore_drill_reviewed=False,
+            normal_use_stress_reviewed=False,
+            content_safety_reviewed=False,
+            import_export_reviewed=False,
+            provider_reliability_reviewed=False,
+            user_facing_polish_reviewed=False,
+            normal_use_manual_checklist_reviewed=False,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert sections["backup_restore_drill"].status == "blocked"
+    assert sections["normal_use_stress"].status == "blocked"
+    assert sections["content_safety_moderation"].status == "blocked"
+    assert sections["import_export_stability"].status == "blocked"
+    assert sections["provider_reliability"].status == "blocked"
+    assert sections["user_facing_polish"].status == "blocked"
+    assert sections["manual_normal_use_checklist"].status == "blocked"
+    assert report.public_launch_ready is False
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_release_candidate_gate_blocks_leak_fixture_safely() -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+    _seed_release_candidate_evidence(engine, world_id, worldline_id)
+    _seed_leaky_world_event(engine, world_id, worldline_id)
+
+    with Session(engine) as session:
+        report = ProductionReadinessGateService(session).release_candidate_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            backup_restore_drill=_backup_restore_report(),
+            normal_use_stress=_normal_use_stress_report(session),
+            manual_play_minutes=75,
+            resume_verified=True,
+            failure_notes_recorded=True,
+            manual_tester_count=1,
+            tester_session_completed=True,
+            no_developer_intervention_verified=True,
+            quota_reviewed=True,
+            feedback_triage_verified=True,
+            memory_persona_qa_reviewed=True,
+            repair_loop_reviewed=True,
+            operational_runbooks_reviewed=True,
+            backup_restore_drill_reviewed=True,
+            normal_use_stress_reviewed=True,
+            content_safety_reviewed=True,
+            import_export_reviewed=True,
+            provider_reliability_reviewed=True,
+            user_facing_polish_reviewed=True,
+            normal_use_manual_checklist_reviewed=True,
+        )
+
+    sections = {section.section_key: section for section in report.sections}
+    assert report.status == "blocked"
+    assert sections["world_event_leak_check"].status == "blocked"
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in report.model_dump_json()
+
+
+def test_release_candidate_endpoint_is_platform_admin_only_and_not_public_launch() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-rc-gate@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    conversation_id = _seed_self_use_demo_evidence(engine, world_id, worldline_id)
+    _seed_private_beta_setup_evidence(engine, world_id, worldline_id, conversation_id)
+    _seed_private_beta_gate_evidence(engine, world_id, worldline_id)
+    _seed_release_candidate_evidence(engine, world_id, worldline_id)
+    _authenticate(client, platform_token)
+
+    response = client.get(
+        "/observability/readiness/release-candidate",
+        params={
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "conversation_id": str(conversation_id),
+            "manual_play_minutes": "75",
+            "resume_verified": "true",
+            "failure_notes_recorded": "true",
+            "manual_tester_count": "1",
+            "tester_session_completed": "true",
+            "no_developer_intervention_verified": "true",
+            "quota_reviewed": "true",
+            "feedback_triage_verified": "true",
+            "memory_persona_qa_reviewed": "true",
+            "repair_loop_reviewed": "true",
+            "operational_runbooks_reviewed": "true",
+            "backup_restore_drill_reviewed": "true",
+            "normal_use_stress_reviewed": "true",
+            "content_safety_reviewed": "true",
+            "import_export_reviewed": "true",
+            "provider_reliability_reviewed": "true",
+            "user_facing_polish_reviewed": "true",
+            "normal_use_manual_checklist_reviewed": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["readiness_kind"] == "release_candidate_gate"
+    assert response.json()["world_id"] == str(world_id)
+    assert response.json()["public_launch_ready"] is False
+    assert "automatic_public_launch" in response.json()["non_goals"]
+    for token in FORBIDDEN_RESPONSE_TOKENS:
+        assert token not in response.text
+
+    _member_id, member_token = _seed_user(engine, "member-rc-gate@example.test", False)
+    _authenticate(client, member_token)
+    forbidden = client.get(
+        "/observability/readiness/release-candidate",
+        params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
+    )
+    assert forbidden.status_code == 403
+
+
+def test_release_candidate_gate_does_not_create_duplicate_framework_tables() -> None:
+    table_names = {
+        "beta_checklist_runs",
+        "long_run_eval_runs",
+        "living_world_release_profiles",
+    }
+    assert "release_candidate_gate_runs" not in table_names
+    assert "release_candidate_gate_reports" not in table_names
+    assert "normal_use_readiness_reports" not in table_names
+
+
 def _engine() -> Engine:
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -806,6 +1030,7 @@ def _engine() -> Engine:
         ModelInvocation.__table__,
         PromptSnapshot.__table__,
         AgentMemoryItem.__table__,
+        MemoryBackendProfile.__table__,
         MemoryWriteJob.__table__,
         RuntimeDiagnosticEvent.__table__,
         ProviderIntegration.__table__,
@@ -2067,6 +2292,448 @@ def _seed_private_beta_gate_evidence(
             )
         )
         session.commit()
+
+
+def _seed_release_candidate_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> None:
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        primary = session.scalars(
+            select(ProviderIntegration).where(
+                ProviderIntegration.world_id == world_id,
+                ProviderIntegration.provider_kind == "text_generation",
+            )
+        ).first()
+        fallback = session.scalars(
+            select(ProviderIntegration).where(
+                ProviderIntegration.world_id == world_id,
+                ProviderIntegration.provider_kind == "image_generation",
+            )
+        ).first()
+        if primary is None or fallback is None:
+            raise RuntimeError("provider evidence is missing")
+        primary.config_json = {
+            **dict(primary.config_json),
+            "reliability": {
+                "manual_fallback_enabled": True,
+                "fallback_provider_ids": [str(fallback.id)],
+            },
+        }
+        session.add(
+            ProviderHealthCheck(
+                id=uuid.uuid4(),
+                provider_integration_id=primary.id,
+                status="healthy",
+                latency_ms=8,
+                checked_at=now,
+                metadata_json={"provider_reliability": True},
+            )
+        )
+        session.add(
+            ModerationReport(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                reporter_user_id=session.scalar(select(User.id).limit(1)),
+                target_ref_kind="conversation_turn",
+                target_ref_id=None,
+                category="quality",
+                severity="low",
+                status="resolved",
+                reason="release candidate safety fixture",
+                reporter_note="private reporter note",
+                evidence_refs_json=[{"kind": "worldline", "id": str(worldline_id)}],
+                created_by_actor_ref="user:tester",
+                reviewed_by_actor_ref="system:test",
+                reviewed_at=now,
+                review_note="resolved",
+                metadata_json={"beta_feedback_report_id": "safe-ref"},
+            )
+        )
+        report = session.scalars(
+            select(BetaFeedbackReport).where(BetaFeedbackReport.world_id == world_id)
+        ).first()
+        if report is not None:
+            report.moderation_report_id = uuid.uuid4()
+        package_world = World(
+            id=uuid.uuid4(),
+            owner_user_id=session.scalar(select(World.owner_user_id).where(World.id == world_id)),
+            slug=f"rc-import-{world_id.hex[:8]}",
+            name="RC Imported Package",
+            is_active=False,
+            rules_config={
+                "package_import_extended_manifests": {
+                    "providers": [{"provider_key": "safe-provider"}],
+                    "personas": [{"agent_key": "alice"}],
+                    "memories": [{"memory_key": "alice"}],
+                    "visual_mappings": [{"mapping_kind": "scene_background"}],
+                    "voice_mappings": [{"voice_profile_key": "alice"}],
+                    "source_traceability": [{"excluded_from_public_sample": True}],
+                    "review_apply_required_for_specialized_records": True,
+                }
+            },
+        )
+        session.add(package_world)
+        session.commit()
+
+
+def _seed_stress_worlds(engine: Engine) -> None:
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        for world_index in range(3):
+            owner_id = uuid.uuid4()
+            world_id = uuid.uuid4()
+            session.add(
+                User(
+                    id=owner_id,
+                    email=f"rc-stress-{world_index}@example.test",
+                    display_name=f"RC Stress Owner {world_index}",
+                    is_active=True,
+                )
+            )
+            session.add(
+                World(
+                    id=world_id,
+                    owner_user_id=owner_id,
+                    slug=f"rc-stress-{world_index}",
+                    name=f"RC Stress {world_index}",
+                    rules_config={},
+                )
+            )
+            worldline_ids = []
+            for worldline_index in range(2):
+                worldline_id = uuid.uuid4()
+                worldline_ids.append(worldline_id)
+                session.add(
+                    Worldline(
+                        id=worldline_id,
+                        world_id=world_id,
+                        worldline_key=f"line-{worldline_index}",
+                        name=f"Line {worldline_index}",
+                        description=None,
+                        parent_worldline_id=None,
+                        forked_from_snapshot_id=None,
+                        fork_event_sequence=None,
+                        status="active",
+                        created_by_actor_ref="system:test",
+                        metadata={},
+                    )
+                )
+            provider_ids = []
+            for provider_index, provider_kind in enumerate(("text_generation", "image_generation")):
+                provider_id = uuid.uuid4()
+                provider_ids.append(provider_id)
+                session.add(
+                    ProviderIntegration(
+                        id=provider_id,
+                        world_id=world_id,
+                        scope_kind="world",
+                        scope_key=f"{world_id}:{provider_index}",
+                        provider_kind=provider_kind,
+                        adapter_kind="fake",
+                        provider_key=f"rc-stress-{world_index}-{provider_index}",
+                        display_name="RC Stress Fake Provider",
+                        base_url=None,
+                        auth_ref="env:RC_STRESS_FAKE",
+                        config_json={},
+                        default_params_json={},
+                        status="active",
+                        visibility="world_admin",
+                    )
+                )
+            session.add(
+                ProviderBudgetPolicy(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    provider_id=None,
+                    policy_key="rc-stress-budget",
+                    status="active",
+                    emergency_stop_enabled=False,
+                    limits_json={"max_daily_invocations": 500},
+                    metadata_json={},
+                )
+            )
+            agent_id = uuid.uuid4()
+            session.add(
+                Agent(
+                    id=agent_id,
+                    world_id=world_id,
+                    agent_key=f"rc-stress-agent-{world_index}",
+                    display_name="RC Stress Agent",
+                    kind="role_agent",
+                    character_profile={},
+                    config={},
+                    is_enabled=True,
+                )
+            )
+            backend_id = uuid.uuid4()
+            session.add(
+                MemoryBackendProfile(
+                    id=backend_id,
+                    profile_key=f"rc-stress-memory-{world_index}",
+                    name="RC Stress Memory",
+                    backend_kind="local_pgvector",
+                    vector_store_config={},
+                    llm_config={},
+                    embedder_config={},
+                    reranker_config={},
+                    secret_refs={},
+                    is_enabled=True,
+                )
+            )
+            for line_index, line_id in enumerate(worldline_ids):
+                for player_index in range(1):
+                    user_id = uuid.uuid4()
+                    actor_id = uuid.uuid4()
+                    session_id = uuid.uuid4()
+                    session.add(
+                        User(
+                            id=user_id,
+                            email=(
+                                f"rc-stress-player-{world_index}-{line_index}-{player_index}"
+                                "@example.test"
+                            ),
+                            display_name="RC Stress Player",
+                        )
+                    )
+                    session.add(
+                        PlayerActorProfile(
+                            id=actor_id,
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            user_id=user_id,
+                            actor_ref=f"player:{user_id}",
+                            display_name="Stress Player",
+                            current_scene_id=None,
+                            profile_json={"safe": True},
+                            is_active=True,
+                        )
+                    )
+                    session.add(
+                        ConversationSession(
+                            id=session_id,
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            scene_id=None,
+                            session_key=f"rc-stress-{session_id.hex[:8]}",
+                            title="RC Stress Session",
+                            scope_type="world",
+                            mode="manual_chain",
+                            status="completed",
+                            objective="RC stress fixture",
+                            opening_prompt="",
+                            max_turns=30,
+                            next_turn_index=20,
+                            policy_config={},
+                            writer_config={},
+                            memory_config={},
+                        )
+                    )
+                    session.add(
+                        PlayerSession(
+                            id=uuid.uuid4(),
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            user_id=user_id,
+                            player_actor_id=actor_id,
+                            conversation_session_id=session_id,
+                            scene_id=None,
+                            last_turn_id=None,
+                            last_presentation_id=None,
+                            route_state_json={"route": "stress"},
+                            resume_state_json={"safe": True},
+                            recovery_status="ready",
+                            status="active",
+                            last_seen_at=now,
+                        )
+                    )
+                    for turn_index in range(20):
+                        session.add(
+                            ConversationTurn(
+                                id=uuid.uuid4(),
+                                session_id=session_id,
+                                turn_index=turn_index,
+                                speaker_kind="operator" if turn_index % 2 == 0 else "agent",
+                                speaker_agent_id=None if turn_index % 2 == 0 else agent_id,
+                                input_text="Safe stress input",
+                                output_text="Safe stress output",
+                                status="succeeded",
+                            )
+                        )
+                    session.add(
+                        ModelInvocation(
+                            id=uuid.uuid4(),
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            trace_id=uuid.uuid4(),
+                            invocation_kind="conversation_turn",
+                            actor_kind="agent",
+                            actor_ref="agent:stress",
+                            agent_id=agent_id,
+                            conversation_id=session_id,
+                            turn_id=None,
+                            provider_kind="local_stub",
+                            model_name="safe-model",
+                            input_json={"redacted": True},
+                            output_json={"redacted": True},
+                            usage_json={},
+                            latency_ms=10,
+                            estimated_cost=0,
+                            status="succeeded",
+                            visibility="world_admin",
+                            redaction_status="redacted",
+                            retention_policy="local_debug",
+                            contains_sensitive_context=False,
+                        )
+                    )
+                    session.add(
+                        MediaJob(
+                            id=uuid.uuid4(),
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            conversation_id=session_id,
+                            turn_id=None,
+                            agent_id=agent_id,
+                            job_kind="image_generation",
+                            provider_kind="fake",
+                            status="succeeded",
+                            priority=10,
+                            provider_config_json={"provider_id": str(provider_ids[1])},
+                            request_json={"safe": True},
+                            result_json={"safe": True},
+                            created_by_actor_ref="system:test",
+                            finished_at=now,
+                        )
+                    )
+                    session.add(
+                        MemoryWriteJob(
+                            id=uuid.uuid4(),
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            agent_id=agent_id,
+                            backend_profile_id=backend_id,
+                            source_kind="conversation_turn",
+                            source_id=uuid.uuid4(),
+                            payload_json={"safe": True},
+                            dedupe_key=f"rc-stress-{world_index}-{line_index}-{player_index}",
+                            status="succeeded",
+                            attempt_count=1,
+                            next_attempt_at=now,
+                            processed_at=now,
+                        )
+                    )
+                    report_id = uuid.uuid4()
+                    run_id = uuid.uuid4()
+                    session.add(
+                        BetaFeedbackReport(
+                            id=report_id,
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            reporter_user_id=user_id,
+                            player_actor_id=actor_id,
+                            issue_type="ux",
+                            severity="low",
+                            status="triaged",
+                            title="Stress feedback",
+                            description="Safe stress feedback.",
+                            reporter_note=None,
+                            evidence_refs_json=[],
+                            repair_proposal_refs_json=[],
+                            triage_note="triaged",
+                            triaged_by_actor_ref="system:test",
+                            triaged_at=now,
+                            metadata_json={},
+                        )
+                    )
+                    session.add(
+                        AuthoringImportRun(
+                            id=run_id,
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            source_batch_id=None,
+                            run_kind="preview",
+                            status="previewed",
+                            summary_json={"source": "stress"},
+                            created_by_actor_ref="system:test",
+                        )
+                    )
+                    session.add(
+                        AuthoringImportProposal(
+                            id=uuid.uuid4(),
+                            world_id=world_id,
+                            worldline_id=line_id,
+                            run_id=run_id,
+                            source_fragment_id=None,
+                            proposal_kind="other",
+                            target_ref_kind="stress_repair",
+                            title="Stress repair",
+                            summary="Safe stress proposal.",
+                            proposed_payload_json={"safe": True},
+                            evidence_json={"safe": True},
+                            confidence=0.8,
+                            priority=1,
+                            status="applied",
+                            applied_ref_json={"safe": True},
+                        )
+                    )
+            session.add(
+                LongRunEvalRun(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_ids[0],
+                    eval_key="long-run-rc-stress",
+                    horizon_days=1,
+                    status="completed",
+                    started_at=now,
+                    finished_at=now,
+                    metrics={"turn_equivalent": 20},
+                    recommendations=[],
+                    blockers=[],
+                    metadata_json={},
+                )
+            )
+        session.commit()
+
+
+def _backup_restore_report(
+    status: IncidentStatus = IncidentStatus.OK,
+) -> BackupRestoreDrillReport:
+    blocked = status != IncidentStatus.OK
+    return BackupRestoreDrillReport(
+        status=status,
+        generated_at=datetime.now(UTC),
+        target_profile="fresh_local_single_host",
+        check_count=1,
+        evidence_count=1,
+        blocker_count=1 if blocked else 0,
+        warning_count=0,
+        checks=[
+            BackupRestoreDrillCheck(
+                check_key="database_state",
+                status=status,
+                summary="Safe backup/restore fixture evidence.",
+                evidence_count=1,
+                blocker_count=1 if blocked else 0,
+                warning_count=0,
+                evidence_refs=[{"kind": "table_count", "id": "worlds", "status": "1"}],
+                blockers=["Restore drill failed."] if blocked else [],
+                warnings=[],
+            )
+        ],
+        suppressed_fields=["storage_references", "provider_credentials"],
+        non_goals=["public_restore_report"],
+    )
+
+
+def _normal_use_stress_report(session: Session) -> NormalUseStressReport:
+    for world in session.scalars(select(World)).all():
+        world.is_active = False
+    session.commit()
+    _seed_stress_worlds(cast(Engine, session.get_bind()))
+    return NormalUseStressService(session).report()
 
 
 def _seed_release_eval_and_checklist(

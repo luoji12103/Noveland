@@ -264,6 +264,16 @@ class PrivateBetaGateReport(ProductionReadinessReport):
     public_launch_ready: bool = False
 
 
+class ReleaseCandidateGateReport(ProductionReadinessReport):
+    readiness_kind: str = Field(default="release_candidate_gate", min_length=1)
+    private_beta_gate: PrivateBetaGateReport
+    backup_restore_drill: BackupRestoreDrillReport | None = None
+    normal_use_stress: NormalUseStressReport | None = None
+    manual_checklist: list[SelfUseMvpManualChecklistItem] = Field(default_factory=list)
+    readiness_tiers: dict[str, str] = Field(default_factory=dict)
+    public_launch_ready: bool = False
+
+
 class BackupRestoreDrillCheck(_FrozenContract):
     check_key: str = Field(min_length=1, max_length=120)
     status: IncidentStatus

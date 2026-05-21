@@ -1,15 +1,19 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 8 Release Candidate Gate planning checkpoint
+- v1.1 Phase 8 Release Candidate Gate fast-forward merge
 
 ## In Progress
-- None
+- v1.1 Phase 8 Release Candidate Gate fast-forward merge
 
 ## Blocked
 - None
 
 ## Done
+- v1.1 Phase 8 Release Candidate Gate full backend/OpenSpec gate
+- v1.1 Phase 8 Release Candidate Gate implementation
+- v1.1 Phase 8 Release Candidate Gate targeted tests
+- v1.1 Phase 8 Release Candidate Gate planning checkpoint
 - v1.1 Phase 7 User-facing Polish planning checkpoint
 - v1.1 Phase 7 User-facing Polish impeccable preflight
 - v1.1 Phase 7 User-facing Polish implementation

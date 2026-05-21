@@ -22,6 +22,7 @@ from noveland.invocations.models import ModelInvocation
 from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
 from noveland.memory.models import AgentMemoryItem, MemoryWriteJob
 from noveland.observability.contracts import (
+    BackupRestoreDrillReport,
     DiagnosticComponent,
     DiagnosticRetentionDryRun,
     DiagnosticRetentionPruneResult,
@@ -38,6 +39,7 @@ from noveland.observability.contracts import (
     ProductionReadinessReport,
     ProductionReadinessSection,
     PublicLaunchReadinessReport,
+    ReleaseCandidateGateReport,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
     SelfUseMvpGateReport,
@@ -1747,6 +1749,542 @@ class ProductionReadinessGateService:
                 "tester_visible_admin_diagnostics",
             ],
         )
+
+    def release_candidate_gate_report(
+        self,
+        *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+        conversation_id: uuid.UUID | None = None,
+        evidence_limit_per_section: int = 5,
+        backup_restore_drill: BackupRestoreDrillReport | None = None,
+        normal_use_stress: NormalUseStressReport | None = None,
+        manual_play_minutes: int = 0,
+        resume_verified: bool = False,
+        failure_notes_recorded: bool = False,
+        manual_tester_count: int = 0,
+        tester_session_completed: bool = False,
+        no_developer_intervention_verified: bool = False,
+        quota_reviewed: bool = False,
+        feedback_triage_verified: bool = False,
+        memory_persona_qa_reviewed: bool = False,
+        repair_loop_reviewed: bool = False,
+        operational_runbooks_reviewed: bool = False,
+        backup_restore_drill_reviewed: bool = False,
+        normal_use_stress_reviewed: bool = False,
+        content_safety_reviewed: bool = False,
+        import_export_reviewed: bool = False,
+        provider_reliability_reviewed: bool = False,
+        user_facing_polish_reviewed: bool = False,
+        normal_use_manual_checklist_reviewed: bool = False,
+    ) -> ReleaseCandidateGateReport:
+        safe_limit = max(1, min(evidence_limit_per_section, 20))
+        worldline = worldline_or_404(self._session, world_id, worldline_id)
+        private_beta = self.private_beta_gate_report(
+            world_id=world_id,
+            worldline_id=worldline.id,
+            conversation_id=conversation_id,
+            evidence_limit_per_section=safe_limit,
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+            manual_tester_count=manual_tester_count,
+            tester_session_completed=tester_session_completed,
+            no_developer_intervention_verified=no_developer_intervention_verified,
+            quota_reviewed=quota_reviewed,
+            feedback_triage_verified=feedback_triage_verified,
+            memory_persona_qa_reviewed=memory_persona_qa_reviewed,
+            repair_loop_reviewed=repair_loop_reviewed,
+        )
+        if normal_use_stress is None:
+            normal_use_stress = NormalUseStressService(self._session).report(
+                evidence_limit_per_check=safe_limit,
+            )
+        manual_checklist = _release_candidate_manual_checklist(
+            operational_runbooks_reviewed=operational_runbooks_reviewed,
+            backup_restore_drill_reviewed=backup_restore_drill_reviewed,
+            normal_use_stress_reviewed=normal_use_stress_reviewed,
+            content_safety_reviewed=content_safety_reviewed,
+            import_export_reviewed=import_export_reviewed,
+            provider_reliability_reviewed=provider_reliability_reviewed,
+            user_facing_polish_reviewed=user_facing_polish_reviewed,
+            normal_use_manual_checklist_reviewed=normal_use_manual_checklist_reviewed,
+        )
+        sections = [
+            self._rc_private_beta_gate_section(private_beta, safe_limit),
+            self._rc_backup_restore_drill_section(backup_restore_drill),
+            self._rc_normal_use_stress_section(normal_use_stress, safe_limit),
+            self._rc_content_safety_section(
+                world_id,
+                worldline.id,
+                safe_limit,
+                content_safety_reviewed=content_safety_reviewed,
+            ),
+            self._rc_import_export_section(
+                world_id,
+                worldline.id,
+                safe_limit,
+                import_export_reviewed=import_export_reviewed,
+            ),
+            self._rc_provider_reliability_section(
+                world_id,
+                safe_limit,
+                provider_reliability_reviewed=provider_reliability_reviewed,
+            ),
+            self._rc_user_facing_polish_section(
+                user_facing_polish_reviewed=user_facing_polish_reviewed,
+            ),
+            self._rc_manual_normal_use_section(manual_checklist),
+            self._self_use_no_world_event_leak_section(world_id, worldline.id, safe_limit),
+        ]
+        evidence_count = sum(section.evidence_count for section in sections)
+        blocker_count = sum(section.blocker_count for section in sections)
+        warning_count = sum(section.warning_count for section in sections)
+        return ReleaseCandidateGateReport(
+            status=_readiness_status(sections),
+            generated_at=datetime.now(UTC),
+            world_id=world_id,
+            readiness_kind="release_candidate_gate",
+            section_count=len(sections),
+            evidence_count=evidence_count,
+            blocker_count=blocker_count,
+            warning_count=warning_count,
+            sections=sections,
+            private_beta_gate=private_beta,
+            backup_restore_drill=backup_restore_drill,
+            normal_use_stress=normal_use_stress,
+            manual_checklist=manual_checklist,
+            readiness_tiers={
+                "self_use_mvp": "completed_by_self_use_mvp_gate",
+                "private_beta": private_beta.status.value,
+                "normal_use": "evaluated_by_v1_1_evidence_sections",
+                "release_candidate": _readiness_status(sections).value,
+                "public_launch": "not_implied",
+            },
+            public_launch_ready=False,
+            suppressed_fields=[
+                "invite_tokens",
+                "invite_token_hashes",
+                "credential_values",
+                "credential_headers",
+                "resolved_secrets",
+                "auth_ref_values",
+                "prompt_snapshot_bodies",
+                "prompt_bodies",
+                "provider_result_bodies",
+                "provider_payloads",
+                "media_object_locations",
+                "object_locator_values",
+                "storage_locator_values",
+                "filesystem_paths",
+                "object_storage_paths",
+                "binary_payloads",
+                "inline_binary_payloads",
+                "world_event_payload_snapshots",
+                "raw_source_fragments",
+                "local_model_paths",
+                "raw_workflow_json",
+                "feedback_reporter_private_notes",
+                "moderation_private_evidence",
+            ],
+            non_goals=[
+                "automatic_public_launch",
+                "public_launch_readiness",
+                "duplicate_readiness_framework",
+                "marketplace_readiness",
+                "runtime_provider_execution",
+                "tester_visible_admin_diagnostics",
+                "external_load_testing",
+                "staging_restore_drill",
+            ],
+        )
+
+    def _rc_private_beta_gate_section(
+        self,
+        private_beta: PrivateBetaGateReport,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        refs: list[IncidentEvidenceRef] = []
+        for section in private_beta.sections:
+            refs.extend(section.evidence_refs)
+            if len(refs) >= limit:
+                refs = refs[:limit]
+                break
+        blockers = []
+        if private_beta.status == IncidentStatus.BLOCKED:
+            blockers.append("Private beta gate still has blocking evidence.")
+        warning_count = 1 if private_beta.status == IncidentStatus.WATCH else 0
+        return _readiness_section(
+            "private_beta_gate_readiness",
+            status=private_beta.status,
+            summary=(
+                f"Private beta gate is {private_beta.status} with "
+                f"{private_beta.blocker_count} blockers and "
+                f"{private_beta.warning_count} warnings."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Resolve private beta gate blockers before RC evaluation."],
+        )
+
+    def _rc_backup_restore_drill_section(
+        self,
+        backup_restore_drill: BackupRestoreDrillReport | None,
+    ) -> ProductionReadinessSection:
+        if backup_restore_drill is None:
+            return _readiness_section(
+                "backup_restore_drill",
+                status=IncidentStatus.BLOCKED,
+                summary="No backup/restore drill report was supplied for RC readiness.",
+                blockers=["Successful fresh local/single-host restore drill evidence is missing."],
+                recommendations=["Run the backup/restore drill and attach its safe report."],
+            )
+        blockers = []
+        if backup_restore_drill.status == IncidentStatus.BLOCKED:
+            blockers.append("Backup/restore drill has blocking checks.")
+        warning_count = backup_restore_drill.warning_count
+        status = (
+            IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK
+        )
+        return _readiness_section(
+            "backup_restore_drill",
+            status=status,
+            summary=(
+                f"Backup/restore drill is {backup_restore_drill.status} for "
+                f"{backup_restore_drill.target_profile} with "
+                f"{backup_restore_drill.blocker_count} blockers and "
+                f"{backup_restore_drill.warning_count} warnings."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="backup_restore_drill_check",
+                    id=check.check_key,
+                    component="backup_restore_drill",
+                    status=check.status,
+                    reason_code=check.check_key,
+                )
+                for check in backup_restore_drill.checks
+            ],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[] if not blockers else ["Resolve restore drill blockers."],
+        )
+
+    def _rc_normal_use_stress_section(
+        self,
+        normal_use_stress: NormalUseStressReport,
+        limit: int,
+    ) -> ProductionReadinessSection:
+        refs: list[IncidentEvidenceRef] = []
+        for check in normal_use_stress.checks:
+            refs.extend(check.evidence_refs)
+            if len(refs) >= limit:
+                refs = refs[:limit]
+                break
+        blockers = []
+        if normal_use_stress.status == IncidentStatus.BLOCKED:
+            blockers.append("Normal-use stress report has blocking checks.")
+        warning_count = 1 if normal_use_stress.status == IncidentStatus.WATCH else 0
+        return _readiness_section(
+            "normal_use_stress",
+            status=normal_use_stress.status,
+            summary=(
+                f"Normal-use stress observed {normal_use_stress.observed_world_count} worlds, "
+                f"{normal_use_stress.observed_player_session_count} player sessions, and "
+                f"{normal_use_stress.observed_turn_equivalent} turn-equivalent events."
+            ),
+            evidence_refs=refs,
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[] if not blockers else ["Resolve normal-use stress blockers."],
+        )
+
+    def _rc_content_safety_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+        *,
+        content_safety_reviewed: bool,
+    ) -> ProductionReadinessSection:
+        del worldline_id
+        reports = Base.metadata.tables.get("moderation_reports")
+        actions = Base.metadata.tables.get("moderation_actions")
+        incidents = Base.metadata.tables.get("moderation_incidents")
+        if reports is None or actions is None or incidents is None:
+            return _missing_table_section("content_safety_moderation", "moderation workflow")
+        report_count = self._table_count(reports, reports.c.world_id == world_id)
+        action_count = self._table_count(actions, actions.c.world_id == world_id)
+        incident_count = self._table_count(incidents, incidents.c.world_id == world_id)
+        open_incident_count = self._table_count(
+            incidents,
+            incidents.c.world_id == world_id,
+            incidents.c.status.in_(("open", "under_review")),
+        )
+        escalated_feedback_count = self._count(
+            BetaFeedbackReport,
+            BetaFeedbackReport.world_id == world_id,
+            BetaFeedbackReport.moderation_report_id.is_not(None),
+        )
+        blockers: list[str] = []
+        if report_count + action_count + incident_count == 0:
+            blockers.append("No moderation report/action/incident evidence exists.")
+        if escalated_feedback_count == 0:
+            blockers.append("No beta feedback escalation to moderation evidence exists.")
+        if not content_safety_reviewed:
+            blockers.append("Content safety/moderation review is not confirmed.")
+        warning_count = 1 if open_incident_count else 0
+        return _readiness_section(
+            "content_safety_moderation",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{report_count} moderation reports, {action_count} actions, "
+                f"{incident_count} incidents, {escalated_feedback_count} feedback escalations."
+            ),
+            evidence_refs=self._moderation_refs(
+                reports=reports,
+                actions=actions,
+                incidents=incidents,
+                world_id=world_id,
+                limit=limit,
+            ),
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Review moderation and feedback escalation evidence before RC."],
+        )
+
+    def _rc_import_export_section(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        limit: int,
+        *,
+        import_export_reviewed: bool,
+    ) -> ProductionReadinessSection:
+        package_metadata_worlds = self._package_metadata_worlds(limit)
+        package_metadata_count = len(package_metadata_worlds)
+        applied_proposals = self._session.scalars(
+            select(AuthoringImportProposal)
+            .where(
+                AuthoringImportProposal.world_id == world_id,
+                AuthoringImportProposal.worldline_id == worldline_id,
+                AuthoringImportProposal.status.in_(("approved", "applied")),
+            )
+            .order_by(AuthoringImportProposal.updated_at.desc())
+            .limit(limit),
+        ).all()
+        blockers: list[str] = []
+        if package_metadata_count == 0:
+            blockers.append("No world package import/export stability metadata exists.")
+        if not applied_proposals:
+            blockers.append("No reviewed/applied authoring proposal evidence exists.")
+        if not import_export_reviewed:
+            blockers.append("Import/export stability review is not confirmed.")
+        refs = [
+            IncidentEvidenceRef(
+                kind="world_package_import_metadata",
+                id=str(world.id),
+                component="import_export_stability",
+                status="review_apply_required",
+                reason_code="package_import_extended_manifests",
+                world_id=world.id,
+                occurred_at=world.updated_at,
+            )
+            for world in package_metadata_worlds
+        ]
+        refs.extend(
+            IncidentEvidenceRef(
+                kind="authoring_import_proposal",
+                id=str(proposal.id),
+                component="import_export_stability",
+                status=proposal.status,
+                reason_code=str(proposal.target_ref_kind or proposal.proposal_kind),
+                world_id=proposal.world_id,
+                worldline_id=proposal.worldline_id,
+                occurred_at=proposal.updated_at,
+            )
+            for proposal in applied_proposals
+        )
+        return _readiness_section(
+            "import_export_stability",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                f"{package_metadata_count} package metadata records and "
+                f"{len(applied_proposals)} reviewed/applied authoring proposals."
+            ),
+            evidence_refs=refs[:limit],
+            blockers=blockers,
+            recommendations=[]
+            if not blockers
+            else ["Run safe export/import preview/apply and review package evidence."],
+        )
+
+    def _rc_provider_reliability_section(
+        self,
+        world_id: uuid.UUID,
+        limit: int,
+        *,
+        provider_reliability_reviewed: bool,
+    ) -> ProductionReadinessSection:
+        providers = self._session.scalars(
+            select(ProviderIntegration)
+            .where(ProviderIntegration.world_id == world_id)
+            .order_by(ProviderIntegration.updated_at.desc())
+            .limit(limit),
+        ).all()
+        manual_fallback_count = sum(
+            1
+            for provider in providers
+            if _provider_manual_fallback_enabled(provider.config_json)
+        )
+        degraded_health_count = int(
+            self._session.scalar(
+                select(func.count(ProviderHealthCheck.id))
+                .join(
+                    ProviderIntegration,
+                    ProviderIntegration.id == ProviderHealthCheck.provider_integration_id,
+                )
+                .where(
+                    ProviderIntegration.world_id == world_id,
+                    ProviderHealthCheck.status.in_(("degraded", "unhealthy")),
+                )
+            )
+            or 0
+        )
+        fallback_invocation_count = self._fallback_invocation_count(world_id)
+        requeue_count = self._requeue_media_job_count(world_id)
+        blockers: list[str] = []
+        if manual_fallback_count + fallback_invocation_count + requeue_count == 0:
+            blockers.append("No provider reliability policy, fallback, or requeue evidence exists.")
+        if not provider_reliability_reviewed:
+            blockers.append("Provider reliability review is not confirmed.")
+        warning_count = 1 if degraded_health_count else 0
+        return _readiness_section(
+            "provider_reliability",
+            status=IncidentStatus.BLOCKED
+            if blockers
+            else IncidentStatus.WATCH
+            if warning_count
+            else IncidentStatus.OK,
+            summary=(
+                f"{manual_fallback_count} manual fallback policies, "
+                f"{fallback_invocation_count} fallback invocations, {requeue_count} requeues, "
+                f"{degraded_health_count} degraded/unhealthy health checks."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="provider_integration",
+                    id=str(provider.id),
+                    component="provider_reliability",
+                    status=provider.status,
+                    reason_code="manual_fallback_policy"
+                    if _provider_manual_fallback_enabled(provider.config_json)
+                    else "provider_reliability_context",
+                    world_id=provider.world_id,
+                    occurred_at=provider.updated_at,
+                )
+                for provider in providers
+            ],
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers and not warning_count
+            else ["Review provider reliability, fallback, degraded mode, and requeue evidence."],
+        )
+
+    def _rc_user_facing_polish_section(
+        self,
+        *,
+        user_facing_polish_reviewed: bool,
+    ) -> ProductionReadinessSection:
+        blockers = [] if user_facing_polish_reviewed else [
+            "User-facing polish review is not confirmed."
+        ]
+        return _readiness_section(
+            "user_facing_polish",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=(
+                "v1.1 user-facing polish evidence is represented by the Phase 7 Web gate "
+                "and manual normal-use review."
+            ),
+            evidence_refs=[
+                IncidentEvidenceRef(
+                    kind="web_gate",
+                    id="v1.1-phase-7-user-facing-polish",
+                    component="user_facing_polish",
+                    status="reviewed" if user_facing_polish_reviewed else "missing_review",
+                    reason_code="phase_7_web_lint_typecheck_unit_build_e2e",
+                )
+            ],
+            blockers=blockers,
+            recommendations=[] if not blockers else ["Review Phase 7 Web polish gate evidence."],
+        )
+
+    def _rc_manual_normal_use_section(
+        self,
+        checklist: list[SelfUseMvpManualChecklistItem],
+    ) -> ProductionReadinessSection:
+        blockers = [
+            item.title
+            for item in checklist
+            if item.required_for_pass and item.status == IncidentStatus.BLOCKED
+        ]
+        warning_count = sum(1 for item in checklist if item.status == IncidentStatus.WATCH)
+        return _readiness_section(
+            "manual_normal_use_checklist",
+            status=IncidentStatus.BLOCKED if blockers else IncidentStatus.OK,
+            summary=f"{len(checklist) - len(blockers)} of {len(checklist)} manual checks pass.",
+            blockers=blockers,
+            warning_count=warning_count,
+            recommendations=[]
+            if not blockers
+            else ["Complete the manual normal-use RC checklist before archive."],
+        )
+
+    def _package_metadata_worlds(self, limit: int) -> list[World]:
+        worlds = self._session.scalars(
+            select(World).order_by(World.updated_at.desc()).limit(1000),
+        ).all()
+        return [
+            world
+            for world in worlds
+            if isinstance(world.rules_config, dict)
+            and isinstance(world.rules_config.get("package_import_extended_manifests"), dict)
+        ][:limit]
+
+    def _fallback_invocation_count(self, world_id: uuid.UUID) -> int:
+        count = 0
+        for request_params in self._session.scalars(
+            select(ModelInvocation.request_params_json).where(ModelInvocation.world_id == world_id),
+        ):
+            if isinstance(request_params, dict) and request_params.get("fallback_selected") is True:
+                count += 1
+        return count
+
+    def _requeue_media_job_count(self, world_id: uuid.UUID) -> int:
+        count = 0
+        for provider_config in self._session.scalars(
+            select(MediaJob.provider_config_json).where(MediaJob.world_id == world_id),
+        ):
+            if (
+                isinstance(provider_config, dict)
+                and provider_config.get("provider_reliability_requeue") is True
+            ):
+                count += 1
+        return count
 
     def _self_use_conversation(
         self,
@@ -4417,6 +4955,111 @@ def _private_beta_manual_checklist(
             required_for_pass=True,
         ),
     ]
+
+
+def _release_candidate_manual_checklist(
+    *,
+    operational_runbooks_reviewed: bool,
+    backup_restore_drill_reviewed: bool,
+    normal_use_stress_reviewed: bool,
+    content_safety_reviewed: bool,
+    import_export_reviewed: bool,
+    provider_reliability_reviewed: bool,
+    user_facing_polish_reviewed: bool,
+    normal_use_manual_checklist_reviewed: bool,
+) -> list[SelfUseMvpManualChecklistItem]:
+    checks = (
+        (
+            "operational_runbooks_reviewed",
+            "Operational runbooks reviewed",
+            operational_runbooks_reviewed,
+            "Operator confirmed normal-use runbooks are current and actionable.",
+            (
+                "Review provider, quota, media, migration, backup, rollback, worldline, "
+                "secret, beta incident, import/export, and fallback runbooks."
+            ),
+        ),
+        (
+            "backup_restore_drill_reviewed",
+            "Backup/restore drill reviewed",
+            backup_restore_drill_reviewed,
+            "Operator reviewed successful fresh local/single-host restore drill evidence.",
+            "Run and review the backup/restore drill report.",
+        ),
+        (
+            "normal_use_stress_reviewed",
+            "Normal-use stress reviewed",
+            normal_use_stress_reviewed,
+            "Operator reviewed deterministic normal-use stress evidence.",
+            "Run and review the normal-use stress report.",
+        ),
+        (
+            "content_safety_reviewed",
+            "Content safety and moderation reviewed",
+            content_safety_reviewed,
+            "Operator reviewed moderation, takedown, privacy, and escalation evidence.",
+            "Review content safety, moderation, and feedback escalation evidence.",
+        ),
+        (
+            "import_export_reviewed",
+            "Import/export stability reviewed",
+            import_export_reviewed,
+            "Operator reviewed safe package import/export evidence.",
+            "Review world package export/import preview/apply evidence.",
+        ),
+        (
+            "provider_reliability_reviewed",
+            "Provider reliability reviewed",
+            provider_reliability_reviewed,
+            "Operator reviewed provider degraded mode, fallback, and requeue evidence.",
+            "Review provider reliability policy, fallback, quota, and audit evidence.",
+        ),
+        (
+            "user_facing_polish_reviewed",
+            "User-facing polish reviewed",
+            user_facing_polish_reviewed,
+            "Operator reviewed Phase 7 Web gate and normal-use UI polish evidence.",
+            (
+                "Review onboarding, resume, playback, quota, feedback, setup, import/export, "
+                "and provider status polish."
+            ),
+        ),
+        (
+            "normal_use_manual_checklist_reviewed",
+            "Normal-use manual checklist reviewed",
+            normal_use_manual_checklist_reviewed,
+            "Operator confirmed the normal-use RC checklist is complete.",
+            "Complete the normal-use release-candidate checklist.",
+        ),
+    )
+    items = [
+        SelfUseMvpManualChecklistItem(
+            item_key=key,
+            title=title,
+            status=IncidentStatus.OK if passed else IncidentStatus.BLOCKED,
+            evidence_hint=ok_hint if passed else missing_hint,
+            required_for_pass=True,
+        )
+        for key, title, passed, ok_hint, missing_hint in checks
+    ]
+    items.append(
+        SelfUseMvpManualChecklistItem(
+            item_key="release_candidate_not_public_launch",
+            title="Release candidate is not public launch readiness",
+            status=IncidentStatus.OK,
+            evidence_hint=(
+                "Passing RC readiness does not publicize worlds, enable unauthenticated access, "
+                "or replace public launch readiness."
+            ),
+            required_for_pass=True,
+        )
+    )
+    return items
+
+
+def _provider_manual_fallback_enabled(config_json: dict[str, Any]) -> bool:
+    reliability = config_json.get("reliability") if isinstance(config_json, dict) else None
+    return isinstance(reliability, dict) and reliability.get("manual_fallback_enabled") is True
 
 
 def _record(model: RuntimeDiagnosticEvent) -> RuntimeDiagnosticRecord:
