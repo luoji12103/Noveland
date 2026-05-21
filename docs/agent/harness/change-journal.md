@@ -44,6 +44,17 @@
 - Docs updated: Phase 2 checkpoint, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Commit Phase 2, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 3. No Web UI was touched, so `impeccable` was not required for Phase 2.
 
+## v1.1 Phase 2 Real Backup/Restore Drill merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 2 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-2-backup-restore-drill` into local `main`, marked Phase 2 complete in OpenSpec tasks, and moved harness handoff state to Phase 3 Multi-world / Multi-user Stress Test.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 2 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `3.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 3 on `feature/v1.1-3-multi-world-multi-user-stress` from clean local `main` with a docs-only stress baseline checkpoint before implementation. No push performed.
+
 ## v1.1 Normal Use / Release Candidate feasibility review entry
 
 - Date: 2026-05-21

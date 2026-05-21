@@ -26,7 +26,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 3.3 Verify database, media, checksums, worldlines, conversations, presentations, memory, provider config without secrets, and OpenSpec/docs provenance.
 - [x] 3.4 Add backup/restore drill, checksum, reference, and no-secret tests.
 - [x] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 3.6 Fast-forward merge to local main and update harness docs.
+- [x] 3.6 Fast-forward merge to local main and update harness docs.
 
 ## 4. Phase 3 — Multi-world / Multi-user Stress Test
 

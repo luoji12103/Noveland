@@ -1,11 +1,10 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 2 Real Backup/Restore Drill commit and fast-forward merge
 - v1.1 Phase 3 Multi-world / Multi-user Stress Test planning checkpoint, after Phase 2 merge
 
 ## In Progress
-- v1.1 Phase 2 Real Backup/Restore Drill
+- None
 
 ## Blocked
 - None
@@ -21,6 +20,7 @@
 - v1.1 Phase 2 Real Backup/Restore Drill implementation
 - v1.1 Phase 2 Real Backup/Restore Drill targeted tests
 - v1.1 Phase 2 Real Backup/Restore Drill full backend/OpenSpec gate
+- v1.1 Phase 2 Real Backup/Restore Drill fast-forward merge
 - v1.1 Normal Use / Release Candidate feasibility review and OpenSpec adaptation
 - v1.0 Private Beta MVP OpenSpec archive and release notes
 - v1.0 Phase 8 Private Beta Gate fast-forward merge
