@@ -2,8 +2,8 @@
 
 - Date: 2026-05-21T00:00:00Z
 - Branch: main
-- Objective: start v1.1 Phase 6 Provider Reliability Layer from clean local main.
-- Status: v1.1 Phase 6 Provider Reliability Layer implementation, targeted tests, and full backend/OpenSpec gate are complete on the feature branch. Commit and fast-forward merge are next. No push performed.
+- Objective: start v1.1 Phase 7 User-facing Polish from clean local main.
+- Status: v1.1 Phase 6 Provider Reliability Layer is complete and fast-forward merged locally. Main has merge bookkeeping changes pending. No push performed.
 
 ## Current Context
 
@@ -35,6 +35,7 @@
 - v1.1 Phase 6 Provider Reliability Layer checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.6-provider-reliability-layer-plan.md`. The phase will extend the existing providers boundary with migration-free health trend/degraded reports, manual-first fallback policy validation, fallback audit metadata in provider execution, and audited media-job requeue. No Web UI is scoped for Phase 6.
 - v1.1 Phase 6 implementation adds `backend/packages/providers/src/noveland/providers/reliability.py`, reliability DTOs, provider router endpoints for reliability reports, fallback planning, and provider media-job requeue, plus explicit fallback request fields on provider execution/test/smoke DTOs. Automatic fallback remains disabled; fallback only runs when explicitly requested and policy, degraded evidence, capability, quota, auth, and audit checks pass. Targeted checks passed: focused provider ruff, focused provider mypy, and `cd backend && uv run pytest tests/test_provider_execution_service.py tests/test_api_providers.py -q` (`28 passed`).
 - v1.1 Phase 6 full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`550 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- v1.1 Phase 6 commit `43d7f47` fast-forward merged to local `main`; merge bookkeeping is being recorded in OpenSpec task `7.6`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
 - v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.

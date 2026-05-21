@@ -1,7 +1,7 @@
 # Task Board
 
 ## Open
-- v1.1 Phase 6 Provider Reliability Layer fast-forward merge
+- v1.1 Phase 7 User-facing Polish planning checkpoint
 
 ## In Progress
 - None
@@ -14,6 +14,7 @@
 - v1.1 Phase 6 Provider Reliability Layer implementation
 - v1.1 Phase 6 Provider Reliability Layer targeted tests
 - v1.1 Phase 6 Provider Reliability Layer full backend/OpenSpec gate
+- v1.1 Phase 6 Provider Reliability Layer fast-forward merge
 - v1.1 Phase 5 Import/Export Stability planning checkpoint
 - v1.1 Phase 5 Import/Export Stability implementation
 - v1.1 Phase 5 Import/Export Stability targeted tests

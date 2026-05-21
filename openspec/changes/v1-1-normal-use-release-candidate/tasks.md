@@ -62,7 +62,7 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 - [x] 7.3 Add provider reliability UI only after using `impeccable` if Web scope is approved.
 - [x] 7.4 Add degraded mode, retry, fallback, quota, audit, and no-hidden-spend tests.
 - [x] 7.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
-- [ ] 7.6 Fast-forward merge to local main and update harness docs.
+- [x] 7.6 Fast-forward merge to local main and update harness docs.
 
 ## 8. Phase 7 — User-facing Polish
 

@@ -44,6 +44,17 @@
 - Docs updated: Phase 6 checkpoint, project index, file inventory, task board, active handoff, and change journal.
 - Follow-up notes: Full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`550 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`. Commit Phase 6, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 7. No Web UI was touched, so `impeccable` was not required for Phase 6.
 
+## v1.1 Phase 6 Provider Reliability Layer merge entry
+
+- Date: 2026-05-21
+- Branch: main
+- Scope: v1.1 Normal Use / Release Candidate Phase 6 merge bookkeeping.
+- Summary: Fast-forward merged `feature/v1.1-6-provider-reliability-layer` into local `main`, marked Phase 6 complete in OpenSpec tasks, and moved harness handoff state to Phase 7 User-facing Polish.
+- Files changed: OpenSpec tasks, task board, active handoff, and change journal.
+- Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 6 backend/OpenSpec gate.
+- Docs updated: OpenSpec task `7.6`, task board, active handoff, and change journal.
+- Follow-up notes: Start Phase 7 on `feature/v1.1-7-user-facing-polish` from clean local `main`, read/use `impeccable`, and keep polish scoped to existing user/operator flows. No push performed.
+
 ## Entry format
 
 - Date:
