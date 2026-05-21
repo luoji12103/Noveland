@@ -1,4 +1,6 @@
 from noveland.observability.contracts import (
+    BackupRestoreDrillCheck,
+    BackupRestoreDrillReport,
     DiagnosticComponent,
     DiagnosticRetentionDryRun,
     DiagnosticRetentionPruneResult,
@@ -29,6 +31,8 @@ from noveland.observability.services import (
 PACKAGE_NAME = "observability"
 
 __all__ = [
+    "BackupRestoreDrillCheck",
+    "BackupRestoreDrillReport",
     "DiagnosticComponent",
     "DiagnosticRetentionDryRun",
     "DiagnosticRetentionPruneResult",

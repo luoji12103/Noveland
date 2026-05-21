@@ -14,6 +14,9 @@ __all__ = [
     "StorageAuditFinding",
     "StorageAuditResult",
     "StorageIntegrityAuditService",
+    "BackupRestoreDrillService",
+    "RestoreDrillCheck",
+    "RestoreDrillReport",
     "verify_backup_readiness",
 ]
 
@@ -27,4 +30,8 @@ def __getattr__(name: str) -> object:
         from noveland.storage import integrity as _integrity
 
         return getattr(_integrity, name)
+    if name in {"BackupRestoreDrillService", "RestoreDrillCheck", "RestoreDrillReport"}:
+        from noveland.storage import restore_drill as _restore_drill
+
+        return getattr(_restore_drill, name)
     raise AttributeError(name)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -8,6 +9,7 @@ from noveland.auth import AuthenticatedSubject
 from noveland.core.settings import load_settings
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.observability import (
+    BackupRestoreDrillReport,
     IncidentDiagnosticsService,
     IncidentSummary,
     PrivateBetaGateReport,
@@ -20,9 +22,11 @@ from noveland.observability import (
 from noveland.services.api.dependencies import get_db_session, get_platform_admin_subject
 from noveland.storage import LocalObjectStorage
 from noveland.storage.integrity import StorageIntegrityAuditService
+from noveland.storage.restore_drill import BackupRestoreDrillService
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/observability", tags=["observability"])
+REPO_ROOT = Path(__file__).resolve().parents[7]
 
 
 @router.get("/incidents/summary", response_model=IncidentSummary)
@@ -181,4 +185,59 @@ def get_private_beta_readiness(
         feedback_triage_verified=feedback_triage_verified,
         memory_persona_qa_reviewed=memory_persona_qa_reviewed,
         repair_loop_reviewed=repair_loop_reviewed,
+    )
+
+
+@router.get(
+    "/readiness/backup-restore-drill",
+    response_model=BackupRestoreDrillReport,
+)
+def get_backup_restore_drill_readiness(
+    subject: Annotated[AuthenticatedSubject, Depends(get_platform_admin_subject)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    storage_audit_limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
+    storage_finding_limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+) -> BackupRestoreDrillReport:
+    del subject
+    settings = load_settings()
+    storage_audit = StorageIntegrityAuditService(
+        db_session,
+        media_storage=LocalMediaObjectStorage(settings.object_storage_root / "media"),
+        object_storage=LocalObjectStorage(settings.object_storage_root),
+    ).audit(limit=storage_audit_limit, finding_limit=storage_finding_limit)
+    openspec_root = REPO_ROOT / "openspec"
+    archive_root = openspec_root / "changes/archive"
+    report = BackupRestoreDrillService(
+        db_session,
+        storage_audit=storage_audit,
+        openspec_root_exists=openspec_root.is_dir(),
+        current_specs_exist=(openspec_root / "specs").is_dir(),
+        archived_change_count=len(list(archive_root.glob("*"))) if archive_root.is_dir() else 0,
+    ).report()
+    return BackupRestoreDrillReport.model_validate(
+        {
+            "status": report.status,
+            "generated_at": report.generated_at,
+            "target_profile": report.target_profile,
+            "check_count": report.check_count,
+            "evidence_count": report.evidence_count,
+            "blocker_count": report.blocker_count,
+            "warning_count": report.warning_count,
+            "checks": [
+                {
+                    "check_key": check.check_key,
+                    "status": check.status,
+                    "summary": check.summary,
+                    "evidence_count": check.evidence_count,
+                    "blocker_count": check.blocker_count,
+                    "warning_count": check.warning_count,
+                    "evidence_refs": list(check.evidence_refs),
+                    "blockers": list(check.blockers),
+                    "warnings": list(check.warnings),
+                }
+                for check in report.checks
+            ],
+            "suppressed_fields": list(report.suppressed_fields),
+            "non_goals": list(report.non_goals),
+        },
     )

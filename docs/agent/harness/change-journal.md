@@ -33,6 +33,17 @@
 - Docs updated: OpenSpec task `2.5`, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 2 on `feature/v1.1-2-backup-restore-drill` from clean local `main` with a docs-only fresh local restore drill checkpoint before implementation. No push performed.
 
+## v1.1 Phase 2 Real Backup/Restore Drill implementation entry
+
+- Date: 2026-05-21
+- Branch: feature/v1.1-2-backup-restore-drill
+- Scope: v1.1 Normal Use / Release Candidate Phase 2 implementation only.
+- Summary: Added the Phase 2 checkpoint and a read-only fresh local/single-host restore drill verifier. The verifier reuses storage integrity audit evidence to check restored database state, media objects, checksums, snapshot payloads, provider config metadata without secrets, OpenSpec provenance, and safe report redaction. Added platform-admin `/observability/readiness/backup-restore-drill` under the existing observability/readiness boundary. The phase adds no migrations, provider calls, Web UI, broad `worlds.py` routes, persisted drill tables, or public restore reports.
+- Files changed: `backend/packages/storage/src/noveland/storage/restore_drill.py`, storage/observability exports and contracts, `backend/services/api/src/noveland/services/api/observability.py`, `backend/tests/test_backup_restore_drill.py`, Phase 2 checkpoint, OpenSpec tasks through `3.4`, and harness docs.
+- Tests added/updated: Added backup/restore drill tests for complete restored fixture pass, missing media/checksum safe blocker, provider config secret-marker blocker, admin-only endpoint access, and no forbidden response markers. Targeted Phase 2 checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_backup_restore_drill.py -q` (`4 passed`). Full backend/OpenSpec gate passed: backend ruff, backend mypy (`324 source files`), backend pytest (`537 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
+- Docs updated: Phase 2 checkpoint, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: Commit Phase 2, fast-forward merge to local `main`, and record merge bookkeeping before starting Phase 3. No Web UI was touched, so `impeccable` was not required for Phase 2.
+
 ## v1.1 Normal Use / Release Candidate feasibility review entry
 
 - Date: 2026-05-21

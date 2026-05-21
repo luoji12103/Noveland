@@ -21,11 +21,11 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 3. Phase 2 — Real Backup/Restore Drill
 
-- [ ] 3.1 Write docs-only phase planning checkpoint.
-- [ ] 3.2 Implement or document executable backup/restore drill steps for a fresh local/single-host target with empty database and object storage root.
-- [ ] 3.3 Verify database, media, checksums, worldlines, conversations, presentations, memory, provider config without secrets, and OpenSpec/docs provenance.
-- [ ] 3.4 Add backup/restore drill, checksum, reference, and no-secret tests.
-- [ ] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
+- [x] 3.1 Write docs-only phase planning checkpoint.
+- [x] 3.2 Implement or document executable backup/restore drill steps for a fresh local/single-host target with empty database and object storage root.
+- [x] 3.3 Verify database, media, checksums, worldlines, conversations, presentations, memory, provider config without secrets, and OpenSpec/docs provenance.
+- [x] 3.4 Add backup/restore drill, checksum, reference, and no-secret tests.
+- [x] 3.5 Run targeted tests, full local gate, OpenSpec validation, and `git diff --check`.
 - [ ] 3.6 Fast-forward merge to local main and update harness docs.
 
 ## 4. Phase 3 — Multi-world / Multi-user Stress Test

@@ -170,6 +170,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/packages/core/src/noveland/core/database.py`
 - `backend/packages/core/src/noveland/core/models.py`
 - `backend/packages/core/src/noveland/core/settings.py`
+- `backend/packages/storage/src/noveland/storage/restore_drill.py`
 - `backend/packages/auth/`
 - `backend/packages/auth/src/noveland/auth/contracts.py`
 - `backend/packages/auth/src/noveland/auth/errors.py`
@@ -586,7 +587,9 @@ Track key structural files and prevent unregistered sprawl.
 - `docs/agent/harness/feature-updates/v1.0.8-private-beta-gate-plan.md`
 - `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`
 - `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`
+- `docs/agent/harness/feature-updates/v1.1.2-backup-restore-drill-plan.md`
 - `backend/tests/test_operational_runbooks_docs.py`
+- `backend/tests/test_backup_restore_drill.py`
 - `docs/agent/harness/release-notes/`
 - `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`
 - `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`
