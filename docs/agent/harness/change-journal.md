@@ -1,5 +1,16 @@
 # Change Journal
 
+## v1.1 Normal Use / Release Candidate archive entry
+
+- Date: 2026-05-22
+- Branch: main
+- Scope: OpenSpec archive, v1.1 current specs, release notes, and harness bookkeeping.
+- Summary: Archived the completed v1.1 Normal Use / Release Candidate OpenSpec change, synced implemented v1.1 capabilities into current OpenSpec specs, and added v1.1 release notes.
+- Files changed: `/openspec/specs/**`, `/openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/**`, `/docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md`, and harness docs.
+- Tests added/updated: N/A.
+- Docs updated: OpenSpec current specs, OpenSpec archive, v1.1 release notes, project index, file inventory, task board, active handoff, and change journal.
+- Follow-up notes: v1.1 is closed locally. Do not start a new version without explicit instruction. No backend/Web runtime behavior changed and no push was performed.
+
 ## v1.1 Phase 8 Release Candidate Gate merge entry
 
 - Date: 2026-05-21

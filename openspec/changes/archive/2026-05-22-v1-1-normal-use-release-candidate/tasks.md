@@ -84,6 +84,6 @@ Use these tasks when implementation is explicitly requested. Planning tasks may 
 
 ## 10. Closeout
 
-- [ ] 10.1 Archive the completed OpenSpec change only after all phases are accepted.
-- [ ] 10.2 Generate v1.1 release notes.
-- [ ] 10.3 Confirm main is clean and report ahead/behind origin.
+- [x] 10.1 Archive the completed OpenSpec change only after all phases are accepted.
+- [x] 10.2 Generate v1.1 release notes.
+- [x] 10.3 Confirm main is clean and report ahead/behind origin.

@@ -114,10 +114,11 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md` — release notes for the completed v0.8 Public Experience & Ecosystem sequence.
 - `docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md` — release notes for the completed v0.9 Self-use MVP Demo World Cut sequence.
 - `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md` — release notes for the completed v1.0 Private Beta MVP sequence.
-- `openspec/` — OpenSpec current specs, archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9/v1.0 changes, and active v1.1 milestone roadmap change.
+- `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md` — release notes for the completed v1.1 Normal Use / Release Candidate sequence.
+- `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9/v1.0/v1.1 changes.
 - `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/` — archived v0.9 OpenSpec change for the self-use playable demo world.
 - `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/` — archived v1.0 OpenSpec change for invite-only private beta: onboarding/access, player session stability, quota enforcement, setup wizard, memory/persona QA, beta feedback, repair loop, and private beta gate.
-- `openspec/changes/v1-1-normal-use-release-candidate/` — active OpenSpec roadmap for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
+- `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/` — archived v1.1 OpenSpec change for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
 - `docs/agent/harness/task-board.md` — current execution state only.
 - `docs/agent/operations/runtime-recovery.md` — local operator recovery playbook for runtime, provider, memory queue, event audit, and snapshot integrity incidents.
 - `docs/agent/operations/backup-restore.md` — local operator backup/restore workflow for database dumps plus object storage payload archives.

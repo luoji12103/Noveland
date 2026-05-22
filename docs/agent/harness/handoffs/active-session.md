@@ -1,9 +1,9 @@
 # Active Session Handoff
 
-- Date: 2026-05-21T00:00:00Z
+- Date: 2026-05-22T00:00:00Z
 - Branch: main
-- Objective: v1.1 Phase 1-8 implementation is complete; await explicit closeout/archive instruction.
-- Status: v1.1 Phase 8 Release Candidate Gate is committed and fast-forward merged to local main. OpenSpec tasks are complete through `9.6`; closeout tasks remain open. No push performed.
+- Objective: report v1.1 Normal Use / Release Candidate closeout status.
+- Status: v1.1 Phase 1 through Phase 8 are complete, current specs are synced, release notes are written, and the OpenSpec change is archived locally. No push performed.
 
 ## Current Context
 
@@ -18,7 +18,7 @@
 - The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
 - The completed v0.9 change is archived under `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/`.
 - Archived v1.0 roadmap change: `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/`.
-- Active v1.1 roadmap change: `openspec/changes/v1-1-normal-use-release-candidate/`.
+- Archived v1.1 roadmap change: `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/`.
 - v1.1 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`. Recommendation: **B. v1.1 can start after minor OpenSpec adjustments.** The current phase order remains Operational Runbooks, Real Backup/Restore Drill, Multi-world / Multi-user Stress Test, Content Safety & Moderation Hardening, Import/Export Stability, Provider Reliability Layer, User-facing Polish, and Release Candidate Gate.
 - v1.1 review decisions: Phase 2 restore target is a fresh local/single-host profile with empty database and object storage root; Phase 3 first stress baseline is 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and deterministic 120-turn or equivalent coverage; Phase 6 provider reliability is manual-first with opt-in constrained automatic fallback only after checkpoint approval; Phase 7 Web work must use `impeccable`.
 - v1.1 Phase 1 Operational Runbooks checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`. The phase is docs-only and adds normal-use runbooks under `docs/agent/operations/runbooks/` plus `backend/tests/test_operational_runbooks_docs.py`.
@@ -43,6 +43,7 @@
 - v1.1 Phase 8 implementation adds `ReleaseCandidateGateReport`, `ProductionReadinessGateService.release_candidate_gate_report`, and platform-admin `GET /observability/readiness/release-candidate`. Targeted checks passed: focused readiness pytest (`27 passed`), focused ruff, and focused mypy.
 - v1.1 Phase 8 full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`555 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
 - v1.1 Phase 8 commit `fbe6ce6` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `9.6`.
+- v1.1 OpenSpec change is archived under `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/`, current specs are synced under `openspec/specs/`, and release notes are recorded at `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md`.
 - v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
 - v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
 - v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.
