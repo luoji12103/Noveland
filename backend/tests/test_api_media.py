@@ -144,6 +144,18 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     primary_id, _fork_id = _seed_worldlines(engine, world_id)
     visible_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
     private_id = _seed_asset(engine, world_id, primary_id, visibility="private")
+    stored = client.media_storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{primary_id}/assets/{visible_id}/member-visible",
+        b"visible-bytes",
+        content_type="image/png",
+    )
+    with Session(engine) as session:
+        visible_asset = session.get(MediaAsset, visible_id)
+        assert visible_asset is not None
+        visible_asset.storage_uri = stored.uri
+        visible_asset.preview_uri = stored.uri
+        visible_asset.thumbnail_uri = stored.uri
+        session.commit()
 
     _authenticate_session_only(client, owner_token)
     missing_csrf = client.post(
@@ -157,6 +169,7 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/media/assets")
+    member_search = client.get(f"/worlds/{world_id}/media/assets/search")
     member_get_visible = client.get(f"/worlds/{world_id}/media/assets/{visible_id}")
     member_private_contexts = client.get(
         f"/worlds/{world_id}/media/assets/{private_id}/contexts"
@@ -176,6 +189,9 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
         },
     )
 
+    _authenticate(client, owner_token)
+    admin_get_visible = client.get(f"/worlds/{world_id}/media/assets/{visible_id}")
+
     _authenticate(client, stranger_token)
     stranger_list = client.get(f"/worlds/{world_id}/media/assets")
 
@@ -183,7 +199,21 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     assert missing_csrf.status_code == 403
     assert member_list.status_code == 200
     assert [asset["id"] for asset in member_list.json()] == [str(visible_id)]
+    assert member_list.json()[0]["storage_uri"] is None
+    assert member_list.json()[0]["preview_uri"] is None
+    assert member_list.json()[0]["thumbnail_uri"] is None
+    assert member_search.status_code == 200
+    assert member_search.json()["assets"][0]["storage_uri"] is None
+    assert member_search.json()["assets"][0]["preview_uri"] is None
+    assert member_search.json()["assets"][0]["thumbnail_uri"] is None
     assert member_get_visible.status_code == 200
+    assert member_get_visible.json()["storage_uri"] is None
+    assert member_get_visible.json()["preview_uri"] is None
+    assert member_get_visible.json()["thumbnail_uri"] is None
+    assert admin_get_visible.status_code == 200
+    assert admin_get_visible.json()["storage_uri"] == stored.uri
+    assert admin_get_visible.json()["preview_uri"] == stored.uri
+    assert admin_get_visible.json()["thumbnail_uri"] == stored.uri
     assert member_private_contexts.status_code == 404
     assert member_private_references.status_code == 404
     assert member_private_lineage.status_code == 404

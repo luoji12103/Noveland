@@ -69,3 +69,14 @@
 - Remediation: ProviderProfileService.invoke_profile now blocks legacy profile execution with a safe configuration error before API key lookup, rate-limit accounting, plugin provider creation, or HTTP transport. Provider profile test calls record a failed configuration status instead of executing external spend.
 - Verification: uv run pytest tests/test_model_provider.py tests/test_api_runtime.py tests/test_runtime_daemon.py passed with 20 passed; uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; uv run mypy packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed.
 - Residual scope: migrating legacy platform provider profiles into world-scoped ProviderExecutionService-backed provider integrations remains future work; until then legacy execution is blocked/degraded.
+
+
+### F-003 Member media asset API leaks internal storage references
+
+- Severity: High
+- Affected boundary: reader/member API exposure of internal media storage references.
+- Evidence: backend/services/api/src/noveland/services/api/media.py list_media_assets, search_media_assets, and get_media_asset use get_world_member_context but return MediaAssetRecord; backend/packages/media/src/noveland/media/contracts.py MediaAssetRecord includes storage_uri, preview_uri, and thumbnail_uri; backend/packages/media/src/noveland/media/service.py _asset_record copies those fields from MediaAsset without redaction. Uploaded or registered visible assets can therefore expose media:// storage references to ordinary world members.
+- Impact: world members can learn internal object-storage keys/URIs for visible media assets outside the reader-safe media descriptor/download route, violating architecture-contracts and increasing storage path disclosure risk.
+- Remediation: media asset list/search/get responses now redact asset-level storage_uri, preview_uri, and thumbnail_uri when served to non-admin member contexts, while world admins/platform admins keep storage reference visibility for media management.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 12 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.
+- Residual scope: member-facing media metadata, context/input/reference metadata, and broader forbidden-data response paths remain under the ongoing 2.4 audit.

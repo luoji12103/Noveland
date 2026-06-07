@@ -3260,3 +3260,15 @@
 - Tests added/updated: Service-level regression tests proving legacy execution is blocked before mock transport execution and before missing secret-ref disclosure, plus provider test-call state coverage for failed/degraded legacy execution.
 - Verification: uv run pytest tests/test_model_provider.py tests/test_api_runtime.py tests/test_runtime_daemon.py passed with 20 passed; uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; uv run mypy packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed.
 - Follow-up notes: Future migration should map or replace platform provider profiles with world-scoped ProviderExecutionService provider integrations. Continue backend audit with worldline isolation and forbidden-data exposure paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening member media storage reference remediation entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-003.
+- Finding: F-003 found member media asset list/search/get routes using get_world_member_context but returning MediaAssetRecord, whose storage_uri, preview_uri, and thumbnail_uri fields were copied directly from media assets.
+- Summary: Added an architecture-contracts OpenSpec delta for member media asset storage-reference redaction, then redacted asset-level storage_uri, preview_uri, and thumbnail_uri from non-admin member media asset list/search/get responses. World admins and platform admins retain the internal storage reference fields for media management.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Media API member visibility regression now seeds a member-visible asset with internal storage references and asserts list/search/get redact them for members while preserving them for world admins.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 12 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed.
+- Follow-up notes: Continue forbidden-data audit for member-facing media metadata, media contexts/inputs/references, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.

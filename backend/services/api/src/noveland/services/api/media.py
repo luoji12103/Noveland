@@ -297,7 +297,8 @@ def list_media_assets(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[MediaAssetRecord]:
     try:
-        return MediaService(db_session).list_assets(
+        member_visible_only = _member_visible_only(_context)
+        assets = MediaService(db_session).list_assets(
             world_id,
             MediaAssetListFilters(
                 worldline_id=worldline_id,
@@ -315,8 +316,9 @@ def list_media_assets(
                 contains_text=contains_text,
                 limit=limit,
             ),
-            member_visible_only=not _context.is_platform_admin and _context.role != "world_admin",
+            member_visible_only=member_visible_only,
         )
+        return [_media_asset_record_for_context(asset, _context) for asset in assets]
     except (MediaValidationError, ValueError) as exc:
         raise _unprocessable(str(exc)) from exc
 
@@ -345,7 +347,7 @@ def search_media_assets(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> MediaAssetSearchResult:
     try:
-        return MediaCatalogService(db_session).search_assets(
+        result = MediaCatalogService(db_session).search_assets(
             world_id,
             MediaAssetSearchFilters(
                 worldline_id=worldline_id,
@@ -367,6 +369,13 @@ def search_media_assets(
                 limit=limit,
             ),
             member_visible_only=_member_visible_only(context),
+        )
+        return result.model_copy(
+            update={
+                "assets": [
+                    _media_asset_record_for_context(asset, context) for asset in result.assets
+                ]
+            }
         )
     except ValueError as exc:
         raise _unprocessable(str(exc)) from exc
@@ -484,7 +493,7 @@ def get_media_asset(
     )
     if record is None:
         raise _not_found()
-    return record
+    return _media_asset_record_for_context(record, _context)
 
 
 @router.get("/assets/{asset_id}/objects", response_model=list[MediaObjectRecord])
@@ -1470,6 +1479,17 @@ def _require_visible_asset(
 
 def _member_visible_only(context: WorldAccessContext) -> bool:
     return not context.is_platform_admin and context.role != "world_admin"
+
+
+def _media_asset_record_for_context(
+    record: MediaAssetRecord,
+    context: WorldAccessContext,
+) -> MediaAssetRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(
+        update={"storage_uri": None, "preview_uri": None, "thumbnail_uri": None}
+    )
 
 
 def _parse_tag_filters(encoded_filters: list[str]) -> list[MediaAssetTagFilter]:
