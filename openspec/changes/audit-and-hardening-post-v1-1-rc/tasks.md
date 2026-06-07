@@ -90,3 +90,13 @@
 - Intended remediation: make media job list/detail admin-only using the existing world admin dependency, preserve admin media management visibility, and add targeted regression coverage that ordinary members receive 403 while admins still receive job internals.
 - Status: Remediated in backend media job boundary batch.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.
+
+### F-005 Member media lineage leaks related asset storage references
+
+- Severity: High
+- Affected boundary: member media API exposure of internal storage references through nested lineage DTOs.
+- Evidence: backend/services/api/src/noveland/services/api/media.py media_asset_lineage uses get_world_member_context but returns MediaLineageService.lineage directly; backend/packages/media/src/noveland/media/catalog.py MediaLineageService.lineage builds related_assets with _asset_record(model), which includes storage_uri, preview_uri, and thumbnail_uri from MediaAssetRecord. The F-003 response shaping only redacts top-level media asset list/search/get records, not lineage related_assets.
+- Impact: a world member who can read visible media lineage can learn internal object-storage keys/URIs for related visible assets through the nested related_assets array.
+- Intended remediation: shape MediaAssetLineage.related_assets through the existing member/admin media asset redaction helper in the API layer and add regression coverage for member redaction plus admin preservation.
+- Status: Remediated in backend media lineage redaction batch.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.

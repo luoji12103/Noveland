@@ -3,13 +3,13 @@
 - Date: 2026-06-08T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001, F-002, F-003, and F-004 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-005 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Baseline before branch: main and origin/main at 1ffbf8a7876a5ddc10789db2339cf2efba125c76, commit docs(openspec): archive v1.1 normal use release candidate.
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-004 batch: ca88e17 fix(security): redact member media storage refs.
+- Current HEAD before F-005 batch: e7e469a fix(security): restrict media job diagnostics to admins.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. Other uvicorn/next processes exist on the host, but they were not treated as authoritative Noveland project services for this audit.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,12 +26,11 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime server state: branch feature/audit-and-hardening-post-v1-1-rc, HEAD ca88e17 before this batch, clean worktree, active OpenSpec change 12/27 tasks, specs and changes strict validation passing, Postgres/NATS healthy.
-- Audited media forbidden-data exposure after F-003.
-- Recorded F-004: media job list/detail used get_world_member_context while returning MediaJobRecord with provider_config_json, request_json, result_json, error_text, and created_by_actor_ref.
-- Added an architecture-contracts OpenSpec delta requiring member-scoped media routes not to expose media job execution diagnostics.
-- Made media job list/detail admin-only via get_world_admin_context while preserving admin media management diagnostics.
-- Added regression coverage proving ordinary world members receive 403 for media job list/detail containing internal execution evidence and world admins still receive diagnostics.
+- Continued media forbidden-data audit after F-004.
+- Recorded F-005: member media lineage returned related_assets from MediaLineageService.lineage without applying API-layer storage reference redaction to nested MediaAssetRecord values.
+- Added an architecture-contracts OpenSpec delta requiring member media lineage related_assets to redact storage_uri, preview_uri, and thumbnail_uri.
+- Shaped MediaAssetLineage.related_assets through the existing _media_asset_record_for_context helper.
+- Extended regression coverage proving ordinary world members receive redacted related asset storage refs and world admins retain them.
 
 ## Verification This Batch
 
@@ -39,17 +38,16 @@
 - uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py: passed.
 - uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py: passed.
 - openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
-- openspec validate --specs --strict: 76 passed.
 - git diff --check: passed before commit.
 
 ## Remaining Work
 
-1. Continue backend security audit with member-facing media lineage related_assets, metadata-bearing contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation checks.
+1. Continue backend security audit with metadata-bearing media contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation checks.
 2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-004
+## Finding F-005
 
-- Member media job list/detail routes used get_world_member_context but returned MediaJobRecord, which includes provider_config_json, request_json, result_json, error_text, and created_by_actor_ref.
-- The remediation makes media job list/detail admin-only. Ordinary members no longer receive the job DTO, so provider config, prompt-like request JSON, storage_uri/bytes/base64 markers, raw-output-like result JSON, error text, and actor refs stay on admin diagnostics surfaces.
-- Residual risk: media lineage related_assets and metadata-bearing member media DTOs still need dedicated forbidden-data review.
+- Member media lineage related_assets were returned as full MediaAssetRecord values from the media catalog service, bypassing the F-003 top-level asset redaction helper.
+- The remediation redacts storage_uri, preview_uri, and thumbnail_uri for related_assets in non-admin member lineage responses while preserving admin media-management visibility.
+- Residual risk: arbitrary metadata on member-visible media context/input/reference/collection/tag DTOs still needs dedicated forbidden-data review.

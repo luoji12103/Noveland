@@ -293,6 +293,18 @@ def test_media_api_member_can_read_visible_fork_asset_references() -> None:
     _primary_id, fork_id = _seed_worldlines(engine, world_id)
     source_id = _seed_asset(engine, world_id, fork_id, visibility="world_member")
     output_id = _seed_asset(engine, world_id, fork_id, visibility="world_member")
+    stored = client.media_storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{fork_id}/assets/{source_id}/lineage-related",
+        b"lineage-related",
+        content_type="image/png",
+    )
+    with Session(engine) as session:
+        source_asset = session.get(MediaAsset, source_id)
+        assert source_asset is not None
+        source_asset.storage_uri = stored.uri
+        source_asset.preview_uri = stored.uri
+        source_asset.thumbnail_uri = stored.uri
+        session.commit()
 
     _authenticate(client, owner_token)
     created_input = client.post(
@@ -308,9 +320,20 @@ def test_media_api_member_can_read_visible_fork_asset_references() -> None:
     lineage = client.get(f"/worlds/{world_id}/media/assets/{output_id}/lineage")
     references = client.get(f"/worlds/{world_id}/media/assets/{source_id}/references")
 
+    _authenticate(client, owner_token)
+    admin_lineage = client.get(f"/worlds/{world_id}/media/assets/{output_id}/lineage")
+
     assert created_input.status_code == 201
     assert lineage.status_code == 200
     assert lineage.json()["inputs"][0]["input_asset_id"] == str(source_id)
+    assert lineage.json()["related_assets"][0]["id"] == str(source_id)
+    assert lineage.json()["related_assets"][0]["storage_uri"] is None
+    assert lineage.json()["related_assets"][0]["preview_uri"] is None
+    assert lineage.json()["related_assets"][0]["thumbnail_uri"] is None
+    assert admin_lineage.status_code == 200
+    assert admin_lineage.json()["related_assets"][0]["storage_uri"] == stored.uri
+    assert admin_lineage.json()["related_assets"][0]["preview_uri"] == stored.uri
+    assert admin_lineage.json()["related_assets"][0]["thumbnail_uri"] == stored.uri
     assert references.status_code == 200
     assert references.json()["input_count"] == 1
 

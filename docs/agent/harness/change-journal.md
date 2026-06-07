@@ -3284,3 +3284,15 @@
 - Tests added/updated: Added a Media API regression that seeds provider config, raw prompt-like request JSON, storage_uri, bytes/base64 marker, raw output-like result JSON, and error_text; ordinary world members now receive 403 on list/detail while world admins retain diagnostics.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
 - Follow-up notes: Continue forbidden-data audit for member-facing media lineage related_assets, metadata-bearing contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening media lineage related asset redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-005.
+- Finding: F-005 found member media lineage responses returning related_assets from MediaLineageService.lineage without API-layer member redaction, leaving storage_uri, preview_uri, and thumbnail_uri visible on nested MediaAssetRecord values.
+- Summary: Added an architecture-contracts OpenSpec delta for member media lineage related asset redaction, then shaped MediaAssetLineage.related_assets through the existing media asset context redaction helper. World admins retain related asset storage references for media management.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the visible fork lineage regression to seed related asset storage references and assert member lineage redacts storage_uri, preview_uri, and thumbnail_uri while admin lineage preserves them.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
+- Follow-up notes: Continue forbidden-data audit for metadata-bearing media contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.

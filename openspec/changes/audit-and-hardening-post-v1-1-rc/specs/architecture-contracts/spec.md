@@ -19,3 +19,10 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** they request media job list or detail responses
 - **THEN** the response SHALL NOT expose provider configuration JSON, request JSON, result JSON, error text, actor refs, raw prompts, raw outputs, storage refs, bytes, or base64 execution evidence
 - **AND** admin media management routes MAY continue to expose job internals required for operator diagnosis.
+
+
+#### Scenario: Member reads media asset lineage
+- **GIVEN** a world member can read visible media asset lineage
+- **WHEN** lineage includes related visible media assets with internal storage references
+- **THEN** every related asset in the member response SHALL redact storage_uri, preview_uri, and thumbnail_uri
+- **AND** admin media routes MAY continue to expose those related asset storage references for media management.

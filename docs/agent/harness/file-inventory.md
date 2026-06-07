@@ -794,3 +794,5 @@ If a coding agent created a structural path that is not listed here and did not 
 ## Recent Audit Notes
 
 - 2026-06-08 F-004 kept existing media API ownership in `backend/services/api/src/noveland/services/api/media.py` and regression coverage in `backend/tests/test_api_media.py`; no new structural files were added. Media job list/detail are admin-only because `MediaJobRecord` carries provider_config_json, request_json, result_json, error_text, and actor refs.
+
+- 2026-06-08 F-005 kept existing media API ownership in `backend/services/api/src/noveland/services/api/media.py` and regression coverage in `backend/tests/test_api_media.py`; no new structural files were added. Member media lineage now redacts storage_uri, preview_uri, and thumbnail_uri on nested related_assets.

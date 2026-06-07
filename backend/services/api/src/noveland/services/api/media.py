@@ -877,10 +877,18 @@ def media_asset_lineage(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return MediaLineageService(db_session).lineage(
+        lineage = MediaLineageService(db_session).lineage(
             world_id,
             asset_id,
             member_visible_only=_member_visible_only(context),
+        )
+        return lineage.model_copy(
+            update={
+                "related_assets": [
+                    _media_asset_record_for_context(asset, context)
+                    for asset in lineage.related_assets
+                ]
+            }
         )
     except MediaNotFoundError as exc:
         raise _not_found() from exc
