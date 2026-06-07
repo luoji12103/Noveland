@@ -1224,7 +1224,7 @@ def create_media_job(
 @router.get("/jobs", response_model=list[MediaJobRecord])
 def list_media_jobs(
     world_id: uuid.UUID,
-    _context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: Annotated[uuid.UUID | None, Query()] = None,
     job_kind: Annotated[MediaJobKind | None, Query()] = None,
@@ -1271,7 +1271,7 @@ def list_media_jobs(
 def get_media_job(
     world_id: uuid.UUID,
     job_id: uuid.UUID,
-    _context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> MediaJobRecord:

@@ -221,6 +221,42 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     assert stranger_list.status_code == 404
 
 
+def test_media_api_jobs_are_admin_only_for_internal_execution_evidence() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
+
+    _authenticate(client, member_token)
+    member_list = client.get(f"/worlds/{world_id}/media/jobs")
+    member_get = client.get(f"/worlds/{world_id}/media/jobs/{job_id}")
+
+    _authenticate(client, owner_token)
+    admin_list = client.get(
+        f"/worlds/{world_id}/media/jobs", params={"worldline_id": str(primary_id)}
+    )
+    admin_get = client.get(f"/worlds/{world_id}/media/jobs/{job_id}")
+
+    assert member_id
+    assert member_list.status_code == 403
+    assert member_get.status_code == 403
+    assert admin_list.status_code == 200
+    assert [item["id"] for item in admin_list.json()] == [str(job_id)]
+    assert admin_get.status_code == 200
+    assert admin_get.json()["provider_config_json"] == {"api_key": "sk-media-job-secret"}
+    assert admin_get.json()["request_json"] == {
+        "prompt": "raw prompt",
+        "storage_uri": "media://private-object",
+        "bytes": "base64-data",
+    }
+    assert admin_get.json()["result_json"] == {"raw_output": "raw provider output"}
+    assert admin_get.json()["error_text"] == "/tmp/private-media-job failed"
+
+
 def test_media_api_rejects_narrative_artifact_and_cross_worldline_contexts() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -716,6 +752,49 @@ def _seed_asset(
         )
         session.commit()
     return asset_id
+
+
+def _seed_job_with_internal_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> uuid.UUID:
+    job_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            MediaJob(
+                id=job_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=None,
+                turn_id=None,
+                agent_id=None,
+                job_kind="image_generation",
+                provider_kind="fake",
+                status="failed",
+                priority=0,
+                cancel_policy=None,
+                deadline_hint=None,
+                dedupe_key=None,
+                invalidation_key=None,
+                source_event_id=None,
+                source_invocation_id=None,
+                provider_config_json={"api_key": "sk-media-job-secret"},
+                request_json={
+                    "prompt": "raw prompt",
+                    "storage_uri": "media://private-object",
+                    "bytes": "base64-data",
+                },
+                result_json={"raw_output": "raw provider output"},
+                error_text="/tmp/private-media-job failed",
+                created_by_actor_ref="system:test",
+                started_at=now,
+                finished_at=now,
+            )
+        )
+        session.commit()
+    return job_id
 
 
 def _seed_object(

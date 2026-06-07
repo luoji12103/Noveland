@@ -80,3 +80,13 @@
 - Remediation: media asset list/search/get responses now redact asset-level storage_uri, preview_uri, and thumbnail_uri when served to non-admin member contexts, while world admins/platform admins keep storage reference visibility for media management.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 12 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.
 - Residual scope: member-facing media metadata, context/input/reference metadata, and broader forbidden-data response paths remain under the ongoing 2.4 audit.
+
+### F-004 Member media job APIs expose provider/request/result internals
+
+- Severity: High
+- Affected boundary: member media API exposure of provider configuration, request/result payloads, raw prompt/output-like evidence, storage references, and actor refs.
+- Evidence: backend/services/api/src/noveland/services/api/media.py list_media_jobs and get_media_job use get_world_member_context and return MediaJobRecord; backend/packages/media/src/noveland/media/contracts.py MediaJobRecord includes provider_config_json, request_json, result_json, error_text, and created_by_actor_ref. Media jobs can contain provider IDs/config, prompts, storage_uri/media object refs, bytes/base64 markers, and execution failures intended for admin diagnostics.
+- Impact: any authenticated world member can enumerate or fetch media jobs for their world and read internal provider/media execution evidence that architecture-contracts reserves for admin/operator surfaces.
+- Intended remediation: make media job list/detail admin-only using the existing world admin dependency, preserve admin media management visibility, and add targeted regression coverage that ordinary members receive 403 while admins still receive job internals.
+- Status: Remediated in backend media job boundary batch.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.

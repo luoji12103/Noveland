@@ -3272,3 +3272,15 @@
 - Tests added/updated: Media API member visibility regression now seeds a member-visible asset with internal storage references and asserts list/search/get redact them for members while preserving them for world admins.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 12 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed.
 - Follow-up notes: Continue forbidden-data audit for member-facing media metadata, media contexts/inputs/references, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening media job admin boundary remediation entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-004.
+- Finding: F-004 found member media job list/detail routes using get_world_member_context while returning MediaJobRecord, which includes provider_config_json, request_json, result_json, error_text, and created_by_actor_ref.
+- Summary: Added an architecture-contracts OpenSpec delta requiring media job execution diagnostics to stay out of member responses, then made media job list/detail admin-only via the existing world admin dependency. Admin media management keeps job internals for operator diagnosis.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a Media API regression that seeds provider config, raw prompt-like request JSON, storage_uri, bytes/base64 marker, raw output-like result JSON, and error_text; ordinary world members now receive 403 on list/detail while world admins retain diagnostics.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
+- Follow-up notes: Continue forbidden-data audit for member-facing media lineage related_assets, metadata-bearing contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
