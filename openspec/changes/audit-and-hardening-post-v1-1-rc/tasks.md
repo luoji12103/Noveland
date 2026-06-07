@@ -19,7 +19,7 @@
 - [x] 3.2 Add or update targeted backend regression tests for the fixed boundary.
 - [x] 3.3 Run focused backend ruff/mypy/pytest for the touched files and record results.
 - [x] 3.4 Update OpenSpec tasks and harness documents for the backend batch.
-- [ ] 3.5 Commit the backend batch without pushing.
+- [x] 3.5 Commit the backend batch without pushing.
 
 ## 4. Web And E2E Security Audit
 
@@ -66,5 +66,6 @@
 - Affected boundary: provider spend/quota, invocation ledger, prompt snapshot, and provider secret execution boundary.
 - Evidence: backend/packages/adapters/src/noveland/adapters/model_provider.py ProviderProfileService.invoke_profile resolves API keys from provider_api_keys_json and creates plugin providers directly; backend/services/api/src/noveland/services/api/runtime.py test_provider_profile calls ProviderProfileService.test_profile; backend/services/runtime/src/noveland/services/runtime/agent_loop.py calls ProviderProfileService.invoke_profile during agent runs; backend/services/api/src/noveland/services/api/worlds.py and backend/services/api/src/noveland/services/api/conversations.py construct AgentRuntimeOrchestrator or ConversationNarrativeWriterService with ProviderProfileService; backend/packages/narrative/src/noveland/narrative/services.py invokes the profile service for summary/chapter generation.
 - Impact: legacy provider profile test calls, manual agent runs, conversation advancement, runtime daemon turns, and narrative generation can reach external provider plugins/httpx without ProviderExecutionService, the provider registry budget checks, uniform safe auth metadata, and the newer provider execution failure handling. Some agent runtime paths write invocation rows around the call, but quota and centralized secret/provider execution policy are still bypassed.
-- Intended remediation: design a compatibility path that migrates or maps legacy provider profiles into ProviderExecutionService-backed execution, or blocks/degrades external legacy profile execution until migrated; add regression tests proving no legacy profile path can execute hidden provider spend outside ProviderExecutionService.
-- Targeted verification: pending remediation design and tests.
+- Remediation: ProviderProfileService.invoke_profile now blocks legacy profile execution with a safe configuration error before API key lookup, rate-limit accounting, plugin provider creation, or HTTP transport. Provider profile test calls record a failed configuration status instead of executing external spend.
+- Verification: uv run pytest tests/test_model_provider.py tests/test_api_runtime.py tests/test_runtime_daemon.py passed with 20 passed; uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; uv run mypy packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed.
+- Residual scope: migrating legacy platform provider profiles into world-scoped ProviderExecutionService-backed provider integrations remains future work; until then legacy execution is blocked/degraded.

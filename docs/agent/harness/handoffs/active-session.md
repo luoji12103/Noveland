@@ -3,7 +3,7 @@
 - Date: 2026-06-08T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 recorded, remediated, tested, and committed at cc423ea; F-002 legacy provider profile execution bypassing ProviderExecutionService recorded with provider-system and cost-quota spec deltas. No push performed.
+- Status: F-001 recorded, remediated, tested, and committed at cc423ea; F-002 recorded at 7c900ae, remediated, tested, validated, and committed in the provider boundary batch. No push performed.
 
 ## Current Context
 
@@ -11,7 +11,7 @@
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Initial baseline before this change: openspec list --json returned no active changes; openspec validate --specs --strict passed 76 specs; openspec validate --changes --strict had no items.
-- Local services on the server: Noveland Postgres and NATS containers are healthy on overridden ports. Noveland API/Web/runtime are not intentionally running for this audit.
+- Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. Noveland API/Web/runtime are not intentionally running for this audit.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,31 +26,28 @@
 
 ## Completed This Batch
 
-- Fixed the pre-existing git diff --check failure from a trailing blank line in docs/agent/harness/change-journal.md.
-- Audited FastAPI write routes for CSRF coverage using AST over backend/services/api/src/noveland/services/api.
-- Recorded F-001: persisted moderation, player privacy, and world package import apply mutations lacked CSRF while using cookie-backed authenticated contexts.
-- Added OpenSpec deltas for content-safety-moderation-hardening, player-privacy-data-controls, and world-packaging.
-- Added decorator-level Depends(require_csrf) to the persisted mutation routes in moderation.py, player_privacy.py, and world_packaging.py.
-- Added targeted missing-CSRF regression assertions in test_api_moderation.py, test_api_player_privacy.py, and test_api_world_packaging.py.
+- Designed the F-002 compatibility remediation against the active provider-system and cost-quota-enforcement OpenSpec deltas.
+- Chose the explicit block/degrade path rather than a partial migration because legacy platform provider profiles are not world-scoped ProviderIntegration records.
+- Updated ProviderProfileService.invoke_profile to raise a safe configuration error before API key lookup, rate-limit accounting, plugin provider creation, or HTTP transport.
+- Updated provider profile test-call behavior to persist failed configuration status without external provider spend.
+- Updated service-level provider tests to prove legacy execution does not call mock transport and does not disclose missing secret refs in the disabled path.
 
 ## Verification This Batch
 
-- openspec validate audit-and-hardening-post-v1-1-rc --strict: passed before remediation records.
-- uv run pytest tests/test_api_moderation.py tests/test_api_player_privacy.py tests/test_api_world_packaging.py: 18 passed.
-- uv run ruff check on moderation.py, player_privacy.py, world_packaging.py, and the three touched tests: passed.
-- uv run mypy on the same six files: passed.
+- uv run pytest tests/test_model_provider.py tests/test_api_runtime.py tests/test_runtime_daemon.py: 20 passed.
+- uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py: passed.
+- uv run mypy packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py: passed.
+- openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
+- git diff --check: passed before commit.
 
 ## Remaining Work
 
-1. Run final OpenSpec validation, git diff --check, and git status for this batch.
-2. Commit the coherent backend CSRF batch without pushing.
-3. Design and remediate F-002: legacy ProviderProfileService execution must route through ProviderExecutionService or be blocked/degraded before real external spend.
-4. Continue backend security audit with worldline isolation and forbidden-data exposure paths.
-5. Later audit Web/e2e, product normal-use flows, and spec/history drift.
+1. Continue backend security audit with worldline isolation and forbidden-data exposure paths.
+2. Later audit Web/e2e, product normal-use flows, and spec/history drift.
 
 ## Finding F-002
 
 - Legacy ProviderProfileService remains callable from runtime agent runs, conversation/narrative generation, and platform provider-profile test calls.
-- The path resolves provider_api_keys_json and instantiates plugin providers directly instead of using ProviderExecutionService.
-- Spec deltas added under provider-system and cost-quota-enforcement require migration or explicit block/degrade before external provider execution.
-- No implementation fix has been made yet for F-002; next batch should design the compatibility/remediation path first.
+- The previous path resolved provider_api_keys_json and instantiated plugin providers directly instead of using ProviderExecutionService.
+- The current remediation blocks ProviderProfileService.invoke_profile before secret lookup, plugin creation, or HTTP transport, so legacy calls degrade/fail safely until migrated.
+- Residual risk: legacy platform provider profiles still need a future migration/replacement path to world-scoped ProviderExecutionService provider integrations for restored live provider functionality.

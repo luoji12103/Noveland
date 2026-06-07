@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 import httpx
 from noveland.adapters.models import ProviderProfile
@@ -13,11 +13,6 @@ from noveland.plugins.categories import PluginCategory
 from noveland.plugins.constants import (
     BUILTIN_ANTHROPIC_COMPATIBLE,
     BUILTIN_OPENAI_COMPATIBLE,
-)
-from noveland.plugins.errors import (
-    PluginConfigValidationError,
-    PluginFactoryError,
-    PluginNotFoundError,
 )
 from noveland.plugins.registry import PluginRegistry
 from pydantic import BaseModel, ConfigDict, Field
@@ -80,6 +75,12 @@ class ProviderInvocationError(ProviderError):
     ) -> None:
         super().__init__(message)
         self.error_code = error_code
+
+
+LEGACY_PROVIDER_PROFILE_EXECUTION_DISABLED_MESSAGE = (
+    "Legacy provider profile execution is disabled until profiles migrate "
+    "to ProviderExecutionService."
+)
 
 
 class _FrozenContract(BaseModel):
@@ -315,27 +316,9 @@ class ProviderProfileService:
         self._session.flush()
 
     def invoke_profile(self, profile: ProviderProfileRecord, prompt: str) -> ProviderCompletion:
-        api_key = self._settings.provider_api_keys_json.get(profile.api_key_ref)
-        if api_key is None or api_key == "":
-            raise ProviderConfigurationError("Provider API key ref is not configured")
-        _rate_limiter.check(profile)
-        registry = _plugin_registry()
-        plugin_identifier = profile.plugin_identifier or _default_provider_plugin_identifier(
-            profile.provider_type,
-        )
-        try:
-            plugin = cast(
-                _ModelProviderPlugin,
-                registry.create(plugin_identifier, profile.plugin_config),
-            )
-        except PluginNotFoundError as exc:
-            raise ProviderConfigurationError(str(exc)) from exc
-        except PluginConfigValidationError as exc:
-            raise ProviderConfigurationError(str(exc)) from exc
-        except PluginFactoryError as exc:
-            raise ProviderConfigurationError(str(exc)) from exc
-        provider = plugin.create_provider(profile, api_key, self._transport)
-        return provider.complete(prompt)
+        """Block legacy provider execution until it is migrated to ProviderExecutionService."""
+
+        raise ProviderConfigurationError(LEGACY_PROVIDER_PROFILE_EXECUTION_DISABLED_MESSAGE)
 
     def test_profile(
         self,

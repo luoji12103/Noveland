@@ -780,6 +780,8 @@ Track key structural files and prevent unregistered sprawl.
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/world-packaging/spec.md
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/cost-quota-enforcement/spec.md
+- `backend/tests/test_model_provider.py`
+
 ## Update rule
 
 Add new structural files/modules here when they become part of the stable architecture.

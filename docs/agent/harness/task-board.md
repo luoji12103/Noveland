@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary remediation
 - Post-v1.1 RC audit preflight, OpenSpec scaffold, and initial harness state
 - v1.1 Normal Use / Release Candidate OpenSpec archive and release notes
 - v1.1 Phase 8 Release Candidate Gate fast-forward merge
@@ -477,3 +478,4 @@
   in separate feature-named branches.
 - Post-v1.1 RC audit and hardening backend CSRF batch 1 complete
 - Post-v1.1 RC audit F-002 legacy provider profile execution boundary recorded
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary remediation

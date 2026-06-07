@@ -398,7 +398,7 @@ Fast orientation for a new coding session.
   - `noveland.plugins.builtins` — first-party plugin implementations and built-in plugin registry
   - `noveland.plugins.constants` — stable built-in plugin identifiers used by migrations and bindings
 - `backend/packages/adapters/`
-  - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, test-call support, services, and model-provider adapters
+  - `noveland.adapters.model_provider` — provider profile contracts, reliability settings, safe disabled legacy test-call support, services, and model-provider adapters
   - `noveland.adapters.models` — provider profile ORM model and provider health fields
 - `backend/packages/storage/`
   - `noveland.storage.local` — local filesystem object storage rooted by `NOVELAND_OBJECT_STORAGE_ROOT`
