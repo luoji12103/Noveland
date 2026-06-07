@@ -1,15 +1,20 @@
 # Task Board
 
 ## Open
-- None
+- Post-v1.1 RC Web/e2e security audit
+- Post-v1.1 RC product normal-use audit
+- Post-v1.1 RC spec/history compliance audit
+- Post-v1.1 RC remediation batches after confirmed findings
 
 ## In Progress
-- None
+- Post-v1.1 RC audit and hardening OpenSpec change
+- Backend security audit first batch
 
 ## Blocked
 - None
 
 ## Done
+- Post-v1.1 RC audit preflight, OpenSpec scaffold, and initial harness state
 - v1.1 Normal Use / Release Candidate OpenSpec archive and release notes
 - v1.1 Phase 8 Release Candidate Gate fast-forward merge
 - v1.1 Phase 8 Release Candidate Gate full backend/OpenSpec gate
@@ -470,3 +475,4 @@
   performance annotations, provider integrations,
   upload/download policy, asset embeddings/similarity search, and Web surfaces
   in separate feature-named branches.
+- Post-v1.1 RC audit and hardening backend CSRF batch 1 complete

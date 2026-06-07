@@ -22,7 +22,7 @@ from noveland.moderation.models import ModerationAction, ModerationIncident, Mod
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.providers.models import ProviderIntegration
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.services.api.media import _media_storage
 from noveland.services.api.reader_media import _reader_media_storage
@@ -62,10 +62,18 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     target_id = _seed_conversation(engine, world_id, worldline_id)
 
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
     unauthenticated = client.post(
         f"/worlds/{world_id}/moderation/reports",
         json=_report_payload(worldline_id, target_id),
+        headers={CSRF_HEADER_NAME: "csrf-token"},
     )
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_report = client.post(
+        f"/worlds/{world_id}/moderation/reports",
+        json=_report_payload(worldline_id, target_id),
+    )
+
     _authenticate(client, member_token)
     created = client.post(
         f"/worlds/{world_id}/moderation/reports",
@@ -83,6 +91,12 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     _authenticate(client, other_token)
     other_list = client.get(f"/worlds/{world_id}/moderation/reports")
 
+    _authenticate_without_csrf(client, admin_token)
+    missing_csrf_review = client.patch(
+        f"/worlds/{world_id}/moderation/reports/{created.json()['id']}",
+        json={"status": "under_review", "review_note": "missing csrf"},
+    )
+
     _authenticate(client, admin_token)
     admin_list = client.get(f"/worlds/{world_id}/moderation/reports")
     reviewed = client.patch(
@@ -91,6 +105,7 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     )
 
     assert unauthenticated.status_code == 401
+    assert missing_csrf_report.status_code == 403
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "submitted"
@@ -101,6 +116,7 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     assert member_list.status_code == 403
     assert other_list.status_code == 403
     assert admin_list.status_code == 200
+    assert missing_csrf_review.status_code == 403
     assert [item["id"] for item in admin_list.json()] == [body["id"]]
     assert reviewed.status_code == 200
     assert reviewed.json()["status"] == "under_review"
@@ -823,6 +839,14 @@ def _seed_beta_feedback(
 
 
 def _authenticate(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_without_csrf(client: TestClient, token: str) -> None:
     client.cookies.clear()
     client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)

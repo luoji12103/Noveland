@@ -3212,3 +3212,26 @@
 - Verification: Targeted backend tests passed (`21 passed`), targeted Web tests passed (`9 passed`), full backend ruff/mypy/pytest passed (`453 passed, 7 skipped`), full Web lint/typecheck/unit/build/check:next-env passed (`128 unit tests`), Web e2e passed on rerun (`21 passed`), docker compose config passed, OpenSpec strict changes/specs validation passed, and `git diff --check` passed.
 - Flaky notes: The first full Web e2e run timed out on the existing broad `world admin manages workspace pages and conversations` scenario while waiting for participant save. The isolated scenario passed immediately, and the subsequent full e2e run passed.
 - Follow-up notes: Fast-forward merge Phase 1 to local `main`. Next accepted v0.9 work is Phase 2 Visual Generation Control Plane planning; do not start Phase 2 until explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening preflight entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: OpenSpec-governed post-v1.1 release-candidate audit setup and initial handoff only.
+- Summary: Reconfirmed realtime git/OpenSpec/service/test-entry status from the server, read current harness/architecture/v0.9-v1.1 archive and release-note context, created `openspec/changes/audit-and-hardening-post-v1-1-rc/`, and defined the audit/hardening proposal, design, spec delta, and task plan. No implementation files were changed.
+- Files changed: `openspec/changes/audit-and-hardening-post-v1-1-rc/**`, `docs/agent/harness/{project-index.md,file-inventory.md,task-board.md,handoffs/active-session.md,change-journal.md}`.
+- Tests added/updated: N/A, planning and audit setup only.
+- Verification: `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; initial baseline had `openspec validate --specs --strict` passing 76 specs and no active changes before this branch.
+- Follow-up notes: Start backend security audit first. Record concrete findings before implementation fixes. Do not push.
+
+## Post-v1.1 RC Audit and Hardening backend CSRF batch entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit batch 1, focused on CSRF coverage for persisted cookie-authenticated mutations.
+- Finding: F-001 found moderation report/review/action/incident mutations, player privacy export/delete/review mutations, and world package import apply lacked CSRF protection while relying on browser session cookies.
+- Summary: Added OpenSpec deltas for moderation, player privacy, and world packaging CSRF expectations; added decorator-level Depends(require_csrf) on persisted mutation routes; preserved non-persisting login, validate, resolve, memory search, and package preview POST behavior for later policy review.
+- Files changed: backend/services/api/src/noveland/services/api/moderation.py, backend/services/api/src/noveland/services/api/player_privacy.py, backend/services/api/src/noveland/services/api/world_packaging.py, backend/tests/test_api_moderation.py, backend/tests/test_api_player_privacy.py, backend/tests/test_api_world_packaging.py, openspec/changes/audit-and-hardening-post-v1-1-rc/**, and harness docs.
+- Tests added/updated: Missing-CSRF regression assertions for moderation report create/review, player privacy export/delete/review, and world package import apply.
+- Verification: uv run pytest tests/test_api_moderation.py tests/test_api_player_privacy.py tests/test_api_world_packaging.py passed with 18 passed; uv run ruff check on the six touched backend/test files passed; uv run mypy on the same six files passed.
+- Follow-up notes: Continue backend audit with worldline isolation, provider spend/secret boundaries, forbidden response/event data, and the remaining non-persisting POST policy review. Do not push unless explicitly requested.

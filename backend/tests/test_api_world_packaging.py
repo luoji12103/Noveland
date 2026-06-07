@@ -24,7 +24,7 @@ from noveland.media.models import MediaAsset, MediaObject, MediaReference
 from noveland.memory.models import AgentMemoryItem
 from noveland.providers.models import ProviderCapability, ProviderIntegration
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.speech.models import AgentVoiceProfileBinding, VoiceProfile
 from noveland.visual.models import (
@@ -216,6 +216,11 @@ def test_world_package_import_apply_creates_safe_records_only() -> None:
         f"/worlds/{world_id}/packages/import-preview",
         {"manifest": manifest},
     )
+    _authenticate_without_csrf(client, owner_token)
+    missing_csrf_apply = client.post(
+        f"/worlds/{world_id}/packages/import-apply",
+        json={"manifest": manifest, "slug": "missing-csrf", "name": "Missing CSRF"},
+    )
     apply = _authenticated_post(
         client,
         owner_token,
@@ -231,6 +236,7 @@ def test_world_package_import_apply_creates_safe_records_only() -> None:
 
     assert preview.status_code == 200
     assert preview.json()["blocker_count"] == 0
+    assert missing_csrf_apply.status_code == 403
     assert apply.status_code == 200
     body = apply.json()
     assert body["applied"] is True
@@ -989,6 +995,15 @@ def _authenticated_post(
 
 def _authenticate(client: TestClient, token: str) -> None:
     client.cookies.clear()
+    client.headers.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_without_csrf(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)
 
 

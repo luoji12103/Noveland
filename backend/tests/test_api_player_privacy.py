@@ -15,7 +15,7 @@ from noveland.core.database import import_model_modules
 from noveland.events.models import WorldEventModel
 from noveland.player_privacy.models import PlayerPrivacyRequest
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     InWorldNotification,
@@ -63,6 +63,12 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     _seed_player_records(engine, world_id, worldline_id, other_id, choice_key="other-choice")
 
     unauthenticated = client.get(f"/worlds/{world_id}/player/privacy/export")
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_export_request = client.post(
+        f"/worlds/{world_id}/player/privacy/export",
+        json={"worldline_id": str(worldline_id)},
+    )
+
     _authenticate(client, member_token)
     export_response = client.get(
         f"/worlds/{world_id}/player/privacy/export",
@@ -80,6 +86,7 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     )
 
     assert unauthenticated.status_code == 401
+    assert missing_csrf_export_request.status_code == 403
     assert export_response.status_code == 200
     export = export_response.json()
     assert export["profile"]["email"] == "member@example.test"
@@ -121,6 +128,16 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     _seed_player_records(engine, world_id, worldline_id, member_id)
 
     before_events = _count_rows(engine, WorldEventModel)
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_delete_request = client.post(
+        f"/worlds/{world_id}/player/privacy/delete-requests",
+        json={
+            "worldline_id": str(worldline_id),
+            "target_ref_kind": "all_player_data",
+            "reason": "CSRF must be present.",
+        },
+    )
+
     _authenticate(client, member_token)
     created = client.post(
         f"/worlds/{world_id}/player/privacy/delete-requests",
@@ -145,6 +162,12 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     _authenticate(client, other_token)
     other_list = client.get(f"/worlds/{world_id}/player/privacy/requests")
 
+    _authenticate_without_csrf(client, admin_token)
+    missing_csrf_review = client.patch(
+        f"/worlds/{world_id}/player/privacy/requests/{created.json()['id']}",
+        json={"status": "under_review", "review_note": "missing csrf"},
+    )
+
     _authenticate(client, admin_token)
     admin_list = client.get(f"/worlds/{world_id}/player/privacy/requests")
     reviewed = client.patch(
@@ -156,6 +179,7 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
         json={"status": "completed", "review_note": "Should not complete deletion."},
     )
 
+    assert missing_csrf_delete_request.status_code == 403
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "requested"
@@ -166,6 +190,7 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     assert other_list.status_code == 200
     assert other_list.json() == []
     assert admin_list.status_code == 200
+    assert missing_csrf_review.status_code == 403
     assert [item["id"] for item in admin_list.json()] == [body["id"]]
     assert reviewed.status_code == 200
     assert reviewed.json()["status"] == "under_review"
@@ -437,6 +462,16 @@ def _seed_player_records(
 
 
 def _authenticate(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_without_csrf(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)
 
 

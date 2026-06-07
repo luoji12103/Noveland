@@ -768,6 +768,16 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/tests/test_visual_generation_service.py`
 - `backend/tests/test_api_visual_generation.py`
 
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/`
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/proposal.md`
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/design.md`
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/post-v1-1-rc-audit-hardening/spec.md`
+
+- backend/services/api/src/noveland/services/api/player_privacy.py
+- openspec/changes/audit-and-hardening-post-v1-1-rc/specs/content-safety-moderation-hardening/spec.md
+- openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-privacy-data-controls/spec.md
+- openspec/changes/audit-and-hardening-post-v1-1-rc/specs/world-packaging/spec.md
 ## Update rule
 
 Add new structural files/modules here when they become part of the stable architecture.
