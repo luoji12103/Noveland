@@ -221,6 +221,126 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     assert stranger_list.status_code == 404
 
 
+def test_media_api_member_metadata_redaction_across_visible_records() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, turn_id = _seed_conversation(engine, world_id, primary_id)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    source_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    leaky_metadata = _leaky_media_metadata()
+    expected_metadata = _safe_member_media_metadata()
+    with Session(engine) as session:
+        asset = session.get(MediaAsset, asset_id)
+        assert asset is not None
+        asset.metadata_json = dict(leaky_metadata)
+        session.commit()
+
+    _authenticate(client, owner_token)
+    context = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/contexts",
+        json={
+            "worldline_id": str(primary_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+            "context_role": "attachment",
+            "metadata": leaky_metadata,
+        },
+    )
+    input_record = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/inputs",
+        json={
+            "worldline_id": str(primary_id),
+            "input_asset_id": str(source_id),
+            "input_role": "reference",
+            "metadata": leaky_metadata,
+        },
+    )
+    tag = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/tags",
+        json={
+            "worldline_id": str(primary_id),
+            "tag_type": "audit",
+            "tag_key": "safe",
+            "tag_value": "visible",
+            "visibility": "world_member",
+            "metadata": leaky_metadata,
+        },
+    )
+    collection = client.post(
+        f"/worlds/{world_id}/media/collections",
+        json={
+            "worldline_id": str(primary_id),
+            "collection_kind": "audit",
+            "title": "Visible",
+            "visibility": "world_member",
+            "metadata": leaky_metadata,
+        },
+    )
+    collection_id = collection.json()["id"]
+    collection_item = client.post(
+        f"/worlds/{world_id}/media/collections/{collection_id}/items",
+        json={
+            "worldline_id": str(primary_id),
+            "asset_id": str(asset_id),
+            "role": "member",
+            "metadata": leaky_metadata,
+        },
+    )
+
+    _authenticate(client, member_token)
+    member_asset = client.get(f"/worlds/{world_id}/media/assets/{asset_id}")
+    member_contexts = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/contexts")
+    member_inputs = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/inputs")
+    member_tags = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/tags")
+    member_references = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/references")
+    member_lineage = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/lineage")
+    member_collections = client.get(f"/worlds/{world_id}/media/collections")
+    member_collection = client.get(f"/worlds/{world_id}/media/collections/{collection_id}")
+    member_collection_items = client.get(
+        f"/worlds/{world_id}/media/collections/{collection_id}/items"
+    )
+
+    _authenticate(client, owner_token)
+    admin_asset = client.get(f"/worlds/{world_id}/media/assets/{asset_id}")
+    admin_references = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/references")
+
+    assert member_id
+    assert context.status_code == 201
+    assert input_record.status_code == 201
+    assert tag.status_code == 201
+    assert collection.status_code == 201
+    assert collection_item.status_code == 201
+    assert member_asset.status_code == 200
+    assert member_asset.json()["metadata"] == expected_metadata
+    assert member_contexts.status_code == 200
+    assert member_contexts.json()[0]["metadata"] == expected_metadata
+    assert member_inputs.status_code == 200
+    assert member_inputs.json()[0]["metadata"] == expected_metadata
+    assert member_tags.status_code == 200
+    assert member_tags.json()[0]["metadata"] == expected_metadata
+    assert member_references.status_code == 200
+    assert member_references.json()["contexts"][0]["metadata"] == expected_metadata
+    assert member_references.json()["tags"][0]["metadata"] == expected_metadata
+    assert member_references.json()["collections"][0]["metadata"] == expected_metadata
+    assert member_lineage.status_code == 200
+    assert member_lineage.json()["inputs"][0]["metadata"] == expected_metadata
+    assert member_collections.status_code == 200
+    assert member_collections.json()[0]["metadata"] == expected_metadata
+    assert member_collection.status_code == 200
+    assert member_collection.json()["metadata"] == expected_metadata
+    assert member_collection_items.status_code == 200
+    assert member_collection_items.json()[0]["metadata"] == expected_metadata
+    assert admin_asset.status_code == 200
+    assert admin_asset.json()["metadata"]["storage_uri"] == "media://hidden-object"
+    assert admin_references.status_code == 200
+    assert admin_references.json()["contexts"][0]["metadata"]["raw_prompt"] == "raw prompt"
+
+
 def test_media_api_jobs_are_admin_only_for_internal_execution_evidence() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -775,6 +895,22 @@ def _seed_asset(
         )
         session.commit()
     return asset_id
+
+
+def _leaky_media_metadata() -> dict[str, object]:
+    return {
+        "safe": "keep",
+        "storage_uri": "media://hidden-object",
+        "raw_prompt": "raw prompt",
+        "bytes": "base64-data",
+        "nested": {"safe": "nested", "filesystem_path": "/tmp/private-file"},
+        "items": ["visible", "media://hidden-list-item"],
+        "token": "sk-metadata-secret",
+    }
+
+
+def _safe_member_media_metadata() -> dict[str, object]:
+    return {"safe": "keep", "nested": {"safe": "nested"}, "items": ["visible"]}
 
 
 def _seed_job_with_internal_evidence(

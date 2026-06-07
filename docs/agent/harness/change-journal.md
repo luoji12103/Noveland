@@ -3296,3 +3296,15 @@
 - Tests added/updated: Extended the visible fork lineage regression to seed related asset storage references and assert member lineage redacts storage_uri, preview_uri, and thumbnail_uri while admin lineage preserves them.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
 - Follow-up notes: Continue forbidden-data audit for metadata-bearing media contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening member media metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-006.
+- Finding: F-006 found member-readable media asset, context, input, tag, collection, item, references, and lineage DTOs carrying admin-authored arbitrary metadata without response sanitization.
+- Summary: Added an architecture-contracts OpenSpec delta for member media metadata-bearing DTO redaction, then added API-layer recursive member metadata sanitization. Member responses now omit sensitive metadata keys and leak-pattern values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, and base64 while retaining safe metadata. Admin responses preserve full metadata.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a Media API regression that writes leaky metadata through visible asset/context/input/tag/collection/item records, verifies member top-level and nested metadata is sanitized, and verifies admin asset/reference metadata preserves internal fields.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 14 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for world event payloads, reader/player DTOs, and worldline isolation paths, then move to Web/e2e security. Do not push unless explicitly requested.

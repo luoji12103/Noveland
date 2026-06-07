@@ -100,3 +100,13 @@
 - Intended remediation: shape MediaAssetLineage.related_assets through the existing member/admin media asset redaction helper in the API layer and add regression coverage for member redaction plus admin preservation.
 - Status: Remediated in backend media lineage redaction batch.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.
+
+### F-006 Member media metadata-bearing DTOs expose arbitrary forbidden data
+
+- Severity: High
+- Affected boundary: member media API exposure of admin-authored arbitrary metadata across visible media records.
+- Evidence: backend/services/api/src/noveland/services/api/media.py member-readable routes return MediaAssetRecord, MediaContextRecord, MediaAssetInputRecord, MediaAssetTagRecord, MediaAssetCollectionRecord, MediaAssetCollectionItemRecord, MediaAssetReferences, and MediaAssetLineage. backend/packages/media/src/noveland/media/contracts.py defines metadata: dict[str, Any] on these records, and service/catalog record builders copy metadata_json without response sanitization. Admins can attach metadata containing storage_uri/media:// refs, filesystem paths, raw_prompt/raw_output markers, secret/auth keys, bytes, or base64 values, which ordinary members can read when the asset/tag/collection is visible.
+- Impact: ordinary world members can receive internal storage paths, raw execution evidence markers, secret-like metadata, or binary/base64 markers through otherwise visible media catalog and lineage endpoints.
+- Intended remediation: add API-layer member metadata sanitization for all member-facing media record shapes while preserving admin metadata visibility, and add regression coverage across top-level and nested media DTOs.
+- Status: Remediated in backend member media metadata redaction batch.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 14 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.

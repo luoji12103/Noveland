@@ -26,3 +26,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** lineage includes related visible media assets with internal storage references
 - **THEN** every related asset in the member response SHALL redact storage_uri, preview_uri, and thumbnail_uri
 - **AND** admin media routes MAY continue to expose those related asset storage references for media management.
+
+#### Scenario: Member reads media metadata-bearing DTOs
+- **GIVEN** a world member can read visible media asset, context, input, tag, collection, item, references, or lineage responses
+- **WHEN** those records contain arbitrary metadata with forbidden keys or values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL omit the forbidden metadata keys and values while retaining safe metadata
+- **AND** admin media routes MAY continue to expose full metadata for media management and diagnostics.

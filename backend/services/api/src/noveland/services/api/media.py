@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -99,6 +100,40 @@ router = APIRouter(prefix="/worlds/{world_id}/media", tags=["media"])
 turn_media_router = APIRouter(
     prefix="/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/media",
     tags=["media"],
+)
+
+_MEMBER_METADATA_SENSITIVE_KEYS = {
+    "api_key",
+    "apikey",
+    "token",
+    "bearer_token",
+    "authorization",
+    "secret",
+    "client_secret",
+    "access_key",
+    "password",
+    "private_key",
+    "auth_ref",
+    "storage_uri",
+    "preview_uri",
+    "thumbnail_uri",
+    "object_path",
+    "file_path",
+    "filesystem_path",
+    "local_model_path",
+    "bytes",
+    "base64",
+    "raw_prompt",
+    "raw_output",
+    "prompt_snapshot",
+    "provider_health",
+    "diagnostics",
+}
+_MEMBER_METADATA_LEAK_PATTERN = re.compile(
+    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw_prompt|raw_output|prompt_snapshot|"
+    r"authorization|bearer\s+)",
+    re.IGNORECASE,
 )
 
 
@@ -590,11 +625,14 @@ def list_media_asset_tags(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return MediaCatalogService(db_session).list_tags(
-            world_id,
-            asset_id,
-            member_visible_only=_member_visible_only(context),
-        )
+        return [
+            _media_asset_tag_record_for_context(record, context)
+            for record in MediaCatalogService(db_session).list_tags(
+                world_id,
+                asset_id,
+                member_visible_only=_member_visible_only(context),
+            )
+        ]
     except MediaNotFoundError as exc:
         raise _not_found() from exc
 
@@ -776,7 +814,10 @@ def list_media_contexts(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return service.list_contexts(world_id, asset_id)
+        return [
+            _media_context_record_for_context(record, context)
+            for record in service.list_contexts(world_id, asset_id)
+        ]
     except MediaNotFoundError as exc:
         raise _not_found() from exc
 
@@ -843,7 +884,10 @@ def list_media_asset_inputs(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return service.list_inputs(world_id, asset_id)
+        return [
+            _media_asset_input_record_for_context(record, context)
+            for record in service.list_inputs(world_id, asset_id)
+        ]
     except MediaNotFoundError as exc:
         raise _not_found() from exc
 
@@ -858,10 +902,26 @@ def media_asset_references(
     try:
         service = MediaService(db_session)
         _require_visible_asset(service, world_id, asset_id, context)
-        return MediaLineageService(db_session).references(
+        references = MediaLineageService(db_session).references(
             world_id,
             asset_id,
             member_visible_only=_member_visible_only(context),
+        )
+        return references.model_copy(
+            update={
+                "contexts": [
+                    _media_context_record_for_context(record, context)
+                    for record in references.contexts
+                ],
+                "tags": [
+                    _media_asset_tag_record_for_context(record, context)
+                    for record in references.tags
+                ],
+                "collections": [
+                    _media_asset_collection_record_for_context(record, context)
+                    for record in references.collections
+                ],
+            }
         )
     except MediaNotFoundError as exc:
         raise _not_found() from exc
@@ -884,6 +944,14 @@ def media_asset_lineage(
         )
         return lineage.model_copy(
             update={
+                "inputs": [
+                    _media_asset_input_record_for_context(record, context)
+                    for record in lineage.inputs
+                ],
+                "outputs": [
+                    _media_asset_input_record_for_context(record, context)
+                    for record in lineage.outputs
+                ],
                 "related_assets": [
                     _media_asset_record_for_context(asset, context)
                     for asset in lineage.related_assets
@@ -904,13 +972,18 @@ def list_media_asset_collections(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[MediaAssetCollectionRecord]:
     try:
-        return MediaCollectionService(db_session).list_collections(
-            world_id,
-            worldline_id=worldline_id,
-            collection_kind=None if collection_kind is None else collection_kind.strip().lower(),
-            member_visible_only=_member_visible_only(context),
-            limit=limit,
-        )
+        return [
+            _media_asset_collection_record_for_context(record, context)
+            for record in MediaCollectionService(db_session).list_collections(
+                world_id,
+                worldline_id=worldline_id,
+                collection_kind=None
+                if collection_kind is None
+                else collection_kind.strip().lower(),
+                member_visible_only=_member_visible_only(context),
+                limit=limit,
+            )
+        ]
     except MediaValidationError as exc:
         raise _unprocessable(str(exc)) from exc
 
@@ -960,7 +1033,7 @@ def get_media_asset_collection(
     )
     if record is None:
         raise _not_found()
-    return record
+    return _media_asset_collection_record_for_context(record, context)
 
 
 @router.patch(
@@ -1020,11 +1093,14 @@ def list_media_asset_collection_items(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[MediaAssetCollectionItemRecord]:
     try:
-        return MediaCollectionService(db_session).list_items(
-            world_id,
-            collection_id,
-            member_visible_only=_member_visible_only(context),
-        )
+        return [
+            _media_asset_collection_item_record_for_context(record, context)
+            for record in MediaCollectionService(db_session).list_items(
+                world_id,
+                collection_id,
+                member_visible_only=_member_visible_only(context),
+            )
+        ]
     except MediaNotFoundError as exc:
         raise _not_found() from exc
 
@@ -1496,8 +1572,87 @@ def _media_asset_record_for_context(
     if not _member_visible_only(context):
         return record
     return record.model_copy(
-        update={"storage_uri": None, "preview_uri": None, "thumbnail_uri": None}
+        update={
+            "storage_uri": None,
+            "preview_uri": None,
+            "thumbnail_uri": None,
+            "metadata": _sanitize_member_metadata(record.metadata),
+        }
     )
+
+
+def _media_context_record_for_context(
+    record: MediaContextRecord,
+    context: WorldAccessContext,
+) -> MediaContextRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+
+
+def _media_asset_input_record_for_context(
+    record: MediaAssetInputRecord,
+    context: WorldAccessContext,
+) -> MediaAssetInputRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+
+
+def _media_asset_tag_record_for_context(
+    record: MediaAssetTagRecord,
+    context: WorldAccessContext,
+) -> MediaAssetTagRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+
+
+def _media_asset_collection_record_for_context(
+    record: MediaAssetCollectionRecord,
+    context: WorldAccessContext,
+) -> MediaAssetCollectionRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+
+
+def _media_asset_collection_item_record_for_context(
+    record: MediaAssetCollectionItemRecord,
+    context: WorldAccessContext,
+) -> MediaAssetCollectionItemRecord:
+    if not _member_visible_only(context):
+        return record
+    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+
+
+def _sanitize_member_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    sanitized = _sanitize_member_metadata_value(metadata)
+    return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _sanitize_member_metadata_value(value: object) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for raw_key, item in value.items():
+            key = str(raw_key)
+            if key.strip().lower() in _MEMBER_METADATA_SENSITIVE_KEYS:
+                continue
+            clean_item = _sanitize_member_metadata_value(item)
+            if clean_item is not None:
+                sanitized[key] = clean_item
+        return sanitized
+    if isinstance(value, list | tuple | set):
+        return [
+            clean_item
+            for clean_item in (_sanitize_member_metadata_value(item) for item in list(value)[:50])
+            if clean_item is not None
+        ]
+    if isinstance(value, str):
+        return None if _MEMBER_METADATA_LEAK_PATTERN.search(value) else value[:500]
+    if value is None or isinstance(value, bool | int | float):
+        return value
+    return str(value)[:200]
 
 
 def _parse_tag_filters(encoded_filters: list[str]) -> list[MediaAssetTagFilter]:
