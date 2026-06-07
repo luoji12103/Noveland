@@ -3235,3 +3235,16 @@
 - Tests added/updated: Missing-CSRF regression assertions for moderation report create/review, player privacy export/delete/review, and world package import apply.
 - Verification: uv run pytest tests/test_api_moderation.py tests/test_api_player_privacy.py tests/test_api_world_packaging.py passed with 18 passed; uv run ruff check on the six touched backend/test files passed; uv run mypy on the same six files passed.
 - Follow-up notes: Continue backend audit with worldline isolation, provider spend/secret boundaries, forbidden response/event data, and the remaining non-persisting POST policy review. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening provider boundary finding entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend provider spend/secret boundary read-only audit.
+- Finding: F-002 found legacy ProviderProfileService execution paths that can call provider plugins/httpx directly from provider-profile test calls, runtime agent runs, conversation advancement, and narrative generation without ProviderExecutionService.
+- Summary: Added OpenSpec deltas for provider-system and cost-quota-enforcement requiring legacy profile execution to route through ProviderExecutionService or be blocked/degraded before external spend. No business code was changed in this finding-only batch.
+- Files changed: openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/cost-quota-enforcement/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: N/A, finding/spec-record batch only.
+- Verification: pending OpenSpec strict validation and git diff --check before commit.
+- Follow-up notes: Next implementation batch should choose a compatibility strategy for legacy provider profiles and add regression tests proving no legacy path executes hidden provider spend outside ProviderExecutionService. Do not push unless explicitly requested.

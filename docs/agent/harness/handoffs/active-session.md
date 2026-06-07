@@ -3,7 +3,7 @@
 - Date: 2026-06-08T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: OpenSpec change scaffolded; backend CSRF persisted-mutation finding F-001 recorded and remediated; targeted backend tests and touched-file ruff/mypy passed. No push performed.
+- Status: F-001 recorded, remediated, tested, and committed at cc423ea; F-002 legacy provider profile execution bypassing ProviderExecutionService recorded with provider-system and cost-quota spec deltas. No push performed.
 
 ## Current Context
 
@@ -44,5 +44,13 @@
 
 1. Run final OpenSpec validation, git diff --check, and git status for this batch.
 2. Commit the coherent backend CSRF batch without pushing.
-3. Continue backend security audit with worldline isolation, provider spend/secret boundaries, and forbidden-data exposure paths.
-4. Later audit Web/e2e, product normal-use flows, and spec/history drift.
+3. Design and remediate F-002: legacy ProviderProfileService execution must route through ProviderExecutionService or be blocked/degraded before real external spend.
+4. Continue backend security audit with worldline isolation and forbidden-data exposure paths.
+5. Later audit Web/e2e, product normal-use flows, and spec/history drift.
+
+## Finding F-002
+
+- Legacy ProviderProfileService remains callable from runtime agent runs, conversation/narrative generation, and platform provider-profile test calls.
+- The path resolves provider_api_keys_json and instantiates plugin providers directly instead of using ProviderExecutionService.
+- Spec deltas added under provider-system and cost-quota-enforcement require migration or explicit block/degrade before external provider execution.
+- No implementation fix has been made yet for F-002; next batch should design the compatibility/remediation path first.

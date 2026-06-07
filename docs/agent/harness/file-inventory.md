@@ -778,6 +778,8 @@ Track key structural files and prevent unregistered sprawl.
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/content-safety-moderation-hardening/spec.md
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-privacy-data-controls/spec.md
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/world-packaging/spec.md
+- openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md
+- openspec/changes/audit-and-hardening-post-v1-1-rc/specs/cost-quota-enforcement/spec.md
 ## Update rule
 
 Add new structural files/modules here when they become part of the stable architecture.

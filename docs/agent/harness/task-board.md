@@ -476,3 +476,4 @@
   upload/download policy, asset embeddings/similarity search, and Web surfaces
   in separate feature-named branches.
 - Post-v1.1 RC audit and hardening backend CSRF batch 1 complete
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary recorded
