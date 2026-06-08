@@ -3948,6 +3948,25 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     conversation_id = _seed_conversation(engine, world_id, "reader-conversation")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    agent_id = _seed_agent(engine, world_id, "guide")
+    run_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            AgentRuntimeRun(
+                id=run_id,
+                world_id=world_id,
+                agent_id=agent_id,
+                status="succeeded",
+                trigger_source="manual",
+                prompt_text="Operator-only prompt",
+                response_text="Operator-only response",
+                diagnostics={"raw_output": "operator-only"},
+                started_at=now,
+                finished_at=now,
+            ),
+        )
+        session.commit()
     summary_id = _seed_narrative_artifact(
         engine,
         world_id,
@@ -3955,8 +3974,16 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         "Summary body",
         artifact_kind="conversation_summary",
         source_conversation_id=conversation_id,
+        source_run_id=run_id,
+        artifact_metadata={
+            "continuity": {"status": "post_canon", "source": "operator"},
+            "raw_prompt": "operator-only prompt",
+            "storage_uri": "media://private/artifact",
+        },
     )
-    _publish_narrative_artifact(engine, world_id, summary_id, owner_id)
+    _publish_narrative_artifact(
+        engine, world_id, summary_id, owner_id, publication_gate={"status": "warning"}
+    )
     draft_chapter_id = _seed_narrative_artifact(
         engine,
         world_id,
@@ -3996,6 +4023,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         f"/worlds/{world_id}/narrative-artifacts",
         params={"source_conversation_id": str(conversation_id), "publication_status": "draft"},
     )
+    owner_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
 
     _authenticate(client, stranger_token)
     hidden = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
@@ -4004,17 +4032,37 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert len(filtered.json()) == 1
     assert filtered.json()[0]["artifact_kind"] == "conversation_summary"
     assert filtered.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert filtered.json()[0]["source_run_id"] is None
+    assert filtered.json()[0]["metadata"] == {}
+    assert filtered.json()[0]["continuity_metadata"] == {}
+    assert filtered.json()[0]["continuity_status"] is None
+    assert filtered.json()[0]["publication"]["source_draft_id"] is None
+    assert filtered.json()[0]["publication"]["metadata"] == {}
+    assert filtered.json()[0]["publication"]["published_by_user_id"] is None
+    assert filtered.json()[0]["publication"]["publication_gate"] is None
     assert hidden_draft_search.status_code == 200
     assert hidden_draft_search.json() == []
     assert detail.status_code == 200
     assert detail.json()["id"] == str(summary_id)
     assert detail.json()["source_conversation_id"] == str(conversation_id)
+    assert detail.json()["source_run_id"] is None
+    assert detail.json()["metadata"] == {}
+    assert detail.json()["publication"]["metadata"] == {}
+    assert detail.json()["publication"]["published_by_user_id"] is None
     assert owner_list.status_code == 200
     assert [item["artifact_kind"] for item in owner_list.json()] == [
         "chapter_draft",
     ]
     assert owner_list.json()[0]["id"] == str(draft_chapter_id)
     assert owner_list.json()[0]["publication"] is None
+    assert owner_detail.status_code == 200
+    assert owner_detail.json()["source_run_id"] == str(run_id)
+    assert owner_detail.json()["metadata"]["raw_prompt"] == "operator-only prompt"
+    assert owner_detail.json()["continuity_metadata"]["source"] == "operator"
+    assert owner_detail.json()["continuity_status"] == "post_canon"
+    assert owner_detail.json()["publication"]["source_draft_id"] == str(summary_id)
+    assert owner_detail.json()["publication"]["published_by_user_id"] == str(owner_id)
+    assert owner_detail.json()["publication"]["publication_gate"]["status"] == "warning"
     assert hidden.status_code == 404
 
 
@@ -4544,6 +4592,7 @@ def _seed_narrative_artifact(
     *,
     artifact_kind: str,
     source_conversation_id: uuid.UUID | None = None,
+    source_run_id: uuid.UUID | None = None,
     artifact_metadata: dict[str, object] | None = None,
 ) -> uuid.UUID:
     artifact_id = uuid.uuid4()
@@ -4553,7 +4602,7 @@ def _seed_narrative_artifact(
                 id=artifact_id,
                 world_id=world_id,
                 agent_id=None,
-                source_run_id=None,
+                source_run_id=source_run_id,
                 source_conversation_id=source_conversation_id,
                 title=title,
                 content=content,

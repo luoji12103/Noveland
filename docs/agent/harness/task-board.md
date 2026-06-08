@@ -489,3 +489,4 @@
 - Post-v1.1 RC audit F-009 member agent catalog redaction
 - Post-v1.1 RC audit F-010 member world profile redaction
 - Post-v1.1 RC audit F-011 member schedule rule redaction
+- Post-v1.1 RC audit F-012 member narrative artifact REST redaction

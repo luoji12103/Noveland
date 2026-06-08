@@ -63,3 +63,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** schedule rules contain config with provider refs, raw prompt/output markers, storage refs, bytes, base64, or other admin-only scheduling evidence
 - **THEN** the member response SHALL omit schedule rule config while preserving safe rule identity, kind, and enabled state
 - **AND** admin schedule rule routes MAY continue to expose configuration details required for world management.
+
+#### Scenario: Member reads narrative artifacts
+- **GIVEN** a world member lists or fetches published narrative artifacts through member-readable routes
+- **WHEN** artifact records or publication records contain source run refs, artifact metadata, continuity metadata/status, publication metadata, publication gate evidence, source draft refs, published-by user refs, raw prompt/output markers, storage refs, bytes, base64, or other admin-only evidence
+- **THEN** the member response SHALL omit those operator-only narrative internals while preserving safe artifact content, title, kind, agent identity, conversation linkage, publication status, reader visibility, and publication timing
+- **AND** admin narrative routes MAY continue to expose metadata and publication evidence required for world management and review.

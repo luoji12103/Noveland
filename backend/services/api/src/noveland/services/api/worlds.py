@@ -7736,7 +7736,7 @@ def list_narrative_artifacts(
 ) -> list[NarrativeArtifactResponse]:
     can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _narrative_artifact_response(artifact)
+        _narrative_artifact_response(artifact, include_admin_fields=can_manage)
         for artifact in NarrativeArtifactService(db_session).list_artifacts_with_publications(
             context.world_id,
             artifact_kind=None if artifact_kind is None else NarrativeArtifactKind(artifact_kind),
@@ -7771,7 +7771,7 @@ def get_narrative_artifact(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Narrative artifact not found",
         )
-    return _narrative_artifact_response(artifact)
+    return _narrative_artifact_response(artifact, include_admin_fields=can_manage)
 
 
 @router.post(
@@ -10048,6 +10048,8 @@ def _agent_observation_response(observation: AgentObservationRecord) -> AgentObs
 
 def _narrative_artifact_response(
     artifact: NarrativeArtifactRecord | NarrativeArtifactWithPublication,
+    *,
+    include_admin_fields: bool = True,
 ) -> NarrativeArtifactResponse:
     if isinstance(artifact, NarrativeArtifactWithPublication):
         publication = artifact.publication
@@ -10059,36 +10061,55 @@ def _narrative_artifact_response(
         id=artifact_record.id,
         world_id=artifact_record.world_id,
         agent_id=artifact_record.agent_id,
-        source_run_id=artifact_record.source_run_id,
+        source_run_id=artifact_record.source_run_id if include_admin_fields else None,
         source_conversation_id=artifact_record.source_conversation_id,
         title=artifact_record.title,
         content=artifact_record.content,
         artifact_kind=artifact_record.artifact_kind.value,
-        metadata=artifact_record.metadata,
-        continuity_metadata=_continuity_metadata(artifact_record.metadata),
-        continuity_status=_continuity_status_from_metadata(artifact_record.metadata),
+        metadata=artifact_record.metadata if include_admin_fields else {},
+        continuity_metadata=(
+            _continuity_metadata(artifact_record.metadata) if include_admin_fields else {}
+        ),
+        continuity_status=(
+            _continuity_status_from_metadata(artifact_record.metadata)
+            if include_admin_fields
+            else None
+        ),
         created_at=artifact_record.created_at,
-        publication=None if publication is None else _narrative_publication_response(publication),
+        publication=(
+            None
+            if publication is None
+            else _narrative_publication_response(
+                publication,
+                include_admin_fields=include_admin_fields,
+            )
+        ),
     )
 
 
 def _narrative_publication_response(
     publication: NarrativePublicationRecord,
+    *,
+    include_admin_fields: bool = True,
 ) -> NarrativePublicationResponse:
     return NarrativePublicationResponse(
         id=publication.id,
         world_id=publication.world_id,
         artifact_id=publication.artifact_id,
-        source_draft_id=publication.source_draft_id,
+        source_draft_id=publication.source_draft_id if include_admin_fields else None,
         status=publication.status.value,
         reader_visible=publication.reader_visible,
-        metadata=publication.metadata,
+        metadata=publication.metadata if include_admin_fields else {},
         published_at=publication.published_at,
         unpublished_at=publication.unpublished_at,
-        published_by_user_id=publication.published_by_user_id,
+        published_by_user_id=publication.published_by_user_id if include_admin_fields else None,
         created_at=publication.created_at,
         updated_at=publication.updated_at,
-        publication_gate=publication.metadata.get("publication_gate"),
+        publication_gate=(
+            publication.metadata.get("publication_gate")
+            if include_admin_fields
+            else None
+        ),
     )
 
 
