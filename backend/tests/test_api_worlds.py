@@ -2766,6 +2766,9 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     )
     listed_choices = client.get(f"/worlds/{world_id}/player-choices")
     other_choices = client.get(f"/worlds/{world_id}/player-choices?user_id={other_id}")
+    _authenticate(client, owner_token)
+    admin_listed_choices = client.get(f"/worlds/{world_id}/player-choices")
+    _authenticate(client, member_token)
     intervention = client.post(
         f"/worlds/{world_id}/interventions",
         json={
@@ -2802,10 +2805,16 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     ]
     assert choice.status_code == 201
     assert choice.json()["user_id"] == str(member_id)
+    assert choice.json()["prompt"] == ""
+    assert choice.json()["selected_option"] == "Stay after school."
     assert other_choice_attempt.status_code == 403
     assert listed_choices.status_code == 200
     assert [item["user_id"] for item in listed_choices.json()] == [str(member_id)]
+    assert listed_choices.json()[0]["prompt"] == ""
+    assert listed_choices.json()[0]["selected_option"] == "Stay after school."
     assert other_choices.status_code == 403
+    assert admin_listed_choices.status_code == 200
+    assert admin_listed_choices.json()[0]["prompt"] == "Help with festival preparations?"
     assert intervention.status_code == 201
     serialized_payloads = f"{choice_event.payload} {intervention_event.payload}"
     assert "Help with festival preparations?" not in serialized_payloads

@@ -154,6 +154,17 @@
 - Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-015, task board, active handoff, project index, file inventory, and change journal.
 - Follow-up notes: Continue the backend member-readable DTO audit for player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
 
+## post-v1.1 RC audit F-016 player choice prompt redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-016 remediation.
+- Summary: Redacted ordinary member player choice prompt text in create/list responses while preserving admin prompt visibility for world management and review. The fix keeps safe choice identity, selected option, context, consequence preview, applied event refs, and timing fields visible to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` to prove member choice prompt redaction on create/list responses and admin list retention. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-016, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for player choice preview diagnostics, dashboard hidden counts, journal/notification/intervention metadata/source fields, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
 ## Entry format
 
 - Date:

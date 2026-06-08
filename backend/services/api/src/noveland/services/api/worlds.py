@@ -3523,7 +3523,9 @@ def list_player_choices(
     choices = db_session.scalars(
         statement.order_by(PlayerChoiceRecord.created_at.desc()).limit(limit),
     ).all()
-    return [_player_choice_response(choice) for choice in choices]
+    return [
+        _player_choice_response(choice, include_admin_fields=can_manage) for choice in choices
+    ]
 
 
 @router.post(
@@ -3563,7 +3565,7 @@ def record_player_choice(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
-    return _player_choice_response(choice)
+    return _player_choice_response(choice, include_admin_fields=can_manage)
 
 
 @router.post(
@@ -8421,7 +8423,11 @@ def _player_actor_response(actor: PlayerActorProfile) -> PlayerActorResponse:
     )
 
 
-def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
+def _player_choice_response(
+    choice: PlayerChoiceRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerChoiceResponse:
     return PlayerChoiceResponse(
         id=choice.id,
         world_id=choice.world_id,
@@ -8430,7 +8436,7 @@ def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
         player_actor_id=choice.player_actor_id,
         choice_key=choice.choice_key,
         choice_kind=cast(PlayerChoiceKind, choice.choice_kind),
-        prompt=choice.prompt,
+        prompt=choice.prompt if include_admin_fields else "",
         selected_option=choice.selected_option,
         context=choice.context_json,
         consequence_preview=choice.consequence_preview,

@@ -87,3 +87,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** worldline records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit worldline metadata while preserving safe branch identity, parent/fork references, status, actor ref, and timing fields
 - **AND** admin worldline management routes MAY continue to expose metadata required for world management.
+
+#### Scenario: Member reads player choices
+- **GIVEN** a world member creates or lists player choices through member-readable routes
+- **WHEN** player choice records contain prompt text with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit player choice prompt text while preserving safe choice identity, selected option, context, consequence preview, applied event ref, and timing fields
+- **AND** admin player-choice routes MAY continue to expose prompt text required for world management and review.

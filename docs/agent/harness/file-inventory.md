@@ -159,7 +159,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/speech.py`
 - `backend/services/api/src/noveland/services/api/visual.py`
 - `backend/services/api/src/noveland/services/api/visual_generation.py`
-- `backend/services/api/src/noveland/services/api/worlds.py` — includes role-aware member/admin response shaping for world, worldline, agent, schedule-rule, narrative artifact, organization, organization membership, and faction-track DTO boundaries.
+- `backend/services/api/src/noveland/services/api/worlds.py` — includes role-aware member/admin response shaping for world, worldline, player choice, agent, schedule-rule, narrative artifact, organization, organization membership, and faction-track DTO boundaries.
 - `backend/services/runtime/`
 - `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
 - `backend/services/runtime/src/noveland/services/runtime/clock_tick.py`
