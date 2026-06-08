@@ -123,3 +123,10 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, storage refs, bytes, base64, provider refs, or other replay/storage evidence
 - **THEN** the member response SHALL omit payload, payload_uri, payload_location, and metadata while preserving safe snapshot identity, worldline, sequence coverage, schema version, status, source event ref, and creation time
 - **AND** admin routes MAY continue to expose snapshot payload and storage evidence required for replay diagnostics and world management.
+
+
+#### Scenario: Member reads release profile
+- **GIVEN** a world member fetches the living-world release profile through member-readable routes
+- **WHEN** the profile contains release policies, checklist evidence refs, gate decisions, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only release evidence
+- **THEN** the member response SHALL omit branch_policy, backup_policy, content_review_policy, player_permission_policy, worldline_policy, checklist, and metadata while preserving safe profile identity, status, and timing fields
+- **AND** admin routes MAY continue to expose release policies, checklist evidence, and metadata required for release management and review.

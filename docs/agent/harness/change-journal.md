@@ -3483,3 +3483,15 @@
 - Tests added/updated: Expanded replay/snapshot API coverage to compare admin-preserved latest snapshot storage metadata against ordinary member-redacted latest snapshot payloads.
 - Verification: uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, release profile/world bible/presence DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening release profile redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-022.
+- Finding: F-022 found the member-readable release profile REST API exposing release policies, checklist gate evidence, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member release profile shaping, then made the release profile response role-aware. World admins retain policies, checklist, gate decision, and metadata; ordinary members receive safe profile identity, status, and timing fields with branch_policy, backup_policy, content_review_policy, player_permission_policy, worldline_policy, checklist, and metadata redacted to empty objects.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded beta release readiness API coverage to compare admin-preserved release profile gate evidence against ordinary member-redacted release profile fields.
+- Verification: uv run pytest tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, world bible, presence/scheduled movement DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

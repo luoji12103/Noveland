@@ -260,3 +260,14 @@
 - Intended remediation: shape latest snapshot responses by caller role; preserve payload, payload_uri, payload_location, and metadata for admins while ordinary members receive safe snapshot identity, worldline, sequence coverage, schema/status, source event ref, and creation time with snapshot internals redacted.
 - Status: Remediated in backend latest snapshot redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+
+### F-022 Member release profile policy and evidence leak
+
+- Severity: High
+- Affected boundary: member-readable living-world release profile REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/release-profile with get_world_member_context. The route serializes ReleaseProfileResponse through _release_profile_response, which copies branch_policy, backup_policy, content_review_policy, player_permission_policy, worldline_policy, checklist, and metadata directly from LivingWorldReleaseProfile. LivingWorldBetaService.upsert_release_profile adds gate_decision evidence refs into checklist and metadata.
+- Impact: ordinary world members can read release policy internals, gate decisions, checklist evidence refs, worldline refs, backup/review requirements, and arbitrary metadata that may include raw prompt/output markers, storage refs, provider refs, secret/auth refs, bytes, base64, or other operator-only release evidence.
+- Intended remediation: shape release profile responses by caller role; preserve policies, checklist, and metadata for admins while ordinary members receive safe profile identity, status, and timing fields with release internals redacted.
+- Status: Remediated in backend release profile redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

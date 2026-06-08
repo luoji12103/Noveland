@@ -2573,6 +2573,11 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
         },
     )
     release_profile_read = client.get(f"/worlds/{world_id}/release-profile")
+
+    _authenticate(client, member_token)
+    member_release_profile_after_create = client.get(f"/worlds/{world_id}/release-profile")
+
+    _authenticate(client, owner_token)
     invalid_ending = client.post(
         f"/worlds/{world_id}/ending-candidates",
         json={
@@ -2700,6 +2705,18 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert released_profile.status_code == 422
     assert "release_launch_gate_missing" in released_profile.text
     assert release_profile_read.json()["branch_policy"] == {"forks": "enabled"}
+    admin_gate_decision = release_profile_read.json()["checklist"]["gate_decision"]
+    assert admin_gate_decision["evidence_refs"] == evidence_refs
+    assert member_release_profile_after_create.status_code == 200
+    assert member_release_profile_after_create.json()["id"] == release_profile.json()["id"]
+    assert member_release_profile_after_create.json()["status"] == "ready"
+    assert member_release_profile_after_create.json()["branch_policy"] == {}
+    assert member_release_profile_after_create.json()["backup_policy"] == {}
+    assert member_release_profile_after_create.json()["content_review_policy"] == {}
+    assert member_release_profile_after_create.json()["player_permission_policy"] == {}
+    assert member_release_profile_after_create.json()["worldline_policy"] == {}
+    assert member_release_profile_after_create.json()["checklist"] == {}
+    assert member_release_profile_after_create.json()["metadata"] == {}
     assert invalid_ending.status_code == 422
     assert "min_route_affinity cannot exceed max_route_affinity" in invalid_ending.text
     assert ending_cross_worldline.status_code == 404

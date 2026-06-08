@@ -5564,8 +5564,12 @@ def get_release_profile(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ReleaseProfileResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     profile = LivingWorldBetaService(db_session).get_release_profile(world_id=context.world_id)
-    return None if profile is None else _release_profile_response(profile)
+    return None if profile is None else _release_profile_response(
+        profile,
+        include_admin_fields=can_manage,
+    )
 
 
 @router.put("/{world_id}/release-profile", response_model=ReleaseProfileResponse)
@@ -9256,19 +9260,22 @@ def _authoring_import_job_response(job: AuthoringImportJob) -> AuthoringImportJo
     )
 
 
-def _release_profile_response(profile: LivingWorldReleaseProfile) -> ReleaseProfileResponse:
+def _release_profile_response(
+    profile: LivingWorldReleaseProfile,
+    include_admin_fields: bool = True,
+) -> ReleaseProfileResponse:
     return ReleaseProfileResponse(
         id=profile.id,
         world_id=profile.world_id,
         profile_key=profile.profile_key,
         status=cast(ReleaseProfileStatus, profile.status),
-        branch_policy=profile.branch_policy,
-        backup_policy=profile.backup_policy,
-        content_review_policy=profile.content_review_policy,
-        player_permission_policy=profile.player_permission_policy,
-        worldline_policy=profile.worldline_policy,
-        checklist=profile.checklist,
-        metadata=profile.metadata_json,
+        branch_policy=profile.branch_policy if include_admin_fields else {},
+        backup_policy=profile.backup_policy if include_admin_fields else {},
+        content_review_policy=profile.content_review_policy if include_admin_fields else {},
+        player_permission_policy=profile.player_permission_policy if include_admin_fields else {},
+        worldline_policy=profile.worldline_policy if include_admin_fields else {},
+        checklist=profile.checklist if include_admin_fields else {},
+        metadata=profile.metadata_json if include_admin_fields else {},
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

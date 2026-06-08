@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-022 member release profile policy/evidence redaction
 - Post-v1.1 RC audit F-021 member latest snapshot payload/storage redaction
 - Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
 - Post-v1.1 RC audit F-019 member journal/notification/intervention evidence redaction
