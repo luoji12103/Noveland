@@ -124,6 +124,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit metadata while preserving safe relationship scores, relationship identities, calendar titles, descriptions, times, recurrence, status, and timing fields
 - **AND** admin routes MAY continue to expose metadata required for world management, scheduling, and review.
 
+#### Scenario: Member reads scene and location graph rules
+- **GIVEN** a world member lists scenes or location edges through member-readable routes
+- **WHEN** scene opening rules or location traversal rules contain provider refs, storage refs, raw prompt/output markers, bytes, base64, secret/auth refs, hidden route conditions, or other admin-only movement/rule evidence
+- **THEN** the member response SHALL omit those rule/config internals while preserving safe scene and location graph identity, names, public descriptions, region/location tags, travel labels, active state, and timing fields
+- **AND** admin routes MAY continue to expose opening and traversal rules required for world management and runtime planning.
+
 #### Scenario: Member reads latest snapshot
 - **GIVEN** a world member fetches the latest world snapshot through member-readable routes
 - **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, storage refs, bytes, base64, provider refs, or other replay/storage evidence

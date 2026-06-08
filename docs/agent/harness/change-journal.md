@@ -3555,3 +3555,15 @@
 - Tests added/updated: Expanded player privacy export API coverage to seed journal source refs, notification source refs, and intervention choice/event linkage, then assert exported values are redacted to null while existing forbidden marker checks still pass.
 - Verification: uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted passed with 1 passed; uv run ruff check packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; uv run mypy packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening scene/location rule redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-028.
+- Finding: F-028 found member-readable scene and location graph REST APIs exposing scene opening_rules and location traversal_rules to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member scene/location graph rule shaping, then made scene and location-edge list responses role-aware. World admins retain opening/traversal rule config; ordinary members receive safe scene/location identity, public descriptions, region/location tags, travel labels, active state, and timing fields with rule config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded location graph and agent presence API coverage to seed opening/traversal rule configs with forbidden markers, then compare admin-preserved scene/location graph output against ordinary member-redacted output.
+- Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

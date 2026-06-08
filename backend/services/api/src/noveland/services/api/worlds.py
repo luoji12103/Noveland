@@ -6441,7 +6441,8 @@ def list_scenes(
     scenes = db_session.scalars(
         select(Scene).where(Scene.world_id == context.world_id).order_by(Scene.scene_key),
     ).all()
-    return [_scene_response(scene) for scene in scenes]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_scene_response(scene, include_admin_fields=can_manage) for scene in scenes]
 
 
 @router.post(
@@ -6523,7 +6524,10 @@ def list_location_edges(
         .where(SceneLocationEdge.world_id == context.world_id)
         .order_by(SceneLocationEdge.created_at),
     ).all()
-    return [_location_edge_response(db_session, edge) for edge in edges]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _location_edge_response(db_session, edge, include_admin_fields=can_manage) for edge in edges
+    ]
 
 
 @router.post(
@@ -8112,7 +8116,7 @@ def _world_response(
     )
 
 
-def _scene_response(scene: Scene) -> SceneResponse:
+def _scene_response(scene: Scene, *, include_admin_fields: bool = True) -> SceneResponse:
     return SceneResponse(
         id=scene.id,
         world_id=scene.world_id,
@@ -8121,7 +8125,7 @@ def _scene_response(scene: Scene) -> SceneResponse:
         description=scene.description,
         region_key=scene.region_key,
         location_tags=scene.location_tags,
-        opening_rules=scene.opening_rules,
+        opening_rules=scene.opening_rules if include_admin_fields else {},
         is_active=scene.is_active,
     )
 
@@ -8129,6 +8133,8 @@ def _scene_response(scene: Scene) -> SceneResponse:
 def _location_edge_response(
     db_session: Session,
     edge: SceneLocationEdge,
+    *,
+    include_admin_fields: bool = True,
 ) -> SceneLocationEdgeResponse:
     source_scene = _scene_or_404(db_session, edge.world_id, edge.source_scene_id)
     target_scene = _scene_or_404(db_session, edge.world_id, edge.target_scene_id)
@@ -8140,7 +8146,7 @@ def _location_edge_response(
         source_scene_key=source_scene.scene_key,
         target_scene_key=target_scene.scene_key,
         travel_label=edge.travel_label,
-        traversal_rules=edge.traversal_rules,
+        traversal_rules=edge.traversal_rules if include_admin_fields else {},
         created_at=edge.created_at,
         updated_at=edge.updated_at,
     )

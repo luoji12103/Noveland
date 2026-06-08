@@ -680,7 +680,11 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
             "name": "Classroom",
             "region_key": "school",
             "location_tags": ["school", "indoors"],
-            "opening_rules": {"weekday": "07:00-18:00"},
+            "opening_rules": {
+                "weekday": "07:00-18:00",
+                "raw_prompt": "operator-only",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         },
     )
     courtyard = client.post(
@@ -721,7 +725,11 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
             "source_scene_id": classroom_id,
             "target_scene_id": courtyard_id,
             "travel_label": "walkway",
-            "traversal_rules": {"requires": "school_access"},
+            "traversal_rules": {
+                "requires": "school_access",
+                "raw_prompt": "operator-only",
+                "storage_uri": "media://private/location-plan",
+            },
         },
     )
     duplicate_edge = client.post(
@@ -747,6 +755,7 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
         json={"current_scene_id": str(other_scene_id)},
     )
     scenes = client.get(f"/worlds/{world_id}/scenes")
+    admin_edges = client.get(f"/worlds/{world_id}/location-edges")
 
     with Session(engine) as session:
         presence_event = WorldEventStore(session).append_event(
@@ -771,11 +780,17 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
 
     _authenticate(client, member_token)
     member_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
+    member_scenes = client.get(f"/worlds/{world_id}/scenes")
+    member_edges_after_create = client.get(f"/worlds/{world_id}/location-edges")
 
     assert classroom.status_code == 201
     assert classroom.json()["region_key"] == "school"
     assert classroom.json()["location_tags"] == ["school", "indoors"]
-    assert classroom.json()["opening_rules"] == {"weekday": "07:00-18:00"}
+    assert classroom.json()["opening_rules"] == {
+        "weekday": "07:00-18:00",
+        "raw_prompt": "operator-only",
+        "provider_profile_id": classroom.json()["opening_rules"]["provider_profile_id"],
+    }
     assert member_edges.status_code == 200
     assert member_edges.json() == []
     assert member_create_edge.status_code == 403
@@ -796,6 +811,18 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert upsert_presence.json()["encounter_eligible"] is False
     assert invalid_presence_scene.status_code == 404
     assert [scene["scene_key"] for scene in scenes.json()] == ["classroom", "courtyard"]
+    classroom_scene = next(scene for scene in scenes.json() if scene["scene_key"] == "classroom")
+    assert classroom_scene["opening_rules"] == {
+        "weekday": "07:00-18:00",
+        "raw_prompt": "operator-only",
+        "provider_profile_id": classroom.json()["opening_rules"]["provider_profile_id"],
+    }
+    assert admin_edges.status_code == 200
+    assert admin_edges.json()[0]["traversal_rules"] == {
+        "requires": "school_access",
+        "raw_prompt": "operator-only",
+        "storage_uri": "media://private/location-plan",
+    }
     assert admin_presence.status_code == 200
     assert admin_presence.json()["scheduled_movement"] == {
         "next_scene_id": courtyard_id,
@@ -810,6 +837,17 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert member_presence.json()["encounter_eligible"] is False
     assert member_presence.json()["scheduled_movement"] == {}
     assert member_presence.json()["last_event_id"] is None
+    assert member_scenes.status_code == 200
+    member_classroom = next(
+        scene for scene in member_scenes.json() if scene["scene_key"] == "classroom"
+    )
+    assert member_classroom["opening_rules"] == {}
+    assert member_classroom["name"] == "Classroom"
+    assert member_classroom["region_key"] == "school"
+    assert member_classroom["location_tags"] == ["school", "indoors"]
+    assert member_edges_after_create.status_code == 200
+    assert member_edges_after_create.json()[0]["travel_label"] == "covered walkway"
+    assert member_edges_after_create.json()[0]["traversal_rules"] == {}
 
 
 def test_organization_memberships_and_faction_tracks_append_events() -> None:
