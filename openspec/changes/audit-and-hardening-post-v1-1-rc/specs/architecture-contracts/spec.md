@@ -142,3 +142,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the presence record contains scheduled movement plans, last event linkage, storage refs, provider refs, raw prompt/output markers, bytes, base64, secret/auth refs, or other operator-only scheduling evidence
 - **THEN** the member response SHALL omit scheduled_movement and last_event_id while preserving safe current scene, visibility, encounter eligibility, identity, worldline, and timing fields
 - **AND** admin routes MAY continue to expose scheduled movement and last event linkage required for world management and runtime diagnostics.
+
+#### Scenario: Member reads conversation session metadata
+- **GIVEN** a world member lists or fetches conversation sessions through member-readable routes
+- **WHEN** the session contains objective text, opening prompts, policy settings, writer/provider/plugin configuration, memory configuration, group context, storage refs, provider refs, raw prompt/output markers, bytes, base64, secret/auth refs, or other operator-only conversation orchestration evidence
+- **THEN** the member response SHALL omit those session internals while preserving safe session identity, worldline, scene, title, scope, mode, status, turn counters, terminal state, and timing fields
+- **AND** admin routes MAY continue to expose session orchestration internals required for conversation management and runtime diagnostics.

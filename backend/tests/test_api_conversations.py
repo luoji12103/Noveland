@@ -80,7 +80,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     first_agent_id = _seed_agent(engine, world_id, "guide", scene_id)
     second_agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
     fork_id = _seed_fork_worldline(engine, world_id)
-    _seed_provider_profile(engine)
+    provider_profile_id = _seed_provider_profile(engine)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
 
@@ -104,9 +104,30 @@ def test_conversation_api_enforces_access_and_manual_advance(
             "mode": "manual_chain",
             "worldline_id": str(fork_id),
             "scene_id": str(scene_id),
+            "objective": "operator-only objective with raw_prompt marker",
+            "opening_prompt": "operator-only opening prompt",
             "max_turns": 3,
-            "policy": _policy_json(),
-            "writer_config": _writer_config_json(),
+            "policy": {
+                **_policy_json(),
+                "max_turn_budget": 3,
+            },
+            "writer_config": {
+                **_writer_config_json(),
+                "provider_profile_id": str(provider_profile_id),
+                "style_guide": "operator-only style guide",
+                "source_constraints": "operator-only source constraints",
+                "include_prompt_preview": True,
+            },
+            "memory_config": {
+                "write_turn_memory": True,
+                "retrieve_memory": True,
+                "max_context_items": 7,
+                "query_window": 9,
+                "include_recent_turns": True,
+                "include_agent_observations": True,
+                "memory_query_strategy": "transcript",
+            },
+            "group_context": {"raw_output": "operator-only group context"},
         },
     )
     conversation_id = create_response.json()["id"]
@@ -128,6 +149,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/conversations")
+    member_detail = client.get(f"/worlds/{world_id}/conversations/{conversation_id}")
     member_turns = client.get(f"/worlds/{world_id}/conversations/{conversation_id}/turns")
     member_speaker_preview = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/speaker-preview",
@@ -152,6 +174,19 @@ def test_conversation_api_enforces_access_and_manual_advance(
 
     assert create_response.status_code == 201
     assert create_response.json()["worldline_id"] == str(fork_id)
+    assert create_response.json()["objective"] == "operator-only objective with raw_prompt marker"
+    assert create_response.json()["opening_prompt"] == "operator-only opening prompt"
+    assert create_response.json()["policy"]["max_turn_budget"] == 3
+    assert create_response.json()["writer_config"]["provider_profile_id"] == str(
+        provider_profile_id,
+    )
+    assert create_response.json()["writer_config"]["writer_plugin_config"]["group_context"] == {
+        "raw_output": "operator-only group context",
+    }
+    assert create_response.json()["memory_config"]["memory_query_strategy"] == "transcript"
+    assert create_response.json()["group_context"]["raw_output"] == (
+        "operator-only group context"
+    )
     assert replace_participants.status_code == 200
     assert seed_response.status_code == 200
     assert advance_response.status_code == 200
@@ -160,6 +195,24 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert speaker_preview.json()["policy_mode"] == "round_robin"
     assert speaker_preview.json()["selected_agent_id"] == str(second_agent_id)
     assert member_list.status_code == 200
+    assert member_detail.status_code == 200
+    member_session = member_list.json()[0]
+    assert member_session["id"] == str(conversation_id)
+    assert member_session["title"] == "Manual chain"
+    assert member_session["objective"] == ""
+    assert member_session["opening_prompt"] == ""
+    assert member_session["policy"]["manual_next_agent_id"] is None
+    assert member_session["writer_config"]["provider_profile_id"] is None
+    assert member_session["writer_config"]["writer_plugin_identifier"] == ""
+    assert member_session["writer_config"]["writer_plugin_config"] == {}
+    assert member_session["writer_config"]["style_guide"] == ""
+    assert member_session["writer_config"]["source_constraints"] == ""
+    assert member_session["writer_config"]["include_prompt_preview"] is False
+    assert member_session["memory_config"]["retrieve_memory"] is False
+    assert member_session["memory_config"]["memory_query_strategy"] == ""
+    assert member_session["group_context"] == {}
+    assert member_detail.json()["objective"] == ""
+    assert member_detail.json()["writer_config"]["writer_plugin_config"] == {}
     assert member_turns.status_code == 200
     assert member_speaker_preview.status_code == 403
     assert member_diagnostics.status_code == 403

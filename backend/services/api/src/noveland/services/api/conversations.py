@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from noveland.adapters import ProviderProfileService
 from noveland.adapters.models import ProviderProfile
 from noveland.agents.models import Agent
+from noveland.auth import AuthRole
 from noveland.conversations import (
     ConversationErrorPolicy,
     ConversationMemoryConfig,
@@ -352,8 +353,9 @@ def list_conversations(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ConversationSessionResponse]:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _session_response(session)
+        _session_response(session, include_admin_fields=can_manage)
         for session in ConversationService(db_session).list_sessions(context.world_id)
     ]
 
@@ -405,7 +407,8 @@ def get_conversation(
         session = ConversationService(db_session).get_session(context.world_id, conversation_id)
     except LookupError as exc:
         raise _not_found() from exc
-    return _session_response(session)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return _session_response(session, include_admin_fields=can_manage)
 
 
 @router.patch("/{conversation_id}", response_model=ConversationSessionResponse)
@@ -941,7 +944,11 @@ def _memory_config_contract(
     )
 
 
-def _session_response(session: ConversationSessionRecord) -> ConversationSessionResponse:
+def _session_response(
+    session: ConversationSessionRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> ConversationSessionResponse:
     return ConversationSessionResponse(
         id=session.id,
         world_id=session.world_id,
@@ -952,46 +959,115 @@ def _session_response(session: ConversationSessionRecord) -> ConversationSession
         scope_type=session.scope_type.value,
         mode=session.mode.value,
         status=session.status.value,
-        objective=session.objective,
-        opening_prompt=session.opening_prompt,
+        objective=session.objective if include_admin_fields else "",
+        opening_prompt=session.opening_prompt if include_admin_fields else "",
         max_turns=session.max_turns,
         next_turn_index=session.next_turn_index,
-        policy=ConversationPolicyResponse(
-            error_policy=session.policy.error_policy.value,
-            max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
-            loop_guard_window=session.policy.loop_guard_window,
-            repeat_output_threshold=session.policy.repeat_output_threshold,
-            speaker_policy=session.policy.speaker_policy.value,
-            manual_next_agent_id=session.policy.manual_next_agent_id,
-            participant_repeat_cooldown=session.policy.participant_repeat_cooldown,
-            min_enabled_participants=session.policy.min_enabled_participants,
-            max_turn_budget=session.policy.max_turn_budget,
+        policy=_session_policy_response(session, include_admin_fields=include_admin_fields),
+        writer_config=_session_writer_config_response(
+            session,
+            include_admin_fields=include_admin_fields,
         ),
-        writer_config=ConversationWriterConfigResponse(
-            provider_profile_id=session.writer_config.provider_profile_id,
-            writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
-            writer_plugin_config=session.writer_config.writer_plugin_config,
-            auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
-            generate_summary=session.writer_config.generate_summary,
-            generate_chapter=session.writer_config.generate_chapter,
-            style_guide=session.writer_config.style_guide,
-            target_length=session.writer_config.target_length,
-            source_constraints=session.writer_config.source_constraints,
-            include_prompt_preview=session.writer_config.include_prompt_preview,
+        memory_config=_session_memory_config_response(
+            session,
+            include_admin_fields=include_admin_fields,
         ),
-        memory_config=ConversationMemoryConfigResponse(
-            write_turn_memory=session.memory_config.write_turn_memory,
-            retrieve_memory=session.memory_config.retrieve_memory,
-            max_context_items=session.memory_config.max_context_items,
-            query_window=session.memory_config.query_window,
-            include_recent_turns=session.memory_config.include_recent_turns,
-            include_agent_observations=session.memory_config.include_agent_observations,
-            memory_query_strategy=session.memory_config.memory_query_strategy,
+        group_context=(
+            _group_context_from_writer_config(session.writer_config)
+            if include_admin_fields
+            else {}
         ),
-        group_context=_group_context_from_writer_config(session.writer_config),
         terminal_reason=None if session.terminal_reason is None else session.terminal_reason.value,
         created_at=session.created_at.isoformat(),
         updated_at=session.updated_at.isoformat(),
+    )
+
+
+def _session_policy_response(
+    session: ConversationSessionRecord,
+    *,
+    include_admin_fields: bool,
+) -> ConversationPolicyResponse:
+    if not include_admin_fields:
+        return ConversationPolicyResponse(
+            error_policy="fail_session",
+            max_consecutive_failed_turns=1,
+            loop_guard_window=2,
+            repeat_output_threshold=2,
+            speaker_policy="round_robin",
+            manual_next_agent_id=None,
+            participant_repeat_cooldown=0,
+            min_enabled_participants=1,
+            max_turn_budget=None,
+        )
+    return ConversationPolicyResponse(
+        error_policy=session.policy.error_policy.value,
+        max_consecutive_failed_turns=session.policy.max_consecutive_failed_turns,
+        loop_guard_window=session.policy.loop_guard_window,
+        repeat_output_threshold=session.policy.repeat_output_threshold,
+        speaker_policy=session.policy.speaker_policy.value,
+        manual_next_agent_id=session.policy.manual_next_agent_id,
+        participant_repeat_cooldown=session.policy.participant_repeat_cooldown,
+        min_enabled_participants=session.policy.min_enabled_participants,
+        max_turn_budget=session.policy.max_turn_budget,
+    )
+
+
+def _session_writer_config_response(
+    session: ConversationSessionRecord,
+    *,
+    include_admin_fields: bool,
+) -> ConversationWriterConfigResponse:
+    if not include_admin_fields:
+        return ConversationWriterConfigResponse(
+            provider_profile_id=None,
+            writer_plugin_identifier="",
+            writer_plugin_config={},
+            auto_generate_on_complete=False,
+            generate_summary=False,
+            generate_chapter=False,
+            style_guide="",
+            target_length="standard",
+            source_constraints="",
+            include_prompt_preview=False,
+        )
+    return ConversationWriterConfigResponse(
+        provider_profile_id=session.writer_config.provider_profile_id,
+        writer_plugin_identifier=session.writer_config.writer_plugin_identifier,
+        writer_plugin_config=session.writer_config.writer_plugin_config,
+        auto_generate_on_complete=session.writer_config.auto_generate_on_complete,
+        generate_summary=session.writer_config.generate_summary,
+        generate_chapter=session.writer_config.generate_chapter,
+        style_guide=session.writer_config.style_guide,
+        target_length=session.writer_config.target_length,
+        source_constraints=session.writer_config.source_constraints,
+        include_prompt_preview=session.writer_config.include_prompt_preview,
+    )
+
+
+def _session_memory_config_response(
+    session: ConversationSessionRecord,
+    *,
+    include_admin_fields: bool,
+) -> ConversationMemoryConfigResponse:
+    if not include_admin_fields:
+        return ConversationMemoryConfigResponse(
+            write_turn_memory=False,
+            retrieve_memory=False,
+            max_context_items=0,
+            query_window=0,
+            include_recent_turns=False,
+            include_agent_observations=False,
+            memory_query_strategy="",
+        )
+    return ConversationMemoryConfigResponse(
+        write_turn_memory=session.memory_config.write_turn_memory,
+        retrieve_memory=session.memory_config.retrieve_memory,
+        max_context_items=session.memory_config.max_context_items,
+        query_window=session.memory_config.query_window,
+        include_recent_turns=session.memory_config.include_recent_turns,
+        include_agent_observations=session.memory_config.include_agent_observations,
+        memory_query_strategy=session.memory_config.memory_query_strategy,
     )
 
 

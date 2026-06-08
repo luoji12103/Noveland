@@ -3,13 +3,13 @@
 - Date: 2026-06-09T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-024 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-025 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Baseline before branch: main and origin/main at 1ffbf8a7876a5ddc10789db2339cf2efba125c76, commit docs(openspec): archive v1.1 normal use release candidate.
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-024 batch: ad6bbf2 fix(security): redact member world bible evidence.
+- Current HEAD before F-025 batch: c9d1841 fix(security): redact member presence internals.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API, Web, or runtime process was observed during this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,30 +26,30 @@
 
 ## Completed This Batch
 
-- Reconfirmed server state after F-023: branch feature/audit-and-hardening-post-v1-1-rc, HEAD ad6bbf2 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
-- Audited member-readable worlds.py agent presence DTOs and confirmed scheduled_movement and last_event_id exposure to ordinary world members.
-- Recorded F-024: member-readable agent presence responses exposed future/offscreen movement plans and last event linkage.
-- Added an architecture-contracts OpenSpec delta requiring member agent presence responses to omit scheduled_movement and last_event_id while preserving safe current scene, visibility, encounter eligibility, identity, worldline, and timing fields.
-- Added role-aware response shaping. World admins retain presence scheduled movement and last event linkage; ordinary members receive scheduled_movement={} and last_event_id=None.
-- Expanded location graph and agent presence API regression coverage to compare admin-preserved scheduling evidence against member-redacted payloads.
+- Reconfirmed server state after F-024: branch feature/audit-and-hardening-post-v1-1-rc, HEAD c9d1841 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
+- Audited member-readable conversation session list/detail DTOs and confirmed objective, opening_prompt, policy, writer_config, memory_config, and group_context exposure to ordinary world members.
+- Recorded F-025: member-readable conversation session responses exposed conversation orchestration internals and provider/plugin/memory configuration.
+- Added an architecture-contracts OpenSpec delta requiring member conversation session responses to omit orchestration internals while preserving safe session identity, worldline, scene, title, scope, mode, status, turn counters, terminal state, and timing fields.
+- Added role-aware response shaping. World admins retain conversation session orchestration internals; ordinary members receive redacted objective/opening prompt, policy, writer config, memory config, and group context.
+- Expanded conversation API regression coverage to compare admin-preserved session internals against member-redacted list/detail payloads.
 
 ## Verification This Batch
 
-- uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope: 1 passed.
-- uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py: passed.
-- uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py: passed.
+- uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance: 1 passed.
+- uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
+- uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
 - openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
 - openspec validate --specs --strict: 76 passed.
 - git diff --check: passed before commit.
 
 ## Remaining Work
 
-1. Continue backend security audit with remaining non-realtime member DTOs, residual source/evidence refs, worldline isolation checks, and forbidden-data paths.
+1. Continue backend security audit with remaining member-readable DTOs, including conversation narrative artifact metadata/source refs, worldline isolation checks, and forbidden-data paths.
 2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-024
+## Finding F-025
 
-- Member-readable agent presence REST responses exposed scheduled movement plans and last event linkage.
-- The remediation makes this response role-aware, preserving scheduling internals for admins while returning scheduled_movement={} and last_event_id=None to ordinary members.
-- Residual risk: remaining source/evidence refs in other member-readable DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.
+- Member-readable conversation session REST responses exposed objective text, opening prompts, policy, writer/provider/plugin config, memory config, and group context.
+- The remediation makes list/detail responses role-aware, preserving orchestration internals for admins while redacting them for ordinary members.
+- Residual risk: conversation narrative artifact metadata/source refs, other member-readable DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.
