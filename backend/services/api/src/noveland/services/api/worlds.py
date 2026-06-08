@@ -7016,7 +7016,8 @@ def list_agents(
     agents = db_session.scalars(
         select(Agent).where(Agent.world_id == context.world_id).order_by(Agent.agent_key),
     ).all()
-    return [_agent_response(agent) for agent in agents]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_agent_response(agent, include_admin_fields=can_manage) for agent in agents]
 
 
 @router.get(
@@ -9256,7 +9257,11 @@ def _user_summary_response(user: User) -> UserSummaryResponse:
     )
 
 
-def _agent_response(agent: Agent) -> AgentResponse:
+def _agent_response(
+    agent: Agent,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentResponse:
     return AgentResponse(
         id=agent.id,
         world_id=agent.world_id,
@@ -9266,13 +9271,15 @@ def _agent_response(agent: Agent) -> AgentResponse:
         agent_key=agent.agent_key,
         display_name=agent.display_name,
         kind=cast(AgentKind, agent.kind),
-        provider_profile_id=_provider_profile_id_from_config(agent.config),
+        provider_profile_id=(
+            _provider_profile_id_from_config(agent.config) if include_admin_fields else None
+        ),
         narrative_role=cast(NarrativeRole | None, agent.narrative_role),
         importance=cast(CharacterImportance | None, agent.importance),
         canon_status=cast(ContinuityStatus | None, agent.canon_status),
         character_category=cast(CharacterCategory | None, agent.character_category),
         character_profile=agent.character_profile,
-        config=agent.config,
+        config=agent.config if include_admin_fields else {},
         is_enabled=agent.is_enabled,
     )
 

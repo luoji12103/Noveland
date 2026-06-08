@@ -3332,3 +3332,15 @@
 - Tests added/updated: Expanded agent run API regression coverage to compare admin run list internals with member redacted run list payloads while preserving worldline filtering coverage.
 - Verification: uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api tests/test_api_worlds.py::test_agent_run_apis_filter_by_worldline passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining non-realtime reader/player/member DTOs and worldline isolation, then Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening agent catalog redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-009.
+- Finding: F-009 found the member-readable agent catalog REST API exposing provider_profile_id and full agent config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member agent catalog shaping, then made list_agents role-aware. World admins retain provider/config details; ordinary members receive safe public agent identity and characterization fields with provider refs and config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded agent preset/materialization API coverage to compare admin agent catalog provider/config visibility against member-redacted catalog payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping tests/test_api_worlds.py::test_world_admin_manages_scenes_agents_and_conflicts tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.

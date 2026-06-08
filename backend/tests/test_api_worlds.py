@@ -2935,8 +2935,10 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
         platform_admin=True,
     )
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
     world_id = _seed_world(engine, owner_id, "agent-preset-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     _seed_provider_profile(engine, profile_key="preset-provider")
 
     _authenticate(client, platform_token)
@@ -2998,11 +3000,23 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
 
     _authenticate(client, owner_token)
     agents = client.get(f"/worlds/{world_id}/agents")
+    _authenticate(client, member_token)
+    member_agents = client.get(f"/worlds/{world_id}/agents")
 
     assert updated_preset.status_code == 200
     assert updated_preset.json()["version"] == 2
     assert agents.status_code == 200
     assert agents.json()[0]["source_preset_version"] == 1
+    assert agents.json()[0]["provider_profile_id"] == str(
+        _provider_profile_id_by_key(engine, "preset-provider"),
+    )
+    assert agents.json()[0]["config"]["style"] == "override"
+    assert agents.json()[0]["config"]["length"] == "short"
+    assert member_agents.status_code == 200
+    assert member_agents.json()[0]["id"] == agent_id
+    assert member_agents.json()[0]["display_name"] == "Narrator"
+    assert member_agents.json()[0]["provider_profile_id"] is None
+    assert member_agents.json()[0]["config"] == {}
 
 
 def test_agent_preset_update_preview_reports_stale_and_current_agents() -> None:

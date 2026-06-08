@@ -130,3 +130,13 @@
 - Intended remediation: shape agent run list responses by caller role; preserve run internals for admins while ordinary members receive only safe identifiers, status, trigger/source linkage, and timing fields with prompt, response, provider, and diagnostic internals redacted.
 - Status: Remediated in backend agent run list redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api tests/test_api_worlds.py::test_agent_run_apis_filter_by_worldline passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-009 Member agent catalog exposes provider profile refs and admin config
+
+- Severity: High
+- Affected boundary: member-readable agent catalog REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/agents with get_world_member_context, and list_agents serializes AgentResponse through _agent_response. AgentResponse includes provider_profile_id derived from agent.config and the full agent.config dictionary, which can contain provider profile refs and arbitrary admin execution/provider configuration.
+- Impact: ordinary world members can enumerate provider profile references and internal agent configuration through the agent catalog even though provider/runtime execution details are reserved for admin/operator surfaces.
+- Intended remediation: shape agent catalog responses by caller role; preserve full provider/config details for admins while ordinary members receive safe public agent identity and characterization fields with provider refs and config redacted.
+- Status: Remediated in backend agent catalog redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping tests/test_api_worlds.py::test_world_admin_manages_scenes_agents_and_conflicts tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
