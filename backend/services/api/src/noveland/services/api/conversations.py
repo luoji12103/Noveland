@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -35,6 +36,8 @@ from noveland.narrative import (
     ConversationNarrativePromptPreview,
     ConversationNarrativeWriterService,
     NarrativeArtifactRecord,
+    NarrativeArtifactService,
+    NarrativeArtifactWithPublication,
     NarrativeGenerationMode,
 )
 from noveland.observability import (
@@ -682,14 +685,29 @@ def list_conversation_narrative_artifacts(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ConversationNarrativeArtifactResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     try:
-        artifacts = ConversationNarrativeWriterService(
-            db_session,
-            ProviderProfileService(db_session, load_settings()),
-        ).list_conversation_artifacts(context.world_id, conversation_id)
+        if can_manage:
+            artifacts: Sequence[NarrativeArtifactRecord | NarrativeArtifactWithPublication] = (
+                ConversationNarrativeWriterService(
+                    db_session,
+                    ProviderProfileService(db_session, load_settings()),
+                ).list_conversation_artifacts(context.world_id, conversation_id)
+            )
+        else:
+            ConversationService(db_session).get_session(context.world_id, conversation_id)
+            artifacts = NarrativeArtifactService(db_session).list_artifacts_with_publications(
+                context.world_id,
+                source_conversation_id=conversation_id,
+                limit=50,
+                published_only=True,
+            )
     except LookupError as exc:
         raise _not_found() from exc
-    return [_narrative_artifact_response(artifact) for artifact in artifacts]
+    return [
+        _narrative_artifact_response(artifact, include_admin_fields=can_manage)
+        for artifact in artifacts
+    ]
 
 
 @router.post(
@@ -1201,19 +1219,25 @@ def _int_or_zero(value: object) -> int:
 
 
 def _narrative_artifact_response(
-    artifact: NarrativeArtifactRecord,
+    artifact: NarrativeArtifactRecord | NarrativeArtifactWithPublication,
+    *,
+    include_admin_fields: bool = True,
 ) -> ConversationNarrativeArtifactResponse:
+    if isinstance(artifact, NarrativeArtifactWithPublication):
+        artifact_record = artifact.artifact
+    else:
+        artifact_record = artifact
     return ConversationNarrativeArtifactResponse(
-        id=artifact.id,
-        world_id=artifact.world_id,
-        agent_id=artifact.agent_id,
-        source_run_id=artifact.source_run_id,
-        source_conversation_id=artifact.source_conversation_id,
-        title=artifact.title,
-        content=artifact.content,
-        artifact_kind=artifact.artifact_kind.value,
-        metadata=artifact.metadata,
-        created_at=artifact.created_at.isoformat(),
+        id=artifact_record.id,
+        world_id=artifact_record.world_id,
+        agent_id=artifact_record.agent_id,
+        source_run_id=artifact_record.source_run_id if include_admin_fields else None,
+        source_conversation_id=artifact_record.source_conversation_id,
+        title=artifact_record.title,
+        content=artifact_record.content,
+        artifact_kind=artifact_record.artifact_kind.value,
+        metadata=artifact_record.metadata if include_admin_fields else {},
+        created_at=artifact_record.created_at.isoformat(),
     )
 
 

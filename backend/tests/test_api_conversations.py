@@ -42,7 +42,7 @@ from noveland.memory.models import (
     MemoryWriteJob,
     MemoryWriteLog,
 )
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -441,6 +441,98 @@ def test_conversation_api_stop_and_diagnostics() -> None:
     )
 
 
+def test_conversation_narrative_listing_redacts_member_evidence() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "conversation-narrative-world")
+    scene_id = _seed_scene(engine, world_id, "story-room")
+    agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, owner_token)
+    create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "member-narrative-session",
+            "title": "Member narrative session",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
+            "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
+        },
+    )
+    conversation_id = uuid.UUID(create_response.json()["id"])
+    published_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Published summary",
+        "Published summary body",
+        agent_id=agent_id,
+        source_run_id=uuid.uuid4(),
+        metadata={
+            "raw_prompt": "operator-only prompt",
+            "storage_uri": "media://private/artifact",
+        },
+        publish=True,
+        reader_visible=True,
+    )
+    draft_chapter_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Draft chapter",
+        "Draft chapter body",
+        artifact_kind="chapter_draft",
+        metadata={"raw_output": "operator-only draft"},
+    )
+    hidden_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Hidden summary",
+        "Hidden summary body",
+        metadata={"storage_uri": "media://hidden/artifact"},
+        publish=True,
+        reader_visible=False,
+    )
+
+    _authenticate(client, member_token)
+    member_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
+    )
+
+    _authenticate(client, owner_token)
+    admin_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
+    )
+
+    assert create_response.status_code == 201
+    assert member_response.status_code == 200
+    assert [artifact["id"] for artifact in member_response.json()] == [str(published_summary_id)]
+    assert member_response.json()[0]["source_run_id"] is None
+    assert member_response.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert member_response.json()[0]["metadata"] == {}
+    assert member_response.json()[0]["title"] == "Published summary"
+    assert member_response.json()[0]["content"] == "Published summary body"
+    assert admin_response.status_code == 200
+    assert {artifact["id"] for artifact in admin_response.json()} == {
+        str(hidden_summary_id),
+        str(draft_chapter_id),
+        str(published_summary_id),
+    }
+    admin_published = next(
+        artifact
+        for artifact in admin_response.json()
+        if artifact["id"] == str(published_summary_id)
+    )
+    assert admin_published["source_run_id"] is not None
+    assert admin_published["metadata"]["raw_prompt"] == "operator-only prompt"
+
+
 def test_conversation_narrative_generation_and_listing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -575,6 +667,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, NarrativePublication.__table__),
         cast(Table, SecretRecord.__table__),
         cast(Table, CharacterKnowledgeFact.__table__),
         cast(Table, CharacterEmotionalState.__table__),
@@ -673,6 +766,54 @@ def _seed_agent(
         )
         session.commit()
     return agent_id
+
+
+def _seed_conversation_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    title: str,
+    content: str,
+    *,
+    agent_id: uuid.UUID | None = None,
+    source_run_id: uuid.UUID | None = None,
+    artifact_kind: str = "conversation_summary",
+    metadata: dict[str, object] | None = None,
+    publish: bool = False,
+    reader_visible: bool = True,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                agent_id=agent_id,
+                source_run_id=source_run_id,
+                source_conversation_id=conversation_id,
+                title=title,
+                content=content,
+                artifact_kind=artifact_kind,
+                artifact_metadata=metadata or {},
+            ),
+        )
+        if publish:
+            session.add(
+                NarrativePublication(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    artifact_id=artifact_id,
+                    source_draft_id=artifact_id,
+                    status="published",
+                    reader_visible=reader_visible,
+                    published_metadata={"publication_gate": {"status": "pass"}},
+                    published_at=now,
+                    published_by_user_id=None,
+                ),
+            )
+        session.commit()
+    return artifact_id
 
 
 def _seed_provider_profile(engine: Engine) -> uuid.UUID:

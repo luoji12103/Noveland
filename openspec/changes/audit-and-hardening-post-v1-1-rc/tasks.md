@@ -301,3 +301,13 @@
 - Intended remediation: shape conversation session list/detail responses by caller role; preserve orchestration internals for admins while ordinary members receive safe session identity, worldline, scene, title, scope, mode, status, turn counters, terminal state, and timing fields with session internals redacted.
 - Status: Remediated in backend conversation session redaction batch.
 - Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-026 Member conversation narrative artifact visibility and evidence leak
+
+- Severity: High
+- Affected boundary: member-readable conversation-scoped narrative artifact list REST API.
+- Evidence: backend/services/api/src/noveland/services/api/conversations.py exposes GET /worlds/{world_id}/conversations/{conversation_id}/narrative with get_world_member_context. The route calls ConversationNarrativeWriterService.list_conversation_artifacts, which returns all artifacts for the conversation from NarrativeArtifactService.list_artifacts without publication or reader-visible filtering, then serializes ConversationNarrativeArtifactResponse through _narrative_artifact_response with source_run_id and metadata copied directly. The world-level narrative artifact API already filters ordinary members to published reader-visible artifacts and redacts source_run_id/metadata, but the conversation-scoped route bypasses that boundary.
+- Impact: ordinary world members can list draft, unpublished, or non-reader-visible conversation summaries and chapter drafts before publication, and can read source run refs plus arbitrary artifact metadata that may include raw prompt/output markers, storage refs, provider refs, secret/auth refs, bytes, base64, or other operator-only narrative evidence.
+- Intended remediation: shape conversation-scoped narrative artifact list responses by caller role; preserve full draft visibility, source refs, and metadata for admins while ordinary members receive only published reader-visible artifacts for that conversation with source_run_id and metadata redacted.
+- Status: Open before backend conversation narrative artifact redaction batch.
+- Verification: Pending.
