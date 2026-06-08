@@ -32,3 +32,10 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** those records contain arbitrary metadata with forbidden keys or values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
 - **THEN** the member response SHALL omit the forbidden metadata keys and values while retaining safe metadata
 - **AND** admin media routes MAY continue to expose full metadata for media management and diagnostics.
+
+
+#### Scenario: Member subscribes to realtime world or conversation streams
+- **GIVEN** a world member subscribes to world or conversation realtime streams
+- **WHEN** agent runs, diagnostics, conversations, or narrative artifacts change
+- **THEN** the member stream SHALL NOT expose raw prompts, raw outputs, provider execution diagnostics, admin-only diagnostic details, hidden or unpublished narrative artifact content, provider profile refs, storage refs, bytes, or base64 evidence
+- **AND** admin realtime consumers MAY continue to receive operator diagnostics and execution details required for world management.

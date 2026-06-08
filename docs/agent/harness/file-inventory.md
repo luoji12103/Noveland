@@ -798,3 +798,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-08 F-005 kept existing media API ownership in `backend/services/api/src/noveland/services/api/media.py` and regression coverage in `backend/tests/test_api_media.py`; no new structural files were added. Member media lineage now redacts storage_uri, preview_uri, and thumbnail_uri on nested related_assets.
 
 - 2026-06-08 F-006 kept existing media API ownership in `backend/services/api/src/noveland/services/api/media.py` and regression coverage in `backend/tests/test_api_media.py`; no new structural files were added. Member media metadata-bearing DTOs now recursively omit forbidden keys/values while admin DTOs preserve full metadata.
+
+- 2026-06-08 F-007 kept existing realtime API ownership in `backend/services/api/src/noveland/services/api/realtime.py` and regression coverage in `backend/tests/test_api_realtime.py`; no new structural files were added. Member realtime streams now suppress admin diagnostics, agent run internals, hidden/unpublished narrative artifacts, and conversation policy/writer internals while admin streams retain operator detail.

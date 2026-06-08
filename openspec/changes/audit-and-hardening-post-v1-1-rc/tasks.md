@@ -110,3 +110,13 @@
 - Intended remediation: add API-layer member metadata sanitization for all member-facing media record shapes while preserving admin metadata visibility, and add regression coverage across top-level and nested media DTOs.
 - Status: Remediated in backend member media metadata redaction batch.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 14 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed.
+
+### F-007 Realtime member streams expose internal run, diagnostic, and hidden narrative payloads
+
+- Severity: High
+- Affected boundary: member-readable realtime world/conversation streams.
+- Evidence: backend/services/api/src/noveland/services/api/realtime.py authenticates the world and conversation stream routes with require_world_member, while collect_world_stream_delta serializes runtime diagnostics, agent run prompt_text, response_text, provider_profile_id, and run diagnostics, all narrative artifacts regardless publication visibility, and conversation session opening_prompt, policy_config, and writer_config. The conversation stream and live snapshot also serialize diagnostic details to ordinary world members.
+- Impact: ordinary world members can receive operator-only prompts, raw model output-like run text, provider/run diagnostic evidence, hidden or unpublished narrative content, and conversation policy/writer internals over realtime channels despite admin REST routes keeping diagnostics and event audit admin-only.
+- Intended remediation: shape realtime stream payloads by caller role; preserve full diagnostics and execution details for world admins while restricting member streams to safe clock, reader-visible published narrative artifacts, safe conversation/turn updates, and no diagnostic/run internals.
+- Status: Remediated in backend realtime member-stream redaction batch.
+- Verification: uv run pytest tests/test_api_realtime.py passed with 6 passed; uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

@@ -3308,3 +3308,15 @@
 - Tests added/updated: Added a Media API regression that writes leaky metadata through visible asset/context/input/tag/collection/item records, verifies member top-level and nested metadata is sanitized, and verifies admin asset/reference metadata preserves internal fields.
 - Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 14 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for world event payloads, reader/player DTOs, and worldline isolation paths, then move to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening realtime member stream redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-007.
+- Finding: F-007 found member-authenticated realtime world and conversation streams exposing admin diagnostics, agent run prompt/response text, run diagnostics, hidden/unpublished narrative artifacts, and conversation policy/writer internals.
+- Summary: Added an architecture-contracts OpenSpec delta for member realtime stream shaping, then made world and conversation stream payloads role-aware. World admins retain operator diagnostics and execution details; ordinary members receive safe clock, reader-visible published narrative artifacts, safe conversation updates, and no diagnostic/run internals. Conversation live snapshots now apply the same member-safe shaping.
+- Files changed: backend/services/api/src/noveland/services/api/realtime.py, backend/tests/test_api_realtime.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Realtime API regressions compare admin vs member world stream payloads, member vs admin conversation stream payloads, and member WebSocket live snapshots.
+- Verification: uv run pytest tests/test_api_realtime.py passed with 6 passed; uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for non-realtime reader/player DTOs, worldline isolation, and Web/e2e security. Do not push unless explicitly requested.
