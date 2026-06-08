@@ -7602,8 +7602,9 @@ def list_agent_runs(
         ProviderProfileService(db_session, settings),
         settings,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _agent_run_response(run)
+        _agent_run_response(run, include_admin_fields=can_manage)
         for run in orchestrator.list_runs(context.world_id, agent_id, worldline_id)
     ]
 
@@ -9990,21 +9991,25 @@ def _memory_profile_snapshot_response(
     return MemoryProfileSnapshotResponse(**snapshot.model_dump())
 
 
-def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
+def _agent_run_response(
+    run: AgentRunExecution,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentRunResponse:
     return AgentRunResponse(
         run_id=run.run_id,
         world_id=run.world_id,
         worldline_id=run.worldline_id,
         agent_id=run.agent_id,
         status=run.status,
-        prompt_text=run.prompt_text,
-        response_text=run.response_text,
-        provider_profile_id=run.provider_profile_id,
+        prompt_text=run.prompt_text if include_admin_fields else "",
+        response_text=run.response_text if include_admin_fields else None,
+        provider_profile_id=run.provider_profile_id if include_admin_fields else None,
         trigger_source=run.trigger_source,
         source_calendar_entry_id=run.source_calendar_entry_id,
         source_schedule_rule_id=run.source_schedule_rule_id,
         created_event_id=run.created_event_id,
-        diagnostics=redact_diagnostic_details(run.diagnostics),
+        diagnostics=redact_diagnostic_details(run.diagnostics) if include_admin_fields else {},
         started_at=run.started_at,
         finished_at=run.finished_at,
     )

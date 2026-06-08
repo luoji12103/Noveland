@@ -485,3 +485,5 @@ Fast orientation for a new coding session.
 Whenever a new structural file or module is added, update this index.
 
 - 2026-06-08 F-007 updated existing realtime stream response shaping in `backend/services/api/src/noveland/services/api/realtime.py`; no repository layout or package boundary changes were introduced.
+
+- 2026-06-08 F-008 updated existing worlds API agent run response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.

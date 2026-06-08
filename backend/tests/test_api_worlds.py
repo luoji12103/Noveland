@@ -3504,6 +3504,7 @@ def test_agent_runs_and_narrative_artifacts_api(
     member_run_detail = client.get(
         f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
     )
+    member_list_runs_after_run = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
     _authenticate(client, owner_token)
     create_artifact = client.post(
         f"/worlds/{world_id}/narrative-artifacts",
@@ -3529,6 +3530,16 @@ def test_agent_runs_and_narrative_artifacts_api(
     assert run_response.json()["diagnostics"]["profile_key"] == "runtime-profile"
     assert list_runs.status_code == 200
     assert list_runs.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert list_runs.json()[0]["prompt_text"] == "Operator run"
+    assert list_runs.json()[0]["response_text"].startswith("Run completed for: Operator run")
+    assert list_runs.json()[0]["provider_profile_id"] is not None
+    assert list_runs.json()[0]["diagnostics"]["profile_key"] == "runtime-profile"
+    assert member_list_runs_after_run.status_code == 200
+    assert member_list_runs_after_run.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert member_list_runs_after_run.json()[0]["prompt_text"] == ""
+    assert member_list_runs_after_run.json()[0]["response_text"] is None
+    assert member_list_runs_after_run.json()[0]["provider_profile_id"] is None
+    assert member_list_runs_after_run.json()[0]["diagnostics"] == {}
     assert run_detail.status_code == 200
     assert run_detail.json()["run"]["trigger_source"] == "manual"
     assert run_detail.json()["provider_profile"]["profile_key"] == "runtime-profile"

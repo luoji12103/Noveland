@@ -485,3 +485,4 @@
 - Post-v1.1 RC audit F-002 legacy provider profile execution boundary remediation
 - Post-v1.1 RC audit F-003 member media storage reference redaction
 - Post-v1.1 RC audit F-007 realtime member stream redaction
+- Post-v1.1 RC audit F-008 member agent run list redaction

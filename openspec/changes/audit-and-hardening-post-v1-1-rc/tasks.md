@@ -120,3 +120,13 @@
 - Intended remediation: shape realtime stream payloads by caller role; preserve full diagnostics and execution details for world admins while restricting member streams to safe clock, reader-visible published narrative artifacts, safe conversation/turn updates, and no diagnostic/run internals.
 - Status: Remediated in backend realtime member-stream redaction batch.
 - Verification: uv run pytest tests/test_api_realtime.py passed with 6 passed; uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-008 Member agent run list exposes prompt, response, provider, and diagnostic internals
+
+- Severity: High
+- Affected boundary: member-readable agent runtime run list REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/agents/{agent_id}/runs with get_world_member_context, and list_agent_runs serializes AgentRunResponse through _agent_run_response. AgentRunResponse includes prompt_text, response_text, provider_profile_id, and diagnostics derived from AgentRuntimeRun records.
+- Impact: ordinary world members can read operator prompts, raw/model response-like run output, provider profile references, and execution diagnostics through non-realtime REST responses despite detailed run routes and diagnostic routes being admin-only.
+- Intended remediation: shape agent run list responses by caller role; preserve run internals for admins while ordinary members receive only safe identifiers, status, trigger/source linkage, and timing fields with prompt, response, provider, and diagnostic internals redacted.
+- Status: Remediated in backend agent run list redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api tests/test_api_worlds.py::test_agent_run_apis_filter_by_worldline passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
