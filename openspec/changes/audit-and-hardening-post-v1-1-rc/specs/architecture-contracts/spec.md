@@ -212,3 +212,10 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **WHEN** the Web client constructs the same-origin API URL
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web client manages provider integrations
+- **GIVEN** browser-side Web client code issues provider integration read, configuration, health-check, model-discovery, or smoke-test requests through same-origin API routes
+- **AND** the world or provider identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

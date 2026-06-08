@@ -135,6 +135,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/worlds/invocations.ts`
 - `web/lib/worlds/media.ts`
 - `web/lib/worlds/provider-integrations.ts`
+- `web/lib/worlds/provider-integrations.test.ts`
 - `web/lib/worlds/speech.test.ts`
 - `web/lib/worlds/speech.ts`
 - `web/lib/worlds/visual.test.ts`
@@ -852,3 +853,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-09 F-032 kept existing browser-side realtime ownership in `web/lib/realtime.ts` and added focused coverage in `web/lib/realtime.test.ts`. Conversation live WebSocket URLs now encode world and conversation identifier segments before opening backend live-control sockets.
 
 - 2026-06-09 F-033 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and added focused coverage in `web/lib/worlds/client.test.ts`. Conversation same-origin API helper URLs now encode world and conversation identifier segments before issuing read and state-changing conversation requests.
+
+- 2026-06-09 F-034 kept existing Web provider integration client ownership in `web/lib/worlds/provider-integrations.ts` and added focused coverage in `web/lib/worlds/provider-integrations.test.ts`. Provider integration same-origin API helper URLs now encode world and provider identifier segments before issuing configuration, discovery, capability, health-check, history, and smoke-test requests.

@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web provider integration API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin provider integration API path-boundary remediation for F-034.
+- Finding: F-034 found `web/lib/worlds/provider-integrations.ts` building provider configuration, model discovery, capability, health-check, history, and smoke-test helper URLs from decoded `worldId` and `providerId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side provider integration API clients to preserve same-origin route boundaries, then encoded world and provider identifiers for provider collection, templates, model-discovery, detail, capabilities, health-check, health-check history, and smoke-test helper paths. The health-check history limit remains query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/provider-integrations.ts`, `web/lib/worlds/provider-integrations.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web provider integration helper coverage proving world/provider identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing provider helpers.
+- Verification: `npm run test -- lib/worlds/provider-integrations.test.ts` passed with 5 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 142 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run check:next-env` passed; `npm run test:e2e` passed with 21 passed; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this provider-integration scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web conversation API client path boundary entry
 
 - Date: 2026-06-09

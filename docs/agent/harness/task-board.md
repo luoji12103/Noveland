@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-034 Web provider integration API client path boundary remediation
 - Post-v1.1 RC audit F-033 Web conversation API client path boundary remediation
 - Post-v1.1 RC audit F-032 Web conversation live socket path boundary remediation
 - Post-v1.1 RC audit F-031 Web memory backend proxy query preservation remediation

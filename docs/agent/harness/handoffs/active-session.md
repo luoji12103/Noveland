@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-09T00:00:00+08:00
+- Date: 2026-06-09T23:30:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-033 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-034 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-033 batch: a5b3041 fix(web): encode live socket path segments.
+- Current HEAD before F-034 batch: d036917 fix(web): encode conversation api path segments.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -25,33 +25,34 @@
 
 ## Completed This Batch
 
-- Continued the Web/e2e security audit after F-032.
-- Recorded F-033: browser-side conversation same-origin API helper URLs embedded decoded `worldId` and `conversationId` values directly into frontend API paths.
-- Added an architecture-contracts OpenSpec delta requiring browser-side same-origin API clients to use fixed route templates and encoded dynamic segments.
-- Encoded world and conversation identifiers for scoped conversation collection/detail, participants, turns, narrative, diagnostics, seed, advance, start, pause, resume, and stop helper paths in `web/lib/worlds/client.ts`.
-- Added focused Web client helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing conversation helpers.
+- Continued the Web/e2e security audit after F-033.
+- Recorded F-034: browser-side provider integration same-origin API helper URLs embedded decoded `worldId` and `providerId` values directly into frontend API paths.
+- Added an architecture-contracts OpenSpec delta requiring browser-side provider integration API clients to preserve fixed same-origin route templates and encoded dynamic segments.
+- Encoded world and provider identifiers for provider collection, templates, model-discovery, detail, capabilities, health-check, health-check history, and smoke-test helper paths in `web/lib/worlds/provider-integrations.ts`.
+- Added focused Web provider integration helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing provider helpers.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/worlds/client.test.ts`: 25 passed.
+- `cd web && npm run test -- lib/worlds/provider-integrations.test.ts`: 5 passed.
 - `cd web && npm run lint`: passed.
 - `cd web && npm run typecheck`: passed.
-- `cd web && npm run test`: 44 files and 141 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `cd web && npm run test`: 44 files and 142 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
 - `cd web && npm run build`: passed.
 - `cd web && npm run check:next-env`: passed.
 - `cd web && npm run test:e2e`: 21 passed.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`: passed.
+- `openspec validate --changes --strict`: 1 passed.
 - `openspec validate --specs --strict`: 76 passed.
 - `git diff --check`: passed before commit.
 
 ## Remaining Work
 
-1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped conversation API batch.
+1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped provider integration API batch.
 2. Audit project Playwright/e2e coverage for security and boundary gaps without browser/computer-use plugins.
 3. Continue product normal-use flows and spec/history drift audits after the remaining Web/e2e security pass.
 
-## Finding F-033
+## Finding F-034
 
-- Browser-side conversation same-origin API URL construction appended decoded world/conversation identifiers directly to frontend API paths.
-- The remediation encodes both dynamic segments for scoped conversation collection/detail, participants, turns, narrative, diagnostics, seed, advance, start, pause, resume, and stop helper paths.
+- Browser-side provider integration same-origin API URL construction appended decoded world/provider identifiers directly to frontend API paths.
+- The remediation encodes both dynamic segments for provider collection, templates, model-discovery, detail, capabilities, health-check, health-check history, and smoke-test helper paths, while preserving `limit` as query data.
 - Residual risk: other Web client helpers and Next route handlers still contain many dynamic path constructions that need separate evidence-based review before broad remediation.

@@ -225,18 +225,25 @@ export const providerVisibilityOptions: ProviderVisibility[] = [
   "hidden",
 ];
 
+function providerCollectionPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}/providers`;
+}
+
+function providerPath(worldId: string, providerId: string): string {
+  return `${providerCollectionPath(worldId)}/${encodeURIComponent(providerId)}`;
+}
+
 export function listProviderIntegrations(
   worldId: string,
   filters: ProviderListFilters = {},
 ): Promise<ProviderIntegration[]> {
-  return adminRequest<ProviderIntegration[]>(
-    `/api/worlds/${worldId}/providers${providerQuery(filters)}`,
-    { method: "GET" },
-  );
+  return adminRequest<ProviderIntegration[]>(`${providerCollectionPath(worldId)}${providerQuery(filters)}`, {
+    method: "GET",
+  });
 }
 
 export function listProviderTemplates(worldId: string): Promise<ProviderTemplate[]> {
-  return adminRequest<ProviderTemplate[]>(`/api/worlds/${worldId}/providers/templates`, {
+  return adminRequest<ProviderTemplate[]>(`${providerCollectionPath(worldId)}/templates`, {
     method: "GET",
   });
 }
@@ -246,7 +253,7 @@ export function discoverProviderModels(
   input: ProviderModelDiscoveryInput,
 ): Promise<ProviderModelDiscoveryResult> {
   return adminRequest<ProviderModelDiscoveryResult>(
-    `/api/worlds/${worldId}/providers/model-discovery`,
+    `${providerCollectionPath(worldId)}/model-discovery`,
     { method: "POST", body: input, csrf: true },
   );
 }
@@ -255,7 +262,7 @@ export function createProviderIntegration(
   worldId: string,
   input: ProviderIntegrationInput,
 ): Promise<ProviderIntegration> {
-  return adminRequest<ProviderIntegration>(`/api/worlds/${worldId}/providers`, {
+  return adminRequest<ProviderIntegration>(providerCollectionPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -267,7 +274,7 @@ export function updateProviderIntegration(
   providerId: string,
   input: ProviderIntegrationUpdateInput,
 ): Promise<ProviderIntegration> {
-  return adminRequest<ProviderIntegration>(`/api/worlds/${worldId}/providers/${providerId}`, {
+  return adminRequest<ProviderIntegration>(providerPath(worldId, providerId), {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -275,7 +282,7 @@ export function updateProviderIntegration(
 }
 
 export function deleteProviderIntegration(worldId: string, providerId: string): Promise<void> {
-  return adminRequest<void>(`/api/worlds/${worldId}/providers/${providerId}`, {
+  return adminRequest<void>(providerPath(worldId, providerId), {
     method: "DELETE",
     csrf: true,
   });
@@ -286,7 +293,7 @@ export function listProviderCapabilities(
   providerId: string,
 ): Promise<ProviderCapability[]> {
   return adminRequest<ProviderCapability[]>(
-    `/api/worlds/${worldId}/providers/${providerId}/capabilities`,
+    `${providerPath(worldId, providerId)}/capabilities`,
     { method: "GET" },
   );
 }
@@ -296,7 +303,7 @@ export function runProviderHealthCheck(
   providerId: string,
 ): Promise<ProviderHealthCheck> {
   return adminRequest<ProviderHealthCheck>(
-    `/api/worlds/${worldId}/providers/${providerId}/health-check`,
+    `${providerPath(worldId, providerId)}/health-check`,
     { method: "POST", csrf: true },
   );
 }
@@ -307,7 +314,7 @@ export function listProviderHealthChecks(
   limit = 50,
 ): Promise<ProviderHealthCheck[]> {
   return adminRequest<ProviderHealthCheck[]>(
-    `/api/worlds/${worldId}/providers/${providerId}/health-checks?limit=${limit}`,
+    `${providerPath(worldId, providerId)}/health-checks${limitQuery(limit)}`,
     { method: "GET" },
   );
 }
@@ -318,7 +325,7 @@ export function runProviderSmokeTest(
   input: ProviderSmokeTestInput,
 ): Promise<ProviderSmokeTestResult> {
   return adminRequest<ProviderSmokeTestResult>(
-    `/api/worlds/${worldId}/providers/${providerId}/smoke-test`,
+    `${providerPath(worldId, providerId)}/smoke-test`,
     { method: "POST", body: input, csrf: true },
   );
 }
@@ -333,6 +340,12 @@ function providerQuery(filters: ProviderListFilters): string {
   appendOptional(search, "visibility", filters.visibility);
   appendOptional(search, "capability_key", filters.capability_key);
   return search.size === 0 ? "" : `?${search.toString()}`;
+}
+
+function limitQuery(limit: number): string {
+  const search = new URLSearchParams();
+  search.set("limit", String(limit));
+  return `?${search.toString()}`;
 }
 
 function appendOptional(
