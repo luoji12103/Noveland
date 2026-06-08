@@ -202,3 +202,13 @@ The system SHALL build browser-initiated realtime backend URLs from fixed backen
 - **WHEN** the Web client constructs the backend WebSocket URL
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the backend path
 - **AND** the configured WebSocket base URL SHALL remain separate from dynamic path segments.
+
+### Requirement: Web API clients preserve same-origin route boundaries
+The system SHALL build browser-side same-origin API request URLs from fixed frontend route templates and encoded dynamic path segments so decoded identifiers cannot broaden frontend or backend route scope.
+
+#### Scenario: Web client controls conversation sessions
+- **GIVEN** browser-side Web client code issues conversation session read or control requests through same-origin API routes
+- **AND** the world or conversation identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

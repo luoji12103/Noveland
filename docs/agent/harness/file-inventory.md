@@ -127,6 +127,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/beta-feedback/server.ts`
 - `web/lib/beta-feedback/types.ts`
 - `web/lib/worlds/`
+- `web/lib/worlds/client.ts`
+- `web/lib/worlds/client.test.ts`
 - `web/lib/worlds/diagnostics.test.ts`
 - `web/lib/worlds/diagnostics.ts`
 - `web/lib/worlds/invocations.test.ts`
@@ -848,3 +850,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-09 F-031 kept existing Web memory backend proxy ownership in `web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts` and `web/app/api/memory-backend-profiles/[profileId]/logs/route.ts`, and added focused route-handler coverage in `web/lib/runtime/proxy.test.ts`. Memory backend jobs/logs proxy routes now rely on the shared runtime proxy to append query parameters exactly once.
 
 - 2026-06-09 F-032 kept existing browser-side realtime ownership in `web/lib/realtime.ts` and added focused coverage in `web/lib/realtime.test.ts`. Conversation live WebSocket URLs now encode world and conversation identifier segments before opening backend live-control sockets.
+
+- 2026-06-09 F-033 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and added focused coverage in `web/lib/worlds/client.test.ts`. Conversation same-origin API helper URLs now encode world and conversation identifier segments before issuing read and state-changing conversation requests.

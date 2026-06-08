@@ -2208,8 +2208,16 @@ export function deactivateAgent(worldId: string, agentId: string): Promise<void>
   });
 }
 
+function conversationCollectionPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}/conversations`;
+}
+
+function conversationPath(worldId: string, conversationId: string): string {
+  return `${conversationCollectionPath(worldId)}/${encodeURIComponent(conversationId)}`;
+}
+
 export function listConversations(worldId: string): Promise<ConversationSession[]> {
-  return worldRequest<ConversationSession[]>(`/api/worlds/${worldId}/conversations`, {
+  return worldRequest<ConversationSession[]>(conversationCollectionPath(worldId), {
     method: "GET",
   });
 }
@@ -2218,7 +2226,7 @@ export function createConversation(
   worldId: string,
   input: ConversationCreateInput,
 ): Promise<ConversationSession> {
-  return worldRequest<ConversationSession>(`/api/worlds/${worldId}/conversations`, {
+  return worldRequest<ConversationSession>(conversationCollectionPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -2230,14 +2238,11 @@ export function updateConversation(
   conversationId: string,
   input: ConversationUpdateInput,
 ): Promise<ConversationSession> {
-  return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}`,
-    {
-      method: "PATCH",
-      body: input,
-      csrf: true,
-    },
-  );
+  return worldRequest<ConversationSession>(conversationPath(worldId, conversationId), {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
 }
 
 export function listConversationParticipants(
@@ -2245,7 +2250,7 @@ export function listConversationParticipants(
   conversationId: string,
 ): Promise<ConversationParticipant[]> {
   return worldRequest<ConversationParticipant[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    `${conversationPath(worldId, conversationId)}/participants`,
     { method: "GET" },
   );
 }
@@ -2256,7 +2261,7 @@ export function replaceConversationParticipants(
   input: ConversationParticipantInput[],
 ): Promise<ConversationParticipant[]> {
   return worldRequest<ConversationParticipant[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    `${conversationPath(worldId, conversationId)}/participants`,
     {
       method: "PUT",
       body: input,
@@ -2270,7 +2275,7 @@ export function listConversationTurns(
   conversationId: string,
 ): Promise<ConversationTurn[]> {
   return worldRequest<ConversationTurn[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
+    `${conversationPath(worldId, conversationId)}/turns`,
     { method: "GET" },
   );
 }
@@ -2280,7 +2285,7 @@ export function getConversationSpeakerPreview(
   conversationId: string,
 ): Promise<ConversationSpeakerPreview> {
   return worldRequest<ConversationSpeakerPreview>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/speaker-preview`,
+    `${conversationPath(worldId, conversationId)}/speaker-preview`,
     { method: "GET" },
   );
 }
@@ -2290,7 +2295,7 @@ export function getConversationMemorySummary(
   conversationId: string,
 ): Promise<ConversationMemorySummary> {
   return worldRequest<ConversationMemorySummary>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/memory/summary`,
+    `${conversationPath(worldId, conversationId)}/memory/summary`,
     { method: "GET" },
   );
 }
@@ -2300,7 +2305,7 @@ export function getConversationDiagnosticsSummary(
   conversationId: string,
 ): Promise<ConversationDiagnosticsSummary> {
   return worldRequest<ConversationDiagnosticsSummary>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/diagnostics/summary`,
+    `${conversationPath(worldId, conversationId)}/diagnostics/summary`,
     { method: "GET" },
   );
 }
@@ -2310,7 +2315,7 @@ export function listConversationNarrativeArtifacts(
   conversationId: string,
 ): Promise<NarrativeArtifact[]> {
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative`,
+    `${conversationPath(worldId, conversationId)}/narrative`,
     { method: "GET" },
   );
 }
@@ -2322,7 +2327,7 @@ export function generateConversationNarrativeArtifacts(
   provider_profile_id?: string | null,
 ): Promise<NarrativeArtifact[]> {
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/generate`,
+    `${conversationPath(worldId, conversationId)}/narrative/generate`,
     {
       method: "POST",
       body: {
@@ -2341,7 +2346,7 @@ export function previewConversationNarrativePrompt(
   provider_profile_id?: string | null,
 ): Promise<ConversationNarrativePromptPreview> {
   return worldRequest<ConversationNarrativePromptPreview>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/preview`,
+    `${conversationPath(worldId, conversationId)}/narrative/preview`,
     {
       method: "POST",
       body: {
@@ -2359,7 +2364,7 @@ export function seedConversation(
   input: ConversationSeedInput,
 ): Promise<ConversationTurn> {
   return worldRequest<ConversationTurn>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/seed`,
+    `${conversationPath(worldId, conversationId)}/seed`,
     {
       method: "POST",
       body: input,
@@ -2373,7 +2378,7 @@ export function advanceConversation(
   conversationId: string,
 ): Promise<ConversationAdvanceResult> {
   return worldRequest<ConversationAdvanceResult>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/advance`,
+    `${conversationPath(worldId, conversationId)}/advance`,
     {
       method: "POST",
       csrf: true,
@@ -2386,7 +2391,7 @@ export function startConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/start`,
+    `${conversationPath(worldId, conversationId)}/start`,
     {
       method: "POST",
       csrf: true,
@@ -2399,7 +2404,7 @@ export function pauseConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/pause`,
+    `${conversationPath(worldId, conversationId)}/pause`,
     {
       method: "POST",
       csrf: true,
@@ -2412,7 +2417,7 @@ export function resumeConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/resume`,
+    `${conversationPath(worldId, conversationId)}/resume`,
     {
       method: "POST",
       csrf: true,
@@ -2425,7 +2430,7 @@ export function stopConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/stop`,
+    `${conversationPath(worldId, conversationId)}/stop`,
     {
       method: "POST",
       csrf: true,

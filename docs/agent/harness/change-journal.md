@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web conversation API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin conversation API path-boundary remediation for F-033.
+- Finding: F-033 found `web/lib/worlds/client.ts` building conversation read and state-changing control helper URLs from decoded `worldId` and `conversationId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side same-origin API clients to preserve route boundaries, then encoded world and conversation identifiers for scoped conversation collection/detail, participants, turns, narrative, diagnostics, seed, advance, start, pause, resume, and stop helper paths.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web client helper coverage proving world/conversation identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing conversation helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts passed with 25 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 44 files and 141 tests; npm run build passed; npm run check:next-env passed; npm run test:e2e passed with 21 passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.`
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this conversation-helper scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web conversation live socket path boundary entry
 
 - Date: 2026-06-09

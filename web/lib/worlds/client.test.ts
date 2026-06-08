@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  advanceConversation,
   applyAuthoringTemplate,
   applyRelationshipRepair,
   cancelAgentCalendarEntry,
@@ -11,6 +12,7 @@ import {
   createAgentRelationship,
   createAuthoringTemplate,
   createBetaChecklist,
+  createConversation,
   createDailyEpisode,
   createEndingCandidate,
   createFactionTrack,
@@ -122,12 +124,16 @@ import {
   listStoryHooks,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
+  listConversationParticipants,
+  listConversations,
+  listConversationTurns,
   listClockTransitions,
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
   listMemoryBackendProfiles,
   listMemoryBackendProfileJobs,
+  pauseConversation,
   pauseWorldClock,
   previewAuthoringTemplate,
   previewPlayerChoiceConsequences,
@@ -148,6 +154,8 @@ import {
   listPluginCatalog,
   runAgent,
   refreshAgentObservations,
+  replaceConversationParticipants,
+  resumeConversation,
   retryMemoryWriteJob,
   resolveOrganizationConflict,
   skipWorldClock,
@@ -156,11 +164,15 @@ import {
   listWorldDiagnostics,
   planGMMacroEvents,
   searchAgentMemory,
+  seedConversation,
+  startConversation,
+  stopConversation,
   testProviderProfile,
   importWorldComposition,
   validateWorldComposition,
   updateMemoryBackendProfile,
   updateAgent,
+  updateConversation,
   updateEventTriggerCondition,
   updateFactionTrack,
   updateGMAgenda,
@@ -1157,6 +1169,115 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[10][0]).toBe(
       "/api/worlds/world-1/narrative-artifacts/artifact-4/unpublish",
     );
+  });
+
+  it("encodes conversation API identifier path segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "session-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ agent_id: "agent-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ agent_id: "agent-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: "turn-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ session_id: "session-1" }))
+      .mockResolvedValueOnce(jsonResponse({ latest_hit_count: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ operator_message: "ok" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ prompt_text: "Prompt" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-2" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "turn-2" }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session-1" }, turn: { id: "turn-3" } }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "paused" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "stopped" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/admin?tab=1#frag";
+    const conversationId = "conversation/debug?x=1#frag";
+
+    await listConversations(worldId);
+    await createConversation(worldId, {
+      session_key: "session-1",
+      title: "Session",
+      scope_type: "world",
+      mode: "manual_chain",
+      policy: {
+        error_policy: "fail_session",
+        max_consecutive_failed_turns: 1,
+        loop_guard_window: 3,
+        repeat_output_threshold: 2,
+        speaker_policy: "round_robin",
+        manual_next_agent_id: null,
+        participant_repeat_cooldown: 0,
+        min_enabled_participants: 1,
+        max_turn_budget: null,
+      },
+      writer_config: {
+        provider_profile_id: null,
+        writer_plugin_identifier: "builtin",
+        writer_plugin_config: {},
+        auto_generate_on_complete: false,
+        generate_summary: true,
+        generate_chapter: false,
+        style_guide: "",
+        target_length: "brief",
+        source_constraints: "",
+        include_prompt_preview: false,
+      },
+      memory_config: {
+        write_turn_memory: false,
+        retrieve_memory: false,
+        max_context_items: 0,
+        query_window: 0,
+        include_recent_turns: false,
+        include_agent_observations: false,
+        memory_query_strategy: "objective",
+      },
+    });
+    await updateConversation(worldId, conversationId, { title: "Updated" });
+    await listConversationParticipants(worldId, conversationId);
+    await replaceConversationParticipants(worldId, conversationId, [
+      { agent_id: "agent-1", turn_order: 0 },
+    ]);
+    await listConversationTurns(worldId, conversationId);
+    await getConversationSpeakerPreview(worldId, conversationId);
+    await getConversationMemorySummary(worldId, conversationId);
+    await getConversationDiagnosticsSummary(worldId, conversationId);
+    await listConversationNarrativeArtifacts(worldId, conversationId);
+    await previewConversationNarrativePrompt(worldId, conversationId, "summary_only");
+    await generateConversationNarrativeArtifacts(worldId, conversationId, "summary_only");
+    await seedConversation(worldId, conversationId, { input_text: "hello" });
+    await advanceConversation(worldId, conversationId);
+    await startConversation(worldId, conversationId);
+    await pauseConversation(worldId, conversationId);
+    await resumeConversation(worldId, conversationId);
+    await stopConversation(worldId, conversationId);
+
+    const worldSegment = encodeURIComponent(worldId);
+    const conversationSegment = encodeURIComponent(conversationId);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/conversations`,
+      `/api/worlds/${worldSegment}/conversations`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/participants`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/participants`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/turns`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/speaker-preview`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/memory/summary`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/diagnostics/summary`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative/preview`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative/generate`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/seed`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/advance`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/start`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/pause`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/resume`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/stop`,
+    ]);
   });
 
   it("maps calendar conflict requests", async () => {
