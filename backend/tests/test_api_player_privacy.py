@@ -102,6 +102,10 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     assert "prompt" not in export["choices"][0]
     assert "context" not in export["choices"][0]
     assert "consequence_preview" not in export["choices"][0]
+    assert export["journal_entries"][0]["source_ref"] is None
+    assert export["notifications"][0]["source_ref"] is None
+    assert export["interventions"][0]["choice_id"] is None
+    assert export["interventions"][0]["event_id"] is None
     assert export_request_response.status_code == 200
     assert export_request_response.json()["request_id"] is not None
     assert other_export_response.status_code == 200
@@ -434,7 +438,7 @@ def _seed_player_records(
                 title="Club room notice",
                 body="Someone mentioned the letter.",
                 source_event_id=None,
-                source_ref=None,
+                source_ref=str(choice_id),
                 status="unread",
                 metadata_json={"secret": "private"},
             )
@@ -451,7 +455,7 @@ def _seed_player_records(
                 target_scene_id=None,
                 prompt="Raw intervention prompt should not export.",
                 choice_id=choice_id,
-                event_id=None,
+                event_id=uuid.uuid4(),
                 status="recorded",
                 metadata_json={},
                 created_at=now,

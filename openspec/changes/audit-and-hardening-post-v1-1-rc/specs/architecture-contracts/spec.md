@@ -112,6 +112,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit those operator-only journal, notification, and intervention internals while preserving safe user-facing titles, bodies, statuses, target identity fields, and timing fields
 - **AND** admin routes MAY continue to expose source refs, prompt text, choice/event linkage, and metadata required for world management and review.
 
+#### Scenario: Player exports privacy data
+- **GIVEN** a world member requests a player privacy data export
+- **WHEN** the export includes player journal, notification, or intervention records with source refs, source event refs, choice/event linkage, prompt text, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only evidence
+- **THEN** the export SHALL omit those operator-only internals while preserving safe player-owned titles, bodies, selected options, statuses, target identity fields, and timing fields
+- **AND** privacy request audit records SHALL continue to contain safe summaries and actor refs only.
+
 #### Scenario: Member reads agent relationship and calendar metadata
 - **GIVEN** a world member lists agent relationships or agent calendar entries through member-readable routes
 - **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, source evidence refs, or other admin-only scheduling/relationship evidence

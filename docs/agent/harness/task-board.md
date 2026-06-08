@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-027 player privacy export evidence redaction
 - Post-v1.1 RC audit F-026 member conversation narrative artifact visibility/evidence redaction
 - Post-v1.1 RC audit F-025 member conversation session orchestration redaction
 - Post-v1.1 RC audit F-024 member agent presence scheduling evidence redaction

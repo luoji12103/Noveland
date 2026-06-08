@@ -3,12 +3,12 @@
 - Date: 2026-06-09T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-026 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-027 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-026 batch: 15260df fix(security): redact member conversation internals.
+- Current HEAD before F-027 batch: bb9f329 fix(security): redact member conversation narrative evidence.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API, Web, or runtime process was observed during this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -25,18 +25,18 @@
 
 ## Completed This Batch
 
-- Reconfirmed server state after F-025: branch feature/audit-and-hardening-post-v1-1-rc, HEAD 15260df before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
-- Audited member-readable conversation-scoped narrative artifact list responses and confirmed they bypassed the world-level publication/redaction boundary.
-- Recorded F-026: the conversation narrative list exposed draft/unpublished/non-reader-visible artifacts plus source_run_id and arbitrary metadata to ordinary world members.
-- Added an architecture-contracts OpenSpec delta requiring member conversation narrative artifact list responses to include only published reader-visible artifacts and omit source run refs and artifact metadata.
-- Added role-aware response shaping. World admins retain full conversation artifact list visibility and evidence fields; ordinary members receive only published reader-visible artifacts with source_run_id and metadata redacted.
-- Added conversation API regression coverage for published, draft, and non-reader-visible conversation artifacts comparing member-safe and admin-full payloads.
+- Reconfirmed server state after F-026: branch feature/audit-and-hardening-post-v1-1-rc, HEAD bb9f329 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
+- Audited member-readable player privacy export payloads and confirmed they bypassed the F-019 player/member redaction boundary for journal/notification source refs and intervention choice/event linkage.
+- Recorded F-027: player privacy exports exposed source evidence refs and choice/event linkage to ordinary world members.
+- Added architecture-contracts and player-privacy OpenSpec deltas requiring privacy exports to omit operator-only player interaction evidence while preserving safe player-owned export fields.
+- Redacted journal and notification source_ref plus intervention choice_id/event_id from player privacy exports.
+- Expanded player privacy export regression coverage to seed those refs/linkages and assert exported values are null.
 
 ## Verification This Batch
 
-- uv run pytest tests/test_api_conversations.py::test_conversation_narrative_listing_redacts_member_evidence tests/test_api_conversations.py::test_conversation_narrative_generation_and_listing: 2 passed.
-- uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
-- uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
+- uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted: 1 passed.
+- uv run ruff check packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py: passed.
+- uv run mypy packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py: passed.
 - openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
 - openspec validate --specs --strict: 76 passed.
 - git diff --check: passed before commit.
@@ -47,8 +47,8 @@
 2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-026
+## Finding F-027
 
-- Member-readable conversation-scoped narrative artifact REST responses exposed draft/unpublished/non-reader-visible artifacts and narrative evidence fields to ordinary world members.
-- The remediation makes list responses role-aware, preserving draft/source/metadata evidence for admins while restricting ordinary members to published reader-visible conversation artifacts with source_run_id and metadata redacted.
+- Member-readable player privacy export responses exposed journal/notification source refs and intervention choice/event linkage to ordinary world members.
+- The remediation redacts those export evidence fields while preserving safe player-owned export data and request audit summaries.
 - Residual risk: other member-readable DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.

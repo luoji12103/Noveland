@@ -311,3 +311,13 @@
 - Intended remediation: shape conversation-scoped narrative artifact list responses by caller role; preserve full draft visibility, source refs, and metadata for admins while ordinary members receive only published reader-visible artifacts for that conversation with source_run_id and metadata redacted.
 - Status: Open before backend conversation narrative artifact redaction batch.
 - Verification: Pending.
+
+### F-027 Player privacy export evidence refs leak
+
+- Severity: High
+- Affected boundary: member-readable player privacy export REST API.
+- Evidence: backend/services/api/src/noveland/services/api/player_privacy.py exposes GET/POST /worlds/{world_id}/player/privacy/export with get_world_member_context. PlayerPrivacyService._build_export_payload serializes PlayerPrivacyJournalExport.source_ref from PlayerJournalEntry.source_ref, PlayerPrivacyNotificationExport.source_ref from InWorldNotification.source_ref, and PlayerPrivacyInterventionExport.choice_id/event_id from PlayerInterventionRecord directly into the player export. F-019 already classified the same player journal, notification, and intervention source refs and choice/event linkage as operator-only evidence in ordinary member-readable routes, but the privacy export still bypasses that redaction boundary.
+- Impact: ordinary world members can use the privacy export to recover source evidence refs and choice/event linkage that regular player/member APIs now redact. Those refs can expose internal event, choice, source, or review linkage and may act as stable handles into operator-only evidence or worldline history.
+- Intended remediation: redact journal/notification source_ref and intervention choice_id/event_id in privacy exports while preserving safe player-owned titles, bodies, selected options, target identity fields, statuses, counts, and timing fields.
+- Status: Remediated in backend player privacy export evidence redaction batch.
+- Verification: uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted passed with 1 passed; uv run ruff check packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; uv run mypy packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
