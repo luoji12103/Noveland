@@ -3447,3 +3447,15 @@
 - Tests added/updated: Expanded organization membership/faction track API coverage to compare admin organization hidden_summary/metadata preservation against member-redacted organization list payloads.
 - Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
 - Follow-up notes: Continue backend audit for remaining organization membership/faction track metadata, player/reader DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening journal/notification/intervention redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-019.
+- Finding: F-019 found member-readable player journal, in-world notification, and player intervention REST APIs exposing source evidence refs, intervention prompt text, choice/event linkage, and arbitrary metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member journal, notification, and intervention response shaping, then made the relevant worlds API helpers role-aware. World admins retain source refs, prompt text, choice/event linkage, and metadata; ordinary members receive safe title/body/status/target/timing fields with internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded guardrail/player interaction API coverage to compare admin-preserved journal/notification/intervention internals against member-redacted payloads for source refs, prompt text, choice/event linkage, and metadata.
+- Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes passed; uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for member-readable agent relationship metadata, calendar metadata, remaining source/evidence DTOs, and broader worldline isolation. Do not push unless explicitly requested.

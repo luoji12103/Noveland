@@ -4983,7 +4983,8 @@ def list_player_journal(
     entries = db_session.scalars(
         statement.order_by(PlayerJournalEntry.created_at.desc()).limit(limit)
     ).all()
-    return [_journal_entry_response(entry) for entry in entries]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_journal_entry_response(entry, include_admin_fields=can_manage) for entry in entries]
 
 
 @router.post(
@@ -5044,7 +5045,11 @@ def list_notifications(
     notifications = db_session.scalars(
         statement.order_by(InWorldNotification.created_at.desc()).limit(limit)
     ).all()
-    return [_notification_response(notification) for notification in notifications]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _notification_response(notification, include_admin_fields=can_manage)
+        for notification in notifications
+    ]
 
 
 @router.post(
@@ -5107,7 +5112,11 @@ def list_interventions(
     interventions = db_session.scalars(
         statement.order_by(PlayerInterventionRecord.created_at.desc()).limit(limit),
     ).all()
-    return [_intervention_response(intervention) for intervention in interventions]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _intervention_response(intervention, include_admin_fields=can_manage)
+        for intervention in interventions
+    ]
 
 
 @router.post(
@@ -5146,7 +5155,8 @@ def create_intervention(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
-    return _intervention_response(intervention)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return _intervention_response(intervention, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/gm-style-reviews", response_model=list[GMStyleReviewResponse])
@@ -9001,7 +9011,11 @@ def _relationship_repair_response(repair: RelationshipRepairRecord) -> Relations
     )
 
 
-def _journal_entry_response(entry: PlayerJournalEntry) -> JournalEntryResponse:
+def _journal_entry_response(
+    entry: PlayerJournalEntry,
+    *,
+    include_admin_fields: bool = True,
+) -> JournalEntryResponse:
     return JournalEntryResponse(
         id=entry.id,
         world_id=entry.world_id,
@@ -9011,16 +9025,20 @@ def _journal_entry_response(entry: PlayerJournalEntry) -> JournalEntryResponse:
         entry_kind=cast(JournalEntryKind, entry.entry_kind),
         title=entry.title,
         body=entry.body,
-        source_event_id=entry.source_event_id,
-        source_ref=entry.source_ref,
+        source_event_id=entry.source_event_id if include_admin_fields else None,
+        source_ref=entry.source_ref if include_admin_fields else None,
         visibility=cast(JournalVisibility, entry.visibility),
-        metadata=entry.metadata_json,
+        metadata=entry.metadata_json if include_admin_fields else {},
         created_at=entry.created_at,
         updated_at=entry.updated_at,
     )
 
 
-def _notification_response(notification: InWorldNotification) -> InWorldNotificationResponse:
+def _notification_response(
+    notification: InWorldNotification,
+    *,
+    include_admin_fields: bool = True,
+) -> InWorldNotificationResponse:
     return InWorldNotificationResponse(
         id=notification.id,
         world_id=notification.world_id,
@@ -9029,16 +9047,20 @@ def _notification_response(notification: InWorldNotification) -> InWorldNotifica
         notification_kind=cast(NotificationKind, notification.notification_kind),
         title=notification.title,
         body=notification.body,
-        source_event_id=notification.source_event_id,
-        source_ref=notification.source_ref,
+        source_event_id=notification.source_event_id if include_admin_fields else None,
+        source_ref=notification.source_ref if include_admin_fields else None,
         status=cast(NotificationStatus, notification.status),
-        metadata=notification.metadata_json,
+        metadata=notification.metadata_json if include_admin_fields else {},
         created_at=notification.created_at,
         updated_at=notification.updated_at,
     )
 
 
-def _intervention_response(intervention: PlayerInterventionRecord) -> PlayerInterventionResponse:
+def _intervention_response(
+    intervention: PlayerInterventionRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerInterventionResponse:
     return PlayerInterventionResponse(
         id=intervention.id,
         world_id=intervention.world_id,
@@ -9048,11 +9070,11 @@ def _intervention_response(intervention: PlayerInterventionRecord) -> PlayerInte
         intervention_kind=cast(InterventionKind, intervention.intervention_kind),
         target_agent_id=intervention.target_agent_id,
         target_scene_id=intervention.target_scene_id,
-        prompt=intervention.prompt,
-        choice_id=intervention.choice_id,
-        event_id=intervention.event_id,
+        prompt=intervention.prompt if include_admin_fields else "",
+        choice_id=intervention.choice_id if include_admin_fields else None,
+        event_id=intervention.event_id if include_admin_fields else None,
         status=cast(InterventionStatus, intervention.status),
-        metadata=intervention.metadata_json,
+        metadata=intervention.metadata_json if include_admin_fields else {},
         created_at=intervention.created_at,
         updated_at=intervention.updated_at,
     )

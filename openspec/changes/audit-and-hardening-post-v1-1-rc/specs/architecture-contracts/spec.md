@@ -105,3 +105,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the dashboard contains hidden secret counts or other hidden/admin-only state counters
 - **THEN** the member response SHALL omit or zero hidden/admin-only counters while preserving safe aggregate activity counters
 - **AND** admin dashboard routes MAY continue to expose hidden counters required for world management and review.
+
+#### Scenario: Member reads journal, notification, and intervention records
+- **GIVEN** a world member creates or lists player journal, notification, or intervention records through member-readable routes
+- **WHEN** those records contain source event refs, source refs, prompt text, choice/event linkage, metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit those operator-only journal, notification, and intervention internals while preserving safe user-facing titles, bodies, statuses, target identity fields, and timing fields
+- **AND** admin routes MAY continue to expose source refs, prompt text, choice/event linkage, and metadata required for world management and review.

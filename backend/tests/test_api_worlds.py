@@ -1834,18 +1834,31 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     journal = client.post(
         f"/worlds/{world_id}/player-journal",
         json={
+            "user_id": str(member_id),
             "entry_kind": "event",
             "title": "Late rehearsal",
             "body": "The route tension moved without direct intervention.",
+            "source_event_id": resolved.json()["event_ids"][0],
+            "source_ref": "event:late-rehearsal",
+            "metadata": {
+                "raw_prompt": "operator journal prompt",
+                "storage_uri": "journal://private/evidence",
+            },
         },
     )
     notification = client.post(
         f"/worlds/{world_id}/notifications",
         json={
+            "user_id": str(member_id),
             "notification_kind": "rumor",
             "title": "Club room rumor",
             "body": "Someone mentioned a hidden letter.",
             "source_event_id": resolved.json()["event_ids"][0],
+            "source_ref": "event:club-room-rumor",
+            "metadata": {
+                "raw_output": "operator notification output",
+                "storage_uri": "notification://private/evidence",
+            },
         },
     )
     intervention = client.post(
@@ -1893,7 +1906,10 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
         f"/worlds/{world_id}/worldlines/fork",
         json={"worldline_key": "knowledge-alt", "name": "Knowledge Alt"},
     )
-    member_journal = client.get(f"/worlds/{world_id}/player-journal")
+    member_journal = client.get(
+        f"/worlds/{world_id}/player-journal",
+        params={"user_id": str(member_id)},
+    )
     member_notifications = client.get(f"/worlds/{world_id}/notifications")
     with Session(engine) as session:
         choice_events = session.scalars(
@@ -1964,7 +1980,7 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert dashboard.json()["knowledge_count"] >= 1
     assert dashboard.json()["hidden_secret_count"] == 1
     assert dashboard.json()["emotional_state_count"] == 1
-    assert dashboard.json()["unread_notification_count"] == 1
+    assert dashboard.json()["unread_notification_count"] == 0
     assert dashboard.json()["pending_intervention_count"] == 1
     assert member_dashboard_after_auth.status_code == 200
     assert member_dashboard_after_auth.json()["hidden_secret_count"] == 0
@@ -1975,9 +1991,26 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert fork.status_code == 201
     assert fork.json()["parent_worldline_id"] == primary["id"]
     assert member_journal.status_code == 200
+    assert member_journal.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
+    assert member_journal.json()[0]["source_ref"] == "event:late-rehearsal"
+    assert member_journal.json()[0]["metadata"]["raw_prompt"] == "operator journal prompt"
     assert member_notifications.status_code == 200
-    assert member_journal_after_auth.json() == []
-    assert member_notifications_after_auth.json() == []
+    assert member_notifications.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
+    assert member_notifications.json()[0]["source_ref"] == "event:club-room-rumor"
+    assert (
+        member_notifications.json()[0]["metadata"]["raw_output"]
+        == "operator notification output"
+    )
+    assert member_journal_after_auth.status_code == 200
+    assert member_journal_after_auth.json()[0]["title"] == "Late rehearsal"
+    assert member_journal_after_auth.json()[0]["source_event_id"] is None
+    assert member_journal_after_auth.json()[0]["source_ref"] is None
+    assert member_journal_after_auth.json()[0]["metadata"] == {}
+    assert member_notifications_after_auth.status_code == 200
+    assert member_notifications_after_auth.json()[0]["title"] == "Club room rumor"
+    assert member_notifications_after_auth.json()[0]["source_event_id"] is None
+    assert member_notifications_after_auth.json()[0]["source_ref"] is None
+    assert member_notifications_after_auth.json()[0]["metadata"] == {}
 
 
 def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist() -> None:
@@ -2783,8 +2816,15 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "intervention_kind": "contact",
             "target_agent_id": str(agent_id),
             "prompt": "Send a short message after school.",
+            "metadata": {
+                "raw_prompt": "operator intervention prompt",
+                "storage_uri": "intervention://private/evidence",
+            },
         },
     )
+    listed_interventions = client.get(f"/worlds/{world_id}/interventions")
+    _authenticate(client, owner_token)
+    admin_listed_interventions = client.get(f"/worlds/{world_id}/interventions")
 
     with Session(engine) as session:
         choice_event = session.scalars(
@@ -2825,6 +2865,23 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert admin_listed_choices.status_code == 200
     assert admin_listed_choices.json()[0]["prompt"] == "Help with festival preparations?"
     assert intervention.status_code == 201
+    assert intervention.json()["prompt"] == ""
+    assert intervention.json()["choice_id"] is None
+    assert intervention.json()["event_id"] is None
+    assert intervention.json()["metadata"] == {}
+    assert listed_interventions.status_code == 200
+    assert listed_interventions.json()[0]["prompt"] == ""
+    assert listed_interventions.json()[0]["choice_id"] is None
+    assert listed_interventions.json()[0]["event_id"] is None
+    assert listed_interventions.json()[0]["metadata"] == {}
+    assert admin_listed_interventions.status_code == 200
+    assert admin_listed_interventions.json()[0]["prompt"] == "Send a short message after school."
+    assert admin_listed_interventions.json()[0]["choice_id"] is not None
+    assert admin_listed_interventions.json()[0]["event_id"] is not None
+    assert (
+        admin_listed_interventions.json()[0]["metadata"]["raw_prompt"]
+        == "operator intervention prompt"
+    )
     serialized_payloads = f"{choice_event.payload} {intervention_event.payload}"
     assert "Help with festival preparations?" not in serialized_payloads
     assert "Stay after school." not in serialized_payloads

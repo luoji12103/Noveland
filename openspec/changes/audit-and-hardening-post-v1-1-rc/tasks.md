@@ -230,3 +230,13 @@
 - Intended remediation: shape living world dashboard responses by caller role; preserve hidden_secret_count for admins while ordinary members receive safe aggregate dashboard fields with hidden_secret_count redacted to zero.
 - Status: Remediated in backend living world dashboard hidden count redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-019 Member journal, notification, and intervention evidence leaks
+
+- Severity: High
+- Affected boundary: member-readable player journal, in-world notification, and player intervention REST APIs.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/player-journal, GET /worlds/{world_id}/notifications, and GET/POST /worlds/{world_id}/interventions with get_world_member_context. Their responses serialize JournalEntryResponse, InWorldNotificationResponse, and PlayerInterventionResponse through helpers that copy source_event_id, source_ref, metadata_json, prompt, choice_id, and event_id directly.
+- Impact: ordinary world members can read source evidence refs, intervention prompt text, choice/event linkage, and arbitrary metadata that may include raw prompt/output markers, storage refs, provider refs, secret/auth refs, bytes, base64, or other operator-only evidence.
+- Intended remediation: shape journal, notification, and intervention responses by caller role; preserve source refs, prompt text, choice/event linkage, and metadata for admins while ordinary members receive safe title/body/status/target/timing fields with internals redacted.
+- Status: Remediated in backend journal/notification/intervention redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed with 2 targeted tests; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
