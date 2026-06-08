@@ -220,3 +220,13 @@
 - Intended remediation: shape player choice preview responses by caller role; preserve diagnostics for admins while ordinary members receive safe relationship, faction, and offscreen consequence preview fields with diagnostics redacted.
 - Status: Remediated in backend player choice preview diagnostics redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-018 Member living world dashboard hidden secret count leak
+
+- Severity: High
+- Affected boundary: member-readable living world dashboard REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/living-world-dashboard with get_world_member_context and returns _living_world_dashboard_response(dashboard); LivingWorldDashboardResponse includes hidden_secret_count, and _living_world_dashboard_response copies dashboard.hidden_secret_count directly.
+- Impact: ordinary world members can infer the existence and count of hidden secrets in a worldline through a general dashboard route, revealing hidden/admin-only narrative state even when secret records themselves remain admin-only.
+- Intended remediation: shape living world dashboard responses by caller role; preserve hidden_secret_count for admins while ordinary members receive safe aggregate dashboard fields with hidden_secret_count redacted to zero.
+- Status: Remediated in backend living world dashboard hidden count redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

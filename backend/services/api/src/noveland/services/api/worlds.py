@@ -4708,12 +4708,13 @@ def get_living_world_dashboard(
     worldline_id: uuid.UUID | None = None,
 ) -> LivingWorldDashboardResponse:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     dashboard = LivingWorldGuardrailService(db_session).dashboard(
         world_id=context.world_id,
         worldline_id=worldline_id,
         user_id=context.subject.user_id,
     )
-    return _living_world_dashboard_response(dashboard)
+    return _living_world_dashboard_response(dashboard, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/knowledge", response_model=list[KnowledgeFactResponse])
@@ -9094,12 +9095,14 @@ def _narrative_continuity_review_response(
 
 def _living_world_dashboard_response(
     dashboard: LivingWorldDashboard,
+    *,
+    include_admin_fields: bool = True,
 ) -> LivingWorldDashboardResponse:
     return LivingWorldDashboardResponse(
         world_id=dashboard.world_id,
         worldline_id=dashboard.worldline_id,
         knowledge_count=dashboard.knowledge_count,
-        hidden_secret_count=dashboard.hidden_secret_count,
+        hidden_secret_count=dashboard.hidden_secret_count if include_admin_fields else 0,
         emotional_state_count=dashboard.emotional_state_count,
         open_hook_count=dashboard.open_hook_count,
         unread_notification_count=dashboard.unread_notification_count,

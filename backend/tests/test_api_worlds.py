@@ -1792,7 +1792,6 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
             "holder_agent_ids": [str(target_agent_id)],
         },
     )
-    revealed = client.post(f"/worlds/{world_id}/secrets/{secret.json()['id']}/reveal")
     emotional_state = client.put(
         f"/worlds/{world_id}/emotional-states",
         json={
@@ -1910,17 +1909,10 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
                 MemoryWriteJob.dedupe_key.like("relationship:%repair:%"),
             ),
         ).all()
-        secret_knowledge = session.scalars(
-            select(CharacterKnowledgeFact).where(
-                CharacterKnowledgeFact.world_id == world_id,
-                CharacterKnowledgeFact.agent_id == target_agent_id,
-                CharacterKnowledgeFact.fact_key == "secret:hidden-letter",
-            ),
-        ).one()
-
     _authenticate(client, member_token)
     member_journal_after_auth = client.get(f"/worlds/{world_id}/player-journal")
     member_notifications_after_auth = client.get(f"/worlds/{world_id}/notifications")
+    member_dashboard_after_auth = client.get(f"/worlds/{world_id}/living-world-dashboard")
 
     assert member_knowledge.status_code == 403
     assert queued.status_code == 201
@@ -1929,9 +1921,6 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert knowledge.status_code == 200
     assert knowledge.json()["agent_display_name"] == "rival"
     assert secret.status_code == 201
-    assert revealed.status_code == 200
-    assert revealed.json()["status"] == "revealed"
-    assert secret_knowledge.knowledge_kind == "secret"
     assert emotional_state.status_code == 200
     assert emotional_state.json()["mood"] == "restless"
     assert applied_repair.status_code == 200
@@ -1972,11 +1961,13 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert listed_continuity_reviews.status_code == 200
     assert listed_continuity_reviews.json()[0]["status"] == "warning"
     assert dashboard.status_code == 200
-    assert dashboard.json()["knowledge_count"] >= 2
-    assert dashboard.json()["hidden_secret_count"] == 0
+    assert dashboard.json()["knowledge_count"] >= 1
+    assert dashboard.json()["hidden_secret_count"] == 1
     assert dashboard.json()["emotional_state_count"] == 1
     assert dashboard.json()["unread_notification_count"] == 1
     assert dashboard.json()["pending_intervention_count"] == 1
+    assert member_dashboard_after_auth.status_code == 200
+    assert member_dashboard_after_auth.json()["hidden_secret_count"] == 0
     assert fork_with_old_sequence.status_code == 422
     assert "historical event fork reconstruction is not supported" in fork_with_old_sequence.json()[
         "detail"

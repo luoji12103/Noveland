@@ -99,3 +99,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the preview contains diagnostics with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit diagnostics while preserving safe relationship, faction, and offscreen consequence preview fields
 - **AND** admin player-choice preview routes MAY continue to expose diagnostics required for world management and review.
+
+#### Scenario: Member reads living world dashboard
+- **GIVEN** a world member reads the living world dashboard through member-readable routes
+- **WHEN** the dashboard contains hidden secret counts or other hidden/admin-only state counters
+- **THEN** the member response SHALL omit or zero hidden/admin-only counters while preserving safe aggregate activity counters
+- **AND** admin dashboard routes MAY continue to expose hidden counters required for world management and review.
