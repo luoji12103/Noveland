@@ -170,3 +170,13 @@
 - Intended remediation: shape narrative artifact REST responses by caller role; preserve metadata and publication evidence for admins while ordinary members receive safe published artifact content, identity, conversation linkage, publication status, reader visibility, and timing fields with internals redacted.
 - Status: Remediated in backend narrative artifact REST redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members tests/test_api_worlds.py::test_narrative_publication_workflow_filters_reader_visibility tests/test_api_realtime.py::test_world_stream_hides_admin_evidence_for_member_payloads passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
+
+### F-013 Member organization list exposes hidden summary and metadata
+
+- Severity: High
+- Affected boundary: member-readable organization list REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/organizations with get_world_member_context, and list_organizations serializes OrganizationResponse through _organization_response. OrganizationResponse includes hidden_summary and metadata copied from WorldOrganization records.
+- Impact: ordinary world members can read hidden organization narrative/operator summaries and arbitrary admin-authored metadata that may include raw prompt/output markers, storage refs, provider refs, secrets, bytes, base64, or other internal evidence.
+- Intended remediation: shape organization list responses by caller role; preserve hidden_summary and metadata for admins while ordinary members receive safe public organization identity, description, public_summary, active state, and timing fields with hidden internals redacted.
+- Status: Remediated in backend organization list redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.

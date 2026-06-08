@@ -69,3 +69,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** artifact records or publication records contain source run refs, artifact metadata, continuity metadata/status, publication metadata, publication gate evidence, source draft refs, published-by user refs, raw prompt/output markers, storage refs, bytes, base64, or other admin-only evidence
 - **THEN** the member response SHALL omit those operator-only narrative internals while preserving safe artifact content, title, kind, agent identity, conversation linkage, publication status, reader visibility, and publication timing
 - **AND** admin narrative routes MAY continue to expose metadata and publication evidence required for world management and review.
+
+#### Scenario: Member lists organizations
+- **GIVEN** a world member lists organizations through member-readable routes
+- **WHEN** organization records contain hidden summaries, metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit hidden summaries and metadata while preserving safe public organization identity and public summary fields
+- **AND** admin organization routes MAY continue to expose hidden summaries and metadata required for world management.

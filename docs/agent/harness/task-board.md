@@ -490,3 +490,4 @@
 - Post-v1.1 RC audit F-010 member world profile redaction
 - Post-v1.1 RC audit F-011 member schedule rule redaction
 - Post-v1.1 RC audit F-012 member narrative artifact REST redaction
+- Post-v1.1 RC audit F-013 member organization list redaction

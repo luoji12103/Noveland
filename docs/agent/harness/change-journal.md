@@ -3380,3 +3380,15 @@
 - Tests added/updated: Expanded narrative reader API coverage to compare member-redacted artifact/publication internals against admin-preserved source run, metadata, continuity, and publication gate fields while retaining publication visibility behavior.
 - Verification: uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members tests/test_api_worlds.py::test_narrative_publication_workflow_filters_reader_visibility tests/test_api_realtime.py::test_world_stream_hides_admin_evidence_for_member_payloads passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
 - Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTO metadata/source fields, player/reader DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening organization list redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-013.
+- Finding: F-013 found the member-readable organization list REST API exposing hidden_summary and arbitrary organization metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member organization list shaping, then made organization list responses role-aware. World admins retain hidden summaries and metadata; ordinary members receive safe public organization identity, description, public_summary, active state, and timing with hidden internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded organization membership/faction track API coverage to compare admin organization hidden_summary/metadata preservation against member-redacted organization list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
+- Follow-up notes: Continue backend audit for remaining organization membership/faction track metadata, player/reader DTOs, and worldline isolation. Do not push unless explicitly requested.

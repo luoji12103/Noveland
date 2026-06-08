@@ -779,7 +779,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
             "organization_type": "club",
             "public_summary": "Runs school events.",
             "hidden_summary": "Tracks the old club room incident.",
-            "metadata": {"founded": "post-canon"},
+            "metadata": {
+                "founded": "post-canon",
+                "raw_prompt": "operator-only organization prompt",
+            },
         },
     )
     organization_id = created_org.json()["id"]
@@ -823,6 +826,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     list_memberships = client.get(
         f"/worlds/{world_id}/organizations/{organization_id}/memberships",
     )
+    admin_list = client.get(f"/worlds/{world_id}/organizations")
+    _authenticate(client, member_token)
+    member_list_after_create = client.get(f"/worlds/{world_id}/organizations")
+    _authenticate(client, owner_token)
     created_track = client.post(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
         json={
@@ -859,7 +866,15 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert member_create.status_code == 403
     assert created_org.status_code == 201
     assert created_org.json()["organization_key"] == "student-council"
-    assert created_org.json()["metadata"] == {"founded": "post-canon"}
+    assert created_org.json()["hidden_summary"] == "Tracks the old club room incident."
+    assert created_org.json()["metadata"]["raw_prompt"] == "operator-only organization prompt"
+    assert admin_list.status_code == 200
+    assert admin_list.json()[0]["hidden_summary"] == "Tracks the old club room incident."
+    assert admin_list.json()[0]["metadata"]["raw_prompt"] == "operator-only organization prompt"
+    assert member_list_after_create.status_code == 200
+    assert member_list_after_create.json()[0]["public_summary"] == "Runs school events."
+    assert member_list_after_create.json()[0]["hidden_summary"] is None
+    assert member_list_after_create.json()[0]["metadata"] == {}
     assert duplicate_org.status_code == 409
     assert updated_org.status_code == 200
     assert updated_org.json()["organization_type"] == "faction"

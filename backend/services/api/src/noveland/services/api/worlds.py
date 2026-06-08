@@ -6565,12 +6565,19 @@ def list_organizations(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[OrganizationResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     organizations = db_session.scalars(
         select(WorldOrganization)
         .where(WorldOrganization.world_id == context.world_id)
         .order_by(WorldOrganization.organization_key),
     ).all()
-    return [_organization_response(organization) for organization in organizations]
+    return [
+        _organization_response(
+            organization,
+            include_admin_fields=can_manage,
+        )
+        for organization in organizations
+    ]
 
 
 @router.post(
@@ -8091,7 +8098,11 @@ def _location_edge_response(
     )
 
 
-def _organization_response(organization: WorldOrganization) -> OrganizationResponse:
+def _organization_response(
+    organization: WorldOrganization,
+    *,
+    include_admin_fields: bool = True,
+) -> OrganizationResponse:
     return OrganizationResponse(
         id=organization.id,
         world_id=organization.world_id,
@@ -8100,8 +8111,8 @@ def _organization_response(organization: WorldOrganization) -> OrganizationRespo
         organization_type=cast(OrganizationType, organization.organization_type),
         description=organization.description,
         public_summary=organization.public_summary,
-        hidden_summary=organization.hidden_summary,
-        metadata=organization.metadata_json,
+        hidden_summary=organization.hidden_summary if include_admin_fields else None,
+        metadata=organization.metadata_json if include_admin_fields else {},
         is_active=organization.is_active,
         created_at=organization.created_at,
         updated_at=organization.updated_at,
