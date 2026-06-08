@@ -811,7 +811,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
             "loyalty": 80,
             "influence": 70,
             "responsibilities": ["agenda"],
-            "metadata": {"route": "student-council"},
+            "metadata": {
+                "raw_prompt": "operator-only membership prompt",
+                "storage_uri": "media://private/membership-note",
+            },
         },
     )
     duplicate_membership = client.post(
@@ -829,6 +832,9 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     admin_list = client.get(f"/worlds/{world_id}/organizations")
     _authenticate(client, member_token)
     member_list_after_create = client.get(f"/worlds/{world_id}/organizations")
+    member_list_memberships = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+    )
     _authenticate(client, owner_token)
     created_track = client.post(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
@@ -838,6 +844,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
             "track_type": "goal",
             "progress": 10,
             "pressure": 20,
+            "metadata": {
+                "raw_prompt": "operator-only faction prompt",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         },
     )
     duplicate_track = client.post(
@@ -856,6 +866,11 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     list_tracks = client.get(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
     )
+    _authenticate(client, member_token)
+    member_list_tracks = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+    )
+    _authenticate(client, owner_token)
     organization_events = client.get(
         f"/worlds/{world_id}/events",
         params={"importance": "organization"},
@@ -875,6 +890,9 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert member_list_after_create.json()[0]["public_summary"] == "Runs school events."
     assert member_list_after_create.json()[0]["hidden_summary"] is None
     assert member_list_after_create.json()[0]["metadata"] == {}
+    assert member_list_memberships.status_code == 200
+    assert member_list_memberships.json()[0]["agent_key"] == "club-president"
+    assert member_list_memberships.json()[0]["metadata"] == {}
     assert duplicate_org.status_code == 409
     assert updated_org.status_code == 200
     assert updated_org.json()["organization_type"] == "faction"
@@ -888,6 +906,9 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert updated_membership.json()["visibility"] == "hidden"
     assert updated_membership.json()["loyalty"] == 85
     assert [item["agent_key"] for item in list_memberships.json()] == ["club-president"]
+    assert list_memberships.json()[0]["metadata"]["raw_prompt"] == (
+        "operator-only membership prompt"
+    )
     assert created_track.status_code == 201
     assert created_track.json()["progress"] == 10
     assert duplicate_track.status_code == 409
@@ -895,6 +916,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert updated_track.json()["progress"] == 35
     assert list_tracks.status_code == 200
     assert list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert list_tracks.json()[0]["metadata"]["raw_prompt"] == "operator-only faction prompt"
+    assert member_list_tracks.status_code == 200
+    assert member_list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert member_list_tracks.json()[0]["metadata"] == {}
     assert organization_events.status_code == 200
     assert organization_events.json()[0]["event_name"] == "organization.faction_progress_updated"
     assert organization_events.json()[0]["payload"]["previous_progress"] == 10

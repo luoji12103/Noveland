@@ -75,3 +75,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** organization records contain hidden summaries, metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit hidden summaries and metadata while preserving safe public organization identity and public summary fields
 - **AND** admin organization routes MAY continue to expose hidden summaries and metadata required for world management.
+
+#### Scenario: Member lists organization memberships and faction tracks
+- **GIVEN** a world member lists organization memberships or faction progress tracks through member-readable routes
+- **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit membership and faction-track metadata while preserving safe organization identity, agent identity, role, visibility, responsibility, progress, pressure, and summary fields
+- **AND** admin organization management routes MAY continue to expose membership and faction-track metadata required for world management.

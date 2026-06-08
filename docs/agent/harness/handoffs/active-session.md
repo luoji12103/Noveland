@@ -3,13 +3,13 @@
 - Date: 2026-06-08T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-013 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-014 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Baseline before branch: main and origin/main at 1ffbf8a7876a5ddc10789db2339cf2efba125c76, commit docs(openspec): archive v1.1 normal use release candidate.
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-013 batch: d902921 fix(security): redact member narrative artifact internals.
+- Current HEAD before F-014 batch: 3642032 fix(security): redact member organization internals.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. Other uvicorn/next processes exist on the host, but they were not treated as authoritative Noveland project services for this audit.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,12 +26,12 @@
 
 ## Completed This Batch
 
-- Reconfirmed server state after F-012: branch feature/audit-and-hardening-post-v1-1-rc, HEAD d902921 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
-- Audited member-readable worlds.py organization list DTO after F-012.
-- Recorded F-013: member-readable organization list REST responses exposed hidden_summary and arbitrary organization metadata to ordinary world members.
-- Added an architecture-contracts OpenSpec delta requiring member organization list responses to omit hidden summaries and metadata while preserving safe public organization fields.
-- Added role-aware organization list response shaping. World admins retain hidden_summary and metadata; ordinary members receive hidden_summary=None and metadata={}.
-- Expanded organization API regression coverage to prove admin hidden_summary/metadata visibility and member list redaction.
+- Reconfirmed server state after F-013: branch feature/audit-and-hardening-post-v1-1-rc, HEAD 3642032 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
+- Audited member-readable worlds.py organization membership and faction-track list DTOs after F-013.
+- Recorded F-014: member-readable organization membership and faction progress track list REST responses exposed arbitrary metadata to ordinary world members.
+- Added an architecture-contracts OpenSpec delta requiring member membership/faction-track list responses to omit metadata while preserving safe organization, agent, role, progress, pressure, and summary fields.
+- Added role-aware membership and faction-track list response shaping. World admins retain metadata; ordinary members receive metadata={}.
+- Expanded organization API regression coverage to prove admin membership/faction-track metadata visibility and member list redaction.
 
 ## Verification This Batch
 
@@ -48,8 +48,8 @@
 2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-013
+## Finding F-014
 
-- Member-readable organization list REST responses exposed hidden_summary and arbitrary organization metadata.
-- The remediation makes list_organizations role-aware, preserving hidden_summary and metadata for admins while restricting ordinary members to safe public organization fields.
-- Residual risk: organization membership/faction track metadata, additional member-readable worlds.py metadata/source DTOs, reader/player DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.
+- Member-readable organization membership and faction progress track list REST responses exposed arbitrary metadata.
+- The remediation makes list_organization_memberships and list_faction_tracks role-aware, preserving metadata for admins while restricting ordinary members to safe public organization/agent/track fields.
+- Residual risk: additional member-readable worlds.py metadata/source DTOs, reader/player DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.

@@ -6658,6 +6658,7 @@ def list_organization_memberships(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[OrganizationMembershipResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _organization_or_404(db_session, context.world_id, organization_id)
     memberships = db_session.scalars(
         select(OrganizationMembership)
@@ -6667,7 +6668,12 @@ def list_organization_memberships(
         )
         .order_by(OrganizationMembership.created_at),
     ).all()
-    return [_organization_membership_response(db_session, membership) for membership in memberships]
+    return [
+        _organization_membership_response(
+            db_session, membership, include_admin_fields=can_manage
+        )
+        for membership in memberships
+    ]
 
 
 @router.post(
@@ -6750,6 +6756,7 @@ def list_faction_tracks(
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
 ) -> list[FactionProgressTrackResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _organization_or_404(db_session, context.world_id, organization_id)
     resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
         context.world_id,
@@ -6764,7 +6771,12 @@ def list_faction_tracks(
         )
         .order_by(FactionProgressTrack.track_key),
     ).all()
-    return [_faction_track_response(db_session, track) for track in tracks]
+    return [
+        _faction_track_response(
+            db_session, track, include_admin_fields=can_manage
+        )
+        for track in tracks
+    ]
 
 
 @router.post(
@@ -8122,6 +8134,8 @@ def _organization_response(
 def _organization_membership_response(
     db_session: Session,
     membership: OrganizationMembership,
+    *,
+    include_admin_fields: bool = True,
 ) -> OrganizationMembershipResponse:
     organization = _organization_or_404(db_session, membership.world_id, membership.organization_id)
     agent = _agent_or_404(db_session, membership.world_id, membership.agent_id)
@@ -8139,7 +8153,7 @@ def _organization_membership_response(
         loyalty=membership.loyalty,
         influence=membership.influence,
         responsibilities=membership.responsibilities,
-        metadata=membership.metadata_json,
+        metadata=membership.metadata_json if include_admin_fields else {},
         created_at=membership.created_at,
         updated_at=membership.updated_at,
     )
@@ -8148,6 +8162,8 @@ def _organization_membership_response(
 def _faction_track_response(
     db_session: Session,
     track: FactionProgressTrack,
+    *,
+    include_admin_fields: bool = True,
 ) -> FactionProgressTrackResponse:
     organization = _organization_or_404(db_session, track.world_id, track.organization_id)
     return FactionProgressTrackResponse(
@@ -8163,7 +8179,7 @@ def _faction_track_response(
         progress=track.progress,
         pressure=track.pressure,
         summary=track.summary,
-        metadata=track.metadata_json,
+        metadata=track.metadata_json if include_admin_fields else {},
         created_at=track.created_at,
         updated_at=track.updated_at,
     )

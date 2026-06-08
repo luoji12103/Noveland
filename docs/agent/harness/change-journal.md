@@ -132,6 +132,17 @@
 - Docs updated: OpenSpec task `7.6`, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 7 on `feature/v1.1-7-user-facing-polish` from clean local `main`, read/use `impeccable`, and keep polish scoped to existing user/operator flows. No push performed.
 
+## post-v1.1 RC audit F-014 membership/faction track metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-014 remediation.
+- Summary: Redacted ordinary member organization membership and faction progress track metadata in member-readable list responses while preserving admin metadata visibility for world management. The fix keeps safe organization identity, agent identity, role, visibility, responsibility, progress, pressure, summary, and timing fields available to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_organization_memberships_and_faction_tracks_append_events` to prove admin membership/faction metadata retention and ordinary member list redaction. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-014, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for worldline metadata, player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
 ## Entry format
 
 - Date:

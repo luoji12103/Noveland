@@ -180,3 +180,13 @@
 - Intended remediation: shape organization list responses by caller role; preserve hidden_summary and metadata for admins while ordinary members receive safe public organization identity, description, public_summary, active state, and timing fields with hidden internals redacted.
 - Status: Remediated in backend organization list redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
+
+### F-014 Member organization membership and faction track metadata leaks
+
+- Severity: High
+- Affected boundary: member-readable organization membership and faction progress track list REST APIs.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/organizations/{organization_id}/memberships and GET /worlds/{world_id}/organizations/{organization_id}/faction-tracks with get_world_member_context, and list responses serialize OrganizationMembershipResponse and FactionProgressTrackResponse through helpers that copy metadata_json directly.
+- Impact: ordinary world members can read arbitrary admin-authored organization membership and faction-track metadata that may include raw prompt/output markers, storage refs, provider refs, secrets, bytes, base64, or other internal evidence.
+- Intended remediation: shape membership and faction-track list responses by caller role; preserve metadata for admins while ordinary members receive safe organization/agent identity, role, visibility, responsibility, progress, pressure, summary, and timing fields with metadata redacted.
+- Status: Remediated in backend organization membership/faction track redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
