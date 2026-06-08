@@ -351,3 +351,13 @@
 - Intended remediation: encode every dynamic world/conversation stream route segment before constructing the backend path and add focused Web regression coverage proving encoded slashes remain inside the identifier segment rather than becoming backend path separators.
 - Status: Remediated in Web realtime stream proxy path boundary batch.
 - Verification: npm run test -- lib/realtime/proxy.test.ts passed with 3 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 42 files and 136 tests; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-031 Web memory backend proxy duplicates query strings
+
+- Severity: Medium
+- Affected boundary: Web same-origin runtime proxy query preservation for memory backend job and log list routes.
+- Evidence: web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts and web/app/api/memory-backend-profiles/[profileId]/logs/route.ts read `new URL(request.url).search` and append it to the `path` argument passed to `proxyRuntimeRequest`; web/lib/runtime/proxy.ts then appends `request.nextUrl.search` again to every backend fetch URL.
+- Impact: requests such as `/api/memory-backend-profiles/{id}/jobs?status=failed&limit=5` can be proxied as `/memory-backend-profiles/{id}/jobs?status=failed&limit=5?status=failed&limit=5`, which can corrupt integer query parsing and status filtering on the backend runtime route. This weakens same-origin proxy correctness for admin memory queue visibility and can break normal diagnostic workflows.
+- Intended remediation: remove route-local query concatenation from the memory backend jobs/logs route handlers and add focused Web route-handler tests proving query parameters are forwarded exactly once through the shared runtime proxy.
+- Status: Remediated in Web memory backend runtime proxy query preservation batch.
+- Verification: npm run test -- lib/runtime/proxy.test.ts passed with 2 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 43 files and 138 tests; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

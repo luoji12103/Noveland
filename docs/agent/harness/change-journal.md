@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web memory backend proxy query entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin runtime proxy query preservation remediation for F-031.
+- Finding: F-031 found memory backend jobs/logs route handlers embedding the request query into the backend path argument before `proxyRuntimeRequest` appended the same query again.
+- Summary: Added an architecture-contracts OpenSpec delta requiring runtime proxy query parameters to be appended exactly once, then removed route-local query concatenation from memory backend jobs/logs route handlers.
+- Files changed: `web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts`, `web/app/api/memory-backend-profiles/[profileId]/logs/route.ts`, `web/lib/runtime/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added runtime proxy route-handler coverage proving jobs/logs query strings are forwarded exactly once and encoded profile IDs remain path segments.
+- Verification: `npm run test -- lib/runtime/proxy.test.ts` passed with 2 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 43 files and 138 tests; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web realtime stream proxy path boundary entry
 
 - Date: 2026-06-09

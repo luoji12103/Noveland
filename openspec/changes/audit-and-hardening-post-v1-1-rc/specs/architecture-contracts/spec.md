@@ -185,3 +185,10 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **WHEN** the route constructs the backend stream URL
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the backend path
 - **AND** the original query string SHALL be preserved only as a query string, not as part of any path segment.
+
+#### Scenario: Web proxies runtime query parameters
+- **GIVEN** a Web API route proxies a runtime backend route with query parameters
+- **WHEN** the shared runtime proxy helper appends the original request query string
+- **THEN** route handlers SHALL pass only the fixed backend path and encoded dynamic path segments to the helper
+- **AND** query parameters SHALL be appended exactly once
+- **AND** query parameters SHALL NOT be embedded into the backend path argument before proxying.

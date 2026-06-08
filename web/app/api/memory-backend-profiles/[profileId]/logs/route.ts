@@ -9,11 +9,9 @@ type RouteContext = {
 };
 
 export async function GET(request: NextRequest, context: RouteContext): Promise<Response> {
-  const url = new URL(request.url);
-  const search = url.search === "" ? "" : url.search;
   return proxyRuntimeRequest(
     request,
-    `/memory-backend-profiles/${encodeURIComponent((await context.params).profileId)}/logs${search}`,
+    `/memory-backend-profiles/${encodeURIComponent((await context.params).profileId)}/logs`,
     "GET",
   );
 }
