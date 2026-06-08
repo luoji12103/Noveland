@@ -2658,7 +2658,8 @@ def list_worlds(
             .where(WorldMembership.user_id == subject.user_id)
             .order_by(World.slug),
         ).all()
-    return [_world_response(world) for world in worlds]
+    include_admin_fields = is_platform_admin(subject)
+    return [_world_response(world, include_admin_fields=include_admin_fields) for world in worlds]
 
 
 @root_router.get("/agent-presets", response_model=list[AgentPresetResponse])
@@ -3025,7 +3026,11 @@ def get_world(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldResponse:
-    return _world_response(_world_or_404(db_session, context.world_id))
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return _world_response(
+        _world_or_404(db_session, context.world_id),
+        include_admin_fields=can_manage,
+    )
 
 
 @router.get("/{world_id}/bible", response_model=WorldBibleResponse | None)
@@ -8028,19 +8033,25 @@ def deactivate_agent(
     db_session.flush()
 
 
-def _world_response(world: World) -> WorldResponse:
+def _world_response(
+    world: World,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldResponse:
     return WorldResponse(
         id=world.id,
         owner_user_id=world.owner_user_id,
         slug=world.slug,
         name=world.name,
         description=world.description,
-        rules_config=world.rules_config,
-        memory_plugin_identifier=world.memory_plugin_identifier,
-        memory_backend_profile_id=world.memory_backend_profile_id,
-        memory_plugin_config=world.memory_plugin_config,
-        world_rules_plugin_identifier=world.world_rules_plugin_identifier,
-        world_rules_plugin_config=world.world_rules_plugin_config,
+        rules_config=world.rules_config if include_admin_fields else {},
+        memory_plugin_identifier=world.memory_plugin_identifier if include_admin_fields else "",
+        memory_backend_profile_id=world.memory_backend_profile_id if include_admin_fields else None,
+        memory_plugin_config=world.memory_plugin_config if include_admin_fields else {},
+        world_rules_plugin_identifier=(
+            world.world_rules_plugin_identifier if include_admin_fields else ""
+        ),
+        world_rules_plugin_config=world.world_rules_plugin_config if include_admin_fields else {},
         is_active=world.is_active,
     )
 

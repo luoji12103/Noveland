@@ -51,3 +51,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** agent records contain provider profile refs, execution/provider config, raw prompt/output markers, storage refs, bytes, base64, or other admin-only configuration evidence
 - **THEN** the member response SHALL omit those operator-only agent internals while preserving safe public agent identity and characterization fields
 - **AND** admin agent routes MAY continue to expose configuration details required for world management.
+
+#### Scenario: Member reads world profile
+- **GIVEN** a world member reads a world profile through member-readable routes
+- **WHEN** the world record contains rules config, memory backend profile refs, plugin identifiers, plugin config, raw prompt/output markers, storage refs, bytes, base64, or other admin-only configuration evidence
+- **THEN** the member response SHALL omit those operator-only world internals while preserving safe public world identity fields
+- **AND** admin world routes MAY continue to expose configuration details required for world management.

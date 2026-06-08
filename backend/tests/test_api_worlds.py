@@ -155,12 +155,25 @@ def test_platform_admin_can_create_list_and_update_worlds() -> None:
 
 def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None:
     client, engine = _client_with_database()
-    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
     member_id, member_token = _seed_user(engine, "member@example.test")
     _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
     world_id = _seed_world(engine, owner_id, "shared-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    with Session(engine) as session:
+        world = session.get(World, world_id)
+        assert world is not None
+        world.rules_config = {"raw_prompt": "operator-only rules"}
+        world.memory_plugin_identifier = "builtin.mem0_oss"
+        world.memory_backend_profile_id = uuid.uuid4()
+        world.memory_plugin_config = {"storage_uri": "memory://private/profile"}
+        world.world_rules_plugin_identifier = "builtin.default_world_rules"
+        world.world_rules_plugin_config = {"provider_profile_id": str(uuid.uuid4())}
+        session.commit()
+
+    _authenticate(client, owner_token)
+    owner_get = client.get(f"/worlds/{world_id}")
 
     _authenticate(client, member_token)
     member_list = client.get("/worlds")
@@ -172,8 +185,25 @@ def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None
     stranger_list = client.get("/worlds")
     stranger_get = client.get(f"/worlds/{world_id}")
 
+    assert owner_get.status_code == 200
+    assert owner_get.json()["rules_config"]["raw_prompt"] == "operator-only rules"
+    assert owner_get.json()["memory_backend_profile_id"] is not None
+    assert owner_get.json()["memory_plugin_config"]["storage_uri"] == "memory://private/profile"
+    assert owner_get.json()["world_rules_plugin_config"]["provider_profile_id"]
     assert [item["id"] for item in member_list.json()] == [str(world_id)]
+    assert member_list.json()[0]["rules_config"] == {}
+    assert member_list.json()[0]["memory_plugin_identifier"] == ""
+    assert member_list.json()[0]["memory_backend_profile_id"] is None
+    assert member_list.json()[0]["memory_plugin_config"] == {}
+    assert member_list.json()[0]["world_rules_plugin_identifier"] == ""
+    assert member_list.json()[0]["world_rules_plugin_config"] == {}
     assert member_get.status_code == 200
+    assert member_get.json()["rules_config"] == {}
+    assert member_get.json()["memory_plugin_identifier"] == ""
+    assert member_get.json()["memory_backend_profile_id"] is None
+    assert member_get.json()["memory_plugin_config"] == {}
+    assert member_get.json()["world_rules_plugin_identifier"] == ""
+    assert member_get.json()["world_rules_plugin_config"] == {}
     assert member_patch.status_code == 403
     assert member_candidates.status_code == 403
     assert stranger_list.json() == []

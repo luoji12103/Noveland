@@ -140,3 +140,13 @@
 - Intended remediation: shape agent catalog responses by caller role; preserve full provider/config details for admins while ordinary members receive safe public agent identity and characterization fields with provider refs and config redacted.
 - Status: Remediated in backend agent catalog redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping tests/test_api_worlds.py::test_world_admin_manages_scenes_agents_and_conflicts tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-010 Member world profile exposes plugin refs and admin config
+
+- Severity: High
+- Affected boundary: member-readable world profile/list REST APIs.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id} with get_world_member_context and root GET /worlds includes member-owned worlds. Both serialize WorldResponse through _world_response. WorldResponse includes rules_config, memory_plugin_identifier, memory_backend_profile_id, memory_plugin_config, world_rules_plugin_identifier, and world_rules_plugin_config.
+- Impact: ordinary world members can read memory backend profile refs, plugin identifiers, rules/plugin configuration, and arbitrary admin-authored config values through world profile/list responses, exposing operator-only implementation details and potential forbidden metadata.
+- Intended remediation: shape world profile/list responses by caller role; preserve full world configuration for admins while ordinary members receive safe public world identity fields with rules/plugin/backend config redacted.
+- Status: Remediated in backend world profile redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_but_not_mutate_and_non_member_is_hidden tests/test_api_worlds.py::test_platform_admin_can_create_list_and_update_worlds passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

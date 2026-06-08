@@ -804,3 +804,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-08 F-008 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member agent run list responses now redact prompt, response, provider profile, and diagnostic internals while admin responses retain operator detail.
 
 - 2026-06-08 F-009 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member agent catalog responses now redact provider_profile_id and config while admin responses retain operator configuration detail.
+
+- 2026-06-08 F-010 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member world list/get responses now redact rules/plugin/backend config while admin responses retain world management detail.

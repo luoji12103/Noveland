@@ -3344,3 +3344,15 @@
 - Tests added/updated: Expanded agent preset/materialization API coverage to compare admin agent catalog provider/config visibility against member-redacted catalog payloads.
 - Verification: uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping tests/test_api_worlds.py::test_world_admin_manages_scenes_agents_and_conflicts tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening world profile redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-010.
+- Finding: F-010 found member-readable world profile/list REST APIs exposing rules_config, memory backend profile refs, memory plugin config, world rules plugin identifiers, and plugin config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member world profile shaping, then made world list/get responses role-aware. Platform/world admins retain world configuration details; ordinary members receive safe public world identity fields with rules, plugin identifiers/config, and backend profile refs redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded member world read regression coverage to compare admin world profile config visibility against member list/get redaction.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_but_not_mutate_and_non_member_is_hidden tests/test_api_worlds.py::test_platform_admin_can_create_list_and_update_worlds passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
