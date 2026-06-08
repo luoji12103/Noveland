@@ -331,3 +331,13 @@
 - Intended remediation: shape scene and location edge responses by caller role; preserve opening_rules and traversal_rules for admins while ordinary members receive safe scene/location identity, public descriptions, region/location tags, travel labels, active state, and timing fields with rule/config internals redacted.
 - Status: Remediated in backend scene/location rule redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-029 Member conversation turn runtime evidence leak
+
+- Severity: High
+- Affected boundary: member-readable conversation turn REST API.
+- Evidence: backend/services/api/src/noveland/services/api/conversations.py exposes GET /worlds/{world_id}/conversations/{conversation_id}/turns with get_world_member_context. ConversationTurnResponse includes run_id and error_text copied directly from ConversationTurnRecord through _turn_response. Realtime member streams already redact those same turn fields for ordinary members, but the REST turn list still returns them.
+- Impact: ordinary world members can read stable agent runtime run handles and provider/plugin failure text. error_text can contain raw output markers, provider diagnostics, storage refs, secret/auth refs, or traceback-like operator evidence, and run_id can link member-visible turns to admin-only runtime/invocation evidence.
+- Intended remediation: shape conversation turn list responses by caller role; preserve run_id/error_text for admins while ordinary members receive safe turn identity, speaker, transcript text, status, and timing fields with runtime evidence redacted.
+- Status: Remediated in backend conversation turn runtime evidence redaction batch.
+- Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

@@ -191,6 +191,8 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert seed_response.status_code == 200
     assert advance_response.status_code == 200
     assert advance_response.json()["turn"]["speaker_agent_id"] == str(first_agent_id)
+    assert advance_response.json()["turn"]["run_id"] is not None
+    assert advance_response.json()["turn"]["error_text"] is None
     assert speaker_preview.status_code == 200
     assert speaker_preview.json()["policy_mode"] == "round_robin"
     assert speaker_preview.json()["selected_agent_id"] == str(second_agent_id)
@@ -218,6 +220,8 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert member_diagnostics.status_code == 403
     assert memory_summary.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
+    assert member_turns.json()[1]["run_id"] is None
+    assert member_turns.json()[1]["error_text"] is None
     assert member_advance.status_code == 403
     assert stranger_list.status_code == 404
     assert event_worldline_ids == {fork_id}

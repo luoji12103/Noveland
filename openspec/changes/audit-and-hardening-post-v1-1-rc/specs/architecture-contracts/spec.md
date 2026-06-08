@@ -167,3 +167,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL include only published reader-visible artifacts for that conversation
 - **AND** the member response SHALL omit source run refs and artifact metadata while preserving safe artifact identity, title, content, kind, conversation linkage, and creation time
 - **AND** admin routes MAY continue to list draft artifacts and expose source refs and metadata required for conversation narrative management.
+
+#### Scenario: Member lists conversation turns
+- **GIVEN** a world member lists conversation turns through member-readable routes
+- **WHEN** turn records contain runtime run IDs, provider/plugin error text, raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only execution evidence
+- **THEN** the member response SHALL omit run IDs and error text while preserving safe turn identity, speaker, transcript text, status, and timing fields
+- **AND** admin routes MAY continue to expose run IDs and error text required for conversation management and runtime diagnostics.

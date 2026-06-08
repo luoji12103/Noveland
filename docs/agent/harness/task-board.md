@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-029 member conversation turn runtime evidence redaction
 - Post-v1.1 RC audit F-028 member scene/location graph rule redaction
 - Post-v1.1 RC audit F-027 player privacy export evidence redaction
 - Post-v1.1 RC audit F-026 member conversation narrative artifact visibility/evidence redaction

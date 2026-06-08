@@ -525,7 +525,8 @@ def list_turns(
         turns = ConversationService(db_session).list_turns(context.world_id, conversation_id)
     except LookupError as exc:
         raise _not_found() from exc
-    return [_turn_response(turn) for turn in turns]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_turn_response(turn, include_admin_fields=can_manage) for turn in turns]
 
 
 @router.get(
@@ -1131,7 +1132,11 @@ def _speaker_preview_response(
     )
 
 
-def _turn_response(turn: ConversationTurnRecord) -> ConversationTurnResponse:
+def _turn_response(
+    turn: ConversationTurnRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> ConversationTurnResponse:
     return ConversationTurnResponse(
         id=turn.id,
         session_id=turn.session_id,
@@ -1141,8 +1146,8 @@ def _turn_response(turn: ConversationTurnRecord) -> ConversationTurnResponse:
         input_text=turn.input_text,
         output_text=turn.output_text,
         status=turn.status.value,
-        run_id=turn.run_id,
-        error_text=turn.error_text,
+        run_id=turn.run_id if include_admin_fields else None,
+        error_text=turn.error_text if include_admin_fields else None,
         created_at=turn.created_at.isoformat(),
         updated_at=turn.updated_at.isoformat(),
     )

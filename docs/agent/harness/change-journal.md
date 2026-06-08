@@ -3567,3 +3567,16 @@
 - Tests added/updated: Expanded location graph and agent presence API coverage to seed opening/traversal rule configs with forbidden markers, then compare admin-preserved scene/location graph output against ordinary member-redacted output.
 - Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening conversation turn redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-029.
+- Finding: F-029 found member-readable conversation turn REST responses exposing runtime run_id and provider/plugin error_text to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member conversation turn shaping, then made turn list responses role-aware. World admins retain run IDs and error text; ordinary members receive safe turn identity, speaker, transcript text, status, and timing fields with runtime evidence redacted.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded conversation API access coverage to assert admin advance responses preserve run evidence while ordinary member turn list responses redact run_id and error_text.
+- Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

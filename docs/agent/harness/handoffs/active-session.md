@@ -3,12 +3,12 @@
 - Date: 2026-06-09T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-028 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-029 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-028 batch: 7992341 fix(security): redact player privacy export evidence.
+- Current HEAD before F-029 batch: b72857a fix(security): redact member scene location rules.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API, Web, or runtime process was observed during this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -25,18 +25,18 @@
 
 ## Completed This Batch
 
-- Reconfirmed server state after F-027: branch feature/audit-and-hardening-post-v1-1-rc, HEAD 7992341 before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
-- Audited member-readable scene and location graph payloads and confirmed scene opening_rules and location traversal_rules were exposed to ordinary world members.
-- Recorded F-028: member scene and location graph responses exposed admin-authored movement/rule config.
-- Added an architecture-contracts OpenSpec delta requiring member scene/location graph responses to omit rule/config internals while preserving safe public scene/location fields.
-- Made scene and location-edge list responses role-aware. Admins retain opening/traversal rule config; ordinary members receive empty rule/config objects.
-- Expanded location graph regression coverage to seed forbidden markers in opening/traversal rules and assert member redaction plus admin preservation.
+- Reconfirmed server state after F-028: branch feature/audit-and-hardening-post-v1-1-rc, HEAD b72857a before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
+- Audited member-readable conversation turn payloads and confirmed REST turn lists exposed run_id and error_text despite realtime member streams already redacting them.
+- Recorded F-029: member conversation turn responses exposed runtime run handles and provider/plugin error text to ordinary world members.
+- Added an architecture-contracts OpenSpec delta requiring member conversation turn responses to omit runtime evidence while preserving safe transcript fields.
+- Made conversation turn list responses role-aware. Admins retain run_id/error_text; ordinary members receive null values.
+- Expanded conversation API access coverage to assert member turn redaction plus admin runtime evidence preservation.
 
 ## Verification This Batch
 
-- uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope: 1 passed.
-- uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py: passed.
-- uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py: passed.
+- uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance: 1 passed.
+- uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
+- uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
 - openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
 - openspec validate --specs --strict: 76 passed.
 - git diff --check: passed before commit.
@@ -47,8 +47,8 @@
 2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-028
+## Finding F-029
 
-- Member-readable scene and location graph responses exposed scene opening_rules and location traversal_rules to ordinary world members.
-- The remediation redacts those rule/config fields for ordinary members while preserving safe scene/location graph identity fields and admin rule visibility.
+- Member-readable conversation turn responses exposed runtime run_id and provider/plugin error_text to ordinary world members.
+- The remediation redacts those runtime evidence fields for ordinary members while preserving safe transcript fields and admin diagnostics visibility.
 - Residual risk: other member-readable DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.
