@@ -13,5 +13,5 @@ export async function GET(
   { params }: WorldStreamRouteProps,
 ): Promise<Response> {
   const { worldId } = await params;
-  return proxyEventStream(request, `/worlds/${worldId}/stream`);
+  return proxyEventStream(request, `/worlds/${encodeURIComponent(worldId)}/stream`);
 }

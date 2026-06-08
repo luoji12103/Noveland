@@ -8,12 +8,13 @@
 
 ## In Progress
 - Post-v1.1 RC audit and hardening OpenSpec change
-- Backend security audit first batch
+- Web/e2e security audit
 
 ## Blocked
 - None
 
 ## Done
+- Post-v1.1 RC audit F-030 Web realtime stream proxy path boundary remediation
 - Post-v1.1 RC audit F-029 member conversation turn runtime evidence redaction
 - Post-v1.1 RC audit F-028 member scene/location graph rule redaction
 - Post-v1.1 RC audit F-027 player privacy export evidence redaction

@@ -23,7 +23,7 @@
 
 ## 4. Web And E2E Security Audit
 
-- [ ] 4.1 Audit Next route handlers and API proxies for CSRF, auth forwarding, role boundary, evidence redaction, and client-side leaks.
+- [ ] 4.1 Audit Next route handlers and API proxies for CSRF, auth forwarding, route-boundary preservation, role boundary, evidence redaction, and client-side leaks.
 - [ ] 4.2 Audit Web client rendering for XSS-prone content, admin/player/member separation, provider status/degraded state exposure, and forbidden internal metadata.
 - [ ] 4.3 Audit existing Playwright/project e2e coverage for security and boundary gaps without using browser/computer-use plugins.
 - [ ] 4.4 Record Web/e2e findings with severity, evidence, remediation order, and targeted tests.
@@ -341,3 +341,13 @@
 - Intended remediation: shape conversation turn list responses by caller role; preserve run_id/error_text for admins while ordinary members receive safe turn identity, speaker, transcript text, status, and timing fields with runtime evidence redacted.
 - Status: Remediated in backend conversation turn runtime evidence redaction batch.
 - Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-030 Web realtime stream proxy path segment injection
+
+- Severity: High
+- Affected boundary: Web same-origin API proxy route-boundary preservation for world and conversation realtime streams.
+- Evidence: web/app/api/worlds/[worldId]/stream/route.ts constructs `/worlds/${worldId}/stream` from decoded route params without encoding; web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts constructs `/worlds/${worldId}/conversations/${conversationId}/stream` the same way. Other dynamic Web API proxies use encodeURIComponent, and the catch-all world/private-beta routes encode every path segment before forwarding.
+- Impact: a request whose dynamic route parameter contains an encoded slash or reserved path character can be forwarded to a broader or different backend path than the fixed stream route intended. That weakens the Web proxy route boundary and can expose unintended backend stream behavior through the same-origin proxy if a crafted path still matches the frontend route.
+- Intended remediation: encode every dynamic world/conversation stream route segment before constructing the backend path and add focused Web regression coverage proving encoded slashes remain inside the identifier segment rather than becoming backend path separators.
+- Status: Remediated in Web realtime stream proxy path boundary batch.
+- Verification: npm run test -- lib/realtime/proxy.test.ts passed with 3 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 42 files and 136 tests; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

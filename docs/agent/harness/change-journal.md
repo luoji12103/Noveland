@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web realtime stream proxy path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin realtime stream proxy path-boundary remediation for F-030.
+- Finding: F-030 found `web/app/api/worlds/[worldId]/stream/route.ts` and `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts` forwarding decoded route parameters directly into backend stream paths without encoding.
+- Summary: Added an architecture-contracts OpenSpec delta requiring Web API proxies to preserve backend route boundaries with fixed path templates and encoded dynamic segments, then encoded world and conversation stream identifiers before forwarding to backend SSE endpoints.
+- Files changed: `web/app/api/worlds/[worldId]/stream/route.ts`, `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts`, `web/lib/realtime/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded realtime proxy coverage to call the world and conversation stream route handlers with decoded identifiers containing `/`, asserting the backend fetch URL keeps those slashes encoded inside identifier segments while preserving the query string.
+- Verification: `npm run test -- lib/realtime/proxy.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 42 files and 136 tests; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining Next route handlers, CSRF forwarding, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## v1.1 Normal Use / Release Candidate archive entry
 
 - Date: 2026-05-22

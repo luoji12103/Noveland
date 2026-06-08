@@ -3,14 +3,14 @@
 - Date: 2026-06-09T00:00:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-029 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-030 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-029 batch: b72857a fix(security): redact member scene location rules.
+- Current HEAD before F-030 batch: e5dfc3d fix(security): redact member conversation turn evidence.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API, Web, or runtime process was observed during this batch.
+- Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. Process scan showed unrelated uvicorn/Next/Playwright-style processes, but no authoritative Noveland API/Web/runtime process was confirmed for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -25,30 +25,32 @@
 
 ## Completed This Batch
 
-- Reconfirmed server state after F-028: branch feature/audit-and-hardening-post-v1-1-rc, HEAD b72857a before this batch, clean worktree, active OpenSpec change in progress, Postgres/NATS healthy.
-- Audited member-readable conversation turn payloads and confirmed REST turn lists exposed run_id and error_text despite realtime member streams already redacting them.
-- Recorded F-029: member conversation turn responses exposed runtime run handles and provider/plugin error text to ordinary world members.
-- Added an architecture-contracts OpenSpec delta requiring member conversation turn responses to omit runtime evidence while preserving safe transcript fields.
-- Made conversation turn list responses role-aware. Admins retain run_id/error_text; ordinary members receive null values.
-- Expanded conversation API access coverage to assert member turn redaction plus admin runtime evidence preservation.
+- Reconfirmed server state: branch feature/audit-and-hardening-post-v1-1-rc, HEAD e5dfc3d before this batch, clean worktree, active OpenSpec change in progress, OpenSpec strict validation passing, Postgres/NATS healthy.
+- Used the security-best-practices guidance for Next.js, React/frontend, and FastAPI review focus.
+- Audited Web Next route handlers and same-origin proxy helpers for route-boundary handling.
+- Recorded F-030: world and conversation realtime stream route handlers forwarded decoded dynamic route params into backend paths without encoding.
+- Added an architecture-contracts OpenSpec delta requiring Web API proxies to preserve backend route boundaries with fixed templates and encoded dynamic segments.
+- Encoded dynamic `worldId` and `conversationId` segments in the world and conversation SSE proxy route handlers.
+- Expanded realtime proxy tests to prove decoded identifiers containing `/` are forwarded as `%2F` inside backend path segments while preserving query strings.
 
 ## Verification This Batch
 
-- uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance: 1 passed.
-- uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
-- uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py: passed.
-- openspec validate audit-and-hardening-post-v1-1-rc --strict: passed.
-- openspec validate --specs --strict: 76 passed.
-- git diff --check: passed before commit.
+- `cd web && npm run test -- lib/realtime/proxy.test.ts`: 3 passed.
+- `cd web && npm run lint`: passed.
+- `cd web && npm run typecheck`: passed.
+- `cd web && npm run test`: 42 files and 136 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `openspec validate audit-and-hardening-post-v1-1-rc --strict`: passed.
+- `openspec validate --specs --strict`: 76 passed.
+- `git diff --check`: passed before commit.
 
 ## Remaining Work
 
-1. Continue backend security audit with remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths.
-2. Later audit Web/e2e route handlers and client rendering for CSRF, XSS, auth forwarding, role boundaries, and client-side leaks.
+1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, and XSS-prone rendering sinks.
+2. Audit project Playwright/e2e coverage for security and boundary gaps without browser/computer-use plugins.
 3. Later audit product normal-use flows and spec/history drift.
 
-## Finding F-029
+## Finding F-030
 
-- Member-readable conversation turn responses exposed runtime run_id and provider/plugin error_text to ordinary world members.
-- The remediation redacts those runtime evidence fields for ordinary members while preserving safe transcript fields and admin diagnostics visibility.
-- Residual risk: other member-readable DTOs, Web proxies/rendering, and broader worldline isolation still need dedicated review.
+- Web world and conversation realtime stream proxies inserted decoded route parameters directly into backend paths.
+- The remediation encodes dynamic stream path segments before proxying while preserving the query string.
+- Residual risk: other Web route handlers, frontend rendering, client helper URL construction, and e2e coverage still need dedicated review.

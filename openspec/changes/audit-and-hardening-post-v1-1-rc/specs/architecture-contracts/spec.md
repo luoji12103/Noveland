@@ -173,3 +173,15 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** turn records contain runtime run IDs, provider/plugin error text, raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only execution evidence
 - **THEN** the member response SHALL omit run IDs and error text while preserving safe turn identity, speaker, transcript text, status, and timing fields
 - **AND** admin routes MAY continue to expose run IDs and error text required for conversation management and runtime diagnostics.
+
+## ADDED Requirements
+
+### Requirement: Web API proxies preserve backend route boundaries
+The system SHALL build same-origin Web proxy backend URLs from fixed backend route templates and encoded dynamic path segments so decoded route parameters cannot broaden backend route scope.
+
+#### Scenario: Web proxies realtime stream paths
+- **GIVEN** a Web API route proxies a world or conversation realtime stream
+- **AND** the requested world or conversation identifier contains encoded path separators or other reserved path characters
+- **WHEN** the route constructs the backend stream URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the backend path
+- **AND** the original query string SHALL be preserved only as a query string, not as part of any path segment.
