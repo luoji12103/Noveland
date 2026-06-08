@@ -93,3 +93,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** player choice records contain prompt text with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit player choice prompt text while preserving safe choice identity, selected option, context, consequence preview, applied event ref, and timing fields
 - **AND** admin player-choice routes MAY continue to expose prompt text required for world management and review.
+
+#### Scenario: Member previews player choice consequences
+- **GIVEN** a world member previews player choice consequences through member-readable routes
+- **WHEN** the preview contains diagnostics with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit diagnostics while preserving safe relationship, faction, and offscreen consequence preview fields
+- **AND** admin player-choice preview routes MAY continue to expose diagnostics required for world management and review.

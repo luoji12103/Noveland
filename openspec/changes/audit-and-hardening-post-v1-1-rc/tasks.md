@@ -210,3 +210,13 @@
 - Intended remediation: shape player choice responses by caller role; preserve prompt text for admins while ordinary members receive safe choice identity, selected option, context, consequence preview, applied event ref, and timing fields with prompt redacted.
 - Status: Remediated in backend player choice prompt redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-017 Member player choice preview diagnostics leak
+
+- Severity: High
+- Affected boundary: member-readable player choice preview REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes POST /worlds/{world_id}/player-choices/preview with get_world_member_context, computes can_manage, but returns ChoiceConsequencePreviewResponse.diagnostics=preview.diagnostics directly.
+- Impact: ordinary world members can receive diagnostic strings through player choice preview responses; diagnostics may expose provider refs, raw prompt/output markers, storage refs, secret/auth refs, bytes/base64 markers, or internal rule/effect evidence as preview diagnostics evolve.
+- Intended remediation: shape player choice preview responses by caller role; preserve diagnostics for admins while ordinary members receive safe relationship, faction, and offscreen consequence preview fields with diagnostics redacted.
+- Status: Remediated in backend player choice preview diagnostics redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

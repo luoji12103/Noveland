@@ -2767,6 +2767,22 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     listed_choices = client.get(f"/worlds/{world_id}/player-choices")
     other_choices = client.get(f"/worlds/{world_id}/player-choices?user_id={other_id}")
     _authenticate(client, owner_token)
+    admin_preview = client.post(
+        f"/worlds/{world_id}/player-choices/preview",
+        json={
+            "user_id": str(member_id),
+            "player_actor_id": member_actor.json()["id"],
+            "choice_key": "stay-after-school",
+            "choice_kind": "route",
+            "prompt": "Help with festival preparations?",
+            "selected_option": "Stay after school.",
+            "effects": {
+                "relationship_updates": [],
+                "faction_updates": [],
+                "offscreen_events": [],
+            },
+        },
+    )
     admin_listed_choices = client.get(f"/worlds/{world_id}/player-choices")
     _authenticate(client, member_token)
     intervention = client.post(
@@ -2798,7 +2814,9 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert listed_actors.status_code == 200
     assert [actor["user_id"] for actor in listed_actors.json()] == [str(member_id)]
     assert preview.status_code == 200
-    assert preview.json()["diagnostics"] == [
+    assert preview.json()["diagnostics"] == []
+    assert admin_preview.status_code == 200
+    assert admin_preview.json()["diagnostics"] == [
         "0 relationship update(s)",
         "0 faction update(s)",
         "0 offscreen event(s)",

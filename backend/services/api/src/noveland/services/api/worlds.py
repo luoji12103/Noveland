@@ -3593,7 +3593,7 @@ def preview_player_choice_consequences(
         relationship_updates=preview.relationship_updates,
         faction_updates=preview.faction_updates,
         offscreen_events=preview.offscreen_events,
-        diagnostics=preview.diagnostics,
+        diagnostics=preview.diagnostics if can_manage else [],
     )
 
 

@@ -812,3 +812,11 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-08 F-012 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member narrative artifact REST list/detail responses now redact source run refs, artifact metadata, continuity evidence, and publication internals while admin responses retain narrative management detail.
 
 - 2026-06-08 F-013 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member organization list responses now redact hidden_summary and metadata while admin responses retain organization management detail.
+
+- 2026-06-08 F-014 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member organization membership and faction track responses now redact metadata while admin responses retain organization management detail.
+
+- 2026-06-08 F-015 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member worldline list responses now redact metadata while admin responses retain branch management detail.
+
+- 2026-06-08 F-016 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member player choice create/list responses now redact prompt text while admin responses retain review detail.
+
+- 2026-06-08 F-017 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member player choice preview responses now redact diagnostics while admin responses retain review detail.
