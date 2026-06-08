@@ -576,7 +576,11 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
             "relationship_type": "friendship",
             "affection": 42,
             "trust": 35,
-            "metadata": {"reason": "shared promise"},
+            "metadata": {
+                "reason": "shared promise",
+                "raw_prompt": "operator relationship prompt",
+                "storage_uri": "relationship://private/evidence",
+            },
         },
     )
     duplicate = client.post(
@@ -589,9 +593,18 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     )
     updated = client.patch(
         f"/worlds/{world_id}/agents/{source_agent_id}/relationships/{created.json()['id']}",
-        json={"trust": 55, "metadata": {"reason": "kept promise"}},
+        json={
+            "trust": 55,
+            "metadata": {
+                "reason": "kept promise",
+                "raw_output": "operator relationship output",
+                "storage_uri": "relationship://private/updated",
+            },
+        },
     )
     listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
+    _authenticate(client, member_token)
+    member_listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
     with Session(engine) as session:
         relationship_events = session.scalars(
             select(WorldEventModel)
@@ -615,9 +628,14 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     assert duplicate.status_code == 409
     assert updated.status_code == 200
     assert updated.json()["trust"] == 55
-    assert updated.json()["metadata"] == {"reason": "kept promise"}
+    assert updated.json()["metadata"]["reason"] == "kept promise"
+    assert updated.json()["metadata"]["raw_output"] == "operator relationship output"
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == created.json()["id"]
+    assert listed.json()[0]["metadata"]["raw_output"] == "operator relationship output"
+    assert member_listed.status_code == 200
+    assert member_listed.json()[0]["id"] == created.json()["id"]
+    assert member_listed.json()[0]["metadata"] == {}
     assert [event.event_name for event in relationship_events] == [
         "relationship.edge_created",
         "relationship.edge_updated",
@@ -3504,7 +3522,11 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
             "title": "Morning scene",
             "starts_at": "2030-01-01T08:00:00Z",
             "ends_at": "2030-01-01T09:00:00Z",
-            "metadata": {"source": "api-test"},
+            "metadata": {
+                "source": "api-test",
+                "raw_prompt": "operator calendar prompt",
+                "storage_uri": "calendar://private/evidence",
+            },
         },
     )
     create_overlapping_entry = client.post(
@@ -3524,6 +3546,9 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
         },
     )
     list_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+    _authenticate(client, member_token)
+    member_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+    _authenticate(client, owner_token)
     update_entry = client.patch(
         f"/worlds/{world_id}/agents/{agent_id}/calendar/{create_entry.json()['id']}",
         json={"title": "Morning scene updated"},
@@ -3561,6 +3586,10 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert create_entry.json()["status"] == "active"
     assert list_entries.status_code == 200
     assert list_entries.json()[0]["title"] == "Morning scene"
+    assert list_entries.json()[0]["metadata"]["raw_prompt"] == "operator calendar prompt"
+    assert member_entries.status_code == 200
+    assert member_entries.json()[0]["title"] == "Morning scene"
+    assert member_entries.json()[0]["metadata"] == {}
     assert update_entry.status_code == 200
     assert update_entry.json()["title"] == "Morning scene updated"
     assert cancel_entry.status_code == 204

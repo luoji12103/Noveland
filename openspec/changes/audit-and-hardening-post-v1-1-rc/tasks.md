@@ -240,3 +240,13 @@
 - Intended remediation: shape journal, notification, and intervention responses by caller role; preserve source refs, prompt text, choice/event linkage, and metadata for admins while ordinary members receive safe title/body/status/target/timing fields with internals redacted.
 - Status: Remediated in backend journal/notification/intervention redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed with 2 targeted tests; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-020 Member agent relationship and calendar metadata leaks
+
+- Severity: High
+- Affected boundary: member-readable agent relationship list and agent calendar list REST APIs.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/agents/{agent_id}/relationships and GET /worlds/{world_id}/agents/{agent_id}/calendar with get_world_member_context. The responses serialize AgentRelationshipResponse through _agent_relationship_response and CalendarEntryResponse through _calendar_entry_response, both copying metadata dictionaries directly.
+- Impact: ordinary world members can read arbitrary relationship and scheduling metadata that may include raw prompt/output markers, storage refs, provider refs, secret/auth refs, source evidence refs, bytes, base64, or other operator-only evidence.
+- Intended remediation: shape agent relationship and calendar list responses by caller role; preserve metadata for admins while ordinary members receive safe relationship identity/score fields and calendar title/time/status fields with metadata redacted.
+- Status: Remediated in backend relationship/calendar metadata redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_agent_relationship_graph_enforces_world_scope_and_updates_edges tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules passed with 2 targeted tests; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

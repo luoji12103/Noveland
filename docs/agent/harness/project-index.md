@@ -509,3 +509,5 @@ Whenever a new structural file or module is added, update this index.
 - 2026-06-08 F-018 updated existing worlds API living-world dashboard response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.
 
 - 2026-06-08 F-019 updated existing worlds API journal, notification, and intervention response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.
+
+- 2026-06-08 F-020 updated existing worlds API relationship and calendar response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.

@@ -3459,3 +3459,15 @@
 - Tests added/updated: Expanded guardrail/player interaction API coverage to compare admin-preserved journal/notification/intervention internals against member-redacted payloads for source refs, prompt text, choice/event linkage, and metadata.
 - Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes passed; uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for member-readable agent relationship metadata, calendar metadata, remaining source/evidence DTOs, and broader worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening relationship/calendar metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-020.
+- Finding: F-020 found member-readable agent relationship list and agent calendar list REST APIs exposing arbitrary relationship/scheduling metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member relationship and calendar metadata shaping, then made the relevant worlds API list responses role-aware. World admins retain relationship/calendar metadata; ordinary members receive safe relationship identity/score fields and calendar title/time/status fields with metadata redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded relationship graph and calendar/schedule API coverage to compare admin-preserved metadata against member-redacted relationship/calendar list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_agent_relationship_graph_enforces_world_scope_and_updates_edges tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

@@ -7086,7 +7086,11 @@ def list_agent_relationships(
         )
         .order_by(AgentRelationshipEdge.relationship_type, AgentRelationshipEdge.created_at),
     ).all()
-    return [_agent_relationship_response(db_session, edge) for edge in edges]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _agent_relationship_response(db_session, edge, include_admin_fields=can_manage)
+        for edge in edges
+    ]
 
 
 @router.get(
@@ -7297,8 +7301,9 @@ def list_agent_calendar(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[CalendarEntryResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _calendar_entry_response(entry)
+        _calendar_entry_response(entry, include_admin_fields=can_manage)
         for entry in CalendarService(db_session).list_entries(context.world_id, agent_id)
     ]
 
@@ -9365,6 +9370,8 @@ def _agent_response(
 def _agent_relationship_response(
     db_session: Session,
     edge: AgentRelationshipEdge,
+    *,
+    include_admin_fields: bool = True,
 ) -> AgentRelationshipResponse:
     source_agent = _agent_or_404(db_session, edge.world_id, edge.source_agent_id)
     target_agent = _agent_or_404(db_session, edge.world_id, edge.target_agent_id)
@@ -9386,7 +9393,7 @@ def _agent_relationship_response(
         obligation=edge.obligation,
         rivalry=edge.rivalry,
         debt=edge.debt,
-        metadata=edge.metadata_json,
+        metadata=edge.metadata_json if include_admin_fields else {},
         created_at=edge.created_at,
         updated_at=edge.updated_at,
     )
@@ -9967,7 +9974,11 @@ def _agent_config_with_provider_profile_id(
     return next_config
 
 
-def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntryResponse:
+def _calendar_entry_response(
+    entry: CalendarEntryResponse | Any,
+    *,
+    include_admin_fields: bool = True,
+) -> CalendarEntryResponse:
     return CalendarEntryResponse(
         id=entry.id,
         world_id=entry.world_id,
@@ -9978,7 +9989,7 @@ def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntr
         ends_at=entry.ends_at,
         recurrence_rule=entry.recurrence_rule,
         status=entry.status.value if hasattr(entry.status, "value") else str(entry.status),
-        metadata=entry.metadata,
+        metadata=entry.metadata if include_admin_fields else {},
     )
 
 

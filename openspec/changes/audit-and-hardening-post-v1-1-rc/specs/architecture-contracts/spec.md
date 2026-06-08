@@ -111,3 +111,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** those records contain source event refs, source refs, prompt text, choice/event linkage, metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit those operator-only journal, notification, and intervention internals while preserving safe user-facing titles, bodies, statuses, target identity fields, and timing fields
 - **AND** admin routes MAY continue to expose source refs, prompt text, choice/event linkage, and metadata required for world management and review.
+
+#### Scenario: Member reads agent relationship and calendar metadata
+- **GIVEN** a world member lists agent relationships or agent calendar entries through member-readable routes
+- **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, source evidence refs, or other admin-only scheduling/relationship evidence
+- **THEN** the member response SHALL omit metadata while preserving safe relationship scores, relationship identities, calendar titles, descriptions, times, recurrence, status, and timing fields
+- **AND** admin routes MAY continue to expose metadata required for world management, scheduling, and review.
