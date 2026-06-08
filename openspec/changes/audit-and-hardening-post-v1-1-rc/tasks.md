@@ -361,3 +361,13 @@
 - Intended remediation: remove route-local query concatenation from the memory backend jobs/logs route handlers and add focused Web route-handler tests proving query parameters are forwarded exactly once through the shared runtime proxy.
 - Status: Remediated in Web memory backend runtime proxy query preservation batch.
 - Verification: npm run test -- lib/runtime/proxy.test.ts passed with 2 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 43 files and 138 tests; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-032 Web conversation live socket path segment injection
+
+- Severity: High
+- Affected boundary: browser-side Web realtime URL construction for conversation live WebSocket control.
+- Evidence: web/lib/realtime.ts constructs `${getAuthApiWebSocketBaseUrl()}/worlds/${worldId}/conversations/${conversationId}/live` from decoded identifiers without encoding dynamic path segments.
+- Impact: a world or conversation identifier containing an encoded slash or reserved path character can be forwarded to the backend WebSocket router as a broader or different path than the fixed conversation live route intended. Because the live socket accepts state-changing commands such as seed, advance, start, pause, and resume, preserving exact route boundaries is required even when backend authz remains the final enforcement layer.
+- Intended remediation: encode the world and conversation identifiers before constructing the backend live WebSocket URL, and add focused Web regression coverage proving encoded slashes remain inside identifier path segments.
+- Status: Remediated in Web conversation live socket path boundary batch.
+- Verification: npm run test -- lib/realtime.test.ts passed with 2 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 44 files and 140 tests; npm run build passed; npm run check:next-env passed; full npm run test:e2e was attempted and failed on the scene-view safe-media test after 15 passed and 5 skipped, then the failing scene-view test passed on focused rerun; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web conversation live socket path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web realtime live socket path-boundary remediation for F-032.
+- Finding: F-032 found `web/lib/realtime.ts` building conversation live WebSocket URLs from decoded `worldId` and `conversationId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-initiated realtime URLs to preserve backend route boundaries, then encoded world and conversation identifiers before opening conversation live-control sockets.
+- Files changed: `web/lib/realtime.ts`, `web/lib/realtime.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added browser-side realtime helper coverage proving world/conversation identifiers containing `/`, `?`, and `#` remain encoded inside WebSocket path segments.
+- Verification: `npm run test -- lib/realtime.test.ts` passed with 2 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 140 tests; `npm run build` passed; `npm run check:next-env` passed; full `npm run test:e2e` was attempted and failed on the scene-view safe-media test after 15 passed and 5 skipped, then the failing scene-view test passed on focused rerun; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web memory backend proxy query entry
 
 - Date: 2026-06-09

@@ -192,3 +192,13 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** route handlers SHALL pass only the fixed backend path and encoded dynamic path segments to the helper
 - **AND** query parameters SHALL be appended exactly once
 - **AND** query parameters SHALL NOT be embedded into the backend path argument before proxying.
+
+### Requirement: Web realtime clients preserve backend route boundaries
+The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
+
+#### Scenario: Web client opens conversation live sockets
+- **GIVEN** browser-side Web realtime code opens a conversation live WebSocket
+- **AND** the world or conversation identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the backend WebSocket URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the backend path
+- **AND** the configured WebSocket base URL SHALL remain separate from dynamic path segments.

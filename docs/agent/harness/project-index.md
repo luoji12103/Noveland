@@ -213,7 +213,7 @@ Fast orientation for a new coding session.
   - `web/lib/admin/` — Web admin client helpers for CSRF-aware same-origin requests
   - `web/lib/api-proxy.ts` — shared same-origin proxy helper for preset and composition routes
   - `web/lib/realtime/` — same-origin streaming proxy helper
-  - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers
+  - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers with encoded live-socket path segments
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
   - `web/lib/worlds/diagnostics.ts` — multimodal diagnostics and eval-run client helpers
   - `web/lib/worlds/invocations.ts` — model invocation ledger, prompt snapshot, tag, and redaction client helpers
@@ -527,3 +527,4 @@ Whenever a new structural file or module is added, update this index.
 - 2026-06-09 F-029 updated existing conversation API turn list response shaping in `backend/services/api/src/noveland/services/api/conversations.py`; no repository layout or package boundary changes were introduced.
 - 2026-06-09 F-030 updated existing Web realtime stream route proxy path construction in `web/app/api/worlds/[worldId]/stream/route.ts` and `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts`; no repository layout or package boundary changes were introduced.
 - 2026-06-09 F-031 updated existing Web memory backend runtime proxy query construction in `web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts` and `web/app/api/memory-backend-profiles/[profileId]/logs/route.ts`, with focused coverage in `web/lib/runtime/proxy.test.ts`; no repository layout or package boundary changes were introduced.
+- 2026-06-09 F-032 updated existing browser-side conversation live WebSocket URL construction in `web/lib/realtime.ts`, with focused coverage in `web/lib/realtime.test.ts`; no package boundary changes were introduced.

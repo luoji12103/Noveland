@@ -62,7 +62,9 @@ export function createConversationLiveSocket(
   } = {},
 ): WebSocket {
   const socket = new WebSocket(
-    `${getAuthApiWebSocketBaseUrl()}/worlds/${worldId}/conversations/${conversationId}/live`,
+    `${getAuthApiWebSocketBaseUrl()}/worlds/${encodeURIComponent(
+      worldId,
+    )}/conversations/${encodeURIComponent(conversationId)}/live`,
   );
   socket.addEventListener("open", () => {
     handlers.onOpen?.();

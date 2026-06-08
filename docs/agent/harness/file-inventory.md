@@ -115,6 +115,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/auth/`
 - `web/lib/realtime/`
 - `web/lib/realtime.ts`
+- `web/lib/realtime.test.ts`
 - `web/lib/runtime/`
 - `web/lib/private-beta/`
 - `web/lib/private-beta/client.ts`
@@ -845,3 +846,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-09 F-030 kept existing Web realtime proxy ownership in `web/app/api/worlds/[worldId]/stream/route.ts`, `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts`, and `web/lib/realtime/proxy.test.ts`; no new structural files were added. World and conversation stream proxy routes now encode dynamic identifier segments before forwarding to backend stream paths.
 
 - 2026-06-09 F-031 kept existing Web memory backend proxy ownership in `web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts` and `web/app/api/memory-backend-profiles/[profileId]/logs/route.ts`, and added focused route-handler coverage in `web/lib/runtime/proxy.test.ts`. Memory backend jobs/logs proxy routes now rely on the shared runtime proxy to append query parameters exactly once.
+
+- 2026-06-09 F-032 kept existing browser-side realtime ownership in `web/lib/realtime.ts` and added focused coverage in `web/lib/realtime.test.ts`. Conversation live WebSocket URLs now encode world and conversation identifier segments before opening backend live-control sockets.
