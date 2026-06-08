@@ -130,3 +130,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the profile contains release policies, checklist evidence refs, gate decisions, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only release evidence
 - **THEN** the member response SHALL omit branch_policy, backup_policy, content_review_policy, player_permission_policy, worldline_policy, checklist, and metadata while preserving safe profile identity, status, and timing fields
 - **AND** admin routes MAY continue to expose release policies, checklist evidence, and metadata required for release management and review.
+
+#### Scenario: Member reads world bible
+- **GIVEN** a world member fetches the world bible through member-readable routes
+- **WHEN** the bible contains raw source material/import notes, continuity config, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only canon-management evidence
+- **THEN** the member response SHALL omit source_material, continuity_config, and metadata while preserving safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields
+- **AND** admin routes MAY continue to expose source material, continuity configuration, and metadata required for canon management and review.

@@ -3495,3 +3495,15 @@
 - Tests added/updated: Expanded beta release readiness API coverage to compare admin-preserved release profile gate evidence against ordinary member-redacted release profile fields.
 - Verification: uv run pytest tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, world bible, presence/scheduled movement DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening world bible redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-023.
+- Finding: F-023 found the member-readable world bible REST API exposing raw source material/import notes, continuity config, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member world bible shaping, then made the world bible response role-aware. World admins retain source material, continuity config, and metadata; ordinary members receive safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields with source_material blanked and continuity_config/metadata redacted to empty objects.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded world bible API coverage to compare admin-preserved source/config/metadata fields against ordinary member-redacted world bible payloads while preserving continuity status.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, presence/scheduled movement DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

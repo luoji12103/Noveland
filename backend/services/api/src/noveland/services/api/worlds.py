@@ -3039,10 +3039,14 @@ def get_world_bible(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldBibleResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     bible = db_session.scalars(
         select(WorldBible).where(WorldBible.world_id == context.world_id),
     ).one_or_none()
-    return None if bible is None else _world_bible_response(bible)
+    return None if bible is None else _world_bible_response(
+        bible,
+        include_admin_fields=can_manage,
+    )
 
 
 @router.put("/{world_id}/bible", response_model=WorldBibleResponse)
@@ -9312,17 +9316,20 @@ def _beta_checklist_item_response(item: BetaChecklistItem) -> BetaChecklistItemR
     )
 
 
-def _world_bible_response(bible: WorldBible) -> WorldBibleResponse:
+def _world_bible_response(
+    bible: WorldBible,
+    include_admin_fields: bool = True,
+) -> WorldBibleResponse:
     return WorldBibleResponse(
         id=bible.id,
         world_id=bible.world_id,
-        source_material=bible.source_material,
+        source_material=bible.source_material if include_admin_fields else "",
         canon_timeline=bible.canon_timeline,
         setting_rules=bible.setting_rules,
         forbidden_changes=bible.forbidden_changes,
         sequel_boundaries=bible.sequel_boundaries,
-        continuity_config=bible.continuity_config,
-        metadata=bible.metadata_json,
+        continuity_config=bible.continuity_config if include_admin_fields else {},
+        metadata=bible.metadata_json if include_admin_fields else {},
         continuity_status=_continuity_status_from_metadata(bible.continuity_config),
         created_at=bible.created_at,
         updated_at=bible.updated_at,

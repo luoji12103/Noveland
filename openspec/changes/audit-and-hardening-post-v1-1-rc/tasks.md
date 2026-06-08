@@ -271,3 +271,13 @@
 - Intended remediation: shape release profile responses by caller role; preserve policies, checklist, and metadata for admins while ordinary members receive safe profile identity, status, and timing fields with release internals redacted.
 - Status: Remediated in backend release profile redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-023 Member world bible source and continuity evidence leak
+
+- Severity: High
+- Affected boundary: member-readable world bible REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/bible with get_world_member_context. The route serializes WorldBibleResponse through _world_bible_response, which copies source_material, continuity_config, and metadata directly from WorldBible. The Web overview non-admin branch also renders data.worldBible.source_material.
+- Impact: ordinary world members can read raw source material/import notes, continuity configuration, and arbitrary metadata that may include raw prompt/output markers, storage refs, provider refs, secret/auth refs, bytes, base64, or other operator-only canon management evidence.
+- Intended remediation: shape world bible responses by caller role; preserve source_material, continuity_config, and metadata for admins while ordinary members receive safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields with source/config/metadata internals redacted.
+- Status: Remediated in backend world bible redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

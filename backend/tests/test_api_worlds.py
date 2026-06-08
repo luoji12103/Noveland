@@ -430,9 +430,22 @@ def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
     assert created.json()["source_material"] == "Original ending and sequel notes."
     assert created.json()["continuity_status"] == "post_canon"
     assert created.json()["metadata"] == {"source": "operator"}
+    _authenticate(client, member_token)
+    member_read_after_create = client.get(f"/worlds/{world_id}/bible")
+
     assert updated.status_code == 200
     assert updated.json()["source_material"] == "Updated sequel notes."
+    assert updated.json()["continuity_config"] == {"continuity_status": "alternate"}
     assert updated.json()["continuity_status"] == "alternate"
+    assert member_read_after_create.status_code == 200
+    assert member_read_after_create.json()["source_material"] == ""
+    assert member_read_after_create.json()["canon_timeline"] == []
+    assert member_read_after_create.json()["setting_rules"] == {}
+    assert member_read_after_create.json()["forbidden_changes"] == []
+    assert member_read_after_create.json()["sequel_boundaries"] == {}
+    assert member_read_after_create.json()["continuity_config"] == {}
+    assert member_read_after_create.json()["metadata"] == {}
+    assert member_read_after_create.json()["continuity_status"] == "alternate"
 
 
 def test_agent_character_metadata_and_continuity_surfaces_are_compatible() -> None:
