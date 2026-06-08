@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-024 member agent presence scheduling evidence redaction
 - Post-v1.1 RC audit F-023 member world bible source/config redaction
 - Post-v1.1 RC audit F-022 member release profile policy/evidence redaction
 - Post-v1.1 RC audit F-021 member latest snapshot payload/storage redaction

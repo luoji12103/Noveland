@@ -738,14 +738,36 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
             "current_scene_id": classroom_id,
             "visibility_status": "offscreen",
             "encounter_eligible": False,
-            "scheduled_movement": {"next_scene_id": courtyard_id},
+            "scheduled_movement": {"next_scene_id": courtyard_id, "raw_prompt": "operator-only"},
         },
     )
+    admin_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
     invalid_presence_scene = client.put(
         f"/worlds/{world_id}/agents/{agent_id}/presence",
         json={"current_scene_id": str(other_scene_id)},
     )
     scenes = client.get(f"/worlds/{world_id}/scenes")
+
+    with Session(engine) as session:
+        presence_event = WorldEventStore(session).append_event(
+            WorldEventAppend(
+                world_id=world_id,
+                event_name="presence.operator_plan",
+                payload={"summary": "operator scheduling evidence"},
+                wall_time=datetime(2026, 5, 6, 12, 0, tzinfo=UTC),
+                world_time=datetime(2030, 1, 3, 8, 0, tzinfo=UTC),
+                actor_ref="system:test",
+            ),
+        )
+        presence_state = session.scalars(
+            select(AgentPresenceState).where(
+                AgentPresenceState.world_id == world_id,
+                AgentPresenceState.agent_id == agent_id,
+            ),
+        ).one()
+        presence_state.last_event_id = presence_event.id
+        session.commit()
+    admin_presence_with_event = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
 
     _authenticate(client, member_token)
     member_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
@@ -774,8 +796,20 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert upsert_presence.json()["encounter_eligible"] is False
     assert invalid_presence_scene.status_code == 404
     assert [scene["scene_key"] for scene in scenes.json()] == ["classroom", "courtyard"]
+    assert admin_presence.status_code == 200
+    assert admin_presence.json()["scheduled_movement"] == {
+        "next_scene_id": courtyard_id,
+        "raw_prompt": "operator-only",
+    }
+    assert admin_presence.json()["last_event_id"] is None
+    assert admin_presence_with_event.status_code == 200
+    assert admin_presence_with_event.json()["last_event_id"] == str(presence_event.id)
     assert member_presence.status_code == 200
-    assert member_presence.json()["scheduled_movement"] == {"next_scene_id": courtyard_id}
+    assert member_presence.json()["current_scene_key"] == "classroom"
+    assert member_presence.json()["visibility_status"] == "offscreen"
+    assert member_presence.json()["encounter_eligible"] is False
+    assert member_presence.json()["scheduled_movement"] == {}
+    assert member_presence.json()["last_event_id"] is None
 
 
 def test_organization_memberships_and_faction_tracks_append_events() -> None:

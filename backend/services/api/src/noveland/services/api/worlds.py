@@ -7124,7 +7124,12 @@ def get_agent_presence(
             AgentPresenceState.agent_id == agent_id,
         ),
     ).one_or_none()
-    return None if presence is None else _presence_response(db_session, presence)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return (
+        None
+        if presence is None
+        else _presence_response(db_session, presence, include_admin_fields=can_manage)
+    )
 
 
 @router.put(
@@ -8216,7 +8221,12 @@ def _faction_track_response(
     )
 
 
-def _presence_response(db_session: Session, presence: AgentPresenceState) -> AgentPresenceResponse:
+def _presence_response(
+    db_session: Session,
+    presence: AgentPresenceState,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentPresenceResponse:
     agent = _agent_or_404(db_session, presence.world_id, presence.agent_id)
     scene = (
         None
@@ -8235,8 +8245,8 @@ def _presence_response(db_session: Session, presence: AgentPresenceState) -> Age
         current_scene_name=None if scene is None else scene.name,
         visibility_status=cast(PresenceVisibilityStatus, presence.visibility_status),
         encounter_eligible=presence.encounter_eligible,
-        scheduled_movement=presence.scheduled_movement,
-        last_event_id=presence.last_event_id,
+        scheduled_movement=presence.scheduled_movement if include_admin_fields else {},
+        last_event_id=presence.last_event_id if include_admin_fields else None,
         created_at=presence.created_at,
         updated_at=presence.updated_at,
     )

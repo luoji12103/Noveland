@@ -136,3 +136,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** the bible contains raw source material/import notes, continuity config, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only canon-management evidence
 - **THEN** the member response SHALL omit source_material, continuity_config, and metadata while preserving safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields
 - **AND** admin routes MAY continue to expose source material, continuity configuration, and metadata required for canon management and review.
+
+#### Scenario: Member reads agent presence
+- **GIVEN** a world member fetches agent presence through member-readable routes
+- **WHEN** the presence record contains scheduled movement plans, last event linkage, storage refs, provider refs, raw prompt/output markers, bytes, base64, secret/auth refs, or other operator-only scheduling evidence
+- **THEN** the member response SHALL omit scheduled_movement and last_event_id while preserving safe current scene, visibility, encounter eligibility, identity, worldline, and timing fields
+- **AND** admin routes MAY continue to expose scheduled movement and last event linkage required for world management and runtime diagnostics.

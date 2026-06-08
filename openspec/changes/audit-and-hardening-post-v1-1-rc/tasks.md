@@ -281,3 +281,13 @@
 - Intended remediation: shape world bible responses by caller role; preserve source_material, continuity_config, and metadata for admins while ordinary members receive safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields with source/config/metadata internals redacted.
 - Status: Remediated in backend world bible redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-024 Member agent presence scheduling evidence leak
+
+- Severity: High
+- Affected boundary: member-readable agent presence REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/agents/{agent_id}/presence with get_world_member_context. The route serializes AgentPresenceResponse through _presence_response, which copies scheduled_movement and last_event_id directly from AgentPresenceState. Existing regression coverage asserted that ordinary members received scheduled_movement.
+- Impact: ordinary world members can infer future/offscreen movement plans and source event linkage. Scheduled movement is an arbitrary JSON dictionary and may contain raw prompt/output markers, storage refs, provider refs, secret/auth refs, bytes, base64, scene-planning notes, or other operator-only scheduling evidence.
+- Intended remediation: shape agent presence responses by caller role; preserve scheduled_movement and last_event_id for admins while ordinary members receive safe current scene, visibility, encounter eligibility, identity, worldline, and timing fields with scheduling internals redacted.
+- Status: Remediated in backend agent presence redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
