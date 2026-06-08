@@ -6051,8 +6051,9 @@ def list_schedule_rules(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ScheduleRuleResponse]:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _schedule_rule_response(rule)
+        _schedule_rule_response(rule, include_admin_fields=can_manage)
         for rule in CalendarService(db_session).list_rules(context.world_id)
     ]
 
@@ -9915,14 +9916,18 @@ def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntr
     )
 
 
-def _schedule_rule_response(rule: ScheduleRuleResponse | Any) -> ScheduleRuleResponse:
+def _schedule_rule_response(
+    rule: ScheduleRuleResponse | Any,
+    *,
+    include_admin_fields: bool = True,
+) -> ScheduleRuleResponse:
     return ScheduleRuleResponse(
         id=rule.id,
         world_id=rule.world_id,
         rule_key=rule.rule_key,
         name=rule.name,
         kind=rule.kind.value if hasattr(rule.kind, "value") else str(rule.kind),
-        config=rule.config,
+        config=rule.config if include_admin_fields else {},
         is_enabled=rule.is_enabled,
     )
 

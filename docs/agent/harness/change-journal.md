@@ -3356,3 +3356,15 @@
 - Tests added/updated: Expanded member world read regression coverage to compare admin world profile config visibility against member list/get redaction.
 - Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_but_not_mutate_and_non_member_is_hidden tests/test_api_worlds.py::test_platform_admin_can_create_list_and_update_worlds passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening schedule rule redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-011.
+- Finding: F-011 found the member-readable schedule rule list REST API exposing WorldScheduleRule config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member schedule rule shaping, then made list_schedule_rules role-aware. World admins retain full rule config; ordinary members receive safe rule identity, kind, and enabled state with config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded calendar/schedule API coverage to compare admin schedule rule config visibility against member-redacted rule list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules tests/test_api_worlds.py::test_world_composition_export_and_import_round_trip passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTO metadata/source fields, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.

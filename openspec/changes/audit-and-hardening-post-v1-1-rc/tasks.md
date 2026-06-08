@@ -150,3 +150,13 @@
 - Intended remediation: shape world profile/list responses by caller role; preserve full world configuration for admins while ordinary members receive safe public world identity fields with rules/plugin/backend config redacted.
 - Status: Remediated in backend world profile redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_but_not_mutate_and_non_member_is_hidden tests/test_api_worlds.py::test_platform_admin_can_create_list_and_update_worlds passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-011 Member schedule rule list exposes admin rule config
+
+- Severity: High
+- Affected boundary: member-readable schedule rule list REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/schedule-rules with get_world_member_context, and list_schedule_rules serializes ScheduleRuleResponse through _schedule_rule_response. ScheduleRuleResponse includes config copied from WorldScheduleRule config.
+- Impact: ordinary world members can read arbitrary admin-authored schedule rule configuration, including provider/profile refs, prompt-like scheduling instructions, storage refs, or other execution details intended for operators.
+- Intended remediation: shape schedule rule list responses by caller role; preserve full rule config for admins while ordinary members receive safe rule identity, kind, and enabled state with config redacted.
+- Status: Remediated in backend schedule rule redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules tests/test_api_worlds.py::test_world_composition_export_and_import_round_trip passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

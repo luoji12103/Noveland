@@ -488,3 +488,4 @@
 - Post-v1.1 RC audit F-008 member agent run list redaction
 - Post-v1.1 RC audit F-009 member agent catalog redaction
 - Post-v1.1 RC audit F-010 member world profile redaction
+- Post-v1.1 RC audit F-011 member schedule rule redaction
