@@ -14,6 +14,9 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-021 member latest snapshot payload/storage redaction
+- Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
+- Post-v1.1 RC audit F-019 member journal/notification/intervention evidence redaction
 - Post-v1.1 RC audit F-018 member living world dashboard hidden count redaction
 - Post-v1.1 RC audit F-017 member player choice preview diagnostics redaction
 - Post-v1.1 RC audit F-016 member player choice prompt redaction

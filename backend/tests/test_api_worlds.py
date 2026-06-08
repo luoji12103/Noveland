@@ -3851,6 +3851,9 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     integrity_after = client.get(f"/worlds/{world_id}/snapshots/integrity")
     replay_after = client.get(f"/worlds/{world_id}/replay/state")
 
+    _authenticate(client, member_token)
+    member_latest_after = client.get(f"/worlds/{world_id}/snapshots/latest")
+
     _authenticate(client, stranger_token)
     hidden_replay = client.get(f"/worlds/{world_id}/replay/state")
     hidden_integrity = client.get(f"/worlds/{world_id}/snapshots/integrity")
@@ -3868,6 +3871,17 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert created.json()["schema_version"] == "world_state.v1"
     assert latest_after.status_code == 200
     assert latest_after.json()["id"] == created.json()["id"]
+    assert latest_after.json()["payload_uri"].startswith(f"object://worlds/{world_id}/")
+    assert latest_after.json()["payload_location"] == "object"
+    assert latest_after.json()["metadata"]["storage"] == "local_object"
+    assert member_latest_after.status_code == 200
+    member_snapshot = member_latest_after.json()
+    assert member_snapshot["id"] == created.json()["id"]
+    assert member_snapshot["covers_event_sequence"] == created.json()["covers_event_sequence"]
+    assert member_snapshot["payload"] is None
+    assert member_snapshot["payload_uri"] is None
+    assert member_snapshot["payload_location"] is None
+    assert member_snapshot["metadata"] == {}
     assert integrity_after.status_code == 200
     assert integrity_after.json()["status"] == "ok"
     assert integrity_after.json()["latest_snapshot_id"] == created.json()["id"]

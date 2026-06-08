@@ -3471,3 +3471,15 @@
 - Tests added/updated: Expanded relationship graph and calendar/schedule API coverage to compare admin-preserved metadata against member-redacted relationship/calendar list payloads.
 - Verification: uv run pytest tests/test_api_worlds.py::test_agent_relationship_graph_enforces_world_scope_and_updates_edges tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening latest snapshot redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-021.
+- Finding: F-021 found the member-readable latest snapshot REST API exposing snapshot payload, payload_uri, payload_location, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member latest snapshot shaping, then made the latest snapshot response role-aware. World admins retain snapshot payload/storage diagnostics; ordinary members receive safe snapshot identity, worldline, sequence coverage, schema/status, created-by event ref, and creation time with payload, payload_uri, payload_location, and metadata redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded replay/snapshot API coverage to compare admin-preserved latest snapshot storage metadata against ordinary member-redacted latest snapshot payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, release profile/world bible/presence DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.

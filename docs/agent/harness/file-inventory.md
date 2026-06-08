@@ -159,7 +159,7 @@ Track key structural files and prevent unregistered sprawl.
 - `backend/services/api/src/noveland/services/api/speech.py`
 - `backend/services/api/src/noveland/services/api/visual.py`
 - `backend/services/api/src/noveland/services/api/visual_generation.py`
-- `backend/services/api/src/noveland/services/api/worlds.py` — includes role-aware member/admin response shaping for world, worldline, player choice, agent, schedule-rule, narrative artifact, organization, organization membership, and faction-track DTO boundaries.
+- `backend/services/api/src/noveland/services/api/worlds.py` — includes role-aware member/admin response shaping for world, worldline, player choice, agent, schedule-rule, narrative artifact, organization, organization membership, faction-track, relationship/calendar, and latest snapshot DTO boundaries.
 - `backend/services/runtime/`
 - `backend/services/runtime/src/noveland/services/runtime/agent_loop.py`
 - `backend/services/runtime/src/noveland/services/runtime/clock_tick.py`
@@ -826,3 +826,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-08 F-019 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member journal, notification, and intervention responses now redact source refs, prompt text, choice/event linkage, and metadata while admin responses retain review detail.
 
 - 2026-06-08 F-020 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member agent relationship and calendar list responses now redact metadata while admin responses retain relationship/scheduling review detail.
+
+- 2026-06-08 F-021 kept existing worlds API ownership in `backend/services/api/src/noveland/services/api/worlds.py` and regression coverage in `backend/tests/test_api_worlds.py`; no new structural files were added. Member latest snapshot responses now redact payload, payload_uri, payload_location, and metadata while admin responses retain replay/storage diagnostics.

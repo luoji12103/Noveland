@@ -5985,13 +5985,14 @@ def latest_snapshot(
     worldline_id: uuid.UUID | None = None,
 ) -> WorldSnapshotResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     snapshot = WorldReplayService(db_session, load_settings()).latest_snapshot(
         context.world_id,
         worldline_id=worldline_id,
     )
     if snapshot is None:
         return None
-    return _snapshot_response(snapshot)
+    return _snapshot_response(snapshot, include_admin_fields=can_manage)
 
 
 @router.get(
@@ -10248,7 +10249,10 @@ def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
     )
 
 
-def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
+def _snapshot_response(
+    snapshot: WorldSnapshotRecord,
+    include_admin_fields: bool = True,
+) -> WorldSnapshotResponse:
     return WorldSnapshotResponse(
         id=snapshot.id,
         world_id=snapshot.world_id,
@@ -10256,10 +10260,10 @@ def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
         covers_event_sequence=snapshot.covers_event_sequence,
         schema_version=snapshot.schema_version,
         status=snapshot.status.value,
-        payload=snapshot.payload,
-        payload_uri=snapshot.payload_uri,
-        payload_location=_snapshot_payload_location(snapshot),
-        metadata=snapshot.metadata,
+        payload=snapshot.payload if include_admin_fields else None,
+        payload_uri=snapshot.payload_uri if include_admin_fields else None,
+        payload_location=_snapshot_payload_location(snapshot) if include_admin_fields else None,
+        metadata=snapshot.metadata if include_admin_fields else {},
         created_by_event_id=snapshot.created_by_event_id,
         created_at=snapshot.created_at,
     )

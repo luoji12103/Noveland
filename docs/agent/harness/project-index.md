@@ -116,7 +116,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md` — release notes for the completed v1.0 Private Beta MVP sequence.
 - `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md` — release notes for the completed v1.1 Normal Use / Release Candidate sequence.
 - `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9/v1.0/v1.1 changes.
-- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; backend F-001 through F-018 are recorded with targeted remediations through member living-world dashboard hidden count redaction.
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; backend F-001 through F-021 are recorded with targeted remediations through member latest snapshot payload/storage redaction.
 - `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/` — archived v0.9 OpenSpec change for the self-use playable demo world.
 - `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/` — archived v1.0 OpenSpec change for invite-only private beta: onboarding/access, player session stability, quota enforcement, setup wizard, memory/persona QA, beta feedback, repair loop, and private beta gate.
 - `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/` — archived v1.1 OpenSpec change for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
@@ -511,3 +511,5 @@ Whenever a new structural file or module is added, update this index.
 - 2026-06-08 F-019 updated existing worlds API journal, notification, and intervention response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.
 
 - 2026-06-08 F-020 updated existing worlds API relationship and calendar response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.
+
+- 2026-06-08 F-021 updated existing worlds API latest snapshot response shaping in `backend/services/api/src/noveland/services/api/worlds.py`; no repository layout or package boundary changes were introduced.

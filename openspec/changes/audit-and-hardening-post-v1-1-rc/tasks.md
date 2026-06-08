@@ -250,3 +250,13 @@
 - Intended remediation: shape agent relationship and calendar list responses by caller role; preserve metadata for admins while ordinary members receive safe relationship identity/score fields and calendar title/time/status fields with metadata redacted.
 - Status: Remediated in backend relationship/calendar metadata redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_agent_relationship_graph_enforces_world_scope_and_updates_edges tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules passed with 2 targeted tests; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-021 Member latest snapshot payload and storage reference leak
+
+- Severity: High
+- Affected boundary: member-readable world snapshot REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/snapshots/latest with get_world_member_context. The route serializes WorldSnapshotResponse through _snapshot_response, which copies snapshot.payload, snapshot.payload_uri, payload_location, and metadata directly from WorldSnapshotRecord.
+- Impact: ordinary world members can read internal object-storage URIs for object-backed snapshots or inline replay snapshot payloads and metadata. Snapshot metadata can include storage backend details, payload byte counts, raw event/state evidence markers, storage refs, provider refs, bytes/base64 markers, or other operator-only replay evidence.
+- Intended remediation: shape latest snapshot responses by caller role; preserve payload, payload_uri, payload_location, and metadata for admins while ordinary members receive safe snapshot identity, worldline, sequence coverage, schema/status, source event ref, and creation time with snapshot internals redacted.
+- Status: Remediated in backend latest snapshot redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot passed with 1 targeted test; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

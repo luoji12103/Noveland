@@ -117,3 +117,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, source evidence refs, or other admin-only scheduling/relationship evidence
 - **THEN** the member response SHALL omit metadata while preserving safe relationship scores, relationship identities, calendar titles, descriptions, times, recurrence, status, and timing fields
 - **AND** admin routes MAY continue to expose metadata required for world management, scheduling, and review.
+
+#### Scenario: Member reads latest snapshot
+- **GIVEN** a world member fetches the latest world snapshot through member-readable routes
+- **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, storage refs, bytes, base64, provider refs, or other replay/storage evidence
+- **THEN** the member response SHALL omit payload, payload_uri, payload_location, and metadata while preserving safe snapshot identity, worldline, sequence coverage, schema version, status, source event ref, and creation time
+- **AND** admin routes MAY continue to expose snapshot payload and storage evidence required for replay diagnostics and world management.
