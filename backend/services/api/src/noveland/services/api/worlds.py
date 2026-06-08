@@ -3076,6 +3076,7 @@ def list_worldlines(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[WorldlineResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _world_or_404(db_session, context.world_id)
     ensure_primary_worldline(db_session, context.world_id)
     worldlines = db_session.scalars(
@@ -3083,7 +3084,10 @@ def list_worldlines(
         .where(Worldline.world_id == context.world_id)
         .order_by(Worldline.parent_worldline_id.is_not(None), Worldline.created_at),
     ).all()
-    return [_worldline_response(worldline) for worldline in worldlines]
+    return [
+        _worldline_response(worldline, include_admin_fields=can_manage)
+        for worldline in worldlines
+    ]
 
 
 @router.post(
@@ -8269,7 +8273,11 @@ def _offscreen_resolution_response(result: Any) -> OffscreenResolutionResponse:
     )
 
 
-def _worldline_response(worldline: Worldline) -> WorldlineResponse:
+def _worldline_response(
+    worldline: Worldline,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldlineResponse:
     return WorldlineResponse(
         id=worldline.id,
         world_id=worldline.world_id,
@@ -8281,7 +8289,7 @@ def _worldline_response(worldline: Worldline) -> WorldlineResponse:
         fork_event_sequence=worldline.fork_event_sequence,
         status=cast(WorldlineStatus, worldline.status),
         created_by_actor_ref=worldline.created_by_actor_ref,
-        metadata=worldline.metadata_json,
+        metadata=worldline.metadata_json if include_admin_fields else {},
         created_at=worldline.created_at,
         updated_at=worldline.updated_at,
     )

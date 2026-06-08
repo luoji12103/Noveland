@@ -143,6 +143,17 @@
 - Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-014, task board, active handoff, project index, file inventory, and change journal.
 - Follow-up notes: Continue the backend member-readable DTO audit for worldline metadata, player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
 
+## post-v1.1 RC audit F-015 worldline metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-015 remediation.
+- Summary: Redacted ordinary member worldline metadata in member-readable list responses while preserving admin metadata visibility for branch management. The fix keeps safe branch identity, parent/fork references, status, actor refs, and timing fields visible to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_read_safe_worldline_comparison_without_mutation` to prove admin worldline metadata retention and ordinary member list redaction. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-015, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
 ## Entry format
 
 - Date:

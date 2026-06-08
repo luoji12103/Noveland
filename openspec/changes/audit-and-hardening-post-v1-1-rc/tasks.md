@@ -190,3 +190,13 @@
 - Intended remediation: shape membership and faction-track list responses by caller role; preserve metadata for admins while ordinary members receive safe organization/agent identity, role, visibility, responsibility, progress, pressure, summary, and timing fields with metadata redacted.
 - Status: Remediated in backend organization membership/faction track redaction batch.
 - Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+
+### F-015 Member worldline list metadata leaks
+
+- Severity: High
+- Affected boundary: member-readable worldline list REST API.
+- Evidence: backend/services/api/src/noveland/services/api/worlds.py exposes GET /worlds/{world_id}/worldlines with get_world_member_context, and list_worldlines serializes WorldlineResponse through _worldline_response, which copies metadata_json directly.
+- Impact: ordinary world members can read arbitrary admin-authored worldline metadata that may include raw prompt/output markers, storage refs, provider refs, secrets, bytes, base64, or other internal branch-management evidence.
+- Intended remediation: shape worldline list responses by caller role; preserve metadata for admins while ordinary members receive safe branch identity, parent/fork references, status, actor ref, and timing fields with metadata redacted.
+- Status: Remediated in backend worldline list redaction batch.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_safe_worldline_comparison_without_mutation passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.

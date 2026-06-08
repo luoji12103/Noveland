@@ -2839,6 +2839,7 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
     )
 
     assert listed.status_code == 200
+    assert [item["metadata"] for item in listed.json()] == [{}, {}]
     assert comparison.status_code == 200
     assert comparison.json() == {
         "base_worldline_id": str(primary_id),
@@ -2859,6 +2860,7 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
     assert "secret" not in serialized
 
     _authenticate(client, owner_token)
+    admin_listed = client.get(f"/worlds/{world_id}/worldlines")
     admin_fork = client.post(
         f"/worlds/{world_id}/worldlines/fork",
         json={
@@ -2866,6 +2868,13 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
             "worldline_key": "admin-fork",
             "name": "Admin Fork",
         },
+    )
+    assert admin_listed.status_code == 200
+    assert admin_listed.json()[0]["metadata"]["raw_prompt"] == (
+        "operator-only primary worldline prompt"
+    )
+    assert admin_listed.json()[1]["metadata"]["raw_prompt"] == (
+        "operator-only fork worldline prompt"
     )
     assert admin_fork.status_code == 201
 
@@ -4481,6 +4490,10 @@ def _add_membership(
 def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
     with Session(engine) as session:
         primary = ensure_primary_worldline(session, world_id)
+        primary.metadata_json = {
+            "raw_prompt": "operator-only primary worldline prompt",
+            "storage_uri": "media://private/worldline-primary",
+        }
         fork = Worldline(
             world_id=world_id,
             worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
@@ -4489,7 +4502,10 @@ def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uu
             parent_worldline_id=primary.id,
             status="active",
             created_by_actor_ref="test:api-worlds",
-            metadata_json={},
+            metadata_json={
+                "raw_prompt": "operator-only fork worldline prompt",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         )
         session.add(fork)
         session.commit()

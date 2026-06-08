@@ -81,3 +81,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
 - **THEN** the member response SHALL omit membership and faction-track metadata while preserving safe organization identity, agent identity, role, visibility, responsibility, progress, pressure, and summary fields
 - **AND** admin organization management routes MAY continue to expose membership and faction-track metadata required for world management.
+
+#### Scenario: Member lists worldlines
+- **GIVEN** a world member lists worldlines through member-readable routes
+- **WHEN** worldline records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit worldline metadata while preserving safe branch identity, parent/fork references, status, actor ref, and timing fields
+- **AND** admin worldline management routes MAY continue to expose metadata required for world management.

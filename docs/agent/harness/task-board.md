@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-015 member worldline metadata redaction
 - Post-v1.1 RC audit F-014 member organization membership/faction track metadata redaction
 - Post-v1.1 RC audit F-006 member media metadata redaction
 - Post-v1.1 RC audit F-005 media lineage related asset redaction
