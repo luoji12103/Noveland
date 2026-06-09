@@ -294,3 +294,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+
+#### Scenario: Web client manages story, route, ending, authoring, release, and beta checklist operations
+- **GIVEN** browser-side Web client code issues story hook, plot thread, route affinity, route milestone, ending candidate, long-run eval, authoring template, release profile, or beta checklist requests through same-origin API routes
+- **AND** the world identifier or nested ending, authoring template, or checklist run identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

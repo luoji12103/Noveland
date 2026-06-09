@@ -1149,7 +1149,7 @@ export function listStoryHooks(
   filters: WorldlineScopedFilters = {},
 ): Promise<StoryHook[]> {
   return worldRequest<StoryHook[]>(
-    `/api/worlds/${worldId}/story-hooks${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/story-hooks${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1158,7 +1158,7 @@ export function createStoryHook(
   worldId: string,
   input: StoryHookCreateInput,
 ): Promise<StoryHook> {
-  return worldRequest<StoryHook>(`/api/worlds/${worldId}/story-hooks`, {
+  return worldRequest<StoryHook>(`${worldApiPath(worldId)}/story-hooks`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1170,7 +1170,7 @@ export function listPlotThreads(
   filters: WorldlineScopedFilters = {},
 ): Promise<PlotThread[]> {
   return worldRequest<PlotThread[]>(
-    `/api/worlds/${worldId}/plot-threads${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/plot-threads${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1179,7 +1179,7 @@ export function createPlotThread(
   worldId: string,
   input: PlotThreadCreateInput,
 ): Promise<PlotThread> {
-  return worldRequest<PlotThread>(`/api/worlds/${worldId}/plot-threads`, {
+  return worldRequest<PlotThread>(`${worldApiPath(worldId)}/plot-threads`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1195,7 +1195,7 @@ export function listRouteAffinities(
   appendOptional(search, "agent_id", filters.agent_id);
   appendOptional(search, "status", filters.status);
   return worldRequest<RouteAffinity[]>(
-    `/api/worlds/${worldId}/route-affinities${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/route-affinities${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1204,7 +1204,7 @@ export function upsertRouteAffinity(
   worldId: string,
   input: RouteAffinityUpsertInput,
 ): Promise<RouteAffinity> {
-  return worldRequest<RouteAffinity>(`/api/worlds/${worldId}/route-affinities`, {
+  return worldRequest<RouteAffinity>(`${worldApiPath(worldId)}/route-affinities`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1216,7 +1216,7 @@ export function listRouteMilestones(
   filters: WorldlineScopedFilters = {},
 ): Promise<RouteMilestone[]> {
   return worldRequest<RouteMilestone[]>(
-    `/api/worlds/${worldId}/route-milestones${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/route-milestones${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1225,7 +1225,7 @@ export function createRouteMilestone(
   worldId: string,
   input: RouteMilestoneCreateInput,
 ): Promise<RouteMilestone> {
-  return worldRequest<RouteMilestone>(`/api/worlds/${worldId}/route-milestones`, {
+  return worldRequest<RouteMilestone>(`${worldApiPath(worldId)}/route-milestones`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1241,7 +1241,7 @@ export function listEndingCandidates(
   appendOptional(search, "status", filters.status);
   appendOptional(search, "ending_type", filters.ending_type);
   return worldRequest<EndingCandidate[]>(
-    `/api/worlds/${worldId}/ending-candidates${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/ending-candidates${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1250,7 +1250,7 @@ export function createEndingCandidate(
   worldId: string,
   input: EndingCandidateCreateInput,
 ): Promise<EndingCandidate> {
-  return worldRequest<EndingCandidate>(`/api/worlds/${worldId}/ending-candidates`, {
+  return worldRequest<EndingCandidate>(`${worldApiPath(worldId)}/ending-candidates`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1263,7 +1263,7 @@ export function dryRunEndingCandidate(
   filters: WorldlineScopedFilters = {},
 ): Promise<EndingDryRun> {
   return worldRequest<EndingDryRun>(
-    `/api/worlds/${worldId}/ending-candidates/${endingId}/dry-run${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/ending-candidates/${pathSegment(endingId)}/dry-run${worldlineSuffix(filters)}`,
     { method: "POST", csrf: true },
   );
 }
@@ -1273,7 +1273,7 @@ export function listLongRunEvals(
   filters: WorldlineScopedFilters = {},
 ): Promise<LongRunEvalRun[]> {
   return worldRequest<LongRunEvalRun[]>(
-    `/api/worlds/${worldId}/long-run-evals${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/long-run-evals${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1282,7 +1282,7 @@ export function createLongRunEval(
   worldId: string,
   input: LongRunEvalCreateInput,
 ): Promise<LongRunEvalRun> {
-  return worldRequest<LongRunEvalRun>(`/api/worlds/${worldId}/long-run-evals`, {
+  return worldRequest<LongRunEvalRun>(`${worldApiPath(worldId)}/long-run-evals`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1296,7 +1296,7 @@ export function listAuthoringTemplates(
   const search = new URLSearchParams();
   appendOptional(search, "template_kind", filters.template_kind);
   return worldRequest<AuthoringTemplate[]>(
-    `/api/worlds/${worldId}/authoring-templates${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/authoring-templates${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1305,7 +1305,7 @@ export function createAuthoringTemplate(
   worldId: string,
   input: AuthoringTemplateCreateInput,
 ): Promise<AuthoringTemplate> {
-  return worldRequest<AuthoringTemplate>(`/api/worlds/${worldId}/authoring-templates`, {
+  return worldRequest<AuthoringTemplate>(`${worldApiPath(worldId)}/authoring-templates`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1318,7 +1318,7 @@ export function previewAuthoringTemplate(
   input: AuthoringTemplateApplyInput = {},
 ): Promise<AuthoringImportJob> {
   return worldRequest<AuthoringImportJob>(
-    `/api/worlds/${worldId}/authoring-templates/${templateId}/preview`,
+    `${worldApiPath(worldId)}/authoring-templates/${pathSegment(templateId)}/preview`,
     {
       method: "POST",
       body: input,
@@ -1333,7 +1333,7 @@ export function applyAuthoringTemplate(
   input: AuthoringTemplateApplyInput = {},
 ): Promise<AuthoringImportJob> {
   return worldRequest<AuthoringImportJob>(
-    `/api/worlds/${worldId}/authoring-templates/${templateId}/apply`,
+    `${worldApiPath(worldId)}/authoring-templates/${pathSegment(templateId)}/apply`,
     {
       method: "POST",
       body: input,
@@ -1343,7 +1343,7 @@ export function applyAuthoringTemplate(
 }
 
 export function getReleaseProfile(worldId: string): Promise<LivingWorldReleaseProfile | null> {
-  return worldRequest<LivingWorldReleaseProfile | null>(`/api/worlds/${worldId}/release-profile`, {
+  return worldRequest<LivingWorldReleaseProfile | null>(`${worldApiPath(worldId)}/release-profile`, {
     method: "GET",
   });
 }
@@ -1352,7 +1352,7 @@ export function upsertReleaseProfile(
   worldId: string,
   input: ReleaseProfileUpsertInput,
 ): Promise<LivingWorldReleaseProfile> {
-  return worldRequest<LivingWorldReleaseProfile>(`/api/worlds/${worldId}/release-profile`, {
+  return worldRequest<LivingWorldReleaseProfile>(`${worldApiPath(worldId)}/release-profile`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1364,7 +1364,7 @@ export function listBetaChecklists(
   filters: WorldlineScopedFilters = {},
 ): Promise<BetaChecklistRun[]> {
   return worldRequest<BetaChecklistRun[]>(
-    `/api/worlds/${worldId}/beta-checklists${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/beta-checklists${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1373,7 +1373,7 @@ export function createBetaChecklist(
   worldId: string,
   input: BetaChecklistRunCreateInput,
 ): Promise<BetaChecklistRun> {
-  return worldRequest<BetaChecklistRun>(`/api/worlds/${worldId}/beta-checklists`, {
+  return worldRequest<BetaChecklistRun>(`${worldApiPath(worldId)}/beta-checklists`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1385,7 +1385,7 @@ export function listBetaChecklistItems(
   runId: string,
 ): Promise<BetaChecklistItem[]> {
   return worldRequest<BetaChecklistItem[]>(
-    `/api/worlds/${worldId}/beta-checklists/${runId}/items`,
+    `${worldApiPath(worldId)}/beta-checklists/${pathSegment(runId)}/items`,
     { method: "GET" },
   );
 }

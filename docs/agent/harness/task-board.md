@@ -529,3 +529,4 @@
 - Post-v1.1 RC audit F-019 member journal/notification/intervention redaction
 - Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
 - Post-v1.1 RC audit F-044 Web daily-life/offscreen client path boundary hardening
+- Post-v1.1 RC audit F-045 Web story/route/ending/authoring/release/beta client path boundary hardening

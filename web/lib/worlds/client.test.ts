@@ -760,6 +760,132 @@ describe("world client", () => {
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
+  it("encodes reserved characters in story, route, ending, authoring, release, and beta route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "hook" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "thread" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "route" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "milestone" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteEndingId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "eval" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteTemplateId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "preview-job" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "apply-job" }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "release" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteChecklistRunId }))
+      .mockResolvedValueOnce(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listStoryHooks(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createStoryHook(storyRouteWorldId, {
+      hook_key: "promise",
+      title: "Promise",
+      hook_type: "promise",
+      summary: "Promise summary",
+    });
+    await listPlotThreads(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createPlotThread(storyRouteWorldId, {
+      thread_key: "thread",
+      title: "Thread",
+      thread_type: "personal",
+      summary: "Thread summary",
+    });
+    await listRouteAffinities(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      agent_id: storyRouteAgentId,
+      status: "active",
+    });
+    await upsertRouteAffinity(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      agent_id: storyRouteAgentId,
+      route_key: "route",
+    });
+    await listRouteMilestones(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createRouteMilestone(storyRouteWorldId, { milestone_key: "milestone", title: "Milestone" });
+    await listEndingCandidates(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      status: "available",
+      ending_type: "normal",
+    });
+    await createEndingCandidate(storyRouteWorldId, {
+      ending_key: "ending",
+      title: "Ending",
+      ending_type: "normal",
+    });
+    await dryRunEndingCandidate(storyRouteWorldId, storyRouteEndingId, {
+      worldline_id: storyRouteWorldlineId,
+    });
+    await listLongRunEvals(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createLongRunEval(storyRouteWorldId, { eval_key: "eval" });
+    await listAuthoringTemplates(storyRouteWorldId, { template_kind: "world_bundle" });
+    await createAuthoringTemplate(storyRouteWorldId, {
+      template_key: "template",
+      template_kind: "world_bundle",
+      name: "Template",
+    });
+    await previewAuthoringTemplate(storyRouteWorldId, storyRouteTemplateId, {
+      target_worldline_id: storyRouteWorldlineId,
+    });
+    await applyAuthoringTemplate(storyRouteWorldId, storyRouteTemplateId, {
+      target_worldline_id: storyRouteWorldlineId,
+      duplicate_policy: "skip",
+    });
+    await getReleaseProfile(storyRouteWorldId);
+    await upsertReleaseProfile(storyRouteWorldId, { status: "ready" });
+    await listBetaChecklists(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createBetaChecklist(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      run_key: "beta",
+    });
+    await listBetaChecklistItems(storyRouteWorldId, storyRouteChecklistRunId);
+
+    const worldSegment = encodeURIComponent(storyRouteWorldId);
+    const worldlineSegment = encodeURIComponent(storyRouteWorldlineId);
+    const agentSegment = encodeURIComponent(storyRouteAgentId);
+    const endingSegment = encodeURIComponent(storyRouteEndingId);
+    const templateSegment = encodeURIComponent(storyRouteTemplateId);
+    const checklistSegment = encodeURIComponent(storyRouteChecklistRunId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/story-hooks?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/story-hooks`,
+      `/api/worlds/${worldSegment}/plot-threads?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/plot-threads`,
+      `/api/worlds/${worldSegment}/route-affinities?worldline_id=${worldlineSegment}&agent_id=${agentSegment}&status=active`,
+      `/api/worlds/${worldSegment}/route-affinities`,
+      `/api/worlds/${worldSegment}/route-milestones?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/route-milestones`,
+      `/api/worlds/${worldSegment}/ending-candidates?worldline_id=${worldlineSegment}&status=available&ending_type=normal`,
+      `/api/worlds/${worldSegment}/ending-candidates`,
+      `/api/worlds/${worldSegment}/ending-candidates/${endingSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/long-run-evals?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/long-run-evals`,
+      `/api/worlds/${worldSegment}/authoring-templates?template_kind=world_bundle`,
+      `/api/worlds/${worldSegment}/authoring-templates`,
+      `/api/worlds/${worldSegment}/authoring-templates/${templateSegment}/preview`,
+      `/api/worlds/${worldSegment}/authoring-templates/${templateSegment}/apply`,
+      `/api/worlds/${worldSegment}/release-profile`,
+      `/api/worlds/${worldSegment}/release-profile`,
+      `/api/worlds/${worldSegment}/beta-checklists?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/beta-checklists`,
+      `/api/worlds/${worldSegment}/beta-checklists/${checklistSegment}/items`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("encodes reserved characters in clock, replay, and scene route segments", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -1817,6 +1943,12 @@ const orgAgentScheduleRuleId = "schedule/weekday?enabled=true#frag";
 const orgAgentWorldlineId = "worldline/org?branch=true#frag";
 const dailyLifeWorldId = "world/daily?admin=true#frag";
 const dailyLifeWorldlineId = "worldline/daily?branch=true#frag";
+const storyRouteWorldId = "world/story?admin=true#frag";
+const storyRouteWorldlineId = "worldline/story?branch=true#frag";
+const storyRouteAgentId = "agent/story?role=true#frag";
+const storyRouteEndingId = "ending/normal?dry=true#frag";
+const storyRouteTemplateId = "template/source?preview=true#frag";
+const storyRouteChecklistRunId = "checklist/beta?items=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";
