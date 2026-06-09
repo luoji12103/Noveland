@@ -235,36 +235,50 @@ export const redactionModeOptions: RedactionMode[] = [
   "hide",
 ];
 
+function worldPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}`;
+}
+
+function invocationsPath(worldId: string): string {
+  return `${worldPath(worldId)}/model-invocations`;
+}
+
+function invocationPath(worldId: string, invocationId: string): string {
+  return `${invocationsPath(worldId)}/${encodeURIComponent(invocationId)}`;
+}
+
+function invocationTagsPath(worldId: string, invocationId: string): string {
+  return `${invocationPath(worldId, invocationId)}/tags`;
+}
+
 export async function listInvocations(
   worldId: string,
   filters: InvocationFilters = {},
 ): Promise<InvocationRecord[]> {
   const result = await adminRequest<InvocationSearchResult>(
-    `/api/worlds/${worldId}/model-invocations${query(filters)}`,
+    `${invocationsPath(worldId)}${query(filters)}`,
     { method: "GET" },
   );
   return result.invocations;
 }
 
 export function getInvocation(worldId: string, invocationId: string): Promise<InvocationRecord> {
-  return adminRequest<InvocationRecord>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}`,
-    { method: "GET" },
-  );
+  return adminRequest<InvocationRecord>(invocationPath(worldId, invocationId), {
+    method: "GET",
+  });
 }
 
 export function getPromptSnapshot(worldId: string, invocationId: string): Promise<PromptSnapshot> {
   return adminRequest<PromptSnapshot>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}/prompt-snapshot`,
+    `${invocationPath(worldId, invocationId)}/prompt-snapshot`,
     { method: "GET" },
   );
 }
 
 export function listInvocationTags(worldId: string, invocationId: string): Promise<InvocationTag[]> {
-  return adminRequest<InvocationTag[]>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}/tags`,
-    { method: "GET" },
-  );
+  return adminRequest<InvocationTag[]>(invocationTagsPath(worldId, invocationId), {
+    method: "GET",
+  });
 }
 
 export function createInvocationTag(
@@ -272,10 +286,11 @@ export function createInvocationTag(
   invocationId: string,
   input: InvocationTagInput,
 ): Promise<InvocationTag> {
-  return adminRequest<InvocationTag>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}/tags`,
-    { method: "POST", body: input, csrf: true },
-  );
+  return adminRequest<InvocationTag>(invocationTagsPath(worldId, invocationId), {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
 }
 
 export function deleteInvocationTag(
@@ -284,7 +299,7 @@ export function deleteInvocationTag(
   tagId: string,
 ): Promise<void> {
   return adminRequest<void>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}/tags/${tagId}`,
+    `${invocationTagsPath(worldId, invocationId)}/${encodeURIComponent(tagId)}`,
     { method: "DELETE", csrf: true },
   );
 }
@@ -294,10 +309,11 @@ export function redactInvocation(
   invocationId: string,
   input: InvocationRedactInput,
 ): Promise<InvocationRecord> {
-  return adminRequest<InvocationRecord>(
-    `/api/worlds/${worldId}/model-invocations/${invocationId}/redact`,
-    { method: "POST", body: input, csrf: true },
-  );
+  return adminRequest<InvocationRecord>(`${invocationPath(worldId, invocationId)}/redact`, {
+    method: "POST",
+    body: input,
+    csrf: true,
+  });
 }
 
 function query(filters: InvocationFilters): string {
