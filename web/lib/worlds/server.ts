@@ -1495,22 +1495,21 @@ export async function getProviderIntegrationAdminData(
         "Unable to load selected world.",
       );
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, providers, providerTemplates] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
       apiFetch<ProviderIntegration[]>(
-        `/worlds/${worldId}/providers?include_global=true&include_hidden=${String(
-          isPlatformAdmin,
-        )}`,
+        `${worldPath}/providers${queryString({ include_global: true, include_hidden: isPlatformAdmin })}`,
         cookies,
       ),
-      apiFetch<ProviderTemplate[]>(`/worlds/${worldId}/providers/templates`, cookies),
+      apiFetch<ProviderTemplate[]>(`${worldPath}/providers/templates`, cookies),
     ]);
     const [capabilityEntries, healthEntries] = await Promise.all([
       Promise.all(
         providers.map(async (provider) => [
           provider.id,
           await apiFetchOptional<ProviderCapability[]>(
-            `/worlds/${worldId}/providers/${provider.id}/capabilities`,
+            `${worldPath}/providers/${pathSegment(provider.id)}/capabilities`,
             cookies,
           ),
         ] as const),
@@ -1519,7 +1518,7 @@ export async function getProviderIntegrationAdminData(
         providers.map(async (provider) => [
           provider.id,
           await apiFetchOptional<ProviderHealthCheck[]>(
-            `/worlds/${worldId}/providers/${provider.id}/health-checks?limit=10`,
+            `${worldPath}/providers/${pathSegment(provider.id)}/health-checks${queryString({ limit: 10 })}`,
             cookies,
           ),
         ] as const),
@@ -1565,17 +1564,18 @@ export async function getMediaAdminData(
     if (selectedWorld === null) {
       return emptyMediaAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, assets, jobs, references] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
-      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?limit=50`, cookies),
-      apiFetch<MediaJob[]>(`/worlds/${worldId}/media/jobs?limit=50`, cookies),
-      apiFetchOptional<MediaReference[]>(`/worlds/${worldId}/media/references?limit=100`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
+      apiFetch<MediaAsset[]>(`${worldPath}/media/assets${queryString({ limit: 50 })}`, cookies),
+      apiFetch<MediaJob[]>(`${worldPath}/media/jobs${queryString({ limit: 50 })}`, cookies),
+      apiFetchOptional<MediaReference[]>(`${worldPath}/media/references${queryString({ limit: 100 })}`, cookies),
     ]);
     const objectEntries = await Promise.all(
       assets.slice(0, 25).map(async (asset) => [
         asset.id,
         await apiFetchOptional<MediaObject[]>(
-          `/worlds/${worldId}/media/assets/${asset.id}/objects`,
+          `${worldPath}/media/assets/${pathSegment(asset.id)}/objects`,
           cookies,
         ),
       ] as const),
@@ -1584,7 +1584,7 @@ export async function getMediaAdminData(
       assets.slice(0, 25).map(async (asset) => [
         asset.id,
         await apiFetchOptional<MediaAssetReferences>(
-          `/worlds/${worldId}/media/assets/${asset.id}/references`,
+          `${worldPath}/media/assets/${pathSegment(asset.id)}/references`,
           cookies,
         ),
       ] as const),
@@ -1623,25 +1623,30 @@ export async function getVisualAdminData(
     if (selectedWorld === null) {
       return emptyVisualAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, worldlines, agents, scenes, imageAssets] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
-      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
-      apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
-      apiFetch<Scene[]>(`/worlds/${worldId}/scenes`, cookies),
-      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?asset_kind=image&limit=100`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
+      apiFetch<Worldline[]>(`${worldPath}/worldlines`, cookies),
+      apiFetch<Agent[]>(`${worldPath}/agents`, cookies),
+      apiFetch<Scene[]>(`${worldPath}/scenes`, cookies),
+      apiFetch<MediaAsset[]>(
+        `${worldPath}/media/assets${queryString({ asset_kind: "image", limit: 100 })}`,
+        cookies,
+      ),
     ]);
     const selectedWorldlineId =
       worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
+    const worldlineQuery = queryString({ worldline_id: selectedWorldlineId });
     const [spriteSets, backgrounds] =
       selectedWorldlineId === null
         ? [[], []]
         : await Promise.all([
             apiFetch<SpriteSet[]>(
-              `/worlds/${worldId}/visual/sprite-sets?worldline_id=${selectedWorldlineId}`,
+              `${worldPath}/visual/sprite-sets${worldlineQuery}`,
               cookies,
             ),
             apiFetch<SceneBackground[]>(
-              `/worlds/${worldId}/visual/backgrounds?worldline_id=${selectedWorldlineId}`,
+              `${worldPath}/visual/backgrounds${worldlineQuery}`,
               cookies,
             ),
           ]);
@@ -1649,7 +1654,7 @@ export async function getVisualAdminData(
       spriteSets.map(async (spriteSet) => [
         spriteSet.id,
         await apiFetchOptional<SpriteVariant[]>(
-          `/worlds/${worldId}/visual/sprite-sets/${spriteSet.id}/variants`,
+          `${worldPath}/visual/sprite-sets/${pathSegment(spriteSet.id)}/variants`,
           cookies,
         ),
       ] as const),
@@ -1691,40 +1696,33 @@ export async function getSpeechAdminData(
     if (selectedWorld === null) {
       return emptySpeechAdminData(worlds, null, isPlatformAdmin, "Unable to load selected world.");
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, worldlines, agents, providers, audioAssets] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
-      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
-      apiFetch<Agent[]>(`/worlds/${worldId}/agents`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
+      apiFetch<Worldline[]>(`${worldPath}/worldlines`, cookies),
+      apiFetch<Agent[]>(`${worldPath}/agents`, cookies),
       apiFetch<ProviderIntegration[]>(
-        `/worlds/${worldId}/providers?include_global=true&include_hidden=${String(isPlatformAdmin)}`,
+        `${worldPath}/providers${queryString({ include_global: true, include_hidden: isPlatformAdmin })}`,
         cookies,
       ),
-      apiFetch<MediaAsset[]>(`/worlds/${worldId}/media/assets?asset_kind=audio&limit=100`, cookies),
+      apiFetch<MediaAsset[]>(
+        `${worldPath}/media/assets${queryString({ asset_kind: "audio", limit: 100 })}`,
+        cookies,
+      ),
     ]);
     const selectedWorldlineId =
       worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
+    const worldlineQuery = queryString({ worldline_id: selectedWorldlineId });
     const [voiceProfiles, styleMappings, transcripts] = await Promise.all([
-      apiFetch<VoiceProfile[]>(
-        `/worlds/${worldId}/speech/voice-profiles${
-          selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
-        }`,
-        cookies,
-      ),
-      apiFetch<SpeechStyleMapping[]>(`/worlds/${worldId}/speech/style-mappings`, cookies),
-      apiFetch<SpeechTranscript[]>(
-        `/worlds/${worldId}/speech/transcripts${
-          selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
-        }`,
-        cookies,
-      ),
+      apiFetch<VoiceProfile[]>(`${worldPath}/speech/voice-profiles${worldlineQuery}`, cookies),
+      apiFetch<SpeechStyleMapping[]>(`${worldPath}/speech/style-mappings`, cookies),
+      apiFetch<SpeechTranscript[]>(`${worldPath}/speech/transcripts${worldlineQuery}`, cookies),
     ]);
     const bindingEntries = await Promise.all(
       agents.map(async (agent) => [
         agent.id,
         await apiFetchOptional<AgentVoiceProfileBinding[]>(
-          `/worlds/${worldId}/agents/${agent.id}/voice-profiles${
-            selectedWorldlineId === null ? "" : `?worldline_id=${selectedWorldlineId}`
-          }`,
+          `${worldPath}/agents/${pathSegment(agent.id)}/voice-profiles${worldlineQuery}`,
           cookies,
         ),
       ] as const),
@@ -1774,11 +1772,12 @@ export async function getInvocationLedgerAdminData(
         "Unable to load selected world.",
       );
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, worldlines, result] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
-      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
+      apiFetch<Worldline[]>(`${worldPath}/worldlines`, cookies),
       apiFetch<{ invocations: InvocationRecord[] }>(
-        `/worlds/${worldId}/model-invocations?limit=50&include_hidden=${String(isPlatformAdmin)}`,
+        `${worldPath}/model-invocations${queryString({ limit: 50, include_hidden: isPlatformAdmin })}`,
         cookies,
       ),
     ]);
@@ -1789,7 +1788,7 @@ export async function getInvocationLedgerAdminData(
         invocations.slice(0, 25).map(async (invocation) => [
           invocation.id,
           await apiFetchOptional<InvocationTag[]>(
-            `/worlds/${worldId}/model-invocations/${invocation.id}/tags`,
+            `${worldPath}/model-invocations/${pathSegment(invocation.id)}/tags`,
             cookies,
           ),
         ] as const),
@@ -1797,7 +1796,7 @@ export async function getInvocationLedgerAdminData(
       selectedInvocation === null
         ? Promise.resolve(null)
         : apiFetchOptional<PromptSnapshot>(
-            `/worlds/${worldId}/model-invocations/${selectedInvocation.id}/prompt-snapshot`,
+            `${worldPath}/model-invocations/${pathSegment(selectedInvocation.id)}/prompt-snapshot`,
             cookies,
           ),
     ]);
@@ -1845,28 +1844,25 @@ export async function getMultimodalDiagnosticsAdminData(
         "Unable to load selected world.",
       );
     }
+    const worldPath = serverWorldPath(worldId);
     const [memberships, worldlines] = await Promise.all([
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
-      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
+      apiFetch<Worldline[]>(`${worldPath}/worldlines`, cookies),
     ]);
     const selectedWorldlineId =
       worldlines.find((worldline) => worldline.status === "active")?.id ?? worldlines[0]?.id ?? null;
-    const worldlineQuery =
-      selectedWorldlineId === null ? "" : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}`;
-    const runQuery =
-      selectedWorldlineId === null
-        ? "?limit=20"
-        : `?worldline_id=${encodeURIComponent(selectedWorldlineId)}&limit=20`;
+    const worldlineQuery = queryString({ worldline_id: selectedWorldlineId });
+    const runQuery = queryString({ worldline_id: selectedWorldlineId, limit: 20 });
     const [diagnostics, evalRuns] =
       selectedWorldlineId === null
         ? [null, []]
         : await Promise.all([
             apiFetchOptional<MultimodalDiagnosticsResult>(
-              `/worlds/${worldId}/diagnostics/multimodal${worldlineQuery}`,
+              `${worldPath}/diagnostics/multimodal${worldlineQuery}`,
               cookies,
             ),
             apiFetchOptional<MultimodalEvalRun[]>(
-              `/worlds/${worldId}/multimodal-evals${runQuery}`,
+              `${worldPath}/multimodal-evals${runQuery}`,
               cookies,
             ),
           ]);
@@ -2024,6 +2020,27 @@ async function apiFetch<T>(path: string, cookieHeader: string | null): Promise<T
     return (await response.json()) as T;
   }
   throw new WorldServerError(await errorDetail(response), response.status);
+}
+
+function serverWorldPath(worldId: string): string {
+  return `/worlds/${pathSegment(worldId)}`;
+}
+
+function pathSegment(value: string): string {
+  return encodeURIComponent(value);
+}
+
+type QueryValue = string | number | boolean | null | undefined;
+
+function queryString(params: Record<string, QueryValue>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== null && value !== undefined) {
+      search.set(key, String(value));
+    }
+  }
+  const encoded = search.toString();
+  return encoded === "" ? "" : `?${encoded}`;
 }
 
 function emptyWorldWorkspaceData(

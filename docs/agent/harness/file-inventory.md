@@ -137,6 +137,8 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/worlds/media.ts`
 - `web/lib/worlds/provider-integrations.ts`
 - `web/lib/worlds/provider-integrations.test.ts`
+- `web/lib/worlds/server.test.ts`
+- `web/lib/worlds/server.ts`
 - `web/lib/worlds/speech.test.ts`
 - `web/lib/worlds/speech.ts`
 - `web/lib/worlds/visual.test.ts`
