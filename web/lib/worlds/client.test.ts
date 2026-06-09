@@ -703,6 +703,63 @@ describe("world client", () => {
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
+  it("encodes reserved characters in daily-life and offscreen route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ candidate_count: 0, candidates: [] }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "offscreen" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse({ processed_count: 1, resolved_count: 1, failed_count: 0 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getDailyLifePreview(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      start_world_time: "2030-01-01T08:00:00Z",
+      horizon_hours: 12,
+      limit: 5,
+    });
+    await generateDailyLifeCandidates(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      horizon_hours: 6,
+      limit: 3,
+    });
+    await listDailyLifeCandidates(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      status: "candidate",
+      limit: 4,
+    });
+    await createOffscreenEvent(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      title: "Offscreen",
+      due_at: "2030-01-01T10:00:00Z",
+    });
+    await listOffscreenEvents(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      status: "pending",
+      limit: 2,
+    });
+    await resolveOffscreenEvents(dailyLifeWorldId, 7, dailyLifeWorldlineId);
+
+    const worldSegment = encodeURIComponent(dailyLifeWorldId);
+    const worldlineSegment = encodeURIComponent(dailyLifeWorldlineId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/daily-life/preview?worldline_id=${worldlineSegment}&start_world_time=2030-01-01T08%3A00%3A00Z&horizon_hours=12&limit=5`,
+      `/api/worlds/${worldSegment}/daily-life/generate`,
+      `/api/worlds/${worldSegment}/daily-life/candidates?worldline_id=${worldlineSegment}&status=candidate&limit=4`,
+      `/api/worlds/${worldSegment}/offscreen-events`,
+      `/api/worlds/${worldSegment}/offscreen-events?worldline_id=${worldlineSegment}&status=pending&limit=2`,
+      `/api/worlds/${worldSegment}/offscreen-events/resolve?limit=7&worldline_id=${worldlineSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("encodes reserved characters in clock, replay, and scene route segments", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -1758,6 +1815,8 @@ const orgAgentRelationshipId = "relationship/guide?target=true#frag";
 const orgAgentCalendarEntryId = "calendar/class?time=true#frag";
 const orgAgentScheduleRuleId = "schedule/weekday?enabled=true#frag";
 const orgAgentWorldlineId = "worldline/org?branch=true#frag";
+const dailyLifeWorldId = "world/daily?admin=true#frag";
+const dailyLifeWorldlineId = "worldline/daily?branch=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";

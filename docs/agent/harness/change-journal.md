@@ -3748,3 +3748,16 @@
 - Tests added/updated: Expanded conversation API access coverage to assert admin advance responses preserve run evidence while ordinary member turn list responses redact run_id and error_text.
 - Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
 - Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web daily-life/offscreen client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-044.
+- Finding: F-044 found browser-side daily-life preview/generation/candidate and offscreen event create/list/resolve helpers appending decoded world identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for daily-life/offscreen client route-boundary preservation, then encoded the scoped world path segment in the affected helpers while keeping query filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in daily-life/offscreen world identifiers stay inside encoded same-origin path segments and worldline filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 29 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 152 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining living-world helper groups in web/lib/worlds/client.ts, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and admin/player/member boundary leaks. Do not push unless explicitly requested.

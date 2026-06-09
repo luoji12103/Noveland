@@ -1021,7 +1021,7 @@ export function getDailyLifePreview(
     search.set("limit", String(filters.limit));
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
-  return worldRequest<DailyLifePreview>(`/api/worlds/${worldId}/daily-life/preview${suffix}`, {
+  return worldRequest<DailyLifePreview>(`${worldApiPath(worldId)}/daily-life/preview${suffix}`, {
     method: "GET",
   });
 }
@@ -1030,7 +1030,7 @@ export function generateDailyLifeCandidates(
   worldId: string,
   input: DailyLifeGenerateInput = {},
 ): Promise<DailyLifeEventCandidate[]> {
-  return worldRequest<DailyLifeEventCandidate[]>(`/api/worlds/${worldId}/daily-life/generate`, {
+  return worldRequest<DailyLifeEventCandidate[]>(`${worldApiPath(worldId)}/daily-life/generate`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1051,7 +1051,7 @@ export function listDailyLifeCandidates(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<DailyLifeEventCandidate[]>(
-    `/api/worlds/${worldId}/daily-life/candidates${suffix}`,
+    `${worldApiPath(worldId)}/daily-life/candidates${suffix}`,
     { method: "GET" },
   );
 }
@@ -1060,7 +1060,7 @@ export function createOffscreenEvent(
   worldId: string,
   input: OffscreenEventCreateInput,
 ): Promise<OffscreenEventQueueItem> {
-  return worldRequest<OffscreenEventQueueItem>(`/api/worlds/${worldId}/offscreen-events`, {
+  return worldRequest<OffscreenEventQueueItem>(`${worldApiPath(worldId)}/offscreen-events`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1081,7 +1081,7 @@ export function listOffscreenEvents(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<OffscreenEventQueueItem[]>(
-    `/api/worlds/${worldId}/offscreen-events${suffix}`,
+    `${worldApiPath(worldId)}/offscreen-events${suffix}`,
     { method: "GET" },
   );
 }
@@ -1095,7 +1095,7 @@ export function resolveOffscreenEvents(
   search.set("limit", String(limit));
   appendOptional(search, "worldline_id", worldlineId);
   return worldRequest<OffscreenResolution>(
-    `/api/worlds/${worldId}/offscreen-events/resolve?${search.toString()}`,
+    `${worldApiPath(worldId)}/offscreen-events/resolve?${search.toString()}`,
     {
       method: "POST",
       csrf: true,

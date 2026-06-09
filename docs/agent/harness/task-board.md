@@ -528,3 +528,4 @@
 - Post-v1.1 RC audit F-018 member living-world dashboard hidden count redaction
 - Post-v1.1 RC audit F-019 member journal/notification/intervention redaction
 - Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
+- Post-v1.1 RC audit F-044 Web daily-life/offscreen client path boundary hardening
