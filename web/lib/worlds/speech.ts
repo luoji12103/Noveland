@@ -257,18 +257,46 @@ export const voiceBindingRoleOptions: VoiceBindingRole[] = [
   "other",
 ];
 
+function worldPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}`;
+}
+
+function speechPath(worldId: string): string {
+  return `${worldPath(worldId)}/speech`;
+}
+
+function voiceProfilesPath(worldId: string): string {
+  return `${speechPath(worldId)}/voice-profiles`;
+}
+
+function voiceProfilePath(worldId: string, voiceProfileId: string): string {
+  return `${voiceProfilesPath(worldId)}/${encodeURIComponent(voiceProfileId)}`;
+}
+
+function agentVoiceProfilesPath(worldId: string, agentId: string): string {
+  return `${worldPath(worldId)}/agents/${encodeURIComponent(agentId)}/voice-profiles`;
+}
+
+function styleMappingsPath(worldId: string): string {
+  return `${speechPath(worldId)}/style-mappings`;
+}
+
+function styleMappingPath(worldId: string, mappingId: string): string {
+  return `${styleMappingsPath(worldId)}/${encodeURIComponent(mappingId)}`;
+}
+
 export function listVoiceProfiles(
   worldId: string,
   filters: VoiceProfileFilters = {},
 ): Promise<VoiceProfile[]> {
   return adminRequest<VoiceProfile[]>(
-    `/api/worlds/${worldId}/speech/voice-profiles${query(filters)}`,
+    `${voiceProfilesPath(worldId)}${query(filters)}`,
     { method: "GET" },
   );
 }
 
 export function createVoiceProfile(worldId: string, input: VoiceProfileInput): Promise<VoiceProfile> {
-  return adminRequest<VoiceProfile>(`/api/worlds/${worldId}/speech/voice-profiles`, {
+  return adminRequest<VoiceProfile>(voiceProfilesPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -281,7 +309,7 @@ export function updateVoiceProfile(
   input: VoiceProfileUpdateInput,
 ): Promise<VoiceProfile> {
   return adminRequest<VoiceProfile>(
-    `/api/worlds/${worldId}/speech/voice-profiles/${voiceProfileId}`,
+    voiceProfilePath(worldId, voiceProfileId),
     {
       method: "PATCH",
       body: input,
@@ -291,7 +319,7 @@ export function updateVoiceProfile(
 }
 
 export function deleteVoiceProfile(worldId: string, voiceProfileId: string): Promise<void> {
-  return adminRequest<void>(`/api/worlds/${worldId}/speech/voice-profiles/${voiceProfileId}`, {
+  return adminRequest<void>(voiceProfilePath(worldId, voiceProfileId), {
     method: "DELETE",
     csrf: true,
   });
@@ -303,7 +331,7 @@ export function listAgentVoiceBindings(
   filters: VoiceProfileFilters = {},
 ): Promise<AgentVoiceProfileBinding[]> {
   return adminRequest<AgentVoiceProfileBinding[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/voice-profiles${query(filters)}`,
+    `${agentVoiceProfilesPath(worldId, agentId)}${query(filters)}`,
     { method: "GET" },
   );
 }
@@ -314,7 +342,7 @@ export function createAgentVoiceBinding(
   input: AgentVoiceProfileBindingInput,
 ): Promise<AgentVoiceProfileBinding> {
   return adminRequest<AgentVoiceProfileBinding>(
-    `/api/worlds/${worldId}/agents/${agentId}/voice-profiles`,
+    agentVoiceProfilesPath(worldId, agentId),
     {
       method: "POST",
       body: input,
@@ -329,7 +357,7 @@ export function deleteAgentVoiceBinding(
   bindingId: string,
 ): Promise<void> {
   return adminRequest<void>(
-    `/api/worlds/${worldId}/agents/${agentId}/voice-profiles/${bindingId}`,
+    `${agentVoiceProfilesPath(worldId, agentId)}/${encodeURIComponent(bindingId)}`,
     {
       method: "DELETE",
       csrf: true,
@@ -342,7 +370,7 @@ export function listStyleMappings(
   filters: StyleMappingFilters = {},
 ): Promise<SpeechStyleMapping[]> {
   return adminRequest<SpeechStyleMapping[]>(
-    `/api/worlds/${worldId}/speech/style-mappings${query(filters)}`,
+    `${styleMappingsPath(worldId)}${query(filters)}`,
     { method: "GET" },
   );
 }
@@ -351,7 +379,7 @@ export function createStyleMapping(
   worldId: string,
   input: SpeechStyleMappingInput,
 ): Promise<SpeechStyleMapping> {
-  return adminRequest<SpeechStyleMapping>(`/api/worlds/${worldId}/speech/style-mappings`, {
+  return adminRequest<SpeechStyleMapping>(styleMappingsPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -364,7 +392,7 @@ export function updateStyleMapping(
   input: SpeechStyleMappingUpdateInput,
 ): Promise<SpeechStyleMapping> {
   return adminRequest<SpeechStyleMapping>(
-    `/api/worlds/${worldId}/speech/style-mappings/${mappingId}`,
+    styleMappingPath(worldId, mappingId),
     {
       method: "PATCH",
       body: input,
@@ -374,7 +402,7 @@ export function updateStyleMapping(
 }
 
 export function deleteStyleMapping(worldId: string, mappingId: string): Promise<void> {
-  return adminRequest<void>(`/api/worlds/${worldId}/speech/style-mappings/${mappingId}`, {
+  return adminRequest<void>(styleMappingPath(worldId, mappingId), {
     method: "DELETE",
     csrf: true,
   });
@@ -385,13 +413,13 @@ export function listTranscripts(
   filters: TranscriptFilters = {},
 ): Promise<SpeechTranscript[]> {
   return adminRequest<SpeechTranscript[]>(
-    `/api/worlds/${worldId}/speech/transcripts${query(filters)}`,
+    `${speechPath(worldId)}/transcripts${query(filters)}`,
     { method: "GET" },
   );
 }
 
 export function runTTS(worldId: string, input: TTSInput): Promise<TTSResult> {
-  return adminRequest<TTSResult>(`/api/worlds/${worldId}/speech/tts`, {
+  return adminRequest<TTSResult>(`${speechPath(worldId)}/tts`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -399,7 +427,7 @@ export function runTTS(worldId: string, input: TTSInput): Promise<TTSResult> {
 }
 
 export function runSTT(worldId: string, input: STTInput): Promise<STTResult> {
-  return adminRequest<STTResult>(`/api/worlds/${worldId}/speech/stt`, {
+  return adminRequest<STTResult>(`${speechPath(worldId)}/stt`, {
     method: "POST",
     body: input,
     csrf: true,

@@ -121,6 +121,108 @@ describe("speech admin client", () => {
       expect((call[1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
     }
   });
+
+  it("encodes speech admin API identifier path segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(voiceProfile))
+      .mockResolvedValueOnce(jsonResponse(voiceProfile))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(agentBinding))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(styleMapping))
+      .mockResolvedValueOnce(jsonResponse(styleMapping))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([transcript]))
+      .mockResolvedValueOnce(jsonResponse(ttsResult))
+      .mockResolvedValueOnce(jsonResponse(sttResult));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/live?tab=speech#frag";
+    const agentId = "agent/main?voice=true#frag";
+    const voiceProfileId = "voice/main?kind=tts#frag";
+    const bindingId = "binding/default?role=voice#frag";
+    const mappingId = "mapping/happy?provider=openai#frag";
+
+    await listVoiceProfiles(worldId, { worldline_id: "worldline/live?branch=1#frag" });
+    await createVoiceProfile(worldId, {
+      worldline_id: "worldline-1",
+      profile_key: "akari",
+      display_name: "Akari voice",
+      status: "active",
+      visibility: "world_admin",
+      owner_kind: "agent",
+      owner_agent_id: agentId,
+      supported_languages: ["ja"],
+      voice_kind: "preset",
+      consent_status: "not_required",
+      usage_policy_json: {},
+      metadata_json: {},
+    });
+    await updateVoiceProfile(worldId, voiceProfileId, { display_name: "Akari saved" });
+    await deleteVoiceProfile(worldId, voiceProfileId);
+    await listAgentVoiceBindings(worldId, agentId, { worldline_id: "worldline/live?branch=1#frag" });
+    await createAgentVoiceBinding(worldId, agentId, {
+      worldline_id: "worldline-1",
+      voice_profile_id: voiceProfileId,
+      binding_role: "default",
+      priority: 100,
+      is_default: true,
+      style_overrides_json: {},
+    });
+    await deleteAgentVoiceBinding(worldId, agentId, bindingId);
+    await listStyleMappings(worldId, { provider_kind: "openai", emotion_key: "happy" });
+    await createStyleMapping(worldId, {
+      mapping_key: "openai-happy",
+      provider_kind: "openai",
+      emotion_key: "happy",
+      style_json: { voice: "alloy" },
+    });
+    await updateStyleMapping(worldId, mappingId, { style_json: { voice: "verse" } });
+    await deleteStyleMapping(worldId, mappingId);
+    await listTranscripts(worldId, { source_asset_id: "audio/live?take=1#frag" });
+    await runTTS(worldId, {
+      worldline_id: "worldline-1",
+      provider_id: "provider-tts",
+      voice_profile_id: voiceProfileId,
+      text: "hello",
+      style_overrides_json: {},
+      output_format: "wav",
+    });
+    await runSTT(worldId, {
+      worldline_id: "worldline-1",
+      provider_id: "provider-stt",
+      source_asset_id: "audio-1",
+      diarization: false,
+      timestamps: false,
+    });
+
+    const worldSegment = encodeURIComponent(worldId);
+    const agentSegment = encodeURIComponent(agentId);
+    const voiceSegment = encodeURIComponent(voiceProfileId);
+    const bindingSegment = encodeURIComponent(bindingId);
+    const mappingSegment = encodeURIComponent(mappingId);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/" + worldSegment + "/speech/voice-profiles?worldline_id=worldline%2Flive%3Fbranch%3D1%23frag",
+      "/api/worlds/" + worldSegment + "/speech/voice-profiles",
+      "/api/worlds/" + worldSegment + "/speech/voice-profiles/" + voiceSegment,
+      "/api/worlds/" + worldSegment + "/speech/voice-profiles/" + voiceSegment,
+      "/api/worlds/" + worldSegment + "/agents/" + agentSegment + "/voice-profiles?worldline_id=worldline%2Flive%3Fbranch%3D1%23frag",
+      "/api/worlds/" + worldSegment + "/agents/" + agentSegment + "/voice-profiles",
+      "/api/worlds/" + worldSegment + "/agents/" + agentSegment + "/voice-profiles/" + bindingSegment,
+      "/api/worlds/" + worldSegment + "/speech/style-mappings?provider_kind=openai&emotion_key=happy",
+      "/api/worlds/" + worldSegment + "/speech/style-mappings",
+      "/api/worlds/" + worldSegment + "/speech/style-mappings/" + mappingSegment,
+      "/api/worlds/" + worldSegment + "/speech/style-mappings/" + mappingSegment,
+      "/api/worlds/" + worldSegment + "/speech/transcripts?source_asset_id=audio%2Flive%3Ftake%3D1%23frag",
+      "/api/worlds/" + worldSegment + "/speech/tts",
+      "/api/worlds/" + worldSegment + "/speech/stt",
+    ]);
+  });
 });
 
 const voiceProfile = {

@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web speech admin API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin speech admin API path-boundary remediation for F-035.
+- Finding: F-035 found `web/lib/worlds/speech.ts` building speech voice profile, agent voice binding, style mapping, transcript, TTS, and STT helper URLs from decoded `worldId`, `agentId`, `voiceProfileId`, `bindingId`, and `mappingId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side speech admin API clients to preserve same-origin route boundaries, then encoded world, agent, voice profile, binding, and style mapping identifiers for speech collection/detail, agent voice binding, style mapping, transcript, TTS, and STT helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/speech.ts`, `web/lib/worlds/speech.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web speech helper coverage proving world, agent, voice profile, binding, and style mapping identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing speech helpers.
+- Verification: `npm run test -- lib/worlds/speech.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 143 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run check:next-env` passed; full `npm run test:e2e` was attempted and failed on the workspace/conversation e2e after 11 passed and 9 skipped, then the focused workspace/conversation rerun failed at a different runtime notice assertion, and a second focused rerun passed; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this speech-admin scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e instability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web provider integration API client path boundary entry
 
 - Date: 2026-06-09

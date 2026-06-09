@@ -855,3 +855,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-09 F-033 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and added focused coverage in `web/lib/worlds/client.test.ts`. Conversation same-origin API helper URLs now encode world and conversation identifier segments before issuing read and state-changing conversation requests.
 
 - 2026-06-09 F-034 kept existing Web provider integration client ownership in `web/lib/worlds/provider-integrations.ts` and added focused coverage in `web/lib/worlds/provider-integrations.test.ts`. Provider integration same-origin API helper URLs now encode world and provider identifier segments before issuing configuration, discovery, capability, health-check, history, and smoke-test requests.
+
+- 2026-06-09 F-035 kept existing Web speech admin client ownership in `web/lib/worlds/speech.ts` and focused coverage in `web/lib/worlds/speech.test.ts`. Speech admin same-origin API helper URLs now encode world, agent, voice profile, binding, and style mapping identifier segments before issuing voice profile, binding, style mapping, transcript, TTS, and STT requests.
