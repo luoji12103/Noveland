@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-041 Web core world API client path boundary remediation
 - Post-v1.1 RC audit F-040 Web server admin loader backend path boundary remediation
 - Post-v1.1 RC audit F-039 Web multimodal diagnostics API client path boundary remediation
 - Post-v1.1 RC audit F-038 Web invocation ledger API client path boundary remediation

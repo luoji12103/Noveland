@@ -189,12 +189,14 @@ import {
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
+  updateWorld,
   upsertAgentPresence,
   upsertEmotionalState,
   upsertKnowledgeFact,
   upsertReleaseProfile,
   upsertRouteAffinity,
   upsertWorldBible,
+  upsertPlayerSessionResume,
   listWorldlines,
 } from "@/lib/worlds/client";
 
@@ -550,6 +552,103 @@ describe("world client", () => {
       "/api/worlds/world-1/player-choices/preview",
       "/api/worlds/world-1/player-choices",
     ]);
+  });
+
+  it("encodes reserved characters in core world route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ id: worldId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "forked" }))
+      .mockResolvedValueOnce(jsonResponse({ base_worldline_id: baseWorldlineId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agendaId }))
+      .mockResolvedValueOnce(jsonResponse({ id: agendaId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: ruleId }))
+      .mockResolvedValueOnce(jsonResponse({ id: ruleId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "player-actor" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "resume" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ preview: true }))
+      .mockResolvedValueOnce(jsonResponse({ id: "choice" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateWorld(worldId, { name: "Renamed" });
+    await listWorldlines(worldId);
+    await forkWorldline(worldId, {
+      source_worldline_id: baseWorldlineId,
+      worldline_key: "core-route",
+      name: "Core Route",
+    });
+    await compareWorldlines(worldId, baseWorldlineId, compareWorldlineId);
+    await listGMAgendas(worldId, { worldline_id: worldlineId });
+    await createGMAgenda(worldId, { worldline_id: worldlineId, title: "Agenda", summary: "Summary" });
+    await updateGMAgenda(worldId, agendaId, { status: "paused" });
+    await listGMProposals(worldId, { status: "proposed", limit: 5 });
+    await createGMProposal(worldId, {
+      worldline_id: worldlineId,
+      title: "Proposal",
+      reason: "Reason",
+      event_name: "gm.route_beat",
+    });
+    await reviewGMProposal(worldId, proposalId, { status: "resolved" });
+    await draftLowRiskGMProposal(worldId, proposalId);
+    await listResolutionRules(worldId);
+    await createResolutionRule(worldId, { rule_key: "rule", name: "Rule" });
+    await updateResolutionRule(worldId, ruleId, { status: "inactive" });
+    await dryRunResolutionRule(worldId, ruleId, { worldline_id: worldlineId });
+    await listPlayerActors(worldId, { worldline_id: worldlineId, user_id: userId });
+    await bindPlayerActor(worldId, { display_name: "Player" });
+    await upsertPlayerSessionResume(worldId, {
+      worldline_id: worldlineId,
+      player_actor_id: "actor-1",
+    });
+    await listPlayerChoices(worldId, { worldline_id: worldlineId, user_id: userId, limit: 5 });
+    await previewPlayerChoiceConsequences(worldId, playerChoiceInput);
+    await recordPlayerChoice(worldId, playerChoiceInput);
+
+    const worldSegment = encodeURIComponent(worldId);
+    const baseSegment = encodeURIComponent(baseWorldlineId);
+    const compareSegment = encodeURIComponent(compareWorldlineId);
+    const agendaSegment = encodeURIComponent(agendaId);
+    const proposalSegment = encodeURIComponent(proposalId);
+    const ruleSegment = encodeURIComponent(ruleId);
+    const worldlineSegment = encodeURIComponent(worldlineId);
+    const userSegment = encodeURIComponent(userId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}`,
+      `/api/worlds/${worldSegment}/worldlines`,
+      `/api/worlds/${worldSegment}/worldlines/fork`,
+      `/api/worlds/${worldSegment}/worldlines/${baseSegment}/compare/${compareSegment}`,
+      `/api/worlds/${worldSegment}/gm/agendas?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/gm/agendas`,
+      `/api/worlds/${worldSegment}/gm/agendas/${agendaSegment}`,
+      `/api/worlds/${worldSegment}/gm/proposals?status=proposed&limit=5`,
+      `/api/worlds/${worldSegment}/gm/proposals`,
+      `/api/worlds/${worldSegment}/gm/proposals/${proposalSegment}/review`,
+      `/api/worlds/${worldSegment}/gm/proposals/${proposalSegment}/draft-low-risk`,
+      `/api/worlds/${worldSegment}/resolution-rules`,
+      `/api/worlds/${worldSegment}/resolution-rules`,
+      `/api/worlds/${worldSegment}/resolution-rules/${ruleSegment}`,
+      `/api/worlds/${worldSegment}/resolution-rules/${ruleSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/player-actors?worldline_id=${worldlineSegment}&user_id=${userSegment}`,
+      `/api/worlds/${worldSegment}/player-actors`,
+      `/api/worlds/${worldSegment}/player-sessions/resume`,
+      `/api/worlds/${worldSegment}/player-choices?worldline_id=${worldlineSegment}&user_id=${userSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/player-choices/preview`,
+      `/api/worlds/${worldSegment}/player-choices`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
   it("maps plot, route, and rumor flow requests", async () => {
@@ -1418,6 +1517,22 @@ describe("world client", () => {
     });
   });
 });
+
+const worldId = "world/core?admin=true#frag";
+const baseWorldlineId = "worldline/base?branch=1#frag";
+const compareWorldlineId = "worldline/compare?branch=2#frag";
+const worldlineId = "worldline/live?branch=main#frag";
+const agendaId = "agenda/gm?draft=true#frag";
+const proposalId = "proposal/gm?review=true#frag";
+const ruleId = "rule/resolution?dry=true#frag";
+const userId = "user/player?email=true#frag";
+const playerChoiceInput = {
+  player_actor_id: "actor/player?active=true#frag",
+  choice_key: "help",
+  choice_kind: "intervention" as const,
+  prompt: "Help?",
+  selected_option: "Yes",
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
