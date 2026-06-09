@@ -3799,3 +3799,16 @@
 - Tests added/updated: Added focused worlds client coverage proving reserved characters in knowledge/review world, worldline, agent, user, secret, and relationship repair identifiers stay inside encoded same-origin path segments and query filters remain query data.
 - Verification: `npm run test -- lib/worlds/client.test.ts` passed with 32 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 155 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
 - Follow-up notes: Continue Web/e2e audit for remaining helper groups in web/lib/worlds/client.ts, especially agent memory/persona/observations/runs, narrative artifacts, memberships, member candidates, and diagnostics, plus Next route handlers, proxy CSRF forwarding, response header behavior, and client-side rendering sinks. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web agent/narrative client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-048.
+- Finding: F-048 found browser-side agent memory, memory profile snapshot, agent run, agent persona, agent observation, manual agent run, narrative artifact, publish/unpublish, agent update, and agent deactivate helpers appending decoded world and nested identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for agent memory/run/persona/observation/narrative client route-boundary preservation, then encoded the scoped world, agent, run, and narrative artifact path segments while keeping narrative artifact filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in agent/narrative world, agent, run, artifact, and source conversation identifiers stay inside encoded same-origin path segments and query filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 33 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 156 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- Follow-up notes: Continue Web/e2e audit for remaining helper groups in web/lib/worlds/client.ts, especially memberships, member candidates, diagnostics, and any residual raw same-origin path construction, plus Next route handlers, proxy CSRF forwarding, response header behavior, and client-side rendering sinks. Do not push unless explicitly requested.

@@ -58,6 +58,7 @@ import {
   getExternalToolPolicy,
   getReleaseProfile,
   getLivingWorldDashboard,
+  getAgentMemoryProfileSnapshot,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
   getDailyLifePreview,
@@ -65,6 +66,7 @@ import {
   getAgentPresence,
   getNarrativeArtifact,
   createWorld,
+  deactivateAgent,
   deactivateAgentPreset,
   disableScheduleRule,
   deleteMemoryBackendProfile,
@@ -79,6 +81,7 @@ import {
   exportWorldComposition,
   executeGroupInteraction,
   forkWorldline,
+  forgetAgentMemory,
   getRuntimeControl,
   getRuntimeStatus,
   getScaleReadiness,
@@ -162,6 +165,7 @@ import {
   listProviderHealth,
   listPluginCatalog,
   runAgent,
+  refreshAgentMemoryProfileSnapshot,
   refreshAgentObservations,
   replaceConversationParticipants,
   resumeConversation,
@@ -1475,6 +1479,114 @@ describe("world client", () => {
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
+  it("encodes reserved characters in agent memory, run, persona, observation, narrative, and agent route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ backend: "memory", deleted_count: 1 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeRunId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "persona" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "persona" }))
+      .mockResolvedValueOnce(jsonResponse({ valid: true, issues: [] }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "observation" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "run" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeArtifactId }))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeArtifactId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "publication" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "publication" }))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeAgentId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId);
+    await searchAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId, {
+      query_text: "memory",
+      limit: 2,
+    });
+    await getAgentMemoryProfileSnapshot(agentNarrativeWorldId, agentNarrativeAgentId);
+    await refreshAgentMemoryProfileSnapshot(agentNarrativeWorldId, agentNarrativeAgentId);
+    await forgetAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId);
+    await listAgentRuns(agentNarrativeWorldId, agentNarrativeAgentId);
+    await getAgentRunDetail(agentNarrativeWorldId, agentNarrativeAgentId, agentNarrativeRunId);
+    await getAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId);
+    await updateAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId, {
+      persona_text: "Guide",
+    });
+    await validateAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId, {
+      persona_text: "Guide",
+    });
+    await listAgentObservations(agentNarrativeWorldId, agentNarrativeAgentId);
+    await createAgentObservation(agentNarrativeWorldId, agentNarrativeAgentId, {
+      observation_type: "memory",
+      content: "Observation",
+    });
+    await refreshAgentObservations(agentNarrativeWorldId, agentNarrativeAgentId);
+    await runAgent(agentNarrativeWorldId, agentNarrativeAgentId, {
+      prompt: "Run",
+    });
+    await listNarrativeArtifacts(agentNarrativeWorldId);
+    await listFilteredNarrativeArtifacts(agentNarrativeWorldId, {
+      source_conversation_id: agentNarrativeConversationId,
+      q: "artifact",
+      limit: 3,
+    });
+    await getNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId);
+    await createNarrativeArtifact(agentNarrativeWorldId, {
+      title: "Artifact",
+      content: "Body",
+    });
+    await publishNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId, {
+      reader_visible: true,
+    });
+    await unpublishNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId);
+    await updateAgent(agentNarrativeWorldId, agentNarrativeAgentId, {
+      display_name: "Guide",
+    });
+    await deactivateAgent(agentNarrativeWorldId, agentNarrativeAgentId);
+
+    const worldSegment = encodeURIComponent(agentNarrativeWorldId);
+    const agentSegment = encodeURIComponent(agentNarrativeAgentId);
+    const runSegment = encodeURIComponent(agentNarrativeRunId);
+    const artifactSegment = encodeURIComponent(agentNarrativeArtifactId);
+    const conversationSegment = encodeURIComponent(agentNarrativeConversationId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/search`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/profile-snapshot`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/profile-snapshot/refresh`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/forget`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/runs`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/runs/${runSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona/validate`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations/refresh`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/run`,
+      `/api/worlds/${worldSegment}/narrative-artifacts`,
+      `/api/worlds/${worldSegment}/narrative-artifacts?source_conversation_id=${conversationSegment}&q=artifact&limit=3`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}`,
+      `/api/worlds/${worldSegment}/narrative-artifacts`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}/publish`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}/unpublish`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[3][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("maps knowledge, player, and guardrail requests", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -2243,6 +2355,11 @@ const reviewGuardrailAgentId = "agent/review?role=true#frag";
 const reviewGuardrailUserId = "user/review?email=true#frag";
 const reviewGuardrailSecretId = "secret/reveal?hidden=true#frag";
 const reviewGuardrailRepairId = "repair/apply?status=true#frag";
+const agentNarrativeWorldId = "world/agent?admin=true#frag";
+const agentNarrativeAgentId = "agent/memory?role=true#frag";
+const agentNarrativeRunId = "run/detail?trace=true#frag";
+const agentNarrativeArtifactId = "artifact/story?publish=true#frag";
+const agentNarrativeConversationId = "conversation/source?q=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";

@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-09T15:35:00+08:00
+- Date: 2026-06-09T20:20:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-047 are remediated on this branch. No push performed.
+- Status: F-001 through F-048 are remediated on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-047 batch: 251b640 fix(web): encode event flow api path segments.
+- Current HEAD before F-048 batch: ae0b859 fix(web): encode review flow api path segments.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres is healthy on 55432->5432; Noveland NATS is healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch; project Playwright e2e used its own test server.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,31 +26,31 @@
 ## Completed This Batch
 
 - Reconfirmed realtime git/OpenSpec/service/test-entry status from the server before editing.
-- Continued the Web/e2e security audit after F-046.
-- Recorded and remediated F-047: browser-side knowledge, secret, emotional state, relationship repair, player journal, notification, intervention, player privacy, GM style review, and narrative continuity review helpers embedded decoded world and nested identifiers directly into same-origin API paths.
-- Added an architecture-contracts OpenSpec delta requiring knowledge/secret/player/privacy/review Web clients to preserve same-origin route templates with encoded dynamic segments and encoded query filters.
-- Encoded path segments in the scoped helper group in `web/lib/worlds/client.ts`: knowledge, secrets, secret reveal, emotional states, relationship repairs, repair apply, player journal, notifications, interventions, player privacy export/delete requests, GM style reviews, and narrative continuity reviews.
+- Continued the Web/e2e security audit after F-047.
+- Recorded and remediated F-048: browser-side agent memory, memory profile snapshot, agent run, agent persona, agent observation, manual agent run, narrative artifact, publish/unpublish, agent update, and agent deactivate helpers embedded decoded world and nested identifiers directly into same-origin API paths.
+- Added an architecture-contracts OpenSpec delta requiring agent/narrative Web clients to preserve same-origin route templates with encoded dynamic segments and encoded query filters.
+- Encoded path segments in the scoped helper group in `web/lib/worlds/client.ts`: agent memory list/search/profile snapshot/refresh/forget, agent run list/detail/manual run, persona get/update/validate, observations list/create/refresh, narrative artifact list/filter/detail/create/publish/unpublish, agent update, and agent deactivate.
 - Added focused Web worlds client tests proving reserved characters stay inside representative same-origin path segments and query values.
 - Restored `web/next-env.d.ts` after Playwright/Next dev regenerated it to `.next/dev/types/routes.d.ts`.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/worlds/client.test.ts`: 32 passed.
+- `cd web && npm run test -- lib/worlds/client.test.ts`: 33 passed.
 - `cd web && npm run typecheck`: passed.
 - `cd web && npm run lint`: passed.
-- `cd web && npm run test`: 45 files and 155 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `cd web && npm run test`: 45 files and 156 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
 - `cd web && npm run build`: passed.
 - `cd web && npm run test:e2e`: 21 passed.
 - `cd web && npm run check:next-env`: failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
 
 ## Remaining Work
 
-1. Continue Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this scoped F-047 batch, especially agent memory/persona/observation/run, narrative artifacts, memberships, member candidates, and diagnostics helpers.
+1. Continue Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this scoped F-048 batch, especially memberships, member candidates, diagnostics, and any residual raw same-origin path construction.
 2. Audit Next route handlers and API proxies for CSRF forwarding, method exposure, response header behavior, role boundary, evidence redaction, and client-side data leaks.
 3. Audit Web rendering and project Playwright/e2e coverage for XSS-prone sinks, admin/player/member boundary gaps, and normal-use product flow drift without browser/computer-use plugins.
 
-## Finding F-047
+## Finding F-048
 
-- Browser-side Web knowledge/secret/player/privacy/review API URL construction appended decoded world and nested identifiers directly to same-origin API paths.
-- The remediation encodes dynamic world, secret, and relationship repair path segments for the scoped helper group, while preserving filters as query data.
+- Browser-side Web agent/narrative API URL construction appended decoded world and nested identifiers directly to same-origin API paths.
+- The remediation encodes dynamic world, agent, run, and narrative artifact path segments for the scoped helper group, while preserving filters as query data.
 - Residual risk: remaining `web/lib/worlds/client.ts` helper groups outside this scope and Next route handlers still need separate evidence-based review before remediation.

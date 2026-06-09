@@ -533,3 +533,4 @@
 - Post-v1.1 RC audit F-045 Web story/route/ending/authoring/release/beta client path boundary hardening
 - Post-v1.1 RC audit F-046 Web event/episode/group/relationship/conflict/rumor/dashboard client path boundary hardening
 - Post-v1.1 RC audit F-047 Web knowledge/secret/player/privacy/review client path boundary hardening
+- Post-v1.1 RC audit F-048 Web agent memory/run/persona/narrative client path boundary hardening

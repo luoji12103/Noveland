@@ -320,3 +320,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+
+#### Scenario: Web client manages agent memory, persona, observation, run, and narrative artifact operations
+- **GIVEN** browser-side Web client code issues agent memory, memory profile snapshot, agent run, agent persona, agent observation, manual agent run, narrative artifact, publish/unpublish, agent update, or agent deactivate requests through same-origin API routes
+- **AND** the world identifier or nested agent, run, or narrative artifact identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

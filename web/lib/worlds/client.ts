@@ -1934,7 +1934,7 @@ export function createNarrativeContinuityReview(
 }
 
 export function listAgentMemory(worldId: string, agentId: string): Promise<MemoryItem[]> {
-  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
+  return worldRequest<MemoryItem[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory`, {
     method: "GET",
   });
 }
@@ -1944,7 +1944,7 @@ export function searchAgentMemory(
   agentId: string,
   input: MemorySearchInput,
 ): Promise<MemoryItem[]> {
-  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory/search`, {
+  return worldRequest<MemoryItem[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/search`, {
     method: "POST",
     body: input,
   });
@@ -1955,7 +1955,7 @@ export function getAgentMemoryProfileSnapshot(
   agentId: string,
 ): Promise<MemoryProfileSnapshot | null> {
   return worldRequest<MemoryProfileSnapshot | null>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/profile-snapshot`,
     { method: "GET" },
   );
 }
@@ -1965,7 +1965,7 @@ export function refreshAgentMemoryProfileSnapshot(
   agentId: string,
 ): Promise<MemoryProfileSnapshot> {
   return worldRequest<MemoryProfileSnapshot>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot/refresh`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/profile-snapshot/refresh`,
     {
       method: "POST",
       csrf: true,
@@ -1978,7 +1978,7 @@ export function forgetAgentMemory(
   agentId: string,
 ): Promise<{ backend: string; deleted_count: number | null }> {
   return worldRequest<{ backend: string; deleted_count: number | null }>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/forget`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/forget`,
     {
       method: "POST",
       csrf: true,
@@ -1987,7 +1987,7 @@ export function forgetAgentMemory(
 }
 
 export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRun[]> {
-  return worldRequest<AgentRun[]>(`/api/worlds/${worldId}/agents/${agentId}/runs`, {
+  return worldRequest<AgentRun[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/runs`, {
     method: "GET",
   });
 }
@@ -1998,13 +1998,13 @@ export function getAgentRunDetail(
   runId: string,
 ): Promise<AgentRunDetail> {
   return worldRequest<AgentRunDetail>(
-    `/api/worlds/${worldId}/agents/${agentId}/runs/${runId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/runs/${pathSegment(runId)}`,
     { method: "GET" },
   );
 }
 
 export function getAgentPersona(worldId: string, agentId: string): Promise<AgentPersona | null> {
-  return worldRequest<AgentPersona | null>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+  return worldRequest<AgentPersona | null>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona`, {
     method: "GET",
   });
 }
@@ -2014,7 +2014,7 @@ export function updateAgentPersona(
   agentId: string,
   input: AgentPersonaUpdateInput,
 ): Promise<AgentPersona> {
-  return worldRequest<AgentPersona>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+  return worldRequest<AgentPersona>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2027,7 +2027,7 @@ export function validateAgentPersona(
   input: AgentPersonaUpdateInput,
 ): Promise<PersonaPolicyValidation> {
   return worldRequest<PersonaPolicyValidation>(
-    `/api/worlds/${worldId}/agents/${agentId}/persona/validate`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona/validate`,
     {
       method: "POST",
       body: input,
@@ -2052,7 +2052,7 @@ export function listAgentObservations(
   worldId: string,
   agentId: string,
 ): Promise<AgentObservation[]> {
-  return worldRequest<AgentObservation[]>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+  return worldRequest<AgentObservation[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations`, {
     method: "GET",
   });
 }
@@ -2062,7 +2062,7 @@ export function createAgentObservation(
   agentId: string,
   input: AgentObservationCreateInput,
 ): Promise<AgentObservation> {
-  return worldRequest<AgentObservation>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+  return worldRequest<AgentObservation>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2074,7 +2074,7 @@ export function refreshAgentObservations(
   agentId: string,
 ): Promise<AgentObservation[]> {
   return worldRequest<AgentObservation[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/observations/refresh`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations/refresh`,
     {
       method: "POST",
       csrf: true,
@@ -2083,7 +2083,7 @@ export function refreshAgentObservations(
 }
 
 export function runAgent(worldId: string, agentId: string, input: AgentRunCreateInput): Promise<AgentRun> {
-  return worldRequest<AgentRun>(`/api/worlds/${worldId}/agents/${agentId}/run`, {
+  return worldRequest<AgentRun>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/run`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2091,7 +2091,7 @@ export function runAgent(worldId: string, agentId: string, input: AgentRunCreate
 }
 
 export function listNarrativeArtifacts(worldId: string): Promise<NarrativeArtifact[]> {
-  return worldRequest<NarrativeArtifact[]>(`/api/worlds/${worldId}/narrative-artifacts`, {
+  return worldRequest<NarrativeArtifact[]>(`${worldApiPath(worldId)}/narrative-artifacts`, {
     method: "GET",
   });
 }
@@ -2124,7 +2124,7 @@ export function listFilteredNarrativeArtifacts(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/narrative-artifacts${suffix}`,
+    `${worldApiPath(worldId)}/narrative-artifacts${suffix}`,
     {
       method: "GET",
     },
@@ -2135,7 +2135,7 @@ export function getNarrativeArtifact(
   worldId: string,
   artifactId: string,
 ): Promise<NarrativeArtifact> {
-  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts/${artifactId}`, {
+  return worldRequest<NarrativeArtifact>(`${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}`, {
     method: "GET",
   });
 }
@@ -2144,7 +2144,7 @@ export function createNarrativeArtifact(
   worldId: string,
   input: NarrativeArtifactCreateInput,
 ): Promise<NarrativeArtifact> {
-  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts`, {
+  return worldRequest<NarrativeArtifact>(`${worldApiPath(worldId)}/narrative-artifacts`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2157,7 +2157,7 @@ export function publishNarrativeArtifact(
   input: NarrativePublicationInput = {},
 ): Promise<NarrativePublication> {
   return worldRequest<NarrativePublication>(
-    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/publish`,
+    `${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}/publish`,
     {
       method: "POST",
       body: input,
@@ -2172,7 +2172,7 @@ export function unpublishNarrativeArtifact(
   input: NarrativePublicationInput = {},
 ): Promise<NarrativePublication> {
   return worldRequest<NarrativePublication>(
-    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/unpublish`,
+    `${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}/unpublish`,
     {
       method: "POST",
       body: input,
@@ -2194,7 +2194,7 @@ export function updateAgent(
   agentId: string,
   input: AgentUpdateInput,
 ): Promise<Agent> {
-  return worldRequest<Agent>(`/api/worlds/${worldId}/agents/${agentId}`, {
+  return worldRequest<Agent>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2202,7 +2202,7 @@ export function updateAgent(
 }
 
 export function deactivateAgent(worldId: string, agentId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}`, {
     method: "DELETE",
     csrf: true,
   });
