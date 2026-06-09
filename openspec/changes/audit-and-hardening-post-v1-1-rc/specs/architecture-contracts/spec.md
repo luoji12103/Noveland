@@ -303,3 +303,11 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web client manages event trigger, scene beat, episode, group, relationship, conflict, rumor, and dashboard operations
+- **GIVEN** browser-side Web client code issues event trigger condition, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, or living-world dashboard requests through same-origin API routes
+- **AND** the world identifier or nested condition, group interaction, relationship suggestion, organization conflict, or rumor propagation identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

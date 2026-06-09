@@ -871,4 +871,6 @@ If a coding agent created a structural path that is not listed here and did not 
 
 - 2026-06-09 F-044 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and focused coverage in `web/lib/worlds/client.test.ts`. Daily-life and offscreen-event same-origin API helper URLs now encode world identifier segments before issuing preview, generation, candidate, create, list, and resolve requests.
 
+- 2026-06-09 F-046 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and focused coverage in `web/lib/worlds/client.test.ts`. Event trigger condition, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, and living-world dashboard same-origin API helper URLs now encode world and nested condition/context/suggestion/conflict/propagation identifier segments before issuing read and state-changing requests.
+
 - 2026-06-09 F-045 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and focused coverage in `web/lib/worlds/client.test.ts`. Story, plot, route, ending, long-run eval, authoring template, release profile, and beta checklist same-origin API helper URLs now encode world and nested ending/template/checklist identifier segments before issuing read and state-changing requests.

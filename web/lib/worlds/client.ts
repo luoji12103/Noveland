@@ -1392,7 +1392,7 @@ export function listBetaChecklistItems(
 
 export function listEventTriggerConditions(worldId: string): Promise<EventTriggerCondition[]> {
   return worldRequest<EventTriggerCondition[]>(
-    `/api/worlds/${worldId}/event-trigger-conditions`,
+    `${worldApiPath(worldId)}/event-trigger-conditions`,
     { method: "GET" },
   );
 }
@@ -1402,7 +1402,7 @@ export function createEventTriggerCondition(
   input: EventTriggerConditionCreateInput,
 ): Promise<EventTriggerCondition> {
   return worldRequest<EventTriggerCondition>(
-    `/api/worlds/${worldId}/event-trigger-conditions`,
+    `${worldApiPath(worldId)}/event-trigger-conditions`,
     {
       method: "POST",
       body: input,
@@ -1417,7 +1417,7 @@ export function updateEventTriggerCondition(
   input: EventTriggerConditionUpdateInput,
 ): Promise<EventTriggerCondition> {
   return worldRequest<EventTriggerCondition>(
-    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}`,
+    `${worldApiPath(worldId)}/event-trigger-conditions/${pathSegment(conditionId)}`,
     {
       method: "PATCH",
       body: input,
@@ -1432,7 +1432,7 @@ export function dryRunEventTriggerCondition(
   filters: WorldlineScopedFilters = {},
 ): Promise<TriggerConditionDryRun> {
   return worldRequest<TriggerConditionDryRun>(
-    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}/dry-run${worldlineSuffix(
+    `${worldApiPath(worldId)}/event-trigger-conditions/${pathSegment(conditionId)}/dry-run${worldlineSuffix(
       filters,
     )}`,
     { method: "POST", csrf: true },
@@ -1444,7 +1444,7 @@ export function listSceneBeats(
   filters: WorldlineScopedFilters = {},
 ): Promise<SceneBeatDraft[]> {
   return worldRequest<SceneBeatDraft[]>(
-    `/api/worlds/${worldId}/scene-beats${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/scene-beats${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1453,7 +1453,7 @@ export function createSceneBeat(
   worldId: string,
   input: SceneBeatDraftCreateInput,
 ): Promise<SceneBeatDraft> {
-  return worldRequest<SceneBeatDraft>(`/api/worlds/${worldId}/scene-beats`, {
+  return worldRequest<SceneBeatDraft>(`${worldApiPath(worldId)}/scene-beats`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1465,7 +1465,7 @@ export function listDailyEpisodes(
   filters: WorldlineScopedFilters = {},
 ): Promise<DailyEpisodeDraft[]> {
   return worldRequest<DailyEpisodeDraft[]>(
-    `/api/worlds/${worldId}/daily-episodes${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/daily-episodes${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1474,7 +1474,7 @@ export function createDailyEpisode(
   worldId: string,
   input: DailyEpisodeDraftCreateInput,
 ): Promise<DailyEpisodeDraft> {
-  return worldRequest<DailyEpisodeDraft>(`/api/worlds/${worldId}/daily-episodes`, {
+  return worldRequest<DailyEpisodeDraft>(`${worldApiPath(worldId)}/daily-episodes`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1486,7 +1486,7 @@ export function listGroupInteractions(
   filters: WorldlineScopedFilters = {},
 ): Promise<GroupInteractionContext[]> {
   return worldRequest<GroupInteractionContext[]>(
-    `/api/worlds/${worldId}/group-interactions${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/group-interactions${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1495,7 +1495,7 @@ export function createGroupInteraction(
   worldId: string,
   input: GroupInteractionCreateInput,
 ): Promise<GroupInteractionContext> {
-  return worldRequest<GroupInteractionContext>(`/api/worlds/${worldId}/group-interactions`, {
+  return worldRequest<GroupInteractionContext>(`${worldApiPath(worldId)}/group-interactions`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1508,7 +1508,7 @@ export function executeGroupInteraction(
   input: GroupInteractionExecuteInput = {},
 ): Promise<GroupInteractionExecution> {
   return worldRequest<GroupInteractionExecution>(
-    `/api/worlds/${worldId}/group-interactions/${contextId}/execute`,
+    `${worldApiPath(worldId)}/group-interactions/${pathSegment(contextId)}/execute`,
     {
       method: "POST",
       body: input,
@@ -1522,7 +1522,7 @@ export function listRelationshipSuggestions(
   filters: WorldlineScopedFilters = {},
 ): Promise<RelationshipEventSuggestion[]> {
   return worldRequest<RelationshipEventSuggestion[]>(
-    `/api/worlds/${worldId}/relationship-suggestions${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/relationship-suggestions${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1537,7 +1537,7 @@ export function generateRelationshipSuggestions(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<RelationshipEventSuggestion[]>(
-    `/api/worlds/${worldId}/relationship-suggestions/generate${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/relationship-suggestions/generate${searchSuffix(search)}`,
     { method: "POST", csrf: true },
   );
 }
@@ -1548,7 +1548,7 @@ export function updateRelationshipSuggestion(
   input: RelationshipSuggestionUpdateInput,
 ): Promise<RelationshipEventSuggestion> {
   return worldRequest<RelationshipEventSuggestion>(
-    `/api/worlds/${worldId}/relationship-suggestions/${suggestionId}`,
+    `${worldApiPath(worldId)}/relationship-suggestions/${pathSegment(suggestionId)}`,
     {
       method: "PATCH",
       body: input,
@@ -1562,7 +1562,7 @@ export function listOrganizationConflicts(
   filters: WorldlineScopedFilters = {},
 ): Promise<OrganizationConflict[]> {
   return worldRequest<OrganizationConflict[]>(
-    `/api/worlds/${worldId}/organization-conflicts${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/organization-conflicts${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1571,7 +1571,7 @@ export function createOrganizationConflict(
   worldId: string,
   input: OrganizationConflictCreateInput,
 ): Promise<OrganizationConflict> {
-  return worldRequest<OrganizationConflict>(`/api/worlds/${worldId}/organization-conflicts`, {
+  return worldRequest<OrganizationConflict>(`${worldApiPath(worldId)}/organization-conflicts`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1583,7 +1583,7 @@ export function resolveOrganizationConflict(
   conflictId: string,
 ): Promise<OrganizationConflict> {
   return worldRequest<OrganizationConflict>(
-    `/api/worlds/${worldId}/organization-conflicts/${conflictId}/resolve`,
+    `${worldApiPath(worldId)}/organization-conflicts/${pathSegment(conflictId)}/resolve`,
     { method: "POST", csrf: true },
   );
 }
@@ -1593,13 +1593,13 @@ export function listRumors(
   filters: WorldlineScopedFilters = {},
 ): Promise<Rumor[]> {
   return worldRequest<Rumor[]>(
-    `/api/worlds/${worldId}/rumors${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/rumors${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
 
 export function createRumor(worldId: string, input: RumorCreateInput): Promise<Rumor> {
-  return worldRequest<Rumor>(`/api/worlds/${worldId}/rumors`, {
+  return worldRequest<Rumor>(`${worldApiPath(worldId)}/rumors`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1611,7 +1611,7 @@ export function listRumorPropagations(
   filters: WorldlineScopedFilters = {},
 ): Promise<RumorPropagation[]> {
   return worldRequest<RumorPropagation[]>(
-    `/api/worlds/${worldId}/rumor-propagations${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/rumor-propagations${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1620,7 +1620,7 @@ export function createRumorPropagation(
   worldId: string,
   input: RumorPropagationCreateInput,
 ): Promise<RumorPropagation> {
-  return worldRequest<RumorPropagation>(`/api/worlds/${worldId}/rumor-propagations`, {
+  return worldRequest<RumorPropagation>(`${worldApiPath(worldId)}/rumor-propagations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1632,7 +1632,7 @@ export function deliverRumorPropagation(
   propagationId: string,
 ): Promise<RumorPropagation> {
   return worldRequest<RumorPropagation>(
-    `/api/worlds/${worldId}/rumor-propagations/${propagationId}/deliver`,
+    `${worldApiPath(worldId)}/rumor-propagations/${pathSegment(propagationId)}/deliver`,
     { method: "POST", csrf: true },
   );
 }
@@ -1642,7 +1642,7 @@ export function getLivingWorldDashboard(
   filters: WorldlineScopedFilters = {},
 ): Promise<LivingWorldDashboard> {
   return worldRequest<LivingWorldDashboard>(
-    `/api/worlds/${worldId}/living-world-dashboard${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/living-world-dashboard${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }

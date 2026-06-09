@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web event/episode/group/relationship/conflict/rumor/dashboard API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin event trigger, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, and living-world dashboard API path-boundary remediation for F-046.
+- Finding: F-046 found `web/lib/worlds/client.ts` building event trigger condition, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, and living-world dashboard helper URLs from decoded `worldId` and nested identifier values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring these browser-side Web helpers to preserve same-origin route boundaries, then encoded world, condition, group context, relationship suggestion, organization conflict, and rumor propagation identifiers for the scoped helper group. Existing worldline filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, worldline, condition, group context, relationship suggestion, organization conflict, and rumor propagation identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 31 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 154 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this event/episode/group/relationship/conflict/rumor/dashboard scope, especially knowledge, secrets, emotional states, relationship repairs, player journal/notifications/interventions, reviews, agent memory/persona/observation/run, narrative artifacts, memberships, member candidates, and diagnostics helpers, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web organization/agent/calendar/schedule API client path boundary entry
 
 - Date: 2026-06-09

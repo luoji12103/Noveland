@@ -886,6 +886,120 @@ describe("world client", () => {
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
+  it("encodes reserved characters in event, episode, group, relationship, conflict, rumor, and dashboard route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConditionId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConditionId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "beat" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "episode" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowContextId }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "conversation" } }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowSuggestionId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConflictId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConflictId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "rumor" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowPropagationId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowPropagationId }))
+      .mockResolvedValueOnce(jsonResponse({ worldline_id: eventFlowWorldlineId }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listEventTriggerConditions(eventFlowWorldId);
+    await createEventTriggerCondition(eventFlowWorldId, { condition_key: "event", name: "Event" });
+    await updateEventTriggerCondition(eventFlowWorldId, eventFlowConditionId, { status: "inactive" });
+    await dryRunEventTriggerCondition(eventFlowWorldId, eventFlowConditionId, {
+      worldline_id: eventFlowWorldlineId,
+    });
+    await listSceneBeats(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createSceneBeat(eventFlowWorldId, { title: "Beat" });
+    await listDailyEpisodes(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createDailyEpisode(eventFlowWorldId, { title: "Episode" });
+    await listGroupInteractions(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createGroupInteraction(eventFlowWorldId, {
+      context_key: "group",
+      title: "Group",
+      interaction_type: "club",
+    });
+    await executeGroupInteraction(eventFlowWorldId, eventFlowContextId, {
+      session_key: "group-session",
+    });
+    await listRelationshipSuggestions(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await generateRelationshipSuggestions(eventFlowWorldId, {
+      worldline_id: eventFlowWorldlineId,
+      limit: 5,
+    });
+    await updateRelationshipSuggestion(eventFlowWorldId, eventFlowSuggestionId, {
+      status: "accepted",
+    });
+    await listOrganizationConflicts(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createOrganizationConflict(eventFlowWorldId, {
+      organization_id: "org-1",
+      title: "Conflict",
+      summary: "Conflict summary",
+    });
+    await resolveOrganizationConflict(eventFlowWorldId, eventFlowConflictId);
+    await listRumors(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createRumor(eventFlowWorldId, {
+      rumor_key: "rumor",
+      title: "Rumor",
+      content: "Rumor content",
+    });
+    await listRumorPropagations(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createRumorPropagation(eventFlowWorldId, {
+      rumor_id: "rumor-1",
+      propagation_reason: "Shared",
+    });
+    await deliverRumorPropagation(eventFlowWorldId, eventFlowPropagationId);
+    await getLivingWorldDashboard(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+
+    const worldSegment = encodeURIComponent(eventFlowWorldId);
+    const worldlineSegment = encodeURIComponent(eventFlowWorldlineId);
+    const conditionSegment = encodeURIComponent(eventFlowConditionId);
+    const contextSegment = encodeURIComponent(eventFlowContextId);
+    const suggestionSegment = encodeURIComponent(eventFlowSuggestionId);
+    const conflictSegment = encodeURIComponent(eventFlowConflictId);
+    const propagationSegment = encodeURIComponent(eventFlowPropagationId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/event-trigger-conditions`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions/${conditionSegment}`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions/${conditionSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/scene-beats?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/scene-beats`,
+      `/api/worlds/${worldSegment}/daily-episodes?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/daily-episodes`,
+      `/api/worlds/${worldSegment}/group-interactions?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/group-interactions`,
+      `/api/worlds/${worldSegment}/group-interactions/${contextSegment}/execute`,
+      `/api/worlds/${worldSegment}/relationship-suggestions?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/relationship-suggestions/generate?worldline_id=${worldlineSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/relationship-suggestions/${suggestionSegment}`,
+      `/api/worlds/${worldSegment}/organization-conflicts?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/organization-conflicts`,
+      `/api/worlds/${worldSegment}/organization-conflicts/${conflictSegment}/resolve`,
+      `/api/worlds/${worldSegment}/rumors?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/rumors`,
+      `/api/worlds/${worldSegment}/rumor-propagations?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/rumor-propagations`,
+      `/api/worlds/${worldSegment}/rumor-propagations/${propagationSegment}/deliver`,
+      `/api/worlds/${worldSegment}/living-world-dashboard?worldline_id=${worldlineSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("encodes reserved characters in clock, replay, and scene route segments", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -1949,6 +2063,13 @@ const storyRouteAgentId = "agent/story?role=true#frag";
 const storyRouteEndingId = "ending/normal?dry=true#frag";
 const storyRouteTemplateId = "template/source?preview=true#frag";
 const storyRouteChecklistRunId = "checklist/beta?items=true#frag";
+const eventFlowWorldId = "world/event?admin=true#frag";
+const eventFlowWorldlineId = "worldline/event?branch=true#frag";
+const eventFlowConditionId = "condition/event?dry=true#frag";
+const eventFlowContextId = "group/context?execute=true#frag";
+const eventFlowSuggestionId = "suggestion/relation?accept=true#frag";
+const eventFlowConflictId = "conflict/org?resolve=true#frag";
+const eventFlowPropagationId = "propagation/rumor?deliver=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";
