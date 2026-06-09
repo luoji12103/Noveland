@@ -559,11 +559,11 @@ export function deactivateAgentPreset(presetId: string): Promise<void> {
 }
 
 export function getWorldClock(worldId: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock`, { method: "GET" });
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock`, { method: "GET" });
 }
 
 export function pauseWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/pause`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/pause`, {
     method: "POST",
     body: reason === undefined ? {} : { reason },
     csrf: true,
@@ -575,7 +575,7 @@ export function resumeWorldClock(
   speed_multiplier?: string,
   reason?: string,
 ): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/resume`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/resume`, {
     method: "POST",
     body: {
       ...(speed_multiplier === undefined || speed_multiplier === "" ? {} : { speed_multiplier }),
@@ -586,7 +586,7 @@ export function resumeWorldClock(
 }
 
 export function advanceWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/advance`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/advance`, {
     method: "POST",
     body: reason === undefined ? {} : { reason },
     csrf: true,
@@ -598,7 +598,7 @@ export function skipWorldClock(
   target_world_time: string,
   reason?: string,
 ): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/skip`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/skip`, {
     method: "POST",
     body: { target_world_time, ...(reason === undefined ? {} : { reason }) },
     csrf: true,
@@ -607,7 +607,7 @@ export function skipWorldClock(
 
 export function listClockTransitions(worldId: string, limit = 20): Promise<WorldClockTransition[]> {
   return worldRequest<WorldClockTransition[]>(
-    `/api/worlds/${worldId}/clock/transitions?limit=${encodeURIComponent(String(limit))}`,
+    `${worldApiPath(worldId)}/clock/transitions?limit=${encodeURIComponent(String(limit))}`,
     { method: "GET" },
   );
 }
@@ -616,7 +616,7 @@ export function getReplayState(
   worldId: string,
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldReplayState> {
-  return worldRequest<WorldReplayState>(`/api/worlds/${worldId}/replay/state${worldlineSuffix(filters)}`, {
+  return worldRequest<WorldReplayState>(`${worldApiPath(worldId)}/replay/state${worldlineSuffix(filters)}`, {
     method: "GET",
   });
 }
@@ -626,7 +626,7 @@ export function getLatestSnapshot(
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshot | null> {
   return worldRequest<WorldSnapshot | null>(
-    `/api/worlds/${worldId}/snapshots/latest${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/snapshots/latest${worldlineSuffix(filters)}`,
     {
       method: "GET",
     },
@@ -637,7 +637,7 @@ export function createSnapshot(
   worldId: string,
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshot> {
-  return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots${worldlineSuffix(filters)}`, {
+  return worldRequest<WorldSnapshot>(`${worldApiPath(worldId)}/snapshots${worldlineSuffix(filters)}`, {
     method: "POST",
     csrf: true,
   });
@@ -648,7 +648,7 @@ export function getSnapshotIntegrity(
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshotIntegrity> {
   return worldRequest<WorldSnapshotIntegrity>(
-    `/api/worlds/${worldId}/snapshots/integrity${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/snapshots/integrity${worldlineSuffix(filters)}`,
     {
       method: "GET",
     },
@@ -686,17 +686,17 @@ export function listWorldEvents(
     search.set("limit", String(filters.limit));
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
-  return worldRequest<WorldEventAuditEntry[]>(`/api/worlds/${worldId}/events${suffix}`, {
+  return worldRequest<WorldEventAuditEntry[]>(`${worldApiPath(worldId)}/events${suffix}`, {
     method: "GET",
   });
 }
 
 export function listScenes(worldId: string): Promise<Scene[]> {
-  return worldRequest<Scene[]>(`/api/worlds/${worldId}/scenes`, { method: "GET" });
+  return worldRequest<Scene[]>(`${worldApiPath(worldId)}/scenes`, { method: "GET" });
 }
 
 export function createScene(worldId: string, input: SceneCreateInput): Promise<Scene> {
-  return worldRequest<Scene>(`/api/worlds/${worldId}/scenes`, {
+  return worldRequest<Scene>(`${worldApiPath(worldId)}/scenes`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -708,7 +708,7 @@ export function updateScene(
   sceneId: string,
   input: SceneUpdateInput,
 ): Promise<Scene> {
-  return worldRequest<Scene>(`/api/worlds/${worldId}/scenes/${sceneId}`, {
+  return worldRequest<Scene>(`${worldApiPath(worldId)}/scenes/${pathSegment(sceneId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -716,14 +716,14 @@ export function updateScene(
 }
 
 export function deactivateScene(worldId: string, sceneId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/scenes/${sceneId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/scenes/${pathSegment(sceneId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
 export function listLocationEdges(worldId: string): Promise<SceneLocationEdge[]> {
-  return worldRequest<SceneLocationEdge[]>(`/api/worlds/${worldId}/location-edges`, {
+  return worldRequest<SceneLocationEdge[]>(`${worldApiPath(worldId)}/location-edges`, {
     method: "GET",
   });
 }
@@ -732,7 +732,7 @@ export function createLocationEdge(
   worldId: string,
   input: SceneLocationEdgeCreateInput,
 ): Promise<SceneLocationEdge> {
-  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges`, {
+  return worldRequest<SceneLocationEdge>(`${worldApiPath(worldId)}/location-edges`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -744,7 +744,7 @@ export function updateLocationEdge(
   edgeId: string,
   input: SceneLocationEdgeUpdateInput,
 ): Promise<SceneLocationEdge> {
-  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges/${edgeId}`, {
+  return worldRequest<SceneLocationEdge>(`${worldApiPath(worldId)}/location-edges/${pathSegment(edgeId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,

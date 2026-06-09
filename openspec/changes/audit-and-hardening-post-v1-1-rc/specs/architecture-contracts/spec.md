@@ -270,3 +270,11 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web client manages clock, replay, and scene graph operations
+- **GIVEN** browser-side Web client code issues world clock, replay, snapshot, event audit, scene, or location-edge requests through same-origin API routes
+- **AND** the world identifier or nested scene/location-edge identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   advanceConversation,
+  advanceWorldClock,
   applyAuthoringTemplate,
   applyRelationshipRepair,
   cancelAgentCalendarEntry,
@@ -42,6 +43,7 @@ import {
   createSnapshot,
   createRumor,
   createRumorPropagation,
+  createScene,
   createSceneBeat,
   createSecret,
   createStoryHook,
@@ -83,6 +85,7 @@ import {
   getReplayState,
   getSnapshotIntegrity,
   getWorldBible,
+  getWorldClock,
   generateDailyLifeCandidates,
   listAuthoringTemplates,
   listBetaChecklistItems,
@@ -121,6 +124,7 @@ import {
   listNotifications,
   listSecrets,
   listSceneBeats,
+  listScenes,
   listStoryHooks,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
@@ -189,6 +193,7 @@ import {
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
+  updateScene,
   updateWorld,
   upsertAgentPresence,
   upsertEmotionalState,
@@ -552,6 +557,88 @@ describe("world client", () => {
       "/api/worlds/world-1/player-choices/preview",
       "/api/worlds/world-1/player-choices",
     ]);
+  });
+
+  it("encodes reserved characters in clock, replay, and scene route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "paused" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ source_sequence: 1 }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphSceneId }))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphSceneId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphEdgeId }))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphEdgeId }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getWorldClock(sceneGraphWorldId);
+    await pauseWorldClock(sceneGraphWorldId, "pause");
+    await resumeWorldClock(sceneGraphWorldId, "2", "resume");
+    await advanceWorldClock(sceneGraphWorldId, "advance");
+    await skipWorldClock(sceneGraphWorldId, "2030-01-01T00:00:00Z");
+    await listClockTransitions(sceneGraphWorldId, 5);
+    await getReplayState(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await getLatestSnapshot(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await createSnapshot(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await getSnapshotIntegrity(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await listWorldEvents(sceneGraphWorldId, {
+      worldline_id: sceneGraphWorldlineId,
+      event_name: "agent.run_succeeded?debug=true#frag",
+      actor_ref: sceneGraphActorRef,
+      limit: 5,
+    });
+    await listScenes(sceneGraphWorldId);
+    await createScene(sceneGraphWorldId, { scene_key: "scene", name: "Scene" });
+    await updateScene(sceneGraphWorldId, sceneGraphSceneId, { name: "Updated" });
+    await deactivateScene(sceneGraphWorldId, sceneGraphSceneId);
+    await listLocationEdges(sceneGraphWorldId);
+    await createLocationEdge(sceneGraphWorldId, {
+      source_scene_id: sceneGraphSceneId,
+      target_scene_id: "scene-target",
+    });
+    await updateLocationEdge(sceneGraphWorldId, sceneGraphEdgeId, { travel_label: "Path" });
+
+    const worldSegment = encodeURIComponent(sceneGraphWorldId);
+    const sceneSegment = encodeURIComponent(sceneGraphSceneId);
+    const edgeSegment = encodeURIComponent(sceneGraphEdgeId);
+    const worldlineSegment = encodeURIComponent(sceneGraphWorldlineId);
+    const actorSegment = encodeURIComponent(sceneGraphActorRef);
+    const eventSegment = encodeURIComponent("agent.run_succeeded?debug=true#frag");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/clock`,
+      `/api/worlds/${worldSegment}/clock/pause`,
+      `/api/worlds/${worldSegment}/clock/resume`,
+      `/api/worlds/${worldSegment}/clock/advance`,
+      `/api/worlds/${worldSegment}/clock/skip`,
+      `/api/worlds/${worldSegment}/clock/transitions?limit=5`,
+      `/api/worlds/${worldSegment}/replay/state?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots/latest?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots/integrity?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/events?worldline_id=${worldlineSegment}&event_name=${eventSegment}&actor_ref=${actorSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/scenes`,
+      `/api/worlds/${worldSegment}/scenes`,
+      `/api/worlds/${worldSegment}/scenes/${sceneSegment}`,
+      `/api/worlds/${worldSegment}/scenes/${sceneSegment}`,
+      `/api/worlds/${worldSegment}/location-edges`,
+      `/api/worlds/${worldSegment}/location-edges`,
+      `/api/worlds/${worldSegment}/location-edges/${edgeSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
   it("encodes reserved characters in core world route segments", async () => {
@@ -1518,6 +1605,11 @@ describe("world client", () => {
   });
 });
 
+const sceneGraphWorldId = "world/scene?clock=true#frag";
+const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
+const sceneGraphSceneId = "scene/location?active=true#frag";
+const sceneGraphEdgeId = "edge/location?active=true#frag";
+const sceneGraphActorRef = "agent/guide?role=narrator#frag";
 const worldId = "world/core?admin=true#frag";
 const baseWorldlineId = "worldline/base?branch=1#frag";
 const compareWorldlineId = "worldline/compare?branch=2#frag";
