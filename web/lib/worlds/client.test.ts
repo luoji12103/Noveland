@@ -34,6 +34,8 @@ import {
   createOrganizationMembership,
   createAgentPreset,
   createPlayerJournalEntry,
+  createPlayerDeleteRequest,
+  createPlayerPrivacyExport,
   createPlotThread,
   createProviderProfile,
   createRelationshipRepair,
@@ -1308,6 +1310,171 @@ describe("world client", () => {
     ]);
   });
 
+  it("encodes reserved characters in knowledge, secret, repair, player, privacy, and review route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "knowledge" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailSecretId }))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailSecretId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "emotion" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailRepairId }))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailRepairId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "journal" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "notification" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "intervention" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "export" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "delete-request" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "gm-style-review" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "continuity-review" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listKnowledgeFacts(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      agent_id: reviewGuardrailAgentId,
+      limit: 5,
+    });
+    await upsertKnowledgeFact(reviewGuardrailWorldId, {
+      agent_id: reviewGuardrailAgentId,
+      fact_key: "knowledge",
+      content: "Knowledge",
+    });
+    await listSecrets(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "hidden",
+      limit: 4,
+    });
+    await createSecret(reviewGuardrailWorldId, {
+      secret_key: "secret",
+      title: "Secret",
+      content: "Secret content",
+    });
+    await revealSecret(reviewGuardrailWorldId, reviewGuardrailSecretId);
+    await listEmotionalStates(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      agent_id: reviewGuardrailAgentId,
+    });
+    await upsertEmotionalState(reviewGuardrailWorldId, {
+      agent_id: reviewGuardrailAgentId,
+      mood: "tense",
+    });
+    await listRelationshipRepairs(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "proposed",
+      limit: 3,
+    });
+    await createRelationshipRepair(reviewGuardrailWorldId, {
+      relationship_id: "relationship-1",
+      repair_kind: "apology",
+      reason: "Repair",
+    });
+    await applyRelationshipRepair(reviewGuardrailWorldId, reviewGuardrailRepairId);
+    await listPlayerJournal(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      user_id: reviewGuardrailUserId,
+      limit: 2,
+    });
+    await createPlayerJournalEntry(reviewGuardrailWorldId, {
+      entry_kind: "event",
+      title: "Journal",
+      body: "Body",
+    });
+    await listNotifications(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "unread",
+      limit: 6,
+    });
+    await createNotification(reviewGuardrailWorldId, {
+      notification_kind: "rumor",
+      title: "Notice",
+      body: "Body",
+    });
+    await listInterventions(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      user_id: reviewGuardrailUserId,
+      status: "recorded",
+      limit: 7,
+    });
+    await createIntervention(reviewGuardrailWorldId, {
+      player_actor_id: "actor-1",
+      intervention_kind: "contact",
+      prompt: "Prompt",
+    });
+    await createPlayerPrivacyExport(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      target_ref_kind: "player_profile",
+      target_ref_id: "actor-1",
+      reason: "Export",
+    });
+    await createPlayerDeleteRequest(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      target_ref_kind: "player_profile",
+      target_ref_id: "actor-1",
+      reason: "Delete",
+    });
+    await listGMStyleReviews(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "warning",
+      limit: 8,
+    });
+    await createGMStyleReview(reviewGuardrailWorldId, {
+      source_kind: "manual",
+      reviewed_text: "Review",
+    });
+    await listNarrativeContinuityReviews(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "warning",
+      limit: 9,
+    });
+    await createNarrativeContinuityReview(reviewGuardrailWorldId, {
+      source_kind: "manual",
+      reviewed_text: "Continuity",
+    });
+
+    const worldSegment = encodeURIComponent(reviewGuardrailWorldId);
+    const worldlineSegment = encodeURIComponent(reviewGuardrailWorldlineId);
+    const agentSegment = encodeURIComponent(reviewGuardrailAgentId);
+    const userSegment = encodeURIComponent(reviewGuardrailUserId);
+    const secretSegment = encodeURIComponent(reviewGuardrailSecretId);
+    const repairSegment = encodeURIComponent(reviewGuardrailRepairId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/knowledge?worldline_id=${worldlineSegment}&agent_id=${agentSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/knowledge`,
+      `/api/worlds/${worldSegment}/secrets?worldline_id=${worldlineSegment}&status=hidden&limit=4`,
+      `/api/worlds/${worldSegment}/secrets`,
+      `/api/worlds/${worldSegment}/secrets/${secretSegment}/reveal`,
+      `/api/worlds/${worldSegment}/emotional-states?worldline_id=${worldlineSegment}&agent_id=${agentSegment}`,
+      `/api/worlds/${worldSegment}/emotional-states`,
+      `/api/worlds/${worldSegment}/relationship-repairs?worldline_id=${worldlineSegment}&status=proposed&limit=3`,
+      `/api/worlds/${worldSegment}/relationship-repairs`,
+      `/api/worlds/${worldSegment}/relationship-repairs/${repairSegment}/apply`,
+      `/api/worlds/${worldSegment}/player-journal?worldline_id=${worldlineSegment}&user_id=${userSegment}&limit=2`,
+      `/api/worlds/${worldSegment}/player-journal`,
+      `/api/worlds/${worldSegment}/notifications?worldline_id=${worldlineSegment}&status=unread&limit=6`,
+      `/api/worlds/${worldSegment}/notifications`,
+      `/api/worlds/${worldSegment}/interventions?worldline_id=${worldlineSegment}&user_id=${userSegment}&status=recorded&limit=7`,
+      `/api/worlds/${worldSegment}/interventions`,
+      `/api/worlds/${worldSegment}/player/privacy/export`,
+      `/api/worlds/${worldSegment}/player/privacy/delete-requests`,
+      `/api/worlds/${worldSegment}/gm-style-reviews?worldline_id=${worldlineSegment}&status=warning&limit=8`,
+      `/api/worlds/${worldSegment}/gm-style-reviews`,
+      `/api/worlds/${worldSegment}/narrative-continuity-reviews?worldline_id=${worldlineSegment}&status=warning&limit=9`,
+      `/api/worlds/${worldSegment}/narrative-continuity-reviews`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("maps knowledge, player, and guardrail requests", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -2070,6 +2237,12 @@ const eventFlowContextId = "group/context?execute=true#frag";
 const eventFlowSuggestionId = "suggestion/relation?accept=true#frag";
 const eventFlowConflictId = "conflict/org?resolve=true#frag";
 const eventFlowPropagationId = "propagation/rumor?deliver=true#frag";
+const reviewGuardrailWorldId = "world/review?admin=true#frag";
+const reviewGuardrailWorldlineId = "worldline/review?branch=true#frag";
+const reviewGuardrailAgentId = "agent/review?role=true#frag";
+const reviewGuardrailUserId = "user/review?email=true#frag";
+const reviewGuardrailSecretId = "secret/reveal?hidden=true#frag";
+const reviewGuardrailRepairId = "repair/apply?status=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";

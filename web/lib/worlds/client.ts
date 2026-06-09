@@ -1658,7 +1658,7 @@ export function listKnowledgeFacts(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<CharacterKnowledgeFact[]>(
-    `/api/worlds/${worldId}/knowledge${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/knowledge${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1667,7 +1667,7 @@ export function upsertKnowledgeFact(
   worldId: string,
   input: KnowledgeFactUpsertInput,
 ): Promise<CharacterKnowledgeFact> {
-  return worldRequest<CharacterKnowledgeFact>(`/api/worlds/${worldId}/knowledge`, {
+  return worldRequest<CharacterKnowledgeFact>(`${worldApiPath(worldId)}/knowledge`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1684,13 +1684,13 @@ export function listSecrets(
   if (filters.limit !== undefined) {
     search.set("limit", String(filters.limit));
   }
-  return worldRequest<SecretRecord[]>(`/api/worlds/${worldId}/secrets${searchSuffix(search)}`, {
+  return worldRequest<SecretRecord[]>(`${worldApiPath(worldId)}/secrets${searchSuffix(search)}`, {
     method: "GET",
   });
 }
 
 export function createSecret(worldId: string, input: SecretCreateInput): Promise<SecretRecord> {
-  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets`, {
+  return worldRequest<SecretRecord>(`${worldApiPath(worldId)}/secrets`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1698,7 +1698,7 @@ export function createSecret(worldId: string, input: SecretCreateInput): Promise
 }
 
 export function revealSecret(worldId: string, secretId: string): Promise<SecretRecord> {
-  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets/${secretId}/reveal`, {
+  return worldRequest<SecretRecord>(`${worldApiPath(worldId)}/secrets/${pathSegment(secretId)}/reveal`, {
     method: "POST",
     csrf: true,
   });
@@ -1712,7 +1712,7 @@ export function listEmotionalStates(
   appendOptional(search, "worldline_id", filters.worldline_id);
   appendOptional(search, "agent_id", filters.agent_id);
   return worldRequest<CharacterEmotionalState[]>(
-    `/api/worlds/${worldId}/emotional-states${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/emotional-states${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1721,7 +1721,7 @@ export function upsertEmotionalState(
   worldId: string,
   input: EmotionalStateUpsertInput,
 ): Promise<CharacterEmotionalState> {
-  return worldRequest<CharacterEmotionalState>(`/api/worlds/${worldId}/emotional-states`, {
+  return worldRequest<CharacterEmotionalState>(`${worldApiPath(worldId)}/emotional-states`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1739,7 +1739,7 @@ export function listRelationshipRepairs(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<RelationshipRepairRecord[]>(
-    `/api/worlds/${worldId}/relationship-repairs${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/relationship-repairs${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1748,7 +1748,7 @@ export function createRelationshipRepair(
   worldId: string,
   input: RelationshipRepairCreateInput,
 ): Promise<RelationshipRepairRecord> {
-  return worldRequest<RelationshipRepairRecord>(`/api/worlds/${worldId}/relationship-repairs`, {
+  return worldRequest<RelationshipRepairRecord>(`${worldApiPath(worldId)}/relationship-repairs`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1760,7 +1760,7 @@ export function applyRelationshipRepair(
   repairId: string,
 ): Promise<RelationshipRepairRecord> {
   return worldRequest<RelationshipRepairRecord>(
-    `/api/worlds/${worldId}/relationship-repairs/${repairId}/apply`,
+    `${worldApiPath(worldId)}/relationship-repairs/${pathSegment(repairId)}/apply`,
     { method: "POST", csrf: true },
   );
 }
@@ -1776,7 +1776,7 @@ export function listPlayerJournal(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<PlayerJournalEntry[]>(
-    `/api/worlds/${worldId}/player-journal${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/player-journal${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1785,7 +1785,7 @@ export function createPlayerJournalEntry(
   worldId: string,
   input: JournalEntryCreateInput,
 ): Promise<PlayerJournalEntry> {
-  return worldRequest<PlayerJournalEntry>(`/api/worlds/${worldId}/player-journal`, {
+  return worldRequest<PlayerJournalEntry>(`${worldApiPath(worldId)}/player-journal`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1803,7 +1803,7 @@ export function listNotifications(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<InWorldNotification[]>(
-    `/api/worlds/${worldId}/notifications${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/notifications${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1812,7 +1812,7 @@ export function createNotification(
   worldId: string,
   input: NotificationCreateInput,
 ): Promise<InWorldNotification> {
-  return worldRequest<InWorldNotification>(`/api/worlds/${worldId}/notifications`, {
+  return worldRequest<InWorldNotification>(`${worldApiPath(worldId)}/notifications`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1835,7 +1835,7 @@ export function listInterventions(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<PlayerInterventionRecord[]>(
-    `/api/worlds/${worldId}/interventions${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/interventions${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1844,7 +1844,7 @@ export function createIntervention(
   worldId: string,
   input: InterventionCreateInput,
 ): Promise<PlayerInterventionRecord> {
-  return worldRequest<PlayerInterventionRecord>(`/api/worlds/${worldId}/interventions`, {
+  return worldRequest<PlayerInterventionRecord>(`${worldApiPath(worldId)}/interventions`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1855,7 +1855,7 @@ export function createPlayerPrivacyExport(
   worldId: string,
   input: PlayerPrivacyRequestCreateInput,
 ): Promise<PlayerPrivacyExport> {
-  return worldRequest<PlayerPrivacyExport>(`/api/worlds/${worldId}/player/privacy/export`, {
+  return worldRequest<PlayerPrivacyExport>(`${worldApiPath(worldId)}/player/privacy/export`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1867,7 +1867,7 @@ export function createPlayerDeleteRequest(
   input: PlayerPrivacyRequestCreateInput,
 ): Promise<PlayerPrivacyRequest> {
   return worldRequest<PlayerPrivacyRequest>(
-    `/api/worlds/${worldId}/player/privacy/delete-requests`,
+    `${worldApiPath(worldId)}/player/privacy/delete-requests`,
     {
       method: "POST",
       body: input,
@@ -1887,7 +1887,7 @@ export function listGMStyleReviews(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<GMStyleReview[]>(
-    `/api/worlds/${worldId}/gm-style-reviews${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/gm-style-reviews${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1896,7 +1896,7 @@ export function createGMStyleReview(
   worldId: string,
   input: GMStyleReviewCreateInput,
 ): Promise<GMStyleReview> {
-  return worldRequest<GMStyleReview>(`/api/worlds/${worldId}/gm-style-reviews`, {
+  return worldRequest<GMStyleReview>(`${worldApiPath(worldId)}/gm-style-reviews`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1914,7 +1914,7 @@ export function listNarrativeContinuityReviews(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<NarrativeContinuityReview[]>(
-    `/api/worlds/${worldId}/narrative-continuity-reviews${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/narrative-continuity-reviews${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1924,7 +1924,7 @@ export function createNarrativeContinuityReview(
   input: NarrativeContinuityReviewCreateInput,
 ): Promise<NarrativeContinuityReview> {
   return worldRequest<NarrativeContinuityReview>(
-    `/api/worlds/${worldId}/narrative-continuity-reviews`,
+    `${worldApiPath(worldId)}/narrative-continuity-reviews`,
     {
       method: "POST",
       body: input,
