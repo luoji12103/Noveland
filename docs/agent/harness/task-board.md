@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-039 Web multimodal diagnostics API client path boundary remediation
 - Post-v1.1 RC audit F-038 Web invocation ledger API client path boundary remediation
 - Post-v1.1 RC audit F-037 Web media admin API client path boundary remediation
 - Post-v1.1 RC audit F-036 Web visual admin API client path boundary remediation

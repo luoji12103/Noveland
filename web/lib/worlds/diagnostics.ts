@@ -59,12 +59,28 @@ export type MultimodalEvalRunFilters = MultimodalDiagnosticsFilters & {
   limit?: number;
 };
 
+function worldPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}`;
+}
+
+function diagnosticsPath(worldId: string): string {
+  return `${worldPath(worldId)}/diagnostics`;
+}
+
+function multimodalEvalsPath(worldId: string): string {
+  return `${worldPath(worldId)}/multimodal-evals`;
+}
+
+function multimodalEvalPath(worldId: string, runId: string): string {
+  return `${multimodalEvalsPath(worldId)}/${encodeURIComponent(runId)}`;
+}
+
 export function getMultimodalDiagnostics(
   worldId: string,
   filters: MultimodalDiagnosticsFilters = {},
 ): Promise<MultimodalDiagnosticsResult> {
   return adminRequest<MultimodalDiagnosticsResult>(
-    `/api/worlds/${worldId}/diagnostics/multimodal${query(filters)}`,
+    `${diagnosticsPath(worldId)}/multimodal${query(filters)}`,
     { method: "GET" },
   );
 }
@@ -74,7 +90,7 @@ export function listMultimodalEvalRuns(
   filters: MultimodalEvalRunFilters = {},
 ): Promise<MultimodalEvalRun[]> {
   return adminRequest<MultimodalEvalRun[]>(
-    `/api/worlds/${worldId}/multimodal-evals${query(filters)}`,
+    `${multimodalEvalsPath(worldId)}${query(filters)}`,
     { method: "GET" },
   );
 }
@@ -83,29 +99,25 @@ export function getMultimodalEvalRun(
   worldId: string,
   runId: string,
 ): Promise<MultimodalEvalRun> {
-  return adminRequest<MultimodalEvalRun>(
-    `/api/worlds/${worldId}/multimodal-evals/${runId}`,
-    { method: "GET" },
-  );
+  return adminRequest<MultimodalEvalRun>(multimodalEvalPath(worldId, runId), {
+    method: "GET",
+  });
 }
 
 export function runMultimodalEval(
   worldId: string,
   input: MultimodalEvalRunRequest = {},
 ): Promise<MultimodalEvalRun> {
-  return adminRequest<MultimodalEvalRun>(
-    `/api/worlds/${worldId}/multimodal-evals/run`,
-    {
-      method: "POST",
-      body: {
-        eval_key: input.eval_key ?? "multimodal-smoke",
-        horizon_days: input.horizon_days ?? 7,
-        metadata: input.metadata ?? { source: "web_admin" },
-        worldline_id: input.worldline_id ?? null,
-      },
-      csrf: true,
+  return adminRequest<MultimodalEvalRun>(`${multimodalEvalsPath(worldId)}/run`, {
+    method: "POST",
+    body: {
+      eval_key: input.eval_key ?? "multimodal-smoke",
+      horizon_days: input.horizon_days ?? 7,
+      metadata: input.metadata ?? { source: "web_admin" },
+      worldline_id: input.worldline_id ?? null,
     },
-  );
+    csrf: true,
+  });
 }
 
 function query(filters: Record<string, unknown>): string {

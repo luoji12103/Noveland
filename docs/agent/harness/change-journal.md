@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web multimodal diagnostics API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin multimodal diagnostics API path-boundary remediation for F-039.
+- Finding: F-039 found `web/lib/worlds/diagnostics.ts` building multimodal diagnostics, eval-run list/detail, and eval execution helper URLs from decoded `worldId` and `runId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side multimodal diagnostics API clients to preserve same-origin route boundaries, then encoded world and eval-run identifiers for diagnostics, eval-run collection/detail, and eval execution helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/diagnostics.ts`, `web/lib/worlds/diagnostics.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web diagnostics helper coverage proving world and eval-run identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing diagnostics helpers.
+- Verification: `npm run test -- lib/worlds/diagnostics.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 147 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this diagnostics scope, server-side Web data loader path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web invocation ledger API client path boundary entry
 
 - Date: 2026-06-09

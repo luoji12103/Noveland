@@ -50,6 +50,39 @@ describe("multimodal diagnostics admin client", () => {
       worldline_id: "worldline-1",
     });
   });
+
+  it("encodes reserved characters in diagnostics route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(diagnostics))
+      .mockResolvedValueOnce(jsonResponse([evalRun]))
+      .mockResolvedValueOnce(jsonResponse(evalRun))
+      .mockResolvedValueOnce(jsonResponse(evalRun));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/diagnostics?admin=true#frag";
+    const runId = "run/eval?detail=true#frag";
+
+    await getMultimodalDiagnostics(worldId, { worldline_id: "line/main?x=1#frag" });
+    await listMultimodalEvalRuns(worldId, { worldline_id: "line/main?x=1#frag", limit: 25 });
+    await getMultimodalEvalRun(worldId, runId);
+    await runMultimodalEval(worldId, { worldline_id: "line/main?x=1#frag" });
+
+    const encodedWorld = encodeURIComponent(worldId);
+    const encodedRun = encodeURIComponent(runId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${encodedWorld}/diagnostics/multimodal?worldline_id=line%2Fmain%3Fx%3D1%23frag`,
+      `/api/worlds/${encodedWorld}/multimodal-evals?worldline_id=line%2Fmain%3Fx%3D1%23frag&limit=25`,
+      `/api/worlds/${encodedWorld}/multimodal-evals/${encodedRun}`,
+      `/api/worlds/${encodedWorld}/multimodal-evals/run`,
+    ]);
+    expect((fetchMock.mock.calls[3][1].headers as Headers).get("X-CSRF-Token")).toBe(
+      "csrf-token",
+    );
+  });
+
 });
 
 const diagnostics = {
