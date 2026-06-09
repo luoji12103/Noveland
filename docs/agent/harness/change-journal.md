@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web visual admin API client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin visual admin API path-boundary remediation for F-036.
+- Finding: F-036 found `web/lib/worlds/visual.ts` building sprite set, sprite variant, scene background, resolver, and compose-scene helper URLs from decoded `worldId`, `spriteSetId`, `variantId`, and `backgroundId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side visual admin API clients to preserve same-origin route boundaries, then encoded world, sprite set, sprite variant, and background identifiers for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths. Existing visual filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/visual.ts`, `web/lib/worlds/visual.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web visual helper coverage proving world, sprite set, sprite variant, and background identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing visual helpers.
+- Verification: `npm run test -- lib/worlds/visual.test.ts` passed with 4 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 144 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this visual-admin scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web speech admin API client path boundary entry
 
 - Date: 2026-06-09

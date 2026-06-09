@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-09T23:59:00+08:00
+- Date: 2026-06-10T00:28:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-035 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-036 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-035 batch: d02f804 fix(web): encode provider api path segments.
+- Current HEAD before F-036 batch: b9782f2 fix(web): encode speech api path segments.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -25,22 +25,21 @@
 
 ## Completed This Batch
 
-- Continued the Web/e2e security audit after F-034.
-- Recorded F-035: browser-side speech admin same-origin API helper URLs embedded decoded world, agent, voice profile, binding, and style mapping identifiers directly into frontend API paths.
-- Added an architecture-contracts OpenSpec delta requiring browser-side speech admin API clients to preserve fixed same-origin route templates and encoded dynamic segments.
-- Encoded dynamic speech admin identifiers for voice profile collection/detail, agent voice bindings, style mappings, transcripts, TTS, and STT helper paths in `web/lib/worlds/speech.ts`.
-- Added focused Web speech helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing speech helpers.
+- Continued the Web/e2e security audit after F-035.
+- Recorded F-036: browser-side visual admin same-origin API helper URLs embedded decoded world, sprite set, sprite variant, and background identifiers directly into frontend API paths.
+- Added an architecture-contracts OpenSpec delta requiring browser-side visual admin API clients to preserve fixed same-origin route templates and encoded dynamic segments.
+- Encoded dynamic visual admin identifiers for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths in `web/lib/worlds/visual.ts`.
+- Added focused Web visual helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing visual helpers.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/worlds/speech.test.ts`: 3 passed.
+- `cd web && npm run test -- lib/worlds/visual.test.ts`: 4 passed.
 - `cd web && npm run lint`: passed.
 - `cd web && npm run typecheck`: passed.
-- `cd web && npm run test`: 44 files and 143 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `cd web && npm run test`: 44 files and 144 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
 - `cd web && npm run build`: passed.
-- `cd web && npm run check:next-env`: passed.
-- `cd web && npm run test:e2e`: attempted and failed on the workspace/conversation e2e after 11 passed and 9 skipped.
-- `cd web && npm run test:e2e -- tests/e2e/auth.spec.ts -g "world admin manages workspace pages and conversations"`: first focused rerun failed at a different runtime notice assertion; second focused rerun passed.
+- `cd web && npm run test:e2e`: 21 passed.
+- `cd web && npm run check:next-env`: initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`: passed.
 - `openspec validate --changes --strict`: 1 passed.
 - `openspec validate --specs --strict`: 76 passed.
@@ -48,12 +47,12 @@
 
 ## Remaining Work
 
-1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped speech admin API batch.
+1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped visual admin API batch.
 2. Audit project Playwright/e2e stability and boundary coverage without browser/computer-use plugins.
 3. Continue product normal-use flows and spec/history drift audits after the remaining Web/e2e security pass.
 
-## Finding F-035
+## Finding F-036
 
-- Browser-side speech admin same-origin API URL construction appended decoded world/agent/voice profile/binding/style mapping identifiers directly to frontend API paths.
-- The remediation encodes dynamic segments for speech voice profile collection/detail, agent voice bindings, style mappings, transcripts, TTS, and STT helper paths, while preserving filters as query data.
+- Browser-side visual admin same-origin API URL construction appended decoded world/sprite set/sprite variant/background identifiers directly to frontend API paths.
+- The remediation encodes dynamic segments for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths, while preserving filters as query data.
 - Residual risk: other Web client helpers and Next route handlers still contain many dynamic path constructions that need separate evidence-based review before broad remediation.
