@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelMediaJob,
+  listMediaAssetReferences,
   listMediaAssets,
   listMediaJobs,
   listMediaObjects,
@@ -88,6 +89,63 @@ describe("media admin client", () => {
     expect((request.headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
     expect(request.body).toBeInstanceOf(FormData);
     expect(url).not.toContain("media://");
+  });
+
+  it("encodes reserved characters in media admin route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse([])))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(mediaAsset))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(mediaJob))
+      .mockResolvedValueOnce(jsonResponse(mediaJob))
+      .mockResolvedValueOnce(jsonResponse({ asset: mediaAsset, object: mediaObject }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/alpha?admin=true#frag";
+    const assetId = "asset/input?role=source#frag";
+    const jobId = "job/retry?force=true#frag";
+    const objectId = "object/main?download=1#frag";
+
+    await listMediaAssets(worldId, { contains_text: "sprite/one?x=1#y" });
+    await listMediaObjects(worldId, assetId);
+    await updateMediaAsset(worldId, assetId, { title: "Encoded" });
+    await listMediaAssetReferences(worldId, assetId);
+    await listMediaReferences(worldId, { asset_id: assetId });
+    await listMediaJobs(worldId, { provider_kind: "fake/provider?x=1#frag" });
+    await cancelMediaJob(worldId, jobId);
+    await retryMediaJob(worldId, jobId);
+    await uploadMediaAsset(worldId, {
+      file: new File(["image-bytes"], "sprite.png", { type: "image/png" }),
+      asset_kind: "image",
+      asset_role: "character_sprite",
+      visibility: "world_admin",
+    });
+
+    const encodedWorld = encodeURIComponent(worldId);
+    const encodedAsset = encodeURIComponent(assetId);
+    const encodedJob = encodeURIComponent(jobId);
+    const calls = fetchMock.mock.calls.map((call) => call[0]);
+
+    expect(calls).toEqual([
+      `/api/worlds/${encodedWorld}/media/assets?contains_text=sprite%2Fone%3Fx%3D1%23y`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}/objects`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}/references`,
+      `/api/worlds/${encodedWorld}/media/references?asset_id=asset%2Finput%3Frole%3Dsource%23frag`,
+      `/api/worlds/${encodedWorld}/media/jobs?provider_kind=fake%2Fprovider%3Fx%3D1%23frag`,
+      `/api/worlds/${encodedWorld}/media/jobs/${encodedJob}/cancel`,
+      `/api/worlds/${encodedWorld}/media/jobs/${encodedJob}/retry`,
+      `/api/worlds/${encodedWorld}/media/assets/upload`,
+    ]);
+    expect(mediaObjectDownloadPath(worldId, objectId)).toBe(
+      `/api/worlds/${encodedWorld}/media/objects/${encodeURIComponent(objectId)}/download`,
+    );
   });
 
   it("builds safe backend download paths from object ids only", () => {

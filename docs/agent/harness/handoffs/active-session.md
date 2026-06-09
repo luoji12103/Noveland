@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-10T00:28:00+08:00
+- Date: 2026-06-09T09:11:07+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-036 are remediated and targeted checks passed on this branch. No push performed.
+- Status: F-001 through F-037 are remediated and targeted checks passed on this branch. No push performed.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-036 batch: b9782f2 fix(web): encode speech api path segments.
+- Current HEAD before F-037 batch: d306f39 fix(web): encode visual api path segments.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API/Web/runtime process was started for this batch.
+- Current server services: Noveland Postgres and NATS containers are healthy on overridden ports. No authoritative Noveland API/Web/runtime process was started for this batch; project Playwright e2e used its own test server.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -25,18 +25,18 @@
 
 ## Completed This Batch
 
-- Continued the Web/e2e security audit after F-035.
-- Recorded F-036: browser-side visual admin same-origin API helper URLs embedded decoded world, sprite set, sprite variant, and background identifiers directly into frontend API paths.
-- Added an architecture-contracts OpenSpec delta requiring browser-side visual admin API clients to preserve fixed same-origin route templates and encoded dynamic segments.
-- Encoded dynamic visual admin identifiers for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths in `web/lib/worlds/visual.ts`.
-- Added focused Web visual helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing visual helpers.
+- Continued the Web/e2e security audit after F-036.
+- Recorded F-037: browser-side media admin same-origin API helper URLs embedded decoded world, asset, job, and object identifiers directly into frontend API paths.
+- Added an architecture-contracts OpenSpec delta requiring browser-side media admin API clients to preserve fixed same-origin route templates and encoded dynamic segments.
+- Encoded dynamic media admin identifiers for asset collection/detail, asset objects, asset references, media references, media jobs, job cancel/retry, upload, and object download helper paths in `web/lib/worlds/media.ts`.
+- Added focused Web media helper tests proving reserved characters stay inside identifier path segments across representative read and state-changing media helpers.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/worlds/visual.test.ts`: 4 passed.
+- `cd web && npm run test -- lib/worlds/media.test.ts`: 5 passed.
 - `cd web && npm run lint`: passed.
 - `cd web && npm run typecheck`: passed.
-- `cd web && npm run test`: 44 files and 144 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `cd web && npm run test`: 44 files and 145 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
 - `cd web && npm run build`: passed.
 - `cd web && npm run test:e2e`: 21 passed.
 - `cd web && npm run check:next-env`: initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
@@ -47,12 +47,12 @@
 
 ## Remaining Work
 
-1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped visual admin API batch.
+1. Continue Web/e2e security audit for remaining Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and other client helper path construction outside this scoped media admin API batch.
 2. Audit project Playwright/e2e stability and boundary coverage without browser/computer-use plugins.
 3. Continue product normal-use flows and spec/history drift audits after the remaining Web/e2e security pass.
 
-## Finding F-036
+## Finding F-037
 
-- Browser-side visual admin same-origin API URL construction appended decoded world/sprite set/sprite variant/background identifiers directly to frontend API paths.
-- The remediation encodes dynamic segments for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths, while preserving filters as query data.
-- Residual risk: other Web client helpers and Next route handlers still contain many dynamic path constructions that need separate evidence-based review before broad remediation.
+- Browser-side media admin same-origin API URL construction appended decoded world/asset/job/object identifiers directly to frontend API paths.
+- The remediation encodes dynamic segments for asset collection/detail, asset objects, asset references, media references, media jobs, job cancel/retry, upload, and object download helper paths, while preserving filters as query data.
+- Residual risk: other Web client helpers, server-side Web data loaders, and Next route handlers still contain many dynamic path constructions that need separate evidence-based review before broad remediation.

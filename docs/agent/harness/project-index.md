@@ -116,7 +116,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md` — release notes for the completed v1.0 Private Beta MVP sequence.
 - `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md` — release notes for the completed v1.1 Normal Use / Release Candidate sequence.
 - `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9/v1.0/v1.1 changes.
-- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; F-001 through F-036 are recorded with targeted remediations through Web visual admin API client path-boundary hardening.
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; F-001 through F-037 are recorded with targeted remediations through Web media admin API client path-boundary hardening.
 - `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/` — archived v0.9 OpenSpec change for the self-use playable demo world.
 - `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/` — archived v1.0 OpenSpec change for invite-only private beta: onboarding/access, player session stability, quota enforcement, setup wizard, memory/persona QA, beta feedback, repair loop, and private beta gate.
 - `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/` — archived v1.1 OpenSpec change for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
@@ -217,7 +217,7 @@ Fast orientation for a new coding session.
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
   - `web/lib/worlds/diagnostics.ts` — multimodal diagnostics and eval-run client helpers
   - `web/lib/worlds/invocations.ts` — model invocation ledger, prompt snapshot, tag, and redaction client helpers
-  - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers
+  - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers with encoded world, asset, job, and object path segments
   - `web/lib/worlds/provider-integrations.ts` — provider integration client helpers for `/worlds/{world_id}/providers` with encoded world/provider path segments
   - `web/lib/worlds/speech.ts` — speech voice profile, binding, style mapping, transcript, TTS, and STT client helpers with encoded world, agent, profile, binding, and mapping path segments
   - `web/lib/worlds/visual.ts` — visual sprite, variant, background, resolver, and compose-scene client helpers with encoded world, sprite set, variant, and background path segments

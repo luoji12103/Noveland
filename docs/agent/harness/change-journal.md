@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web media admin API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin media admin API path-boundary remediation for F-037.
+- Finding: F-037 found `web/lib/worlds/media.ts` building media asset, object, reference, job, upload, and download helper URLs from decoded `worldId`, `assetId`, `jobId`, and `objectId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side media admin API clients to preserve same-origin route boundaries, then encoded world, asset, job, and object identifiers for media asset collection/detail, asset objects, asset references, media references, media jobs, job cancel/retry, upload, and object download helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/media.ts`, `web/lib/worlds/media.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web media helper coverage proving world, asset, job, and object identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing media helpers.
+- Verification: `npm run test -- lib/worlds/media.test.ts` passed with 5 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 145 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this media-admin scope, server-side Web data loader path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web visual admin API client path boundary entry
 
 - Date: 2026-06-10
