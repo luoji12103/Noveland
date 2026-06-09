@@ -752,7 +752,7 @@ export function updateLocationEdge(
 }
 
 export function listOrganizations(worldId: string): Promise<WorldOrganization[]> {
-  return worldRequest<WorldOrganization[]>(`/api/worlds/${worldId}/organizations`, {
+  return worldRequest<WorldOrganization[]>(`${worldApiPath(worldId)}/organizations`, {
     method: "GET",
   });
 }
@@ -761,7 +761,7 @@ export function createOrganization(
   worldId: string,
   input: OrganizationCreateInput,
 ): Promise<WorldOrganization> {
-  return worldRequest<WorldOrganization>(`/api/worlds/${worldId}/organizations`, {
+  return worldRequest<WorldOrganization>(`${worldApiPath(worldId)}/organizations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -774,7 +774,7 @@ export function updateOrganization(
   input: OrganizationUpdateInput,
 ): Promise<WorldOrganization> {
   return worldRequest<WorldOrganization>(
-    `/api/worlds/${worldId}/organizations/${organizationId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}`,
     {
       method: "PATCH",
       body: input,
@@ -788,7 +788,7 @@ export function listOrganizationMemberships(
   organizationId: string,
 ): Promise<OrganizationMembership[]> {
   return worldRequest<OrganizationMembership[]>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships`,
     { method: "GET" },
   );
 }
@@ -799,7 +799,7 @@ export function createOrganizationMembership(
   input: OrganizationMembershipCreateInput,
 ): Promise<OrganizationMembership> {
   return worldRequest<OrganizationMembership>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships`,
     {
       method: "POST",
       body: input,
@@ -815,7 +815,7 @@ export function updateOrganizationMembership(
   input: OrganizationMembershipUpdateInput,
 ): Promise<OrganizationMembership> {
   return worldRequest<OrganizationMembership>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships/${membershipId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships/${pathSegment(membershipId)}`,
     {
       method: "PATCH",
       body: input,
@@ -830,7 +830,7 @@ export function listFactionTracks(
   filters: WorldlineScopedFilters = {},
 ): Promise<FactionProgressTrack[]> {
   return worldRequest<FactionProgressTrack[]>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -841,7 +841,7 @@ export function createFactionTrack(
   input: FactionProgressTrackCreateInput,
 ): Promise<FactionProgressTrack> {
   return worldRequest<FactionProgressTrack>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks`,
     {
       method: "POST",
       body: input,
@@ -857,7 +857,7 @@ export function updateFactionTrack(
   input: FactionProgressTrackUpdateInput,
 ): Promise<FactionProgressTrack> {
   return worldRequest<FactionProgressTrack>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks/${trackId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks/${pathSegment(trackId)}`,
     {
       method: "PATCH",
       body: input,
@@ -867,7 +867,7 @@ export function updateFactionTrack(
 }
 
 export function listAgents(worldId: string): Promise<Agent[]> {
-  return worldRequest<Agent[]>(`/api/worlds/${worldId}/agents`, { method: "GET" });
+  return worldRequest<Agent[]>(`${worldApiPath(worldId)}/agents`, { method: "GET" });
 }
 
 export function listAgentRelationships(
@@ -876,7 +876,7 @@ export function listAgentRelationships(
   filters: WorldlineScopedFilters = {},
 ): Promise<AgentRelationship[]> {
   return worldRequest<AgentRelationship[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -887,7 +887,7 @@ export function createAgentRelationship(
   input: AgentRelationshipCreateInput,
 ): Promise<AgentRelationship> {
   return worldRequest<AgentRelationship>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships`,
     {
       method: "POST",
       body: input,
@@ -903,7 +903,7 @@ export function updateAgentRelationship(
   input: AgentRelationshipUpdateInput,
 ): Promise<AgentRelationship> {
   return worldRequest<AgentRelationship>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships/${relationshipId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships/${pathSegment(relationshipId)}`,
     {
       method: "PATCH",
       body: input,
@@ -918,7 +918,7 @@ export function getAgentPresence(
   filters: WorldlineScopedFilters = {},
 ): Promise<AgentPresence | null> {
   return worldRequest<AgentPresence | null>(
-    `/api/worlds/${worldId}/agents/${agentId}/presence${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/presence${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -928,7 +928,7 @@ export function upsertAgentPresence(
   agentId: string,
   input: AgentPresenceInput,
 ): Promise<AgentPresence> {
-  return worldRequest<AgentPresence>(`/api/worlds/${worldId}/agents/${agentId}/presence`, {
+  return worldRequest<AgentPresence>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/presence`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -936,7 +936,7 @@ export function upsertAgentPresence(
 }
 
 export function listAgentCalendar(worldId: string, agentId: string): Promise<CalendarEntry[]> {
-  return worldRequest<CalendarEntry[]>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+  return worldRequest<CalendarEntry[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar`, {
     method: "GET",
   });
 }
@@ -946,7 +946,7 @@ export function createAgentCalendarEntry(
   agentId: string,
   input: CalendarEntryCreateInput,
 ): Promise<CalendarEntry> {
-  return worldRequest<CalendarEntry>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+  return worldRequest<CalendarEntry>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -960,7 +960,7 @@ export function updateAgentCalendarEntry(
   input: CalendarEntryUpdateInput,
 ): Promise<CalendarEntry> {
   return worldRequest<CalendarEntry>(
-    `/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar/${pathSegment(entryId)}`,
     {
       method: "PATCH",
       body: input,
@@ -974,14 +974,14 @@ export function cancelAgentCalendarEntry(
   agentId: string,
   entryId: string,
 ): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar/${pathSegment(entryId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
 export function listScheduleRules(worldId: string): Promise<ScheduleRule[]> {
-  return worldRequest<ScheduleRule[]>(`/api/worlds/${worldId}/schedule-rules`, { method: "GET" });
+  return worldRequest<ScheduleRule[]>(`${worldApiPath(worldId)}/schedule-rules`, { method: "GET" });
 }
 
 export function getCalendarConflicts(
@@ -1000,7 +1000,7 @@ export function getCalendarConflicts(
   }
   const query = search.toString();
   return worldRequest<CalendarConflictReport>(
-    `/api/worlds/${worldId}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
+    `${worldApiPath(worldId)}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
     { method: "GET" },
   );
 }
@@ -1107,7 +1107,7 @@ export function createScheduleRule(
   worldId: string,
   input: ScheduleRuleCreateInput,
 ): Promise<ScheduleRule> {
-  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules`, {
+  return worldRequest<ScheduleRule>(`${worldApiPath(worldId)}/schedule-rules`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1118,7 +1118,7 @@ export function previewScheduleRule(
   worldId: string,
   input: ScheduleRulePreviewInput,
 ): Promise<ScheduleRulePreview> {
-  return worldRequest<ScheduleRulePreview>(`/api/worlds/${worldId}/schedule-rules/preview`, {
+  return worldRequest<ScheduleRulePreview>(`${worldApiPath(worldId)}/schedule-rules/preview`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1130,7 +1130,7 @@ export function updateScheduleRule(
   ruleId: string,
   input: ScheduleRuleUpdateInput,
 ): Promise<ScheduleRule> {
-  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+  return worldRequest<ScheduleRule>(`${worldApiPath(worldId)}/schedule-rules/${pathSegment(ruleId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -1138,7 +1138,7 @@ export function updateScheduleRule(
 }
 
 export function disableScheduleRule(worldId: string, ruleId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/schedule-rules/${pathSegment(ruleId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2182,7 +2182,7 @@ export function unpublishNarrativeArtifact(
 }
 
 export function createAgent(worldId: string, input: AgentCreateInput): Promise<Agent> {
-  return worldRequest<Agent>(`/api/worlds/${worldId}/agents`, {
+  return worldRequest<Agent>(`${worldApiPath(worldId)}/agents`, {
     method: "POST",
     body: input,
     csrf: true,

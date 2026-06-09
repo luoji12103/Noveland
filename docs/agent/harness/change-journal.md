@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web organization/agent/calendar/schedule API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin organization, agent, calendar, and schedule API path-boundary remediation for F-043.
+- Finding: F-043 found `web/lib/worlds/client.ts` building organization, membership, faction track, agent relationship, agent presence, agent calendar, schedule rule, and calendar conflict helper URLs from decoded `worldId` and nested identifier values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring these browser-side Web helpers to preserve same-origin route boundaries, then encoded world, organization, membership, track, agent, relationship, calendar entry, and schedule rule identifiers for the scoped helper group. Existing filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, organization, membership, track, agent, relationship, calendar entry, schedule rule, and worldline identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing organization/agent/calendar/schedule helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 28 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 151 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this organization/agent/calendar/schedule scope, especially daily-life/offscreen and later living-world helper groups, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web clock/replay/scene API client path boundary entry
 
 - Date: 2026-06-09

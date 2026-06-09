@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-043 Web organization/agent/calendar/schedule API client path boundary remediation
 - Post-v1.1 RC audit F-042 Web clock/replay/scene API client path boundary remediation
 - Post-v1.1 RC audit F-041 Web core world API client path boundary remediation
 - Post-v1.1 RC audit F-040 Web server admin loader backend path boundary remediation

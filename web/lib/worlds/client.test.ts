@@ -64,6 +64,7 @@ import {
   getNarrativeArtifact,
   createWorld,
   deactivateAgentPreset,
+  disableScheduleRule,
   deleteMemoryBackendProfile,
   disableProviderProfile,
   dryRunEndingCandidate,
@@ -148,11 +149,13 @@ import {
   revealSecret,
   reviewGMProposal,
   resumeWorldClock,
+  listAgentCalendar,
   listAgentMemory,
   listAgentRelationships,
   listNarrativeArtifacts,
   listConversationNarrativeArtifacts,
   listAgentPresets,
+  listAgents,
   listProviderProfiles,
   listProviderHealth,
   listPluginCatalog,
@@ -176,6 +179,7 @@ import {
   validateWorldComposition,
   updateMemoryBackendProfile,
   updateAgent,
+  updateAgentCalendarEntry,
   updateConversation,
   updateEventTriggerCondition,
   updateFactionTrack,
@@ -557,6 +561,146 @@ describe("world client", () => {
       "/api/worlds/world-1/player-choices/preview",
       "/api/worlds/world-1/player-choices",
     ]);
+  });
+
+  it("encodes reserved characters in organization, agent, calendar, and schedule route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentOrganizationId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentOrganizationId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentMembershipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentMembershipId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentTrackId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentTrackId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentRelationshipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentRelationshipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentCalendarEntryId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentCalendarEntryId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ conflict_count: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentScheduleRuleId }))
+      .mockResolvedValueOnce(jsonResponse({ preview: true }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentScheduleRuleId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listOrganizations(orgAgentWorldId);
+    await createOrganization(orgAgentWorldId, {
+      organization_key: "org",
+      name: "Organization",
+      organization_type: "club",
+    });
+    await updateOrganization(orgAgentWorldId, orgAgentOrganizationId, { is_active: false });
+    await listOrganizationMemberships(orgAgentWorldId, orgAgentOrganizationId);
+    await createOrganizationMembership(orgAgentWorldId, orgAgentOrganizationId, {
+      agent_id: orgAgentAgentId,
+      role_title: "President",
+    });
+    await updateOrganizationMembership(orgAgentWorldId, orgAgentOrganizationId, orgAgentMembershipId, {
+      loyalty: 80,
+    });
+    await listFactionTracks(orgAgentWorldId, orgAgentOrganizationId, {
+      worldline_id: orgAgentWorldlineId,
+    });
+    await createFactionTrack(orgAgentWorldId, orgAgentOrganizationId, {
+      worldline_id: orgAgentWorldlineId,
+      track_key: "track",
+      name: "Track",
+      track_type: "goal",
+    });
+    await updateFactionTrack(orgAgentWorldId, orgAgentOrganizationId, orgAgentTrackId, {
+      progress: 50,
+    });
+    await listAgents(orgAgentWorldId);
+    await listAgentRelationships(orgAgentWorldId, orgAgentAgentId, {
+      worldline_id: orgAgentWorldlineId,
+    });
+    await createAgentRelationship(orgAgentWorldId, orgAgentAgentId, {
+      source_agent_id: orgAgentAgentId,
+      target_agent_id: "agent-target",
+      relationship_type: "friendship",
+    });
+    await updateAgentRelationship(orgAgentWorldId, orgAgentAgentId, orgAgentRelationshipId, {
+      trust: 20,
+    });
+    await getAgentPresence(orgAgentWorldId, orgAgentAgentId, { worldline_id: orgAgentWorldlineId });
+    await upsertAgentPresence(orgAgentWorldId, orgAgentAgentId, {
+      worldline_id: orgAgentWorldlineId,
+      current_scene_id: "scene-1",
+    });
+    await listAgentCalendar(orgAgentWorldId, orgAgentAgentId);
+    await createAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, {
+      title: "Class",
+      starts_at: "2030-01-01T08:00:00Z",
+    });
+    await updateAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, orgAgentCalendarEntryId, {
+      status: "cancelled",
+    });
+    await cancelAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, orgAgentCalendarEntryId);
+    await listScheduleRules(orgAgentWorldId);
+    await getCalendarConflicts(orgAgentWorldId, {
+      start_world_time: "2030-01-01T08:00:00Z",
+      horizon_hours: 12,
+      limit: 5,
+    });
+    await createScheduleRule(orgAgentWorldId, {
+      rule_key: "weekday",
+      name: "Weekday",
+      kind: "weekday",
+    });
+    await previewScheduleRule(orgAgentWorldId, { kind: "weekday" });
+    await updateScheduleRule(orgAgentWorldId, orgAgentScheduleRuleId, { is_enabled: false });
+    await disableScheduleRule(orgAgentWorldId, orgAgentScheduleRuleId);
+
+    const worldSegment = encodeURIComponent(orgAgentWorldId);
+    const organizationSegment = encodeURIComponent(orgAgentOrganizationId);
+    const membershipSegment = encodeURIComponent(orgAgentMembershipId);
+    const trackSegment = encodeURIComponent(orgAgentTrackId);
+    const agentSegment = encodeURIComponent(orgAgentAgentId);
+    const relationshipSegment = encodeURIComponent(orgAgentRelationshipId);
+    const entrySegment = encodeURIComponent(orgAgentCalendarEntryId);
+    const ruleSegment = encodeURIComponent(orgAgentScheduleRuleId);
+    const worldlineSegment = encodeURIComponent(orgAgentWorldlineId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/organizations`,
+      `/api/worlds/${worldSegment}/organizations`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships/${membershipSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks/${trackSegment}`,
+      `/api/worlds/${worldSegment}/agents`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships/${relationshipSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/presence?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/presence`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar/${entrySegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar/${entrySegment}`,
+      `/api/worlds/${worldSegment}/schedule-rules`,
+      `/api/worlds/${worldSegment}/calendar/conflicts?start_world_time=2030-01-01T08%3A00%3A00Z&horizon_hours=12&limit=5`,
+      `/api/worlds/${worldSegment}/schedule-rules`,
+      `/api/worlds/${worldSegment}/schedule-rules/preview`,
+      `/api/worlds/${worldSegment}/schedule-rules/${ruleSegment}`,
+      `/api/worlds/${worldSegment}/schedule-rules/${ruleSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
   it("encodes reserved characters in clock, replay, and scene route segments", async () => {
@@ -1605,6 +1749,15 @@ describe("world client", () => {
   });
 });
 
+const orgAgentWorldId = "world/org?admin=true#frag";
+const orgAgentOrganizationId = "org/student?active=true#frag";
+const orgAgentMembershipId = "membership/student?role=true#frag";
+const orgAgentTrackId = "track/faction?goal=true#frag";
+const orgAgentAgentId = "agent/guide?role=true#frag";
+const orgAgentRelationshipId = "relationship/guide?target=true#frag";
+const orgAgentCalendarEntryId = "calendar/class?time=true#frag";
+const orgAgentScheduleRuleId = "schedule/weekday?enabled=true#frag";
+const orgAgentWorldlineId = "worldline/org?branch=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";
