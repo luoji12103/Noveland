@@ -534,3 +534,14 @@
 - Intended remediation: encode the scoped helper world and nested identifiers before constructing same-origin API URLs, preserve existing filters as query data, and add focused Web regression coverage proving reserved characters remain encoded inside identifier path segments for representative read and state-changing helpers.
 - Status: Remediated in Web agent memory/run/persona/narrative API client path boundary batch.
 - Verification: `npm run test -- lib/worlds/client.test.ts` passed with 33 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 156 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+
+
+### F-049 Web membership, member candidate, and diagnostics API client path segment injection
+
+- Severity: High
+- Affected boundary: browser-side Web same-origin API URL construction for membership list/upsert/delete, member candidate search, and world diagnostics helpers in `web/lib/worlds/client.ts`.
+- Evidence: `web/lib/worlds/client.ts` constructs same-origin URLs such as `/api/worlds/${worldId}/memberships`, `/memberships/${userId}`, `/member-candidates?query=...`, and `/diagnostics` from decoded identifiers without encoding dynamic path segments.
+- Impact: a world or user identifier containing an encoded slash, query delimiter, or fragment delimiter can become additional same-origin frontend/backend path or query structure instead of staying inside the identifier segment. These helpers include role membership mutation, member candidate search, and world diagnostics reads, so route-boundary preservation is required even though backend authorization remains final enforcement.
+- Intended remediation: encode the scoped helper world and nested user identifiers before constructing same-origin API URLs, preserve existing filters as query data, and add focused Web regression coverage proving reserved characters remain encoded inside identifier path segments for representative read and state-changing helpers.
+- Status: Remediated in Web membership/candidate/diagnostics API client path boundary batch.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 34 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 157 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.

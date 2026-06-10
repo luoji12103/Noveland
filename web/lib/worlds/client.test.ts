@@ -124,6 +124,7 @@ import {
   listRouteAffinities,
   listRouteMilestones,
   listLongRunEvals,
+  listMemberships,
   listRumors,
   listRumorPropagations,
   listNarrativeContinuityReviews,
@@ -183,6 +184,7 @@ import {
   testProviderProfile,
   importWorldComposition,
   validateWorldComposition,
+  deleteMembership,
   updateMemoryBackendProfile,
   updateAgent,
   updateAgentCalendarEntry,
@@ -191,6 +193,7 @@ import {
   updateFactionTrack,
   updateGMAgenda,
   updateLocationEdge,
+  upsertMembership,
   updateOrganization,
   updateOrganizationMembership,
   updateAgentRelationship,
@@ -1587,6 +1590,37 @@ describe("world client", () => {
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
+  it("encodes reserved characters in membership, candidate, and diagnostics route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ user_id: membershipBoundaryUserId, role: "world_admin" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listMemberships(membershipBoundaryWorldId);
+    await upsertMembership(membershipBoundaryWorldId, membershipBoundaryUserId, "world_admin");
+    await deleteMembership(membershipBoundaryWorldId, membershipBoundaryUserId);
+    await listMemberCandidates(membershipBoundaryWorldId, "user/name?invite=true#frag", 4);
+    await listWorldDiagnostics(membershipBoundaryWorldId);
+
+    const worldSegment = encodeURIComponent(membershipBoundaryWorldId);
+    const userSegment = encodeURIComponent(membershipBoundaryUserId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/memberships`,
+      `/api/worlds/${worldSegment}/memberships/${userSegment}`,
+      `/api/worlds/${worldSegment}/memberships/${userSegment}`,
+      `/api/worlds/${worldSegment}/member-candidates?limit=4&query=user%2Fname%3Finvite%3Dtrue%23frag`,
+      `/api/worlds/${worldSegment}/diagnostics`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("maps knowledge, player, and guardrail requests", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -2360,6 +2394,8 @@ const agentNarrativeAgentId = "agent/memory?role=true#frag";
 const agentNarrativeRunId = "run/detail?trace=true#frag";
 const agentNarrativeArtifactId = "artifact/story?publish=true#frag";
 const agentNarrativeConversationId = "conversation/source?q=true#frag";
+const membershipBoundaryWorldId = "world/members?admin=true#frag";
+const membershipBoundaryUserId = "user/member?role=true#frag";
 const sceneGraphWorldId = "world/scene?clock=true#frag";
 const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
 const sceneGraphSceneId = "scene/location?active=true#frag";

@@ -2439,7 +2439,7 @@ export function stopConversation(
 }
 
 export function listMemberships(worldId: string): Promise<Membership[]> {
-  return worldRequest<Membership[]>(`/api/worlds/${worldId}/memberships`, { method: "GET" });
+  return worldRequest<Membership[]>(`${worldApiPath(worldId)}/memberships`, { method: "GET" });
 }
 
 export function upsertMembership(
@@ -2447,7 +2447,7 @@ export function upsertMembership(
   userId: string,
   role: WorldRole,
 ): Promise<Membership> {
-  return worldRequest<Membership>(`/api/worlds/${worldId}/memberships/${userId}`, {
+  return worldRequest<Membership>(`${worldApiPath(worldId)}/memberships/${pathSegment(userId)}`, {
     method: "PUT",
     body: { user_id: userId, role },
     csrf: true,
@@ -2455,7 +2455,7 @@ export function upsertMembership(
 }
 
 export function deleteMembership(worldId: string, userId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/memberships/${userId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/memberships/${pathSegment(userId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2471,7 +2471,7 @@ export function listMemberCandidates(
     params.set("query", query.trim());
   }
   return worldRequest<MemberCandidate[]>(
-    `/api/worlds/${worldId}/member-candidates?${params.toString()}`,
+    `${worldApiPath(worldId)}/member-candidates?${params.toString()}`,
     { method: "GET" },
   );
 }
@@ -2505,7 +2505,7 @@ export function listRuntimeDiagnostics(): Promise<RuntimeDiagnostic[]> {
 }
 
 export function listWorldDiagnostics(worldId: string): Promise<RuntimeDiagnostic[]> {
-  return worldRequest<RuntimeDiagnostic[]>(`/api/worlds/${worldId}/diagnostics`, {
+  return worldRequest<RuntimeDiagnostic[]>(`${worldApiPath(worldId)}/diagnostics`, {
     method: "GET",
   });
 }

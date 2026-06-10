@@ -3812,3 +3812,16 @@
 - Tests added/updated: Added focused worlds client coverage proving reserved characters in agent/narrative world, agent, run, artifact, and source conversation identifiers stay inside encoded same-origin path segments and query filters remain query data.
 - Verification: `npm run test -- lib/worlds/client.test.ts` passed with 33 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 156 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
 - Follow-up notes: Continue Web/e2e audit for remaining helper groups in web/lib/worlds/client.ts, especially memberships, member candidates, diagnostics, and any residual raw same-origin path construction, plus Next route handlers, proxy CSRF forwarding, response header behavior, and client-side rendering sinks. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web membership/diagnostics client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-049.
+- Finding: F-049 found browser-side membership list/upsert/delete, member candidate search, and world diagnostics helpers appending decoded world and user identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for membership/candidate/diagnostics client route-boundary preservation, then encoded the scoped world and membership user path segments while keeping member candidate filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in membership/diagnostics world and user identifiers stay inside encoded same-origin path segments and candidate search text remains query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 34 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 157 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- Follow-up notes: Browser-side `web/lib/worlds/client.ts` no longer has raw `/api/worlds/${worldId}` path construction. Continue Web/e2e audit for other client/proxy modules and Next route handlers, especially CSRF forwarding, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Do not push unless explicitly requested.
