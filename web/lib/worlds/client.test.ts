@@ -87,6 +87,8 @@ import {
   getScaleReadiness,
   getLatestSnapshot,
   getAgentPersona,
+  getMemoryBackendProfileHealth,
+  getMemoryBackendProfileLogs,
   getAgentPresetUpdatePreview,
   getReplayState,
   getSnapshotIntegrity,
@@ -166,6 +168,7 @@ import {
   listProviderHealth,
   listPluginCatalog,
   runAgent,
+  runMemoryBackendProfileEvalSmoke,
   refreshAgentMemoryProfileSnapshot,
   refreshAgentObservations,
   replaceConversationParticipants,
@@ -1618,6 +1621,67 @@ describe("world client", () => {
       `/api/worlds/${worldSegment}/diagnostics`,
     ]);
     const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in admin preset, memory, and provider route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const adminPresetId = "preset/admin?preview=true#frag";
+    const memoryProfileId = "memory/profile?logs=true#frag";
+    const memoryJobId = "job/memory?retry=true#frag";
+    const providerProfileId = "provider/profile?test=true#frag";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ id: adminPresetId }))
+      .mockResolvedValueOnce(jsonResponse({ preset_id: adminPresetId, agents: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ id: memoryProfileId }))
+      .mockResolvedValueOnce(jsonResponse({ status: "healthy" }))
+      .mockResolvedValueOnce(jsonResponse({ entries: [] }))
+      .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ status: "passed" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ id: memoryJobId, status: "pending" }))
+      .mockResolvedValueOnce(jsonResponse({ id: providerProfileId }))
+      .mockResolvedValueOnce(jsonResponse({ status: "success" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAgentPreset(adminPresetId, { name: "Updated preset" });
+    await getAgentPresetUpdatePreview(adminPresetId);
+    await deactivateAgentPreset(adminPresetId);
+    await updateMemoryBackendProfile(memoryProfileId, { name: "Updated memory" });
+    await getMemoryBackendProfileHealth(memoryProfileId);
+    await getMemoryBackendProfileLogs(memoryProfileId, 7);
+    await listMemoryBackendProfileJobs(memoryProfileId, { status: "failed", limit: 5 });
+    await runMemoryBackendProfileEvalSmoke(memoryProfileId);
+    await deleteMemoryBackendProfile(memoryProfileId);
+    await retryMemoryWriteJob(memoryJobId);
+    await updateProviderProfile(providerProfileId, { name: "Updated provider" });
+    await testProviderProfile(providerProfileId, "Reply with OK.");
+    await disableProviderProfile(providerProfileId);
+
+    const presetSegment = encodeURIComponent(adminPresetId);
+    const memoryProfileSegment = encodeURIComponent(memoryProfileId);
+    const memoryJobSegment = encodeURIComponent(memoryJobId);
+    const providerProfileSegment = encodeURIComponent(providerProfileId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/agent-presets/${presetSegment}`,
+      `/api/agent-presets/${presetSegment}/update-preview`,
+      `/api/agent-presets/${presetSegment}`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/health`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/logs?limit=7`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/jobs?status=failed&limit=5`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/eval-smoke`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}`,
+      `/api/memory-write-jobs/${memoryJobSegment}/retry`,
+      `/api/provider-profiles/${providerProfileSegment}`,
+      `/api/provider-profiles/${providerProfileSegment}/test-call`,
+      `/api/provider-profiles/${providerProfileSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[0][1].headers as Headers;
     expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 

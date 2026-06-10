@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web admin preset/memory/provider API client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin platform admin preset, memory backend, memory write job, and provider profile API path-boundary remediation for F-050.
+- Finding: F-050 found `web/lib/worlds/client.ts` building agent preset, memory backend profile, memory write job retry, and provider profile helper URLs from decoded preset/profile/job identifiers without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring platform admin Web helpers to preserve same-origin route boundaries, then encoded preset, memory backend profile, memory write job, and provider profile identifiers for the scoped helper group. Existing memory log/job filters remain query data.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving preset, memory backend profile, memory write job, and provider profile identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing platform admin helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 35 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 158 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit outside `web/lib/worlds/client.ts`, especially other client/proxy modules and Next route handlers for CSRF forwarding, method exposure, response header behavior, role boundary, evidence redaction, client-side data leaks, XSS-prone rendering sinks, and admin/player/member boundary drift. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## Post-v1.1 RC Audit and Hardening Web event/episode/group/relationship/conflict/rumor/dashboard API client path boundary entry
 
 - Date: 2026-06-09

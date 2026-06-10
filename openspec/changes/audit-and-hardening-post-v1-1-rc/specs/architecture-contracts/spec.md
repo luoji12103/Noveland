@@ -338,3 +338,11 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web client manages platform admin presets, memory backends, memory jobs, and provider profiles
+- **GIVEN** browser-side Web client code issues platform admin agent preset, memory backend profile, memory write job retry, or provider profile requests through same-origin API routes
+- **AND** the preset, memory backend profile, memory write job, or provider profile identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.

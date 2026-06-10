@@ -535,7 +535,7 @@ export function updateAgentPreset(
   presetId: string,
   input: AgentPresetUpdateInput,
 ): Promise<AgentPreset> {
-  return apiRequest<AgentPreset>(`/api/agent-presets/${presetId}`, {
+  return apiRequest<AgentPreset>(`/api/agent-presets/${pathSegment(presetId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -546,13 +546,13 @@ export function getAgentPresetUpdatePreview(
   presetId: string,
 ): Promise<AgentPresetUpdatePreview> {
   return apiRequest<AgentPresetUpdatePreview>(
-    `/api/agent-presets/${presetId}/update-preview`,
+    `/api/agent-presets/${pathSegment(presetId)}/update-preview`,
     { method: "GET" },
   );
 }
 
 export function deactivateAgentPreset(presetId: string): Promise<void> {
-  return apiRequest<void>(`/api/agent-presets/${presetId}`, {
+  return apiRequest<void>(`/api/agent-presets/${pathSegment(presetId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2536,15 +2536,18 @@ export function updateMemoryBackendProfile(
   profileId: string,
   input: MemoryBackendProfileUpdateInput,
 ): Promise<MemoryBackendProfile> {
-  return apiRequest<MemoryBackendProfile>(`/api/memory-backend-profiles/${profileId}`, {
-    method: "PATCH",
-    body: input,
-    csrf: true,
-  });
+  return apiRequest<MemoryBackendProfile>(
+    `/api/memory-backend-profiles/${pathSegment(profileId)}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function deleteMemoryBackendProfile(profileId: string): Promise<void> {
-  return apiRequest<void>(`/api/memory-backend-profiles/${profileId}`, {
+  return apiRequest<void>(`/api/memory-backend-profiles/${pathSegment(profileId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2554,7 +2557,7 @@ export function getMemoryBackendProfileHealth(
   profileId: string,
 ): Promise<MemoryBackendHealth> {
   return apiRequest<MemoryBackendHealth>(
-    `/api/memory-backend-profiles/${profileId}/health`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/health`,
     { method: "GET" },
   );
 }
@@ -2564,7 +2567,9 @@ export function getMemoryBackendProfileLogs(
   limit = 20,
 ): Promise<MemoryBackendLogs> {
   return apiRequest<MemoryBackendLogs>(
-    `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/logs?limit=${encodeURIComponent(
+      String(limit),
+    )}`,
     { method: "GET" },
   );
 }
@@ -2589,23 +2594,26 @@ export function listMemoryBackendProfileJobs(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return apiRequest<MemoryWriteJobList>(
-    `/api/memory-backend-profiles/${profileId}/jobs${suffix}`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/jobs${suffix}`,
     { method: "GET" },
   );
 }
 
 export function retryMemoryWriteJob(jobId: string): Promise<MemoryWriteJob> {
-  return apiRequest<MemoryWriteJob>(`/api/memory-write-jobs/${jobId}/retry`, {
-    method: "POST",
-    csrf: true,
-  });
+  return apiRequest<MemoryWriteJob>(
+    `/api/memory-write-jobs/${pathSegment(jobId)}/retry`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function runMemoryBackendProfileEvalSmoke(
   profileId: string,
 ): Promise<MemoryEvalResult> {
   return apiRequest<MemoryEvalResult>(
-    `/api/memory-backend-profiles/${profileId}/eval-smoke`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/eval-smoke`,
     {
       method: "POST",
       csrf: true,
@@ -2625,7 +2633,7 @@ export function updateProviderProfile(
   profileId: string,
   input: ProviderProfileUpdateInput,
 ): Promise<ProviderProfile> {
-  return apiRequest<ProviderProfile>(`/api/provider-profiles/${profileId}`, {
+  return apiRequest<ProviderProfile>(`/api/provider-profiles/${pathSegment(profileId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2633,7 +2641,7 @@ export function updateProviderProfile(
 }
 
 export function disableProviderProfile(profileId: string): Promise<void> {
-  return apiRequest<void>(`/api/provider-profiles/${profileId}`, {
+  return apiRequest<void>(`/api/provider-profiles/${pathSegment(profileId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2643,11 +2651,14 @@ export function testProviderProfile(
   profileId: string,
   prompt?: string,
 ): Promise<ProviderTestCallResult> {
-  return apiRequest<ProviderTestCallResult>(`/api/provider-profiles/${profileId}/test-call`, {
-    method: "POST",
-    body: prompt === undefined || prompt.trim() === "" ? {} : { prompt },
-    csrf: true,
-  });
+  return apiRequest<ProviderTestCallResult>(
+    `/api/provider-profiles/${pathSegment(profileId)}/test-call`,
+    {
+      method: "POST",
+      body: prompt === undefined || prompt.trim() === "" ? {} : { prompt },
+      csrf: true,
+    },
+  );
 }
 
 type WorldRequestOptions = {
