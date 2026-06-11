@@ -34,10 +34,11 @@ export async function getBetaFeedbackData(
     if (selectedWorld === null) {
       return emptyBetaFeedbackData(worlds, "Unable to load selected world.");
     }
+    const worldPath = `/worlds/${pathSegment(worldId)}`;
     const [worldlines, reports, memberships] = await Promise.all([
-      apiFetch<Worldline[]>(`/worlds/${worldId}/worldlines`, cookies),
-      apiFetch<BetaFeedbackReport[]>(`/worlds/${worldId}/beta-feedback/reports`, cookies),
-      apiFetchOptional<Membership[]>(`/worlds/${worldId}/memberships`, cookies),
+      apiFetch<Worldline[]>(`${worldPath}/worldlines`, cookies),
+      apiFetch<BetaFeedbackReport[]>(`${worldPath}/beta-feedback/reports`, cookies),
+      apiFetchOptional<Membership[]>(`${worldPath}/memberships`, cookies),
     ]);
     return {
       worlds,
@@ -57,6 +58,10 @@ export async function getBetaFeedbackData(
 
 async function cookieHeader(): Promise<string | null> {
   return (await headers()).get("cookie");
+}
+
+function pathSegment(value: string): string {
+  return encodeURIComponent(value);
 }
 
 async function apiFetch<T>(path: string, cookieHeaderValue: string | null): Promise<T> {

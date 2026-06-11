@@ -293,6 +293,14 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
+
+#### Scenario: Web beta feedback server loader fetches scoped backend records
+- **GIVEN** server-rendered Web beta feedback loader code fetches world-scoped worldline, feedback report, or membership records from backend API routes
+- **AND** the world identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web server loader constructs the backend API URL
+- **THEN** the world identifier segment SHALL be encoded before it is appended to the backend API path
+- **AND** query-string and fragment delimiters SHALL remain encoded inside the world identifier path segment rather than becoming request query parameters or fragments.
+
 #### Scenario: Web server workspace loaders fetch scoped backend records
 - **GIVEN** server-rendered Web loader code fetches world workspace, agent detail, conversation, player, reader, worldline, or platform memory backend records from backend API routes
 - **AND** the world identifier or a nested backend record identifier contains encoded path separators or other reserved path characters
