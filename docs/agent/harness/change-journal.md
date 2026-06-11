@@ -4018,3 +4018,15 @@
 - Tests added/updated: Expanded observability unit coverage for value-level redaction in diagnostic details and for event_type/message/details redaction through RuntimeDiagnosticsService record/list paths.
 - Verification: `cd backend && uv run pytest tests/test_observability.py tests/test_observability_incidents.py -q` passed with 6 tests; `cd backend && uv run pytest tests/test_api_conversations.py tests/test_api_realtime.py tests/test_api_worlds.py::test_world_diagnostics_require_world_admin -q` passed with 13 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; full `cd backend && uv run ruff check .` and `cd backend && uv run mypy .` passed.
 - Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, speech/API output, remaining player/member DTOs, and then resume Web/e2e/product/spec-history batches. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Speech safe response entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-066.
+- Finding: F-066 found `POST /worlds/{world_id}/speech/tts` returning `output_asset.storage_uri` and `output_objects[].storage_uri` internal `media://...` locators plus raw invocation text in the speech test response.
+- Summary: Added a speech-admin-console OpenSpec scenario for safe TTS/STT test responses, introduced speech-specific API response DTOs, and shaped TTS/STT responses to preserve safe IDs, world/worldline scope, status, MIME/checksum metadata, transcript text, and invocation IDs while omitting media storage locators, media job request/result internals, and raw invocation text/json/error fields.
+- Files changed: backend/services/api/src/noveland/services/api/speech.py, backend/tests/test_api_speech.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/speech-admin-console/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded the speech API integration test to assert TTS/STT responses do not contain `storage_uri`, `media://`, media job request/result/config fields, or raw invocation payload fields.
+- Verification: `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_speech.py tests/test_speech_service.py tests/test_voice_profiles.py -q` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
+- Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, remaining player/member DTOs, and worldline isolation edge cases, then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -186,10 +187,14 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
     assert binding.json()["is_default"] is True
     assert style.status_code == 201
     assert tts.status_code == 201
-    assert tts.json()["output_asset"]["asset_role"] == "speech_audio"
-    assert tts.json()["output_objects"][0]["mime_type"] == "audio/wav"
+    tts_body = tts.json()
+    assert tts_body["output_asset"]["asset_role"] == "speech_audio"
+    assert tts_body["output_objects"][0]["mime_type"] == "audio/wav"
+    _assert_safe_speech_response(tts_body)
     assert stt.status_code == 201
-    assert stt.json()["transcript"]["transcript_text"] == "fake transcript"
+    stt_body = stt.json()
+    assert stt_body["transcript"]["transcript_text"] == "fake transcript"
+    _assert_safe_speech_response(stt_body)
     assert transcripts.status_code == 200
     assert transcripts.json()[0]["source_asset_id"] == str(source_asset_id)
     assert owner_profiles.status_code == 200
@@ -217,6 +222,28 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
 
 class _SpeechApiClient(TestClient):
     speech_storage: LocalMediaObjectStorage
+
+
+def _assert_safe_speech_response(body: dict[str, object]) -> None:
+    serialized = json.dumps(body)
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "request_json" not in serialized
+    assert "result_json" not in serialized
+    assert "provider_config_json" not in serialized
+    invocation = body["model_invocation"]
+    assert isinstance(invocation, dict)
+    for forbidden_field in (
+        "input_text",
+        "output_text",
+        "input_json",
+        "output_json",
+        "request_params_json",
+        "response_metadata_json",
+        "error_text",
+    ):
+        assert forbidden_field not in invocation
+
 
 
 def _client_with_database() -> tuple[_SpeechApiClient, Engine]:

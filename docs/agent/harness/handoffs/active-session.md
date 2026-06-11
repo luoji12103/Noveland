@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T07:20:00+08:00
+- Date: 2026-06-12T08:20:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-065 are remediated on this branch; latest batch is F-065 observability diagnostics text/value redaction.
+- Status: F-001 through F-066 are remediated on this branch; latest batch is F-066 speech TTS/STT safe response shaping.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-065 batch: aa8d3ec fix(beta-feedback): redact reporter triage evidence.
+- Base before F-066 batch: 8307adf fix(observability): redact diagnostic text values.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services at F-065 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
+- Current server services at F-066 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,32 +26,30 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime server state after the previous push: branch `feature/audit-and-hardening-post-v1-1-rc`, clean worktree, local/remote in sync, active OpenSpec change, Postgres/NATS healthy, and OpenSpec specs/changes strict validation passing before edits.
-- Continued backend forbidden-evidence audit across moderation and observability. Moderation routes remain admin-only for report/action/incident read surfaces except member report creation, with CSRF on persisted mutations; no moderation reporter/admin backflow defect was confirmed beyond already-fixed F-064.
-- Recorded/remediated F-065: runtime diagnostics only redacted detail values by sensitive key, leaving secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, or base64 in event_type/message or safe-key detail values; focused observability tests also exposed a conversations/observability package import cycle.
-- Added an observability OpenSpec scenario requiring runtime diagnostic text/value redaction before persistence and again on read for historical records.
-- Broke the conversations-to-observability top-level import cycle with a lazy diagnostics service lookup.
-- Added value-level redaction for runtime diagnostic event_type, message, and details, applied before persistence and on `_record()` read shaping.
-- Added focused observability tests for value-level redaction and service record/list behavior.
+- Reconfirmed realtime server state: branch `feature/audit-and-hardening-post-v1-1-rc`, clean worktree at start, local branch ahead of origin by F-065 only, active OpenSpec change valid, Postgres/NATS healthy.
+- Continued backend forbidden-evidence audit across speech APIs. Speech management routes are world-admin scoped and provider calls go through `ProviderExecutionService`; voice profile worldline media reference validation from F-063 remains in place.
+- Recorded/remediated F-066: speech TTS/STT test action responses returned raw `MediaAssetRecord`/`MediaObjectRecord`/`InvocationRecordView` DTOs, exposing `media://` storage URIs and raw invocation text in the immediate speech admin response.
+- Added a speech-admin-console OpenSpec scenario requiring speech test responses to omit storage locators, raw provider request/output payloads, resolved secrets, bytes, and base64 while preserving safe operator follow-up IDs and metadata.
+- Added speech-specific safe API response DTOs for TTS/STT results and shaped responses at the API layer without changing speech service persistence, provider execution, media storage, or invocation ledger records.
+- Expanded the speech API test to assert TTS/STT responses do not contain `storage_uri`, `media://`, job request/result/config fields, or raw invocation payload fields.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_observability.py tests/test_observability_incidents.py -q` passed with 6 tests.
-- `cd backend && uv run pytest tests/test_api_conversations.py tests/test_api_realtime.py tests/test_api_worlds.py::test_world_diagnostics_require_world_admin -q` passed with 13 tests.
-- `cd backend && uv run ruff check packages/observability/src/noveland/observability/services.py packages/conversations/src/noveland/conversations/services.py tests/test_observability.py` passed.
-- `cd backend && uv run mypy packages/observability/src/noveland/observability/services.py packages/conversations/src/noveland/conversations/services.py tests/test_observability.py` passed.
+- `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 1 test.
+- `cd backend && uv run pytest tests/test_api_speech.py tests/test_speech_service.py tests/test_voice_profiles.py -q` passed with 11 tests.
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/speech.py tests/test_api_speech.py` passed.
+- `cd backend && uv run mypy services/api/src/noveland/services/api/speech.py tests/test_api_speech.py` passed.
 - OpenSpec strict validations and `git diff --check` passed after documentation updates.
-- Full `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
-- Full `cd backend && uv run ruff check .` and `cd backend && uv run mypy .` passed.
+- Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
 
 ## Remaining Work
 
-1. Commit the completed F-065 batch after final status review; do not push unless explicitly requested.
-2. Continue backend forbidden-evidence audits for privacy export contents, speech/API output, remaining player/member DTOs, and worldline isolation edge cases.
+1. Commit the completed F-066 batch after final status review; do not push unless explicitly requested.
+2. Continue backend forbidden-evidence audits for privacy export contents, remaining player/member DTOs, and worldline isolation edge cases.
 3. Continue Web/e2e security audit on remaining Next route handlers, proxy modules, method exposure, response shaping, role boundary, evidence redaction, and client-side leaks.
 
-## Finding F-065
+## Finding F-066
 
-- Runtime diagnostics preserved sensitive marker values in diagnostic event_type/message and safe-key detail values.
-- The remediation redacts secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, and base64 before persistence and again on read for historical diagnostics.
-- Residual risk: admin diagnostics may still include safe operator context by design; continue reviewing lower-privilege diagnostics and product-facing degraded-state surfaces for evidence leaks.
+- Speech TTS/STT API responses exposed internal media storage URIs and raw invocation payload fields.
+- The remediation shapes speech action responses through safe DTOs that omit storage locators, media job internals, and raw invocation payload fields while preserving safe IDs/status/MIME/checksum/transcript/invocation follow-up fields.
+- Residual risk: dedicated admin media and invocation ledger routes still intentionally expose deeper operator evidence according to their own access/redaction contracts; continue auditing lower-privilege and product-facing surfaces.

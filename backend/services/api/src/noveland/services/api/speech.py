@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -89,6 +91,122 @@ class SpeechStyleMappingCreateRequest(BaseModel):
     provider_kind: str = Field(min_length=1, max_length=80)
     emotion_key: str = Field(min_length=1, max_length=80)
     style_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class SpeechMediaJobResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    conversation_id: uuid.UUID | None
+    turn_id: uuid.UUID | None
+    agent_id: uuid.UUID | None
+    job_kind: str
+    status: str
+    priority: int
+    provider_kind: str | None
+    source_event_id: uuid.UUID | None
+    source_invocation_id: uuid.UUID | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SpeechMediaAssetResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    asset_kind: str
+    asset_role: str
+    source_kind: str
+    status: str
+    visibility: str
+    mime_type: str | None
+    file_ext: str | None
+    size_bytes: int | None
+    checksum_sha256: str | None
+    width: int | None
+    height: int | None
+    duration_ms: int | None
+    sample_rate_hz: int | None
+    audio_channels: int | None
+    has_alpha: bool | None
+    color_mode: str | None
+    provider_kind: str | None
+    source_job_id: uuid.UUID | None
+    source_event_id: uuid.UUID | None
+    source_invocation_id: uuid.UUID | None
+    title: str | None
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SpeechMediaObjectResponse(BaseModel):
+    id: uuid.UUID
+    asset_id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    object_role: str
+    filename: str | None
+    mime_type: str
+    size_bytes: int
+    checksum_sha256: str
+    width: int | None
+    height: int | None
+    duration_ms: int | None
+    sample_rate_hz: int | None
+    audio_channels: int | None
+    frame_rate: float | None
+    created_at: datetime
+
+
+class SpeechInvocationResponse(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    worldline_id: uuid.UUID
+    trace_id: uuid.UUID
+    parent_invocation_id: uuid.UUID | None
+    invocation_kind: str
+    actor_kind: str
+    agent_id: uuid.UUID | None
+    conversation_id: uuid.UUID | None
+    turn_id: uuid.UUID | None
+    world_event_id: uuid.UUID | None
+    media_job_id: uuid.UUID | None
+    media_asset_id: uuid.UUID | None
+    memory_write_job_id: uuid.UUID | None
+    provider_kind: str
+    model_name: str | None
+    model_version: str | None
+    prompt_template_key: str | None
+    prompt_template_version: int | None
+    usage_json: dict[str, Any] | None
+    latency_ms: int | None
+    estimated_cost: Decimal | None
+    status: str
+    visibility: str
+    redaction_status: str
+    retention_policy: str
+    contains_sensitive_context: bool
+    purge_after: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SafeTTSResult(BaseModel):
+    media_job: SpeechMediaJobResponse
+    output_asset: SpeechMediaAssetResponse
+    output_objects: list[SpeechMediaObjectResponse]
+    model_invocation: SpeechInvocationResponse
+    model_invocation_id: uuid.UUID
+
+
+class SafeSTTResult(BaseModel):
+    media_job: SpeechMediaJobResponse
+    transcript: SpeechTranscriptRead
+    model_invocation: SpeechInvocationResponse
+    model_invocation_id: uuid.UUID
 
 
 @router.get("/voice-profiles", response_model=list[VoiceProfileRead])
@@ -250,7 +368,7 @@ def delete_agent_voice_profile_binding(
 
 @router.post(
     "/tts",
-    response_model=TTSResult,
+    response_model=SafeTTSResult,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_csrf)],
 )
@@ -261,13 +379,14 @@ def text_to_speech(
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_speech_storage)],
-) -> TTSResult:
+) -> SafeTTSResult:
     try:
-        return SpeechService(db_session, storage).text_to_speech(
+        result = SpeechService(db_session, storage).text_to_speech(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
         )
+        return _safe_tts_result(result)
     except (
         ProviderNotFoundError,
         ProviderValidationError,
@@ -281,7 +400,7 @@ def text_to_speech(
 
 @router.post(
     "/stt",
-    response_model=STTResult,
+    response_model=SafeSTTResult,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_csrf)],
 )
@@ -292,13 +411,14 @@ def speech_to_text(
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_speech_storage)],
-) -> STTResult:
+) -> SafeSTTResult:
     try:
-        return SpeechService(db_session, storage).speech_to_text(
+        result = SpeechService(db_session, storage).speech_to_text(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
         )
+        return _safe_stt_result(result)
     except (
         ProviderValidationError,
         ProviderExecutionError,
@@ -408,6 +528,139 @@ def delete_style_mapping(
     except SpeechNotFoundError as exc:
         raise _not_found() from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _safe_tts_result(result: TTSResult) -> SafeTTSResult:
+    return SafeTTSResult(
+        media_job=_safe_media_job(result.media_job),
+        output_asset=_safe_media_asset(result.output_asset),
+        output_objects=[_safe_media_object(item) for item in result.output_objects],
+        model_invocation=_safe_invocation(result.model_invocation),
+        model_invocation_id=result.model_invocation_id,
+    )
+
+
+def _safe_stt_result(result: STTResult) -> SafeSTTResult:
+    return SafeSTTResult(
+        media_job=_safe_media_job(result.media_job),
+        transcript=result.transcript,
+        model_invocation=_safe_invocation(result.model_invocation),
+        model_invocation_id=result.model_invocation_id,
+    )
+
+
+def _safe_media_job(job: Any) -> SpeechMediaJobResponse:
+    return SpeechMediaJobResponse(
+        id=job.id,
+        world_id=job.world_id,
+        worldline_id=job.worldline_id,
+        conversation_id=job.conversation_id,
+        turn_id=job.turn_id,
+        agent_id=job.agent_id,
+        job_kind=_enum_value(job.job_kind),
+        status=_enum_value(job.status),
+        priority=job.priority,
+        provider_kind=job.provider_kind,
+        source_event_id=job.source_event_id,
+        source_invocation_id=job.source_invocation_id,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
+def _safe_media_asset(asset: Any) -> SpeechMediaAssetResponse:
+    return SpeechMediaAssetResponse(
+        id=asset.id,
+        world_id=asset.world_id,
+        worldline_id=asset.worldline_id,
+        asset_kind=_enum_value(asset.asset_kind),
+        asset_role=_enum_value(asset.asset_role),
+        source_kind=_enum_value(asset.source_kind),
+        status=_enum_value(asset.status),
+        visibility=_enum_value(asset.visibility),
+        mime_type=asset.mime_type,
+        file_ext=asset.file_ext,
+        size_bytes=asset.size_bytes,
+        checksum_sha256=asset.checksum_sha256,
+        width=asset.width,
+        height=asset.height,
+        duration_ms=asset.duration_ms,
+        sample_rate_hz=asset.sample_rate_hz,
+        audio_channels=asset.audio_channels,
+        has_alpha=asset.has_alpha,
+        color_mode=asset.color_mode,
+        provider_kind=asset.provider_kind,
+        source_job_id=asset.source_job_id,
+        source_event_id=asset.source_event_id,
+        source_invocation_id=asset.source_invocation_id,
+        title=asset.title,
+        description=asset.description,
+        created_at=asset.created_at,
+        updated_at=asset.updated_at,
+    )
+
+
+def _safe_media_object(media_object: Any) -> SpeechMediaObjectResponse:
+    return SpeechMediaObjectResponse(
+        id=media_object.id,
+        asset_id=media_object.asset_id,
+        world_id=media_object.world_id,
+        worldline_id=media_object.worldline_id,
+        object_role=_enum_value(media_object.object_role),
+        filename=media_object.filename,
+        mime_type=media_object.mime_type,
+        size_bytes=media_object.size_bytes,
+        checksum_sha256=media_object.checksum_sha256,
+        width=media_object.width,
+        height=media_object.height,
+        duration_ms=media_object.duration_ms,
+        sample_rate_hz=media_object.sample_rate_hz,
+        audio_channels=media_object.audio_channels,
+        frame_rate=media_object.frame_rate,
+        created_at=media_object.created_at,
+    )
+
+
+def _safe_invocation(invocation: Any) -> SpeechInvocationResponse:
+    return SpeechInvocationResponse(
+        id=invocation.id,
+        world_id=invocation.world_id,
+        worldline_id=invocation.worldline_id,
+        trace_id=invocation.trace_id,
+        parent_invocation_id=invocation.parent_invocation_id,
+        invocation_kind=_enum_value(invocation.invocation_kind),
+        actor_kind=_enum_value(invocation.actor_kind),
+        agent_id=invocation.agent_id,
+        conversation_id=invocation.conversation_id,
+        turn_id=invocation.turn_id,
+        world_event_id=invocation.world_event_id,
+        media_job_id=invocation.media_job_id,
+        media_asset_id=invocation.media_asset_id,
+        memory_write_job_id=invocation.memory_write_job_id,
+        provider_kind=_enum_value(invocation.provider_kind),
+        model_name=invocation.model_name,
+        model_version=invocation.model_version,
+        prompt_template_key=invocation.prompt_template_key,
+        prompt_template_version=invocation.prompt_template_version,
+        usage_json=invocation.usage_json,
+        latency_ms=invocation.latency_ms,
+        estimated_cost=invocation.estimated_cost,
+        status=_enum_value(invocation.status),
+        visibility=_enum_value(invocation.visibility),
+        redaction_status=_enum_value(invocation.redaction_status),
+        retention_policy=_enum_value(invocation.retention_policy),
+        contains_sensitive_context=invocation.contains_sensitive_context,
+        purge_after=invocation.purge_after,
+        created_at=invocation.created_at,
+        updated_at=invocation.updated_at,
+    )
+
+
+def _enum_value(value: Any) -> Any:
+    return value.value if hasattr(value, "value") else value
+
 
 
 def _actor_ref(subject: AuthenticatedSubject) -> str:
