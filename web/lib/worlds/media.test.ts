@@ -149,13 +149,37 @@ describe("media admin client", () => {
   });
 
   it("builds safe backend download paths from object ids only", () => {
+    const readerWorldId = "11111111-1111-4111-8111-111111111111";
+    const readerObjectId = "22222222-2222-4222-8222-222222222222";
+    const readerDownloadPath =
+      `/api/worlds/${readerWorldId}/reader/media/objects/${readerObjectId}/download`;
+
     expect(mediaObjectDownloadPath("world-1", "object-1")).toBe(
       "/api/worlds/world-1/media/objects/object-1/download",
     );
     expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/objects/${readerObjectId}/download`,
+      ),
+    ).toBe(readerDownloadPath);
+    expect(readerMediaObjectDownloadPath(readerDownloadPath)).toBe(readerDownloadPath);
+    expect(readerMediaObjectDownloadPath("media://hidden/object")).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/objects/${readerObjectId}/download?token=secret`,
+      ),
+    ).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/objects/${readerObjectId}/download/extra`,
+      ),
+    ).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(`/worlds/${readerWorldId}/media/objects/${readerObjectId}/download`),
+    ).toBeNull();
+    expect(
       readerMediaObjectDownloadPath("/worlds/world-1/reader/media/objects/object-1/download"),
-    ).toBe("/api/worlds/world-1/reader/media/objects/object-1/download");
-    expect(readerMediaObjectDownloadPath("media://hidden/object")).toBe("");
+    ).toBeNull();
   });
 });
 

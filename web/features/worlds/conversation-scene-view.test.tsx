@@ -14,11 +14,11 @@ describe("ConversationSceneView", () => {
     expect(screen.getByText("Guide replies to the reader.")).toBeVisible();
     expect(screen.getByLabelText("Reader-safe scene image")).toHaveStyle({
       backgroundImage:
-        "url(/api/worlds/world-1/reader/media/objects/composite-object-1/download)",
+        `url(/api/worlds/${READER_WORLD_ID}/reader/media/objects/${COMPOSITE_OBJECT_ID}/download)`,
     });
     expect(screen.getByLabelText("Scene audio")).toHaveAttribute(
       "src",
-      "/api/worlds/world-1/reader/media/objects/audio-object-1/download",
+      `/api/worlds/${READER_WORLD_ID}/reader/media/objects/${AUDIO_OBJECT_ID}/download`,
     );
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
@@ -75,6 +75,9 @@ function serializedDocument(): string {
 
 const RESERVED_WORLD_ID = "world/reader?mode=scene#frag";
 const RESERVED_CONVERSATION_ID = "conversation/live?debug=true#frag";
+const READER_WORLD_ID = "11111111-1111-4111-8111-111111111111";
+const COMPOSITE_OBJECT_ID = "22222222-2222-4222-8222-222222222222";
+const AUDIO_OBJECT_ID = "33333333-3333-4333-8333-333333333333";
 
 const sceneData: ConversationPlaybackData = {
   worlds: [],
@@ -214,7 +217,7 @@ const sceneData: ConversationPlaybackData = {
       duration_ms: null,
       objects: [
         {
-          object_id: "composite-object-1",
+          object_id: COMPOSITE_OBJECT_ID,
           object_role: "original",
           content_type: "image/png",
           size: 12,
@@ -224,7 +227,7 @@ const sceneData: ConversationPlaybackData = {
           duration_ms: null,
           sample_rate_hz: null,
           audio_channels: null,
-          download_url: "/worlds/world-1/reader/media/objects/composite-object-1/download",
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/objects/${COMPOSITE_OBJECT_ID}/download`,
         },
       ],
       references: [
@@ -255,7 +258,7 @@ const sceneData: ConversationPlaybackData = {
       duration_ms: 1000,
       objects: [
         {
-          object_id: "audio-object-1",
+          object_id: AUDIO_OBJECT_ID,
           object_role: "original",
           content_type: "audio/wav",
           size: 20,
@@ -265,7 +268,7 @@ const sceneData: ConversationPlaybackData = {
           duration_ms: 1000,
           sample_rate_hz: 24000,
           audio_channels: 1,
-          download_url: "/worlds/world-1/reader/media/objects/audio-object-1/download",
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/objects/${AUDIO_OBJECT_ID}/download`,
         },
       ],
       references: [

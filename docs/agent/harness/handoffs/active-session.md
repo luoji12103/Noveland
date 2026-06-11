@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T03:55:00+08:00
+- Date: 2026-06-12T19:31:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-056 are remediated on this branch.
+- Status: F-001 through F-057 are remediated on this branch.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-056 commit: 9a71684 fix(auth): require csrf for login.
+- Current HEAD before F-057 commit: 822f41c fix(memory): reject raw backend secrets.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services: Noveland Postgres is healthy on 55432->5432; Noveland NATS is healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
+- Current server services at batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started outside project Web build/e2e commands.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,20 +26,21 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime git/OpenSpec/service/test-entry status from the server before editing.
-- Continued backend/Web security audit after F-055 across Next routes, low-privilege DTOs, CSRF coverage, realtime streams, provider/runtime profiles, and memory backend secret boundaries.
-- Recorded and remediated F-056: memory backend profile config and `secret_refs` could persist raw secret material and then return it through platform runtime APIs/Web admin form state.
-- Added an architecture-contracts OpenSpec delta requiring memory backend profile config to reject raw secret material and keep `secret_refs` as runtime secret lookup references.
-- Added memory service validation for sensitive config keys, raw-secret-looking config values, non-empty single secret reference names, and raw-secret-looking `secret_refs` values.
-- Added memory service and runtime API regression coverage for rejecting direct `api_key` config and raw secret refs while preserving safe reference names.
+- Reconfirmed realtime git/OpenSpec/service status from the server before editing.
+- Continued Web rendering audit and recorded/remediated F-057: reader media descriptor `download_url` conversion accepted arbitrary same-origin `/worlds/...` or `/api/worlds/...` paths before image/audio rendering.
+- Added an architecture-contracts OpenSpec scenario requiring Web reader media rendering to accept only exact UUID reader-media object download routes and reject query, fragment, extra path, non-reader route, and non-backend scheme values.
+- Tightened `readerMediaObjectDownloadPath()` to normalize backend reader media URLs to `/api/...`, return `null` for rejected descriptor URLs, and keep playback/scene components on their existing missing-media fallback path.
+- Updated media helper and playback/scene component tests to use backend-contract UUID download URLs and assert rejected descriptor URL shapes.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_backend_profile_rejects_raw_secret_material tests/test_api_runtime.py::test_memory_backend_profile_api_rejects_raw_secret_material`: 2 passed.
-- `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py`: 26 passed.
-- `cd backend && uv run ruff check .`: passed.
-- `cd backend && uv run mypy .`: passed.
-- `cd backend && uv run pytest`: 563 passed, 8 skipped.
+- `cd web && npm run test -- lib/worlds/media.test.ts features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx`: 3 files and 13 tests passed.
+- `cd web && npm run lint`: passed.
+- `cd web && npm run typecheck`: passed.
+- `cd web && npm run test`: 51 files and 177 tests passed, with existing runtime-admin React act warnings.
+- `cd web && npm run build`: passed.
+- `cd web && npm run test:e2e`: 21 tests passed.
+- `cd web && npm run check:next-env`: initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`: passed.
 - `openspec validate --changes --strict`: passed with 1 passed.
 - `openspec validate --specs --strict`: passed with 76 specs.
@@ -51,8 +52,8 @@
 2. Audit Web rendering and project Playwright/e2e coverage for XSS-prone sinks, admin/player/member boundary gaps, and normal-use product flow drift without browser/computer-use plugins.
 3. Continue product normal-use and spec/history drift audit after Web route/proxy review.
 
-## Finding F-056
+## Finding F-057
 
-- Memory backend profile config accepted direct secret-bearing keys/values and `secret_refs` accepted obvious raw secret values before persistence.
-- The remediation rejects raw secret material at the memory service boundary before database writes while preserving safe reference names used for `NOVELAND_MEMORY_BACKEND_SECRETS_JSON` lookup.
-- Residual risk: remaining Web admin/client helper sharp edges, response error shaping, and client-rendering sinks still need separate evidence-based review before remediation.
+- Reader playback/scene media conversion accepted broad `/worlds/...` and `/api/worlds/...` descriptor URLs before rendering them as image/audio sources.
+- The remediation accepts only exact UUID reader-media object download routes and rejects non-backend schemes, query strings, fragments, extra path segments, alternate world routes, and non-UUID paths.
+- Residual risk: remaining Web route handlers/proxies and client-rendering surfaces still need separate evidence-based review before remediation.

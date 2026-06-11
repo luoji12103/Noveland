@@ -485,14 +485,17 @@ export function mediaObjectDownloadPath(worldId: string, objectId: string): stri
   return `${mediaPath(worldId)}/objects/${encodeURIComponent(objectId)}/download`;
 }
 
-export function readerMediaObjectDownloadPath(downloadUrl: string): string {
-  if (downloadUrl.startsWith("/api/worlds/")) {
-    return downloadUrl;
+const UUID_PATH_SEGMENT = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+const READER_MEDIA_DOWNLOAD_PATH_PATTERN = new RegExp(
+  `^/api/worlds/${UUID_PATH_SEGMENT}/reader/media/objects/${UUID_PATH_SEGMENT}/download$`,
+);
+
+export function readerMediaObjectDownloadPath(downloadUrl: string): string | null {
+  const path = downloadUrl.startsWith("/worlds/") ? `/api${downloadUrl}` : downloadUrl;
+  if (READER_MEDIA_DOWNLOAD_PATH_PATTERN.test(path)) {
+    return path;
   }
-  if (downloadUrl.startsWith("/worlds/")) {
-    return `/api${downloadUrl}`;
-  }
-  return "";
+  return null;
 }
 
 function query(filters: Record<string, unknown>): string {

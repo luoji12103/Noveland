@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web reader media download route boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web reader playback and scene media descriptor download URL boundary remediation for F-057.
+- Finding: F-057 found `web/lib/worlds/media.ts` accepting any descriptor `download_url` beginning with `/api/worlds/` or `/worlds/` and returning it for `<audio src>` or CSS `url(...)` rendering in `web/features/worlds/conversation-playback.tsx` and `web/features/worlds/conversation-scene-view.tsx`, while the backend reader media service emits only `/worlds/{world_uuid}/reader/media/objects/{object_uuid}/download` paths.
+- Summary: Added an architecture-contracts OpenSpec scenario for reader media rendering path boundaries, tightened `readerMediaObjectDownloadPath()` to accept only exact UUID reader-media object download routes and return `null` for non-backend schemes, query strings, fragments, extra path segments, alternate world routes, or non-UUID test paths, and updated playback/scene fixtures to use backend-contract UUID media URLs.
+- Files changed: `web/lib/worlds/media.ts`, `web/lib/worlds/media.test.ts`, `web/features/worlds/conversation-playback.test.tsx`, `web/features/worlds/conversation-scene-view.test.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded media helper coverage for accepted `/worlds/.../reader/media/objects/.../download` and `/api/worlds/.../reader/media/objects/.../download` UUID paths plus rejected `media://`, query, extra-path, non-reader media, and non-UUID descriptor URLs; updated playback and scene component tests to assert rendered safe media uses backend-contract UUID download paths.
+- Verification: `cd web && npm run test -- lib/worlds/media.test.ts features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx` passed with 3 files and 13 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 177 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handlers, proxy method/response shaping, admin/player/member boundary rendering, and product normal-use drift. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Memory backend profile secret-reference boundary entry
 
 - Date: 2026-06-12

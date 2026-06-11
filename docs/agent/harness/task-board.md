@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening
 - Post-v1.1 RC audit F-056 Memory backend profile secret-reference persistence boundary hardening
 - Post-v1.1 RC audit F-055 Auth login CSRF session-fixation boundary hardening
 - Post-v1.1 RC audit F-054 Web non-auth proxy Set-Cookie boundary hardening
@@ -542,3 +543,4 @@
 - Post-v1.1 RC audit F-050 Web admin preset/memory/provider client path boundary hardening
 - Post-v1.1 RC audit F-051 Web private beta/beta feedback client path boundary hardening
 - Post-v1.1 RC audit F-052 Web server workspace loader backend path boundary hardening
+- Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening

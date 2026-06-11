@@ -387,3 +387,10 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **WHEN** the component constructs a Next.js `Link` href or a browser navigation path
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the app route path
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web reader media rendering accepts scoped download paths
+- **GIVEN** browser-side Web playback or scene components render reader media descriptors
+- **AND** a descriptor supplies a `download_url` value
+- **WHEN** the client converts the descriptor URL into a same-origin media path
+- **THEN** it SHALL accept only exact reader media object download routes with UUID world and object path segments
+- **AND** it SHALL reject query strings, fragments, extra path segments, non-reader media routes, and non-backend media schemes before rendering image or audio sources.
