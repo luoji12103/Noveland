@@ -521,10 +521,12 @@ def test_media_api_upload_download_objects_and_restricted_visibility() -> None:
     assert download.status_code == 200
     assert download.content == b"image-bytes"
     assert download.headers["content-type"].startswith("image/png")
+    assert download.headers["x-content-type-options"] == "nosniff"
     assert member_download.status_code == 403
     assert owner_hidden_download.status_code == 404
     assert platform_hidden_download.status_code == 200
     assert platform_hidden_download.content == b"hidden-bytes"
+    assert platform_hidden_download.headers["x-content-type-options"] == "nosniff"
 
 
 def test_media_api_generic_references_turn_media_and_job_patch() -> None:

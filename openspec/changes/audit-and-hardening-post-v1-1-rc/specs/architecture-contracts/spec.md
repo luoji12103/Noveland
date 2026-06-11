@@ -199,6 +199,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the Web proxy response SHALL omit those `Set-Cookie` headers
 - **AND** authenticated auth routes MAY continue to relay backend cookie mutation headers required for login, logout, and CSRF flows.
 
+#### Scenario: Web proxies preserve media response safety headers
+- **GIVEN** a Web API route proxies a backend media object download or other byte response
+- **WHEN** the backend response contains safe response metadata such as content type, content disposition, content length, or `X-Content-Type-Options`
+- **THEN** the Web proxy response SHALL preserve the safe response metadata needed for browser download/rendering safety
+- **AND** it SHALL continue to omit backend cookie mutation headers unless an auth route explicitly opts in.
+
 #### Scenario: Login requires double-submit CSRF before session cookie creation
 - **GIVEN** a browser client submits credentials to the login route
 - **WHEN** the login request would create a new authenticated session cookie

@@ -612,7 +612,11 @@ def download_media_object(
         raise _unprocessable(str(exc)) from exc
     except MediaStorageError as exc:
         raise _not_found() from exc
-    return FastAPIResponse(content=data, media_type=media_object.mime_type)
+    return FastAPIResponse(
+        content=data,
+        media_type=media_object.mime_type,
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/assets/{asset_id}/tags", response_model=list[MediaAssetTagRecord])

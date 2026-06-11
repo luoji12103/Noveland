@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T19:31:00+08:00
+- Date: 2026-06-12T19:55:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-057 are remediated on this branch.
+- Status: F-001 through F-058 are remediated on this branch.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-057 commit: 822f41c fix(memory): reject raw backend secrets.
+- Current HEAD before F-058 commit: 23d9e5e fix(web): constrain reader media download urls.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services at batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started outside project Web build/e2e commands.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -27,17 +27,24 @@
 ## Completed This Batch
 
 - Reconfirmed realtime git/OpenSpec/service status from the server before editing.
-- Continued Web rendering audit and recorded/remediated F-057: reader media descriptor `download_url` conversion accepted arbitrary same-origin `/worlds/...` or `/api/worlds/...` paths before image/audio rendering.
-- Added an architecture-contracts OpenSpec scenario requiring Web reader media rendering to accept only exact UUID reader-media object download routes and reject query, fragment, extra path, non-reader route, and non-backend scheme values.
-- Tightened `readerMediaObjectDownloadPath()` to normalize backend reader media URLs to `/api/...`, return `null` for rejected descriptor URLs, and keep playback/scene components on their existing missing-media fallback path.
-- Updated media helper and playback/scene component tests to use backend-contract UUID download URLs and assert rejected descriptor URL shapes.
+- Continued Web route/proxy response-shaping audit and recorded/remediated F-058: backend reader media nosniff was dropped by Web proxy responses, and backend admin media byte downloads lacked nosniff.
+- Added an architecture-contracts OpenSpec scenario requiring Web proxies to preserve safe media/byte response metadata while still stripping cookie mutation headers outside auth routes.
+- Added `X-Content-Type-Options: nosniff` to backend admin media byte downloads.
+- Added a safe Web proxy response-header allowlist for content type, content disposition, content length, and nosniff while preserving existing no-store cache policy and Set-Cookie stripping.
+- Added backend media and Web world proxy regression coverage.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/worlds/media.test.ts features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx`: 3 files and 13 tests passed.
+- `cd backend && uv run pytest tests/test_api_media.py::test_media_api_upload_download_objects_and_restricted_visibility`: 1 test passed.
+- `cd web && npm run test -- lib/worlds/proxy.test.ts`: 1 file and 4 tests passed.
+- `cd backend && uv run pytest tests/test_api_media.py tests/test_api_reader_media.py`: 14 tests passed.
+- `cd web && npm run test -- lib/auth/proxy.test.ts lib/worlds/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts`: 5 files and 13 tests passed.
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py`: passed.
+- `cd backend && uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py`: passed.
+- `cd backend && uv run pytest`: 563 passed, 8 skipped.
 - `cd web && npm run lint`: passed.
 - `cd web && npm run typecheck`: passed.
-- `cd web && npm run test`: 51 files and 177 tests passed, with existing runtime-admin React act warnings.
+- `cd web && npm run test`: 51 files and 178 tests passed, with existing runtime-admin React act warnings.
 - `cd web && npm run build`: passed.
 - `cd web && npm run test:e2e`: 21 tests passed.
 - `cd web && npm run check:next-env`: initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
@@ -52,8 +59,8 @@
 2. Audit Web rendering and project Playwright/e2e coverage for XSS-prone sinks, admin/player/member boundary gaps, and normal-use product flow drift without browser/computer-use plugins.
 3. Continue product normal-use and spec/history drift audit after Web route/proxy review.
 
-## Finding F-057
+## Finding F-058
 
-- Reader playback/scene media conversion accepted broad `/worlds/...` and `/api/worlds/...` descriptor URLs before rendering them as image/audio sources.
-- The remediation accepts only exact UUID reader-media object download routes and rejects non-backend schemes, query strings, fragments, extra path segments, alternate world routes, and non-UUID paths.
+- Reader media downloads set nosniff at the backend boundary but the Web same-origin proxy dropped it; admin media downloads did not set nosniff.
+- The remediation adds nosniff to backend admin media byte downloads and preserves safe byte-response headers through Web proxies while continuing to strip backend Set-Cookie outside auth.
 - Residual risk: remaining Web route handlers/proxies and client-rendering surfaces still need separate evidence-based review before remediation.

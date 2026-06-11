@@ -61,6 +61,38 @@ describe("world proxy", () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
 
+  it("preserves media safety headers while stripping backend cookies", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: {
+            "content-type": "image/png",
+            "content-disposition": "attachment; filename=scene.png",
+            "content-length": "3",
+            "x-content-type-options": "nosniff",
+            "set-cookie": "noveland_session=attacker; Path=/",
+          },
+        }),
+      ),
+    );
+    const request = new NextRequest("http://web.example.test/api/worlds/world-1/reader/media/objects/object-1/download");
+
+    const response = await proxyWorldRequest(
+      request,
+      ["world-1", "reader", "media", "objects", "object-1", "download"],
+      "GET",
+    );
+
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("content-disposition")).toBe("attachment; filename=scene.png");
+    expect(response.headers.get("content-length")).toBe("3");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
   it("relays backend delete status", async () => {
     vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));

@@ -11,6 +11,13 @@ type ProxyResponseOptions = {
   relaySetCookie?: boolean;
 };
 
+const SAFE_PROXY_RESPONSE_HEADERS = [
+  "content-type",
+  "content-disposition",
+  "content-length",
+  "x-content-type-options",
+];
+
 export async function proxyAuthRequest(
   request: NextRequest,
   authPath: string,
@@ -33,10 +40,7 @@ export async function buildProxyResponse(
   options: ProxyResponseOptions = {},
 ): Promise<Response> {
   const responseHeaders = new Headers();
-  const contentType = backendResponse.headers.get("content-type");
-  if (contentType !== null) {
-    responseHeaders.set("content-type", contentType);
-  }
+  copySafeProxyResponseHeaders(backendResponse.headers, responseHeaders);
   responseHeaders.set("cache-control", "no-store");
   if (options.relaySetCookie === true) {
     for (const cookieHeader of extractSetCookieHeaders(backendResponse.headers)) {
@@ -78,6 +82,15 @@ export function extractSetCookieHeaders(headers: Headers): string[] {
 
   const singleHeader = headers.get("set-cookie");
   return singleHeader === null ? [] : [singleHeader];
+}
+
+function copySafeProxyResponseHeaders(source: Headers, target: Headers): void {
+  for (const headerName of SAFE_PROXY_RESPONSE_HEADERS) {
+    const value = source.get(headerName);
+    if (value !== null) {
+      target.set(headerName, value);
+    }
+  }
 }
 
 function buildForwardHeaders(request: NextRequest): Headers {
