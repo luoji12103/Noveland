@@ -193,6 +193,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **AND** query parameters SHALL be appended exactly once
 - **AND** query parameters SHALL NOT be embedded into the backend path argument before proxying.
 
+#### Scenario: Web non-auth proxies do not relay backend cookie mutation headers
+- **GIVEN** a Web API route proxies a non-auth backend route for worlds, runtime, plugins, private beta, presets, or world composition helpers
+- **WHEN** the backend response contains one or more `Set-Cookie` headers
+- **THEN** the Web proxy response SHALL omit those `Set-Cookie` headers
+- **AND** authenticated auth routes MAY continue to relay backend cookie mutation headers required for login, logout, and CSRF flows.
+
 ### Requirement: Web realtime clients preserve backend route boundaries
 The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
 

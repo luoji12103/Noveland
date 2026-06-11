@@ -38,6 +38,29 @@ describe("world proxy", () => {
     expect(headers.get("x-csrf-token")).toBe("csrf");
   });
 
+  it("strips backend set-cookie headers from non-auth world responses", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "set-cookie": "noveland_session=attacker; Path=/",
+          },
+        }),
+      ),
+    );
+    const request = new NextRequest("http://web.example.test/api/worlds/world-1");
+
+    const response = await proxyWorldRequest(request, ["world-1"], "GET");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    await expect(response.json()).resolves.toEqual({ ok: true });
+  });
+
   it("relays backend delete status", async () => {
     vi.stubEnv("NOVELAND_API_BASE_URL", "http://api.example.test");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));

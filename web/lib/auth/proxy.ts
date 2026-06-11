@@ -7,6 +7,10 @@ type CookieHeaders = Headers & {
   getSetCookie?: () => string[];
 };
 
+type ProxyResponseOptions = {
+  relaySetCookie?: boolean;
+};
+
 export async function proxyAuthRequest(
   request: NextRequest,
   authPath: string,
@@ -21,18 +25,23 @@ export async function proxyAuthRequest(
     cache: "no-store",
   });
 
-  return buildProxyResponse(backendResponse);
+  return buildProxyResponse(backendResponse, { relaySetCookie: true });
 }
 
-export async function buildProxyResponse(backendResponse: Response): Promise<Response> {
+export async function buildProxyResponse(
+  backendResponse: Response,
+  options: ProxyResponseOptions = {},
+): Promise<Response> {
   const responseHeaders = new Headers();
   const contentType = backendResponse.headers.get("content-type");
   if (contentType !== null) {
     responseHeaders.set("content-type", contentType);
   }
   responseHeaders.set("cache-control", "no-store");
-  for (const cookieHeader of extractSetCookieHeaders(backendResponse.headers)) {
-    responseHeaders.append("set-cookie", cookieHeader);
+  if (options.relaySetCookie === true) {
+    for (const cookieHeader of extractSetCookieHeaders(backendResponse.headers)) {
+      responseHeaders.append("set-cookie", cookieHeader);
+    }
   }
 
   const responseBody =
