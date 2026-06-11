@@ -9,12 +9,20 @@ vi.mock("next/headers", () => ({
 }));
 
 import {
+  getAgentDetailData,
+  getConversationDetailData,
+  getConversationPlaybackData,
   getInvocationLedgerAdminData,
   getMediaAdminData,
+  getMemoryBackendAdminData,
   getMultimodalDiagnosticsAdminData,
+  getNarrativeReaderDetailData,
+  getPlayerInteractionData,
   getProviderIntegrationAdminData,
   getSpeechAdminData,
   getVisualAdminData,
+  getWorldWorkspaceData,
+  getWorldlineBrowserData,
 } from "@/lib/worlds/server";
 
 describe("world server admin loaders", () => {
@@ -86,6 +94,58 @@ describe("world server admin loaders", () => {
     );
     expect(urls.join("\n")).not.toContain("/worlds/world/admin?");
   });
+
+  it("encodes reserved characters in workspace server loader backend path segments", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
+    const fetchMock = vi.fn(async (requestUrl: string) => responseForWorkspaceLoader(requestUrl));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getWorldWorkspaceData(worldId, true);
+    await getAgentDetailData(worldId, agentId, true);
+    await getConversationDetailData(worldId, conversationId);
+    await getConversationPlaybackData(worldId, conversationId);
+    await getPlayerInteractionData(worldId, userId);
+    await getWorldlineBrowserData(worldId, worldlineId, compareWorldlineId);
+    await getNarrativeReaderDetailData(worldId, artifactId);
+    await getMemoryBackendAdminData();
+
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+    const encodedWorld = encodeURIComponent(worldId);
+    const encodedAgent = encodeURIComponent(agentId);
+    const encodedConversation = encodeURIComponent(conversationId);
+    const encodedTurn = encodeURIComponent(turnId);
+    const encodedOrganization = encodeURIComponent(organizationId);
+    const encodedChecklistRun = encodeURIComponent(checklistRunId);
+    const encodedWorldline = encodeURIComponent(worldlineId);
+    const encodedCompareWorldline = encodeURIComponent(compareWorldlineId);
+    const encodedArtifact = encodeURIComponent(artifactId);
+    const encodedMemoryProfile = encodeURIComponent(memoryProfileId);
+
+    expect(urls).toContain(`${apiBase}/worlds/${encodedWorld}/agents/${encodedAgent}/presence`);
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/organizations/${encodedOrganization}/memberships`,
+    );
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/beta-checklists/${encodedChecklistRun}/items`,
+    );
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/conversations/${encodedConversation}/turns`,
+    );
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/conversations/${encodedConversation}/turns/${encodedTurn}/presentation`,
+    );
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/worldlines/${encodedWorldline}/compare/${encodedCompareWorldline}`,
+    );
+    expect(urls).toContain(
+      `${apiBase}/worlds/${encodedWorld}/narrative-artifacts/${encodedArtifact}`,
+    );
+    expect(urls).toContain(`${apiBase}/memory-backend-profiles/${encodedMemoryProfile}/health`);
+    expect(urls.join("\n")).not.toContain("/worlds/world/admin?");
+    expect(urls.join("\n")).not.toContain("/agents/agent/detail?");
+    expect(urls.join("\n")).not.toContain("/conversations/conversation/live?");
+    expect(urls.join("\n")).not.toContain("/memory-backend-profiles/memory/profile?");
+  });
 });
 
 const apiBase = "http://api.example.test";
@@ -96,6 +156,14 @@ const spriteSetId = "sprite/set?variant=true#frag";
 const agentId = "agent/voice?main=true#frag";
 const invocationId = "invoke/raw?prompt=true#frag";
 const worldlineId = "worldline/live?branch=1#frag";
+const compareWorldlineId = "worldline/compare?branch=2#frag";
+const conversationId = "conversation/live?debug=true#frag";
+const turnId = "turn/live?presentation=true#frag";
+const artifactId = "artifact/reader?draft=false#frag";
+const organizationId = "organization/main?view=admin#frag";
+const checklistRunId = "checklist/run?items=true#frag";
+const memoryProfileId = "memory/profile?logs=true#frag";
+const userId = "user/player?scope=member#frag";
 
 function responseFor(requestUrl: string): Response {
   const url = new URL(requestUrl);
@@ -174,6 +242,91 @@ function responseFor(requestUrl: string): Response {
   }
 
   throw new Error(`Unexpected backend URL: ${requestUrl}`);
+}
+
+function responseForWorkspaceLoader(requestUrl: string): Response {
+  const url = new URL(requestUrl);
+  const encodedWorld = encodeURIComponent(worldId);
+  const worldPrefix = `/worlds/${encodedWorld}`;
+
+  if (url.pathname === "/worlds") {
+    return jsonResponse([{ id: worldId, name: "World" }]);
+  }
+  if (url.pathname === "/plugins/catalog") {
+    return jsonResponse([]);
+  }
+  if (url.pathname === "/provider-profiles" || url.pathname === "/agent-presets") {
+    return jsonResponse([]);
+  }
+  if (url.pathname === "/memory-backend-profiles") {
+    return jsonResponse([{ id: memoryProfileId, profile_key: "mem0", display_name: "Mem0" }]);
+  }
+  if (url.pathname === `/memory-backend-profiles/${encodeURIComponent(memoryProfileId)}/health`) {
+    return jsonResponse({ status: "healthy" });
+  }
+  if (url.pathname === `/memory-backend-profiles/${encodeURIComponent(memoryProfileId)}/logs`) {
+    return jsonResponse({ write_logs: [], retrieval_logs: [] });
+  }
+  if (url.pathname === `/memory-backend-profiles/${encodeURIComponent(memoryProfileId)}/jobs`) {
+    return jsonResponse({ jobs: [], total: 0 });
+  }
+  if (url.pathname === "/memory-backfill/dry-run") {
+    return jsonResponse({ backend: "memory", deleted_count: null });
+  }
+  if (!url.pathname.startsWith(worldPrefix)) {
+    return jsonResponse([]);
+  }
+
+  if (url.pathname.endsWith("/agents")) {
+    return jsonResponse([{ id: agentId, name: "Agent" }]);
+  }
+  if (url.pathname.endsWith("/organizations")) {
+    return jsonResponse([{ id: organizationId, name: "Organization" }]);
+  }
+  if (url.pathname.endsWith("/worldlines")) {
+    return jsonResponse([
+      { id: worldlineId, status: "active", parent_worldline_id: null },
+      { id: compareWorldlineId, status: "active", parent_worldline_id: worldlineId },
+    ]);
+  }
+  if (url.pathname.endsWith("/conversations")) {
+    return jsonResponse([{ id: conversationId, worldline_id: worldlineId, title: "Conversation" }]);
+  }
+  if (url.pathname.endsWith("/turns")) {
+    return jsonResponse([{ id: turnId, speaker: "Agent" }]);
+  }
+  if (url.pathname.endsWith("/player-actors")) {
+    return jsonResponse([{ id: "player-actor-1", user_id: userId }]);
+  }
+  if (url.pathname.endsWith("/beta-checklists")) {
+    return jsonResponse([{ id: checklistRunId, status: "blocked" }]);
+  }
+  if (url.pathname.endsWith("/narrative-artifacts")) {
+    return jsonResponse([{ id: artifactId, title: "Artifact" }]);
+  }
+  if (url.pathname.endsWith(`/${encodeURIComponent(artifactId)}`)) {
+    return jsonResponse({ id: artifactId, title: "Artifact" });
+  }
+  if (url.pathname.endsWith("/clock") || url.pathname.endsWith("/replay/state")) {
+    return jsonResponse({});
+  }
+  if (url.pathname.endsWith("/bible") || url.pathname.endsWith("/snapshots/latest")) {
+    return jsonResponse(null);
+  }
+  if (url.pathname.endsWith("/presentation")) {
+    return jsonResponse(null);
+  }
+  if (url.pathname.includes("/compare/")) {
+    return jsonResponse({ base_worldline_id: worldlineId, compare_worldline_id: compareWorldlineId });
+  }
+  if (url.pathname.endsWith("/reader/media")) {
+    return jsonResponse([]);
+  }
+  if (url.pathname.endsWith("/player-sessions/resume")) {
+    return jsonResponse(null);
+  }
+
+  return jsonResponse([]);
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

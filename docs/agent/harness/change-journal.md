@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web server workspace loader backend path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Server-rendered Web world workspace, agent, conversation, player, reader, worldline, and memory backend admin loader backend API path-boundary remediation for F-052.
+- Finding: F-052 found `web/lib/worlds/server.ts` building backend API paths from decoded `worldId`, `agentId`, `conversationId`, `artifactId`, worldline IDs, backend record IDs, and memory backend profile IDs without encoding every dynamic segment.
+- Summary: Added an architecture-contracts OpenSpec delta for Web server workspace loaders, then routed world paths through `serverWorldPath()` and nested identifiers through `pathSegment()` while preserving existing query filters as query data. This extends the earlier admin-loader path-boundary hardening to the remaining server-rendered workspace loaders and platform memory backend loader.
+- Files changed: `web/lib/worlds/server.ts`, `web/lib/worlds/server.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded Web server loader coverage to exercise representative workspace, agent detail, conversation detail/playback, player interaction, worldline comparison, narrative reader detail, and memory backend admin paths with identifiers containing `/`, `?`, and `#`.
+- Verification: `npm run test -- lib/worlds/server.test.ts` passed with 2 tests; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 47 files and 163 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining Next route handlers and proxy modules, especially CSRF forwarding, response header behavior, method exposure, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction for this session is SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Web private beta/beta feedback client path boundary entry
 
 - Date: 2026-06-12

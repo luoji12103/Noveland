@@ -116,7 +116,7 @@ Fast orientation for a new coding session.
 - `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md` — release notes for the completed v1.0 Private Beta MVP sequence.
 - `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md` — release notes for the completed v1.1 Normal Use / Release Candidate sequence.
 - `openspec/` — OpenSpec current specs and archived v0.4/v0.5/v0.6/v0.7/v0.8/v0.9/v1.0/v1.1 changes.
-- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; F-001 through F-051 are recorded with targeted remediations through Web private beta/beta feedback client path-boundary hardening.
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/` — active post-v1.1 release-candidate audit and hardening change for backend security, Web/e2e security, product normal-use, and spec/history compliance; F-001 through F-052 are recorded with targeted remediations through Web server workspace loader backend path-boundary hardening.
 - `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/` — archived v0.9 OpenSpec change for the self-use playable demo world.
 - `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/` — archived v1.0 OpenSpec change for invite-only private beta: onboarding/access, player session stability, quota enforcement, setup wizard, memory/persona QA, beta feedback, repair loop, and private beta gate.
 - `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/` — archived v1.1 OpenSpec change for normal-use release-candidate readiness: runbooks, backup/restore drill, stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate.
@@ -215,7 +215,7 @@ Fast orientation for a new coding session.
   - `web/lib/realtime/` — same-origin streaming proxy helper
   - `web/lib/realtime.ts` — browser-side EventSource and conversation live WebSocket helpers with encoded live-socket path segments
   - `web/lib/worlds/` — world API types, browser helpers, server data loader, and proxy helpers
-  - `web/lib/worlds/server.ts` — server-rendered Web data loaders, including provider/media/visual/speech/invocation/diagnostics admin loaders with encoded backend world and nested record path segments
+  - `web/lib/worlds/server.ts` — server-rendered Web data loaders, including workspace, agent, conversation, player, reader, worldline, memory backend, provider/media/visual/speech/invocation, and diagnostics loaders with encoded backend world and nested record path segments
   - `web/lib/worlds/diagnostics.ts` — multimodal diagnostics and eval-run client helpers with encoded world and eval-run path segments
   - `web/lib/worlds/invocations.ts` — model invocation ledger, prompt snapshot, tag, and redaction client helpers with encoded world, invocation, and tag path segments
   - `web/lib/worlds/media.ts` — media asset, object, job, reference, upload, and safe download client helpers with encoded world, asset, job, and object path segments
@@ -544,3 +544,4 @@ Whenever a new structural file or module is added, update this index.
 - 2026-06-10 F-049 updated existing Web worlds client membership/candidate/diagnostics API URL construction in `web/lib/worlds/client.ts`, with focused coverage in `web/lib/worlds/client.test.ts`; no package boundary changes were introduced.
 - 2026-06-10 F-050 updated existing Web worlds client platform admin preset/memory/provider API URL construction in `web/lib/worlds/client.ts`, with focused coverage in `web/lib/worlds/client.test.ts`; no package boundary changes were introduced.
 - 2026-06-12 F-051 updated existing Web private beta onboarding and beta feedback URL construction in `web/lib/private-beta/client.ts`, `web/lib/beta-feedback/client.ts`, and `web/features/private-beta/private-beta-onboarding.tsx`, with focused coverage in `web/lib/private-beta/client.test.ts`, `web/lib/beta-feedback/client.test.ts`, and `web/features/private-beta/private-beta-onboarding.test.tsx`; no package boundary changes were introduced.
+- 2026-06-12 F-052 updated existing Web server-rendered loader backend URL construction in `web/lib/worlds/server.ts`, with focused coverage in `web/lib/worlds/server.test.ts`; no package boundary changes were introduced.
