@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web proxy request body preservation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin proxy request body byte-preservation remediation for F-059.
+- Finding: F-059 found `web/lib/worlds/media.ts` sending media uploads as `FormData` to `/api/worlds/{world_id}/media/assets/upload` while `web/lib/worlds/proxy.ts` decoded every non-GET request body with `request.text()` before forwarding it. The same text-decoding pattern existed in auth, generic API, runtime, and private-beta proxy helpers.
+- Summary: Added an architecture-contracts OpenSpec scenario for Web proxy request body byte preservation, changed auth, generic API, worlds, runtime, and private-beta proxy helpers to forward non-GET request bodies as raw `ArrayBuffer` bytes, and kept empty request bodies absent when forwarding to the backend.
+- Files changed: `web/lib/auth/proxy.ts`, `web/lib/api-proxy.ts`, `web/lib/worlds/proxy.ts`, `web/lib/runtime/proxy.ts`, `web/lib/private-beta/proxy.ts`, `web/lib/worlds/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Updated world proxy JSON-body assertions to decode the forwarded `ArrayBuffer`, and added binary upload coverage proving non-UTF-8 bytes survive proxy forwarding unchanged while existing cookie, CSRF, query, Set-Cookie stripping, and safe response-header coverage still passes.
+- Verification: `cd web && npm run test -- lib/worlds/proxy.test.ts lib/auth/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts` passed with 5 files and 14 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 179 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import. `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining route handler method exposure, proxy response/request edge cases, role-boundary rendering, client-side leaks, and product normal-use drift. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening media response safety header boundary entry
 
 - Date: 2026-06-12

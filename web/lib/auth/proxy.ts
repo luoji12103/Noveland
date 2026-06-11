@@ -24,11 +24,11 @@ export async function proxyAuthRequest(
   method: "GET" | "POST",
 ): Promise<Response> {
   const requestHeaders = buildForwardHeaders(request);
-  const requestBody = method === "GET" ? undefined : await request.text();
+  const requestBody = await proxyRequestBody(request, method);
   const backendResponse = await fetch(`${getAuthApiBaseUrl()}${authPath}`, {
     method,
     headers: requestHeaders,
-    body: requestBody || undefined,
+    body: requestBody,
     cache: "no-store",
   });
 
@@ -100,6 +100,14 @@ function buildForwardHeaders(request: NextRequest): Headers {
   copyHeader(request, headers, "user-agent");
   copyHeader(request, headers, CSRF_HEADER_NAME);
   return headers;
+}
+
+async function proxyRequestBody(request: NextRequest, method: "GET" | "POST"): Promise<ArrayBuffer | undefined> {
+  if (method === "GET") {
+    return undefined;
+  }
+  const body = await request.arrayBuffer();
+  return body.byteLength === 0 ? undefined : body;
 }
 
 function copyHeader(request: NextRequest, headers: Headers, name: string): void {

@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-059 Web proxy request body byte-preservation hardening
 - Post-v1.1 RC audit F-058 media response safety header hardening
 - Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening
 - Post-v1.1 RC audit F-056 Memory backend profile secret-reference persistence boundary hardening
@@ -546,3 +547,4 @@
 - Post-v1.1 RC audit F-052 Web server workspace loader backend path boundary hardening
 - Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening
 - Post-v1.1 RC audit F-058 media response safety header hardening
+- Post-v1.1 RC audit F-059 Web proxy request body byte-preservation hardening

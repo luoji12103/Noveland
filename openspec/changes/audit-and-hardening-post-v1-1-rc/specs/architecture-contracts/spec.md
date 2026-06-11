@@ -205,6 +205,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the Web proxy response SHALL preserve the safe response metadata needed for browser download/rendering safety
 - **AND** it SHALL continue to omit backend cookie mutation headers unless an auth route explicitly opts in.
 
+#### Scenario: Web proxies preserve request body bytes
+- **GIVEN** a Web API route proxies a non-GET backend request such as media upload, world import, auth, runtime, or private-beta mutation
+- **WHEN** the frontend request body contains JSON, multipart form-data, or arbitrary bytes
+- **THEN** the Web proxy SHALL forward the original request body bytes without text decoding or re-encoding
+- **AND** empty request bodies SHALL remain absent when forwarded to the backend.
+
 #### Scenario: Login requires double-submit CSRF before session cookie creation
 - **GIVEN** a browser client submits credentials to the login route
 - **WHEN** the login request would create a new authenticated session cookie
