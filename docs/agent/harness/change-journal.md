@@ -4006,3 +4006,15 @@
 - Tests added/updated: Extended beta feedback API coverage so admin triage can attach media job/invocation evidence and repair refs, while reporter detail reads after triage hide admin-only fields.
 - Verification: `cd backend && uv run pytest tests/test_api_beta_feedback.py` passed with 4 tests; `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_authoring.py` passed with 19 tests; focused backend ruff/mypy passed; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend forbidden-evidence audits for moderation, observability, privacy export contents, speech/API output, and remaining member/player DTOs. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Observability diagnostics redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-065.
+- Finding: F-065 found runtime diagnostics only redacted details by sensitive key, while event_type/message and safe-key detail values could preserve secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, or base64. Focused observability tests also exposed a package import cycle through conversations importing the top-level observability package during observability service import.
+- Summary: Added an observability OpenSpec scenario for diagnostic text/value redaction, broke the conversations-to-observability package import cycle with a lazy diagnostics service lookup, redacted sensitive marker values before diagnostic persistence, and reapplied redaction on read for historical records.
+- Files changed: backend/packages/observability/src/noveland/observability/services.py, backend/packages/conversations/src/noveland/conversations/services.py, backend/tests/test_observability.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/observability-incident-diagnostics/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded observability unit coverage for value-level redaction in diagnostic details and for event_type/message/details redaction through RuntimeDiagnosticsService record/list paths.
+- Verification: `cd backend && uv run pytest tests/test_observability.py tests/test_observability_incidents.py -q` passed with 6 tests; `cd backend && uv run pytest tests/test_api_conversations.py tests/test_api_realtime.py tests/test_api_worlds.py::test_world_diagnostics_require_world_admin -q` passed with 13 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; full `cd backend && uv run ruff check .` and `cd backend && uv run mypy .` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, speech/API output, remaining player/member DTOs, and then resume Web/e2e/product/spec-history batches. Do not push unless explicitly requested after this batch commit.

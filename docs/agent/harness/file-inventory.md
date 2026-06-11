@@ -782,6 +782,7 @@ Track key structural files and prevent unregistered sprawl.
 - `openspec/changes/audit-and-hardening-post-v1-1-rc/design.md`
 - `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`
 - `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/post-v1-1-rc-audit-hardening/spec.md`
+- `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/observability-incident-diagnostics/spec.md`
 
 - backend/services/api/src/noveland/services/api/player_privacy.py
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/content-safety-moderation-hardening/spec.md
@@ -791,6 +792,8 @@ Track key structural files and prevent unregistered sprawl.
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/cost-quota-enforcement/spec.md
 - openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md
 - `backend/tests/test_model_provider.py`
+
+- `backend/tests/test_observability.py`
 
 ## Update rule
 
@@ -900,3 +903,4 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-12 F-062 kept existing reader media backend ownership in `backend/packages/reader_delivery/src/noveland/reader_delivery/service.py` and `backend/services/api/src/noveland/services/api/reader_media.py`, with focused coverage in `backend/tests/test_api_reader_media.py`, `backend/tests/test_api_moderation.py`, `web/lib/worlds/media.test.ts`, `web/features/worlds/conversation-playback.test.tsx`, and `web/features/worlds/conversation-scene-view.test.tsx`. Reader media descriptors now generate worldline-scoped download paths, unscoped reader media object downloads return 404 before storage reads, and Web playback/scene rendering accepts only exact UUID world/worldline/object reader media download paths.
 - 2026-06-12 F-063 kept existing speech voice profile service ownership in `backend/packages/speech/src/noveland/speech/voice_profiles.py`, with focused coverage in `backend/tests/test_voice_profiles.py`. World-level voice profiles can still act as defaults without reference media, but they now reject worldline-scoped `reference_asset_id` values; scoped profiles continue to require same-worldline audio reference assets.
 - 2026-06-12 F-064 kept existing beta feedback service/API ownership in `backend/packages/beta_feedback/src/noveland/beta_feedback/service.py` and `backend/services/api/src/noveland/services/api/beta_feedback.py`, with focused coverage in `backend/tests/test_api_beta_feedback.py`. Reporter/member beta feedback reads now hide admin triage evidence refs, repair proposal refs, moderation refs, admin actor refs, and metadata while admin reads retain full repair/moderation evidence.
+- 2026-06-12 F-065 kept existing observability diagnostics ownership in `backend/packages/observability/src/noveland/observability/services.py`, moved `backend/packages/conversations/src/noveland/conversations/services.py` off top-level observability package imports to avoid a focused-test import cycle, and added coverage in `backend/tests/test_observability.py`. Runtime diagnostics now redact sensitive marker values in event type, message, and details before persistence and again on read for historical records.

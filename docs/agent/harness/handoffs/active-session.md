@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T06:08:00+08:00
+- Date: 2026-06-12T07:20:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-064 are remediated on this branch; latest batch is F-064 beta feedback reporter triage evidence redaction.
+- Status: F-001 through F-065 are remediated on this branch; latest batch is F-065 observability diagnostics text/value redaction.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-064 batch: 10c8c52 fix(speech): reject world-level voice media refs.
+- Base before F-065 batch: aa8d3ec fix(beta-feedback): redact reporter triage evidence.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services at F-064 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
+- Current server services at F-065 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,26 +26,32 @@
 
 ## Completed This Batch
 
-- Continued backend member/reader/player forbidden-evidence audit after F-063.
-- Reviewed speech API, worlds member routes, conversation member routes, media member routes, player session resume, player privacy, and beta feedback surfaces for worldline/ref/data exposure; no confirmed defect was recorded in those slices except beta feedback reporter triage evidence.
-- Recorded/remediated F-064: reporter-owned beta feedback reads returned admin triage evidence refs, repair proposal refs, moderation refs, admin actor refs, and metadata after operator triage.
-- Added an architecture-contracts OpenSpec scenario requiring reporter/member beta feedback reads to hide admin triage evidence while admin routes retain repair/moderation evidence.
-- Made `BetaFeedbackService._read()` role-aware so non-admin reads keep safe report status/severity and reporter-safe evidence kinds only, with metadata stripped; admin reads keep full triage evidence.
-- Added focused API regression coverage for admin triage with media job/invocation evidence and reporter reads after triage.
+- Reconfirmed realtime server state after the previous push: branch `feature/audit-and-hardening-post-v1-1-rc`, clean worktree, local/remote in sync, active OpenSpec change, Postgres/NATS healthy, and OpenSpec specs/changes strict validation passing before edits.
+- Continued backend forbidden-evidence audit across moderation and observability. Moderation routes remain admin-only for report/action/incident read surfaces except member report creation, with CSRF on persisted mutations; no moderation reporter/admin backflow defect was confirmed beyond already-fixed F-064.
+- Recorded/remediated F-065: runtime diagnostics only redacted detail values by sensitive key, leaving secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, or base64 in event_type/message or safe-key detail values; focused observability tests also exposed a conversations/observability package import cycle.
+- Added an observability OpenSpec scenario requiring runtime diagnostic text/value redaction before persistence and again on read for historical records.
+- Broke the conversations-to-observability top-level import cycle with a lazy diagnostics service lookup.
+- Added value-level redaction for runtime diagnostic event_type, message, and details, applied before persistence and on `_record()` read shaping.
+- Added focused observability tests for value-level redaction and service record/list behavior.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_api_beta_feedback.py` passed with 4 tests; `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_authoring.py` passed with 19 tests; focused backend ruff/mypy passed; OpenSpec strict validations and `git diff --check` passed.
-- Full backend/Web gates were not rerun for F-064; full backend pytest passed in the preceding F-063 batch with 564 passed and 8 skipped, and the previous F-062 batch had full Web unit/build/e2e gates passing.
+- `cd backend && uv run pytest tests/test_observability.py tests/test_observability_incidents.py -q` passed with 6 tests.
+- `cd backend && uv run pytest tests/test_api_conversations.py tests/test_api_realtime.py tests/test_api_worlds.py::test_world_diagnostics_require_world_admin -q` passed with 13 tests.
+- `cd backend && uv run ruff check packages/observability/src/noveland/observability/services.py packages/conversations/src/noveland/conversations/services.py tests/test_observability.py` passed.
+- `cd backend && uv run mypy packages/observability/src/noveland/observability/services.py packages/conversations/src/noveland/conversations/services.py tests/test_observability.py` passed.
+- OpenSpec strict validations and `git diff --check` passed after documentation updates.
+- Full `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
+- Full `cd backend && uv run ruff check .` and `cd backend && uv run mypy .` passed.
 
 ## Remaining Work
 
-1. Commit the completed F-064 batch after final status review; do not push unless explicitly requested.
-2. Continue backend forbidden-evidence audits for moderation, observability, privacy export contents, speech/API output, and remaining member/player DTOs.
+1. Commit the completed F-065 batch after final status review; do not push unless explicitly requested.
+2. Continue backend forbidden-evidence audits for privacy export contents, speech/API output, remaining player/member DTOs, and worldline isolation edge cases.
 3. Continue Web/e2e security audit on remaining Next route handlers, proxy modules, method exposure, response shaping, role boundary, evidence redaction, and client-side leaks.
 
-## Finding F-064
+## Finding F-065
 
-- Beta feedback reporter reads exposed admin triage evidence refs and linkage fields after admin triage.
-- The remediation keeps full triage evidence on admin reads but hides media job/invocation/admin repair/moderation/actor/metadata fields from reporter/member reads.
-- Residual risk: continue reviewing moderation and privacy/export DTOs for similar admin-evidence backflow before closing task 2.4.
+- Runtime diagnostics preserved sensitive marker values in diagnostic event_type/message and safe-key detail values.
+- The remediation redacts secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, and base64 before persistence and again on read for historical diagnostics.
+- Residual risk: admin diagnostics may still include safe operator context by design; continue reviewing lower-privilege diagnostics and product-facing degraded-state surfaces for evidence leaks.
