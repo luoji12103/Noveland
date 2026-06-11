@@ -1940,7 +1940,7 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
             "user_id": str(member_id),
             "entry_kind": "event",
             "title": "Late rehearsal",
-            "body": "The route tension moved without direct intervention.",
+            "body": "raw_prompt operator journal prompt",
             "source_event_id": resolved.json()["event_ids"][0],
             "source_ref": "event:late-rehearsal",
             "metadata": {
@@ -1954,8 +1954,8 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
         json={
             "user_id": str(member_id),
             "notification_kind": "rumor",
-            "title": "Club room rumor",
-            "body": "Someone mentioned a hidden letter.",
+            "title": "media://private/club-room-rumor",
+            "body": "raw_output operator notification output",
             "source_event_id": resolved.json()["event_ids"][0],
             "source_ref": "event:club-room-rumor",
             "metadata": {
@@ -2096,24 +2096,36 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert member_journal.status_code == 200
     assert member_journal.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
     assert member_journal.json()[0]["source_ref"] == "event:late-rehearsal"
+    assert member_journal.json()[0]["body"] == "raw_prompt operator journal prompt"
     assert member_journal.json()[0]["metadata"]["raw_prompt"] == "operator journal prompt"
     assert member_notifications.status_code == 200
     assert member_notifications.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
     assert member_notifications.json()[0]["source_ref"] == "event:club-room-rumor"
+    assert member_notifications.json()[0]["title"] == "media://private/club-room-rumor"
+    assert member_notifications.json()[0]["body"] == "raw_output operator notification output"
     assert (
         member_notifications.json()[0]["metadata"]["raw_output"]
         == "operator notification output"
     )
     assert member_journal_after_auth.status_code == 200
     assert member_journal_after_auth.json()[0]["title"] == "Late rehearsal"
+    assert member_journal_after_auth.json()[0]["body"] == ""
     assert member_journal_after_auth.json()[0]["source_event_id"] is None
     assert member_journal_after_auth.json()[0]["source_ref"] is None
     assert member_journal_after_auth.json()[0]["metadata"] == {}
     assert member_notifications_after_auth.status_code == 200
-    assert member_notifications_after_auth.json()[0]["title"] == "Club room rumor"
+    assert member_notifications_after_auth.json()[0]["title"] == ""
+    assert member_notifications_after_auth.json()[0]["body"] == ""
     assert member_notifications_after_auth.json()[0]["source_event_id"] is None
     assert member_notifications_after_auth.json()[0]["source_ref"] is None
     assert member_notifications_after_auth.json()[0]["metadata"] == {}
+    member_text_payload = json.dumps(
+        member_journal_after_auth.json() + member_notifications_after_auth.json(),
+        sort_keys=True,
+    )
+    assert "media://" not in member_text_payload
+    assert "raw_prompt" not in member_text_payload
+    assert "raw_output" not in member_text_payload
 
 
 def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist() -> None:

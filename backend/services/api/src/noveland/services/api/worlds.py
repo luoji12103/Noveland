@@ -9139,8 +9139,8 @@ def _journal_entry_response(
         user_id=entry.user_id,
         player_actor_id=entry.player_actor_id,
         entry_kind=cast(JournalEntryKind, entry.entry_kind),
-        title=entry.title,
-        body=entry.body,
+        title=entry.title if include_admin_fields else _sanitize_public_text(entry.title),
+        body=entry.body if include_admin_fields else _sanitize_public_text(entry.body),
         source_event_id=entry.source_event_id if include_admin_fields else None,
         source_ref=entry.source_ref if include_admin_fields else None,
         visibility=cast(JournalVisibility, entry.visibility),
@@ -9161,8 +9161,16 @@ def _notification_response(
         worldline_id=notification.worldline_id,
         user_id=notification.user_id,
         notification_kind=cast(NotificationKind, notification.notification_kind),
-        title=notification.title,
-        body=notification.body,
+        title=(
+            notification.title
+            if include_admin_fields
+            else _sanitize_public_text(notification.title)
+        ),
+        body=(
+            notification.body
+            if include_admin_fields
+            else _sanitize_public_text(notification.body)
+        ),
         source_event_id=notification.source_event_id if include_admin_fields else None,
         source_ref=notification.source_ref if include_admin_fields else None,
         status=cast(NotificationStatus, notification.status),
