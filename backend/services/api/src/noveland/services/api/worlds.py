@@ -180,7 +180,7 @@ from sqlalchemy.orm import Session
 
 SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$"
 SLUG_RE = re.compile(SLUG_PATTERN)
-PUBLIC_PROFILE_FORBIDDEN_KEYS = {
+PUBLIC_JSON_FORBIDDEN_KEYS = {
     "api_key",
     "apikey",
     "auth_ref",
@@ -208,13 +208,13 @@ PUBLIC_PROFILE_FORBIDDEN_KEYS = {
     "thumbnail_uri",
     "token",
 }
-PUBLIC_PROFILE_FORBIDDEN_VALUE_RE = re.compile(
+PUBLIC_JSON_FORBIDDEN_VALUE_RE = re.compile(
     r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
     r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
     r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
     re.IGNORECASE,
 )
-_OMIT_PUBLIC_PROFILE_VALUE = object()
+_OMIT_PUBLIC_JSON_VALUE = object()
 
 WorldRole = Literal["world_admin", "human_user"]
 AgentKind = Literal["role_agent", "narrative_agent"]
@@ -3529,7 +3529,7 @@ def bind_player_actor(
         user_id=user_id,
         display_name=actor_bind.display_name,
         current_scene_id=actor_bind.current_scene_id,
-        profile=_sanitize_public_profile(actor_bind.profile),
+        profile=_sanitize_public_json(actor_bind.profile),
     )
     return _player_actor_response(actor)
 
@@ -8483,38 +8483,42 @@ def _resolution_rule_dry_run_response(
     )
 
 
-def _sanitize_public_profile(value: Any) -> dict[str, Any]:
-    sanitized = _sanitize_public_profile_value(value)
+def _sanitize_public_json(value: Any) -> dict[str, Any]:
+    sanitized = _sanitize_public_json_value(value)
     return sanitized if isinstance(sanitized, dict) else {}
 
 
-def _sanitize_public_profile_value(value: Any) -> Any:
+def _sanitize_public_text(value: str) -> str:
+    return "" if PUBLIC_JSON_FORBIDDEN_VALUE_RE.search(value) else value
+
+
+def _sanitize_public_json_value(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if key_text.strip().lower() in PUBLIC_PROFILE_FORBIDDEN_KEYS:
+            if key_text.strip().lower() in PUBLIC_JSON_FORBIDDEN_KEYS:
                 continue
-            sanitized_item = _sanitize_public_profile_value(item)
-            if sanitized_item is not _OMIT_PUBLIC_PROFILE_VALUE:
+            sanitized_item = _sanitize_public_json_value(item)
+            if sanitized_item is not _OMIT_PUBLIC_JSON_VALUE:
                 sanitized[key_text] = sanitized_item
         return sanitized
     if isinstance(value, list):
         sanitized_list = []
         for item in value:
-            sanitized_item = _sanitize_public_profile_value(item)
-            if sanitized_item is not _OMIT_PUBLIC_PROFILE_VALUE:
+            sanitized_item = _sanitize_public_json_value(item)
+            if sanitized_item is not _OMIT_PUBLIC_JSON_VALUE:
                 sanitized_list.append(sanitized_item)
         return sanitized_list
     if isinstance(value, tuple):
         return [
             sanitized_item
             for item in value
-            if (sanitized_item := _sanitize_public_profile_value(item))
-            is not _OMIT_PUBLIC_PROFILE_VALUE
+            if (sanitized_item := _sanitize_public_json_value(item))
+            is not _OMIT_PUBLIC_JSON_VALUE
         ]
-    if isinstance(value, str) and PUBLIC_PROFILE_FORBIDDEN_VALUE_RE.search(value):
-        return _OMIT_PUBLIC_PROFILE_VALUE
+    if isinstance(value, str) and PUBLIC_JSON_FORBIDDEN_VALUE_RE.search(value):
+        return _OMIT_PUBLIC_JSON_VALUE
     return value
 
 
@@ -8527,7 +8531,7 @@ def _player_actor_response(actor: PlayerActorProfile) -> PlayerActorResponse:
         actor_ref=actor.actor_ref,
         display_name=actor.display_name,
         current_scene_id=actor.current_scene_id,
-        profile=_sanitize_public_profile(actor.profile_json),
+        profile=_sanitize_public_json(actor.profile_json),
         is_active=actor.is_active,
         created_at=actor.created_at,
         updated_at=actor.updated_at,
@@ -8548,9 +8552,21 @@ def _player_choice_response(
         choice_key=choice.choice_key,
         choice_kind=cast(PlayerChoiceKind, choice.choice_kind),
         prompt=choice.prompt if include_admin_fields else "",
-        selected_option=choice.selected_option,
-        context=choice.context_json,
-        consequence_preview=choice.consequence_preview,
+        selected_option=(
+            choice.selected_option
+            if include_admin_fields
+            else _sanitize_public_text(choice.selected_option)
+        ),
+        context=(
+            choice.context_json
+            if include_admin_fields
+            else _sanitize_public_json(choice.context_json)
+        ),
+        consequence_preview=(
+            choice.consequence_preview
+            if include_admin_fields
+            else _sanitize_public_json(choice.consequence_preview)
+        ),
         applied_event_id=choice.applied_event_id,
         created_at=choice.created_at,
         updated_at=choice.updated_at,
@@ -9465,7 +9481,7 @@ def _agent_response(
         character_profile=(
             agent.character_profile
             if include_admin_fields
-            else _sanitize_public_profile(agent.character_profile)
+            else _sanitize_public_json(agent.character_profile)
         ),
         config=agent.config if include_admin_fields else {},
         is_enabled=agent.is_enabled,

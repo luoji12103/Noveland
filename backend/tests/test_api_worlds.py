@@ -2856,6 +2856,21 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
         "nested": {"safe_note": "historical-kept"},
         "items": ["historical-note", {"safe_item": "historical-kept"}],
     }
+    expected_choice_context = {
+        "safe": "visible-choice-context",
+        "nested": {"safe_note": "choice-kept"},
+        "items": ["choice-note", {"safe_item": "choice-kept"}],
+    }
+    expected_choice_preview = {
+        "relationship_updates": [],
+        "faction_updates": [],
+        "offscreen_events": [{"title": "Safe offscreen event"}],
+        "diagnostics": [
+            "0 relationship update(s)",
+            "0 faction update(s)",
+            "1 offscreen event(s)",
+        ],
+    }
 
     _authenticate(client, owner_token)
     owner_actor = client.put(
@@ -2945,8 +2960,32 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "choice_kind": "route",
             "prompt": "Help with festival preparations?",
             "selected_option": "Stay after school.",
-            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
-            "apply": True,
+            "context": {
+                "safe": "visible-choice-context",
+                "storage_uri": "media://private/choice-context",
+                "nested": {
+                    "safe_note": "choice-kept",
+                    "raw_prompt": "choice operator prompt",
+                },
+                "items": [
+                    "choice-note",
+                    "media://private/choice-list-entry",
+                    {"safe_item": "choice-kept", "raw_output": "provider output"},
+                ],
+                "path": "/root/private/choice-context.json",
+            },
+            "effects": {
+                "relationship_updates": [],
+                "faction_updates": [],
+                "offscreen_events": [
+                    {
+                        "title": "Safe offscreen event",
+                        "storage_uri": "media://private/offscreen-event",
+                        "raw_output": "provider output",
+                    },
+                ],
+            },
+            "apply": False,
         },
     )
     other_choice_attempt = client.post(
@@ -3037,14 +3076,30 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert choice.json()["user_id"] == str(member_id)
     assert choice.json()["prompt"] == ""
     assert choice.json()["selected_option"] == "Stay after school."
+    assert choice.json()["context"] == expected_choice_context
+    assert choice.json()["consequence_preview"] == expected_choice_preview
+    choice_text = json.dumps(choice.json(), sort_keys=True)
+    assert "storage_uri" not in choice_text
+    assert "media://" not in choice_text
+    assert "raw_prompt" not in choice_text
+    assert "raw_output" not in choice_text
+    assert "/root/" not in choice_text
     assert other_choice_attempt.status_code == 403
     assert listed_choices.status_code == 200
     assert [item["user_id"] for item in listed_choices.json()] == [str(member_id)]
     assert listed_choices.json()[0]["prompt"] == ""
     assert listed_choices.json()[0]["selected_option"] == "Stay after school."
+    assert listed_choices.json()[0]["context"] == expected_choice_context
+    assert listed_choices.json()[0]["consequence_preview"] == expected_choice_preview
     assert other_choices.status_code == 403
     assert admin_listed_choices.status_code == 200
     assert admin_listed_choices.json()[0]["prompt"] == "Help with festival preparations?"
+    assert admin_listed_choices.json()[0]["context"]["storage_uri"] == (
+        "media://private/choice-context"
+    )
+    assert admin_listed_choices.json()[0]["consequence_preview"]["offscreen_events"][0][
+        "raw_output"
+    ] == "provider output"
     assert intervention.status_code == 201
     assert intervention.json()["prompt"] == ""
     assert intervention.json()["choice_id"] is None

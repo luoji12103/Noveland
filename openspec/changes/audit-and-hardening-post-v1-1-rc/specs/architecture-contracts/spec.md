@@ -36,6 +36,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit the forbidden character profile keys and values while retaining safe public characterization fields
 - **AND** admin agent reads MAY continue to expose the full character profile for authoring and repair workflows.
 
+#### Scenario: Member reads player choice metadata
+- **GIVEN** a world member records or lists player choices through member-readable routes
+- **WHEN** the choice context or consequence preview contains arbitrary JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL omit the forbidden keys and values while retaining safe choice metadata and diagnostics
+- **AND** admin player choice reads MAY continue to expose full review metadata required for authoring and repair workflows.
+
 #### Scenario: Member reads player actor profiles
 - **GIVEN** a world member lists or binds player actor profiles through member-readable routes
 - **WHEN** the player actor profile contains arbitrary profile JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
