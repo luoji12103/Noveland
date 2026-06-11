@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web private beta/beta feedback client path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin private beta onboarding, beta feedback, and player-surface route path-boundary remediation for F-051.
+- Finding: F-051 found `web/lib/private-beta/client.ts`, `web/lib/beta-feedback/client.ts`, and `web/features/private-beta/private-beta-onboarding.tsx` building API paths or player links from decoded `worldId`/`reportId` values without encoding dynamic path segments.
+- Summary: Reused the existing architecture-contracts Web API client route-boundary delta, then encoded private beta world identifiers, beta feedback world/report identifiers, and the private beta player-surface world route segment. Feedback filters continue to use `URLSearchParams` as query data.
+- Files changed: `web/lib/private-beta/client.ts`, `web/lib/private-beta/client.test.ts`, `web/lib/beta-feedback/client.ts`, `web/lib/beta-feedback/client.test.ts`, `web/features/private-beta/private-beta-onboarding.tsx`, `web/features/private-beta/private-beta-onboarding.test.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added private beta and beta feedback client coverage proving world/report identifiers containing `/`, `?`, and `#` stay encoded inside same-origin API path segments; updated private beta onboarding component coverage proving the player-surface link encodes the world route segment without leaking invite tokens or internal fields.
+- Verification: `npm run test -- lib/private-beta/client.test.ts lib/beta-feedback/client.test.ts features/private-beta/private-beta-onboarding.test.tsx` passed with 3 files and 6 tests; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 47 files and 162 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining client/proxy modules and Next route handlers, especially CSRF forwarding, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction for this session is SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Web admin preset/memory/provider API client path boundary entry
 
 - Date: 2026-06-10

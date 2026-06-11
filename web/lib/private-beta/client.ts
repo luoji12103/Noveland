@@ -26,8 +26,9 @@ export function bootstrapPrivateBetaPlayerProfile(
   worldId: string,
   input: PrivateBetaPlayerProfileInput,
 ): Promise<PrivateBetaPlayerProfileResult> {
+  const worldSegment = encodeURIComponent(worldId);
   return privateBetaRequest<PrivateBetaPlayerProfileResult>(
-    `/api/worlds/${worldId}/private-beta/onboarding/player-profile`,
+    `/api/worlds/${worldSegment}/private-beta/onboarding/player-profile`,
     {
       method: "POST",
       body: input,

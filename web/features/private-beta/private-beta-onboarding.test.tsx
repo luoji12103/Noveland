@@ -26,6 +26,10 @@ describe("PrivateBetaOnboarding", () => {
     expect(screen.getAllByText("redeemed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("tester").length).toBeGreaterThan(0);
     expect(screen.getByText("Use the player surface after identity setup.")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open player surface" })).toHaveAttribute(
+      "href",
+      "/worlds/world%2Fprivate%3Fbeta%3Dtrue%23frag/player",
+    );
     expect(serializedDocument()).not.toMatch(/token-secret|storage_uri|raw_prompt|raw_output/i);
   });
 
@@ -86,9 +90,12 @@ const playerProfile = {
   updated_at: "2026-05-17T00:00:00.000Z",
 };
 
+const readyWorldId = "world/private?beta=true#frag";
+
 const playerProfileReady = {
   ...playerProfile,
   id: "profile-2",
+  world_id: readyWorldId,
   display_name: "Ready Tester",
 };
 
@@ -109,7 +116,7 @@ const onboardingData: PrivateBetaOnboardingData = {
       },
       {
         invite_id: "invite-2",
-        world_id: "world-2",
+        world_id: readyWorldId,
         world_name: "Ready World",
         worldline_id: "worldline-2",
         worldline_name: "Primary",

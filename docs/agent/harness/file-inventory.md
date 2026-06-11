@@ -119,11 +119,13 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/runtime/`
 - `web/lib/private-beta/`
 - `web/lib/private-beta/client.ts`
+- `web/lib/private-beta/client.test.ts`
 - `web/lib/private-beta/proxy.ts`
 - `web/lib/private-beta/server.ts`
 - `web/lib/private-beta/types.ts`
 - `web/lib/beta-feedback/`
 - `web/lib/beta-feedback/client.ts`
+- `web/lib/beta-feedback/client.test.ts`
 - `web/lib/beta-feedback/server.ts`
 - `web/lib/beta-feedback/types.ts`
 - `web/lib/worlds/`
@@ -882,3 +884,5 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-10 F-049 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and focused coverage in `web/lib/worlds/client.test.ts`. Membership, member candidate, and world diagnostics same-origin API helper URLs now encode world and nested user identifier segments before issuing read and state-changing requests; `web/lib/worlds/client.ts` no longer has raw `/api/worlds/${worldId}` path construction.
 
 - 2026-06-10 F-050 kept existing Web worlds client ownership in `web/lib/worlds/client.ts` and focused coverage in `web/lib/worlds/client.test.ts`. Platform admin agent preset, memory backend profile, memory write job retry, and provider profile same-origin API helper URLs now encode preset/profile/job identifier segments before issuing read and state-changing requests.
+
+- 2026-06-12 F-051 kept existing Web private beta and beta feedback ownership in `web/lib/private-beta/client.ts`, `web/lib/beta-feedback/client.ts`, and `web/features/private-beta/private-beta-onboarding.tsx`, and added focused coverage in `web/lib/private-beta/client.test.ts`, `web/lib/beta-feedback/client.test.ts`, and `web/features/private-beta/private-beta-onboarding.test.tsx`. Private beta player profile, beta feedback report list/create/triage, and player-surface helper URLs now encode world/report identifier segments before issuing requests or navigation.

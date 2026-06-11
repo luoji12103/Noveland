@@ -536,3 +536,4 @@
 - Post-v1.1 RC audit F-048 Web agent memory/run/persona/narrative client path boundary hardening
 - Post-v1.1 RC audit F-049 Web membership/candidate/diagnostics client path boundary hardening
 - Post-v1.1 RC audit F-050 Web admin preset/memory/provider client path boundary hardening
+- Post-v1.1 RC audit F-051 Web private beta/beta feedback client path boundary hardening

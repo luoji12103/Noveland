@@ -346,3 +346,11 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+
+#### Scenario: Web client manages private beta onboarding and beta feedback
+- **GIVEN** browser-side Web client code issues private beta player profile bootstrap, beta feedback report list/create/triage requests, or private beta player-surface navigation
+- **AND** the world identifier or beta feedback report identifier contains encoded path separators or other reserved path characters
+- **WHEN** the Web client constructs the same-origin API URL or local player-surface link
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path or app route path
+- **AND** query-string filters SHALL be encoded as query data
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
