@@ -9,7 +9,13 @@ describe("auth client", () => {
     document.cookie = "noveland_csrf=; Max-Age=0; Path=/";
   });
 
-  it("maps csrf and login responses", async () => {
+  it("maps csrf responses", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ csrf_token: "csrf-token" })));
+
+    await expect(requestCsrf()).resolves.toEqual({ csrf_token: "csrf-token" });
+  });
+
+  it("obtains and sends a csrf header when logging in", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ csrf_token: "csrf-token" }))
@@ -23,16 +29,24 @@ describe("auth client", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(requestCsrf()).resolves.toEqual({ csrf_token: "csrf-token" });
     await expect(
       login({ email: "admin@example.test", password: "correct-password" }),
     ).resolves.toMatchObject({ email: "admin@example.test" });
 
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/auth/csrf",
+      expect.objectContaining({ credentials: "include", cache: "no-store" }),
+    );
     expect(fetchMock).toHaveBeenLastCalledWith(
       "/api/auth/login",
       expect.objectContaining({
         method: "POST",
         credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          [CSRF_HEADER_NAME]: "csrf-token",
+        },
         body: JSON.stringify({
           email: "admin@example.test",
           password: "correct-password",
@@ -41,7 +55,31 @@ describe("auth client", () => {
     );
   });
 
+  it("uses an existing csrf cookie when logging in", async () => {
+    document.cookie = "noveland_csrf=csrf-cookie; Path=/";
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        user_id: "user-1",
+        email: "admin@example.test",
+        display_name: "Admin",
+        roles: ["platform_admin"],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await login({ email: "admin@example.test", password: "correct-password" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/login",
+      expect.objectContaining({
+        headers: expect.objectContaining({ [CSRF_HEADER_NAME]: "csrf-cookie" }),
+      }),
+    );
+  });
+
   it("raises typed status errors for failed login", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(jsonResponse({ detail: "Invalid email or password" }, 401)),

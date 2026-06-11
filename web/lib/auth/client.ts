@@ -25,13 +25,23 @@ export async function requestCsrf(): Promise<CsrfResponse> {
 }
 
 export async function login(input: LoginInput): Promise<AuthSubject> {
+  const csrfToken = await loginCsrfToken();
   const response = await fetch("/api/auth/login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", [CSRF_HEADER_NAME]: csrfToken },
     credentials: "include",
     body: JSON.stringify(input),
   });
   return parseJsonResponse<AuthSubject>(response, "Sign in failed.");
+}
+
+async function loginCsrfToken(): Promise<string> {
+  const existingToken = readCookie(CSRF_COOKIE_NAME);
+  if (existingToken !== null) {
+    return existingToken;
+  }
+  const response = await requestCsrf();
+  return response.csrf_token;
 }
 
 export async function currentSubject(): Promise<AuthSubject> {

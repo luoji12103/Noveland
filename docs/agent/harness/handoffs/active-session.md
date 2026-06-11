@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T02:20:00+08:00
+- Date: 2026-06-12T02:50:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-054 are remediated on this branch.
+- Status: F-001 through F-055 are remediated on this branch.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-054 batch: 1a31a2d fix(web): encode local app route links.
+- Current HEAD before F-055 commit: 2a412a8 fix(web): strip non-auth proxy cookies.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services: Noveland Postgres is healthy on 55432->5432; Noveland NATS is healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch; project Playwright e2e used its own test server.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -27,19 +27,24 @@
 ## Completed This Batch
 
 - Reconfirmed realtime git/OpenSpec/service/test-entry status from the server before editing.
-- Continued the Web/e2e security audit on Next route/proxy response header behavior after F-053.
-- Recorded and remediated F-054: the shared Web proxy response helper relayed backend `Set-Cookie` headers for non-auth proxies as well as auth routes.
-- Added an architecture-contracts OpenSpec delta requiring non-auth Web proxies to omit backend cookie mutation headers while preserving auth cookie flows.
-- Made `Set-Cookie` relay opt-in on `buildProxyResponse()`, explicitly enabled it in `proxyAuthRequest()`, and left API/world/runtime/private-beta proxies on the default strip behavior.
-- Added focused proxy regression coverage for auth relay preservation and non-auth generic API, world, runtime, and private beta cookie stripping.
+- Continued the Web/e2e security audit on auth session-cookie creation after F-054.
+- Recorded and remediated F-055: backend login created session cookies without requiring double-submit CSRF, and the Web auth client did not send the CSRF header on login.
+- Added an architecture-contracts OpenSpec delta requiring login to validate CSRF before creating session cookies.
+- Added `require_csrf(request)` at the start of backend login, moved login CSRF acquisition into `web/lib/auth/client.ts`, and kept logout CSRF behavior intact.
+- Added backend and Web regression coverage for missing login CSRF rejection, successful CSRF-protected login, CSRF cookie/header behavior, existing-cookie reuse, failed login, logout CSRF, and exact cookie reads.
 - Restored `web/next-env.d.ts` after Playwright/Next dev regenerated it to `.next/dev/types/routes.d.ts`.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/auth/proxy.test.ts lib/worlds/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts`: 5 files and 12 tests passed.
+- `cd backend && uv run pytest tests/test_api_auth.py`: 7 passed.
+- `cd backend && uv run pytest tests/test_api_auth_integration.py`: 3 skipped because `NOVELAND_TEST_DATABASE_URL` was not set.
+- `cd backend && uv run ruff check .`: passed.
+- `cd backend && uv run mypy .`: passed.
+- `cd backend && uv run pytest`: 561 passed, 8 skipped.
+- `cd web && npm run test -- lib/auth/client.test.ts features/auth/login-form.test.tsx`: 2 files and 9 tests passed.
 - `cd web && npm run typecheck`: passed.
 - `cd web && npm run lint`: passed.
-- `cd web && npm run test`: 51 files and 175 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
+- `cd web && npm run test`: 51 files and 177 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
 - `cd web && npm run build`: passed.
 - `cd web && npm run test:e2e`: 21 passed.
 - `cd web && npm run check:next-env`: failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
@@ -54,8 +59,8 @@
 2. Audit Web rendering and project Playwright/e2e coverage for XSS-prone sinks, admin/player/member boundary gaps, and normal-use product flow drift without browser/computer-use plugins.
 3. Continue product normal-use and spec/history drift audit after Web route/proxy review.
 
-## Finding F-054
+## Finding F-055
 
-- Non-auth Web proxies reused an auth-oriented response helper that unconditionally relayed backend `Set-Cookie` headers.
-- The remediation preserves cookie mutation relay for auth flows only and strips backend cookie mutation headers from generic API, world, runtime, and private beta proxies.
+- Backend `/auth/login` created authenticated session cookies without requiring the same double-submit CSRF proof used by other cookie-backed mutations.
+- The remediation requires CSRF before backend session-cookie creation and makes the Web auth client obtain/send the login CSRF header itself.
 - Residual risk: remaining Next route handler method exposure, response shaping beyond cookies, and client-rendering sinks still need separate evidence-based review before remediation.

@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Auth login CSRF boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend auth login session-cookie creation and Web auth client login CSRF request construction for F-055.
+- Finding: F-055 found backend `/auth/login` creating `noveland_session` and `noveland_csrf` cookies without requiring double-submit CSRF, while the Web login client did not send `X-CSRF-Token` even though the login form had pre-fetched a CSRF cookie.
+- Summary: Added an architecture-contracts OpenSpec scenario for CSRF-protected login, required `require_csrf(request)` before backend login session creation, moved Web login CSRF acquisition into `web/lib/auth/client.ts`, and kept logout CSRF behavior intact.
+- Files changed: `backend/services/api/src/noveland/services/api/auth.py`, `backend/tests/test_api_auth.py`, `backend/tests/test_api_auth_integration.py`, `web/lib/auth/client.ts`, `web/lib/auth/client.test.ts`, `web/features/auth/login-form.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added backend regression coverage proving login rejects missing CSRF before setting session cookies, updated backend auth/integration login helpers to send explicit double-submit CSRF headers, and expanded Web auth client coverage for CSRF fetch/header behavior, existing-cookie reuse, failed login, logout CSRF, and exact cookie reads.
+- Verification: `cd backend && uv run pytest tests/test_api_auth.py` passed with 7 tests; `cd backend && uv run pytest tests/test_api_auth_integration.py` skipped 3 integration tests because `NOVELAND_TEST_DATABASE_URL` was not set; `cd backend && uv run ruff check .` passed; `cd backend && uv run mypy .` passed; `cd backend && uv run pytest` passed with 561 passed and 8 skipped; `cd web && npm run test -- lib/auth/client.test.ts features/auth/login-form.test.tsx` passed with 2 files and 9 tests; `cd web && npm run typecheck` passed; `cd web && npm run lint` passed; full `cd web && npm run test` passed with 51 files and 177 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 passed; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handler method exposure, response shaping, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Web non-auth proxy Set-Cookie boundary entry
 
 - Date: 2026-06-12

@@ -70,6 +70,7 @@ def login(
     response: Response,
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> SubjectResponse:
+    require_csrf(request)
     settings = load_settings()
     user = _user_by_email(db_session, login_request.email)
     if user is None or not user.is_active:

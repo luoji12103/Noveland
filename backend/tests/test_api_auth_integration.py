@@ -59,6 +59,7 @@ def test_seed_admin_and_http_auth_flow_against_postgres(engine: Engine) -> None:
     login_response = client.post(
         "/auth/login",
         json={"email": email, "password": "correct-password"},
+        headers=_csrf_headers(client),
     )
     csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
     me_response = client.get("/auth/me")
@@ -95,6 +96,7 @@ def test_seed_admin_cli_updates_platform_admin_against_postgres(
     login_response = client.post(
         "/auth/login",
         json={"email": email, "password": "correct-password"},
+        headers=_csrf_headers(client),
     )
 
     assert login_response.status_code == 200
@@ -110,6 +112,14 @@ def test_seed_admin_rejects_short_password(engine: Engine) -> None:
                 password="short",
                 display_name="Short Password",
             )
+
+
+def _csrf_headers(client: TestClient) -> dict[str, str]:
+    response = client.get("/auth/csrf")
+    assert response.status_code == 200
+    csrf_token = response.json()["csrf_token"]
+    assert csrf_token
+    return {CSRF_HEADER_NAME: csrf_token, "Cookie": f"{CSRF_COOKIE_NAME}={csrf_token}"}
 
 
 def _client_for_engine(engine: Engine) -> TestClient:

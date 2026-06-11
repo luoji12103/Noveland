@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AuthClientError, login, requestCsrf } from "@/lib/auth/client";
+import { AuthClientError, login } from "@/lib/auth/client";
 
 export function LoginForm() {
   const router = useRouter();
@@ -22,7 +22,6 @@ export function LoginForm() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await requestCsrf();
       await login({ email, password });
       router.replace("/worlds");
       router.refresh();

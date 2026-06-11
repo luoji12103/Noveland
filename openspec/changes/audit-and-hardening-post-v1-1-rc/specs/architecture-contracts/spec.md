@@ -199,6 +199,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the Web proxy response SHALL omit those `Set-Cookie` headers
 - **AND** authenticated auth routes MAY continue to relay backend cookie mutation headers required for login, logout, and CSRF flows.
 
+#### Scenario: Login requires double-submit CSRF before session cookie creation
+- **GIVEN** a browser client submits credentials to the login route
+- **WHEN** the login request would create a new authenticated session cookie
+- **THEN** the backend SHALL require a matching CSRF cookie and `X-CSRF-Token` header before creating the session
+- **AND** the Web auth client SHALL obtain and forward that CSRF token with the login request.
+
 ### Requirement: Web realtime clients preserve backend route boundaries
 The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
 
