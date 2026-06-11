@@ -40,6 +40,25 @@ def list_reader_media(
     )
 
 
+@router.get("/worldlines/{worldline_id}/objects/{object_id}/download")
+def download_reader_media_object_for_worldline(
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    object_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    storage: Annotated[LocalMediaObjectStorage, Depends(_reader_media_storage)],
+) -> FastAPIResponse:
+    _ = context
+    return _download_reader_media_object_response(
+        world_id,
+        worldline_id,
+        object_id,
+        db_session,
+        storage,
+    )
+
+
 @router.get("/objects/{object_id}/download")
 def download_reader_media_object(
     world_id: uuid.UUID,
@@ -50,6 +69,24 @@ def download_reader_media_object(
     worldline_id: uuid.UUID | None = None,
 ) -> FastAPIResponse:
     _ = context
+    if worldline_id is None:
+        raise _not_found()
+    return _download_reader_media_object_response(
+        world_id,
+        worldline_id,
+        object_id,
+        db_session,
+        storage,
+    )
+
+
+def _download_reader_media_object_response(
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    object_id: uuid.UUID,
+    db_session: Session,
+    storage: LocalMediaObjectStorage,
+) -> FastAPIResponse:
     try:
         result = ReaderMediaDeliveryService(db_session, storage=storage).read_object(
             world_id,

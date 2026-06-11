@@ -1741,7 +1741,7 @@ const readerMediaDescriptors = [
         duration_ms: null,
         sample_rate_hz: null,
         audio_channels: null,
-        download_url: `/worlds/${worldOneId}/reader/media/objects/${playbackCompositeObjectId}/download`,
+        download_url: `/worlds/${worldOneId}/reader/media/worldlines/${primaryWorldlineId}/objects/${playbackCompositeObjectId}/download`,
       },
     ],
     references: [
@@ -1782,7 +1782,7 @@ const readerMediaDescriptors = [
         duration_ms: 800,
         sample_rate_hz: 24000,
         audio_channels: 1,
-        download_url: `/worlds/${worldOneId}/reader/media/objects/${playbackAudioObjectId}/download`,
+        download_url: `/worlds/${worldOneId}/reader/media/worldlines/${primaryWorldlineId}/objects/${playbackAudioObjectId}/download`,
       },
     ],
     references: [

@@ -487,7 +487,7 @@ export function mediaObjectDownloadPath(worldId: string, objectId: string): stri
 
 const UUID_PATH_SEGMENT = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 const READER_MEDIA_DOWNLOAD_PATH_PATTERN = new RegExp(
-  `^/api/worlds/${UUID_PATH_SEGMENT}/reader/media/objects/${UUID_PATH_SEGMENT}/download$`,
+  `^/api/worlds/${UUID_PATH_SEGMENT}/reader/media/worldlines/${UUID_PATH_SEGMENT}/objects/${UUID_PATH_SEGMENT}/download$`,
 );
 
 export function readerMediaObjectDownloadPath(downloadUrl: string): string | null {

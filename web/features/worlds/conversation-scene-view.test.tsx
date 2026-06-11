@@ -14,11 +14,11 @@ describe("ConversationSceneView", () => {
     expect(screen.getByText("Guide replies to the reader.")).toBeVisible();
     expect(screen.getByLabelText("Reader-safe scene image")).toHaveStyle({
       backgroundImage:
-        `url(/api/worlds/${READER_WORLD_ID}/reader/media/objects/${COMPOSITE_OBJECT_ID}/download)`,
+        `url(/api/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${COMPOSITE_OBJECT_ID}/download)`,
     });
     expect(screen.getByLabelText("Scene audio")).toHaveAttribute(
       "src",
-      `/api/worlds/${READER_WORLD_ID}/reader/media/objects/${AUDIO_OBJECT_ID}/download`,
+      `/api/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${AUDIO_OBJECT_ID}/download`,
     );
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
@@ -76,6 +76,7 @@ function serializedDocument(): string {
 const RESERVED_WORLD_ID = "world/reader?mode=scene#frag";
 const RESERVED_CONVERSATION_ID = "conversation/live?debug=true#frag";
 const READER_WORLD_ID = "11111111-1111-4111-8111-111111111111";
+const READER_WORLDLINE_ID = "11111111-2222-4111-8111-111111111111";
 const COMPOSITE_OBJECT_ID = "22222222-2222-4222-8222-222222222222";
 const AUDIO_OBJECT_ID = "33333333-3333-4333-8333-333333333333";
 
@@ -227,7 +228,7 @@ const sceneData: ConversationPlaybackData = {
           duration_ms: null,
           sample_rate_hz: null,
           audio_channels: null,
-          download_url: `/worlds/${READER_WORLD_ID}/reader/media/objects/${COMPOSITE_OBJECT_ID}/download`,
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${COMPOSITE_OBJECT_ID}/download`,
         },
       ],
       references: [
@@ -268,7 +269,7 @@ const sceneData: ConversationPlaybackData = {
           duration_ms: 1000,
           sample_rate_hz: 24000,
           audio_channels: 1,
-          download_url: `/worlds/${READER_WORLD_ID}/reader/media/objects/${AUDIO_OBJECT_ID}/download`,
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${AUDIO_OBJECT_ID}/download`,
         },
       ],
       references: [

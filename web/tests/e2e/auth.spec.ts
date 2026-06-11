@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const worldOneId = "10000000-0000-4000-8000-000000000001";
+const primaryWorldlineId = "11000000-0000-4000-8000-000000000001";
 const seedConversationId = "76000000-0000-4000-8000-000000000001";
 
 test.describe.configure({ timeout: 60000 });
@@ -527,7 +528,7 @@ test("reader playback renders conversation turns through safe media", async ({ p
   await expect(page.getByLabel("Reader-safe scene media")).toBeVisible();
   await expect(page.getByLabel("Turn audio")).toHaveAttribute(
     "src",
-    `/api/worlds/${worldOneId}/reader/media/objects/76810000-0000-4000-8000-000000000002/download`,
+    `/api/worlds/${worldOneId}/reader/media/worldlines/${primaryWorldlineId}/objects/76810000-0000-4000-8000-000000000002/download`,
   );
 
   const pageText = await page.locator("body").innerText();
@@ -548,7 +549,7 @@ test("reader scene view renders galgame-style safe media", async ({ page }) => {
   await expect(page.getByLabel("Reader-safe scene image")).toBeVisible();
   await expect(page.getByLabel("Scene audio")).toHaveAttribute(
     "src",
-    `/api/worlds/${worldOneId}/reader/media/objects/76810000-0000-4000-8000-000000000002/download`,
+    `/api/worlds/${worldOneId}/reader/media/worldlines/${primaryWorldlineId}/objects/76810000-0000-4000-8000-000000000002/download`,
   );
 
   await page.getByRole("button", { name: /Turn 1/ }).click();

@@ -291,7 +291,7 @@ def test_applied_moderation_takedown_hides_reader_media_without_admin_route_chan
 
     _authenticate(client, member_token)
     before_list = client.get(f"/worlds/{world_id}/reader/media")
-    before_download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    before_download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate(client, admin_token)
     action = client.post(
@@ -309,7 +309,7 @@ def test_applied_moderation_takedown_hides_reader_media_without_admin_route_chan
     _authenticate(client, member_token)
     after_list = client.get(f"/worlds/{world_id}/reader/media")
     after_detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
-    after_download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    after_download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate(client, admin_token)
     admin_download = client.get(f"/worlds/{world_id}/media/objects/{object_id}/download")
@@ -836,6 +836,15 @@ def _seed_beta_feedback(
         )
         session.commit()
     return feedback_id
+
+
+def _reader_media_download_path(
+    world_id: uuid.UUID, worldline_id: uuid.UUID, object_id: uuid.UUID
+) -> str:
+    return (
+        f"/worlds/{world_id}/reader/media/worldlines/"
+        f"{worldline_id}/objects/{object_id}/download"
+    )
 
 
 def _authenticate(client: TestClient, token: str) -> None:

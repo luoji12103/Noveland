@@ -1,5 +1,14 @@
 ## MODIFIED Requirements
 
+### Requirement: Worldline-scoped state validates world and worldline identity
+The system SHALL treat `world_id` and `worldline_id` as first-class identifiers for worldline-scoped records and SHALL reject links that cross worlds or worldlines.
+
+#### Scenario: Reader media object delivery requires scoped worldline identity
+- **GIVEN** a reader-visible media object belongs to a worldline-scoped media asset
+- **WHEN** a reader/member/player/admin downloads the media object through reader media delivery
+- **THEN** the delivery route SHALL require a worldline identifier in the route path or explicit request scope
+- **AND** the service SHALL reject missing or mismatched worldline scope before reading storage bytes.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 
@@ -420,5 +429,5 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **GIVEN** browser-side Web playback or scene components render reader media descriptors
 - **AND** a descriptor supplies a `download_url` value
 - **WHEN** the client converts the descriptor URL into a same-origin media path
-- **THEN** it SHALL accept only exact reader media object download routes with UUID world and object path segments
+- **THEN** it SHALL accept only exact reader media object download routes with UUID world, worldline, and object path segments
 - **AND** it SHALL reject query strings, fragments, extra path segments, non-reader media routes, and non-backend media schemes before rendering image or audio sources.

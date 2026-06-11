@@ -179,8 +179,8 @@ class ReaderMediaDeliveryService:
                 sample_rate_hz=media_object.sample_rate_hz,
                 audio_channels=media_object.audio_channels,
                 download_url=(
-                    f"/worlds/{media_object.world_id}/reader/media/objects/"
-                    f"{media_object.id}/download"
+                    f"/worlds/{media_object.world_id}/reader/media/worldlines/"
+                    f"{media_object.worldline_id}/objects/{media_object.id}/download"
                 ),
             )
             for media_object in objects

@@ -68,6 +68,7 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
     listed = client.get(f"/worlds/{world_id}/reader/media")
     detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
     downloaded = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    scoped_downloaded = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate_session_only(client, owner_token)
     admin_listed = client.get(
@@ -81,11 +82,14 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
     assert detail.status_code == 200
     assert detail.json()["asset_id"] == str(asset_id)
     assert detail.json()["objects"][0]["object_id"] == str(object_id)
-    assert detail.json()["objects"][0]["download_url"].endswith(f"{object_id}/download")
-    assert downloaded.status_code == 200
-    assert downloaded.content == b"reader-image"
-    assert downloaded.headers["content-type"].startswith("image/png")
-    assert downloaded.headers["x-content-type-options"] == "nosniff"
+    assert detail.json()["objects"][0]["download_url"] == _reader_media_download_path(
+        world_id, worldline_id, object_id
+    )
+    assert downloaded.status_code == 404
+    assert scoped_downloaded.status_code == 200
+    assert scoped_downloaded.content == b"reader-image"
+    assert scoped_downloaded.headers["content-type"].startswith("image/png")
+    assert scoped_downloaded.headers["x-content-type-options"] == "nosniff"
     assert admin_listed.status_code == 200
     _assert_no_forbidden_markers(listed.json())
     _assert_no_forbidden_markers(detail.json())
@@ -135,7 +139,7 @@ def test_reader_media_suppresses_non_deliverable_assets() -> None:
     listed = client.get(f"/worlds/{world_id}/reader/media")
     hidden_detail = client.get(f"/worlds/{world_id}/reader/media/{hidden_id}")
     hidden_download = client.get(
-        f"/worlds/{world_id}/reader/media/objects/{hidden_object_id}/download"
+        _reader_media_download_path(world_id, worldline_id, hidden_object_id)
     )
     private_detail = client.get(f"/worlds/{world_id}/reader/media/{private_id}")
     unreferenced_detail = client.get(f"/worlds/{world_id}/reader/media/{unreferenced_id}")
@@ -201,15 +205,23 @@ def test_reader_media_rejects_cross_world_and_cross_worldline_requests() -> None
         f"/worlds/{world_id}/reader/media/{fork_asset_id}",
         params={"worldline_id": str(worldline_id)},
     )
+    unscoped_object = client.get(
+        f"/worlds/{world_id}/reader/media/objects/{fork_object_id}/download"
+    )
     wrong_object_worldline = client.get(
         f"/worlds/{world_id}/reader/media/objects/{fork_object_id}/download",
         params={"worldline_id": str(worldline_id)},
     )
-    valid_object = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    wrong_object_worldline_path = client.get(
+        _reader_media_download_path(world_id, worldline_id, fork_object_id)
+    )
+    valid_object = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     assert wrong_world.status_code == 404
     assert wrong_worldline.status_code == 404
+    assert unscoped_object.status_code == 404
     assert wrong_object_worldline.status_code == 404
+    assert wrong_object_worldline_path.status_code == 404
     assert valid_object.status_code == 200
 
 
@@ -245,7 +257,7 @@ def test_reader_media_requires_reader_visible_reference_context() -> None:
     _authenticate_session_only(client, owner_token)
     listed = client.get(f"/worlds/{world_id}/reader/media")
     detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
-    download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     assert listed.status_code == 200
     assert listed.json() == []
@@ -559,6 +571,15 @@ def _seed_reference(
         )
         session.commit()
     return reference_id
+
+
+def _reader_media_download_path(
+    world_id: uuid.UUID, worldline_id: uuid.UUID, object_id: uuid.UUID
+) -> str:
+    return (
+        f"/worlds/{world_id}/reader/media/worldlines/"
+        f"{worldline_id}/objects/{object_id}/download"
+    )
 
 
 def _authenticate_session_only(client: TestClient, token: str) -> None:
