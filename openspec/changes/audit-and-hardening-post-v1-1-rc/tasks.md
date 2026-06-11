@@ -695,3 +695,14 @@
 - Intended remediation: keep world-level provider/default voice profiles allowed, but reject `reference_asset_id` on world-level profiles because no world-level media asset exists; continue requiring exact same-worldline audio assets for scoped voice profiles.
 - Status: Remediated in speech voice profile reference-asset boundary batch.
 - Verification: `cd backend && uv run pytest tests/test_voice_profiles.py` passed with 4 tests; `cd backend && uv run pytest tests/test_speech_service.py tests/test_api_speech.py tests/test_voice_profiles.py` passed with 11 tests; `cd backend && uv run ruff check packages/speech/src/noveland/speech/voice_profiles.py tests/test_voice_profiles.py` passed; `cd backend && uv run mypy packages/speech/src/noveland/speech/voice_profiles.py tests/test_voice_profiles.py` passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+
+
+### F-064 Beta feedback reporter reads expose admin triage evidence refs
+
+- Severity: High
+- Affected boundary: member-readable beta feedback report list/detail responses and admin triage evidence.
+- Evidence: `BetaFeedbackService.list_reports()` and `get_report()` scoped non-admin callers to their own reports, but both returned `_read(report)` with full `evidence_refs_json`, `repair_proposal_refs_json`, `triage_note`, `triaged_by_actor_ref`, `moderation_report_id`, and report metadata. Admin triage can replace evidence refs with media job or invocation refs and link repair proposals, causing those admin-only references and actor refs to flow back to the reporter on later reads.
+- Impact: a beta tester could read admin-only triage evidence identifiers, repair proposal refs, moderation refs, admin actor refs, or metadata from their own report after operator triage, weakening the intended separation between reporter-private feedback UX and admin repair/moderation evidence.
+- Intended remediation: make beta feedback read shaping role-aware; preserve full triage evidence for admin routes while reporter/member reads keep safe status and severity, filter evidence refs to reporter-safe kinds, and omit repair/moderation/admin actor/metadata fields.
+- Status: Remediated in beta feedback reporter triage evidence redaction batch.
+- Verification: `cd backend && uv run pytest tests/test_api_beta_feedback.py` passed with 4 tests; `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_authoring.py` passed with 19 tests; `cd backend && uv run ruff check packages/beta_feedback/src/noveland/beta_feedback/service.py tests/test_api_beta_feedback.py` passed; `cd backend && uv run mypy packages/beta_feedback/src/noveland/beta_feedback/service.py tests/test_api_beta_feedback.py` passed; OpenSpec strict validations and `git diff --check` passed.

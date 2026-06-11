@@ -23,6 +23,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** they request world content
 - **THEN** the response SHALL omit admin evidence and internal storage/provider details.
 
+#### Scenario: Beta feedback reporters do not receive admin triage evidence
+- **GIVEN** a beta feedback reporter can list or fetch their own report through member-readable routes
+- **WHEN** an admin has triaged the report with admin evidence refs, repair proposal refs, moderation refs, actor refs, or metadata
+- **THEN** the reporter response SHALL hide those admin-only triage fields while preserving safe report status and severity
+- **AND** admin beta feedback routes MAY continue to expose triage evidence required for repair and moderation workflows.
+
 #### Scenario: Member reads media asset catalog
 - **GIVEN** a world member can list, search, or fetch visible media assets through member media APIs
 - **WHEN** a visible media asset has internal storage references such as storage_uri, preview_uri, or thumbnail_uri

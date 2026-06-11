@@ -3993,3 +3993,16 @@
 - Tests added/updated: Added a voice profile service regression proving a world-level profile cannot reference a worldline-scoped audio media asset.
 - Verification: `cd backend && uv run pytest tests/test_voice_profiles.py` passed with 4 tests; `cd backend && uv run pytest tests/test_speech_service.py tests/test_api_speech.py tests/test_voice_profiles.py` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend worldline isolation and forbidden-evidence audits for remaining speech service/API outputs, memory, player sessions, beta feedback, moderation, observability, and product/spec drift. Do not push unless explicitly requested after this batch commit.
+
+
+## Post-v1.1 RC Audit and Hardening Beta feedback reporter triage evidence entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-064.
+- Finding: F-064 found reporter-owned beta feedback reads returned full admin triage evidence after operator triage, including admin-set media job/invocation evidence refs, repair proposal refs, moderation refs, actor refs, and metadata.
+- Summary: Added an architecture-contracts OpenSpec scenario for beta feedback reporter/admin evidence separation, made `BetaFeedbackService._read()` role-aware, preserved full evidence for admin reads, and restricted reporter reads to safe report status/severity plus reporter-safe evidence kinds with metadata stripped.
+- Files changed: backend/packages/beta_feedback/src/noveland/beta_feedback/service.py, backend/tests/test_api_beta_feedback.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended beta feedback API coverage so admin triage can attach media job/invocation evidence and repair refs, while reporter detail reads after triage hide admin-only fields.
+- Verification: `cd backend && uv run pytest tests/test_api_beta_feedback.py` passed with 4 tests; `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_authoring.py` passed with 19 tests; focused backend ruff/mypy passed; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for moderation, observability, privacy export contents, speech/API output, and remaining member/player DTOs. Do not push unless explicitly requested after this batch commit.

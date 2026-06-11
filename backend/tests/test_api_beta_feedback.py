@@ -67,6 +67,11 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
     )
     media_asset_id = _seed_media(engine, world_id, worldline_id, conversation_id, turn_id)
     invocation_id = _seed_invocation(engine, world_id, worldline_id, conversation_id, turn_id)
+    with Session(engine) as session:
+        media_asset = session.get(MediaAsset, media_asset_id)
+        assert media_asset is not None
+        media_job_id = media_asset.source_job_id
+    assert media_job_id is not None
     before_events = _count_world_events(engine)
 
     _authenticate(client, tester_token)
@@ -105,6 +110,10 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
             "status": "investigating",
             "severity": "high",
             "triage_note": "Reproduce against persona QA report.",
+            "evidence_refs": [
+                {"kind": "media_job", "id": str(media_job_id), "role": "admin-job"},
+                {"kind": "invocation", "id": str(invocation_id), "role": "admin-run"},
+            ],
             "repair_proposal_refs": [
                 {
                     "proposal_id": str(uuid.uuid4()),
@@ -115,6 +124,10 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
             ],
         },
         headers=_csrf_headers(client),
+    )
+    _authenticate(client, tester_token)
+    reporter_after_triage = client.get(
+        f"/worlds/{world_id}/beta-feedback/reports/{created.json()['id']}"
     )
 
     assert created.status_code == 201
@@ -127,7 +140,6 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
         "turn",
         "presentation",
         "media_asset",
-        "invocation",
     ]
     assert own_list.status_code == 200
     assert [item["id"] for item in own_list.json()] == [body["id"]]
@@ -136,12 +148,27 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
     assert triaged.status_code == 200
     assert triaged.json()["status"] == "investigating"
     assert triaged.json()["severity"] == "high"
+    assert [ref["kind"] for ref in triaged.json()["evidence_refs"]] == [
+        "media_job",
+        "invocation",
+    ]
     assert triaged.json()["repair_proposal_refs"][0]["proposal_kind"] == "persona"
+    assert reporter_after_triage.status_code == 200
+    reporter_body = reporter_after_triage.json()
+    assert reporter_body["status"] == "investigating"
+    assert reporter_body["severity"] == "high"
+    assert reporter_body["evidence_refs"] == []
+    assert reporter_body["repair_proposal_refs"] == []
+    assert reporter_body["triage_note"] is None
+    assert reporter_body["triaged_by_actor_ref"] is None
+    assert reporter_body["moderation_report_id"] is None
+    assert reporter_body["metadata"] == {}
     assert _count_world_events(engine) == before_events
     _assert_no_forbidden_markers(created.json())
     _assert_no_forbidden_markers(own_list.json())
     _assert_no_forbidden_markers(admin_list.json())
     _assert_no_forbidden_markers(triaged.json())
+    _assert_no_forbidden_markers(reporter_after_triage.json())
 
 
 def test_beta_feedback_preserves_reporter_privacy_and_admin_only_triage() -> None:
