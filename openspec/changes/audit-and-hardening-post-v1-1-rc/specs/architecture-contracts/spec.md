@@ -400,6 +400,14 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the app route path
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
+
+#### Scenario: Web client event stream subscriptions preserve local API route boundaries
+- **GIVEN** browser-side Web UI components subscribe to world or conversation event streams through same-origin Next API routes
+- **AND** the world identifier or conversation identifier contains encoded path separators or other reserved path characters
+- **WHEN** the component constructs the EventSource URL
+- **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
+- **AND** query-string and fragment delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters or fragments.
+
 #### Scenario: Web reader media rendering accepts scoped download paths
 - **GIVEN** browser-side Web playback or scene components render reader media descriptors
 - **AND** a descriptor supplies a `download_url` value

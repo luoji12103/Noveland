@@ -18,6 +18,7 @@ import {
   updateConversation,
 } from "@/lib/worlds/client";
 import {
+  conversationEventStreamPath,
   createConversationLiveSocket,
   mergeById,
   nextRequestId,
@@ -121,7 +122,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
 
   useEffect(() => {
     return subscribeToEventStream<ConversationStreamEnvelope["payload"]>(
-      `/api/worlds/${worldId}/conversations/${conversationId}/stream`,
+      conversationEventStreamPath(worldId, conversationId),
       (envelope) => {
         if (envelope.payload.session !== undefined) {
           setConversationState(envelope.payload.session);

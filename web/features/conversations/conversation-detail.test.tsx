@@ -21,6 +21,8 @@ vi.mock("@/lib/worlds/client", async () => {
 });
 
 vi.mock("@/lib/realtime", () => ({
+  conversationEventStreamPath: (worldId: string, conversationId: string) =>
+    `/api/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(conversationId)}/stream`,
   createConversationLiveSocket: vi.fn(() => ({
     close: vi.fn(),
     readyState: 3,
@@ -43,6 +45,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
+import { subscribeToEventStream } from "@/lib/realtime";
 import {
   generateConversationNarrativeArtifacts,
   getConversationMemorySummary,
@@ -129,6 +132,26 @@ describe("ConversationDetail", () => {
       expect(getConversationMemorySummary).toHaveBeenCalledWith("world-1", "conversation-1");
     });
     expect(screen.getByText("Memory summary")).toBeInTheDocument();
+  });
+
+
+  it("encodes conversation EventSource paths for reserved identifiers", () => {
+    const worldId = "world/conversations?mode=detail#frag";
+    const conversationId = "conversation/live?view=stream#frag";
+
+    render(
+      <ConversationDetail
+        worldId={worldId}
+        conversationId={conversationId}
+        data={adminData}
+      />,
+    );
+
+    expect(vi.mocked(subscribeToEventStream).mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(
+        conversationId,
+      )}/stream`,
+    );
   });
 
   it("updates writer config and generates conversation narrative", async () => {

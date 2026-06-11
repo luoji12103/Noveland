@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { mergeById, subscribeToEventStream } from "@/lib/realtime";
+import { mergeById, subscribeToEventStream, worldEventStreamPath } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type {
   NarrativeReaderDetailData,
@@ -27,7 +27,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
 
   useEffect(() => {
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
-      `/api/worlds/${worldId}/stream`,
+      worldEventStreamPath(worldId),
       (envelope) => {
         const publishedArtifacts = envelope.payload.narrative_artifacts.filter(
           (artifact) =>

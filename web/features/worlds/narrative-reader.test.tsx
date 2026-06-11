@@ -71,6 +71,15 @@ describe("narrative reader", () => {
     expect(screen.getByText(/generation_mode/)).toBeVisible();
   });
 
+
+  it("encodes reader EventSource paths for reserved world identifiers", () => {
+    render(<NarrativeReaderList worldId={RESERVED_WORLD_ID} data={listData} />);
+
+    expect(subscribeToEventStream.mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/stream`,
+    );
+  });
+
   it("merges published stream updates into the reader list", () => {
     subscribeToEventStream.mockImplementation(
       ((_, handler) => {

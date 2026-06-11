@@ -79,7 +79,7 @@ import {
   upsertMembership,
   validateWorldComposition,
 } from "@/lib/worlds/client";
-import { subscribeToEventStream } from "@/lib/realtime";
+import { subscribeToEventStream, worldEventStreamPath } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type {
@@ -197,7 +197,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
       return;
     }
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
-      `/api/worlds/${world.id}/stream`,
+      worldEventStreamPath(world.id),
       (envelope) => {
         if (envelope.payload.clock !== undefined) {
           setClock(envelope.payload.clock);

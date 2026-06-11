@@ -5,9 +5,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-vi.mock("@/lib/realtime", () => ({
-  subscribeToEventStream: vi.fn(() => undefined),
-}));
+vi.mock("@/lib/realtime", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/realtime")>("@/lib/realtime");
+  return {
+    ...actual,
+    subscribeToEventStream: vi.fn(() => undefined),
+  };
+});
 
 vi.mock("@/lib/worlds/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/worlds/client")>(
@@ -34,6 +38,7 @@ vi.mock("@/lib/worlds/client", async () => {
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
+import { subscribeToEventStream } from "@/lib/realtime";
 import {
   compareWorldlines,
   createBetaChecklist,
@@ -348,6 +353,22 @@ describe("WorldOverview", () => {
     expect(screen.getByRole("link", { name: "Reader" })).toHaveAttribute(
       "href",
       `${worldPath}/reader`,
+    );
+  });
+
+
+  it("encodes world EventSource paths for reserved world identifiers", () => {
+    render(
+      <WorldOverview
+        data={{
+          ...workspaceData,
+          selectedWorld: { ...workspaceData.selectedWorld!, id: RESERVED_WORLD_ID },
+        }}
+      />,
+    );
+
+    expect(vi.mocked(subscribeToEventStream).mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/stream`,
     );
   });
 

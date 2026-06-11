@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createConversationLiveSocket } from "@/lib/realtime";
+import { conversationEventStreamPath, createConversationLiveSocket, worldEventStreamPath } from "@/lib/realtime";
 
 class MockWebSocket {
   static instances: MockWebSocket[] = [];
@@ -19,6 +19,19 @@ class MockWebSocket {
     this.listeners.set(type, existing);
   }
 }
+
+describe("realtime stream paths", () => {
+  it("encodes same-origin EventSource route path segments", () => {
+    expect(worldEventStreamPath("world/admin?x=1#frag")).toBe(
+      "/api/worlds/world%2Fadmin%3Fx%3D1%23frag/stream",
+    );
+    expect(
+      conversationEventStreamPath("world/admin?x=1#frag", "conversation/debug?y=2#frag"),
+    ).toBe(
+      "/api/worlds/world%2Fadmin%3Fx%3D1%23frag/conversations/conversation%2Fdebug%3Fy%3D2%23frag/stream",
+    );
+  });
+});
 
 describe("realtime client", () => {
   afterEach(() => {
