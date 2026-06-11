@@ -3275,6 +3275,11 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     _seed_provider_profile(engine, profile_key="preset-provider")
+    expected_member_character_profile = {
+        "safe": "public characterization",
+        "nested": {"safe_note": "kept"},
+        "items": ["public-note", {"safe_item": "kept"}],
+    }
 
     _authenticate(client, platform_token)
     preset_response = client.post(
@@ -3305,6 +3310,21 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
             "agent_key": "narrator",
             "display_name": "Narrator",
             "preset_id": preset_id,
+            "character_profile": {
+                "safe": "public characterization",
+                "storage_uri": "media://private/agent-profile",
+                "nested": {
+                    "safe_note": "kept",
+                    "raw_prompt": "operator-only profile prompt",
+                },
+                "items": [
+                    "public-note",
+                    "media://private/agent-list-entry",
+                    {"safe_item": "kept", "raw_output": "provider output"},
+                ],
+                "secret_refs": ["runtime/provider/key"],
+                "path": "/root/private/agent-profile.json",
+            },
             "config": {"style": "override", "temperature": 0.2},
         },
     )
@@ -3322,6 +3342,12 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert create_agent.json()["config"]["style"] == "override"
     assert create_agent.json()["config"]["length"] == "short"
     assert create_agent.json()["config"]["temperature"] == 0.2
+    assert create_agent.json()["character_profile"]["storage_uri"] == (
+        "media://private/agent-profile"
+    )
+    assert create_agent.json()["character_profile"]["nested"]["raw_prompt"] == (
+        "operator-only profile prompt"
+    )
     assert persona.status_code == 200
     assert persona.json()["persona_text"] == "Always narrates in scene."
     assert calendar.status_code == 200
@@ -3347,11 +3373,25 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     )
     assert agents.json()[0]["config"]["style"] == "override"
     assert agents.json()[0]["config"]["length"] == "short"
+    assert agents.json()[0]["character_profile"]["storage_uri"] == (
+        "media://private/agent-profile"
+    )
     assert member_agents.status_code == 200
     assert member_agents.json()[0]["id"] == agent_id
     assert member_agents.json()[0]["display_name"] == "Narrator"
     assert member_agents.json()[0]["provider_profile_id"] is None
     assert member_agents.json()[0]["config"] == {}
+    assert member_agents.json()[0]["character_profile"] == expected_member_character_profile
+    member_character_profile_text = json.dumps(
+        member_agents.json()[0]["character_profile"],
+        sort_keys=True,
+    )
+    assert "storage_uri" not in member_character_profile_text
+    assert "media://" not in member_character_profile_text
+    assert "raw_prompt" not in member_character_profile_text
+    assert "raw_output" not in member_character_profile_text
+    assert "secret_refs" not in member_character_profile_text
+    assert "/root/" not in member_character_profile_text
 
 
 def test_agent_preset_update_preview_reports_stale_and_current_agents() -> None:

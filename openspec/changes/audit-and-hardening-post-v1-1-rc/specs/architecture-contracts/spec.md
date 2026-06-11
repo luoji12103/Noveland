@@ -30,6 +30,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **AND** admin beta feedback routes MAY continue to expose triage evidence required for repair and moderation workflows.
 
 
+#### Scenario: Member reads agent character profiles
+- **GIVEN** a world member lists agents through the member-readable agent catalog
+- **WHEN** an agent character profile contains arbitrary profile JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL omit the forbidden character profile keys and values while retaining safe public characterization fields
+- **AND** admin agent reads MAY continue to expose the full character profile for authoring and repair workflows.
+
 #### Scenario: Member reads player actor profiles
 - **GIVEN** a world member lists or binds player actor profiles through member-readable routes
 - **WHEN** the player actor profile contains arbitrary profile JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
