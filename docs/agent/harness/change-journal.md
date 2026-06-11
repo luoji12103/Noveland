@@ -4030,3 +4030,15 @@
 - Tests added/updated: Expanded the speech API integration test to assert TTS/STT responses do not contain `storage_uri`, `media://`, media job request/result/config fields, or raw invocation payload fields.
 - Verification: `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_speech.py tests/test_speech_service.py tests/test_voice_profiles.py -q` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
 - Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, remaining player/member DTOs, and worldline isolation edge cases, then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Player actor profile redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-067.
+- Finding: F-067 found member-readable player actor bind/list responses returning arbitrary `PlayerActorProfile.profile_json`, allowing storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64-looking values to reach ordinary world members when profile metadata was admin-authored or historically dirty.
+- Summary: Added an architecture-contracts OpenSpec scenario for member player actor profile redaction, sanitized profile JSON on player actor bind before persistence, and sanitized profile JSON again in `_player_actor_response()` for historical records.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the member player interaction API test to prove dirty bind profiles persist only safe fields and simulated historical dirty profiles are redacted on member list responses.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, worldline isolation edge cases, and then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.

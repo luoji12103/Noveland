@@ -2846,6 +2846,16 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     scene_id = _seed_scene(engine, world_id, "club-room")
     agent_id = _seed_agent(engine, world_id, "guide", scene_id=scene_id)
+    expected_member_profile = {
+        "safe": "visible",
+        "nested": {"safe_note": "kept"},
+        "items": ["public-note", {"safe_item": "kept"}],
+    }
+    expected_historical_profile = {
+        "safe": "historical-visible",
+        "nested": {"safe_note": "historical-kept"},
+        "items": ["historical-note", {"safe_item": "historical-kept"}],
+    }
 
     _authenticate(client, owner_token)
     owner_actor = client.put(
@@ -2861,7 +2871,24 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     _authenticate(client, member_token)
     member_actor = client.put(
         f"/worlds/{world_id}/player-actors",
-        json={"display_name": "Member Player", "current_scene_id": str(scene_id)},
+        json={
+            "display_name": "Member Player",
+            "current_scene_id": str(scene_id),
+            "profile": {
+                "safe": "visible",
+                "storage_uri": "media://private/player-profile",
+                "nested": {
+                    "safe_note": "kept",
+                    "raw_prompt": "operator-only prompt",
+                },
+                "items": [
+                    "public-note",
+                    "media://private/list-entry",
+                    {"safe_item": "kept", "raw_output": "provider output"},
+                ],
+                "path": "/root/private/player-profile.json",
+            },
+        },
     )
     other_actor_attempt = client.put(
         f"/worlds/{world_id}/player-actors",
@@ -2871,6 +2898,32 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "current_scene_id": str(scene_id),
         },
     )
+    assert member_actor.status_code == 200
+    assert member_actor.json()["profile"] == expected_member_profile
+
+    with Session(engine) as session:
+        persisted_member_actor = session.get(
+            PlayerActorProfile,
+            uuid.UUID(member_actor.json()["id"]),
+        )
+        assert persisted_member_actor is not None
+        persisted_profile_after_bind = persisted_member_actor.profile_json
+        persisted_member_actor.profile_json = {
+            "safe": "historical-visible",
+            "storage_uri": "media://private/historical-profile",
+            "nested": {
+                "safe_note": "historical-kept",
+                "raw_prompt": "historical operator prompt",
+            },
+            "items": [
+                "historical-note",
+                "media://private/historical-list-entry",
+                {"safe_item": "historical-kept", "raw_output": "provider output"},
+            ],
+            "path": "/root/private/historical-player-profile.json",
+        }
+        session.commit()
+
     listed_actors = client.get(f"/worlds/{world_id}/player-actors")
     preview = client.post(
         f"/worlds/{world_id}/player-choices/preview",
@@ -2960,9 +3013,17 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             ),
         ).one()
 
-    assert member_actor.status_code == 200
+    assert persisted_profile_after_bind == expected_member_profile
     assert other_actor_attempt.status_code == 403
     assert listed_actors.status_code == 200
+    listed_profile = listed_actors.json()[0]["profile"]
+    assert listed_profile == expected_historical_profile
+    listed_profile_text = json.dumps(listed_profile, sort_keys=True)
+    assert "storage_uri" not in listed_profile_text
+    assert "media://" not in listed_profile_text
+    assert "raw_prompt" not in listed_profile_text
+    assert "raw_output" not in listed_profile_text
+    assert "/root/" not in listed_profile_text
     assert [actor["user_id"] for actor in listed_actors.json()] == [str(member_id)]
     assert preview.status_code == 200
     assert preview.json()["diagnostics"] == []

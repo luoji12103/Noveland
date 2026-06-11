@@ -29,6 +29,13 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the reporter response SHALL hide those admin-only triage fields while preserving safe report status and severity
 - **AND** admin beta feedback routes MAY continue to expose triage evidence required for repair and moderation workflows.
 
+
+#### Scenario: Member reads player actor profiles
+- **GIVEN** a world member lists or binds player actor profiles through member-readable routes
+- **WHEN** the player actor profile contains arbitrary profile JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL omit the forbidden profile keys and values while retaining safe profile fields
+- **AND** writes through the player actor binding route SHALL sanitize profile JSON before persistence.
+
 #### Scenario: Member reads media asset catalog
 - **GIVEN** a world member can list, search, or fetch visible media assets through member media APIs
 - **WHEN** a visible media asset has internal storage references such as storage_uri, preview_uri, or thumbnail_uri
