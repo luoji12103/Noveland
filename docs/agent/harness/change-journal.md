@@ -3981,3 +3981,15 @@
 - Tests added/updated: Added backend reader media assertions for scoped download success, unscoped legacy download 404, and cross-worldline scoped path rejection; updated Web helper/component/e2e expectations for worldline-scoped reader media paths.
 - Verification: `cd backend && uv run pytest tests/test_api_moderation.py::test_applied_moderation_takedown_hides_reader_media_without_admin_route_change tests/test_api_reader_media.py` passed with 6 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 563 passed and 8 skipped; focused Web reader media tests passed with 3 files and 13 tests; `cd web && npm run lint`, `cd web && npm run typecheck`, full `cd web && npm run test`, `cd web && npm run build`, focused and full `cd web && npm run test:e2e`, `cd web && npm run check:next-env`, OpenSpec strict validations, and `git diff --check` passed.
 - Follow-up notes: Continue backend worldline isolation audit for provider smoke/fallback/test invocation routes, observability readiness, visual/speech generation services, and product normal-use/spec drift. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Speech voice profile reference boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-063.
+- Finding: F-063 found world-level voice profiles could carry `reference_asset_id` values pointing at fork-scoped audio assets because validation skipped exact worldline matching whenever the profile's `worldline_id` was null.
+- Summary: Added an architecture-contracts OpenSpec scenario for world-level voice profile media-reference isolation, rejected reference media on world-level voice profiles, and preserved same-worldline audio reference validation for scoped voice profiles.
+- Files changed: backend/packages/speech/src/noveland/speech/voice_profiles.py, backend/tests/test_voice_profiles.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a voice profile service regression proving a world-level profile cannot reference a worldline-scoped audio media asset.
+- Verification: `cd backend && uv run pytest tests/test_voice_profiles.py` passed with 4 tests; `cd backend && uv run pytest tests/test_speech_service.py tests/test_api_speech.py tests/test_voice_profiles.py` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend worldline isolation and forbidden-evidence audits for remaining speech service/API outputs, memory, player sessions, beta feedback, moderation, observability, and product/spec drift. Do not push unless explicitly requested after this batch commit.

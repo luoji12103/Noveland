@@ -188,6 +188,25 @@ def test_voice_profile_allows_many_agents_and_one_default_per_agent(tmp_path: Pa
     assert second_agent_bindings[0].voice_profile_id == shared.id
 
 
+def test_world_level_voice_profile_rejects_worldline_reference_asset(tmp_path: Path) -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_graph(engine)
+    storage = LocalMediaObjectStorage(tmp_path)
+
+    with Session(engine) as session:
+        reference_asset_id = _seed_audio_asset(session, storage, world_id, worldline_id)
+        with pytest.raises(SpeechValidationError, match="world-level voice profiles"):
+            VoiceProfileService(session).create_profile(
+                VoiceProfileCreate(
+                    world_id=world_id,
+                    worldline_id=None,
+                    profile_key="world-ref",
+                    display_name="World Ref",
+                    reference_asset_id=reference_asset_id,
+                )
+            )
+
+
 def test_voice_profile_rejects_reference_asset_from_other_worldline(tmp_path: Path) -> None:
     engine = _engine()
     world_id, worldline_id, _agent_id = _seed_world_graph(engine)

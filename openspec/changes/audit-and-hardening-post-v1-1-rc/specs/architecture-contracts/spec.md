@@ -9,6 +9,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the delivery route SHALL require a worldline identifier in the route path or explicit request scope
 - **AND** the service SHALL reject missing or mismatched worldline scope before reading storage bytes.
 
+#### Scenario: World-level voice profiles do not reference fork media assets
+- **GIVEN** a voice profile omits `worldline_id` so it can act as a world-level default
+- **WHEN** the profile includes a media reference asset
+- **THEN** the speech service SHALL reject worldline-scoped media assets rather than allowing fork-specific audio to become a world-level voice reference
+- **AND** worldline-scoped voice profiles SHALL continue to require reference assets from the same worldline.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 
