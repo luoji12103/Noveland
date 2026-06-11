@@ -165,7 +165,7 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
           <span>{data.playerChoices.length} choices</span>
           <span>{data.interventions.length} interventions</span>
           <span>{data.notifications.filter((item) => item.status === "unread").length} unread</span>
-          <Link className="secondary-button" href={`/worlds/${worldId}/player/privacy`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/player/privacy`}>
             Privacy
           </Link>
         </div>
@@ -231,7 +231,7 @@ export function PlayerInteractions({ worldId, data }: PlayerInteractionsProps) {
             {data.resume?.conversation_session_id ? (
               <Link
                 className="secondary-button"
-                href={`/worlds/${worldId}/reader/conversations/${data.resume.conversation_session_id}/scene`}
+                href={`/worlds/${encodeURIComponent(worldId)}/reader/conversations/${encodeURIComponent(data.resume.conversation_session_id)}/scene`}
               >
                 Restore scene
               </Link>

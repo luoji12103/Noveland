@@ -75,7 +75,7 @@ export function AgentList({ worldId, data }: AgentListProps) {
         formElement.reset();
         setSelectedPresetId("");
         setSelectedKind("role_agent");
-        window.location.assign(`/worlds/${worldId}/agents/${agent.id}`);
+        window.location.assign(`/worlds/${encodeURIComponent(worldId)}/agents/${encodeURIComponent(agent.id)}`);
       },
       "Agent created.",
       false,
@@ -231,7 +231,7 @@ export function AgentList({ worldId, data }: AgentListProps) {
                   <p>Source preset version: {agent.source_preset_version ?? "none"}</p>
                 </div>
                 <div className="button-row">
-                  <Link className="secondary-button" href={`/worlds/${worldId}/agents/${agent.id}`}>
+                  <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/agents/${encodeURIComponent(agent.id)}`}>
                     Open builder
                   </Link>
                   {data.canManageSelectedWorld ? (

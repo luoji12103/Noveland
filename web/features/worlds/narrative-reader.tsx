@@ -108,7 +108,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
           <button className="primary-button" type="submit">
             Apply filters
           </button>
-          <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
             Clear
           </Link>
         </form>
@@ -136,7 +136,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
                 <article className="resource-row" key={artifact.id}>
                   <div>
                     <h3>
-                      <Link href={`/worlds/${worldId}/reader/${artifact.id}`}>{artifact.title}</Link>
+                      <Link href={`/worlds/${encodeURIComponent(worldId)}/reader/${encodeURIComponent(artifact.id)}`}>{artifact.title}</Link>
                     </h3>
                     <p>
                       {artifact.artifact_kind} - {formatDateTime(artifact.created_at)}
@@ -252,13 +252,13 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
 
       <section className="management-panel" aria-labelledby="artifact-title">
         <div className="button-row">
-          <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
             Back to reader
           </Link>
           {sourceConversation !== null ? (
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/conversations/${sourceConversation.id}`}
+              href={`/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(sourceConversation.id)}`}
             >
               Open source conversation
             </Link>
@@ -266,7 +266,7 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
           {sourceConversation !== null ? (
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/reader/conversations/${sourceConversation.id}/playback`}
+              href={`/worlds/${encodeURIComponent(worldId)}/reader/conversations/${encodeURIComponent(sourceConversation.id)}/playback`}
             >
               Open playback
             </Link>

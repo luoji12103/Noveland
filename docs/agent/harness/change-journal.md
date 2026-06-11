@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web UI local app route link path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web local app route link and navigation path-boundary remediation for F-053.
+- Finding: F-053 found workspace navigation, world index navigation, agent builder links, conversation transcript links, player resume/privacy links, overview shortcut links, reader playback/scene links, and narrative reader links constructing `/worlds/...` local app routes from decoded world and nested identifiers without encoding every dynamic segment.
+- Summary: Added an architecture-contracts OpenSpec delta for Web UI local app links, encoded world, agent, conversation, narrative artifact, resume conversation, imported world, and overview shortcut route segments at the existing component call sites, and preserved existing media download helpers.
+- Files changed: `web/features/worlds/worlds-index.tsx`, `web/features/agents/agent-list.tsx`, `web/features/conversations/conversation-list.tsx`, `web/features/workspace/workspace-shell.tsx`, `web/features/worlds/player-interactions.tsx`, `web/features/worlds/world-overview.tsx`, `web/features/worlds/conversation-playback.tsx`, `web/features/worlds/conversation-scene-view.tsx`, `web/features/worlds/narrative-reader.tsx`, focused Web tests, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added reserved-character route-link coverage for worlds index, agent list, conversation list, workspace shell navigation, player resume/privacy links, overview shortcuts, playback/scene navigation, and narrative reader list/detail links.
+- Verification: `npm run test -- features/agents/agent-list.test.tsx features/conversations/conversation-list.test.tsx features/workspace/workspace-shell.test.tsx features/worlds/worlds-index.test.tsx features/worlds/player-interactions.test.tsx features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx features/worlds/narrative-reader.test.tsx features/worlds/world-overview.test.tsx` passed with 9 files and 25 tests; a focused source scan for raw local `/worlds/` route interpolation patterns in `web/features`, `web/components`, and `web/app` returned no matches; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 49 files and 169 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handlers and proxy modules, especially CSRF forwarding, method exposure, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Web server workspace loader backend path boundary entry
 
 - Date: 2026-06-12

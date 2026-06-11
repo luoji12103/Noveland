@@ -25,6 +25,27 @@ describe("ConversationSceneView", () => {
     );
   });
 
+  it("encodes playback route links for reserved identifiers", () => {
+    render(
+      <ConversationSceneView
+        worldId={RESERVED_WORLD_ID}
+        conversationId={RESERVED_CONVERSATION_ID}
+        data={sceneData}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Reader" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader`,
+    );
+    expect(screen.getByRole("link", { name: "Playback" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader/conversations/${encodeURIComponent(
+        RESERVED_CONVERSATION_ID,
+      )}/playback`,
+    );
+  });
+
   it("switches turns and shows deterministic missing-media fallbacks", () => {
     render(<ConversationSceneView worldId="world-1" conversationId="conversation-1" data={sceneData} />);
 
@@ -51,6 +72,9 @@ describe("ConversationSceneView", () => {
 function serializedDocument(): string {
   return document.body.textContent ?? "";
 }
+
+const RESERVED_WORLD_ID = "world/reader?mode=scene#frag";
+const RESERVED_CONVERSATION_ID = "conversation/live?debug=true#frag";
 
 const sceneData: ConversationPlaybackData = {
   worlds: [],

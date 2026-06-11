@@ -21,6 +21,7 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const isPlatformAdmin = subject.roles.includes("platform_admin");
+  const worldPath = worldId === null ? null : `/worlds/${encodeURIComponent(worldId)}`;
 
   return (
     <main className="page-shell">
@@ -55,22 +56,22 @@ export function WorkspaceShell({
 
       <nav className="workspace-nav" aria-label="Workspace navigation">
         <Link href="/worlds">Worlds</Link>
-        {worldId !== null ? (
+        {worldPath !== null ? (
           <>
-            <Link href={`/worlds/${worldId}`}>Overview</Link>
-            <Link href={`/worlds/${worldId}/agents`}>Agents</Link>
-            <Link href={`/worlds/${worldId}/conversations`}>Conversations</Link>
-            <Link href={`/worlds/${worldId}/providers`}>Providers</Link>
-            <Link href={`/worlds/${worldId}/media`}>Media</Link>
-            <Link href={`/worlds/${worldId}/visual`}>Visual</Link>
-            <Link href={`/worlds/${worldId}/speech`}>Speech</Link>
-            <Link href={`/worlds/${worldId}/invocations`}>Invocations</Link>
-            <Link href={`/worlds/${worldId}/diagnostics`}>Diagnostics</Link>
-            <Link href={`/worlds/${worldId}/narrative`}>Narrative</Link>
-            <Link href={`/worlds/${worldId}/reader`}>Reader</Link>
-            <Link href={`/worlds/${worldId}/player`}>Player</Link>
-            <Link href={`/worlds/${worldId}/feedback`}>Feedback</Link>
-            <Link href={`/worlds/${worldId}/worldlines`}>Worldlines</Link>
+            <Link href={`${worldPath}`}>Overview</Link>
+            <Link href={`${worldPath}/agents`}>Agents</Link>
+            <Link href={`${worldPath}/conversations`}>Conversations</Link>
+            <Link href={`${worldPath}/providers`}>Providers</Link>
+            <Link href={`${worldPath}/media`}>Media</Link>
+            <Link href={`${worldPath}/visual`}>Visual</Link>
+            <Link href={`${worldPath}/speech`}>Speech</Link>
+            <Link href={`${worldPath}/invocations`}>Invocations</Link>
+            <Link href={`${worldPath}/diagnostics`}>Diagnostics</Link>
+            <Link href={`${worldPath}/narrative`}>Narrative</Link>
+            <Link href={`${worldPath}/reader`}>Reader</Link>
+            <Link href={`${worldPath}/player`}>Player</Link>
+            <Link href={`${worldPath}/feedback`}>Feedback</Link>
+            <Link href={`${worldPath}/worldlines`}>Worldlines</Link>
           </>
         ) : null}
         {isPlatformAdmin ? (

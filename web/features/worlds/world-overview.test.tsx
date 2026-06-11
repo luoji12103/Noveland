@@ -321,6 +321,36 @@ describe("WorldOverview", () => {
     );
   }, 40000);
 
+  it("encodes workspace shortcut links for reserved world identifiers", () => {
+    render(
+      <WorldOverview
+        data={{
+          ...workspaceData,
+          selectedWorld: { ...workspaceData.selectedWorld!, id: RESERVED_WORLD_ID },
+        }}
+      />,
+    );
+
+    const worldPath = `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}`;
+
+    expect(screen.getByRole("link", { name: "Build agents" })).toHaveAttribute(
+      "href",
+      `${worldPath}/agents`,
+    );
+    expect(screen.getByRole("link", { name: "Open conversations" })).toHaveAttribute(
+      "href",
+      `${worldPath}/conversations`,
+    );
+    expect(screen.getByRole("link", { name: "Narrative artifacts" })).toHaveAttribute(
+      "href",
+      `${worldPath}/narrative`,
+    );
+    expect(screen.getByRole("link", { name: "Reader" })).toHaveAttribute(
+      "href",
+      `${worldPath}/reader`,
+    );
+  });
+
   it("submits V2 beta, release, route, ending, and worldline form contracts", async () => {
     vi.mocked(forkWorldline).mockResolvedValue(undefined as never);
     vi.mocked(compareWorldlines).mockResolvedValue({
@@ -625,6 +655,8 @@ const compositionExport = {
   schedule_rules: [],
   preset_references: [],
 };
+
+const RESERVED_WORLD_ID = "world/overview?mode=shortcuts#frag";
 
 function eventRow(id: string, sequence: number, eventName: string): WorldEventAuditEntry {
   return {

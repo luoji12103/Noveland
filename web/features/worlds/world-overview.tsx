@@ -1361,7 +1361,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               : jsonObject(formString(form, "rules_config")),
           composition: JSON.parse(formString(form, "composition")),
         });
-        window.location.assign(`/worlds/${importedWorld.id}`);
+        window.location.assign(`/worlds/${encodeURIComponent(importedWorld.id)}`);
       },
       "Composition imported.",
       false,
@@ -3382,16 +3382,16 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           Workspace pages
         </h2>
         <div className="button-row">
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/agents`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/agents`}>
             Build agents
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/conversations`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/conversations`}>
             Open conversations
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/narrative`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/narrative`}>
             Narrative artifacts
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/reader`}>
             Reader
           </Link>
         </div>

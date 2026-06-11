@@ -42,7 +42,7 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
         memory_config: memoryConfigFromForm(form),
       });
       formElement.reset();
-      window.location.assign(`/worlds/${worldId}/conversations/${session.id}`);
+      window.location.assign(`/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(session.id)}`);
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -194,7 +194,7 @@ export function ConversationList({ worldId, data }: ConversationListProps) {
                 <div className="button-row">
                   <Link
                     className="secondary-button"
-                    href={`/worlds/${worldId}/conversations/${conversation.id}`}
+                    href={`/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(conversation.id)}`}
                   >
                     Open transcript
                   </Link>
