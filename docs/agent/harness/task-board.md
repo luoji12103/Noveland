@@ -14,6 +14,7 @@
 - None
 
 ## Done
+- Post-v1.1 RC audit F-056 Memory backend profile secret-reference persistence boundary hardening
 - Post-v1.1 RC audit F-055 Auth login CSRF session-fixation boundary hardening
 - Post-v1.1 RC audit F-054 Web non-auth proxy Set-Cookie boundary hardening
 - Post-v1.1 RC audit F-053 Web UI local app route link path-boundary hardening

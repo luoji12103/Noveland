@@ -1,5 +1,17 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Memory backend profile secret-reference boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend memory backend profile config and secret-reference persistence boundary remediation for F-056.
+- Finding: F-056 found `MemoryBackendProfileService` persisting `vector_store_config`, `llm_config`, `embedder_config`, `reranker_config`, and `secret_refs` directly from API requests while runtime APIs returned those fields and Web admin rendered `secret_refs` back into form state. The mem0 backend treats `secret_refs` as lookup keys into `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`, but no validation prevented direct `api_key` config or obvious raw secret values from being stored and returned.
+- Summary: Added an architecture-contracts OpenSpec scenario for memory backend profile secret-reference boundaries, added service-layer validation that rejects sensitive config keys and raw-secret-looking config values, validates `secret_refs` as non-empty single reference names, and preserves safe reference lookup behavior.
+- Files changed: `backend/packages/memory/src/noveland/memory/service.py`, `backend/tests/test_memory_backend.py`, `backend/tests/test_api_runtime.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added memory service and runtime API regressions proving direct secret config and raw secret refs are rejected while safe reference names persist and are returned without echoing rejected secret material.
+- Verification: `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_backend_profile_rejects_raw_secret_material tests/test_api_runtime.py::test_memory_backend_profile_api_rejects_raw_secret_material` passed with 2 tests; `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py` passed with 26 tests; `cd backend && uv run ruff check .` passed; `cd backend && uv run mypy .` passed; `cd backend && uv run pytest` passed with 563 passed and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handler method exposure, response shaping, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
 ## Post-v1.1 RC Audit and Hardening Auth login CSRF boundary entry
 
 - Date: 2026-06-12

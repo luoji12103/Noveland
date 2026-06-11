@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T02:50:00+08:00
+- Date: 2026-06-12T03:55:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-055 are remediated on this branch.
+- Status: F-001 through F-056 are remediated on this branch.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before F-055 commit: 2a412a8 fix(web): strip non-auth proxy cookies.
+- Current HEAD before F-056 commit: 9a71684 fix(auth): require csrf for login.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services: Noveland Postgres is healthy on 55432->5432; Noveland NATS is healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch; project Playwright e2e used its own test server.
+- Current server services: Noveland Postgres is healthy on 55432->5432; Noveland NATS is healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -27,27 +27,19 @@
 ## Completed This Batch
 
 - Reconfirmed realtime git/OpenSpec/service/test-entry status from the server before editing.
-- Continued the Web/e2e security audit on auth session-cookie creation after F-054.
-- Recorded and remediated F-055: backend login created session cookies without requiring double-submit CSRF, and the Web auth client did not send the CSRF header on login.
-- Added an architecture-contracts OpenSpec delta requiring login to validate CSRF before creating session cookies.
-- Added `require_csrf(request)` at the start of backend login, moved login CSRF acquisition into `web/lib/auth/client.ts`, and kept logout CSRF behavior intact.
-- Added backend and Web regression coverage for missing login CSRF rejection, successful CSRF-protected login, CSRF cookie/header behavior, existing-cookie reuse, failed login, logout CSRF, and exact cookie reads.
-- Restored `web/next-env.d.ts` after Playwright/Next dev regenerated it to `.next/dev/types/routes.d.ts`.
+- Continued backend/Web security audit after F-055 across Next routes, low-privilege DTOs, CSRF coverage, realtime streams, provider/runtime profiles, and memory backend secret boundaries.
+- Recorded and remediated F-056: memory backend profile config and `secret_refs` could persist raw secret material and then return it through platform runtime APIs/Web admin form state.
+- Added an architecture-contracts OpenSpec delta requiring memory backend profile config to reject raw secret material and keep `secret_refs` as runtime secret lookup references.
+- Added memory service validation for sensitive config keys, raw-secret-looking config values, non-empty single secret reference names, and raw-secret-looking `secret_refs` values.
+- Added memory service and runtime API regression coverage for rejecting direct `api_key` config and raw secret refs while preserving safe reference names.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_api_auth.py`: 7 passed.
-- `cd backend && uv run pytest tests/test_api_auth_integration.py`: 3 skipped because `NOVELAND_TEST_DATABASE_URL` was not set.
+- `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_backend_profile_rejects_raw_secret_material tests/test_api_runtime.py::test_memory_backend_profile_api_rejects_raw_secret_material`: 2 passed.
+- `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py`: 26 passed.
 - `cd backend && uv run ruff check .`: passed.
 - `cd backend && uv run mypy .`: passed.
-- `cd backend && uv run pytest`: 561 passed, 8 skipped.
-- `cd web && npm run test -- lib/auth/client.test.ts features/auth/login-form.test.tsx`: 2 files and 9 tests passed.
-- `cd web && npm run typecheck`: passed.
-- `cd web && npm run lint`: passed.
-- `cd web && npm run test`: 51 files and 177 tests passed. Existing React act warnings appeared in runtime-admin test output, but the suite passed.
-- `cd web && npm run build`: passed.
-- `cd web && npm run test:e2e`: 21 passed.
-- `cd web && npm run check:next-env`: failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- `cd backend && uv run pytest`: 563 passed, 8 skipped.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`: passed.
 - `openspec validate --changes --strict`: passed with 1 passed.
 - `openspec validate --specs --strict`: passed with 76 specs.
@@ -59,8 +51,8 @@
 2. Audit Web rendering and project Playwright/e2e coverage for XSS-prone sinks, admin/player/member boundary gaps, and normal-use product flow drift without browser/computer-use plugins.
 3. Continue product normal-use and spec/history drift audit after Web route/proxy review.
 
-## Finding F-055
+## Finding F-056
 
-- Backend `/auth/login` created authenticated session cookies without requiring the same double-submit CSRF proof used by other cookie-backed mutations.
-- The remediation requires CSRF before backend session-cookie creation and makes the Web auth client obtain/send the login CSRF header itself.
-- Residual risk: remaining Next route handler method exposure, response shaping beyond cookies, and client-rendering sinks still need separate evidence-based review before remediation.
+- Memory backend profile config accepted direct secret-bearing keys/values and `secret_refs` accepted obvious raw secret values before persistence.
+- The remediation rejects raw secret material at the memory service boundary before database writes while preserving safe reference names used for `NOVELAND_MEMORY_BACKEND_SECRETS_JSON` lookup.
+- Residual risk: remaining Web admin/client helper sharp edges, response error shaping, and client-rendering sinks still need separate evidence-based review before remediation.

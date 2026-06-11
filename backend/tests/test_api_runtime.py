@@ -136,6 +136,65 @@ def test_platform_admin_controls_runtime_and_provider_profiles() -> None:
     assert disable_profile.status_code == 204
 
 
+
+def test_memory_backend_profile_api_rejects_raw_secret_material() -> None:
+    client, _engine = _client_with_database()
+    _user_id, token = _seed_user(_engine, "platform@example.test", platform_admin=True)
+    _authenticate(client, token)
+
+    direct_config = client.post(
+        "/memory-backend-profiles",
+        json={
+            "profile_key": "direct-secret-config",
+            "name": "Direct secret config",
+            "backend_kind": "mem0_oss",
+            "vector_store_config": {},
+            "llm_config": {"config": {"api_key": "sk-live-secret"}},
+            "embedder_config": {},
+            "reranker_config": {},
+            "secret_refs": {"llm_api_key": "memory-openai-ref"},
+        },
+    )
+    direct_ref = client.post(
+        "/memory-backend-profiles",
+        json={
+            "profile_key": "direct-secret-ref",
+            "name": "Direct secret ref",
+            "backend_kind": "mem0_oss",
+            "vector_store_config": {},
+            "llm_config": {},
+            "embedder_config": {},
+            "reranker_config": {},
+            "secret_refs": {"llm_api_key": "sk-live-secret"},
+        },
+    )
+    safe_profile = client.post(
+        "/memory-backend-profiles",
+        json={
+            "profile_key": "safe-memory-ref",
+            "name": "Safe memory ref",
+            "backend_kind": "mem0_oss",
+            "vector_store_config": {},
+            "llm_config": {"provider": "openai", "config": {"model": "gpt-test"}},
+            "embedder_config": {},
+            "reranker_config": {},
+            "secret_refs": {"llm_api_key": "memory-openai-ref"},
+        },
+    )
+    update_direct_ref = client.patch(
+        f"/memory-backend-profiles/{safe_profile.json()["id"]}",
+        json={"secret_refs": {"llm_api_key": "Bearer sk-live-secret"}},
+    )
+
+    assert direct_config.status_code == 422
+    assert direct_ref.status_code == 422
+    assert safe_profile.status_code == 201
+    assert safe_profile.json()["secret_refs"] == {"llm_api_key": "memory-openai-ref"}
+    assert update_direct_ref.status_code == 422
+    for response in (direct_config, direct_ref, update_direct_ref):
+        assert "sk-live-secret" not in response.text
+
+
 def test_platform_admin_manages_memory_backend_profiles_and_ops_surface() -> None:
     client, engine = _client_with_database()
     owner_id, token = _seed_user(engine, "platform@example.test", platform_admin=True)

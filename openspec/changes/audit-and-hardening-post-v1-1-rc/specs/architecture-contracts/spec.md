@@ -205,6 +205,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the backend SHALL require a matching CSRF cookie and `X-CSRF-Token` header before creating the session
 - **AND** the Web auth client SHALL obtain and forward that CSRF token with the login request.
 
+#### Scenario: Memory backend profile configuration preserves secret-reference boundaries
+- **GIVEN** a platform admin creates or updates a memory backend profile
+- **WHEN** the profile includes vector store, LLM, embedder, reranker, or secret reference configuration
+- **THEN** the backend SHALL reject persisted config keys or values that contain raw secret material
+- **AND** memory backend `secret_refs` SHALL store only safe reference names used to resolve secrets from runtime configuration.
+
 ### Requirement: Web realtime clients preserve backend route boundaries
 The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
 

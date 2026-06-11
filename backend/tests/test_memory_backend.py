@@ -17,6 +17,7 @@ from noveland.memory import (
     MemoryBackendKind,
     MemoryBackendProfileCreate,
     MemoryBackendProfileService,
+    MemoryBackendProfileUpdate,
     MemoryDeleteScope,
     MemoryEvalCase,
     MemoryEvent,
@@ -257,6 +258,58 @@ def test_fake_memory_backend_isolates_worldlines() -> None:
     assert delete_result.deleted_count == 1
     assert backend.list_memories(world_id, agent_id, primary_id)
     assert backend.list_memories(world_id, agent_id, fork_id) == []
+
+
+
+def test_memory_backend_profile_rejects_raw_secret_material() -> None:
+    with Session(_engine()) as session:
+        service = MemoryBackendProfileService(session)
+
+        with pytest.raises(MemoryValidationError, match="llm_config contains raw secret"):
+            service.create_profile(
+                MemoryBackendProfileCreate(
+                    profile_key="direct-secret-config",
+                    name="Direct secret config",
+                    backend_kind=MemoryBackendKind.MEM0_OSS,
+                    llm_config={"config": {"api_key": "sk-live-secret"}},
+                )
+            )
+        with pytest.raises(MemoryValidationError, match="secret_refs.llm_api_key"):
+            service.create_profile(
+                MemoryBackendProfileCreate(
+                    profile_key="direct-secret-ref",
+                    name="Direct secret ref",
+                    backend_kind=MemoryBackendKind.MEM0_OSS,
+                    secret_refs={"llm_api_key": "sk-live-secret"},
+                )
+            )
+
+        profile = service.create_profile(
+            MemoryBackendProfileCreate(
+                profile_key="safe-memory-ref",
+                name="Safe memory ref",
+                backend_kind=MemoryBackendKind.MEM0_OSS,
+                llm_config={"provider": "openai", "config": {"model": "gpt-test"}},
+                secret_refs={"llm_api_key": "memory-openai-ref"},
+            )
+        )
+
+        assert profile.secret_refs == {"llm_api_key": "memory-openai-ref"}
+
+        model = session.get(MemoryBackendProfile, profile.id)
+        assert model is not None
+        with pytest.raises(MemoryValidationError, match="embedder_config contains raw secret"):
+            service.update_profile(
+                model,
+                MemoryBackendProfileUpdate(
+                    embedder_config={"headers": {"Authorization": "Bearer sk-live-secret"}}
+                ),
+            )
+        with pytest.raises(MemoryValidationError, match="secret_refs.llm_api_key"):
+            service.update_profile(
+                model,
+                MemoryBackendProfileUpdate(secret_refs={"llm_api_key": "Bearer sk-live-secret"}),
+            )
 
 
 def test_mem0_oss_backend_translates_sdk_payloads() -> None:
