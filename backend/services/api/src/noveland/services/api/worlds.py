@@ -5023,8 +5023,9 @@ def list_player_journal(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     requested_user_id = user_id or context.subject.user_id
-    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if requested_user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     statement = select(PlayerJournalEntry).where(
         PlayerJournalEntry.world_id == context.world_id,
@@ -5034,7 +5035,6 @@ def list_player_journal(
     entries = db_session.scalars(
         statement.order_by(PlayerJournalEntry.created_at.desc()).limit(limit)
     ).all()
-    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [_journal_entry_response(entry, include_admin_fields=can_manage) for entry in entries]
 
 
@@ -5081,12 +5081,13 @@ def list_notifications(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     statement = select(InWorldNotification).where(
         InWorldNotification.world_id == context.world_id,
         InWorldNotification.worldline_id == resolved_worldline.id,
         InWorldNotification.user_id == context.subject.user_id,
     )
-    if context.role == AuthRole.WORLD_ADMIN.value:
+    if can_manage:
         statement = select(InWorldNotification).where(
             InWorldNotification.world_id == context.world_id,
             InWorldNotification.worldline_id == resolved_worldline.id,
@@ -5096,7 +5097,6 @@ def list_notifications(
     notifications = db_session.scalars(
         statement.order_by(InWorldNotification.created_at.desc()).limit(limit)
     ).all()
-    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
         _notification_response(notification, include_admin_fields=can_manage)
         for notification in notifications
@@ -5145,15 +5145,16 @@ def list_interventions(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     requested_user_id = user_id or context.subject.user_id
-    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if requested_user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     statement = select(PlayerInterventionRecord).where(
         PlayerInterventionRecord.world_id == context.world_id,
         PlayerInterventionRecord.worldline_id == resolved_worldline.id,
         PlayerInterventionRecord.user_id == requested_user_id,
     )
-    if context.role == AuthRole.WORLD_ADMIN.value and user_id is None:
+    if can_manage and user_id is None:
         statement = select(PlayerInterventionRecord).where(
             PlayerInterventionRecord.world_id == context.world_id,
             PlayerInterventionRecord.worldline_id == resolved_worldline.id,
@@ -5163,7 +5164,6 @@ def list_interventions(
     interventions = db_session.scalars(
         statement.order_by(PlayerInterventionRecord.created_at.desc()).limit(limit),
     ).all()
-    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
         _intervention_response(intervention, include_admin_fields=can_manage)
         for intervention in interventions
@@ -5182,8 +5182,9 @@ def create_intervention(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> PlayerInterventionResponse:
     require_csrf(request)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     user_id = intervention_create.user_id or context.subject.user_id
-    if user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     if intervention_create.target_agent_id is not None:
         _agent_or_404(db_session, context.world_id, intervention_create.target_agent_id)
@@ -5206,7 +5207,6 @@ def create_intervention(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
-    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return _intervention_response(intervention, include_admin_fields=can_manage)
 
 

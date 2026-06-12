@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T11:59:21+00:00
+- Date: 2026-06-12T12:26:19+00:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-109 are remediated on this branch; latest batch is F-109 Web proxy JSON error body normalization.
+- Status: F-001 through F-110 are remediated on this branch; latest batch is F-110 platform-admin player-record management consistency.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-109 batch: d79694b fix(web-server): sanitize loader error details.
+- Base before F-110 batch: c071c9b fix(web-proxy): sanitize json error bodies.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before this continuation: branch matched origin at d79694b after F-108, worktree contained only the in-progress F-109 files, and prior OpenSpec specs strict validation passed with 76 specs.
+- Current server status was rechecked before this continuation: branch matched origin at c071c9b after F-109, worktree started clean/synced, OpenSpec specs strict validation passed with 76 specs, and Noveland Postgres/NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,21 +26,18 @@
 
 ## Completed This Batch
 
-- Continued Web/e2e security audit after F-108, focusing on same-origin Web proxy response bodies that reach browser network clients.
-- Recorded/remediated F-109: central Web API proxy responses could relay non-2xx backend JSON error bodies containing sensitive backend internals even after UI-visible error text normalization.
-- Updated architecture-contracts OpenSpec before implementation to require Web API proxies normalize backend JSON error bodies while preserving successful JSON, binary/no-content responses, streaming, and explicit auth cookie relay behavior.
-- Routed `buildProxyResponse()` through centralized non-2xx JSON error-body sanitization using shared backend-error detail detection and normalization.
-- Preserved successful JSON and binary responses, 204 bodies, streaming proxy responses, and explicit auth `Set-Cookie` relay behavior; stale `content-length` is dropped only when a response body is sanitized.
-- Added regression coverage for dirty proxied JSON `detail` payloads carrying raw prompt, bearer token, storage URI, and media URI markers, plus safe JSON errors that must retain their original body and `content-length`.
+- Continued backend/Web/e2e audit after F-109, focusing on remaining member/player role-boundary and product normal-use drift.
+- Recorded/remediated F-110: platform admins without direct world membership were treated as ordinary self-scoped users by player journal, notification, and intervention cross-user/list/create checks despite receiving admin-shaped DTOs elsewhere.
+- Added an architecture-contracts scenario requiring platform admins to share world-admin player-record management semantics while ordinary members remain scoped to their own safe records.
+- Reused the existing manage-world predicate for player journal cross-user reads, notification all-user listing, intervention all-user listing, and platform-admin intervention creation for world members.
+- Added regression coverage for platform-admin player journal, notification, and intervention management without world membership.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/auth/proxy.test.ts` first failed against unpatched `buildProxyResponse()` because raw backend JSON detail was relayed, then passed with 6 tests after remediation.
-- `cd web && npm run test -- lib/auth/proxy.test.ts lib/api-proxy.test.ts lib/worlds/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/realtime/proxy.test.ts` passed with 6 files and 19 tests.
-- `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed.
-- Full `cd web && npm run test` passed with 52 files and 205 tests; existing RuntimeAdmin React `act(...)` warnings remained warnings, not failures.
-- `cd web && npm run build` passed with `next-env.d.ts` restored and checked.
-- `cd web && npm run test:e2e` passed with 21 tests, with `next-env.d.ts` restored and `cd web && npm run check:next-env` passing afterward.
+- `cd backend && uv run pytest tests/test_api_worlds.py::test_platform_admin_manages_player_records_without_world_membership -q` first failed with a 403 on platform-admin cross-user player journal access, then passed with 1 test after remediation.
+- `cd backend && uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope tests/test_api_permission_matrix.py -q` passed with 5 tests.
+- Focused `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` and `cd backend && uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed.
+- Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 573 tests and 8 skipped.
 - OpenSpec strict validations and `git diff --check` passed after docs update.
 
 ## Remaining Work
@@ -50,8 +47,8 @@
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Push after successful commits unless the user changes that instruction.
 
-## Finding F-109
+## Finding F-110
 
-- Web same-origin proxies must normalize non-2xx backend JSON error bodies before relaying them to browser clients, because devtools/network consumers can observe those bodies even when UI messages are generic.
-- The remediation sanitizes sensitive-looking keys and values through `buildProxyResponse()` for JSON error responses, preserving safe review status fields and existing success/binary/no-content/streaming/cookie behavior.
+- Player journal, in-world notification, and player intervention routes should use one management predicate for both platform admins and world admins.
+- The remediation preserves member self-scope and safe DTO redaction while allowing platform operators to perform cross-user support and incident workflows without direct world membership.
 - Residual risk: continue remaining Web route-handler, proxy method exposure, server-loader response DTO, client rendering, product-flow, and spec-history drift audits.

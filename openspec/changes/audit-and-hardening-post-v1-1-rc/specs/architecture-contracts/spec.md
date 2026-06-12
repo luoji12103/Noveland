@@ -213,6 +213,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit those operator-only journal, notification, and intervention internals while preserving safe user-facing titles, bodies, statuses, target identity fields, and timing fields
 - **AND** admin routes MAY continue to expose source refs, prompt text, choice/event linkage, and metadata required for world management and review.
 
+#### Scenario: Platform admins manage player journal, notification, and intervention records
+- **GIVEN** a platform admin accesses a world without a direct world membership
+- **WHEN** they list player journal, notification, or intervention records, request another user's player records, or create an intervention for a world member
+- **THEN** the response SHALL use the same management visibility and cross-user access semantics as world admins
+- **AND** ordinary world members SHALL remain limited to their own player records and member-safe response fields.
+
 #### Scenario: Player exports privacy data
 - **GIVEN** a world member requests a player privacy data export
 - **WHEN** the export includes player choices, journal, notification, or intervention records with applied event refs, source refs, source event refs, choice/event linkage, prompt text, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only evidence

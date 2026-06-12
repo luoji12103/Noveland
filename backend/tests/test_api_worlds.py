@@ -3087,6 +3087,114 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     }
 
 
+def test_platform_admin_manages_player_records_without_world_membership() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, _member_token = _seed_user(engine, "member@example.test")
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-admin@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, owner_id, "platform-player-records-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    with Session(engine) as session:
+        worldline = ensure_primary_worldline(session, world_id)
+        actor_id = uuid.uuid4()
+        session.add(
+            PlayerActorProfile(
+                id=actor_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                actor_ref="player:member",
+                display_name="Member Player",
+                profile_json={},
+            ),
+        )
+        session.add(
+            PlayerJournalEntry(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                player_actor_id=actor_id,
+                entry_kind="event",
+                title="Operator journal title",
+                body="raw_prompt operator journal body",
+                source_ref="event:operator-journal",
+                visibility="world_admin",
+                metadata_json={"raw_prompt": "operator journal prompt"},
+            ),
+        )
+        notification_id = uuid.uuid4()
+        session.add(
+            InWorldNotification(
+                id=notification_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                notification_kind="incident",
+                title="Operator notification title",
+                body="raw_output operator notification body",
+                source_ref="event:operator-notification",
+                metadata_json={"raw_output": "operator notification output"},
+            ),
+        )
+        intervention_id = uuid.uuid4()
+        session.add(
+            PlayerInterventionRecord(
+                id=intervention_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                player_actor_id=actor_id,
+                intervention_kind="contact",
+                prompt="Operator intervention prompt",
+                metadata_json={"raw_prompt": "operator intervention prompt"},
+            ),
+        )
+        session.commit()
+
+    _authenticate(client, platform_token)
+    journal = client.get(
+        f"/worlds/{world_id}/player-journal",
+        params={"user_id": str(member_id)},
+    )
+    notifications = client.get(f"/worlds/{world_id}/notifications")
+    interventions = client.get(f"/worlds/{world_id}/interventions")
+    created_intervention = client.post(
+        f"/worlds/{world_id}/interventions",
+        json={
+            "user_id": str(member_id),
+            "player_actor_id": str(actor_id),
+            "intervention_kind": "contact",
+            "prompt": "Platform-created intervention prompt",
+            "metadata": {"raw_prompt": "platform intervention prompt"},
+        },
+    )
+
+    assert journal.status_code == 200
+    assert journal.json()[0]["source_ref"] == "event:operator-journal"
+    assert journal.json()[0]["metadata"]["raw_prompt"] == "operator journal prompt"
+    assert notifications.status_code == 200
+    assert any(item["id"] == str(notification_id) for item in notifications.json())
+    notification = next(item for item in notifications.json() if item["id"] == str(notification_id))
+    assert notification["source_ref"] == "event:operator-notification"
+    assert notification["metadata"]["raw_output"] == "operator notification output"
+    assert interventions.status_code == 200
+    assert any(item["id"] == str(intervention_id) for item in interventions.json())
+    intervention = next(item for item in interventions.json() if item["id"] == str(intervention_id))
+    assert intervention["prompt"] == "Operator intervention prompt"
+    assert intervention["metadata"]["raw_prompt"] == "operator intervention prompt"
+    assert created_intervention.status_code == 201
+    assert created_intervention.json()["user_id"] == str(member_id)
+    assert created_intervention.json()["prompt"] == "Platform-created intervention prompt"
+    assert created_intervention.json()["metadata"]["raw_prompt"] == "platform intervention prompt"
+
+
 def test_world_member_can_use_own_player_interaction_records_without_admin_scope() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner-player-ui@example.test")
