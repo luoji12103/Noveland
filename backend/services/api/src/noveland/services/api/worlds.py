@@ -8588,7 +8588,7 @@ def _player_choice_response(
             if include_admin_fields
             else _sanitize_public_json(choice.consequence_preview)
         ),
-        applied_event_id=choice.applied_event_id,
+        applied_event_id=choice.applied_event_id if include_admin_fields else None,
         created_at=choice.created_at,
         updated_at=choice.updated_at,
     )

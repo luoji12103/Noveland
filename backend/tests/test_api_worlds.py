@@ -3351,6 +3351,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert choice.json()["user_id"] == str(member_id)
     assert choice.json()["prompt"] == ""
     assert choice.json()["selected_option"] == "Stay after school."
+    assert choice.json()["applied_event_id"] is None
     assert choice.json()["context"] == expected_choice_context
     assert choice.json()["consequence_preview"] == expected_choice_preview
     choice_text = json.dumps(choice.json(), sort_keys=True)
@@ -3364,11 +3365,13 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert [item["user_id"] for item in listed_choices.json()] == [str(member_id)]
     assert listed_choices.json()[0]["prompt"] == ""
     assert listed_choices.json()[0]["selected_option"] == "Stay after school."
+    assert listed_choices.json()[0]["applied_event_id"] is None
     assert listed_choices.json()[0]["context"] == expected_choice_context
     assert listed_choices.json()[0]["consequence_preview"] == expected_choice_preview
     assert other_choices.status_code == 403
     assert admin_listed_choices.status_code == 200
     assert admin_listed_choices.json()[0]["prompt"] == "Help with festival preparations?"
+    assert admin_listed_choices.json()[0]["applied_event_id"] == str(choice_event.id)
     assert admin_listed_choices.json()[0]["context"]["storage_uri"] == (
         "media://private/choice-context"
     )

@@ -4249,3 +4249,15 @@
 - Tests added/updated: Extended `test_replay_and_snapshot_api_reads_state_and_creates_snapshot` so admin latest snapshot responses retain `created_by_event_id` while member latest snapshot responses receive `null`.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` first failed on unredacted `created_by_event_id`, then passed with 1 test after remediation; adjacent replay/event audit coverage passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Player choice event evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-085.
+- Finding: F-085 found member-readable player choice create/list responses already hiding prompt text and sanitizing context/consequence preview JSON, but still returning `applied_event_id` even though `record_player_choice()` always appends a `player.choice_recorded` world event.
+- Summary: Updated the architecture-contracts OpenSpec player-choice scenario and gated `_player_choice_response()` applied event refs behind `include_admin_fields`, preserving admin review/event correlation while ordinary members receive safe choice status and sanitized metadata only.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` so member choice create/list responses get `null` for `applied_event_id`, while admin list responses retain the real `player.choice_recorded` event id.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` first failed on unredacted `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
