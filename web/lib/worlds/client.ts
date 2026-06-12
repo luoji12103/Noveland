@@ -1947,6 +1947,7 @@ export function searchAgentMemory(
   return worldRequest<MemoryItem[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/search`, {
     method: "POST",
     body: input,
+    csrf: true,
   });
 }
 

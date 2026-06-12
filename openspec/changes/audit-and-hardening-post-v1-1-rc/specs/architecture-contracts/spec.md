@@ -554,7 +554,8 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **WHEN** the Web client constructs the same-origin API URL
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string filters SHALL be encoded as query data
-- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
+- **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters
+- **AND** agent memory POST requests, including memory search requests with request bodies, SHALL include the same double-submit CSRF header used by other Web world mutations.
 
 
 #### Scenario: Web client manages memberships, member candidates, and world diagnostics

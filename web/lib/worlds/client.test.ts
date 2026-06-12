@@ -1995,6 +1995,7 @@ describe("world client", () => {
   });
 
   it("maps memory requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1" }]))
@@ -2008,6 +2009,9 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
     expect(fetchMock.mock.calls[1][1].body).toBe(
       JSON.stringify({ query_text: "green tea", limit: 5 }),
+    );
+    expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBe(
+      "csrf-token",
     );
   });
 
