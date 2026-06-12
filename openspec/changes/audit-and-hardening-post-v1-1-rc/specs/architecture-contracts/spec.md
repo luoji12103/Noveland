@@ -439,6 +439,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable JSON panels, read-only JSON summaries, run text, or submitting agent-builder JSON payloads
 - **AND** safe characterization, relationship, persona, and operational metadata SHALL remain visible.
 
+#### Scenario: Web preset admin panels normalize sensitive preset evidence
+- **GIVEN** an authorized platform admin views, creates, or updates platform-managed agent presets in the Web preset admin console
+- **WHEN** preset behavior policy, calendar blueprint entries or metadata, or advanced config contain resolved secrets, tokens, authorization headers, raw prompt/output markers, prompt snapshot identifiers, storage URIs, file/object paths, bytes, base64, or local model paths written in common key or value variants
+- **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable preset JSON panels or submitting preset JSON payloads
+- **AND** safe preset behavior, calendar schedule, metadata, and operational config fields SHALL remain visible.
+
 #### Scenario: Web client manages multimodal diagnostics records
 - **GIVEN** browser-side Web client code issues multimodal diagnostics or eval-run list, detail, or run requests through same-origin API routes
 - **AND** the world or eval-run identifier contains encoded path separators or other reserved path characters

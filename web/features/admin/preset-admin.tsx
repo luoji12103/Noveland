@@ -50,11 +50,9 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
           default_kind: formString(form, "default_kind") as "role_agent" | "narrative_agent",
           default_provider_profile_key: optionalFormString(form, "default_provider_profile_key"),
           persona_text: formString(form, "persona_text"),
-          behavior_policy: jsonObject(formString(form, "behavior_policy")),
-          calendar_blueprint: JSON.parse(
-            formString(form, "calendar_blueprint") || "[]",
-          ) as AgentPreset["calendar_blueprint"],
-          advanced_config: jsonObject(formString(form, "advanced_config")),
+          behavior_policy: presetJsonObject(formString(form, "behavior_policy")),
+          calendar_blueprint: presetCalendarBlueprint(formString(form, "calendar_blueprint")),
+          advanced_config: presetJsonObject(formString(form, "advanced_config")),
         });
         formElement.reset();
       },
@@ -74,11 +72,9 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
           default_kind: formString(form, "default_kind") as "role_agent" | "narrative_agent",
           default_provider_profile_key: optionalFormString(form, "default_provider_profile_key"),
           persona_text: formString(form, "persona_text"),
-          behavior_policy: jsonObject(formString(form, "behavior_policy")),
-          calendar_blueprint: JSON.parse(
-            formString(form, "calendar_blueprint") || "[]",
-          ) as AgentPreset["calendar_blueprint"],
-          advanced_config: jsonObject(formString(form, "advanced_config")),
+          behavior_policy: presetJsonObject(formString(form, "behavior_policy")),
+          calendar_blueprint: presetCalendarBlueprint(formString(form, "calendar_blueprint")),
+          advanced_config: presetJsonObject(formString(form, "advanced_config")),
           is_active: form.get("is_active") === "on",
         }),
       "Preset saved.",
@@ -173,19 +169,19 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
                       className="text-input"
                       name="behavior_policy"
                       rows={3}
-                      defaultValue={JSON.stringify(preset.behavior_policy, null, 2)}
+                      defaultValue={presetJsonString(preset.behavior_policy)}
                     />
                     <textarea
                       className="text-input"
                       name="calendar_blueprint"
                       rows={4}
-                      defaultValue={JSON.stringify(preset.calendar_blueprint, null, 2)}
+                      defaultValue={presetJsonString(preset.calendar_blueprint)}
                     />
                     <textarea
                       className="text-input"
                       name="advanced_config"
                       rows={4}
-                      defaultValue={JSON.stringify(preset.advanced_config, null, 2)}
+                      defaultValue={presetJsonString(preset.advanced_config)}
                     />
                     <label className="checkbox-label">
                       <input name="is_active" type="checkbox" defaultChecked={preset.is_active} />
@@ -224,6 +220,133 @@ export function PresetAdmin({ presets, loadError }: PresetAdminProps) {
       </section>
     </section>
   );
+}
+
+
+function presetJsonString(value: unknown): string {
+  return JSON.stringify(sanitizePresetJsonValue(value), null, 2);
+}
+
+function presetJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizePresetJsonObject(jsonObject(rawValue));
+}
+
+function presetCalendarBlueprint(rawValue: string): AgentPreset["calendar_blueprint"] {
+  return sanitizePresetJsonValue(JSON.parse(rawValue || "[]")) as AgentPreset["calendar_blueprint"];
+}
+
+function sanitizePresetJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitivePresetJsonKey(key))
+      .map(([key, entry]) => [key, sanitizePresetJsonValue(entry)]),
+  );
+}
+
+function sanitizePresetJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePresetJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizePresetJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitivePresetString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_PRESET_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_PRESET_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_PRESET_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitivePresetJsonKey(key: string): boolean {
+  const normalized = normalizePresetMarker(key);
+  return (
+    EXACT_SENSITIVE_PRESET_JSON_KEYS.has(normalized) ||
+    SENSITIVE_PRESET_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitivePresetString(value: string): boolean {
+  const normalized = normalizePresetMarker(value);
+  return (
+    SENSITIVE_PRESET_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikePresetToken(value)
+  );
+}
+
+function containsBase64LikePresetToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 16 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizePresetMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function PresetUpdatePreview({ preview }: { preview: AgentPresetUpdatePreview }) {
