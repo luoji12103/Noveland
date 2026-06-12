@@ -17,7 +17,8 @@ from noveland.conversations.models import (
     ConversationTurnPresentation,
 )
 from noveland.core.database import import_model_modules
-from noveland.media.models import MediaAsset, MediaJob, MediaObject
+from noveland.media.models import MediaAsset, MediaJob, MediaObject, MediaReference
+from noveland.moderation.models import ModerationAction
 from noveland.player_sessions.models import PlayerSession
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -401,6 +402,18 @@ def test_player_session_media_without_safe_reader_objects_is_missing_media() -> 
         visibility="player_visible",
         object_mime_type="text/html",
     )
+    no_reference_conversation_id, no_reference_turn_id, no_reference_presentation_id = (
+        _seed_conversation(engine, world_id, worldline_id, scene_id)
+    )
+    _attach_media_to_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        no_reference_presentation_id,
+        visibility="player_visible",
+        object_mime_type="image/png",
+        create_reference=False,
+    )
 
     safe_media = client.post(
         f"/worlds/{world_id}/player-sessions/resume",
@@ -439,13 +452,28 @@ def test_player_session_media_without_safe_reader_objects_is_missing_media() -> 
         headers=_csrf_headers(client),
     )
 
+    no_reference_media = client.post(
+        f"/worlds/{world_id}/player-sessions/resume",
+        json={
+            "worldline_id": str(worldline_id),
+            "player_actor_id": str(actor_id),
+            "conversation_session_id": str(no_reference_conversation_id),
+            "scene_id": str(scene_id),
+            "last_turn_id": str(no_reference_turn_id),
+            "last_presentation_id": str(no_reference_presentation_id),
+        },
+        headers=_csrf_headers(client),
+    )
+
     assert safe_media.status_code == 200
     assert safe_media.json()["recovery_status"] == "ready"
     assert objectless_media.status_code == 200
     assert objectless_media.json()["recovery_status"] == "missing_media"
     assert unsafe_media.status_code == 200
     assert unsafe_media.json()["recovery_status"] == "missing_media"
-    for response in (safe_media, objectless_media, unsafe_media):
+    assert no_reference_media.status_code == 200
+    assert no_reference_media.json()["recovery_status"] == "missing_media"
+    for response in (safe_media, objectless_media, unsafe_media, no_reference_media):
         _assert_no_forbidden_markers(response.json())
 
 
@@ -533,6 +561,8 @@ def _create_required_tables(engine: Engine) -> None:
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
         cast(Table, MediaObject.__table__),
+        cast(Table, MediaReference.__table__),
+        cast(Table, ModerationAction.__table__),
         cast(Table, ConversationTurnPresentation.__table__),
         cast(Table, PlayerSession.__table__),
     ):
@@ -727,6 +757,7 @@ def _attach_media_to_presentation(
     visibility: str,
     media_job_status: str = "succeeded",
     object_mime_type: str | None = "image/png",
+    create_reference: bool = True,
 ) -> uuid.UUID:
     job_id = uuid.uuid4()
     asset_id = uuid.uuid4()
@@ -784,6 +815,20 @@ def _attach_media_to_presentation(
                     mime_type=object_mime_type,
                     size_bytes=len(object_bytes),
                     checksum_sha256=checksum,
+                    metadata_json={},
+                )
+            )
+        if create_reference:
+            session.add(
+                MediaReference(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    asset_id=asset_id,
+                    ref_kind="conversation_turn",
+                    ref_id=presentation.turn_id,
+                    ref_role="output",
+                    display_order=0,
                     metadata_json={},
                 )
             )

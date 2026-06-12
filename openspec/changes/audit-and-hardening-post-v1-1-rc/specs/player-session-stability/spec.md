@@ -19,7 +19,7 @@ The system SHALL show safe fallback states when image, sprite, background, audio
 
 #### Scenario: Presentation references media without safe reader-deliverable objects
 - **Given** a player resume request references a presentation in the player session worldline
-- **AND** that presentation points to visible image, background, composite, or audio media with no safe reader-deliverable object, or only objects with active/scriptable content types
+- **AND** that presentation points to visible image, background, composite, or audio media with no safe reader-deliverable object, only objects with active/scriptable content types, no reader-visible reference, or any other condition that prevents a reader media descriptor from being returned
 - **WHEN** the player session recovery state is calculated
 - **THEN** the response SHALL use a safe missing-media recovery state instead of marking playback ready
 - **AND** the response SHALL NOT expose storage paths, raw object metadata, bytes, base64, content bytes, or provider internals.

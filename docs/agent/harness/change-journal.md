@@ -4784,3 +4784,15 @@
 - Tests added/updated: Added `test_player_session_media_without_safe_reader_objects_is_missing_media`, covering safe image media preservation plus objectless and `text/html` object suppression for player resume recovery.
 - Verification: Temporary CLI reproduction first showed objectless player-visible presentation media returning `recovery_status=ready` with `open_reader_playback`; the focused regression first failed before remediation, then passed after requiring a safe object; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 5 tests; focused backend ruff/mypy passed for player session service and tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 583 tests and 8 skipped.
 - Follow-up notes: Continue Web playback/scene empty-state audit for absent media descriptors, EventSource/client text-sink review, backend media object/reference route review, and remaining member/player DTO boundary checks. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening player resume reader descriptor alignment entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player session recovery and reader media descriptor alignment remediation for F-129.
+- Finding: F-129 found player resume still returned `ready` with `open_reader_playback` when presentation media had a safe object but lacked reader-visible `MediaReference` descriptor requirements; reader media returned no descriptors and member presentation readback hid the asset id.
+- Summary: Extended the player-session-stability OpenSpec scenario to require reader descriptor availability and changed player resume media readiness to reuse `ReaderMediaDeliveryService.get_media()` as the final descriptor reachability check, with a lazy import to avoid package initialization cycles.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/tests/test_api_player_sessions.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-session-stability/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_session_media_without_safe_reader_objects_is_missing_media` to include safe referenced media that remains ready and no-reference media that returns missing-media.
+- Verification: Temporary CLI reproduction first showed safe-object/no-reference media returning ready while reader descriptors were empty; focused player-session regression passed; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 5 tests; focused backend ruff/mypy passed for player session service and tests; related player/reader/presentation API tests passed with 14 tests; full backend ruff, mypy, and pytest passed with 583 tests and 8 skipped.
+- Follow-up notes: Continue Web playback/scene empty-state audit and backend media reference/moderation descriptor alignment checks. Do not push this branch unless the user explicitly asks.
