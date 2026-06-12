@@ -35,6 +35,13 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **WHEN** `WorldEventStore.append_event()` persists the event
 - **THEN** the stored `world_events.payload` SHALL omit those forbidden keys and values while preserving safe event context fields, regardless of the producer.
 
+#### Scenario: Agent memory backend calls require validated worldline scope
+- **GIVEN** an agent memory search or deletion request includes an explicit `worldline_id`
+- **WHEN** the API prepares to call a memory backend, external memory provider, or local vector store for that request
+- **THEN** the service SHALL first verify that the `worldline_id` exists in the requested `world_id`
+- **AND** invalid or cross-world worldline identifiers SHALL be rejected before any backend search or delete call is made
+- **AND** valid worldline-scoped memory operations SHALL continue to use the resolved worldline identifier.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

@@ -4258,6 +4258,8 @@ def test_world_admin_manages_agent_memory() -> None:
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
     member_id, member_token = _seed_user(engine, "member@example.test")
     world_id = _seed_world(engine, owner_id, "memory-world")
+    other_world_id = _seed_world(engine, owner_id, "other-memory-world")
+    _, other_worldline_id = _seed_worldlines(engine, other_world_id)
     agent_id = _seed_agent(engine, world_id, "guide")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
@@ -4302,6 +4304,14 @@ def test_world_admin_manages_agent_memory() -> None:
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
         json={"query_text": ""},
     )
+    bad_worldline_search = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"query_text": "green tea", "worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_forget = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/forget",
+        params={"worldline_id": str(other_worldline_id)},
+    )
     forget_memory = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
     after_forget = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
 
@@ -4321,6 +4331,10 @@ def test_world_admin_manages_agent_memory() -> None:
     assert search_memory.json()[0]["content"] == "Guide likes green tea"
     assert isinstance(search_memory.json()[0]["score"], float)
     assert bad_query.status_code == 422
+    assert bad_worldline_search.status_code == 422
+    assert bad_worldline_search.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_forget.status_code == 422
+    assert bad_worldline_forget.json()["detail"] == "worldline does not exist for world"
     assert forget_memory.status_code == 200
     assert forget_memory.json()["deleted_count"] == 1
     assert after_forget.json() == []

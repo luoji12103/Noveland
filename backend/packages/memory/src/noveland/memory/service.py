@@ -529,8 +529,10 @@ class MemoryService:
             return []
 
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:
+        resolved_worldline_id = self._worldline_id(request.world_id, request.worldline_id)
+        resolved_request = request.model_copy(update={"worldline_id": resolved_worldline_id})
         try:
-            result = self._backend_for_scope(request.world_id).search(request)
+            result = self._backend_for_scope(request.world_id).search(resolved_request)
         except Exception:
             result = MemorySearchResult(
                 backend=self._scope_backend_name(request.world_id), items=[], latency_ms=None
@@ -538,7 +540,7 @@ class MemoryService:
         self._session.add(
             MemoryRetrievalLog(
                 world_id=request.world_id,
-                worldline_id=self._worldline_id(request.world_id, request.worldline_id),
+                worldline_id=resolved_worldline_id,
                 agent_id=request.agent_id,
                 backend_profile_id=self._world_or_404(request.world_id).memory_backend_profile_id,
                 backend=result.backend,
@@ -653,15 +655,17 @@ class MemoryService:
         return _snapshot_record(model)
 
     def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
+        resolved_worldline_id = self._worldline_id(scope.world_id, scope.worldline_id)
+        resolved_scope = scope.model_copy(update={"worldline_id": resolved_worldline_id})
         try:
-            result = self._backend_for_scope(scope.world_id).delete_scope(scope)
+            result = self._backend_for_scope(scope.world_id).delete_scope(resolved_scope)
         except Exception as exc:
             raise MemoryPrivacyDeletionError(str(exc)) from exc
         if scope.run_id is None:
             self._scrub_local_scope_data(
                 scope.world_id,
                 scope.agent_id,
-                self._worldline_id(scope.world_id, scope.worldline_id),
+                resolved_worldline_id,
             )
         self._session.flush()
         return result

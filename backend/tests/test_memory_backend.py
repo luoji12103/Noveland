@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -14,21 +15,28 @@ from noveland.memory import (
     FakeMemoryBackend,
     LocalPgvectorMemoryBackend,
     Mem0OssMemoryBackend,
+    MemoryBackend,
+    MemoryBackendHealth,
+    MemoryBackendHealthStatus,
     MemoryBackendKind,
     MemoryBackendProfileCreate,
     MemoryBackendProfileService,
     MemoryBackendProfileUpdate,
+    MemoryDeleteResult,
     MemoryDeleteScope,
     MemoryEvalCase,
     MemoryEvent,
+    MemoryItemRecord,
     MemoryMessage,
     MemoryProfileSnapshotRecord,
     MemorySearchRequest,
+    MemorySearchResult,
     MemoryService,
     MemoryTurn,
     MemoryWriteJobStatus,
     run_memory_eval_cases,
 )
+from noveland.memory.contracts import MemoryWriteResult
 from noveland.memory.errors import MemoryValidationError
 from noveland.memory.models import (
     AgentMemoryItem,
@@ -771,6 +779,48 @@ def test_memory_service_build_context_and_delete_scope_are_worldline_scoped() ->
     assert remaining_fork_content == []
 
 
+def test_memory_service_rejects_invalid_worldline_before_backend_search_or_delete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = _engine()
+    user_id = _seed_user(engine)
+    world_id = _seed_world(engine, user_id)
+    other_world_id = _seed_world(engine, user_id)
+    agent_id = _seed_agent(engine, world_id)
+    other_worldline_id, _ = _seed_worldlines(engine, other_world_id)
+
+    with Session(engine) as session:
+        service = MemoryService(session, AppSettings())
+        backend = _SpyMemoryBackend()
+
+        def backend_for_scope(_world_id: uuid.UUID) -> MemoryBackend:
+            return backend
+
+        monkeypatch.setattr(service, "_backend_for_scope", backend_for_scope)
+
+        with pytest.raises(MemoryValidationError, match="worldline does not exist for world"):
+            service.search(
+                MemorySearchRequest(
+                    world_id=world_id,
+                    worldline_id=other_worldline_id,
+                    agent_id=agent_id,
+                    query_text="tea",
+                ),
+            )
+
+        with pytest.raises(MemoryValidationError, match="worldline does not exist for world"):
+            service.delete_scope(
+                MemoryDeleteScope(
+                    world_id=world_id,
+                    worldline_id=other_worldline_id,
+                    agent_id=agent_id,
+                ),
+            )
+
+    assert backend.search_calls == 0
+    assert backend.delete_scope_calls == 0
+
+
 def test_memory_service_lists_summarizes_and_retries_write_jobs() -> None:
     engine = _engine()
     user_id = _seed_user(engine)
@@ -1305,6 +1355,37 @@ def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uu
         session.add(fork)
         session.commit()
         return primary.id, fork.id
+
+
+class _SpyMemoryBackend:
+    def __init__(self) -> None:
+        self.search_calls = 0
+        self.delete_scope_calls = 0
+
+    def record_turn(self, turn: MemoryTurn) -> MemoryWriteResult:
+        raise AssertionError("record_turn should not be called")
+
+    def record_events(self, events: Sequence[MemoryEvent]) -> MemoryWriteResult:
+        raise AssertionError("record_events should not be called")
+
+    def list_memories(
+        self,
+        world_id: uuid.UUID,
+        agent_id: uuid.UUID,
+        worldline_id: uuid.UUID | None = None,
+    ) -> Sequence[MemoryItemRecord]:
+        raise AssertionError("list_memories should not be called")
+
+    def search(self, request: MemorySearchRequest) -> MemorySearchResult:
+        self.search_calls += 1
+        return MemorySearchResult(backend="spy", items=[], latency_ms=0)
+
+    def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
+        self.delete_scope_calls += 1
+        return MemoryDeleteResult(backend="spy", deleted_count=0)
+
+    def healthcheck(self) -> MemoryBackendHealth:
+        return MemoryBackendHealth(backend="spy", status=MemoryBackendHealthStatus.HEALTHY)
 
 
 class _FakeMem0Client:

@@ -75,6 +75,7 @@ from noveland.memory import (
 from noveland.memory import (
     MemorySearchRequest as MemoryLookupRequest,
 )
+from noveland.memory.errors import MemoryValidationError
 from noveland.memory.models import MemoryBackendProfile
 from noveland.narrative import (
     NarrativeArtifactKind,
@@ -7492,9 +7493,8 @@ def search_agent_memory(
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     memory_service = MemoryService(db_session, load_settings())
-    return [
-        _memory_item_response(item)
-        for item in memory_service.search(
+    try:
+        result = memory_service.search(
             MemoryLookupRequest(
                 world_id=context.world_id,
                 worldline_id=search_request.worldline_id,
@@ -7502,8 +7502,13 @@ def search_agent_memory(
                 query_text=search_request.query_text,
                 limit=search_request.limit,
             )
-        ).items
-    ]
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return [_memory_item_response(item) for item in result.items]
 
 
 @router.get(
@@ -7559,13 +7564,19 @@ def forget_agent_memory(
 ) -> MemoryDeleteResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    result = MemoryService(db_session, load_settings()).delete_scope(
-        MemoryDeleteScope(
-            world_id=context.world_id,
-            worldline_id=worldline_id,
-            agent_id=agent_id,
-        ),
-    )
+    try:
+        result = MemoryService(db_session, load_settings()).delete_scope(
+            MemoryDeleteScope(
+                world_id=context.world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+            ),
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return MemoryDeleteResponse(backend=result.backend, deleted_count=result.deleted_count)
 
 
