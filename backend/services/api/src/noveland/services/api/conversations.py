@@ -67,9 +67,11 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/worlds/{world_id}/conversations", tags=["conversations"])
 
 CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE = re.compile(
-    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
-    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
-    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    r"(storage[_ -]?uri|media://|object://|file://|s3://|gs://|/root/|/tmp/|"
+    r"base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|"
+    r"provider[_ -]?(kind|key|id)|secret[_ -]?ref|auth[_ -]?ref|"
+    r"file[_ -]?path|filesystem[_ -]?path|object[_ -]?path|bytes)",
     re.IGNORECASE,
 )
 
@@ -1154,12 +1156,12 @@ def _turn_response(
         input_text=(
             turn.input_text
             if include_admin_fields
-            else _sanitize_member_turn_text(turn.input_text)
+            else _sanitize_member_text(turn.input_text)
         ),
         output_text=(
             turn.output_text
             if include_admin_fields or turn.output_text is None
-            else _sanitize_member_turn_text(turn.output_text)
+            else _sanitize_member_text(turn.output_text)
         ),
         status=turn.status.value,
         run_id=turn.run_id if include_admin_fields else None,
@@ -1169,7 +1171,7 @@ def _turn_response(
     )
 
 
-def _sanitize_member_turn_text(value: str) -> str:
+def _sanitize_member_text(value: str) -> str:
     return "" if CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE.search(value) else value
 
 
@@ -1258,8 +1260,16 @@ def _narrative_artifact_response(
         agent_id=artifact_record.agent_id,
         source_run_id=artifact_record.source_run_id if include_admin_fields else None,
         source_conversation_id=artifact_record.source_conversation_id,
-        title=artifact_record.title,
-        content=artifact_record.content,
+        title=(
+            artifact_record.title
+            if include_admin_fields
+            else _sanitize_member_text(artifact_record.title)
+        ),
+        content=(
+            artifact_record.content
+            if include_admin_fields
+            else _sanitize_member_text(artifact_record.content)
+        ),
         artifact_kind=artifact_record.artifact_kind.value,
         metadata=artifact_record.metadata if include_admin_fields else {},
         created_at=artifact_record.created_at.isoformat(),

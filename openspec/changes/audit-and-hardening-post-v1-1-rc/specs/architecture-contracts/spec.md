@@ -368,10 +368,10 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member lists conversation narrative artifacts
 - **GIVEN** a world member lists narrative artifacts through a conversation-scoped member-readable route
-- **WHEN** the conversation has draft, unpublished, non-reader-visible, or published artifacts containing source run refs, artifact metadata, raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only narrative evidence
+- **WHEN** the conversation has draft, unpublished, non-reader-visible, or published artifacts containing source run refs, artifact metadata, raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only narrative evidence in metadata, titles, or content
 - **THEN** the member response SHALL include only published reader-visible artifacts for that conversation
-- **AND** the member response SHALL omit source run refs and artifact metadata while preserving safe artifact identity, title, content, kind, conversation linkage, and creation time
-- **AND** admin routes MAY continue to list draft artifacts and expose source refs and metadata required for conversation narrative management.
+- **AND** the member response SHALL omit source run refs and artifact metadata, blank sensitive-looking artifact title/content text, and preserve safe artifact identity, title, content, kind, conversation linkage, and creation time
+- **AND** admin routes MAY continue to list draft artifacts and expose source refs, metadata, and full artifact text required for conversation narrative management.
 
 #### Scenario: Member lists conversation turns
 - **GIVEN** a world member lists conversation turns through member-readable routes

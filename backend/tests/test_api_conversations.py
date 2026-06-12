@@ -495,6 +495,18 @@ def test_conversation_narrative_listing_redacts_member_evidence() -> None:
         publish=True,
         reader_visible=True,
     )
+    sensitive_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Published raw_prompt summary",
+        "storage_uri media://private/artifact body",
+        agent_id=agent_id,
+        source_run_id=uuid.uuid4(),
+        metadata={"raw_output": "operator-only generated text"},
+        publish=True,
+        reader_visible=True,
+    )
     draft_chapter_id = _seed_conversation_narrative_artifact(
         engine,
         world_id,
@@ -527,17 +539,25 @@ def test_conversation_narrative_listing_redacts_member_evidence() -> None:
 
     assert create_response.status_code == 201
     assert member_response.status_code == 200
-    assert [artifact["id"] for artifact in member_response.json()] == [str(published_summary_id)]
-    assert member_response.json()[0]["source_run_id"] is None
-    assert member_response.json()[0]["source_conversation_id"] == str(conversation_id)
-    assert member_response.json()[0]["metadata"] == {}
-    assert member_response.json()[0]["title"] == "Published summary"
-    assert member_response.json()[0]["content"] == "Published summary body"
+    member_artifacts = {artifact["id"]: artifact for artifact in member_response.json()}
+    assert set(member_artifacts) == {str(published_summary_id), str(sensitive_summary_id)}
+    assert member_artifacts[str(published_summary_id)]["source_run_id"] is None
+    assert member_artifacts[str(published_summary_id)]["source_conversation_id"] == str(
+        conversation_id,
+    )
+    assert member_artifacts[str(published_summary_id)]["metadata"] == {}
+    assert member_artifacts[str(published_summary_id)]["title"] == "Published summary"
+    assert member_artifacts[str(published_summary_id)]["content"] == "Published summary body"
+    assert member_artifacts[str(sensitive_summary_id)]["source_run_id"] is None
+    assert member_artifacts[str(sensitive_summary_id)]["metadata"] == {}
+    assert member_artifacts[str(sensitive_summary_id)]["title"] == ""
+    assert member_artifacts[str(sensitive_summary_id)]["content"] == ""
     assert admin_response.status_code == 200
     assert {artifact["id"] for artifact in admin_response.json()} == {
         str(hidden_summary_id),
         str(draft_chapter_id),
         str(published_summary_id),
+        str(sensitive_summary_id),
     }
     admin_published = next(
         artifact
@@ -546,6 +566,13 @@ def test_conversation_narrative_listing_redacts_member_evidence() -> None:
     )
     assert admin_published["source_run_id"] is not None
     assert admin_published["metadata"]["raw_prompt"] == "operator-only prompt"
+    admin_sensitive = next(
+        artifact
+        for artifact in admin_response.json()
+        if artifact["id"] == str(sensitive_summary_id)
+    )
+    assert admin_sensitive["title"] == "Published raw_prompt summary"
+    assert admin_sensitive["content"] == "storage_uri media://private/artifact body"
 
 
 def test_conversation_narrative_generation_and_listing(
