@@ -4904,3 +4904,15 @@
 - Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` for sensitive member player actor display-name redaction and admin display-name visibility.
 - Verification: Focused player actor regression first failed because member player actor display text containing `raw_prompt` and a filesystem path rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member world summary text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable world list/detail summary text remediation for F-139.
+- Finding: F-139 found `backend/services/api/src/noveland/services/api/worlds.py` redacted world rules/plugin configuration for ordinary members but returned admin-authored world `name` and `description` unchanged on list/detail responses.
+- Summary: Added an architecture-contracts scenario and changed `_world_response()` to blank sensitive-looking world names/descriptions for non-admin member responses while preserving safe world summary text, slug, active state, existing admin-field redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_read_but_not_mutate_and_non_member_is_hidden` for sensitive member world name/description redaction and safe world summary preservation.
+- Verification: Focused world summary regression first failed because member world list/detail returned world name text containing `raw_prompt`, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.

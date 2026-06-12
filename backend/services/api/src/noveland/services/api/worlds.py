@@ -8178,8 +8178,12 @@ def _world_response(
         id=world.id,
         owner_user_id=world.owner_user_id,
         slug=world.slug,
-        name=world.name,
-        description=world.description,
+        name=world.name if include_admin_fields else _sanitize_public_text(world.name),
+        description=(
+            world.description
+            if include_admin_fields or world.description is None
+            else _sanitize_public_text(world.description)
+        ),
         rules_config=world.rules_config if include_admin_fields else {},
         memory_plugin_identifier=world.memory_plugin_identifier if include_admin_fields else "",
         memory_backend_profile_id=world.memory_backend_profile_id if include_admin_fields else None,
