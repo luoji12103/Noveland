@@ -67,6 +67,27 @@ describe("admin API client", () => {
     );
   });
 
+  it("normalizes sensitive backend error details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail: {
+              message:
+                "Provider failed with clientSecret sk-admin-secret at storageUri media://admin/object and /tmp/admin.bin",
+            },
+          },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await expect(adminRequest("/api/provider-profiles", { method: "GET" })).rejects.toEqual(
+      new AdminClientError("Admin request failed.", 500),
+    );
+  });
+
   it("handles no-content responses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 

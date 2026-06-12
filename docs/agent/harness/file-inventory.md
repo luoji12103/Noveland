@@ -112,6 +112,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/lib/admin/`
 - `web/lib/admin/api-client.ts`
 - `web/lib/api-proxy.ts`
+- `web/lib/safe-error-detail.ts`
 - `web/lib/auth/`
 - `web/lib/realtime/`
 - `web/lib/realtime.ts`
@@ -949,3 +950,4 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-12 F-103 kept existing Web provider profile admin ownership in `web/features/admin/provider-admin.tsx`, with focused Web coverage in `web/features/admin/provider-admin.test.tsx`. Provider plugin config schema fields, raw plugin config JSON, and provider capabilities JSON now normalize secret, token, auth, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, and base64 key/value variants before rendering or submit echo while preserving safe provider options and capabilities.
 - 2026-06-12 F-104 kept existing Web visual admin client ownership in `web/lib/worlds/visual.ts`, with focused Web coverage in `web/lib/worlds/visual.test.ts`. Sprite/background resolver preview POST requests now require the same double-submit CSRF header as visual create/update/delete and compose-scene requests while preserving encoded world, sprite set, variant, background, and query identifiers.
 - 2026-06-12 F-105 kept existing Web world client ownership in `web/lib/worlds/client.ts`, with focused Web coverage in `web/lib/worlds/client.test.ts`. Agent memory search POST requests now require the same double-submit CSRF header as adjacent agent memory, persona, observation, run, narrative, and agent mutation helpers while preserving encoded world/agent path segments and request-body mapping.
+- 2026-06-12 F-106 introduced shared Web backend-error detail normalization ownership in `web/lib/safe-error-detail.ts` and applied it to existing admin, world, media, private-beta, and beta-feedback client helpers, with focused Web coverage in `web/lib/admin/api-client.test.ts`, `web/lib/worlds/client.test.ts`, `web/lib/worlds/media.test.ts`, `web/lib/private-beta/client.test.ts`, and `web/lib/beta-feedback/client.test.ts`. Sensitive-looking backend error details now fall back to route-specific generic messages before they can be displayed in UI notices.

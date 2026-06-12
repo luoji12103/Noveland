@@ -583,6 +583,14 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
 
+#### Scenario: Web clients normalize backend error details before notices
+- **GIVEN** browser-side admin, world, media, private-beta, or beta-feedback clients receive non-2xx JSON error responses from same-origin API routes
+- **WHEN** `detail` or `detail.message` contains provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** the thrown client error message SHALL use the route-appropriate generic failure text instead of preserving the forbidden key or value
+- **AND** safe business error text such as forbidden/validation messages MAY be preserved when it contains no forbidden marker
+- **AND** structured publication gate summaries MAY be preserved only when the resulting summary contains no forbidden marker.
+
+
 #### Scenario: Web dashboard world navigation preserves query boundaries
 - **GIVEN** browser-side dashboard code navigates to a selected or newly created world through the local `world` query parameter
 - **AND** the world identifier contains query-string or fragment delimiters

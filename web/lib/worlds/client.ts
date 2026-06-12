@@ -1,5 +1,6 @@
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type {
   Agent,
   AgentCreateInput,
@@ -2737,7 +2738,7 @@ async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return normalizeBackendErrorDetail(body.detail, "World request failed.");
     }
     if (body.detail !== null && typeof body.detail === "object" && !Array.isArray(body.detail)) {
       const detail = body.detail as Record<string, unknown>;
@@ -2745,9 +2746,9 @@ async function errorDetail(response: Response): Promise<string | null> {
       const reviewStatus =
         typeof detail.review_status === "string" ? detail.review_status : null;
       if (message !== null && reviewStatus !== null) {
-        return `${message} (${reviewStatus})`;
+        return normalizeBackendErrorDetail(`${message} (${reviewStatus})`, "World request failed.");
       }
-      return message;
+      return message === null ? null : normalizeBackendErrorDetail(message, "World request failed.");
     }
     return null;
   } catch {

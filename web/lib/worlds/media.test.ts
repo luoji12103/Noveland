@@ -187,6 +187,34 @@ describe("media admin client", () => {
       readerMediaObjectDownloadPath("/worlds/world-1/reader/media/objects/object-1/download"),
     ).toBeNull();
   });
+
+  it("normalizes sensitive upload error details", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail:
+              "Upload failed after reading storageUri media://hidden/object from /var/noveland/media with rawOutput",
+          },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await expect(
+      uploadMediaAsset("world-1", {
+        file: new File(["image-bytes"], "sprite.png", { type: "image/png" }),
+        asset_kind: "image",
+        asset_role: "character_sprite",
+        visibility: "world_admin",
+      }),
+    ).rejects.toMatchObject({
+      message: "Media upload failed.",
+      status: 500,
+    });
+  });
 });
 
 const mediaAsset = {

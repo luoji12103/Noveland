@@ -1,6 +1,7 @@
 import { AdminClientError, adminRequest } from "@/lib/admin/api-client";
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 
 export type MediaAssetKind = "image" | "audio" | "video" | "document" | "other";
 export type MediaAssetStatus = "registered" | "available" | "failed" | "deleted";
@@ -527,7 +528,7 @@ async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return normalizeBackendErrorDetail(body.detail, "Media upload failed.");
     }
   } catch {
     return null;

@@ -33,11 +33,35 @@ describe("private beta client", () => {
     expect((request.headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
     expect(request.body).toBe(JSON.stringify(input));
   });
+
+  it("normalizes sensitive backend error details", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { detail: "Invite failed with promptSnapshotId snapshot-1 and rawPrompt in /models/private.gguf" },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    const input = {
+      worldline_id: "worldline-1",
+      display_name: "Beta Tester",
+      profile: {},
+    };
+
+    await expect(bootstrapPrivateBetaPlayerProfile("world-1", input)).rejects.toMatchObject({
+      message: "Private beta request failed.",
+      status: 500,
+    });
+  });
 });
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status: init.status ?? 200,
     headers: { "Content-Type": "application/json" },
   });
 }

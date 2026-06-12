@@ -84,11 +84,28 @@ describe("beta feedback client", () => {
     expect((request.headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
     expect(request.body).toBe(JSON.stringify(input));
   });
+
+  it("normalizes sensitive backend error details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { detail: "Feedback failed after rawOutput at /var/noveland/feedback with Bearer feedback-token" },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await expect(listBetaFeedbackReports(worldId)).rejects.toMatchObject({
+      message: "Beta feedback request failed.",
+      status: 500,
+    });
+  });
 });
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status: init.status ?? 200,
     headers: { "Content-Type": "application/json" },
   });
 }

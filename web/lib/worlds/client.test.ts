@@ -2399,6 +2399,29 @@ describe("world client", () => {
     });
   });
 
+  it("normalizes sensitive backend error details", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail: {
+              message:
+                "World write failed with rawPrompt, storageUri media://world/object, Bearer world-token, and c2VjcmV0LXdvcmxkLWVycm9yLXByb29m",
+            },
+          },
+          500,
+        ),
+      ),
+    );
+
+    await expect(createWorld({ slug: "first-world", name: "First World" })).rejects.toMatchObject({
+      message: "World request failed.",
+      status: 500,
+    });
+  });
+
   it("summarizes structured publication gate errors", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     vi.stubGlobal(
