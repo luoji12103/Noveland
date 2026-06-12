@@ -4237,3 +4237,15 @@
 - Tests added/updated: Extended `test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping` so admin list responses retain source preset ID/version while member list responses receive `null` for both fields.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` first failed on unredacted `source_preset_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Snapshot source evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-084.
+- Finding: F-084 found member-readable latest snapshot responses already hiding snapshot payload, payload URI/location, and metadata, but still returning `created_by_event_id` to ordinary world members.
+- Summary: Updated the architecture-contracts OpenSpec latest snapshot scenario, made `WorldSnapshotResponse.created_by_event_id` nullable, and redacted the created-by event ref from non-admin `_snapshot_response()` output while preserving admin replay diagnostics.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_replay_and_snapshot_api_reads_state_and_creates_snapshot` so admin latest snapshot responses retain `created_by_event_id` while member latest snapshot responses receive `null`.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` first failed on unredacted `created_by_event_id`, then passed with 1 test after remediation; adjacent replay/event audit coverage passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.

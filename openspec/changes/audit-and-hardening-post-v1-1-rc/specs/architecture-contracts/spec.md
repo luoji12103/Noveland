@@ -210,9 +210,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member reads latest snapshot
 - **GIVEN** a world member fetches the latest world snapshot through member-readable routes
-- **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, storage refs, bytes, base64, provider refs, or other replay/storage evidence
-- **THEN** the member response SHALL omit payload, payload_uri, payload_location, and metadata while preserving safe snapshot identity, worldline, sequence coverage, schema version, status, source event ref, and creation time
-- **AND** admin routes MAY continue to expose snapshot payload and storage evidence required for replay diagnostics and world management.
+- **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, created-by event refs, storage refs, bytes, base64, provider refs, or other replay/storage evidence
+- **THEN** the member response SHALL omit payload, payload_uri, payload_location, metadata, and created-by event refs while preserving safe snapshot identity, worldline, sequence coverage, schema version, status, and creation time
+- **AND** admin routes MAY continue to expose snapshot payload, storage evidence, and created-by event refs required for replay diagnostics and world management.
 
 #### Scenario: Member reads replay state
 - **GIVEN** a world member reads replay state through member-readable routes

@@ -2642,7 +2642,7 @@ class WorldSnapshotResponse(BaseModel):
     payload_uri: str | None
     payload_location: str | None
     metadata: dict[str, Any]
-    created_by_event_id: uuid.UUID
+    created_by_event_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -10445,7 +10445,7 @@ def _snapshot_response(
         payload_uri=snapshot.payload_uri if include_admin_fields else None,
         payload_location=_snapshot_payload_location(snapshot) if include_admin_fields else None,
         metadata=snapshot.metadata if include_admin_fields else {},
-        created_by_event_id=snapshot.created_by_event_id,
+        created_by_event_id=snapshot.created_by_event_id if include_admin_fields else None,
         created_at=snapshot.created_at,
     )
 

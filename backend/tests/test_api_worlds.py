@@ -4425,6 +4425,8 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert created.json()["schema_version"] == "world_state.v1"
     assert latest_after.status_code == 200
     assert latest_after.json()["id"] == created.json()["id"]
+    assert latest_after.json()["created_by_event_id"] == created.json()["created_by_event_id"]
+    assert latest_after.json()["created_by_event_id"] is not None
     assert latest_after.json()["payload_uri"].startswith(f"object://worlds/{world_id}/")
     assert latest_after.json()["payload_location"] == "object"
     assert latest_after.json()["metadata"]["storage"] == "local_object"
@@ -4435,6 +4437,7 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert member_snapshot["payload"] is None
     assert member_snapshot["payload_uri"] is None
     assert member_snapshot["payload_location"] is None
+    assert member_snapshot["created_by_event_id"] is None
     assert member_snapshot["metadata"] == {}
     assert integrity_after.status_code == 200
     assert integrity_after.json()["status"] == "ok"
