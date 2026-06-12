@@ -275,6 +275,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the export SHALL omit those operator-only internals while preserving safe player-owned titles, bodies, selected options, statuses, target identity fields, and timing fields
 - **AND** privacy request audit records SHALL continue to contain safe summaries and actor refs only.
 
+#### Scenario: Member reads sensitive-looking player actor text
+- **GIVEN** a world member binds or lists player actor records through member-readable routes
+- **WHEN** player actor display names contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL blank the sensitive-looking display name while preserving safe display names, actor identity fields, current scene refs, profile redaction, and timing fields
+- **AND** admin routes MAY continue to expose full player actor display names required for player support and world management.
+
 #### Scenario: Member reads agent relationship and calendar metadata
 - **GIVEN** a world member lists agent relationships or agent calendar entries through member-readable routes
 - **WHEN** those records contain metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, source evidence refs, or other admin-only scheduling/relationship evidence

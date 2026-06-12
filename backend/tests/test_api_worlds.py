@@ -3316,17 +3316,18 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
         f"/worlds/{world_id}/player-actors",
         json={
             "user_id": str(other_id),
-            "display_name": "Other Player",
+            "display_name": "Other raw_prompt: admin player actor",
             "current_scene_id": str(scene_id),
         },
     )
     assert owner_actor.status_code == 200
+    assert owner_actor.json()["display_name"] == "Other raw_prompt: admin player actor"
 
     _authenticate(client, member_token)
     member_actor = client.put(
         f"/worlds/{world_id}/player-actors",
         json={
-            "display_name": "Member Player",
+            "display_name": "Member raw_prompt: /root/private/player-actor",
             "current_scene_id": str(scene_id),
             "profile": {
                 "safe": "visible",
@@ -3353,6 +3354,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
         },
     )
     assert member_actor.status_code == 200
+    assert member_actor.json()["display_name"] == ""
     assert member_actor.json()["profile"] == expected_member_profile
 
     with Session(engine) as session:
@@ -3490,6 +3492,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert persisted_profile_after_bind == expected_member_profile
     assert other_actor_attempt.status_code == 403
     assert listed_actors.status_code == 200
+    assert listed_actors.json()[0]["display_name"] == ""
     listed_profile = listed_actors.json()[0]["profile"]
     assert listed_profile == expected_historical_profile
     listed_profile_text = json.dumps(listed_profile, sort_keys=True)

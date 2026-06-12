@@ -4892,3 +4892,15 @@
 - Tests added/updated: Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` for sensitive member schedule rule name redaction and safe schedule rule name preservation.
 - Verification: Focused schedule rule regression first failed because member schedule rule name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member player actor text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable player actor display text remediation for F-138.
+- Finding: F-138 found `backend/services/api/src/noveland/services/api/worlds.py` sanitized player actor `profile` JSON but returned member/player actor `display_name` unchanged on bind/list responses.
+- Summary: Added an architecture-contracts scenario and changed `_player_actor_response()` plus player actor callers to blank sensitive-looking display names for non-admin member responses while preserving safe names, actor identity fields, current scene refs, profile redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` for sensitive member player actor display-name redaction and admin display-name visibility.
+- Verification: Focused player actor regression first failed because member player actor display text containing `raw_prompt` and a filesystem path rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.

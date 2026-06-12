@@ -3505,7 +3505,7 @@ def list_player_actors(
     actors = db_session.scalars(
         statement.order_by(PlayerActorProfile.display_name),
     ).all()
-    return [_player_actor_response(actor) for actor in actors]
+    return [_player_actor_response(actor, include_admin_fields=can_manage) for actor in actors]
 
 
 @router.put("/{world_id}/player-actors", response_model=PlayerActorResponse)
@@ -3532,7 +3532,7 @@ def bind_player_actor(
         current_scene_id=actor_bind.current_scene_id,
         profile=_sanitize_public_json(actor_bind.profile),
     )
-    return _player_actor_response(actor)
+    return _player_actor_response(actor, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/player-choices", response_model=list[PlayerChoiceResponse])
@@ -8614,14 +8614,22 @@ def _sanitize_public_json_value(value: Any) -> Any:
     return value
 
 
-def _player_actor_response(actor: PlayerActorProfile) -> PlayerActorResponse:
+def _player_actor_response(
+    actor: PlayerActorProfile,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerActorResponse:
     return PlayerActorResponse(
         id=actor.id,
         world_id=actor.world_id,
         worldline_id=actor.worldline_id,
         user_id=actor.user_id,
         actor_ref=actor.actor_ref,
-        display_name=actor.display_name,
+        display_name=(
+            actor.display_name
+            if include_admin_fields
+            else _sanitize_public_text(actor.display_name)
+        ),
         current_scene_id=actor.current_scene_id,
         profile=_sanitize_public_json(actor.profile_json),
         is_active=actor.is_active,
