@@ -14,7 +14,7 @@ from noveland.media.models import MediaAsset, MediaJob, MediaObject
 from noveland.media.storage import MediaObjectStorage
 from noveland.memory.models import MemoryWriteJob
 from noveland.providers.models import ProviderHealthCheck, ProviderIntegration
-from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS
+from noveland.providers.secrets import REDACTED, is_sensitive_key
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechTranscript, VoiceProfile
 from noveland.visual.models import (
     CharacterSpriteSet,
@@ -792,8 +792,8 @@ def _snapshot_contains_secret(snapshot: PromptSnapshot) -> bool:
 def _contains_secret_value(value: object) -> bool:
     if isinstance(value, dict):
         for key, item in value.items():
-            key_text = str(key).strip().lower()
-            if key_text in SENSITIVE_KEYS and item not in {None, "", REDACTED}:
+            key_text = str(key)
+            if is_sensitive_key(key_text) and item not in {None, "", REDACTED}:
                 return True
             if _contains_secret_value(item):
                 return True

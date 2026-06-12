@@ -145,6 +145,18 @@ def test_registry_rejects_sensitive_provider_config_recursively() -> None:
                     config_json={"nested": {"api_key": "sk-secret"}},
                 )
             )
+        with pytest.raises(ProviderValidationError, match="sensitive key"):
+            ProviderRegistryService(session).create_provider(
+                ProviderIntegrationCreate(
+                    world_id=world_id,
+                    scope_kind=ProviderScopeKind.WORLD,
+                    provider_kind=ProviderKind.IMAGE_GENERATION,
+                    adapter_kind=ProviderAdapterKind.FAKE,
+                    provider_key="bad-camel-config",
+                    display_name="Bad Camel Config",
+                    config_json={"nested": {"clientSecret": "sk-secret"}},
+                )
+            )
         provider = ProviderRegistryService(session).create_provider(
             ProviderIntegrationCreate(
                 world_id=world_id,
@@ -179,8 +191,14 @@ def test_provider_secret_resolver_uses_env_refs_and_aliases(
 
 
 def test_sanitizer_redacts_nested_sensitive_keys() -> None:
-    assert sanitize_for_persistence({"headers": {"Authorization": "Bearer secret"}}) == {
-        "headers": {"Authorization": "[REDACTED]"}
+    assert sanitize_for_persistence(
+        {
+            "headers": {"Authorization": "Bearer secret"},
+            "nested": {"clientSecret": "sk-secret", "secretKey": "value"},
+        }
+    ) == {
+        "headers": {"Authorization": "[REDACTED]"},
+        "nested": {"clientSecret": "[REDACTED]", "secretKey": "[REDACTED]"},
     }
 
 

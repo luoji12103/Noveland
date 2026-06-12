@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,11 +14,13 @@ SENSITIVE_KEYS = {
     "bearer_token",
     "authorization",
     "secret",
+    "secret_key",
     "client_secret",
     "access_key",
     "password",
     "private_key",
 }
+SENSITIVE_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in SENSITIVE_KEYS}
 REDACTED = "[REDACTED]"
 _ALIASES = {
     "openai:default": "env:OPENAI_API_KEY",
@@ -167,5 +170,10 @@ def _first_sensitive_path(value: Any, *, prefix: str = "") -> str | None:
     return None
 
 
+def is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in SENSITIVE_KEY_MARKERS
+
+
 def _is_sensitive_key(key: str) -> bool:
-    return key.strip().lower() in SENSITIVE_KEYS
+    return is_sensitive_key(key)

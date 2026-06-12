@@ -330,6 +330,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the backend SHALL reject persisted config keys or values that contain raw secret material
 - **AND** memory backend `secret_refs` SHALL store only safe reference names used to resolve secrets from runtime configuration.
 
+#### Scenario: Provider secret-bearing JSON normalizes sensitive key variants
+- **GIVEN** provider integration config, provider execution request JSON, provider budget metadata, package provider templates, or multimodal diagnostic inputs contain arbitrary JSON
+- **WHEN** secret-bearing keys are written in snake_case, camelCase, compact, or mixed punctuation forms such as client_secret, clientSecret, clientsecret, bearer_token, bearerToken, private_key, privateKey, secret_key, or secretKey
+- **THEN** backend validators SHALL reject raw persisted or executable provider JSON containing those keys
+- **AND** package exports, persisted safe DTOs, and diagnostic leak checks SHALL omit, redact, or flag those keys using the same normalized sensitive-key semantics.
+
 ### Requirement: Web realtime clients preserve backend route boundaries
 The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
 

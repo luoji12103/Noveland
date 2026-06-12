@@ -116,7 +116,7 @@ def test_multimodal_eval_detects_integrity_and_leak_failures(tmp_path: Path) -> 
         )
         leaky_snapshot = session.scalars(select(PromptSnapshot)).first()
         assert leaky_snapshot is not None
-        leaky_snapshot.raw_request_json = {"headers": {"authorization": "sk-real-secret"}}
+        leaky_snapshot.raw_request_json = {"headers": {"clientSecret": "sk-real-secret"}}
         session.add(missing_asset)
         session.add(leaky_event)
         session.commit()

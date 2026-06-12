@@ -1688,7 +1688,7 @@ def test_narrative_quality_dashboard_detects_blockers_and_sanitizes_evidence() -
         engine,
         provider_id,
         status="unhealthy",
-        metadata={"nested": {"api_key": "sk-secret"}},
+        metadata={"nested": {"clientSecret": "sk-secret"}},
         error_text="auth failed for sk-secret",
     )
     with Session(engine) as session:
@@ -1739,6 +1739,7 @@ def test_narrative_quality_dashboard_detects_blockers_and_sanitizes_evidence() -
     assert "storage_uri" not in serialized
     assert "media://" not in serialized
     assert "sk-secret" not in serialized
+    assert "clientsecret" not in serialized
     assert "raw_prompt" not in serialized
 
 

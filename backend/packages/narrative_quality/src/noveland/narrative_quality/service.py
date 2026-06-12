@@ -38,7 +38,7 @@ from noveland.providers.registry import (
     ProviderRegistryService,
     ProviderValidationError,
 )
-from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS, reject_sensitive_config
+from noveland.providers.secrets import REDACTED, is_sensitive_key, reject_sensitive_config
 from noveland.providers.service import ProviderExecutionService
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
 from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
@@ -5117,7 +5117,7 @@ def _sanitize_json(value: Any) -> Any:
 
 def _is_leaky_key(key: str) -> bool:
     normalized = key.strip().lower()
-    return normalized in SENSITIVE_KEYS or normalized in _LEAK_KEYWORDS
+    return is_sensitive_key(key) or normalized in _LEAK_KEYWORDS
 
 
 def _safe_text(value: str) -> str:

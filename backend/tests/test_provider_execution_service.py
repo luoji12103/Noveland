@@ -242,6 +242,23 @@ def test_disabled_provider_writes_failed_invocation_without_resolving_secret(
         assert "sk-disabled-provider-secret" not in str(snapshot.raw_response_json)
 
 
+def test_budget_policy_rejects_camel_case_secret_metadata() -> None:
+    engine = _engine()
+    world_id, _ = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        with pytest.raises(ValueError, match="sensitive key"):
+            ProviderBudgetService(session).create_policy(
+                ProviderBudgetPolicyCreate(
+                    world_id=world_id,
+                    provider_id=provider_id,
+                    policy_key="leaky-metadata",
+                    metadata_json={"clientSecret": "sk-budget-secret"},
+                )
+            )
+
+
 def test_emergency_stop_blocks_before_secret_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
