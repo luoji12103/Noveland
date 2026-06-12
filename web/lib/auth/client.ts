@@ -5,6 +5,7 @@ import {
   type CsrfResponse,
   type LoginInput,
 } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 
 export class AuthClientError extends Error {
   constructor(
@@ -81,14 +82,16 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
     return (await response.json()) as T;
   }
 
-  const detail = await errorDetail(response);
+  const detail = await errorDetail(response, fallbackMessage);
   throw new AuthClientError(detail ?? fallbackMessage, response.status);
 }
 
-async function errorDetail(response: Response): Promise<string | null> {
+async function errorDetail(response: Response, fallbackMessage: string): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : null;
+    return typeof body.detail === "string"
+      ? normalizeBackendErrorDetail(body.detail, fallbackMessage)
+      : null;
   } catch {
     return null;
   }

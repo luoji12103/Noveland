@@ -90,6 +90,23 @@ describe("auth client", () => {
     ).rejects.toMatchObject({ status: 401 });
   });
 
+  it("normalizes sensitive backend error details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { detail: "CSRF failed with clientSecret sk-auth-secret and storageUri media://auth/object" },
+          500,
+        ),
+      ),
+    );
+
+    await expect(requestCsrf()).rejects.toMatchObject({
+      message: "Unable to prepare sign in.",
+      status: 500,
+    });
+  });
+
   it("sends csrf header when logging out", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));

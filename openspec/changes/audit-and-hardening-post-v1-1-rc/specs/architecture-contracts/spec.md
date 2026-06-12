@@ -584,7 +584,7 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 
 
 #### Scenario: Web clients normalize backend error details before notices
-- **GIVEN** browser-side admin, world, media, private-beta, or beta-feedback clients receive non-2xx JSON error responses from same-origin API routes
+- **GIVEN** browser-side auth, admin, world, media, private-beta, or beta-feedback clients receive non-2xx JSON error responses from same-origin API routes
 - **WHEN** `detail` or `detail.message` contains provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
 - **THEN** the thrown client error message SHALL use the route-appropriate generic failure text instead of preserving the forbidden key or value
 - **AND** safe business error text such as forbidden/validation messages MAY be preserved when it contains no forbidden marker
