@@ -4820,3 +4820,15 @@
 - Tests added/updated: Added reader media API regressions for moderated conversation turn/session references and for moderated worldline/narrative publication targets plus mixed suppressed/unsuppressed references, covering descriptor list, detail, scoped object download suppression, and reference filtering without over-blocking.
 - Verification: Focused reader media regression first failed against the old implementation, then passed after remediation; related reader media, moderation, player session, and presentation tests passed with 24 tests; focused backend ruff/mypy passed; full backend ruff, mypy, and pytest passed with 586 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend media reference/moderation descriptor alignment checks, including moderation target validation breadth and any remaining reader/member DTO leak paths. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening moderation concrete target validation entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend moderation report/action target validation remediation for F-132.
+- Finding: F-132 found `ModerationService._validate_target()` treated `narrative_publication` and `player_profile` as worldline-scoped but did not validate that their target refs existed or belonged to the supplied worldline; `scene` targets also lacked a world ownership check.
+- Summary: Added a content-safety-moderation-hardening OpenSpec scenario and changed moderation target validation to require concrete scene, narrative publication, and player profile refs to resolve within the requested world/worldline scope while preserving free-form `other` and non-persistent plugin package behavior.
+- Files changed: backend/packages/moderation/src/noveland/moderation/service.py, backend/tests/test_api_moderation.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/content-safety-moderation-hardening/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_moderation_rejects_unresolved_concrete_target_refs`, covering missing, cross-world, cross-worldline, and valid scene/publication/player-profile moderation targets.
+- Verification: Focused moderation regression first failed because an unresolved `narrative_publication` target returned 201, then passed after remediation; focused backend ruff/mypy passed; related moderation, reader media, player session, and conversation presentation tests passed with 25 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend moderation target breadth, reader/member/player DTO leak-path audits, Web route-handler audits, and product/spec-history drift review. Do not push this branch unless the user explicitly asks.

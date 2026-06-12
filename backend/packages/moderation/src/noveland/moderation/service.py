@@ -28,9 +28,10 @@ from noveland.moderation.contracts import (
     ModerationTargetKind,
 )
 from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
+from noveland.narrative.models import NarrativePublication
 from noveland.observability.contracts import IncidentEvidenceRef
 from noveland.providers.models import ProviderIntegration
-from noveland.worlds.models import Worldline
+from noveland.worlds.models import PlayerActorProfile, Scene, Worldline
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -499,6 +500,28 @@ class ModerationService:
                 raise ModerationNotFoundError("target worldline not found")
             if worldline_id is not None and target_id != worldline_id:
                 raise ModerationValidationError("worldline target_ref_id must match worldline_id")
+        if target_kind == ModerationTargetKind.SCENE:
+            scene = self._session.get(Scene, target_id)
+            if target_id is None or scene is None or scene.world_id != world_id:
+                raise ModerationNotFoundError("scene not found")
+        if target_kind == ModerationTargetKind.NARRATIVE_PUBLICATION:
+            publication = self._session.get(NarrativePublication, target_id)
+            if (
+                target_id is None
+                or publication is None
+                or publication.world_id != world_id
+                or publication.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("narrative publication not found")
+        if target_kind == ModerationTargetKind.PLAYER_PROFILE:
+            profile = self._session.get(PlayerActorProfile, target_id)
+            if (
+                target_id is None
+                or profile is None
+                or profile.world_id != world_id
+                or profile.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("player profile not found")
         if target_kind == ModerationTargetKind.PROVIDER_INTEGRATION:
             if target_id is None:
                 raise ModerationValidationError("provider target_ref_id is required")
