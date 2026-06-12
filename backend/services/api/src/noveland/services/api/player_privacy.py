@@ -74,13 +74,18 @@ def list_player_privacy_requests(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> list[PlayerPrivacyRequestRead]:
     _ = world_id
-    return PlayerPrivacyService(db_session).list_requests(
-        context.world_id,
-        worldline_id=worldline_id,
-        user_id=context.subject.user_id,
-        include_all_users=context.is_platform_admin or context.role == "world_admin",
-        limit=limit,
-    )
+    try:
+        return PlayerPrivacyService(db_session).list_requests(
+            context.world_id,
+            worldline_id=worldline_id,
+            user_id=context.subject.user_id,
+            include_all_users=context.is_platform_admin or context.role == "world_admin",
+            limit=limit,
+        )
+    except PlayerPrivacyNotFoundError as exc:
+        raise _not_found() from exc
+    except PlayerPrivacyValidationError as exc:
+        raise _bad_request(str(exc)) from exc
 
 
 @router.post(

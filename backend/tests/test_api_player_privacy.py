@@ -225,8 +225,13 @@ def test_player_privacy_rejects_cross_worldline_requests() -> None:
         f"/worlds/{world_id}/player/privacy/export",
         params={"worldline_id": str(other_worldline_id)},
     )
+    request_list = client.get(
+        f"/worlds/{world_id}/player/privacy/requests",
+        params={"worldline_id": str(other_worldline_id)},
+    )
 
     assert response.status_code == 404
+    assert request_list.status_code == 404
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:

@@ -49,6 +49,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **AND** the service SHALL validate the worldline before backend list calls or profile snapshot reads/writes
 - **AND** valid worldline-scoped list and profile snapshot operations SHALL continue to return records for the resolved worldline.
 
+#### Scenario: Player privacy request lists reject invalid worldline scope
+- **GIVEN** a player privacy request list query includes an explicit `worldline_id`
+- **WHEN** the `worldline_id` is missing from the requested `world_id` or belongs to another world
+- **THEN** the API SHALL reject the request instead of returning an empty successful response
+- **AND** valid worldline-scoped privacy request list queries SHALL continue to return only privacy request records from the resolved worldline.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

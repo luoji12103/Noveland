@@ -129,14 +129,17 @@ class PlayerPrivacyService:
         include_all_users: bool = False,
         limit: int = 100,
     ) -> list[PlayerPrivacyRequestRead]:
+        resolved_worldline_id = (
+            None if worldline_id is None else self._resolve_worldline_id(world_id, worldline_id)
+        )
         statement = (
             select(PlayerPrivacyRequest)
             .where(PlayerPrivacyRequest.world_id == world_id)
             .order_by(PlayerPrivacyRequest.created_at.desc())
             .limit(max(1, min(limit, 200)))
         )
-        if worldline_id is not None:
-            statement = statement.where(PlayerPrivacyRequest.worldline_id == worldline_id)
+        if resolved_worldline_id is not None:
+            statement = statement.where(PlayerPrivacyRequest.worldline_id == resolved_worldline_id)
         if not include_all_users:
             if user_id is None:
                 raise PlayerPrivacyValidationError("user_id is required")
