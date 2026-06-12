@@ -380,6 +380,7 @@ export function resolveSprite(
   return adminRequest<SpriteResolveResult>(`${visualPath(worldId)}/resolve-sprite`, {
     method: "POST",
     body: input,
+    csrf: true,
   });
 }
 
@@ -435,6 +436,7 @@ export function resolveBackground(
     {
       method: "POST",
       body: input,
+      csrf: true,
     },
   );
 }

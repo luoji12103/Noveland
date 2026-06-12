@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T10:33:09+00:00
+- Date: 2026-06-12T10:43:36+00:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-103 are remediated on this branch; latest batch is F-103 Web provider profile admin JSON normalization.
+- Status: F-001 through F-104 are remediated on this branch; latest batch is F-104 Web visual resolver CSRF hardening.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-103 batch: cdd95a8 fix(web-narrative): sanitize writer and reader metadata.
+- Base before F-104 batch: ed1aab4 fix(web-providers): sanitize profile admin json.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before the batch: branch matched origin at cdd95a8 with a clean worktree after F-102 was pushed.
+- Current server status was rechecked before the batch: branch matched origin at ed1aab4 with a clean worktree; OpenSpec change was active and specs strict validation passed with 76 specs; Noveland Postgres and NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,17 +26,16 @@
 
 ## Completed This Batch
 
-- Continued Web/e2e security audit after F-102, focusing on legacy provider profile admin plugin config/capability JSON surfaces.
-- Recorded/remediated F-103: Web provider profile admin rendered provider plugin config schema fields/raw JSON and capabilities JSON directly, and create/update submissions could echo dirty provider evidence.
+- Continued Web/e2e security audit after F-103, focusing on route/client CSRF consistency for visual admin POST helpers.
+- Recorded/remediated F-104: Web visual `resolveSprite` and `resolveBackground` resolver preview POST helpers omitted `csrf: true`, unlike adjacent visual admin mutations and compose-scene.
 - Updated architecture-contracts OpenSpec before implementation.
-- Added normalized provider profile JSON display and submit sanitization in `ProviderAdmin` for plugin config and capabilities.
-- Passed sanitized plugin config into `PluginConfigFields` so schema-derived inputs and raw JSON fallback suppress dirty values while retaining safe provider options.
-- Updated regression coverage for dirty provider plugin config/capabilities display and update submit payloads.
+- Added CSRF to visual sprite/background resolver preview POST helpers.
+- Updated visual client regression coverage to assert resolver preview and compose-scene POST requests all carry `X-CSRF-Token`.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- features/admin/provider-admin.test.tsx` first failed against the unpatched component with dirty provider plugin config visible, then passed with 2 tests after remediation.
-- `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts` passed with 37 tests.
+- `cd web && npm run test -- lib/worlds/visual.test.ts` first failed against the unpatched helpers with missing resolver CSRF headers, then passed with 4 tests after remediation.
+- `cd web && npm run test -- lib/worlds/visual.test.ts lib/admin/api-client.test.ts lib/worlds/proxy.test.ts` passed with 13 tests.
 - `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed.
 - Full `cd web && npm run test` passed with 52 files and 195 tests; existing RuntimeAdmin React `act(...)` warnings remained warnings, not failures.
 - `cd web && npm run build` passed with `next-env.d.ts` restored and checked.
@@ -50,8 +49,8 @@
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Push after successful commits unless the user changes that instruction.
 
-## Finding F-103
+## Finding F-104
 
-- Web provider profile admin plugin config/capability rendering and submission must treat dirty provider JSON containing secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, or base64 key/value markers as sensitive.
-- The remediation omits sensitive provider JSON keys, redacts sensitive-looking safe-key string values, sanitizes provider profile create/update payloads, and preserves safe provider plugin options and capabilities across display and submit paths.
+- Web visual resolver preview POST helpers must use the same double-submit CSRF boundary as other visual admin POST/PATCH/PUT/DELETE actions.
+- The remediation adds `csrf: true` to `resolveSprite` and `resolveBackground` and updates regression coverage so resolver and compose-scene requests all carry `X-CSRF-Token`.
 - Residual risk: continue remaining Web route-handler, proxy, client rendering, response-shaping, product-flow, and spec-history drift audits.

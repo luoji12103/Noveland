@@ -107,7 +107,7 @@ describe("visual admin client", () => {
     }
   });
 
-  it("runs resolver previews without csrf and compose scene with csrf", async () => {
+  it("uses csrf for resolver previews and compose scene", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
@@ -137,9 +137,9 @@ describe("visual admin client", () => {
       "/api/worlds/world-1/visual/resolve-background",
       "/api/worlds/world-1/visual/compose-scene",
     ]);
-    expect((fetchMock.mock.calls[0][1].headers as Headers).get("X-CSRF-Token")).toBeNull();
-    expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBeNull();
-    expect((fetchMock.mock.calls[2][1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    }
     expect(fetchMock.mock.calls[2][0]).not.toContain("media://");
   });
 
