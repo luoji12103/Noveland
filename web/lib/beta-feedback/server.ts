@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type { BetaFeedbackReport } from "@/lib/beta-feedback/types";
 import type { Membership, World, Worldline } from "@/lib/worlds/types";
 
@@ -92,7 +93,9 @@ async function apiFetchOptional<T>(path: string, cookieHeaderValue: string | nul
 async function errorDetail(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : "Beta feedback request failed.";
+    return typeof body.detail === "string"
+      ? normalizeBackendErrorDetail(body.detail, "Beta feedback request failed.")
+      : "Beta feedback request failed.";
   } catch {
     return "Beta feedback request failed.";
   }

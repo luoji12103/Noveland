@@ -23,6 +23,27 @@ describe("beta feedback server loader", () => {
     vi.clearAllMocks();
   });
 
+  it("normalizes sensitive backend error details before rethrowing auth failures", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail:
+              "Beta feedback auth failed with rawPrompt, Bearer beta-token, and /var/noveland/feedback",
+          },
+          401,
+        ),
+      ),
+    );
+
+    await expect(getBetaFeedbackData(worldId, false)).rejects.toMatchObject({
+      message: "Beta feedback request failed.",
+      status: 401,
+    });
+  });
+
   it("encodes reserved characters in backend world path segments", async () => {
     vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
     const fetchMock = vi.fn(async (requestUrl: string) => responseFor(requestUrl));

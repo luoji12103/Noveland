@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type {
   Agent,
   AgentObservation,
@@ -2491,7 +2492,9 @@ function narrativeArtifactQuery(filters: NarrativeArtifactFilters): string {
 async function errorDetail(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : "World request failed.";
+    return typeof body.detail === "string"
+      ? normalizeBackendErrorDetail(body.detail, "World request failed.")
+      : "World request failed.";
   } catch {
     return "World request failed.";
   }

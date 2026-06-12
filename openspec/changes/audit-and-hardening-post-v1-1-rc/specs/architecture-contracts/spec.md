@@ -591,6 +591,13 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **AND** structured publication gate summaries MAY be preserved only when the resulting summary contains no forbidden marker.
 
 
+#### Scenario: Web server loaders normalize backend error details before thrown errors
+- **GIVEN** server-side Web loaders for worlds or beta feedback receive non-2xx JSON error responses from backend API routes
+- **WHEN** `detail` contains provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** any loader error that is rethrown to the Next.js server error boundary or server logs SHALL use the route-appropriate generic failure text instead of preserving the forbidden key or value
+- **AND** loaders that convert backend failures into fixed page `loadError` strings SHALL continue to return those fixed strings.
+
+
 #### Scenario: Web dashboard world navigation preserves query boundaries
 - **GIVEN** browser-side dashboard code navigates to a selected or newly created world through the local `world` query parameter
 - **AND** the world identifier contains query-string or fragment delimiters

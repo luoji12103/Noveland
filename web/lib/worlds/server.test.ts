@@ -22,6 +22,7 @@ import {
   getSpeechAdminData,
   getVisualAdminData,
   getWorldWorkspaceData,
+  getWorldsIndexData,
   getWorldlineBrowserData,
 } from "@/lib/worlds/server";
 
@@ -36,6 +37,21 @@ describe("world server admin loaders", () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+  });
+
+  it("normalizes sensitive backend error details before throwing", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { detail: "World index failed with clientSecret sk-world-server and storageUri media://world/index" },
+          500,
+        ),
+      ),
+    );
+
+    await expect(getWorldsIndexData()).rejects.toMatchObject({ message: "World request failed.", status: 500 });
   });
 
   it("encodes reserved characters in admin backend path segments", async () => {
