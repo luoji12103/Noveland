@@ -50,11 +50,13 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
           profile_key: formString(form, "profile_key"),
           name: formString(form, "name"),
           backend_kind: formString(form, "backend_kind") as "mem0_oss" | "local_pgvector",
-          vector_store_config: jsonObject(formString(form, "vector_store_config")),
-          llm_config: jsonObject(formString(form, "llm_config")),
-          embedder_config: jsonObject(formString(form, "embedder_config")),
-          reranker_config: jsonObject(formString(form, "reranker_config")),
-          secret_refs: jsonObject(formString(form, "secret_refs")) as Record<string, string>,
+          vector_store_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "vector_store_config"))),
+          llm_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "llm_config"))),
+          embedder_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "embedder_config"))),
+          reranker_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "reranker_config"))),
+          secret_refs: sanitizeMemorySecretRefsForDisplay(
+            jsonObject(formString(form, "secret_refs")) as Record<string, string>,
+          ),
           is_enabled: form.get("is_enabled") === "on",
         });
         formElement.reset();
@@ -70,11 +72,13 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
       () =>
         updateMemoryBackendProfile(profileId, {
           name: formString(form, "name"),
-          vector_store_config: jsonObject(formString(form, "vector_store_config")),
-          llm_config: jsonObject(formString(form, "llm_config")),
-          embedder_config: jsonObject(formString(form, "embedder_config")),
-          reranker_config: jsonObject(formString(form, "reranker_config")),
-          secret_refs: jsonObject(formString(form, "secret_refs")) as Record<string, string>,
+          vector_store_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "vector_store_config"))),
+          llm_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "llm_config"))),
+          embedder_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "embedder_config"))),
+          reranker_config: sanitizeMemoryJsonForDisplay(jsonObject(formString(form, "reranker_config"))),
+          secret_refs: sanitizeMemorySecretRefsForDisplay(
+            jsonObject(formString(form, "secret_refs")) as Record<string, string>,
+          ),
           is_enabled: form.get("is_enabled") === "on",
         }),
       "Memory backend profile saved.",
@@ -218,31 +222,31 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
                       className="text-input"
                       name="vector_store_config"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.vector_store_config, null, 2)}
+                      defaultValue={JSON.stringify(sanitizeMemoryJsonForDisplay(profile.vector_store_config), null, 2)}
                     />
                     <textarea
                       className="text-input"
                       name="llm_config"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.llm_config, null, 2)}
+                      defaultValue={JSON.stringify(sanitizeMemoryJsonForDisplay(profile.llm_config), null, 2)}
                     />
                     <textarea
                       className="text-input"
                       name="embedder_config"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.embedder_config, null, 2)}
+                      defaultValue={JSON.stringify(sanitizeMemoryJsonForDisplay(profile.embedder_config), null, 2)}
                     />
                     <textarea
                       className="text-input"
                       name="reranker_config"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.reranker_config, null, 2)}
+                      defaultValue={JSON.stringify(sanitizeMemoryJsonForDisplay(profile.reranker_config), null, 2)}
                     />
                     <textarea
                       className="text-input"
                       name="secret_refs"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.secret_refs, null, 2)}
+                      defaultValue={JSON.stringify(sanitizeMemorySecretRefsForDisplay(profile.secret_refs), null, 2)}
                     />
                     <label className="checkbox-label">
                       <input defaultChecked={profile.is_enabled} name="is_enabled" type="checkbox" />
@@ -332,11 +336,11 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
                   </div>
                   <pre>
                     {JSON.stringify(
-                      {
+                      sanitizeMemoryJsonForDisplay({
                         health: data.profileHealth[profile.id] ?? null,
                         logs: data.profileLogs[profile.id] ?? { write_logs: [], retrieval_logs: [] },
                         jobs: data.profileJobs[profile.id] ?? { jobs: [] },
-                      },
+                      }),
                       null,
                       2,
                     )}
@@ -349,4 +353,75 @@ export function MemoryBackendAdmin({ data }: MemoryBackendAdminProps) {
       </section>
     </section>
   );
+}
+
+function sanitizeMemoryJsonForDisplay(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveMemoryJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeMemoryJsonValue(entry)]),
+  );
+}
+
+function sanitizeMemoryJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeMemoryJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeMemoryJsonForDisplay(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveMemoryString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+function sanitizeMemorySecretRefsForDisplay(value: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, ref]) => typeof ref === "string" && !looksSensitiveMemoryString(ref)),
+  );
+}
+
+const EXACT_SENSITIVE_MEMORY_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_MEMORY_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveMemoryJsonKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return (
+    EXACT_SENSITIVE_MEMORY_JSON_KEYS.has(normalized) ||
+    SENSITIVE_MEMORY_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveMemoryString(value: string): boolean {
+  return /media:\/\/|base64|\/var\/|\/tmp\/|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) || /[A-Za-z]:/.test(value) && value.includes("\\");
 }

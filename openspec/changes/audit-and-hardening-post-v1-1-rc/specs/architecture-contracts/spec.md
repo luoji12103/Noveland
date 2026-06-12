@@ -330,6 +330,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** the backend SHALL reject persisted config keys or values that contain raw secret material
 - **AND** memory backend `secret_refs` SHALL store only safe reference names used to resolve secrets from runtime configuration.
 
+#### Scenario: Web memory admin JSON panels normalize sensitive memory evidence
+- **GIVEN** an authorized platform admin views memory backend profile config, secret refs, health details, or write/retrieval log summaries in the Web memory backend admin console
+- **WHEN** memory JSON contains resolved secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, bytes, or base64 keys written in snake_case, camelCase, compact, or mixed punctuation forms such as client_secret, clientSecret, bearerToken, rawPrompt, storageUri, filePath, or promptSnapshotId
+- **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable JSON panels or diagnostic summaries
+- **AND** safe memory configuration fields and safe `secret_refs` reference values such as `env:MEMORY_OPENAI_API_KEY` SHALL remain visible.
+
 #### Scenario: Provider secret-bearing JSON normalizes sensitive key variants
 - **GIVEN** provider integration config, provider execution request JSON, provider budget metadata, package provider templates, or multimodal diagnostic inputs contain arbitrary JSON
 - **WHEN** secret-bearing keys are written in snake_case, camelCase, compact, or mixed punctuation forms such as client_secret, clientSecret, clientsecret, bearer_token, bearerToken, private_key, privateKey, secret_key, or secretKey
