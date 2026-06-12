@@ -303,7 +303,7 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
             <div>
               <h3>Metadata</h3>
               <p style={{ whiteSpace: "pre-wrap" }}>
-                {JSON.stringify(data.artifact.metadata, null, 2)}
+                {narrativeReaderJsonString(data.artifact.metadata)}
               </p>
             </div>
           </article>
@@ -311,6 +311,124 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
       </section>
     </section>
   );
+}
+
+function narrativeReaderJsonString(value: unknown): string {
+  return JSON.stringify(sanitizeNarrativeReaderJsonValue(value), null, 2);
+}
+
+function sanitizeNarrativeReaderJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveNarrativeReaderJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeNarrativeReaderJsonValue(entry)]),
+  );
+}
+
+function sanitizeNarrativeReaderJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeNarrativeReaderJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeNarrativeReaderJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveNarrativeReaderString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_NARRATIVE_READER_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_NARRATIVE_READER_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_NARRATIVE_READER_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveNarrativeReaderJsonKey(key: string): boolean {
+  const normalized = normalizeNarrativeReaderMarker(key);
+  return (
+    EXACT_SENSITIVE_NARRATIVE_READER_JSON_KEYS.has(normalized) ||
+    SENSITIVE_NARRATIVE_READER_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveNarrativeReaderString(value: string): boolean {
+  const normalized = normalizeNarrativeReaderMarker(value);
+  return (
+    SENSITIVE_NARRATIVE_READER_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeNarrativeReaderToken(value)
+  );
+}
+
+function containsBase64LikeNarrativeReaderToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 24 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeNarrativeReaderMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function formatDateTime(value: string): string {

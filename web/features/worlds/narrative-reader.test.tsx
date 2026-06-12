@@ -72,6 +72,47 @@ describe("narrative reader", () => {
   });
 
 
+  it("redacts sensitive artifact metadata from reader detail", () => {
+    const dirtyData: NarrativeReaderDetailData = {
+      ...detailData,
+      artifact: {
+        ...detailData.artifact!,
+        metadata: {
+          generation_mode: "manual",
+          safe_label: "reader-safe",
+          release_label: "seven-day-beta-eval",
+          nested: {
+            safe_note: "keep-visible",
+            rawPrompt: "actual raw prompt should stay private",
+          },
+          clientSecret: "sk-live-reader-secret",
+          bearerToken: "Bearer reader-token",
+          storageUri: "media://reader/raw-output",
+          promptSnapshotId: "prompt-snapshot-secret",
+          attachment: "U2VjcmV0UmVhZGVyQnl0ZXM=",
+        },
+      },
+    };
+
+    const { container } = render(<NarrativeReaderDetail worldId="world-1" data={dirtyData} />);
+
+    expect(container).toHaveTextContent("generation_mode");
+    expect(container).toHaveTextContent("reader-safe");
+    expect(container).toHaveTextContent("seven-day-beta-eval");
+    expect(container).toHaveTextContent("keep-visible");
+    expect(container).toHaveTextContent("[redacted]");
+    expect(container).not.toHaveTextContent("clientSecret");
+    expect(container).not.toHaveTextContent("bearerToken");
+    expect(container).not.toHaveTextContent("storageUri");
+    expect(container).not.toHaveTextContent("promptSnapshotId");
+    expect(container).not.toHaveTextContent("media://reader/raw-output");
+    expect(container).not.toHaveTextContent("sk-live-reader-secret");
+    expect(container).not.toHaveTextContent("Bearer reader-token");
+    expect(container).not.toHaveTextContent("actual raw prompt should stay private");
+    expect(container).not.toHaveTextContent("U2VjcmV0UmVhZGVyQnl0ZXM=");
+  });
+
+
   it("encodes reader EventSource paths for reserved world identifiers", () => {
     render(<NarrativeReaderList worldId={RESERVED_WORLD_ID} data={listData} />);
 

@@ -712,7 +712,7 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
                 className="text-input"
                 name="writer_plugin_config"
                 rows={3}
-                defaultValue={JSON.stringify(conversation.writer_config.writer_plugin_config, null, 2)}
+                defaultValue={conversationWriterJsonString(conversation.writer_config.writer_plugin_config)}
                 placeholder="{}"
               />
               <label className="checkbox-label">
@@ -941,7 +941,7 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
   return {
     provider_profile_id: optionalFormString(form, "provider_profile_id"),
     writer_plugin_identifier: formString(form, "writer_plugin_identifier"),
-    writer_plugin_config: jsonObject(formString(form, "writer_plugin_config")),
+    writer_plugin_config: conversationWriterJsonObject(formString(form, "writer_plugin_config")),
     auto_generate_on_complete: form.get("auto_generate_on_complete") === "true",
     generate_summary: form.get("generate_summary") === "true",
     generate_chapter: form.get("generate_chapter") === "true",
@@ -953,6 +953,130 @@ function writerConfigFromForm(form: FormData): ConversationWriterConfig {
     source_constraints: formString(form, "source_constraints"),
     include_prompt_preview: form.get("include_prompt_preview") === "true",
   };
+}
+
+function conversationWriterJsonString(value: Record<string, unknown>): string {
+  return JSON.stringify(sanitizeConversationWriterJsonObject(value), null, 2);
+}
+
+function conversationWriterJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizeConversationWriterJsonObject(jsonObject(rawValue));
+}
+
+function sanitizeConversationWriterJsonObject(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveConversationWriterJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeConversationWriterJsonValue(entry)]),
+  );
+}
+
+function sanitizeConversationWriterJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeConversationWriterJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeConversationWriterJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveConversationWriterString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_CONVERSATION_WRITER_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_CONVERSATION_WRITER_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_CONVERSATION_WRITER_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveConversationWriterJsonKey(key: string): boolean {
+  const normalized = normalizeConversationWriterMarker(key);
+  return (
+    EXACT_SENSITIVE_CONVERSATION_WRITER_JSON_KEYS.has(normalized) ||
+    SENSITIVE_CONVERSATION_WRITER_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveConversationWriterString(value: string): boolean {
+  const normalized = normalizeConversationWriterMarker(value);
+  return (
+    SENSITIVE_CONVERSATION_WRITER_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeConversationWriterToken(value)
+  );
+}
+
+function containsBase64LikeConversationWriterToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 24 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeConversationWriterMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function memoryConfigFromForm(form: FormData): ConversationMemoryConfig {

@@ -224,6 +224,88 @@ describe("ConversationDetail", () => {
     expect(screen.getByText("Conversation summary")).toBeInTheDocument();
   });
 
+
+  it("redacts sensitive writer plugin config from display and submit payloads", async () => {
+    vi.mocked(updateConversation).mockResolvedValue(adminData.conversation!);
+    const dirtyWriterConfig = {
+      tone: "quiet",
+      nested: {
+        safe_note: "reader-safe",
+        release_label: "seven-day-beta-eval",
+        rawOutput: "actual raw output should stay server-side",
+      },
+      clientSecret: "sk-live-writer-secret",
+      bearerToken: "Bearer writer-token",
+      storageUri: "media://writer/raw-output",
+      promptSnapshotId: "prompt-snapshot-secret",
+      attachment: "U2VjcmV0V3JpdGVyQnl0ZXM=",
+    };
+    const dirtyData: ConversationDetailData = {
+      ...adminData,
+      conversation: {
+        ...adminData.conversation!,
+        writer_config: {
+          ...adminData.conversation!.writer_config,
+          writer_plugin_config: dirtyWriterConfig,
+        },
+      },
+    };
+
+    render(
+      <ConversationDetail
+        worldId="world-1"
+        conversationId="conversation-1"
+        data={dirtyData}
+      />,
+    );
+
+    const writerConfig = screen.getByLabelText("Writer plugin config") as HTMLTextAreaElement;
+    expect(writerConfig.value).toContain("quiet");
+    expect(writerConfig.value).toContain("reader-safe");
+    expect(writerConfig.value).toContain("seven-day-beta-eval");
+    expect(writerConfig.value).toContain("[redacted]");
+    expect(writerConfig.value).not.toContain("clientSecret");
+    expect(writerConfig.value).not.toContain("bearerToken");
+    expect(writerConfig.value).not.toContain("storageUri");
+    expect(writerConfig.value).not.toContain("promptSnapshotId");
+    expect(writerConfig.value).not.toContain("media://writer/raw-output");
+    expect(writerConfig.value).not.toContain("sk-live-writer-secret");
+    expect(writerConfig.value).not.toContain("Bearer writer-token");
+    expect(writerConfig.value).not.toContain("actual raw output should stay server-side");
+    expect(writerConfig.value).not.toContain("U2VjcmV0V3JpdGVyQnl0ZXM=");
+
+    fireEvent.change(writerConfig, {
+      target: {
+        value: JSON.stringify(dirtyWriterConfig, null, 2),
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save writer config" }));
+
+    await waitFor(() => {
+      expect(updateConversation).toHaveBeenCalledWith("world-1", "conversation-1", {
+        writer_config: {
+          provider_profile_id: "profile-1",
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {
+            tone: "quiet",
+            nested: {
+              safe_note: "reader-safe",
+              release_label: "seven-day-beta-eval",
+            },
+            attachment: "[redacted]",
+          },
+          auto_generate_on_complete: true,
+          generate_summary: true,
+          generate_chapter: true,
+          style_guide: "",
+          target_length: "standard",
+          source_constraints: "",
+          include_prompt_preview: true,
+        },
+      });
+    });
+  });
+
   it("stops a conversation and hides admin controls for read-only members", async () => {
     vi.mocked(stopConversation).mockResolvedValue({
       ...adminData.conversation!,
