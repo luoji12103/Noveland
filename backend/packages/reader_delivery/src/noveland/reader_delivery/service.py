@@ -51,6 +51,7 @@ class ReaderMediaDeliveryService:
     ) -> None:
         self._session = session
         self._storage = storage
+        self._moderation = ModerationService(session)
 
     def list_media(
         self,
@@ -170,11 +171,30 @@ class ReaderMediaDeliveryService:
         )
 
     def _asset_is_moderation_suppressed(self, asset: MediaAsset) -> bool:
-        return ModerationService(self._session).target_is_suppressed(
+        return self._target_is_moderation_suppressed(
             asset.world_id,
+            asset.worldline_id,
+            ModerationTargetKind.WORLDLINE,
+            asset.worldline_id,
+        ) or self._target_is_moderation_suppressed(
+            asset.world_id,
+            asset.worldline_id,
             ModerationTargetKind.MEDIA_ASSET,
             asset.id,
-            worldline_id=asset.worldline_id,
+        )
+
+    def _target_is_moderation_suppressed(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        target_kind: ModerationTargetKind,
+        target_id: uuid.UUID,
+    ) -> bool:
+        return self._moderation.target_is_suppressed(
+            world_id,
+            target_kind,
+            target_id,
+            worldline_id=worldline_id,
         )
 
     def _asset_is_reader_deliverable(self, asset: MediaAsset) -> bool:
@@ -266,8 +286,15 @@ class ReaderMediaDeliveryService:
                 NarrativePublication.reader_visible.is_(True),
             )
         ).first()
-        return publication is not None and (
-            publication.worldline_id is None or publication.worldline_id == ref.worldline_id
+        if publication is None or (
+            publication.worldline_id is not None and publication.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.NARRATIVE_PUBLICATION,
+            publication.id,
         )
 
     def _conversation_turn_is_reader_visible(self, ref: MediaReference) -> bool:
@@ -275,18 +302,37 @@ class ReaderMediaDeliveryService:
         if turn is None:
             return False
         conversation = self._session.get(ConversationSession, turn.session_id)
-        return (
-            conversation is not None
-            and conversation.world_id == ref.world_id
-            and conversation.worldline_id == ref.worldline_id
+        if (
+            conversation is None
+            or conversation.world_id != ref.world_id
+            or conversation.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_SESSION,
+            conversation.id,
+        ) and not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_TURN,
+            ref.ref_id,
         )
 
     def _conversation_session_is_reader_visible(self, ref: MediaReference) -> bool:
         conversation = self._session.get(ConversationSession, ref.ref_id)
-        return (
-            conversation is not None
-            and conversation.world_id == ref.world_id
-            and conversation.worldline_id == ref.worldline_id
+        if (
+            conversation is None
+            or conversation.world_id != ref.world_id
+            or conversation.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_SESSION,
+            conversation.id,
         )
 
 

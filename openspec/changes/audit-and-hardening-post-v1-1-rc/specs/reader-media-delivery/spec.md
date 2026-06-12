@@ -16,3 +16,10 @@ The system SHALL enforce media, object, reference, presentation, and narrative p
 - **When** Web playback or scene view resolves media for the turn
 - **Then** the UI SHALL render the missing-media state for that media kind instead of falling back to unrelated turn-level or session-level referenced media
 - **And** referenced media fallback MAY be used only when the presentation has no explicit media asset identifier for that media kind.
+
+#### Scenario: Reader media respects moderation suppression on referenced surfaces
+- **Given** a reader-deliverable media asset is attached to a worldline, narrative publication, conversation session, or conversation turn
+- **And** an applied moderation suppression action targets that referenced surface
+- **When** an authorized reader requests reader media descriptors, details, or object downloads
+- **Then** reader delivery SHALL omit references to the suppressed surface and SHALL NOT serve the media through that suppressed reference
+- **And** a media asset with no remaining unsuppressed reader-visible references SHALL be omitted from list results and return a not-found response for detail and download requests.

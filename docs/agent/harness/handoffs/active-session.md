@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-13T02:50:00+08:00
+- Date: 2026-06-13T03:20:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-130 are remediated on this branch; latest batch is F-130 Web playback explicit-media fallback hardening.
+- Status: F-001 through F-131 are remediated on this branch; latest batch is F-131 reader media reference moderation hardening.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-130 batch: 197fdd1 fix(player): align resume with reader media descriptors.
+- Base before F-131 batch: 042944f fix(web): preserve explicit playback media absence.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before this continuation: branch was `feature/audit-and-hardening-post-v1-1-rc` at 197fdd1, local and upstream were synchronized, worktree started clean, active OpenSpec change was in progress, specs strict validation passed with 76 specs, change strict validation passed, and Noveland Postgres/NATS were healthy.
+- Current server status was rechecked before this continuation: branch was `feature/audit-and-hardening-post-v1-1-rc` at 042944f, branch was ahead of upstream by 1 local commit, worktree started clean, active OpenSpec change was in progress, specs strict validation passed with 76 specs, change strict validation passed, and Noveland Postgres/NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -42,6 +42,10 @@
 - Added a reader-media-delivery OpenSpec scenario requiring Web playback/scene to render missing-media state for unresolved explicit presentation media instead of substituting unrelated referenced media.
 - Added `web/features/worlds/playback-media.test.ts` covering unresolved explicit image/audio ids, referenced fallback with no explicit ids, and alternate explicit image resolution.
 - Changed `resolveTurnMedia()` so referenced media fallback is used only when the presentation has no explicit media id for that media kind.
+- Identified F-131: Reader media delivery ignored applied moderation suppression on referenced surfaces such as conversation turns and sessions.
+- Added a reader-media-delivery OpenSpec scenario requiring descriptors/details/downloads to respect applied moderation suppression on worldlines, narrative publications, conversation sessions, and conversation turns.
+- Changed `ReaderMediaDeliveryService` to suppress worldline-targeted media and filter moderated narrative publication, conversation session, and conversation turn references before descriptor assembly and object delivery.
+- Added reader media API regressions for moderated turn/session references and moderated worldline/narrative publication targets, plus mixed suppressed/unsuppressed reference filtering.
 
 ## Verification This Batch
 
@@ -68,10 +72,17 @@
 - `cd web && npm run check:next-env` passed.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
 - Web e2e was not run for F-130 because the batch is isolated to shared resolver logic covered by unit/component tests.
+- Temporary CLI reproduction first showed applied `takedown_content` moderation on a conversation turn still allowed reader media list/detail/download 200 responses.
+- `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_suppresses_moderated_reference_targets -q` first failed against the old implementation, then passed after remediation.
+- `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_suppresses_moderated_reference_targets tests/test_api_reader_media.py::test_reader_media_suppresses_moderated_worldline_and_publication_targets tests/test_api_reader_media.py::test_reader_media_keeps_unsuppressed_references_when_one_reference_is_moderated -q` passed with 3 tests.
+- `cd backend && uv run pytest tests/test_api_reader_media.py tests/test_api_moderation.py tests/test_api_player_sessions.py tests/test_api_conversation_presentations.py -q` passed with 24 tests.
+- Focused backend ruff/mypy passed for reader delivery service and reader media tests.
+- Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 586 tests and 8 skipped after F-131.
+- `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed after F-131 docs.
 
 ## Remaining Work
 
-1. Continue backend media reference/moderation descriptor alignment checks and remaining reader/player media boundary audits.
+1. Continue backend moderation target validation breadth, media reference edge cases, and remaining reader/player media boundary audits.
 2. Continue Web/e2e audit for remaining client-side text sinks, EventSource failure assumptions, route handlers, and role boundaries.
 3. Continue backend audits for remaining observability filters, invocation-adjacent filters, media object/reference subroutes, and member/player DTOs.
 4. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
@@ -100,3 +111,9 @@
 - Web playback and scene view should not substitute unrelated referenced media when canonical presentation media ids are explicit but unavailable through reader media descriptors.
 - The remediation distinguishes absent explicit ids from unresolved explicit ids inside `resolveTurnMedia()` and preserves referenced fallback only for turns without explicit presentation media for that kind.
 - Residual risk: continue Web/e2e route-handler and client-side leak audits, and keep checking backend descriptor/moderation alignment for media references.
+
+## Finding F-131
+
+- Reader media delivery should honor applied moderation suppression on referenced reader surfaces, not only on media assets.
+- The remediation suppresses worldline-targeted reader media and filters moderated narrative publication, conversation session, and conversation turn references before descriptors and scoped downloads are served.
+- Residual risk: continue auditing moderation target validation and other reader/member DTO paths for similar surface-level suppression gaps.

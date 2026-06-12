@@ -25,7 +25,7 @@ from noveland.services.api.media import _media_storage
 from noveland.services.api.reader_media import _reader_media_storage
 from noveland.worlds.models import World, Worldline, WorldMembership
 from noveland.worlds.worldlines import ensure_primary_worldline
-from sqlalchemy import Table, create_engine
+from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -334,6 +334,192 @@ def test_reader_media_requires_reader_visible_reference_context() -> None:
     assert download.status_code == 404
 
 
+def test_reader_media_suppresses_moderated_reference_targets() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-moderated-reference@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, turn_id = _seed_conversation(engine, world_id, worldline_id)
+    turn_asset_id, turn_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"turn-media",
+    )
+    session_asset_id, session_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"session-media",
+    )
+    _seed_reference(
+        engine, world_id, worldline_id, turn_asset_id, "conversation_turn", turn_id
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        session_asset_id,
+        "conversation_session",
+        conversation_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_turn",
+        target_ref_id=turn_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_session",
+        target_ref_id=conversation_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    turn_detail = client.get(f"/worlds/{world_id}/reader/media/{turn_asset_id}")
+    session_detail = client.get(f"/worlds/{world_id}/reader/media/{session_asset_id}")
+    turn_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, turn_object_id)
+    )
+    session_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, session_object_id)
+    )
+
+    assert listed.status_code == 200
+    assert listed.json() == []
+    assert turn_detail.status_code == 404
+    assert session_detail.status_code == 404
+    assert turn_download.status_code == 404
+    assert session_download.status_code == 404
+
+
+def test_reader_media_suppresses_moderated_worldline_and_publication_targets() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-moderated-surface@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, fork_id = _seed_worldlines(engine, world_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    publication_id = _publication_id_for_artifact(engine, artifact_id)
+    publication_asset_id, publication_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"publication-media",
+    )
+    fork_artifact_id = _seed_published_artifact(engine, world_id, fork_id)
+    worldline_asset_id, worldline_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        fork_id,
+        visibility="reader_visible",
+        data=b"worldline-media",
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        publication_asset_id,
+        "narrative_artifact",
+        artifact_id,
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        fork_id,
+        worldline_asset_id,
+        "narrative_artifact",
+        fork_artifact_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="narrative_publication",
+        target_ref_id=publication_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        fork_id,
+        target_ref_kind="worldline",
+        target_ref_id=fork_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    publication_detail = client.get(
+        f"/worlds/{world_id}/reader/media/{publication_asset_id}"
+    )
+    worldline_detail = client.get(f"/worlds/{world_id}/reader/media/{worldline_asset_id}")
+    publication_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, publication_object_id)
+    )
+    worldline_download = client.get(
+        _reader_media_download_path(world_id, fork_id, worldline_object_id)
+    )
+
+    assert listed.status_code == 200
+    assert listed.json() == []
+    assert publication_detail.status_code == 404
+    assert worldline_detail.status_code == 404
+    assert publication_download.status_code == 404
+    assert worldline_download.status_code == 404
+
+
+def test_reader_media_keeps_unsuppressed_references_when_one_reference_is_moderated() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-mixed-reference@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    _conversation_id, turn_id = _seed_conversation(engine, world_id, worldline_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    asset_id, object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"mixed-media",
+    )
+    _seed_reference(engine, world_id, worldline_id, asset_id, "conversation_turn", turn_id)
+    _seed_reference(engine, world_id, worldline_id, asset_id, "narrative_artifact", artifact_id)
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_turn",
+        target_ref_id=turn_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
+    download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
+
+    assert listed.status_code == 200
+    assert [item["asset_id"] for item in listed.json()] == [str(asset_id)]
+    assert detail.status_code == 200
+    assert [reference["ref_kind"] for reference in detail.json()["references"]] == [
+        "narrative_artifact"
+    ]
+    assert download.status_code == 200
+    assert download.content == b"mixed-media"
+
+
 def test_admin_media_download_route_is_unchanged() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -491,6 +677,54 @@ def _add_membership(
         session.commit()
 
 
+def _seed_conversation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    conversation_id = uuid.uuid4()
+    turn_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                session_key=f"conversation-{conversation_id.hex[:8]}",
+                title="Reader Conversation",
+                scope_type="world",
+                mode="manual_chain",
+                status="completed",
+                objective="Reader-safe conversation.",
+                opening_prompt="Begin.",
+                max_turns=1,
+                next_turn_index=1,
+                policy_config={},
+                writer_config={},
+                memory_config={},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.add(
+            ConversationTurn(
+                id=turn_id,
+                session_id=conversation_id,
+                turn_index=0,
+                speaker_kind="agent",
+                speaker_agent_id=None,
+                input_text="Reader input.",
+                output_text="Reader output.",
+                status="succeeded",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    return conversation_id, turn_id
+
+
 def _seed_published_artifact(
     engine: Engine,
     world_id: uuid.UUID,
@@ -526,6 +760,16 @@ def _seed_published_artifact(
         )
         session.commit()
     return artifact_id
+
+
+def _publication_id_for_artifact(engine: Engine, artifact_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        publication_id = session.scalars(
+            select(NarrativePublication.id).where(
+                NarrativePublication.artifact_id == artifact_id
+            )
+        ).one()
+    return publication_id
 
 
 def _seed_available_asset_with_object(
@@ -645,6 +889,38 @@ def _seed_reference(
         )
         session.commit()
     return reference_id
+
+
+def _seed_moderation_action(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    target_ref_kind: str,
+    target_ref_id: uuid.UUID,
+    action_kind: str = "takedown_content",
+) -> uuid.UUID:
+    action_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            ModerationAction(
+                id=action_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                action_kind=action_kind,
+                status="applied",
+                target_ref_kind=target_ref_kind,
+                target_ref_id=target_ref_id,
+                reason="Reviewed takedown.",
+                created_by_actor_ref="test",
+                audit_summary_json={"reader_delivery_suppression": True},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    return action_id
 
 
 def _reader_media_download_path(
