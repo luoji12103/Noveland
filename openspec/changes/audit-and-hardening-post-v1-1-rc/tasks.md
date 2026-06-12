@@ -920,3 +920,13 @@
 - Intended remediation: redact `applied_event_id` from non-admin player choice create/list responses while preserving admin review diagnostics and safe member choice identity, selected option, sanitized context/consequence preview, and timing fields.
 - Status: Remediated in member player choice event evidence redaction batch.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` first failed on unredacted `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+
+### F-086 Player privacy export choice applied event evidence leak
+
+- Severity: High
+- Affected boundary: member-readable player privacy export REST API.
+- Evidence: `backend/services/api/src/noveland/services/api/player_privacy.py` exposes `GET/POST /worlds/{world_id}/player/privacy/export` with `get_world_member_context`. `PlayerPrivacyService._build_export_payload()` already redacts journal source refs, notification source refs, and intervention choice/event linkage, but still serializes `PlayerChoiceRecord.applied_event_id` into `PlayerPrivacyChoiceExport.applied_event_id`.
+- Impact: ordinary world members can recover internal player choice world event IDs through privacy export even though normal member player choice responses now redact `applied_event_id` and world event audit is admin-only.
+- Intended remediation: redact choice `applied_event_id` from player privacy exports while preserving safe player-owned choice identity, selected option, kind, actor linkage, and timing fields.
+- Status: Remediated in player privacy export choice event evidence redaction batch.
+- Verification: `cd backend && uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted -q` first failed on unredacted choice `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_player_privacy.py -q` passed with 3 tests; focused backend ruff/mypy passed for `player_privacy/service.py` and `test_api_player_privacy.py`; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.

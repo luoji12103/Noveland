@@ -99,6 +99,7 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
         "conversation_references": 1,
     }
     assert export["choices"][0]["choice_key"] == "member-choice"
+    assert export["choices"][0]["applied_event_id"] is None
     assert "prompt" not in export["choices"][0]
     assert "context" not in export["choices"][0]
     assert "consequence_preview" not in export["choices"][0]
@@ -410,6 +411,7 @@ def _seed_player_records(
                 selected_option="Stay after school.",
                 context_json={"raw_prompt": "internal context"},
                 consequence_preview={"raw_output": "internal consequence"},
+                applied_event_id=uuid.uuid4(),
             )
         )
         session.add(

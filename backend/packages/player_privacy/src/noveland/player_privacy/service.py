@@ -329,7 +329,7 @@ class PlayerPrivacyService:
                     choice_key=choice.choice_key,
                     choice_kind=choice.choice_kind,
                     selected_option=_safe_text(choice.selected_option),
-                    applied_event_id=choice.applied_event_id,
+                    applied_event_id=None,
                     created_at=choice.created_at,
                     updated_at=choice.updated_at,
                 )

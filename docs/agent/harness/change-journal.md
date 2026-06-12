@@ -4261,3 +4261,15 @@
 - Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` so member choice create/list responses get `null` for `applied_event_id`, while admin list responses retain the real `player.choice_recorded` event id.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` first failed on unredacted `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Player privacy choice event evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-086.
+- Finding: F-086 found player privacy exports already hiding prompts, context, consequence preview, journal/notification source refs, and intervention choice/event linkage, but still exporting player choice `applied_event_id`.
+- Summary: Updated the architecture-contracts OpenSpec privacy export scenario and redacted choice applied event refs from `PlayerPrivacyService._build_export_payload()` while preserving safe player-owned choice fields.
+- Files changed: backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/tests/test_api_player_privacy.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_privacy_export_is_player_scoped_and_redacted` so seeded player choices carry an internal applied event ID and member exports return `null` for it.
+- Verification: `cd backend && uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted -q` first failed on unredacted choice `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_player_privacy.py -q` passed with 3 tests; focused backend ruff/mypy passed for `player_privacy/service.py` and `test_api_player_privacy.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
