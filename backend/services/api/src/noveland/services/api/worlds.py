@@ -10259,7 +10259,7 @@ def _schedule_rule_response(
         id=rule.id,
         world_id=rule.world_id,
         rule_key=rule.rule_key,
-        name=rule.name,
+        name=rule.name if include_admin_fields else _sanitize_public_text(rule.name),
         kind=rule.kind.value if hasattr(rule.kind, "value") else str(rule.kind),
         config=rule.config if include_admin_fields else {},
         is_enabled=rule.is_enabled,

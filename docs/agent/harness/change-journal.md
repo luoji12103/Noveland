@@ -4880,3 +4880,15 @@
 - Tests added/updated: Extended existing relationship, agent preset/list, and worldline browser tests for sensitive member identity text redaction and safe worldline text preservation.
 - Verification: Focused relationship/agent/worldline regressions first failed because sensitive member identity text rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member schedule rule text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable schedule rule name remediation for F-137.
+- Finding: F-137 found `backend/services/api/src/noveland/services/api/worlds.py` redacted schedule rule config for ordinary members but returned admin-authored schedule rule `name` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_schedule_rule_response()` to blank sensitive-looking schedule rule names for non-admin member responses while preserving safe rule names, rule keys, kind, enabled state, config redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` for sensitive member schedule rule name redaction and safe schedule rule name preservation.
+- Verification: Focused schedule rule regression first failed because member schedule rule name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.

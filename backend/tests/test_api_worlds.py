@@ -4207,6 +4207,7 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     with Session(engine) as session:
         seeded_rule = session.get(WorldScheduleRule, seeded_rule_id)
         assert seeded_rule is not None
+        seeded_rule.name = "Daily raw_prompt: operator schedule"
         seeded_rule.config = {
             "provider_profile_id": str(uuid.uuid4()),
             "raw_prompt": "operator schedule instruction",
@@ -4294,6 +4295,7 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
 
     assert member_rules.status_code == 200
     assert member_rules.json()[0]["rule_key"] == "daily-prompt"
+    assert member_rules.json()[0]["name"] == ""
     assert member_rules.json()[0]["config"] == {}
     assert member_create_rule.status_code == 403
     assert member_preview.status_code == 403
@@ -4304,11 +4306,20 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert preview_rule.json()["affected_agent_count"] == 1
     assert preview_rule.json()["matches"][0]["world_time"].startswith("2030-01-01T08:00:00")
     admin_rules = client.get(f"/worlds/{world_id}/schedule-rules")
+    _authenticate(client, member_token)
+    member_rules_after_create = client.get(f"/worlds/{world_id}/schedule-rules")
+    _authenticate(client, owner_token)
 
     assert create_rule.status_code == 201
     assert admin_rules.status_code == 200
+    assert admin_rules.json()[0]["name"] == "Daily raw_prompt: operator schedule"
     assert admin_rules.json()[0]["config"]["raw_prompt"] == "operator schedule instruction"
     assert admin_rules.json()[0]["config"]["storage_uri"] == "schedule://private/rule"
+    assert member_rules_after_create.status_code == 200
+    assert member_rules_after_create.json()[0]["name"] == ""
+    assert member_rules_after_create.json()[1]["rule_key"] == "weekday"
+    assert member_rules_after_create.json()[1]["name"] == "Weekday Updated"
+    assert member_rules_after_create.json()[1]["config"] == {}
     assert duplicate_rule.status_code == 409
     assert update_rule.status_code == 200
     assert update_rule.json()["name"] == "Weekday Updated"

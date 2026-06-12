@@ -287,6 +287,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL blank the sensitive-looking calendar text while preserving safe calendar text, times, status, and metadata redaction
 - **AND** admin routes MAY continue to expose full calendar text required for world management and scheduling.
 
+#### Scenario: Member reads sensitive-looking schedule rule text
+- **GIVEN** a world member lists schedule rules through member-readable routes
+- **WHEN** schedule rule names contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL blank the sensitive-looking name while preserving safe rule names, rule keys, kind, enabled state, and config redaction
+- **AND** admin routes MAY continue to expose full schedule rule names and config required for world management and runtime planning.
+
 #### Scenario: Member reads scene and location graph rules
 - **GIVEN** a world member lists scenes or location edges through member-readable routes
 - **WHEN** scene opening rules or location traversal rules contain provider refs, storage refs, raw prompt/output markers, bytes, base64, secret/auth refs, hidden route conditions, or other admin-only movement/rule evidence
