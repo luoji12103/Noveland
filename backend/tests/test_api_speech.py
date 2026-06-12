@@ -220,6 +220,91 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
         assert session.scalars(select(MemoryWriteJob)).all() == []
 
 
+def test_speech_lists_reject_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "speech-owner@example.test")
+    other_owner_id, _ = _seed_user(engine, "speech-other@example.test")
+    world_id = _seed_world(engine, owner_id)
+    other_world_id = _seed_world(engine, other_owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    other_worldline_id = _seed_worldline(engine, other_world_id)
+    agent_id, _, _ = _seed_agent_and_conversation(engine, world_id, worldline_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    source_asset_id = _seed_audio_asset(
+        engine,
+        client.speech_storage,
+        world_id,
+        worldline_id,
+        role="transcript_audio",
+    )
+
+    _authenticate(client, owner_token)
+    profile = client.post(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        json={
+            "worldline_id": str(worldline_id),
+            "profile_key": "hero",
+            "display_name": "Hero",
+        },
+    )
+    assert profile.status_code == 201
+    binding = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        json={
+            "worldline_id": str(worldline_id),
+            "voice_profile_id": profile.json()["id"],
+        },
+    )
+    assert binding.status_code == 201
+    with Session(engine) as session:
+        session.add(
+            SpeechTranscript(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                source_asset_id=source_asset_id,
+                transcript_text="hello",
+                status="available",
+            )
+        )
+        session.commit()
+
+    wrong_profiles = client.get(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    wrong_bindings = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    wrong_transcripts = client.get(
+        f"/worlds/{world_id}/speech/transcripts",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    valid_profiles = client.get(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        params={"worldline_id": str(worldline_id)},
+    )
+    valid_bindings = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        params={"worldline_id": str(worldline_id)},
+    )
+    valid_transcripts = client.get(
+        f"/worlds/{world_id}/speech/transcripts",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert wrong_profiles.status_code == 422
+    assert wrong_bindings.status_code == 422
+    assert wrong_transcripts.status_code == 422
+    assert valid_profiles.status_code == 200
+    assert [record["profile_key"] for record in valid_profiles.json()] == ["hero"]
+    assert valid_bindings.status_code == 200
+    assert valid_bindings.json()[0]["voice_profile_id"] == profile.json()["id"]
+    assert valid_transcripts.status_code == 200
+    assert valid_transcripts.json()[0]["source_asset_id"] == str(source_asset_id)
+
+
 class _SpeechApiClient(TestClient):
     speech_storage: LocalMediaObjectStorage
 

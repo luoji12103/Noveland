@@ -216,7 +216,13 @@ def list_voice_profiles(
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
 ) -> list[VoiceProfileRead]:
-    profiles = VoiceProfileService(db_session).list_profiles(world_id, worldline_id=worldline_id)
+    try:
+        profiles = VoiceProfileService(db_session).list_profiles(
+            world_id,
+            worldline_id=worldline_id,
+        )
+    except (SpeechValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
     if context.is_platform_admin:
         return profiles
     return [
@@ -315,11 +321,14 @@ def list_agent_voice_profiles(
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
 ) -> list[AgentVoiceProfileBindingRead]:
-    return VoiceProfileService(db_session).list_agent_bindings(
-        world_id,
-        agent_id,
-        worldline_id=worldline_id,
-    )
+    try:
+        return VoiceProfileService(db_session).list_agent_bindings(
+            world_id,
+            agent_id,
+            worldline_id=worldline_id,
+        )
+    except (SpeechValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @agent_voice_router.post(
@@ -437,11 +446,14 @@ def list_transcripts(
     worldline_id: uuid.UUID | None = None,
     source_asset_id: uuid.UUID | None = None,
 ) -> list[SpeechTranscriptRead]:
-    return SpeechTranscriptService(db_session).list_transcripts(
-        world_id,
-        worldline_id=worldline_id,
-        source_asset_id=source_asset_id,
-    )
+    try:
+        return SpeechTranscriptService(db_session).list_transcripts(
+            world_id,
+            worldline_id=worldline_id,
+            source_asset_id=source_asset_id,
+        )
+    except (SpeechNotFoundError, SpeechValidationError, ValueError) as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("/transcripts/{transcript_id}", response_model=SpeechTranscriptRead)

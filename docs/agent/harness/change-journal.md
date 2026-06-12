@@ -4612,3 +4612,16 @@
 - Tests added/updated: Extended `test_reader_media_rejects_cross_world_and_cross_worldline_requests` so reader media list requests reject a cross-world `worldline_id` instead of returning an empty success.
 - Verification: `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_rejects_cross_world_and_cross_worldline_requests -q` first failed before remediation because cross-world reader media list returned `200`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_reader_media.py -q` passed with 5 tests; focused backend ruff/mypy passed for reader delivery service, reader media API, and the updated test after ruff fixed import ordering. Full backend `ruff`, `mypy`, and `pytest` passed with 574 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
 - Follow-up notes: Continue invalid-worldline behavior audit for visual/speech generation, invocation filters, member/player DTOs, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening speech list worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend speech admin API worldline isolation remediation for F-115.
+- Finding: F-115 found speech list routes relying on service-level worldline validation without catching the resulting service exceptions: cross-world `worldline_id` queries against voice profile and agent binding lists raised `SpeechValidationError`, while transcript lists raised `SpeechNotFoundError`.
+- Summary: Added an architecture-contracts scenario for handled speech list invalid-worldline responses and mapped invalid explicit worldline scopes in voice profile, agent voice binding, and transcript list routes to existing 422 client errors while preserving valid list behavior and platform-admin visibility filtering.
+- Files changed: backend/services/api/src/noveland/services/api/speech.py, backend/tests/test_api_speech.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_speech_lists_reject_cross_worldline_requests` covering cross-world voice profile, agent voice binding, and transcript list rejection plus valid same-worldline list behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_speech.py::test_speech_lists_reject_cross_worldline_requests -q` first failed with an uncaught `SpeechValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 2 tests; focused backend ruff/mypy passed for speech API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 575 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for visual generation list routes, media job/source filters, observability filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
