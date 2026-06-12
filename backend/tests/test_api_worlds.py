@@ -2873,6 +2873,26 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
         "nested": {"safe_note": "choice-kept"},
         "items": ["choice-note", {"safe_item": "choice-kept"}],
     }
+    dirty_preview_effects = {
+        "relationship_updates": [
+            {"agent_id": str(agent_id), "affection_delta": 5, "raw_prompt": "preview prompt"},
+        ],
+        "faction_updates": [
+            {
+                "track_key": "festival",
+                "progress_delta": 7,
+                "storage_uri": "media://private/faction",
+            },
+        ],
+        "offscreen_events": [
+            {
+                "title": "Safe preview event",
+                "storage_uri": "media://private/preview-event",
+                "raw_output": "provider output",
+                "payload": {"safe": "kept", "path": "/root/private/payload.json"},
+            },
+        ],
+    }
     expected_choice_preview = {
         "relationship_updates": [],
         "faction_updates": [],
@@ -2960,7 +2980,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "choice_kind": "route",
             "prompt": "Help with festival preparations?",
             "selected_option": "Stay after school.",
-            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
+            "effects": dirty_preview_effects,
             "apply": False,
         },
     )
@@ -3024,11 +3044,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "choice_kind": "route",
             "prompt": "Help with festival preparations?",
             "selected_option": "Stay after school.",
-            "effects": {
-                "relationship_updates": [],
-                "faction_updates": [],
-                "offscreen_events": [],
-            },
+            "effects": dirty_preview_effects,
         },
     )
     admin_listed_choices = client.get(f"/worlds/{world_id}/player-choices")
@@ -3078,12 +3094,30 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     assert [actor["user_id"] for actor in listed_actors.json()] == [str(member_id)]
     assert preview.status_code == 200
     assert preview.json()["diagnostics"] == []
+    assert preview.json()["relationship_updates"] == [
+        {"agent_id": str(agent_id), "affection_delta": 5}
+    ]
+    assert preview.json()["faction_updates"] == [
+        {"track_key": "festival", "progress_delta": 7}
+    ]
+    assert preview.json()["offscreen_events"] == [
+        {"title": "Safe preview event", "payload": {"safe": "kept"}}
+    ]
+    preview_text = json.dumps(preview.json(), sort_keys=True)
+    assert "storage_uri" not in preview_text
+    assert "media://" not in preview_text
+    assert "raw_prompt" not in preview_text
+    assert "raw_output" not in preview_text
+    assert "/root/" not in preview_text
     assert admin_preview.status_code == 200
     assert admin_preview.json()["diagnostics"] == [
-        "0 relationship update(s)",
-        "0 faction update(s)",
-        "0 offscreen event(s)",
+        "1 relationship update(s)",
+        "1 faction update(s)",
+        "1 offscreen event(s)",
     ]
+    assert admin_preview.json()["relationship_updates"][0]["raw_prompt"] == "preview prompt"
+    assert admin_preview.json()["faction_updates"][0]["storage_uri"] == "media://private/faction"
+    assert admin_preview.json()["offscreen_events"][0]["raw_output"] == "provider output"
     assert choice.status_code == 201
     assert choice.json()["user_id"] == str(member_id)
     assert choice.json()["prompt"] == ""

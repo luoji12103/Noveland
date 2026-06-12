@@ -3629,9 +3629,21 @@ def preview_player_choice_consequences(
         effects=choice_create.effects,
     )
     return ChoiceConsequencePreviewResponse(
-        relationship_updates=preview.relationship_updates,
-        faction_updates=preview.faction_updates,
-        offscreen_events=preview.offscreen_events,
+        relationship_updates=(
+            preview.relationship_updates
+            if can_manage
+            else _sanitize_public_json_list(preview.relationship_updates)
+        ),
+        faction_updates=(
+            preview.faction_updates
+            if can_manage
+            else _sanitize_public_json_list(preview.faction_updates)
+        ),
+        offscreen_events=(
+            preview.offscreen_events
+            if can_manage
+            else _sanitize_public_json_list(preview.offscreen_events)
+        ),
         diagnostics=preview.diagnostics if can_manage else [],
     )
 
@@ -8486,6 +8498,13 @@ def _resolution_rule_dry_run_response(
 def _sanitize_public_json(value: Any) -> dict[str, Any]:
     sanitized = _sanitize_public_json_value(value)
     return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _sanitize_public_json_list(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized = _sanitize_public_json_value(value)
+    if not isinstance(sanitized, list):
+        return []
+    return [item for item in sanitized if isinstance(item, dict)]
 
 
 def _sanitize_public_text(value: str) -> str:

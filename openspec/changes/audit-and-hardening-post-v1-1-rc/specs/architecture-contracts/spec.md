@@ -42,6 +42,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit the forbidden keys and values while retaining safe choice metadata and diagnostics
 - **AND** admin player choice reads MAY continue to expose full review metadata required for authoring and repair workflows.
 
+#### Scenario: Member previews player choice effect metadata
+- **GIVEN** a world member previews player choice consequences through member-readable routes
+- **WHEN** the preview relationship updates, faction updates, or offscreen event metadata contain arbitrary JSON with storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member preview response SHALL omit the forbidden keys and values while retaining safe public consequence preview fields
+- **AND** admin player choice preview routes MAY continue to expose full effect metadata required for world management and review.
+
 #### Scenario: Member reads journal and notification text
 - **GIVEN** a world member lists player journal entries or in-world notifications
 - **WHEN** the title or body text contains storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
@@ -143,8 +149,8 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member previews player choice consequences
 - **GIVEN** a world member previews player choice consequences through member-readable routes
-- **WHEN** the preview contains diagnostics with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
-- **THEN** the member response SHALL omit diagnostics while preserving safe relationship, faction, and offscreen consequence preview fields
+- **WHEN** the preview contains diagnostics or effect metadata with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other admin-only evidence
+- **THEN** the member response SHALL omit diagnostics and forbidden effect metadata while preserving safe relationship, faction, and offscreen consequence preview fields
 - **AND** admin player-choice preview routes MAY continue to expose diagnostics required for world management and review.
 
 #### Scenario: Member reads living world dashboard
