@@ -33,11 +33,14 @@ def list_reader_media(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> list[ReaderMediaDescriptor]:
     _ = context
-    return ReaderMediaDeliveryService(db_session).list_media(
-        world_id,
-        worldline_id=worldline_id,
-        limit=limit,
-    )
+    try:
+        return ReaderMediaDeliveryService(db_session).list_media(
+            world_id,
+            worldline_id=worldline_id,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise _not_found() from exc
 
 
 @router.get("/worldlines/{worldline_id}/objects/{object_id}/download")
@@ -93,7 +96,7 @@ def _download_reader_media_object_response(
             object_id,
             worldline_id=worldline_id,
         )
-    except (MediaStorageError, OSError) as exc:
+    except (MediaStorageError, OSError, ValueError) as exc:
         raise _not_found() from exc
     if result is None:
         raise _not_found()
@@ -114,11 +117,14 @@ def get_reader_media(
     worldline_id: uuid.UUID | None = None,
 ) -> ReaderMediaDescriptor:
     _ = context
-    descriptor = ReaderMediaDeliveryService(db_session).get_media(
-        world_id,
-        asset_id,
-        worldline_id=worldline_id,
-    )
+    try:
+        descriptor = ReaderMediaDeliveryService(db_session).get_media(
+            world_id,
+            asset_id,
+            worldline_id=worldline_id,
+        )
+    except ValueError as exc:
+        raise _not_found() from exc
     if descriptor is None:
         raise _not_found()
     return descriptor

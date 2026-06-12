@@ -55,6 +55,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the API SHALL reject the request instead of returning an empty successful response
 - **AND** valid worldline-scoped privacy request list queries SHALL continue to return only privacy request records from the resolved worldline.
 
+#### Scenario: Reader media routes reject invalid worldline scope
+- **GIVEN** a reader media list, detail, or object download request includes an explicit `worldline_id`
+- **WHEN** the `worldline_id` is missing from the requested `world_id` or belongs to another world
+- **THEN** the API SHALL reject the request instead of returning an empty successful list or treating the cross-world identifier as a valid filter
+- **AND** valid worldline-scoped reader media list, detail, and download operations SHALL continue to return only reader-deliverable media from the resolved worldline.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

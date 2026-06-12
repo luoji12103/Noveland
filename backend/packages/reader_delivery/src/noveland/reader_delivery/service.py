@@ -13,6 +13,7 @@ from noveland.reader_delivery.contracts import (
     ReaderMediaObjectDescriptor,
     ReaderMediaReferenceDescriptor,
 )
+from noveland.worlds.models import Worldline
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -46,6 +47,7 @@ class ReaderMediaDeliveryService:
         worldline_id: uuid.UUID | None = None,
         limit: int = 100,
     ) -> list[ReaderMediaDescriptor]:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         statement = (
             select(MediaAsset)
             .where(
@@ -57,8 +59,8 @@ class ReaderMediaDeliveryService:
             .order_by(MediaAsset.created_at.desc())
             .limit(max(1, min(limit, 200)))
         )
-        if worldline_id is not None:
-            statement = statement.where(MediaAsset.worldline_id == worldline_id)
+        if resolved_worldline_id is not None:
+            statement = statement.where(MediaAsset.worldline_id == resolved_worldline_id)
         descriptors: list[ReaderMediaDescriptor] = []
         for asset in self._session.scalars(statement).all():
             descriptor = self._descriptor_for_asset(asset)
@@ -73,10 +75,11 @@ class ReaderMediaDeliveryService:
         *,
         worldline_id: uuid.UUID | None = None,
     ) -> ReaderMediaDescriptor | None:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         asset = self._session.get(MediaAsset, asset_id)
         if asset is None or asset.world_id != world_id:
             return None
-        if worldline_id is not None and asset.worldline_id != worldline_id:
+        if resolved_worldline_id is not None and asset.worldline_id != resolved_worldline_id:
             return None
         return self._descriptor_for_asset(asset)
 
@@ -87,12 +90,13 @@ class ReaderMediaDeliveryService:
         *,
         worldline_id: uuid.UUID | None = None,
     ) -> tuple[ReaderMediaObjectDescriptor, bytes] | None:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         if self._storage is None:
             return None
         media_object = self._session.get(MediaObject, object_id)
         if media_object is None or media_object.world_id != world_id:
             return None
-        if worldline_id is not None and media_object.worldline_id != worldline_id:
+        if resolved_worldline_id is not None and media_object.worldline_id != resolved_worldline_id:
             return None
         asset = self._session.get(MediaAsset, media_object.asset_id)
         if (
@@ -108,6 +112,18 @@ class ReaderMediaDeliveryService:
             if object_descriptor.object_id == object_id:
                 return object_descriptor, self._storage.read_bytes(media_object.storage_uri)
         return None
+
+    def _validated_worldline_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        if worldline_id is None:
+            return None
+        worldline = self._session.get(Worldline, worldline_id)
+        if worldline is None or worldline.world_id != world_id:
+            raise ValueError("worldline not found")
+        return worldline.id
 
     def _descriptor_for_asset(self, asset: MediaAsset) -> ReaderMediaDescriptor | None:
         if not self._asset_is_reader_deliverable(asset):

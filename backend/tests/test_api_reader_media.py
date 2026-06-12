@@ -200,6 +200,10 @@ def test_reader_media_rejects_cross_world_and_cross_worldline_requests() -> None
     )
 
     _authenticate_session_only(client, owner_token)
+    wrong_worldline_list = client.get(
+        f"/worlds/{world_id}/reader/media",
+        params={"worldline_id": str(other_worldline_id)},
+    )
     wrong_world = client.get(f"/worlds/{world_id}/reader/media/{other_asset_id}")
     wrong_worldline = client.get(
         f"/worlds/{world_id}/reader/media/{fork_asset_id}",
@@ -217,6 +221,7 @@ def test_reader_media_rejects_cross_world_and_cross_worldline_requests() -> None
     )
     valid_object = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
+    assert wrong_worldline_list.status_code == 404
     assert wrong_world.status_code == 404
     assert wrong_worldline.status_code == 404
     assert unscoped_object.status_code == 404
