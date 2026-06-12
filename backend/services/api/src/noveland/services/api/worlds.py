@@ -9453,10 +9453,26 @@ def _world_bible_response(
         id=bible.id,
         world_id=bible.world_id,
         source_material=bible.source_material if include_admin_fields else "",
-        canon_timeline=bible.canon_timeline,
-        setting_rules=bible.setting_rules,
-        forbidden_changes=bible.forbidden_changes,
-        sequel_boundaries=bible.sequel_boundaries,
+        canon_timeline=(
+            bible.canon_timeline
+            if include_admin_fields
+            else _sanitize_public_json_list(bible.canon_timeline)
+        ),
+        setting_rules=(
+            bible.setting_rules
+            if include_admin_fields
+            else _sanitize_public_json(bible.setting_rules)
+        ),
+        forbidden_changes=(
+            bible.forbidden_changes
+            if include_admin_fields
+            else _sanitize_public_json_list(bible.forbidden_changes)
+        ),
+        sequel_boundaries=(
+            bible.sequel_boundaries
+            if include_admin_fields
+            else _sanitize_public_json(bible.sequel_boundaries)
+        ),
         continuity_config=bible.continuity_config if include_admin_fields else {},
         metadata=bible.metadata_json if include_admin_fields else {},
         continuity_status=_continuity_status_from_metadata(bible.continuity_config),

@@ -213,9 +213,9 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member reads world bible
 - **GIVEN** a world member fetches the world bible through member-readable routes
-- **WHEN** the bible contains raw source material/import notes, continuity config, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only canon-management evidence
-- **THEN** the member response SHALL omit source_material, continuity_config, and metadata while preserving safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields
-- **AND** admin routes MAY continue to expose source material, continuity configuration, and metadata required for canon management and review.
+- **WHEN** the bible contains raw source material/import notes, continuity config, metadata, or public canon timeline, setting rule, forbidden change, and sequel boundary JSON values containing storage refs, bytes, base64, provider refs, secret/auth refs, raw prompt/output markers, or other operator-only canon-management evidence
+- **THEN** the member response SHALL omit source_material, continuity_config, and metadata and SHALL sanitize canon_timeline, setting_rules, forbidden_changes, and sequel_boundaries by removing forbidden keys/values while preserving safe canon timeline, setting rule, forbidden change, sequel boundary, continuity status, identity, and timing fields
+- **AND** admin routes MAY continue to expose source material, continuity configuration, metadata, and unsanitized canon-management JSON required for canon management and review.
 
 #### Scenario: Member reads agent presence
 - **GIVEN** a world member fetches agent presence through member-readable routes

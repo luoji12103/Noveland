@@ -406,14 +406,34 @@ def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
         f"/worlds/{world_id}/bible",
         json={
             "source_material": "Original ending and sequel notes.",
-            "canon_timeline": [{"label": "Finale", "world_time": "2030-01-01"}],
-            "setting_rules": {"school": "closed on Sunday"},
-            "forbidden_changes": [{"rule": "Do not revive resolved antagonist"}],
-            "sequel_boundaries": {"starts_after": "original finale"},
+            "canon_timeline": [
+                {
+                    "label": "Finale",
+                    "world_time": "2030-01-01",
+                    "storage_uri": "media://private/world-bible",
+                    "nested": {"raw_prompt": "operator prompt"},
+                },
+            ],
+            "setting_rules": {
+                "school": "closed on Sunday",
+                "notes": ["safe note", "/root/private/canon.txt"],
+                "raw_output": "provider output",
+            },
+            "forbidden_changes": [
+                {"rule": "Do not revive resolved antagonist", "secret_ref": "canon-key"},
+            ],
+            "sequel_boundaries": {
+                "starts_after": "original finale",
+                "evidence": "data:audio/wav;base64,AAAA",
+            },
             "continuity_config": {"status": "post_canon", "tone": "daily"},
             "metadata": {"source": "operator"},
         },
     )
+    _authenticate(client, member_token)
+    member_read_with_public_values = client.get(f"/worlds/{world_id}/bible")
+
+    _authenticate(client, owner_token)
     updated = client.put(
         f"/worlds/{world_id}/bible",
         json={
@@ -429,7 +449,24 @@ def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
     assert created.status_code == 200
     assert created.json()["source_material"] == "Original ending and sequel notes."
     assert created.json()["continuity_status"] == "post_canon"
+    assert created.json()["canon_timeline"][0]["storage_uri"] == "media://private/world-bible"
+    assert created.json()["setting_rules"]["raw_output"] == "provider output"
     assert created.json()["metadata"] == {"source": "operator"}
+    assert member_read_with_public_values.status_code == 200
+    member_bible = member_read_with_public_values.json()
+    assert member_bible["source_material"] == ""
+    assert member_bible["canon_timeline"] == [
+        {"label": "Finale", "world_time": "2030-01-01", "nested": {}},
+    ]
+    assert member_bible["setting_rules"] == {"school": "closed on Sunday", "notes": ["safe note"]}
+    assert member_bible["forbidden_changes"] == [
+        {"rule": "Do not revive resolved antagonist"},
+    ]
+    assert member_bible["sequel_boundaries"] == {"starts_after": "original finale"}
+    assert member_bible["continuity_config"] == {}
+    assert member_bible["metadata"] == {}
+    assert member_bible["continuity_status"] == "post_canon"
+
     _authenticate(client, member_token)
     member_read_after_create = client.get(f"/worlds/{world_id}/bible")
 
