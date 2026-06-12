@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Sequence
 from typing import Annotated, Any, Literal
@@ -64,6 +65,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/worlds/{world_id}/conversations", tags=["conversations"])
+
+CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE = re.compile(
+    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    re.IGNORECASE,
+)
 
 
 class _RequestModel(BaseModel):
@@ -1143,14 +1151,26 @@ def _turn_response(
         turn_index=turn.turn_index,
         speaker_kind=turn.speaker_kind.value,
         speaker_agent_id=turn.speaker_agent_id,
-        input_text=turn.input_text,
-        output_text=turn.output_text,
+        input_text=(
+            turn.input_text
+            if include_admin_fields
+            else _sanitize_member_turn_text(turn.input_text)
+        ),
+        output_text=(
+            turn.output_text
+            if include_admin_fields or turn.output_text is None
+            else _sanitize_member_turn_text(turn.output_text)
+        ),
         status=turn.status.value,
         run_id=turn.run_id if include_admin_fields else None,
         error_text=turn.error_text if include_admin_fields else None,
         created_at=turn.created_at.isoformat(),
         updated_at=turn.updated_at.isoformat(),
     )
+
+
+def _sanitize_member_turn_text(value: str) -> str:
+    return "" if CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE.search(value) else value
 
 
 def _diagnostic_response(record: RuntimeDiagnosticRecord) -> ConversationDiagnosticResponse:

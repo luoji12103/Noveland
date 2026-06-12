@@ -89,8 +89,11 @@ def test_conversation_api_enforces_access_and_manual_advance(
         profile: object,
         prompt: str,
     ) -> ProviderCompletion:
-        del self, profile
-        return ProviderCompletion(text=f"reply for {prompt}", raw_response={"ok": True})
+        del self, profile, prompt
+        return ProviderCompletion(
+            text="Agent response with raw_output media://private/turn",
+            raw_response={"ok": True},
+        )
 
     monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
 
@@ -140,7 +143,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     )
     seed_response = client.post(
         f"/worlds/{world_id}/conversations/{conversation_id}/seed",
-        json={"input_text": "Operator seed"},
+        json={"input_text": "Operator seed with raw_prompt /root/private/seed.txt"},
     )
     advance_response = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
     speaker_preview = client.get(
@@ -189,8 +192,14 @@ def test_conversation_api_enforces_access_and_manual_advance(
     )
     assert replace_participants.status_code == 200
     assert seed_response.status_code == 200
+    assert seed_response.json()["input_text"] == (
+        "Operator seed with raw_prompt /root/private/seed.txt"
+    )
     assert advance_response.status_code == 200
     assert advance_response.json()["turn"]["speaker_agent_id"] == str(first_agent_id)
+    assert advance_response.json()["turn"]["output_text"] == (
+        "Agent response with raw_output media://private/turn"
+    )
     assert advance_response.json()["turn"]["run_id"] is not None
     assert advance_response.json()["turn"]["error_text"] is None
     assert speaker_preview.status_code == 200
@@ -220,6 +229,8 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert member_diagnostics.status_code == 403
     assert memory_summary.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
+    assert member_turns.json()[0]["input_text"] == ""
+    assert member_turns.json()[1]["output_text"] == ""
     assert member_turns.json()[1]["run_id"] is None
     assert member_turns.json()[1]["error_text"] is None
     assert member_advance.status_code == 403

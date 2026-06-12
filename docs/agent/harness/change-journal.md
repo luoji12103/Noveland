@@ -4138,3 +4138,15 @@
 - Tests added/updated: Extended `test_world_bible_api_preserves_continuity_contract_and_access` so admin reads retain dirty public canon JSON while member reads keep safe canon fields and remove storage refs, filesystem paths, raw prompt/output markers, secret refs, and base64 markers.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue auditing remaining member-readable replay/state and other public narrative/canon surfaces for arbitrary JSON/text, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Conversation turn transcript text redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-076.
+- Finding: F-076 found member-readable conversation turn list responses hiding runtime run IDs and error text but returning `input_text` and `output_text` verbatim. Admin seed text and provider-backed agent output can contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, base64, or other operator-only execution evidence.
+- Summary: Updated the architecture-contracts OpenSpec conversation-turn scenario, added a conversation API member transcript text sanitizer, and applied it only to non-admin turn responses while preserving admin transcript text.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_conversation_api_enforces_access_and_manual_advance` so admin seed/advance responses retain dirty transcript text while member turn list responses blank sensitive-looking input/output text and still hide run/error fields.
+- Verification: `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests; focused backend ruff/mypy passed for `conversations.py` and `test_api_conversations.py`; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing reader/player presentation and playback DTO text/media references for comparable forbidden-evidence exposure, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
