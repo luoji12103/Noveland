@@ -48,6 +48,11 @@ _LEAKY_KEYS = {
     "token",
 }
 _LEAKY_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS}
+_PLAYER_DELIVERABLE_MEDIA_VISIBILITIES = {
+    "world_member",
+    "player_visible",
+    "reader_visible",
+}
 _LEAK_PATTERN = re.compile(
     r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
     r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
@@ -265,11 +270,7 @@ class PlayerSessionService:
             and asset.world_id == world_id
             and asset.worldline_id == worldline_id
             and asset.status == "available"
-            and asset.visibility
-            not in {
-                "developer_only",
-                "hidden",
-            }
+            and asset.visibility in _PLAYER_DELIVERABLE_MEDIA_VISIBILITIES
         )
 
     def _media_job_failed(

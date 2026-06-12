@@ -345,6 +345,50 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
         _assert_no_forbidden_markers(response.json())
 
 
+def test_player_session_private_and_admin_only_media_are_missing_media() -> None:
+    client, engine = _client_with_database()
+    admin_id, _admin_token = _seed_user(
+        engine, "admin-private-media@example.test", platform_admin=True
+    )
+    tester_id, tester_token = _seed_user(engine, "tester-private-media@example.test")
+    world_id, worldline_id, scene_id = _seed_world_graph(engine, admin_id)
+    _add_membership(engine, world_id, tester_id, AuthRole.HUMAN_USER)
+    actor_id = _seed_player_actor(engine, world_id, worldline_id, tester_id, scene_id)
+    _authenticate(client, tester_token)
+
+    for visibility in ("private", "world_admin"):
+        conversation_id, turn_id, presentation_id = _seed_conversation(
+            engine,
+            world_id,
+            worldline_id,
+            scene_id,
+        )
+        _attach_media_to_presentation(
+            engine,
+            world_id,
+            worldline_id,
+            presentation_id,
+            visibility=visibility,
+        )
+
+        response = client.post(
+            f"/worlds/{world_id}/player-sessions/resume",
+            json={
+                "worldline_id": str(worldline_id),
+                "player_actor_id": str(actor_id),
+                "conversation_session_id": str(conversation_id),
+                "scene_id": str(scene_id),
+                "last_turn_id": str(turn_id),
+                "last_presentation_id": str(presentation_id),
+            },
+            headers=_csrf_headers(client),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["recovery_status"] == "missing_media"
+        _assert_no_forbidden_markers(response.json())
+
+
 def _client_with_database() -> tuple[TestClient, Engine]:
     import_model_modules()
     engine = create_engine(
