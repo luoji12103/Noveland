@@ -58,9 +58,13 @@ _LEAKY_KEYS = {
     "raw_output",
     "prompt_snapshot",
 }
+_LEAKY_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"sk-[A-Za-z0-9]|raw_prompt|raw_output)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw[-_ ]?prompt|raw[-_ ]?output|"
+    r"prompt[-_ ]?snapshot|file[-_ ]?path|filesystem[-_ ]?path|bearer\s+)",
     re.IGNORECASE,
 )
 _REDACTED = "[REDACTED]"
@@ -474,7 +478,8 @@ def _sanitize_json(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    return key.strip().lower() in _LEAKY_KEYS
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _LEAKY_KEY_MARKERS)
 
 
 def _safe_text(value: str) -> str:

@@ -42,6 +42,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer_token",
     "authorization",
@@ -112,6 +116,7 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     assert body["reporter_user_id"] == str(member_id)
     assert body["worldline_id"] == str(worldline_id)
     assert body["evidence_refs"][0]["kind"] == "conversation_session"
+    assert body["metadata"] == {"client_note": "safe", "nested": {"safe": "kept"}}
     assert unsafe.status_code == 400
     assert member_list.status_code == 403
     assert other_list.status_code == 403
@@ -480,7 +485,16 @@ def _report_payload(worldline_id: uuid.UUID, target_id: uuid.UUID) -> dict[str, 
                 "worldline_id": str(worldline_id),
             }
         ],
-        "metadata": {"client_note": "safe"},
+        "metadata": {
+            "client_note": "safe",
+            "rawPrompt": "hidden moderation prompt",
+            "promptSnapshotId": str(uuid.uuid4()),
+            "nested": {
+                "rawOutput": "hidden moderation output",
+                "storageUri": "opaque-moderation-storage",
+                "safe": "kept",
+            },
+        },
     }
 
 

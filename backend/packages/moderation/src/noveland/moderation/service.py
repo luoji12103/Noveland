@@ -58,9 +58,13 @@ _SENSITIVE_KEYS = {
     "raw_output",
     "prompt_snapshot",
 }
+_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _SENSITIVE_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"sk-[A-Za-z0-9]|raw_prompt|raw_output|bearer\s+)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw[-_ ]?prompt|raw[-_ ]?output|"
+    r"prompt[-_ ]?snapshot|file[-_ ]?path|filesystem[-_ ]?path|bearer\s+)",
     re.IGNORECASE,
 )
 _WORLDLINE_SCOPED_TARGETS = {
@@ -674,8 +678,7 @@ def _sanitize_json(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
-            normalized_key = str(key).lower()
-            if normalized_key not in _SENSITIVE_KEYS:
+            if not _is_sensitive_key(str(key)):
                 sanitized[str(key)] = _sanitize_json(item)
         return sanitized
     if isinstance(value, list):
@@ -694,3 +697,8 @@ def _validate_safe_text(value: str | None, field_name: str) -> None:
 
 def _safe_text(value: str) -> str:
     return _LEAK_PATTERN.sub("[REDACTED]", value)
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _SENSITIVE_KEY_MARKERS)

@@ -32,6 +32,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer_token",
     "authorization",
@@ -55,7 +59,17 @@ def test_admin_invite_lifecycle_redeem_and_profile_bootstrap_are_safe() -> None:
             "invited_email": "tester@example.test",
             "worldline_id": str(worldline_id),
             "expires_at": _iso(datetime.now(UTC) + timedelta(hours=2)),
-            "metadata": {"note": "first tester", "token": "should be removed"},
+            "metadata": {
+                "note": "first tester",
+                "token": "should be removed",
+                "rawPrompt": "hidden invite prompt",
+                "promptSnapshotId": str(uuid.uuid4()),
+                "nested": {
+                    "rawOutput": "hidden invite output",
+                    "storageUri": "opaque-invite-storage",
+                    "safe": "kept",
+                },
+            },
         },
         headers=_csrf_headers(client),
     )
@@ -69,6 +83,7 @@ def test_admin_invite_lifecycle_redeem_and_profile_bootstrap_are_safe() -> None:
     invite_id = created_body["invite"]["id"]
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == invite_id
+    assert listed.json()[0]["metadata"] == {"note": "first tester", "nested": {"safe": "kept"}}
     assert "token" not in str(listed.json()).lower()
     assert "should be removed" not in str(listed.json()).lower()
 

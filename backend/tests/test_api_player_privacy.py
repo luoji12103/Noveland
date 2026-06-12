@@ -41,6 +41,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer_token",
     "authorization",
@@ -99,6 +103,8 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
         "conversation_references": 1,
     }
     assert export["choices"][0]["choice_key"] == "member-choice"
+    assert export["player_actors"][0]["profile"]["safe_label"] == "visible"
+    assert "hidden profile prompt" not in str(export).lower()
     assert export["choices"][0]["applied_event_id"] is None
     assert "prompt" not in export["choices"][0]
     assert "context" not in export["choices"][0]
@@ -394,7 +400,15 @@ def _seed_player_records(
                 actor_ref=f"player:{user_id}:primary",
                 display_name=f"Player {user_id}",
                 current_scene_id=None,
-                profile_json={"redacted_test": {"storage_uri": "media://private-object"}},
+                profile_json={
+                    "safe_label": "visible",
+                    "rawPrompt": "hidden profile prompt",
+                    "promptSnapshotId": str(uuid.uuid4()),
+                    "redacted_test": {
+                        "storage_uri": "media://private-object",
+                        "storageUri": "opaque-profile-storage",
+                    },
+                },
                 is_active=True,
             )
         )

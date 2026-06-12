@@ -59,6 +59,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the persisted and returned member-owned JSON SHALL omit those forbidden keys and values while preserving safe state and feedback metadata
 - **AND** admin routes MAY continue to expose only the already-sanitized stored metadata, never raw prompt/output, storage, secret, bytes, or base64 evidence.
 
+#### Scenario: Review and onboarding metadata uses normalized sensitive-key filtering
+- **GIVEN** private beta invite metadata, player privacy export/request JSON, or moderation report/review metadata is created, persisted, or read through member/admin routes
+- **WHEN** the JSON contains sensitive keys written in snake_case, camelCase, compact, or mixed punctuation forms such as raw_prompt, rawPrompt, rawprompt, storage_uri, storageUri, prompt_snapshot, or promptSnapshotId
+- **THEN** the service SHALL omit or redact those forbidden keys and values before persistence/readback while preserving safe metadata fields
+- **AND** admin routes MAY continue to expose only the already-sanitized stored metadata, never raw prompt/output, storage, secret, token, bytes, or base64 evidence.
+
 
 #### Scenario: Member reads agent character profiles
 - **GIVEN** a world member lists agents through the member-readable agent catalog
