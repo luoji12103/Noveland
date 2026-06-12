@@ -3697,6 +3697,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert updated_preset.status_code == 200
     assert updated_preset.json()["version"] == 2
     assert agents.status_code == 200
+    assert agents.json()[0]["source_preset_id"] == preset_id
     assert agents.json()[0]["source_preset_version"] == 1
     assert agents.json()[0]["provider_profile_id"] == str(
         _provider_profile_id_by_key(engine, "preset-provider"),
@@ -3709,6 +3710,8 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert member_agents.status_code == 200
     assert member_agents.json()[0]["id"] == agent_id
     assert member_agents.json()[0]["display_name"] == "Narrator"
+    assert member_agents.json()[0]["source_preset_id"] is None
+    assert member_agents.json()[0]["source_preset_version"] is None
     assert member_agents.json()[0]["provider_profile_id"] is None
     assert member_agents.json()[0]["config"] == {}
     assert member_agents.json()[0]["character_profile"] == expected_member_character_profile

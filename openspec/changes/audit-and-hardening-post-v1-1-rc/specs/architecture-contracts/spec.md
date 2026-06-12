@@ -126,7 +126,7 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member lists agents
 - **GIVEN** a world member lists agents through member-readable routes
-- **WHEN** agent records contain provider profile refs, execution/provider config, raw prompt/output markers, storage refs, bytes, base64, or other admin-only configuration evidence
+- **WHEN** agent records contain provider profile refs, source preset refs/versions, execution/provider config, raw prompt/output markers, storage refs, bytes, base64, or other admin-only configuration evidence
 - **THEN** the member response SHALL omit those operator-only agent internals while preserving safe public agent identity and characterization fields
 - **AND** admin agent routes MAY continue to expose configuration details required for world management.
 

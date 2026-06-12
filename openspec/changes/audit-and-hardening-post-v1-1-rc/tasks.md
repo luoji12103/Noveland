@@ -890,3 +890,13 @@
 - Intended remediation: shape replay state responses by caller role; preserve clock source refs for admins while ordinary members receive safe reconstructed replay state with clock `last_event_id` and `last_event_sequence` redacted.
 - Status: Remediated in member replay state source evidence redaction batch.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot tests/test_api_worlds.py::test_world_event_audit_requires_admin_and_filters_events -q` passed with 2 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped.
+
+### F-083 Member agent catalog source preset provenance leak
+
+- Severity: High
+- Affected boundary: member-readable agent catalog REST API.
+- Evidence: `backend/services/api/src/noveland/services/api/worlds.py` exposes `GET /worlds/{world_id}/agents` with `get_world_member_context` and serializes rows through `_agent_response(agent, include_admin_fields=can_manage)`. The helper already redacts provider profile IDs, execution config, and unsafe character profile JSON for ordinary members, but still returns `source_preset_id` and `source_preset_version` directly.
+- Impact: ordinary world members can correlate public agent catalog entries to operator-authored preset provenance and versioning evidence even though platform agent presets are admin-managed records and other agent configuration internals are redacted.
+- Intended remediation: redact source preset IDs and versions from non-admin agent catalog responses while preserving admin create/update/list diagnostics and safe member agent identity/characterization fields.
+- Status: Remediated in member agent catalog source preset provenance redaction batch.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` first failed on unredacted `source_preset_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.

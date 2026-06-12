@@ -4225,3 +4225,15 @@
 - Tests added/updated: Extended replay/snapshot API coverage so member replay state hides clock source refs and admin replay state retains them.
 - Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot tests/test_api_worlds.py::test_world_event_audit_requires_admin_and_filters_events -q` passed with 2 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped.
 - Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Agent catalog source preset provenance redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-083.
+- Finding: F-083 found member-readable agent catalog responses already hiding provider profile IDs, execution config, and unsafe character profile JSON, but still returning `source_preset_id` and `source_preset_version` to ordinary world members.
+- Summary: Updated the architecture-contracts OpenSpec member-agent scenario, gated `_agent_response()` source preset provenance behind `include_admin_fields`, and preserved admin create/update/list source preset diagnostics.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping` so admin list responses retain source preset ID/version while member list responses receive `null` for both fields.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` first failed on unredacted `source_preset_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
