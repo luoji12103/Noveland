@@ -8441,8 +8441,12 @@ def _worldline_response(
         id=worldline.id,
         world_id=worldline.world_id,
         worldline_key=worldline.worldline_key,
-        name=worldline.name,
-        description=worldline.description,
+        name=worldline.name if include_admin_fields else _sanitize_public_text(worldline.name),
+        description=(
+            worldline.description
+            if include_admin_fields or worldline.description is None
+            else _sanitize_public_text(worldline.description)
+        ),
         parent_worldline_id=worldline.parent_worldline_id,
         forked_from_snapshot_id=worldline.forked_from_snapshot_id,
         fork_event_sequence=worldline.fork_event_sequence,
@@ -9581,7 +9585,11 @@ def _agent_response(
         source_preset_id=agent.source_preset_id if include_admin_fields else None,
         source_preset_version=agent.source_preset_version if include_admin_fields else None,
         agent_key=agent.agent_key,
-        display_name=agent.display_name,
+        display_name=(
+            agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(agent.display_name)
+        ),
         kind=cast(AgentKind, agent.kind),
         provider_profile_id=(
             _provider_profile_id_from_config(agent.config) if include_admin_fields else None
@@ -9614,10 +9622,18 @@ def _agent_relationship_response(
         worldline_id=edge.worldline_id,
         source_agent_id=edge.source_agent_id,
         source_agent_key=source_agent.agent_key,
-        source_display_name=source_agent.display_name,
+        source_display_name=(
+            source_agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(source_agent.display_name)
+        ),
         target_agent_id=edge.target_agent_id,
         target_agent_key=target_agent.agent_key,
-        target_display_name=target_agent.display_name,
+        target_display_name=(
+            target_agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(target_agent.display_name)
+        ),
         relationship_type=cast(RelationshipType, edge.relationship_type),
         affection=edge.affection,
         trust=edge.trust,

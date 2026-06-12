@@ -586,8 +586,18 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     other_world_id = _seed_world(engine, other_owner_id, "other-relationship-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
-    source_agent_id = _seed_agent(engine, world_id, "source")
-    target_agent_id = _seed_agent(engine, world_id, "target")
+    source_agent_id = _seed_agent(
+        engine,
+        world_id,
+        "source",
+        display_name="Source raw_prompt: relationship source",
+    )
+    target_agent_id = _seed_agent(
+        engine,
+        world_id,
+        "target",
+        display_name="Target storage_uri media://private/relationship-target",
+    )
     other_agent_id = _seed_agent(engine, other_world_id, "outside")
 
     _authenticate(client, member_token)
@@ -672,7 +682,11 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     assert cross_world.status_code == 404
     assert created.status_code == 201
     assert created.json()["source_agent_key"] == "source"
+    assert created.json()["source_display_name"] == "Source raw_prompt: relationship source"
     assert created.json()["target_agent_key"] == "target"
+    assert created.json()["target_display_name"] == (
+        "Target storage_uri media://private/relationship-target"
+    )
     assert created.json()["relationship_type"] == "friendship"
     assert created.json()["affection"] == 42
     assert duplicate.status_code == 409
@@ -682,9 +696,15 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     assert updated.json()["metadata"]["raw_output"] == "operator relationship output"
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == created.json()["id"]
+    assert listed.json()[0]["source_display_name"] == "Source raw_prompt: relationship source"
+    assert listed.json()[0]["target_display_name"] == (
+        "Target storage_uri media://private/relationship-target"
+    )
     assert listed.json()[0]["metadata"]["raw_output"] == "operator relationship output"
     assert member_listed.status_code == 200
     assert member_listed.json()[0]["id"] == created.json()["id"]
+    assert member_listed.json()[0]["source_display_name"] == ""
+    assert member_listed.json()[0]["target_display_name"] == ""
     assert member_listed.json()[0]["metadata"] == {}
     assert [event.event_name for event in relationship_events] == [
         "relationship.edge_created",
@@ -3586,6 +3606,11 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
     )
 
     assert listed.status_code == 200
+    listed_worldlines = {item["id"]: item for item in listed.json()}
+    assert listed_worldlines[str(primary_id)]["name"] == ""
+    assert listed_worldlines[str(primary_id)]["description"] == "Primary branch stays readable."
+    assert listed_worldlines[str(fork_id)]["name"] == "Fork"
+    assert listed_worldlines[str(fork_id)]["description"] == ""
     assert [item["metadata"] for item in listed.json()] == [{}, {}]
     assert comparison.status_code == 200
     assert comparison.json() == {
@@ -3617,6 +3642,15 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
         },
     )
     assert admin_listed.status_code == 200
+    admin_worldlines = {item["id"]: item for item in admin_listed.json()}
+    assert admin_worldlines[str(primary_id)]["name"] == (
+        "Primary raw_prompt: operator worldline"
+    )
+    assert admin_worldlines[str(primary_id)]["description"] == "Primary branch stays readable."
+    assert admin_worldlines[str(fork_id)]["name"] == "Fork"
+    assert admin_worldlines[str(fork_id)]["description"] == (
+        "storage_uri media://private/worldline-description"
+    )
     assert admin_listed.json()[0]["metadata"]["raw_prompt"] == (
         "operator-only primary worldline prompt"
     )
@@ -3799,7 +3833,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
         f"/worlds/{world_id}/agents",
         json={
             "agent_key": "narrator",
-            "display_name": "Narrator",
+            "display_name": "Narrator raw_output: /root/private/narrator",
             "preset_id": preset_id,
             "character_profile": {
                 "safe": "public characterization",
@@ -3824,6 +3858,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     calendar = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
 
     assert create_agent.status_code == 201
+    assert create_agent.json()["display_name"] == "Narrator raw_output: /root/private/narrator"
     assert create_agent.json()["kind"] == "narrative_agent"
     assert create_agent.json()["source_preset_id"] == preset_id
     assert create_agent.json()["source_preset_version"] == 1
@@ -3858,6 +3893,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert updated_preset.status_code == 200
     assert updated_preset.json()["version"] == 2
     assert agents.status_code == 200
+    assert agents.json()[0]["display_name"] == "Narrator raw_output: /root/private/narrator"
     assert agents.json()[0]["source_preset_id"] == preset_id
     assert agents.json()[0]["source_preset_version"] == 1
     assert agents.json()[0]["provider_profile_id"] == str(
@@ -3870,7 +3906,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     )
     assert member_agents.status_code == 200
     assert member_agents.json()[0]["id"] == agent_id
-    assert member_agents.json()[0]["display_name"] == "Narrator"
+    assert member_agents.json()[0]["display_name"] == ""
     assert member_agents.json()[0]["source_preset_id"] is None
     assert member_agents.json()[0]["source_preset_version"] is None
     assert member_agents.json()[0]["provider_profile_id"] is None
@@ -5325,6 +5361,7 @@ def _seed_agent(
     source_preset_id: uuid.UUID | None = None,
     source_preset_version: int | None = None,
     provider_profile_id: uuid.UUID | None = None,
+    display_name: str | None = None,
 ) -> uuid.UUID:
     agent_id = uuid.uuid4()
     with Session(engine) as session:
@@ -5336,7 +5373,7 @@ def _seed_agent(
                 source_preset_id=source_preset_id,
                 source_preset_version=source_preset_version,
                 agent_key=agent_key,
-                display_name=agent_key,
+                display_name=display_name or agent_key,
                 kind="role_agent",
                 config=(
                     {}
@@ -5370,6 +5407,8 @@ def _add_membership(
 def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
     with Session(engine) as session:
         primary = ensure_primary_worldline(session, world_id)
+        primary.name = "Primary raw_prompt: operator worldline"
+        primary.description = "Primary branch stays readable."
         primary.metadata_json = {
             "raw_prompt": "operator-only primary worldline prompt",
             "storage_uri": "media://private/worldline-primary",
@@ -5378,7 +5417,7 @@ def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uu
             world_id=world_id,
             worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
             name="Fork",
-            description="Forked test worldline",
+            description="storage_uri media://private/worldline-description",
             parent_worldline_id=primary.id,
             status="active",
             created_by_actor_ref="test:api-worlds",

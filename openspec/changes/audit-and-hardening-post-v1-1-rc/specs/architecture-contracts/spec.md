@@ -305,6 +305,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL blank the sensitive-looking text while preserving safe organization, membership, and faction text, metadata redaction, identity fields, and numeric state
 - **AND** admin routes MAY continue to expose full organization and faction text required for world management and runtime planning.
 
+#### Scenario: Member reads sensitive-looking worldline and agent identity text
+- **GIVEN** a world member lists worldlines, agents, or agent relationships through member-readable routes
+- **WHEN** worldline names/descriptions, agent display names, or relationship source/target display names contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL blank the sensitive-looking text while preserving safe worldline names/descriptions, safe agent display names, identity keys, relationship state, metadata redaction, and existing admin-field redaction
+- **AND** admin routes MAY continue to expose full worldline and agent identity text required for world management and runtime planning.
+
 #### Scenario: Member reads latest snapshot
 - **GIVEN** a world member fetches the latest world snapshot through member-readable routes
 - **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, created-by event refs, storage refs, bytes, base64, provider refs, or other replay/storage evidence

@@ -4868,3 +4868,15 @@
 - Tests added/updated: Extended `test_organization_memberships_and_faction_tracks_append_events` for sensitive member organization/membership/faction text redaction and safe organization description/responsibility preservation.
 - Verification: Focused organization/faction regression first failed because member organization name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend member/player DTO audits for agent/worldline public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member worldline agent identity text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable worldline, agent, and relationship identity text remediation for F-136.
+- Finding: F-136 found `backend/services/api/src/noveland/services/api/worlds.py` redacted worldline metadata, agent config/provider/admin fields, agent profile JSON, and relationship metadata for ordinary members but returned worldline `name`/`description`, agent `display_name`, and relationship source/target display names unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_worldline_response()`, `_agent_response()`, and `_agent_relationship_response()` to blank sensitive-looking worldline/agent identity text for non-admin member responses while preserving safe text, keys, relationship state, existing metadata/config redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended existing relationship, agent preset/list, and worldline browser tests for sensitive member identity text redaction and safe worldline text preservation.
+- Verification: Focused relationship/agent/worldline regressions first failed because sensitive member identity text rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
