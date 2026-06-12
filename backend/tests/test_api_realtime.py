@@ -244,6 +244,12 @@ def test_conversation_stream_hides_admin_evidence_for_member_payloads(
         run_id=run_id,
         error_text="provider raw_output traceback",
     )
+    _seed_turn(
+        engine,
+        conversation_id,
+        1,
+        "raw_prompt: provider traceback payload",
+    )
     _seed_conversation_diagnostic(engine, world_id, conversation_id)
 
     member_delta = realtime_api.collect_conversation_stream_delta(
@@ -260,9 +266,12 @@ def test_conversation_stream_hides_admin_evidence_for_member_payloads(
     assert member_payload["session"]["opening_prompt"] == ""
     assert member_payload["session"]["policy"] == {}
     assert member_payload["session"]["writer_config"] == {}
+    assert member_payload["turns"][0]["input_text"] == "Visible dialogue"
     assert member_payload["turns"][0]["output_text"] == "Visible dialogue"
     assert member_payload["turns"][0]["run_id"] is None
     assert member_payload["turns"][0]["error_text"] is None
+    assert member_payload["turns"][1]["input_text"] == ""
+    assert member_payload["turns"][1]["output_text"] == ""
 
     assert admin_delta is not None
     admin_payload = admin_delta["payload"]
@@ -273,6 +282,34 @@ def test_conversation_stream_hides_admin_evidence_for_member_payloads(
     assert admin_payload["session"]["writer_config"]["style_guide"] == "raw_output: writer trace"
     assert admin_payload["turns"][0]["run_id"] == str(run_id)
     assert admin_payload["turns"][0]["error_text"] == "provider raw_output traceback"
+    assert admin_payload["turns"][1]["input_text"] == "raw_prompt: provider traceback payload"
+    assert admin_payload["turns"][1]["output_text"] == "raw_prompt: provider traceback payload"
+
+
+def test_conversation_live_member_snapshot_hides_sensitive_turn_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database(monkeypatch)
+    owner_id, _owner_token = _seed_user(engine, "live-owner@example.test")
+    member_id, member_token = _seed_user(engine, "live-member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(engine, world_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_turn(engine, conversation_id, 0, "raw_output: provider traceback payload")
+
+    client.cookies.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, member_token)
+    with client.websocket_connect(
+        f"/worlds/{world_id}/conversations/{conversation_id}/live",
+        headers={"origin": "http://testserver"},
+    ) as websocket:
+        snapshot = websocket.receive_json()
+
+    assert snapshot["type"] == "session_snapshot"
+    assert snapshot["payload"]["turns"][0]["input_text"] == ""
+    assert snapshot["payload"]["turns"][0]["output_text"] == ""
+    assert snapshot["payload"]["turns"][0]["run_id"] is None
+    assert snapshot["payload"]["turns"][0]["error_text"] is None
 
 
 def test_conversation_live_websocket_rejects_cross_port_origin(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -40,6 +41,13 @@ router = APIRouter(tags=["realtime"])
 
 STREAM_POLL_INTERVAL_SECONDS = 1.0
 STREAM_KEEPALIVE_SECONDS = 15.0
+
+CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE = re.compile(
+    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    re.IGNORECASE,
+)
 
 
 @router.get("/runtime/stream")
@@ -1019,8 +1027,18 @@ def _conversation_turn_payload(
             "turn_index": model.turn_index,
             "speaker_kind": model.speaker_kind,
             "speaker_agent_id": model.speaker_agent_id,
-            "input_text": model.input_text,
-            "output_text": model.output_text,
+            "input_text": _member_safe_turn_text(
+                model.input_text,
+                include_admin_fields=include_admin_fields,
+            ),
+            "output_text": (
+                None
+                if model.output_text is None
+                else _member_safe_turn_text(
+                    model.output_text,
+                    include_admin_fields=include_admin_fields,
+                )
+            ),
             "status": model.status,
             "run_id": model.run_id if include_admin_fields else None,
             "error_text": model.error_text if include_admin_fields else None,
@@ -1029,6 +1047,12 @@ def _conversation_turn_payload(
         },
         ),
     )
+
+
+def _member_safe_turn_text(value: str, *, include_admin_fields: bool) -> str:
+    if include_admin_fields:
+        return value
+    return "" if CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE.search(value) else value
 
 
 def _diagnostic_payload(record: Any) -> dict[str, Any]:

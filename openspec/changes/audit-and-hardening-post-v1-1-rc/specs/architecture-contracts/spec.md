@@ -337,6 +337,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit run IDs and error text and SHALL blank sensitive-looking transcript text while preserving safe turn identity, speaker, safe transcript text, status, and timing fields
 - **AND** admin routes MAY continue to expose run IDs, error text, and unsanitized transcript text required for conversation management and runtime diagnostics.
 
+#### Scenario: Member receives conversation realtime turn deltas
+- **GIVEN** a world member receives a conversation realtime stream or live socket session snapshot
+- **WHEN** turn records contain runtime run IDs, provider/plugin error text, transcript text with raw prompt/output markers, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only execution evidence
+- **THEN** the realtime member payload SHALL omit run IDs and error text and SHALL blank sensitive-looking transcript text while preserving safe turn identity, speaker, safe transcript text, status, and timing fields
+- **AND** admin realtime payloads MAY continue to expose run IDs, error text, and unsanitized transcript text required for conversation management and runtime diagnostics.
+
 ## ADDED Requirements
 
 ### Requirement: Web API proxies preserve backend route boundaries
