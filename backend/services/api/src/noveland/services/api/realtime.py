@@ -1343,7 +1343,32 @@ def _origin_allowed(origin: str | None, request_url: str) -> bool:
     request_parsed = urlparse(request_url)
     if origin_url.hostname is None or request_parsed.hostname is None:
         return False
-    return origin_url.hostname == request_parsed.hostname
+    expected_origin_scheme = _http_scheme_for_websocket_request(request_parsed.scheme)
+    if origin_url.scheme != expected_origin_scheme:
+        return False
+    return (
+        origin_url.hostname == request_parsed.hostname
+        and _effective_port(origin_url.scheme, origin_url.port)
+        == _effective_port(request_parsed.scheme, request_parsed.port)
+    )
+
+
+def _http_scheme_for_websocket_request(request_scheme: str) -> str:
+    if request_scheme == "ws":
+        return "http"
+    if request_scheme == "wss":
+        return "https"
+    return request_scheme
+
+
+def _effective_port(scheme: str, port: int | None) -> int | None:
+    if port is not None:
+        return port
+    if scheme in {"http", "ws"}:
+        return 80
+    if scheme in {"https", "wss"}:
+        return 443
+    return None
 
 
 def _websocket_close_code(status_code: int) -> int:

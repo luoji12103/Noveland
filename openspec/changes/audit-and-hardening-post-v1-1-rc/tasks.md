@@ -1315,3 +1315,14 @@
 - Intended remediation: route non-2xx stream proxy responses through the existing sanitized proxy response helper while preserving successful `text/event-stream` responses, and add focused realtime proxy regression coverage.
 - Status: Remediated in Web event-stream setup error redaction batch.
 - Verification: `cd web && npm run test -- lib/realtime/proxy.test.ts` first failed because non-2xx stream setup errors retained stream headers and bypassed sanitized proxy handling, then passed with 4 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/realtime/proxy.ts lib/realtime/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 208 tests.
+
+
+### F-124 Conversation live WebSocket origin check ignores scheme and port
+
+- Severity: High
+- Affected boundary: Backend cookie-authenticated WebSocket origin protection for conversation live commands.
+- Evidence: Read-only audit showed `backend/services/api/src/noveland/services/api/realtime.py` uses `_origin_allowed(origin, request_url)` before authenticating the live WebSocket, but the helper only compares `origin_url.hostname == request_parsed.hostname`. It ignores scheme and port even though browser same-origin checks include scheme, host, and port.
+- Impact: a hostile origin running on the same hostname but a different scheme or port could open a cookie-authenticated conversation live socket and attempt admin live commands if the victim has active cookies, weakening CSRF-style protection for WebSocket state changes.
+- Intended remediation: enforce full same-origin semantics for WebSocket requests by matching normalized HTTP/WebSocket scheme, hostname, and effective port; preserve valid same-origin TestClient/browser behavior; add API regression coverage for cross-port origin rejection.
+- Status: Remediated in conversation-live WebSocket origin hardening batch.
+- Verification: `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_live_websocket_rejects_cross_port_origin -q` first failed because `Origin: http://testserver:4444` was accepted, then passed after remediation; `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_live_websocket_rejects_cross_port_origin tests/test_api_realtime.py::test_conversation_live_websocket_enforces_origin_and_admin_controls -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_realtime.py -q` passed with 7 tests; focused backend ruff/mypy passed for realtime API and tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 580 tests and 8 skipped.

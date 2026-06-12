@@ -420,6 +420,12 @@ The system SHALL build browser-initiated realtime backend URLs from fixed backen
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the backend path
 - **AND** the configured WebSocket base URL SHALL remain separate from dynamic path segments.
 
+#### Scenario: Conversation live sockets enforce full same-origin boundaries
+- **GIVEN** a browser opens a cookie-authenticated conversation live WebSocket
+- **WHEN** the WebSocket request includes an `Origin` header
+- **THEN** the backend SHALL accept only origins whose scheme, hostname, and port match the WebSocket request origin after applying the HTTP-to-WebSocket scheme equivalence
+- **AND** missing, malformed, cross-host, cross-scheme, or cross-port origins SHALL be rejected before authentication or live command processing.
+
 ### Requirement: Web API clients preserve same-origin route boundaries
 The system SHALL build browser-side same-origin API request URLs from fixed frontend route templates and encoded dynamic path segments so decoded identifiers cannot broaden frontend or backend route scope.
 

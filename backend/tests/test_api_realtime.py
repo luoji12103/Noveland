@@ -275,6 +275,25 @@ def test_conversation_stream_hides_admin_evidence_for_member_payloads(
     assert admin_payload["turns"][0]["error_text"] == "provider raw_output traceback"
 
 
+def test_conversation_live_websocket_rejects_cross_port_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database(monkeypatch)
+    owner_id, owner_token = _seed_user(engine, "owner-cross-port@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    client.cookies.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, owner_token)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(
+            f"/worlds/{world_id}/conversations/{conversation_id}/live",
+            headers={"origin": "http://testserver:4444"},
+        ) as websocket:
+            websocket.receive_json()
+
+
 def test_conversation_live_websocket_enforces_origin_and_admin_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
