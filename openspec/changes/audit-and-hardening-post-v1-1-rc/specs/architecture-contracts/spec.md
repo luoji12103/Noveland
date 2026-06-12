@@ -61,6 +61,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the API SHALL reject the request instead of returning an empty successful list or treating the cross-world identifier as a valid filter
 - **AND** valid worldline-scoped reader media list, detail, and download operations SHALL continue to return only reader-deliverable media from the resolved worldline.
 
+#### Scenario: Reader media descriptors redact sensitive-looking asset text
+- **GIVEN** a world member lists or fetches reader media descriptors through reader media routes
+- **WHEN** deliverable media asset titles or descriptions contain storage refs, filesystem paths, raw prompt/output markers, prompt snapshot refs, provider refs, secret/auth refs, bytes, or base64
+- **THEN** the reader media descriptor SHALL blank the sensitive-looking title/description text while preserving safe titles/descriptions, scoped download URLs, object descriptors, reference descriptors, and moderation filtering
+- **AND** admin media management routes MAY continue to expose full asset text required for media management and diagnostics.
+
 #### Scenario: Speech list routes reject invalid worldline scope consistently
 - **GIVEN** a speech voice profile list, agent voice binding list, or transcript list request includes an explicit `worldline_id`
 - **WHEN** the `worldline_id` is missing from the requested `world_id` or belongs to another world

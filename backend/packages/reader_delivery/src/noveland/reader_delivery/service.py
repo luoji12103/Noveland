@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 
 from noveland.conversations.models import ConversationSession, ConversationTurn
@@ -40,6 +41,15 @@ READER_REFERENCE_KINDS = {
     MediaReferenceKind.CONVERSATION_TURN.value,
     MediaReferenceKind.CONVERSATION_SESSION.value,
 }
+
+READER_MEDIA_FORBIDDEN_TEXT_RE = re.compile(
+    r"(storage[_ -]?uri|media://|object://|file://|s3://|gs://|/root/|/tmp/|"
+    r"base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|"
+    r"provider[_ -]?(kind|key|id)|secret[_ -]?ref|auth[_ -]?ref|"
+    r"file[_ -]?path|filesystem[_ -]?path|object[_ -]?path|bytes)",
+    re.IGNORECASE,
+)
 
 
 class ReaderMediaDeliveryService:
@@ -157,8 +167,8 @@ class ReaderMediaDeliveryService:
             asset_kind=asset.asset_kind,
             asset_role=asset.asset_role,
             visibility=asset.visibility,
-            title=asset.title,
-            description=asset.description,
+            title=_safe_reader_text(asset.title),
+            description=_safe_reader_text(asset.description),
             content_type=primary.content_type,
             size=primary.size,
             width=primary.width,
@@ -342,3 +352,9 @@ def _reader_object_content_type_is_safe(asset_kind: str, content_type: str) -> b
         return False
     normalized = content_type.split(";", 1)[0].strip().lower()
     return normalized in allowed
+
+
+def _safe_reader_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return "" if READER_MEDIA_FORBIDDEN_TEXT_RE.search(value) else value

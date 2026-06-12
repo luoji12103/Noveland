@@ -61,12 +61,32 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
         visibility="reader_visible",
         data=b"reader-image",
     )
+    sensitive_asset_id, _sensitive_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"sensitive-reader-image",
+        filename="sensitive-reader.png",
+        title="Reader raw_prompt image",
+        description="storage_uri media://private/reader-image",
+    )
     _seed_reference(engine, world_id, worldline_id, asset_id, "narrative_artifact", artifact_id)
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        sensitive_asset_id,
+        "narrative_artifact",
+        artifact_id,
+    )
 
     unauthenticated = client.get(f"/worlds/{world_id}/reader/media")
     _authenticate_session_only(client, member_token)
     listed = client.get(f"/worlds/{world_id}/reader/media")
     detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
+    sensitive_detail = client.get(f"/worlds/{world_id}/reader/media/{sensitive_asset_id}")
     downloaded = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
     scoped_downloaded = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
@@ -78,9 +98,16 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
 
     assert unauthenticated.status_code == 401
     assert listed.status_code == 200
-    assert [item["asset_id"] for item in listed.json()] == [str(asset_id)]
+    listed_assets = {item["asset_id"]: item for item in listed.json()}
+    assert set(listed_assets) == {str(asset_id), str(sensitive_asset_id)}
+    assert listed_assets[str(asset_id)]["title"] == "Reader image"
+    assert listed_assets[str(sensitive_asset_id)]["title"] == ""
+    assert listed_assets[str(sensitive_asset_id)]["description"] == ""
     assert detail.status_code == 200
+    assert sensitive_detail.status_code == 200
     assert detail.json()["asset_id"] == str(asset_id)
+    assert sensitive_detail.json()["title"] == ""
+    assert sensitive_detail.json()["description"] == ""
     assert detail.json()["objects"][0]["object_id"] == str(object_id)
     assert detail.json()["objects"][0]["download_url"] == _reader_media_download_path(
         world_id, worldline_id, object_id
@@ -93,6 +120,7 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
     assert admin_listed.status_code == 200
     _assert_no_forbidden_markers(listed.json())
     _assert_no_forbidden_markers(detail.json())
+    _assert_no_forbidden_markers(sensitive_detail.json())
 
 
 def test_reader_media_suppresses_active_content_type_objects() -> None:
@@ -786,6 +814,8 @@ def _seed_available_asset_with_object(
     object_role: str = "original",
     filename: str = "reader.png",
     content_type: str = "image/png",
+    title: str | None = "Reader image",
+    description: str | None = None,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     asset_id = uuid.uuid4()
     object_id = uuid.uuid4()
@@ -810,7 +840,8 @@ def _seed_available_asset_with_object(
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
                 created_by_actor_ref="test",
-                title="Reader image",
+                title=title,
+                description=description,
                 metadata_json={
                     "source_note": "safe",
                     "redaction_probe": "not an api_key or storage path",
