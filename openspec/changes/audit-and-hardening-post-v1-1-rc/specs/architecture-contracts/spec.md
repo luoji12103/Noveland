@@ -38,6 +38,14 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **WHEN** they request world content
 - **THEN** the response SHALL omit admin evidence and internal storage/provider details.
 
+#### Scenario: Member playback fetches safe turn presentation records
+- **GIVEN** a conversation turn has canonical presentation state for reader playback
+- **WHEN** an ordinary world member fetches the turn presentation through the conversation presentation GET route
+- **THEN** the backend SHALL return a member-readable presentation DTO instead of requiring world-admin access
+- **AND** the response SHALL preserve only safe playback fields such as speaker, emotion, render state, visible media asset identifiers, record identifiers, and timestamps
+- **AND** the response SHALL NOT expose internal sprite-set, sprite-variant, voice-profile, transcript, provider, prompt snapshot, model invocation, media job, storage URI/path, bytes, or base64 evidence.
+- **AND** presentation mutation, visual rendering, speech rendering, and audio transcription routes SHALL remain world-admin-only.
+
 #### Scenario: Beta feedback reporters do not receive admin triage evidence
 - **GIVEN** a beta feedback reporter can list or fetch their own report through member-readable routes
 - **WHEN** an admin has triaged the report with admin evidence refs, repair proposal refs, moderation refs, actor refs, or metadata

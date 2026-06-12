@@ -87,15 +87,22 @@ def test_world_member_is_denied_high_risk_admin_surfaces_without_leaks() -> None
         ("GET", f"/worlds/{world_id}/visual/sprite-sets", None),
         ("GET", f"/worlds/{world_id}/speech/voice-profiles", None),
         ("GET", f"/worlds/{world_id}/asset-generation/policies", None),
-        (
-            "GET",
-            f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
-            None,
-        ),
     ]
 
     for method, path, params in routes:
         response = client.request(method, path, params=params)
+        assert response.status_code == 403, path
+        _assert_no_forbidden_tokens(response.text)
+
+    presentation_path = (
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation"
+    )
+    for method, path, body in (
+        ("PUT", presentation_path, {"emotion_key": "happy"}),
+        ("PATCH", presentation_path, {"emotion_key": "happy"}),
+        ("POST", f"{presentation_path}/render-visual", {"location_key": "classroom"}),
+    ):
+        response = client.request(method, path, json=body)
         assert response.status_code == 403, path
         _assert_no_forbidden_tokens(response.text)
 

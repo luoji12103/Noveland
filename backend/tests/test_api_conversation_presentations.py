@@ -168,6 +168,14 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
         f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
         json={"emotion_key": "happy"},
     )
+    member_patch = client.patch(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+        json={"emotion_key": "happy"},
+    )
+    member_render_visual = client.post(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation/render-visual",
+        json={"location_key": "classroom"},
+    )
 
     _authenticate(client, owner_token)
     put_response = client.put(
@@ -211,6 +219,32 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
             "source_asset_id": str(source_audio_asset),
         },
     )
+    dirty_presentation_json: dict[str, Any] = {
+        "caption": "safe caption",
+        "storage_uri": "media://private/presentation",
+        "provider": {"adapter_kind": "fake"},
+        "visual": {
+            "sprite_fallback_reason": "default",
+            "compose_media_job_id": str(uuid.uuid4()),
+        },
+        "speech": {
+            "tts_media_job_id": str(uuid.uuid4()),
+            "model_invocation_id": str(uuid.uuid4()),
+        },
+        "nested": [
+            {"safe": "keep"},
+            {"raw_output": "provider output", "path": "/tmp/presentation.json"},
+        ],
+    }
+    with Session(engine) as session:
+        presentation = session.get(
+            ConversationTurnPresentation,
+            uuid.UUID(stt_response.json()["id"]),
+        )
+        assert presentation is not None
+        presentation.presentation_json = dirty_presentation_json
+        session.commit()
+
     get_response = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
     )
@@ -218,8 +252,14 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
         f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
         json={"presentation_json": {"nested": {"storage_uri": "local://leak"}}},
     )
+    _authenticate(client, member_token)
+    member_get = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+    )
 
     assert member_put.status_code == 403
+    assert member_patch.status_code == 403
+    assert member_render_visual.status_code == 403
     assert put_response.status_code == 200
     assert put_response.json()["emotion_intensity"] == 0.75
     assert patch_response.status_code == 200
@@ -234,7 +274,33 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
     assert stt_response.json()["transcript_id"] is not None
     assert get_response.status_code == 200
     assert get_response.json()["transcript_id"] == stt_response.json()["transcript_id"]
+    assert get_response.json()["sprite_set_id"] == str(sprite_set_id)
+    assert get_response.json()["sprite_variant_id"] == str(neutral_variant_id)
+    assert "media://private/presentation" in _json_text(get_response.json())
+    assert "model_invocation_id" in _json_text(get_response.json())
     assert leak_response.status_code == 422
+    assert member_get.status_code == 200
+    member_presentation = member_get.json()
+    assert member_presentation["speaker_agent_id"] == str(agent_id)
+    assert member_presentation["background_asset_id"] == str(background_asset)
+    assert member_presentation["composite_scene_asset_id"] is not None
+    assert member_presentation["tts_media_asset_id"] is not None
+    assert member_presentation["sprite_set_id"] is None
+    assert member_presentation["sprite_variant_id"] is None
+    assert member_presentation["voice_profile_id"] is None
+    assert member_presentation["transcript_id"] is None
+    assert member_presentation["presentation_json"]["caption"] == "safe caption"
+    assert member_presentation["presentation_json"]["nested"][0]["safe"] == "keep"
+    member_presentation_text = _json_text(member_presentation)
+    for forbidden_marker in (
+        "media://private/presentation",
+        "model_invocation_id",
+        "media_job",
+        "raw_output",
+        "/tmp/presentation.json",
+        "adapter_kind",
+    ):
+        assert forbidden_marker not in member_presentation_text
     assert "storage_uri" not in _json_text(visual_response.json())
     assert "storage_uri" not in _json_text(speech_response.json())
     assert "storage_uri" not in _json_text(stt_response.json())
