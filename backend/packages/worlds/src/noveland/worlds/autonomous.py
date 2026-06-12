@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from noveland.agents.models import Agent
 from noveland.calendar.models import AgentCalendarEntry, WorldScheduleRule
@@ -30,6 +32,41 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 DEFAULT_RUNTIME_ACTOR_REF = "system:runtime"
+OFFSCREEN_EVENT_PAYLOAD_FORBIDDEN_KEYS = {
+    "api_key",
+    "apikey",
+    "auth_ref",
+    "auth_refs",
+    "authorization",
+    "base64",
+    "bearer_token",
+    "bytes",
+    "client_secret",
+    "file_path",
+    "filesystem_path",
+    "password",
+    "path",
+    "preview_uri",
+    "private_key",
+    "prompt_snapshot",
+    "raw_bytes",
+    "raw_output",
+    "raw_prompt",
+    "resolved_secret",
+    "secret",
+    "secret_ref",
+    "secret_refs",
+    "storage_uri",
+    "thumbnail_uri",
+    "token",
+}
+OFFSCREEN_EVENT_PAYLOAD_FORBIDDEN_VALUE_RE = re.compile(
+    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    re.IGNORECASE,
+)
+_OMIT_OFFSCREEN_EVENT_PAYLOAD_VALUE = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,7 +256,7 @@ class LivingWorldAutonomyService:
                         worldline_id=item.worldline_id,
                         event_name=item.event_name,
                         importance=WorldEventImportance(item.importance),
-                        payload=item.payload_json,
+                        payload=_sanitize_offscreen_event_payload(item.payload_json),
                         wall_time=now,
                         world_time=_utc(item.due_at),
                         actor_ref=actor_ref,
@@ -414,6 +451,44 @@ class LivingWorldAutonomyService:
                 ),
             ).all(),
         )
+
+
+def _sanitize_offscreen_event_payload(value: Any) -> dict[str, Any]:
+    sanitized = _sanitize_offscreen_event_payload_value(value)
+    return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _sanitize_offscreen_event_payload_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text.strip().lower() in OFFSCREEN_EVENT_PAYLOAD_FORBIDDEN_KEYS:
+                continue
+            sanitized_item = _sanitize_offscreen_event_payload_value(item)
+            if sanitized_item is not _OMIT_OFFSCREEN_EVENT_PAYLOAD_VALUE:
+                sanitized[key_text] = sanitized_item
+        return sanitized
+    if isinstance(value, list):
+        sanitized_list: list[Any] = []
+        for item in value:
+            sanitized_item = _sanitize_offscreen_event_payload_value(item)
+            if sanitized_item is not _OMIT_OFFSCREEN_EVENT_PAYLOAD_VALUE:
+                sanitized_list.append(sanitized_item)
+        return sanitized_list
+    if isinstance(value, tuple):
+        sanitized_list = []
+        for item in value:
+            sanitized_item = _sanitize_offscreen_event_payload_value(item)
+            if sanitized_item is not _OMIT_OFFSCREEN_EVENT_PAYLOAD_VALUE:
+                sanitized_list.append(sanitized_item)
+        return sanitized_list
+    if (
+        isinstance(value, str)
+        and OFFSCREEN_EVENT_PAYLOAD_FORBIDDEN_VALUE_RE.search(value)
+    ):
+        return _OMIT_OFFSCREEN_EVENT_PAYLOAD_VALUE
+    return value
 
 
 def _utc(value: datetime | None) -> datetime:

@@ -1151,6 +1151,67 @@ def test_daily_life_and_offscreen_event_queue_are_world_scoped() -> None:
     assert other_queue_status == "pending"
 
 
+def test_offscreen_resolution_sanitizes_persisted_world_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-offscreen-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "offscreen-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    queued = client.post(
+        f"/worlds/{world_id}/offscreen-events",
+        json={
+            "event_name": "living_world.offscreen_payload_check",
+            "title": "Due unsafe offscreen payload",
+            "due_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+            "importance": "daily",
+            "payload": {
+                "summary": "safe summary",
+                "safe_number": 3,
+                "storage_uri": "media://private/offscreen",
+                "raw_prompt": "operator prompt",
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "path": "/root/private/offscreen.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"bytes": "base64,aaaa"},
+                    "visible note",
+                    "media://private/list-entry",
+                ],
+            },
+        },
+    )
+    resolved = client.post(f"/worlds/{world_id}/offscreen-events/resolve", params={"limit": 5})
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(resolved.json()["event_ids"][0]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert queued.status_code == 201
+    assert resolved.status_code == 200
+    assert resolved.json()["resolved_count"] == 1
+    assert payload["summary"] == "safe summary"
+    assert payload["safe_number"] == 3
+    assert payload["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in payload["items"]
+    assert "visible note" in payload["items"]
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+    assert "bytes" not in payload_text
+
+
 def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")

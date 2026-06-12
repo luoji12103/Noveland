@@ -3,14 +3,14 @@
 - Date: 2026-06-12T08:25:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-071 are remediated on this branch; latest batch is F-071 player choice preview effect redaction.
+- Status: F-001 through F-072 are remediated on this branch; latest batch is F-072 offscreen event payload persistence redaction.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-071 batch: 8fe7d50 fix(worlds): redact player notification text.
+- Base before F-072 batch: 42d1ca8 fix(worlds): redact player choice preview metadata.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server services at F-071 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
+- Current server services at F-072 batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,31 +26,31 @@
 
 ## Completed This Batch
 
-- Reconfirmed current state after F-070: branch `feature/audit-and-hardening-post-v1-1-rc`, worktree clean, local and origin synchronized at 8fe7d50, active OpenSpec change valid, Postgres/NATS healthy.
-- Continued backend forbidden-evidence audit across Web route/client helpers, player sessions, private beta, beta feedback, media, moderation, conversations, and remaining worlds.py member/player DTOs.
-- Recorded/remediated F-071: member-readable `POST /worlds/{world_id}/player-choices/preview` hid diagnostics for non-admins but returned arbitrary `relationship_updates`, `faction_updates`, and `offscreen_events` effect JSON verbatim from request payloads.
-- Added an architecture-contracts OpenSpec scenario requiring member player choice preview effect metadata to omit forbidden keys/values while retaining safe public consequence preview fields.
-- Added `_sanitize_public_json_list()` and applied it to non-admin player choice preview relationship, faction, and offscreen effect lists; admin preview responses remain unchanged.
-- Expanded player interaction API coverage to first reproduce the member preview `raw_prompt` leak, then assert member preview effect JSON omits `storage_uri`, `media://`, `raw_prompt`, `raw_output`, and `/root/` while admin preview retains full effect metadata and diagnostics.
+- Reconfirmed current state before F-072: branch `feature/audit-and-hardening-post-v1-1-rc`, local and origin synchronized at `42d1ca8`, active OpenSpec change valid, Postgres/NATS healthy, and only the in-progress offscreen-resolution OpenSpec delta dirty.
+- Continued backend forbidden-evidence audit across member/player and world-event persistence surfaces after F-071.
+- Recorded/remediated F-072: offscreen event resolution copied `OffscreenEventQueueItem.payload_json` directly into `WorldEventAppend(payload=...)`, allowing dirty queue payloads from admin input, GM macro plans, player choice effects, or forked queue state to persist forbidden evidence in `world_events.payload`.
+- Added an architecture-contracts OpenSpec scenario requiring resolved offscreen world event payloads to omit storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, and base64-like values while preserving safe context.
+- Added `_sanitize_offscreen_event_payload()` in `backend/packages/worlds/src/noveland/worlds/autonomous.py` and applied it immediately before appending resolved world events; queue admin visibility remains unchanged, but event persistence is protected for historical and new queue rows.
+- Added regression coverage that first reproduced `storage_uri` persistence in `WorldEventModel.payload`, then asserts safe summary/context/list values remain while forbidden markers are removed.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` first failed on the unredacted member preview `raw_prompt`, then passed with 1 test after remediation.
-- `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests.
-- `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed.
-- `cd backend && uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed.
-- Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
-- `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed after harness updates.
+- `cd backend && uv run pytest tests/test_api_worlds.py::test_offscreen_resolution_sanitizes_persisted_world_event_payload -q` first failed on unredacted `storage_uri` persisted in `WorldEventModel.payload`, then passed with 1 test after remediation.
+- `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 39 tests.
+- `cd backend && uv run ruff check packages/worlds/src/noveland/worlds/autonomous.py tests/test_api_worlds.py` passed.
+- `cd backend && uv run mypy packages/worlds/src/noveland/worlds/autonomous.py tests/test_api_worlds.py` passed.
+- Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 565 passed and 8 skipped.
+- `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed.
 
 ## Remaining Work
 
-1. Commit the completed F-071 batch after final diff/status review; do not push unless explicitly requested.
-2. Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, provider/quota/worldline isolation edge cases, and historical dirty content paths.
+1. Commit the completed F-072 batch after final diff/status review; do not push unless explicitly requested.
+2. Continue backend forbidden-evidence audits for remaining historical dirty content paths, provider/quota/worldline isolation edge cases, and remaining member/player DTO surfaces.
 3. Continue Web/e2e security audit on remaining Next route handlers, proxy modules, method exposure, response shaping, role boundary, evidence redaction, and client-side leaks.
 4. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 
-## Finding F-071
+## Finding F-072
 
-- Member player choice preview responses exposed arbitrary effect JSON to ordinary world members even though diagnostics were already hidden.
-- The remediation applies the shared public JSON sanitizer to non-admin preview relationship update, faction update, and offscreen event lists while preserving safe fields and admin review detail.
-- Residual risk: this focused batch covered player choice preview effect JSON only; continue auditing other preview/dry-run endpoints for historical or request-copied forbidden evidence.
+- Offscreen event resolution persisted arbitrary queue payload JSON directly into world events.
+- The remediation sanitizes payload JSON at the domain persistence boundary, so unsafe data is omitted even for historical dirty queue rows while safe fields such as summary, numeric context, nested safe strings, and safe list items remain.
+- Residual risk: this focused batch protects `world_events.payload` at resolution; continue auditing other event producers and historical dirty payload paths for comparable persistence-time boundaries.

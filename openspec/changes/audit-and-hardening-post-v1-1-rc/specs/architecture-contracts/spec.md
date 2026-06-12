@@ -15,6 +15,11 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the speech service SHALL reject worldline-scoped media assets rather than allowing fork-specific audio to become a world-level voice reference
 - **AND** worldline-scoped voice profiles SHALL continue to require reference assets from the same worldline.
 
+#### Scenario: Offscreen resolution writes safe world event payloads
+- **GIVEN** an offscreen event queue item contains payload JSON copied from admin input, GM macro planning, player choice effects, or forked queue state
+- **WHEN** the autonomy service resolves the queue item into `world_events.payload`
+- **THEN** the persisted world event payload SHALL omit storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, and base64-like values while preserving safe event context fields.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 
