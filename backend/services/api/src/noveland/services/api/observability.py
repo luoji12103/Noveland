@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from noveland.auth import AuthenticatedSubject
 from noveland.core.settings import load_settings
 from noveland.media.storage import LocalMediaObjectStorage
@@ -115,15 +115,18 @@ def get_self_use_mvp_readiness(
     failure_notes_recorded: Annotated[bool, Query()] = False,
 ) -> SelfUseMvpGateReport:
     del subject
-    return ProductionReadinessGateService(db_session).self_use_mvp_report(
-        world_id=world_id,
-        worldline_id=worldline_id,
-        conversation_id=conversation_id,
-        evidence_limit_per_section=evidence_limit_per_section,
-        manual_play_minutes=manual_play_minutes,
-        resume_verified=resume_verified,
-        failure_notes_recorded=failure_notes_recorded,
-    )
+    try:
+        return ProductionReadinessGateService(db_session).self_use_mvp_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            evidence_limit_per_section=evidence_limit_per_section,
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("/readiness/private-beta-setup", response_model=PrivateBetaSetupReadinessReport)
@@ -139,15 +142,18 @@ def get_private_beta_setup_readiness(
     failure_notes_recorded: Annotated[bool, Query()] = False,
 ) -> PrivateBetaSetupReadinessReport:
     del subject
-    report = ProductionReadinessGateService(db_session).private_beta_setup_report(
-        world_id=world_id,
-        worldline_id=worldline_id,
-        conversation_id=conversation_id,
-        evidence_limit_per_section=evidence_limit_per_section,
-        manual_play_minutes=manual_play_minutes,
-        resume_verified=resume_verified,
-        failure_notes_recorded=failure_notes_recorded,
-    )
+    try:
+        report = ProductionReadinessGateService(db_session).private_beta_setup_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            evidence_limit_per_section=evidence_limit_per_section,
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
     return PrivateBetaSetupReadinessReport.model_validate(report.model_dump())
 
 
@@ -171,22 +177,25 @@ def get_private_beta_readiness(
     repair_loop_reviewed: Annotated[bool, Query()] = False,
 ) -> PrivateBetaGateReport:
     del subject
-    return ProductionReadinessGateService(db_session).private_beta_gate_report(
-        world_id=world_id,
-        worldline_id=worldline_id,
-        conversation_id=conversation_id,
-        evidence_limit_per_section=evidence_limit_per_section,
-        manual_play_minutes=manual_play_minutes,
-        resume_verified=resume_verified,
-        failure_notes_recorded=failure_notes_recorded,
-        manual_tester_count=manual_tester_count,
-        tester_session_completed=tester_session_completed,
-        no_developer_intervention_verified=no_developer_intervention_verified,
-        quota_reviewed=quota_reviewed,
-        feedback_triage_verified=feedback_triage_verified,
-        memory_persona_qa_reviewed=memory_persona_qa_reviewed,
-        repair_loop_reviewed=repair_loop_reviewed,
-    )
+    try:
+        return ProductionReadinessGateService(db_session).private_beta_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            evidence_limit_per_section=evidence_limit_per_section,
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+            manual_tester_count=manual_tester_count,
+            tester_session_completed=tester_session_completed,
+            no_developer_intervention_verified=no_developer_intervention_verified,
+            quota_reviewed=quota_reviewed,
+            feedback_triage_verified=feedback_triage_verified,
+            memory_persona_qa_reviewed=memory_persona_qa_reviewed,
+            repair_loop_reviewed=repair_loop_reviewed,
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get("/readiness/release-candidate", response_model=ReleaseCandidateGateReport)
@@ -234,57 +243,60 @@ def get_release_candidate_readiness(
         current_specs_exist=(openspec_root / "specs").is_dir(),
         archived_change_count=len(list(archive_root.glob("*"))) if archive_root.is_dir() else 0,
     ).report()
-    return ProductionReadinessGateService(db_session).release_candidate_gate_report(
-        world_id=world_id,
-        worldline_id=worldline_id,
-        conversation_id=conversation_id,
-        evidence_limit_per_section=evidence_limit_per_section,
-        backup_restore_drill=BackupRestoreDrillReport.model_validate(
-            {
-                "status": backup_restore_drill.status,
-                "generated_at": backup_restore_drill.generated_at,
-                "target_profile": backup_restore_drill.target_profile,
-                "check_count": backup_restore_drill.check_count,
-                "evidence_count": backup_restore_drill.evidence_count,
-                "blocker_count": backup_restore_drill.blocker_count,
-                "warning_count": backup_restore_drill.warning_count,
-                "checks": [
-                    {
-                        "check_key": check.check_key,
-                        "status": check.status,
-                        "summary": check.summary,
-                        "evidence_count": check.evidence_count,
-                        "blocker_count": check.blocker_count,
-                        "warning_count": check.warning_count,
-                        "evidence_refs": list(check.evidence_refs),
-                        "blockers": list(check.blockers),
-                        "warnings": list(check.warnings),
-                    }
-                    for check in backup_restore_drill.checks
-                ],
-                "suppressed_fields": list(backup_restore_drill.suppressed_fields),
-                "non_goals": list(backup_restore_drill.non_goals),
-            },
-        ),
-        manual_play_minutes=manual_play_minutes,
-        resume_verified=resume_verified,
-        failure_notes_recorded=failure_notes_recorded,
-        manual_tester_count=manual_tester_count,
-        tester_session_completed=tester_session_completed,
-        no_developer_intervention_verified=no_developer_intervention_verified,
-        quota_reviewed=quota_reviewed,
-        feedback_triage_verified=feedback_triage_verified,
-        memory_persona_qa_reviewed=memory_persona_qa_reviewed,
-        repair_loop_reviewed=repair_loop_reviewed,
-        operational_runbooks_reviewed=operational_runbooks_reviewed,
-        backup_restore_drill_reviewed=backup_restore_drill_reviewed,
-        normal_use_stress_reviewed=normal_use_stress_reviewed,
-        content_safety_reviewed=content_safety_reviewed,
-        import_export_reviewed=import_export_reviewed,
-        provider_reliability_reviewed=provider_reliability_reviewed,
-        user_facing_polish_reviewed=user_facing_polish_reviewed,
-        normal_use_manual_checklist_reviewed=normal_use_manual_checklist_reviewed,
-    )
+    try:
+        return ProductionReadinessGateService(db_session).release_candidate_gate_report(
+            world_id=world_id,
+            worldline_id=worldline_id,
+            conversation_id=conversation_id,
+            evidence_limit_per_section=evidence_limit_per_section,
+            backup_restore_drill=BackupRestoreDrillReport.model_validate(
+                {
+                    "status": backup_restore_drill.status,
+                    "generated_at": backup_restore_drill.generated_at,
+                    "target_profile": backup_restore_drill.target_profile,
+                    "check_count": backup_restore_drill.check_count,
+                    "evidence_count": backup_restore_drill.evidence_count,
+                    "blocker_count": backup_restore_drill.blocker_count,
+                    "warning_count": backup_restore_drill.warning_count,
+                    "checks": [
+                        {
+                            "check_key": check.check_key,
+                            "status": check.status,
+                            "summary": check.summary,
+                            "evidence_count": check.evidence_count,
+                            "blocker_count": check.blocker_count,
+                            "warning_count": check.warning_count,
+                            "evidence_refs": list(check.evidence_refs),
+                            "blockers": list(check.blockers),
+                            "warnings": list(check.warnings),
+                        }
+                        for check in backup_restore_drill.checks
+                    ],
+                    "suppressed_fields": list(backup_restore_drill.suppressed_fields),
+                    "non_goals": list(backup_restore_drill.non_goals),
+                },
+            ),
+            manual_play_minutes=manual_play_minutes,
+            resume_verified=resume_verified,
+            failure_notes_recorded=failure_notes_recorded,
+            manual_tester_count=manual_tester_count,
+            tester_session_completed=tester_session_completed,
+            no_developer_intervention_verified=no_developer_intervention_verified,
+            quota_reviewed=quota_reviewed,
+            feedback_triage_verified=feedback_triage_verified,
+            memory_persona_qa_reviewed=memory_persona_qa_reviewed,
+            repair_loop_reviewed=repair_loop_reviewed,
+            operational_runbooks_reviewed=operational_runbooks_reviewed,
+            backup_restore_drill_reviewed=backup_restore_drill_reviewed,
+            normal_use_stress_reviewed=normal_use_stress_reviewed,
+            content_safety_reviewed=content_safety_reviewed,
+            import_export_reviewed=import_export_reviewed,
+            provider_reliability_reviewed=provider_reliability_reviewed,
+            user_facing_polish_reviewed=user_facing_polish_reviewed,
+            normal_use_manual_checklist_reviewed=normal_use_manual_checklist_reviewed,
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.get(
@@ -340,3 +352,7 @@ def get_backup_restore_drill_readiness(
             "non_goals": list(report.non_goals),
         },
     )
+
+
+def _unprocessable(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)

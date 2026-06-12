@@ -130,9 +130,7 @@ def test_production_readiness_report_aggregates_existing_safe_evidence() -> None
     assert sections["provider_governance"].summary.startswith("1 active providers")
     assert sections["budget_controls"].status == "ok"
     assert sections["storage_integrity"].status == "ok"
-    assert sections["security_regression"].evidence_refs[0].id == (
-        "v0.7-security-regression-suite"
-    )
+    assert sections["security_regression"].evidence_refs[0].id == ("v0.7-security-regression-suite")
     assert "public_launch_gate" in report.non_goals
 
 
@@ -321,10 +319,7 @@ def test_public_launch_readiness_endpoint_is_platform_admin_only_and_safe() -> N
     assert response.json()["world_id"] == str(world_id)
     assert response.json()["auto_launch_enabled"] is False
     assert response.json()["status"] == "blocked"
-    assert (
-        response.json()["sections"][0]["section_key"]
-        == "internal_production_readiness"
-    )
+    assert response.json()["sections"][0]["section_key"] == "internal_production_readiness"
     for token in FORBIDDEN_RESPONSE_TOKENS:
         assert token not in response.text
 
@@ -975,6 +970,44 @@ def test_release_candidate_endpoint_is_platform_admin_only_and_not_public_launch
         params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
     )
     assert forbidden.status_code == 403
+
+
+def test_readiness_endpoints_reject_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-readiness-worldline@example.test",
+        platform_admin=True,
+    )
+    world_id, worldline_id = _seed_world(engine, owner_user_id=platform_user_id)
+    _other_world_id, other_worldline_id = _seed_world(engine)
+    _authenticate(client, platform_token)
+
+    endpoint_params: list[tuple[str, dict[str, str]]] = [
+        ("/observability/readiness/self-use-mvp", {}),
+        ("/observability/readiness/private-beta-setup", {}),
+        ("/observability/readiness/private-beta", {}),
+        ("/observability/readiness/release-candidate", {}),
+    ]
+
+    for endpoint, extra_params in endpoint_params:
+        wrong_worldline = client.get(
+            endpoint,
+            params={
+                "world_id": str(world_id),
+                "worldline_id": str(other_worldline_id),
+                **extra_params,
+            },
+        )
+        assert wrong_worldline.status_code == 422
+        assert wrong_worldline.json()["detail"] == "worldline not found"
+
+    valid = client.get(
+        "/observability/readiness/self-use-mvp",
+        params={"world_id": str(world_id), "worldline_id": str(worldline_id)},
+    )
+    assert valid.status_code == 200
+    assert valid.json()["worldline_id"] == str(worldline_id)
 
 
 def test_release_candidate_gate_does_not_create_duplicate_framework_tables() -> None:

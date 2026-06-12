@@ -79,6 +79,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the API SHALL reject the request with a handled client error instead of surfacing an unhandled media service exception
 - **AND** valid worldline-scoped media asset detail operations SHALL continue to return only assets from the resolved worldline according to member/admin visibility rules.
 
+#### Scenario: Observability readiness routes reject invalid worldline scope consistently
+- **GIVEN** an observability self-use, private-beta setup, private-beta, or release-candidate readiness request includes an explicit `worldline_id`
+- **WHEN** the `worldline_id` is missing from the requested `world_id` or belongs to another world
+- **THEN** the API SHALL reject the request with a handled client error instead of surfacing an unhandled readiness service exception
+- **AND** valid worldline-scoped readiness operations SHALL continue to aggregate evidence from the resolved worldline scope.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

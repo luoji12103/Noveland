@@ -4651,3 +4651,16 @@
 - Tests added/updated: Added `test_media_asset_detail_rejects_cross_worldline_requests` covering cross-world media asset detail rejection and valid same-worldline detail behavior.
 - Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_asset_detail_rejects_cross_worldline_requests -q` first failed with an uncaught `MediaValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_media.py -q` passed with 10 tests; focused backend ruff/mypy passed for media API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 577 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
 - Follow-up notes: Continue invalid-worldline behavior audit for media object/detail subroutes, media references, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening observability readiness worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend platform-admin observability readiness API worldline isolation remediation for F-118.
+- Finding: F-118 found self-use readiness requests with a cross-world `worldline_id` relying on service-level `worldline_or_404()` without API error mapping, raising uncaught `ValueError`; adjacent private-beta setup, private-beta, and release-candidate readiness routes use the same worldline resolution pattern.
+- Summary: Added an architecture-contracts scenario for handled observability readiness invalid-worldline responses and mapped invalid explicit worldline scopes in self-use, private-beta setup, private-beta, and release-candidate readiness routes to existing 422 client errors while preserving valid readiness aggregation behavior.
+- Files changed: backend/services/api/src/noveland/services/api/observability.py, backend/tests/test_production_readiness_gate.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_readiness_endpoints_reject_cross_worldline_requests` covering cross-world self-use, private-beta setup, private-beta, and release-candidate readiness rejection plus valid same-worldline self-use behavior.
+- Verification: `cd backend && uv run pytest tests/test_production_readiness_gate.py::test_readiness_endpoints_reject_cross_worldline_requests -q` first failed with an uncaught `ValueError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_production_readiness_gate.py -q` passed with 28 tests; focused backend ruff/mypy passed for observability API and production readiness tests. Full backend `ruff`, `mypy`, and `pytest` passed with 578 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for remaining observability filters, invocation-adjacent filters, media object/reference subroutes, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
