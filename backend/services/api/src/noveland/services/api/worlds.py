@@ -8245,10 +8245,22 @@ def _organization_response(
         id=organization.id,
         world_id=organization.world_id,
         organization_key=organization.organization_key,
-        name=organization.name,
+        name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         organization_type=cast(OrganizationType, organization.organization_type),
-        description=organization.description,
-        public_summary=organization.public_summary,
+        description=(
+            organization.description
+            if include_admin_fields or organization.description is None
+            else _sanitize_public_text(organization.description)
+        ),
+        public_summary=(
+            organization.public_summary
+            if include_admin_fields or organization.public_summary is None
+            else _sanitize_public_text(organization.public_summary)
+        ),
         hidden_summary=organization.hidden_summary if include_admin_fields else None,
         metadata=organization.metadata_json if include_admin_fields else {},
         is_active=organization.is_active,
@@ -8270,15 +8282,27 @@ def _organization_membership_response(
         world_id=membership.world_id,
         organization_id=membership.organization_id,
         organization_key=organization.organization_key,
-        organization_name=organization.name,
+        organization_name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         agent_id=membership.agent_id,
         agent_key=agent.agent_key,
         agent_display_name=agent.display_name,
-        role_title=membership.role_title,
+        role_title=(
+            membership.role_title
+            if include_admin_fields or membership.role_title is None
+            else _sanitize_public_text(membership.role_title)
+        ),
         visibility=cast(OrganizationVisibility, membership.visibility),
         loyalty=membership.loyalty,
         influence=membership.influence,
-        responsibilities=membership.responsibilities,
+        responsibilities=(
+            membership.responsibilities
+            if include_admin_fields
+            else [_sanitize_public_text(item) for item in membership.responsibilities]
+        ),
         metadata=membership.metadata_json if include_admin_fields else {},
         created_at=membership.created_at,
         updated_at=membership.updated_at,
@@ -8298,13 +8322,21 @@ def _faction_track_response(
         worldline_id=track.worldline_id,
         organization_id=track.organization_id,
         organization_key=organization.organization_key,
-        organization_name=organization.name,
+        organization_name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         track_key=track.track_key,
-        name=track.name,
+        name=track.name if include_admin_fields else _sanitize_public_text(track.name),
         track_type=cast(FactionTrackType, track.track_type),
         progress=track.progress,
         pressure=track.pressure,
-        summary=track.summary,
+        summary=(
+            track.summary
+            if include_admin_fields or track.summary is None
+            else _sanitize_public_text(track.summary)
+        ),
         metadata=track.metadata_json if include_admin_fields else {},
         created_at=track.created_at,
         updated_at=track.updated_at,

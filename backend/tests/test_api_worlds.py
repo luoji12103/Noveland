@@ -926,9 +926,10 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
         f"/worlds/{world_id}/organizations",
         json={
             "organization_key": "student-council",
-            "name": "Student Council",
+            "name": "Student Council raw_prompt: organization name",
             "organization_type": "club",
-            "public_summary": "Runs school events.",
+            "description": "Runs safe school events.",
+            "public_summary": "storage_uri media://private/org-summary",
             "hidden_summary": "Tracks the old club room incident.",
             "metadata": {
                 "founded": "post-canon",
@@ -957,11 +958,11 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
         f"/worlds/{world_id}/organizations/{organization_id}/memberships",
         json={
             "agent_id": str(agent_id),
-            "role_title": "President",
+            "role_title": "President raw_output: membership role",
             "visibility": "public",
             "loyalty": 80,
             "influence": 70,
-            "responsibilities": ["agenda"],
+            "responsibilities": ["agenda", "storage_uri media://private/responsibility"],
             "metadata": {
                 "raw_prompt": "operator-only membership prompt",
                 "storage_uri": "media://private/membership-note",
@@ -991,7 +992,7 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
         json={
             "track_key": "festival-plan",
-            "name": "Festival Plan",
+            "name": "Festival Plan raw_prompt: track name",
             "track_type": "goal",
             "progress": 10,
             "pressure": 20,
@@ -1012,7 +1013,7 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     updated_track = client.patch(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks/"
         f"{created_track.json()['id']}",
-        json={"progress": 35, "summary": "Venue confirmed."},
+        json={"progress": 35, "summary": "Venue confirmed raw_output: /root/faction-plan"},
     )
     list_tracks = client.get(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
@@ -1032,17 +1033,28 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert member_create.status_code == 403
     assert created_org.status_code == 201
     assert created_org.json()["organization_key"] == "student-council"
+    assert created_org.json()["name"] == "Student Council raw_prompt: organization name"
+    assert created_org.json()["description"] == "Runs safe school events."
+    assert created_org.json()["public_summary"] == "storage_uri media://private/org-summary"
     assert created_org.json()["hidden_summary"] == "Tracks the old club room incident."
     assert created_org.json()["metadata"]["raw_prompt"] == "operator-only organization prompt"
     assert admin_list.status_code == 200
+    assert admin_list.json()[0]["name"] == "Student Council raw_prompt: organization name"
+    assert admin_list.json()[0]["description"] == "Runs safe school events."
+    assert admin_list.json()[0]["public_summary"] == "storage_uri media://private/org-summary"
     assert admin_list.json()[0]["hidden_summary"] == "Tracks the old club room incident."
     assert admin_list.json()[0]["metadata"]["raw_prompt"] == "operator-only organization prompt"
     assert member_list_after_create.status_code == 200
-    assert member_list_after_create.json()[0]["public_summary"] == "Runs school events."
+    assert member_list_after_create.json()[0]["name"] == ""
+    assert member_list_after_create.json()[0]["description"] == "Runs safe school events."
+    assert member_list_after_create.json()[0]["public_summary"] == ""
     assert member_list_after_create.json()[0]["hidden_summary"] is None
     assert member_list_after_create.json()[0]["metadata"] == {}
     assert member_list_memberships.status_code == 200
+    assert member_list_memberships.json()[0]["organization_name"] == ""
     assert member_list_memberships.json()[0]["agent_key"] == "club-president"
+    assert member_list_memberships.json()[0]["role_title"] == ""
+    assert member_list_memberships.json()[0]["responsibilities"] == ["agenda", ""]
     assert member_list_memberships.json()[0]["metadata"] == {}
     assert duplicate_org.status_code == 409
     assert updated_org.status_code == 200
@@ -1052,24 +1064,40 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert created_membership.status_code == 201
     assert created_membership.json()["agent_key"] == "club-president"
     assert created_membership.json()["loyalty"] == 80
+    assert created_membership.json()["role_title"] == "President raw_output: membership role"
+    assert created_membership.json()["responsibilities"] == [
+        "agenda",
+        "storage_uri media://private/responsibility",
+    ]
     assert duplicate_membership.status_code == 409
     assert updated_membership.status_code == 200
     assert updated_membership.json()["visibility"] == "hidden"
     assert updated_membership.json()["loyalty"] == 85
     assert [item["agent_key"] for item in list_memberships.json()] == ["club-president"]
+    assert list_memberships.json()[0]["organization_name"] == (
+        "Student Council raw_prompt: organization name"
+    )
+    assert list_memberships.json()[0]["role_title"] == "President raw_output: membership role"
     assert list_memberships.json()[0]["metadata"]["raw_prompt"] == (
         "operator-only membership prompt"
     )
     assert created_track.status_code == 201
     assert created_track.json()["progress"] == 10
+    assert created_track.json()["name"] == "Festival Plan raw_prompt: track name"
     assert duplicate_track.status_code == 409
     assert updated_track.status_code == 200
     assert updated_track.json()["progress"] == 35
     assert list_tracks.status_code == 200
-    assert list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert list_tracks.json()[0]["organization_name"] == (
+        "Student Council raw_prompt: organization name"
+    )
+    assert list_tracks.json()[0]["name"] == "Festival Plan raw_prompt: track name"
+    assert list_tracks.json()[0]["summary"] == "Venue confirmed raw_output: /root/faction-plan"
     assert list_tracks.json()[0]["metadata"]["raw_prompt"] == "operator-only faction prompt"
     assert member_list_tracks.status_code == 200
-    assert member_list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert member_list_tracks.json()[0]["organization_name"] == ""
+    assert member_list_tracks.json()[0]["name"] == ""
+    assert member_list_tracks.json()[0]["summary"] == ""
     assert member_list_tracks.json()[0]["metadata"] == {}
     assert organization_events.status_code == 200
     assert organization_events.json()[0]["event_name"] == "organization.faction_progress_updated"

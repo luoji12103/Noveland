@@ -4856,3 +4856,15 @@
 - Tests added/updated: Extended `test_location_graph_and_agent_presence_enforce_world_scope` for sensitive member scene/location text redaction and safe scene-name preservation.
 - Verification: Focused location graph regression first failed because member scene name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member organization faction text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable organization, membership, and faction progress text remediation for F-135.
+- Finding: F-135 found `backend/services/api/src/noveland/services/api/worlds.py` redacted hidden summaries and metadata for ordinary members but returned admin-authored organization `name`, `description`, `public_summary`, membership `organization_name`, `role_title`, `responsibilities`, and faction `organization_name`, `name`, and `summary` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_organization_response()`, `_organization_membership_response()`, and `_faction_track_response()` to blank sensitive-looking organization, membership, and faction text for non-admin member responses while preserving safe public text, numeric state, identity fields, metadata redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_organization_memberships_and_faction_tracks_append_events` for sensitive member organization/membership/faction text redaction and safe organization description/responsibility preservation.
+- Verification: Focused organization/faction regression first failed because member organization name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for agent/worldline public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
