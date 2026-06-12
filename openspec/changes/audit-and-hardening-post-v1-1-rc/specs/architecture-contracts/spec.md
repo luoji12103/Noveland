@@ -375,6 +375,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
+#### Scenario: Web provider admin JSON panels normalize sensitive provider evidence
+- **GIVEN** an authorized admin views provider integration config, default params, capability JSON, or health metadata in the Web provider admin console
+- **WHEN** provider JSON contains resolved secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, bytes, or base64 keys written in snake_case, camelCase, compact, or mixed punctuation forms such as client_secret, clientSecret, bearerToken, rawPrompt, storageUri, filePath, or promptSnapshotId
+- **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable JSON panels or metadata summaries
+- **AND** safe provider configuration keys such as model_discovery_path, chat_completions_path, endpoint, timeout_seconds, temperature, and dry_run SHALL remain visible.
+
 #### Scenario: Web client manages speech admin records
 - **GIVEN** browser-side Web client code issues speech voice profile, agent voice binding, style mapping, transcript, TTS, or STT requests through same-origin API routes
 - **AND** the world, agent, voice profile, binding, or style mapping identifier contains encoded path separators or other reserved path characters
