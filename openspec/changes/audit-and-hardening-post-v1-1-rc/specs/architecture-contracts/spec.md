@@ -128,6 +128,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit the forbidden metadata keys and values while retaining safe metadata and SHALL blank internal actor refs
 - **AND** admin media routes MAY continue to expose full metadata and actor refs for media management and diagnostics.
 
+#### Scenario: Member media and presentation JSON normalize sensitive key variants
+- **GIVEN** a world member reads media metadata-bearing DTOs or conversation turn presentation JSON through member-readable routes
+- **WHEN** metadata or presentation JSON contains sensitive keys written in snake_case, camelCase, compact, or mixed punctuation forms such as raw_prompt, rawPrompt, rawprompt, storage_uri, storageUri, prompt_snapshot, or promptSnapshotId
+- **THEN** the member response SHALL omit those forbidden keys and values while retaining safe metadata and presentation fields
+- **AND** admin media and presentation routes MAY continue to expose unsanitized authoring/operator JSON required for diagnostics and management.
+
 
 #### Scenario: Member subscribes to realtime world or conversation streams
 - **GIVEN** a world member subscribes to world or conversation realtime streams

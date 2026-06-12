@@ -188,11 +188,31 @@ _MEMBER_PRESENTATION_SENSITIVE_KEYS = {
     "tts_media_job_id",
     "voice_profile_id",
 }
+_MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower())
+    for marker in _MEMBER_PRESENTATION_SENSITIVE_KEYS
+}
+_MEMBER_PRESENTATION_EXACT_KEY_MARKERS = {
+    "base64",
+    "bytes",
+    "invocation",
+    "mediajob",
+    "modelinvocation",
+    "password",
+    "path",
+    "provider",
+    "secret",
+    "token",
+}
+_MEMBER_PRESENTATION_SUBSTRING_KEY_MARKERS = (
+    _MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS - _MEMBER_PRESENTATION_EXACT_KEY_MARKERS
+)
 _MEMBER_PRESENTATION_SENSITIVE_VALUE_RE = re.compile(
-    r"(media://|object://|file://|s3://|gs://|/root/|/tmp/|base64,|"
-    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
-    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot|model_invocation|media_job|"
-    r"storage_uri|provider[_ -]?(kind|key|id)?)",
+    r"(storage[_ -]?uri|media://|object://|file://|s3://|gs://|/root/|/tmp/|"
+    r"base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|model[_ -]?invocation|"
+    r"media[_ -]?job|file[_ -]?path|filesystem[_ -]?path|object[_ -]?path|"
+    r"provider[_ -]?(kind|key|id)?)",
     re.IGNORECASE,
 )
 _OMIT_MEMBER_PRESENTATION_VALUE = object()
@@ -261,7 +281,7 @@ def _sanitize_member_presentation_json_value(value: Any) -> Any:
         sanitized: dict[str, Any] = {}
         for raw_key, item in value.items():
             key = str(raw_key)
-            if key.strip().lower() in _MEMBER_PRESENTATION_SENSITIVE_KEYS:
+            if _is_member_presentation_sensitive_key(key):
                 continue
             clean_item = _sanitize_member_presentation_json_value(item)
             if clean_item is not _OMIT_MEMBER_PRESENTATION_VALUE:
@@ -277,6 +297,13 @@ def _sanitize_member_presentation_json_value(value: Any) -> Any:
     if isinstance(value, str) and _MEMBER_PRESENTATION_SENSITIVE_VALUE_RE.search(value):
         return _OMIT_MEMBER_PRESENTATION_VALUE
     return value
+
+
+def _is_member_presentation_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in _MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS or any(
+        marker and marker in normalized for marker in _MEMBER_PRESENTATION_SUBSTRING_KEY_MARKERS
+    )
 
 
 @router.get("", response_model=ConversationTurnPresentationRecord | None)

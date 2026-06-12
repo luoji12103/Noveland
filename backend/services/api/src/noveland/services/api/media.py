@@ -129,10 +129,25 @@ _MEMBER_METADATA_SENSITIVE_KEYS = {
     "provider_health",
     "diagnostics",
 }
+_MEMBER_METADATA_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower())
+    for marker in _MEMBER_METADATA_SENSITIVE_KEYS
+}
+_MEMBER_METADATA_EXACT_KEY_MARKERS = {
+    "base64",
+    "bytes",
+    "password",
+    "secret",
+    "token",
+}
+_MEMBER_METADATA_SUBSTRING_KEY_MARKERS = (
+    _MEMBER_METADATA_SENSITIVE_KEY_MARKERS - _MEMBER_METADATA_EXACT_KEY_MARKERS
+)
 _MEMBER_METADATA_LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
-    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw_prompt|raw_output|prompt_snapshot|"
-    r"authorization|bearer\s+)",
+    r"(storage[-_ ]?uri|preview[-_ ]?uri|thumbnail[-_ ]?uri|media://|file://|"
+    r"s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|"
+    r"raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|authorization|bearer\s+)",
     re.IGNORECASE,
 )
 
@@ -1689,7 +1704,7 @@ def _sanitize_member_metadata_value(value: object) -> Any:
         sanitized: dict[str, Any] = {}
         for raw_key, item in value.items():
             key = str(raw_key)
-            if key.strip().lower() in _MEMBER_METADATA_SENSITIVE_KEYS:
+            if _is_member_metadata_sensitive_key(key):
                 continue
             clean_item = _sanitize_member_metadata_value(item)
             if clean_item is not None:
@@ -1706,6 +1721,13 @@ def _sanitize_member_metadata_value(value: object) -> Any:
     if value is None or isinstance(value, bool | int | float):
         return value
     return str(value)[:200]
+
+
+def _is_member_metadata_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in _MEMBER_METADATA_SENSITIVE_KEY_MARKERS or any(
+        marker and marker in normalized for marker in _MEMBER_METADATA_SUBSTRING_KEY_MARKERS
+    )
 
 
 def _parse_tag_filters(encoded_filters: list[str]) -> list[MediaAssetTagFilter]:

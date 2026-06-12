@@ -225,6 +225,8 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
     dirty_presentation_json: dict[str, Any] = {
         "caption": "safe caption",
         "storage_uri": "media://private/presentation",
+        "rawPrompt": "operator prompt",
+        "promptSnapshotId": str(uuid.uuid4()),
         "provider": {"adapter_kind": "fake"},
         "visual": {
             "sprite_fallback_reason": "default",
@@ -236,7 +238,12 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
         },
         "nested": [
             {"safe": "keep"},
-            {"raw_output": "provider output", "path": "/tmp/presentation.json"},
+            {
+                "raw_output": "provider output",
+                "rawOutput": "provider camel output",
+                "storageUri": "opaque-presentation-storage",
+                "path": "/tmp/presentation.json",
+            },
         ],
     }
     with Session(engine) as session:
@@ -300,6 +307,10 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
         "model_invocation_id",
         "media_job",
         "raw_output",
+        "rawOutput",
+        "rawPrompt",
+        "promptSnapshot",
+        "storageUri",
         "/tmp/presentation.json",
         "adapter_kind",
     ):

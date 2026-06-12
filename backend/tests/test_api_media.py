@@ -363,6 +363,9 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
     assert collection_item.status_code == 201
     assert member_asset.status_code == 200
     assert member_asset.json()["metadata"] == expected_metadata
+    assert "rawPrompt" not in str(member_asset.json())
+    assert "promptSnapshot" not in str(member_asset.json())
+    assert "storageUri" not in str(member_asset.json())
     assert member_contexts.status_code == 200
     assert member_contexts.json()[0]["metadata"] == expected_metadata
     assert member_inputs.status_code == 200
@@ -963,8 +966,15 @@ def _leaky_media_metadata() -> dict[str, object]:
         "safe": "keep",
         "storage_uri": "media://hidden-object",
         "raw_prompt": "raw prompt",
+        "rawPrompt": "operator prompt",
+        "promptSnapshotId": str(uuid.uuid4()),
         "bytes": "base64-data",
-        "nested": {"safe": "nested", "filesystem_path": "/tmp/private-file"},
+        "nested": {
+            "safe": "nested",
+            "filesystem_path": "/tmp/private-file",
+            "rawOutput": "provider output",
+            "storageUri": "opaque-storage-ref",
+        },
         "items": ["visible", "media://hidden-list-item"],
         "token": "sk-metadata-secret",
     }
