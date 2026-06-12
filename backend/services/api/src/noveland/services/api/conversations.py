@@ -984,7 +984,7 @@ def _session_response(
         worldline_id=session.worldline_id,
         scene_id=session.scene_id,
         session_key=session.session_key,
-        title=session.title,
+        title=session.title if include_admin_fields else _sanitize_member_text(session.title),
         scope_type=session.scope_type.value,
         mode=session.mode.value,
         status=session.status.value,

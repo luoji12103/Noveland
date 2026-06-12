@@ -102,7 +102,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
         f"/worlds/{world_id}/conversations",
         json={
             "session_key": "manual-chain",
-            "title": "Manual chain",
+            "title": "Manual raw_prompt chain",
             "scope_type": "scene",
             "mode": "manual_chain",
             "worldline_id": str(fork_id),
@@ -134,6 +134,19 @@ def test_conversation_api_enforces_access_and_manual_advance(
         },
     )
     conversation_id = create_response.json()["id"]
+    safe_create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "safe-manual-chain",
+            "title": "Manual chain",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
+            "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
+        },
+    )
+    safe_conversation_id = safe_create_response.json()["id"]
     replace_participants = client.put(
         f"/worlds/{world_id}/conversations/{conversation_id}/participants",
         json=[
@@ -176,6 +189,9 @@ def test_conversation_api_enforces_access_and_manual_advance(
         }
 
     assert create_response.status_code == 201
+    assert safe_create_response.status_code == 201
+    assert create_response.json()["title"] == "Manual raw_prompt chain"
+    assert safe_create_response.json()["title"] == "Manual chain"
     assert create_response.json()["worldline_id"] == str(fork_id)
     assert create_response.json()["objective"] == "operator-only objective with raw_prompt marker"
     assert create_response.json()["opening_prompt"] == "operator-only opening prompt"
@@ -207,9 +223,12 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert speaker_preview.json()["selected_agent_id"] == str(second_agent_id)
     assert member_list.status_code == 200
     assert member_detail.status_code == 200
-    member_session = member_list.json()[0]
+    member_sessions = {session["id"]: session for session in member_list.json()}
+    member_session = member_sessions[str(conversation_id)]
+    safe_member_session = member_sessions[str(safe_conversation_id)]
     assert member_session["id"] == str(conversation_id)
-    assert member_session["title"] == "Manual chain"
+    assert member_session["title"] == ""
+    assert safe_member_session["title"] == "Manual chain"
     assert member_session["objective"] == ""
     assert member_session["opening_prompt"] == ""
     assert member_session["policy"]["manual_next_agent_id"] is None
@@ -222,6 +241,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     assert member_session["memory_config"]["retrieve_memory"] is False
     assert member_session["memory_config"]["memory_query_strategy"] == ""
     assert member_session["group_context"] == {}
+    assert member_detail.json()["title"] == ""
     assert member_detail.json()["objective"] == ""
     assert member_detail.json()["writer_config"]["writer_plugin_config"] == {}
     assert member_turns.status_code == 200
