@@ -25,6 +25,11 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **WHEN** the GM service resolves the proposal into `world_events.payload`
 - **THEN** the persisted world event payload SHALL omit storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, and base64-like values while preserving safe proposal identity and event context fields.
 
+#### Scenario: Event store enforces safe world event payloads
+- **GIVEN** any service appends a world event payload containing storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64-like values
+- **WHEN** `WorldEventStore.append_event()` persists the event
+- **THEN** the stored `world_events.payload` SHALL omit forbidden keys and values while preserving safe event context fields, regardless of the producer.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

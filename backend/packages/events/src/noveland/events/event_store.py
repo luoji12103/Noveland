@@ -22,6 +22,7 @@ from noveland.events.errors import (
     SnapshotValidationError,
 )
 from noveland.events.models import WorldEventModel, WorldSnapshotModel
+from noveland.events.sanitization import sanitize_world_event_payload
 from noveland.worlds.worldlines import ensure_primary_worldline, primary_worldline_or_none
 from pydantic import ValidationError
 from sqlalchemy import desc, func, or_, select
@@ -52,7 +53,7 @@ class WorldEventStore:
                 sequence=sequence,
                 event_name=event_input.event_name,
                 importance=event_input.importance.value,
-                payload=event_input.payload,
+                payload=sanitize_world_event_payload(event_input.payload),
                 wall_time=event_input.wall_time,
                 world_time=event_input.world_time,
                 actor_ref=event_input.actor_ref,

@@ -20,7 +20,6 @@ from noveland.worlds.models import (
     Worldline,
 )
 from noveland.worlds.plot import LivingWorldPlotService
-from noveland.worlds.sanitization import sanitize_world_event_payload
 from noveland.worlds.worldlines import (
     ensure_primary_worldline,
     primary_worldline_or_none,
@@ -220,7 +219,7 @@ class LivingWorldAutonomyService:
                         worldline_id=item.worldline_id,
                         event_name=item.event_name,
                         importance=WorldEventImportance(item.importance),
-                        payload=sanitize_world_event_payload(item.payload_json),
+                        payload=item.payload_json,
                         wall_time=now,
                         world_time=_utc(item.due_at),
                         actor_ref=actor_ref,

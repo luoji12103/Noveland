@@ -1278,6 +1278,71 @@ def test_gm_proposal_resolution_sanitizes_persisted_world_event_payload() -> Non
     assert "base64" not in payload_text
 
 
+def test_event_store_sanitizes_secret_reveal_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-secret-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "secret-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    agent_id = _seed_agent(engine, world_id, "secret-holder")
+
+    _authenticate(client, owner_token)
+    secret = client.post(
+        f"/worlds/{world_id}/secrets",
+        json={
+            "secret_key": "hidden-letter",
+            "title": "Safe hidden letter",
+            "content": "The letter was left in the club room.",
+            "holder_agent_ids": [str(agent_id)],
+            "consequence_metadata": {
+                "safe_note": "keep this consequence",
+                "storage_uri": "media://private/secret",
+                "raw_prompt": "operator prompt",
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "path": "/root/private/secret.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"bytes": "base64,cccc"},
+                    "visible note",
+                    "s3://private/secret-entry",
+                ],
+            },
+        },
+    )
+    secret_id = secret.json()["id"]
+    revealed = client.post(f"/worlds/{world_id}/secrets/{secret_id}/reveal")
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(revealed.json()["revealed_event_id"]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert secret.status_code == 201
+    assert revealed.status_code == 200
+    assert revealed.json()["revealed_event_id"] is not None
+    assert payload["secret_id"] == secret_id
+    assert payload["secret_key"] == "hidden-letter"
+    assert payload["title"] == "Safe hidden letter"
+    consequence = payload["consequence_metadata"]
+    assert consequence["safe_note"] == "keep this consequence"
+    assert consequence["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in consequence["items"]
+    assert "visible note" in consequence["items"]
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+    assert "bytes" not in payload_text
+
+
 def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")

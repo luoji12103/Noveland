@@ -17,6 +17,7 @@ WORLD_EVENT_PAYLOAD_FORBIDDEN_KEYS = {
     "filesystem_path",
     "password",
     "path",
+    "payload_uri",
     "preview_uri",
     "private_key",
     "prompt_snapshot",
@@ -32,7 +33,7 @@ WORLD_EVENT_PAYLOAD_FORBIDDEN_KEYS = {
     "token",
 }
 WORLD_EVENT_PAYLOAD_FORBIDDEN_VALUE_RE = re.compile(
-    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"(media://|object://|file://|s3://|gs://|/root/|/tmp/|base64,|"
     r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
     r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
     re.IGNORECASE,
