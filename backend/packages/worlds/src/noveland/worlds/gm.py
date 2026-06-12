@@ -37,6 +37,7 @@ from noveland.worlds.models import (
     Worldline,
 )
 from noveland.worlds.plot import LivingWorldPlotService
+from noveland.worlds.sanitization import sanitize_world_event_payload
 from noveland.worlds.worldlines import ensure_primary_worldline, worldline_or_404
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -425,11 +426,13 @@ class LivingWorldGMService:
                     world_id=proposal.world_id,
                     worldline_id=proposal.worldline_id,
                     event_name=proposal.event_name,
-                    payload={
-                        **proposal.proposed_payload,
-                        "proposal_id": str(proposal.id),
-                        "proposal_title": proposal.title,
-                    },
+                    payload=sanitize_world_event_payload(
+                        {
+                            **proposal.proposed_payload,
+                            "proposal_id": str(proposal.id),
+                            "proposal_title": proposal.title,
+                        },
+                    ),
                     importance=WorldEventImportance(proposal.importance),
                     wall_time=datetime.now(UTC),
                     actor_ref=actor_ref,

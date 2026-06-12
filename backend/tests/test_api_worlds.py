@@ -1212,6 +1212,72 @@ def test_offscreen_resolution_sanitizes_persisted_world_event_payload() -> None:
     assert "bytes" not in payload_text
 
 
+def test_gm_proposal_resolution_sanitizes_persisted_world_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-gm-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "gm-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals",
+        json={
+            "title": "Safe proposal title",
+            "reason": "Exercise proposal payload persistence.",
+            "event_name": "gm.unsafe_payload_check",
+            "importance": "route",
+            "proposed_payload": {
+                "beat": "safe beat",
+                "safe_number": 7,
+                "storage_uri": "media://private/gm-proposal",
+                "raw_prompt": "operator prompt",
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "path": "/root/private/gm-proposal.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"base64": "base64,bbbb"},
+                    "visible note",
+                    "file:///tmp/private-entry",
+                ],
+            },
+        },
+    )
+    proposal_id = proposal.json()["id"]
+    reviewed = client.post(
+        f"/worlds/{world_id}/gm/proposals/{proposal_id}/review",
+        json={"status": "resolved", "review_note": "Accepted for payload test."},
+    )
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(reviewed.json()["resolved_event_id"]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert proposal.status_code == 201
+    assert reviewed.status_code == 200
+    assert reviewed.json()["resolved_event_id"] is not None
+    assert payload["beat"] == "safe beat"
+    assert payload["safe_number"] == 7
+    assert payload["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in payload["items"]
+    assert "visible note" in payload["items"]
+    assert payload["proposal_id"] == proposal_id
+    assert payload["proposal_title"] == "Safe proposal title"
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+
+
 def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
