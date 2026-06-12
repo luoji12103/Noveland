@@ -421,6 +421,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the Web UI SHALL redact those evidence keys and values before rendering the evidence block
 - **AND** safe non-sensitive evidence fields SHALL remain visible.
 
+#### Scenario: Web runtime admin diagnostics normalize sensitive text
+- **GIVEN** an authorized admin views runtime health, external tool policy, scale readiness, or runtime diagnostic entries in the Web runtime admin console
+- **WHEN** those text fields contain resolved secrets, tokens, authorization headers, raw prompt/output markers, prompt snapshot identifiers, storage URIs, file/object paths, bytes, base64, or local model paths from dirty legacy API or SSE data
+- **THEN** the Web UI SHALL redact those sensitive-looking text values before rendering runtime notices, compact lists, readiness summaries, or diagnostic rows
+- **AND** safe operational strings such as policy modes, audit field names, iteration status, readiness areas, and recommendations SHALL remain visible.
+
 #### Scenario: Web client manages multimodal diagnostics records
 - **GIVEN** browser-side Web client code issues multimodal diagnostics or eval-run list, detail, or run requests through same-origin API routes
 - **AND** the world or eval-run identifier contains encoded path separators or other reserved path characters

@@ -129,7 +129,7 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
         </div>
         {runtimeHealth === null ? null : (
           <p className="management-notice">
-            {runtimeHealth.reason} Recent diagnostics: {runtimeHealth.recent_diagnostic_count}.
+            {safeRuntimeText(runtimeHealth.reason)} Recent diagnostics: {runtimeHealth.recent_diagnostic_count}.
           </p>
         )}
         <div className="dashboard-grid">
@@ -212,7 +212,7 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
                 <p className="metric-value">{data.externalToolPolicy.default_permission_mode}</p>
               </div>
             </div>
-            <p className="management-notice">{data.externalToolPolicy.operator_message}</p>
+            <p className="management-notice">{safeRuntimeText(data.externalToolPolicy.operator_message)}</p>
             <CompactList
               title="Deny reasons"
               items={data.externalToolPolicy.deny_reasons}
@@ -249,14 +249,14 @@ export function RuntimeAdmin({ data }: RuntimeAdminProps) {
                 <article className="resource-row" key={section.area}>
                   <div>
                     <h3>
-                      {section.area} - {section.status}
+                      {safeRuntimeText(section.area)} - {safeRuntimeText(section.status)}
                     </h3>
-                    <p>{section.summary}</p>
+                    <p>{safeRuntimeText(section.summary)}</p>
                     {section.blockers.length > 0 ? (
-                      <p>Blockers: {section.blockers.join("; ")}</p>
+                      <p>Blockers: {safeRuntimeTextList(section.blockers).join("; ")}</p>
                     ) : null}
                     {section.recommendations.length > 0 ? (
-                      <p>Next: {section.recommendations[0]}</p>
+                      <p>Next: {safeRuntimeText(section.recommendations[0])}</p>
                     ) : null}
                   </div>
                 </article>
@@ -285,7 +285,7 @@ function CompactList({ title, items }: { title: string; items: string[] }) {
       <article className="resource-row">
         <div>
           <h3>{title}</h3>
-          <p>{items.join(", ")}</p>
+          <p>{safeRuntimeTextList(items).join(", ")}</p>
         </div>
       </article>
     </div>
@@ -305,6 +305,68 @@ function mergeDiagnostics(
   );
 }
 
+function safeRuntimeTextList(items: string[]): string[] {
+  return items.map((item) => safeRuntimeText(item));
+}
+
+function safeRuntimeText(value: string | null | undefined): string {
+  if (value === null || value === undefined || value.trim() === "") {
+    return "-";
+  }
+  return looksSensitiveRuntimeText(value) ? "[redacted]" : value;
+}
+
+const SENSITIVE_RUNTIME_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "bearertoken",
+  "base64",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "password",
+  "privatekey",
+  "promptsnapshot",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secret",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+  "token",
+];
+
+function looksSensitiveRuntimeText(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return (
+    SENSITIVE_RUNTIME_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeRuntimeToken(value)
+  );
+}
+
+function containsBase64LikeRuntimeToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 16 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
 function DiagnosticList({ diagnostics }: { diagnostics: RuntimeAdminData["runtimeDiagnostics"] }) {
   if (diagnostics.length === 0) {
     return <p>No diagnostics recorded.</p>;
@@ -315,9 +377,9 @@ function DiagnosticList({ diagnostics }: { diagnostics: RuntimeAdminData["runtim
         <article className="resource-row" key={diagnostic.id}>
           <div>
             <h3>
-              {diagnostic.severity} - {diagnostic.component}
+              {safeRuntimeText(diagnostic.severity)} - {safeRuntimeText(diagnostic.component)}
             </h3>
-            <p>{diagnostic.message}</p>
+            <p>{safeRuntimeText(diagnostic.message)}</p>
             <p>{diagnostic.occurred_at}</p>
           </div>
         </article>

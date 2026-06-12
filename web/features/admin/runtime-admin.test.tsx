@@ -114,6 +114,108 @@ describe("RuntimeAdmin", () => {
     });
   });
 
+  it("redacts sensitive runtime admin text from loader and stream data", async () => {
+    let onEnvelope: ((envelope: RuntimeStreamEnvelope) => void) | undefined;
+    subscribeToEventStream.mockImplementation((_: string, handler: typeof onEnvelope) => {
+      onEnvelope = handler;
+      return () => {};
+    });
+
+    if (
+      runtimeData.runtimeStatus === null ||
+      runtimeData.externalToolPolicy === null ||
+      runtimeData.scaleReadiness === null
+    ) {
+      throw new Error("runtime fixture is incomplete");
+    }
+
+    const dirtyData: RuntimeAdminData = {
+      ...runtimeData,
+      runtimeStatus: {
+        ...runtimeData.runtimeStatus,
+        runtime_health: {
+          ...stoppedRuntimeHealth,
+          reason:
+            "Runtime blocked after rawPrompt at media://runtime-secret with sk-live-secret.",
+        },
+      },
+      runtimeDiagnostics: [
+        {
+          id: "diag-initial",
+          severity: "error",
+          component: "runtime /tmp/runtime-worker" as RuntimeAdminData["runtimeDiagnostics"][number]["component"],
+          event_type: "runtime.error",
+          message: "Failed using Bearer runtime-token and promptSnapshotId snapshot-1.",
+          details: {},
+          occurred_at: "2026-04-22T00:00:00.000Z",
+          world_id: null,
+          agent_id: null,
+          run_id: null,
+          provider_profile_id: null,
+          created_at: "2026-04-22T00:00:00.000Z",
+        },
+      ],
+      externalToolPolicy: {
+        ...runtimeData.externalToolPolicy,
+        operator_message: "External tool denied storageUri media://tool-secret.",
+        deny_reasons: ["Bearer runtime-token", "external_tool_execution_disabled"],
+        audit_fields: ["actor_ref", "rawOutput"],
+      },
+      scaleReadiness: {
+        ...runtimeData.scaleReadiness,
+        sections: [
+          {
+            ...runtimeData.scaleReadiness.sections[0],
+            summary: "Scale check saw /var/noveland/provider-cache.",
+            blockers: ["rawPrompt in local-model /models/private.gguf"],
+            recommendations: ["Review query plans before growth testing."],
+          },
+        ],
+      },
+    };
+
+    render(<RuntimeAdmin data={dirtyData} />);
+
+    onEnvelope?.({
+      cursor: "cursor-dirty",
+      event_type: "runtime.delta",
+      occurred_at: "2026-04-22T00:00:02.000Z",
+      world_id: null,
+      conversation_id: null,
+      payload: {
+        diagnostics: [
+          {
+            id: "diag-stream",
+            severity: "warning",
+            component: "runtime media://stream-secret" as RuntimeAdminData["runtimeDiagnostics"][number]["component"],
+            event_type: "runtime.warning",
+            message: "SSE carried base64 c2VjcmV0MTIzNA== from rawOutput.",
+            details: {},
+            occurred_at: "2026-04-22T00:00:02.000Z",
+            world_id: null,
+            agent_id: null,
+            run_id: null,
+            provider_profile_id: null,
+            created_at: "2026-04-22T00:00:02.000Z",
+          },
+        ],
+        provider_profiles: [],
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/external_tool_execution_disabled/)).toBeInTheDocument();
+      expect(screen.getByText(/actor_ref/)).toBeInTheDocument();
+      expect(screen.getByText("database_indexes - ok")).toBeInTheDocument();
+      expect(screen.getByText(/Review query plans before growth testing/)).toBeInTheDocument();
+      expect(
+        screen.queryAllByText(
+          /rawPrompt|rawOutput|promptSnapshotId|storageUri|media:\/\/|sk-live-secret|Bearer runtime-token|\/var\/noveland|\/tmp\/runtime|\/models\/private|c2VjcmV0MTIzNA==/i,
+        ),
+      ).toHaveLength(0);
+    });
+  });
+
   it("requests runtime state changes through the HTTP client", async () => {
     subscribeToEventStream.mockImplementation(() => () => {});
     vi.mocked(updateRuntimeControl).mockResolvedValue({
