@@ -667,6 +667,13 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the proxied browser response body SHALL replace or omit the forbidden key or value before it reaches the browser
 - **AND** successful JSON, binary media, no-content responses, safe error summaries, streaming responses, and explicit auth cookie relay behavior SHALL remain unchanged.
 
+#### Scenario: Web event-stream proxies normalize non-stream JSON errors
+- **GIVEN** a same-origin Web event-stream proxy requests a backend runtime, world, or conversation stream
+- **WHEN** the backend responds before stream establishment with a non-2xx `application/json` or `application/*+json` error body
+- **AND** the error body contains provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** the Web proxy SHALL return a sanitized non-stream error response body instead of relaying the forbidden key or value
+- **AND** successful `text/event-stream` responses SHALL remain streamed with event-stream headers.
+
 
 #### Scenario: Web dashboard world navigation preserves query boundaries
 - **GIVEN** browser-side dashboard code navigates to a selected or newly created world through the local `world` query parameter

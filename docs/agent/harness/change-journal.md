@@ -4712,3 +4712,15 @@
 - Tests added/updated: Added `normalizes sensitive structured json error content types` to `web/lib/auth/proxy.test.ts`, covering `application/problem+json`, sensitive nested fields, and content-length removal after sanitization.
 - Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 207 tests.
 - Follow-up notes: Continue Web/e2e audit for remaining proxy content-type edges, streaming redaction assumptions, server/client text sinks, and reader/player media empty states. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web event-stream setup error redaction entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web event-stream proxy setup error redaction remediation for F-123.
+- Finding: F-123 found `web/lib/realtime/proxy.ts` always returned `buildStreamingProxyResponse(backendResponse)`, so backend runtime/world/conversation stream endpoints returning non-2xx JSON or structured `+json` errors before stream establishment bypassed the shared proxy JSON error sanitizer.
+- Summary: Added an architecture-contracts scenario for event-stream proxy setup error redaction and changed `proxyEventStream()` to send non-2xx backend responses through `buildProxyResponse()` while preserving successful `text/event-stream` behavior through `buildStreamingProxyResponse()`.
+- Files changed: web/lib/realtime/proxy.ts, web/lib/realtime/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `normalizes sensitive json setup errors before returning stream proxy responses` to `web/lib/realtime/proxy.test.ts`, covering `application/problem+json` setup errors, sensitive nested fields, cookie stripping, and non-stream error headers.
+- Verification: `cd web && npm run test -- lib/realtime/proxy.test.ts` first failed because non-2xx stream setup errors retained stream headers and bypassed sanitized proxy handling, then passed with 4 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/realtime/proxy.ts lib/realtime/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 208 tests.
+- Follow-up notes: Continue Web/e2e audit for remaining stream client assumptions, server/client text sinks, reader/player media empty states, and backend DTO leak boundaries. Push after successful commits unless the user changes that instruction.

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { buildStreamingProxyResponse } from "@/lib/auth/proxy";
+import { buildProxyResponse, buildStreamingProxyResponse } from "@/lib/auth/proxy";
 import { getAuthApiBaseUrl } from "@/lib/auth/server-config";
 
 export async function proxyEventStream(
@@ -13,6 +13,9 @@ export async function proxyEventStream(
     cache: "no-store",
   });
 
+  if (!backendResponse.ok) {
+    return buildProxyResponse(backendResponse);
+  }
   return buildStreamingProxyResponse(backendResponse);
 }
 

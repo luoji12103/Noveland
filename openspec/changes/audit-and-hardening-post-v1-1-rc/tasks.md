@@ -1304,3 +1304,14 @@
 - Intended remediation: classify `application/json` and `application/*+json` as sanitizable JSON error responses, preserve safe JSON and non-JSON behavior, and add focused proxy regression coverage.
 - Status: Remediated in Web proxy structured JSON error redaction batch.
 - Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 207 tests.
+
+
+### F-123 Web event-stream proxy relays sensitive JSON setup errors
+
+- Severity: Medium
+- Affected boundary: Web event-stream proxy response redaction for backend setup errors.
+- Evidence: Read-only audit showed `web/lib/realtime/proxy.ts` always returns `buildStreamingProxyResponse(backendResponse)`. `buildStreamingProxyResponse()` preserves successful stream behavior but does not use the proxy JSON error sanitizer when backend stream endpoints return a non-2xx JSON or structured `+json` error before stream establishment.
+- Impact: same-origin runtime/world/conversation stream routes can relay sensitive backend error details to browser clients if setup fails with provider secrets, storage refs, paths, raw prompt/output markers, prompt snapshot refs, tokens, or base64-like evidence.
+- Intended remediation: route non-2xx stream proxy responses through the existing sanitized proxy response helper while preserving successful `text/event-stream` responses, and add focused realtime proxy regression coverage.
+- Status: Remediated in Web event-stream setup error redaction batch.
+- Verification: `cd web && npm run test -- lib/realtime/proxy.test.ts` first failed because non-2xx stream setup errors retained stream headers and bypassed sanitized proxy handling, then passed with 4 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/realtime/proxy.ts lib/realtime/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 208 tests.
