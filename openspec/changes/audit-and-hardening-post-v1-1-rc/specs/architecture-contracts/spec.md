@@ -686,6 +686,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the Web proxy SHALL return a sanitized non-stream error response body instead of relaying the forbidden key or value
 - **AND** successful `text/event-stream` responses SHALL remain streamed with event-stream headers.
 
+#### Scenario: Web live socket clients normalize command error notices
+- **GIVEN** browser-side Web conversation detail code receives a live WebSocket `error` message for a conversation command
+- **WHEN** the message payload contains provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** the user-visible notice SHALL use a fixed live-command failure message instead of rendering the forbidden key or value
+- **AND** safe business error text such as forbidden or validation messages MAY be preserved when it contains no forbidden marker.
+
 
 #### Scenario: Web dashboard world navigation preserves query boundaries
 - **GIVEN** browser-side dashboard code navigates to a selected or newly created world through the local `world` query parameter

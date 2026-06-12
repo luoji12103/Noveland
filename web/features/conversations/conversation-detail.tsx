@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import {
   advanceConversation,
   generateConversationNarrativeArtifacts,
@@ -74,7 +75,11 @@ export function ConversationDetail({ worldId, conversationId, data }: Conversati
   const handleLiveMessage = useCallback((message: ConversationLiveMessage) => {
     if (message.type === "error") {
       const liveMessage = message.payload.message;
-      setNotice(typeof liveMessage === "string" ? liveMessage : "Live conversation command failed.");
+      setNotice(
+        typeof liveMessage === "string"
+          ? normalizeBackendErrorDetail(liveMessage, "Live conversation command failed.")
+          : "Live conversation command failed.",
+      );
       setIsBusy(false);
       return;
     }

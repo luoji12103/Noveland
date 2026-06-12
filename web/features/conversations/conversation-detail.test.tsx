@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/worlds/client", async () => {
@@ -45,7 +45,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
-import { subscribeToEventStream } from "@/lib/realtime";
+import { createConversationLiveSocket, subscribeToEventStream } from "@/lib/realtime";
 import {
   generateConversationNarrativeArtifacts,
   getConversationMemorySummary,
@@ -132,6 +132,47 @@ describe("ConversationDetail", () => {
       expect(getConversationMemorySummary).toHaveBeenCalledWith("world-1", "conversation-1");
     });
     expect(screen.getByText("Memory summary")).toBeInTheDocument();
+  });
+
+
+  it("normalizes sensitive live command error notices", async () => {
+    render(
+      <ConversationDetail
+        worldId="world-1"
+        conversationId="conversation-1"
+        data={adminData}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(createConversationLiveSocket).toHaveBeenCalled();
+    });
+    const handlers = vi.mocked(createConversationLiveSocket).mock.calls[0]?.[2];
+
+    act(() => {
+      handlers?.onMessage?.({
+        type: "error",
+        occurred_at: "2026-04-21T00:00:05.000Z",
+        payload: {
+          message: "rawPrompt leaked Bearer live-token and media://live/object",
+        },
+      });
+    });
+
+    expect(screen.getByText("Live conversation command failed.")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/rawPrompt leaked|Bearer live-token|media:\/\/live\/object/i),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      handlers?.onMessage?.({
+        type: "error",
+        occurred_at: "2026-04-21T00:00:06.000Z",
+        payload: { message: "Forbidden" },
+      });
+    });
+
+    expect(screen.getByText("Forbidden")).toBeInTheDocument();
   });
 
 

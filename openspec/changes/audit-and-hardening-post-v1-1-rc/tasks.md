@@ -1336,3 +1336,13 @@
 - Intended remediation: apply the same sensitive-looking transcript text blanking used by member conversation turn responses to realtime conversation turn payloads, preserve safe transcript text and admin realtime visibility, and add focused realtime regression coverage.
 - Status: Remediated in conversation realtime member turn text redaction batch.
 - Verification: `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_stream_hides_admin_evidence_for_member_payloads tests/test_api_realtime.py::test_conversation_live_member_snapshot_hides_sensitive_turn_text -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_realtime.py -q` passed with 8 tests; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py` and matching mypy command passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 581 tests and 8 skipped.
+
+### F-126 Web live command errors render sensitive backend detail text
+
+- Severity: Medium
+- Affected boundary: Browser-side conversation live WebSocket error handling and user-visible notices.
+- Evidence: Read-only audit showed `web/features/conversations/conversation-detail.tsx` handles live WebSocket `error` messages by reading `message.payload.message` and passing the string directly to `setNotice()`. This bypasses the existing `normalizeBackendErrorDetail()` protection used by HTTP/Web client error paths.
+- Impact: if a live command error payload contains provider secrets, storage refs, filesystem/object paths, raw prompt/output markers, prompt snapshot refs, tokens, or base64-like evidence, the conversation detail page can render it directly into the browser notice.
+- Intended remediation: normalize live WebSocket error notice text through the shared sensitive backend detail helper with a fixed live-command fallback, preserve safe business errors, and add focused Web regression coverage.
+- Status: Remediated in Web live command error notice redaction batch.
+- Verification: `cd web && npm run test -- features/conversations/conversation-detail.test.tsx` first failed because the sensitive live WebSocket error message rendered in the notice, then passed with 6 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- features/conversations/conversation-detail.tsx features/conversations/conversation-detail.test.tsx` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 209 tests; `cd web && npm run build` passed; `cd web && npm run check:next-env` passed.
