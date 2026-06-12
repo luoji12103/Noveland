@@ -78,9 +78,10 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member reads media asset catalog
 - **GIVEN** a world member can list, search, or fetch visible media assets through member media APIs
-- **WHEN** a visible media asset has internal storage references such as storage_uri, preview_uri, or thumbnail_uri
-- **THEN** the member response SHALL redact those internal storage references
-- **AND** admin media routes MAY continue to expose them for media management.
+- **WHEN** a visible media asset has internal storage references such as storage_uri, preview_uri, or thumbnail_uri, internal provider/source IDs, provider kinds, or actor refs
+- **THEN** the member response SHALL redact internal storage references and SHALL blank internal provider/source IDs, provider kinds, and actor refs
+- **AND** member catalog/search filters SHALL reject provider/source filter parameters that target internal source event IDs, source invocation IDs, or provider kinds
+- **AND** admin media routes MAY continue to expose those fields and filters for media management.
 
 #### Scenario: Member reads media job diagnostics
 - **GIVEN** a world member can access member-scoped media routes
@@ -91,15 +92,15 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member reads media asset lineage
 - **GIVEN** a world member can read visible media asset lineage
-- **WHEN** lineage includes related visible media assets with internal storage references
-- **THEN** every related asset in the member response SHALL redact storage_uri, preview_uri, and thumbnail_uri
-- **AND** admin media routes MAY continue to expose those related asset storage references for media management.
+- **WHEN** lineage includes input/output source job IDs or related visible media assets with internal storage references, provider/source IDs, provider kinds, or actor refs
+- **THEN** every member lineage response SHALL blank input/output source job IDs and SHALL redact related asset storage, provider/source, provider kind, and actor ref fields
+- **AND** admin media routes MAY continue to expose those lineage internals for media management.
 
 #### Scenario: Member reads media metadata-bearing DTOs
 - **GIVEN** a world member can read visible media asset, context, input, tag, collection, item, references, or lineage responses
-- **WHEN** those records contain arbitrary metadata with forbidden keys or values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
-- **THEN** the member response SHALL omit the forbidden metadata keys and values while retaining safe metadata
-- **AND** admin media routes MAY continue to expose full metadata for media management and diagnostics.
+- **WHEN** those records contain arbitrary metadata with forbidden keys or values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64, or member-visible catalog wrappers carry internal actor refs
+- **THEN** the member response SHALL omit the forbidden metadata keys and values while retaining safe metadata and SHALL blank internal actor refs
+- **AND** admin media routes MAY continue to expose full metadata and actor refs for media management and diagnostics.
 
 
 #### Scenario: Member subscribes to realtime world or conversation streams

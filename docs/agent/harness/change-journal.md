@@ -4150,3 +4150,15 @@
 - Tests added/updated: Extended `test_conversation_api_enforces_access_and_manual_advance` so admin seed/advance responses retain dirty transcript text while member turn list responses blank sensitive-looking input/output text and still hide run/error fields.
 - Verification: `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests; focused backend ruff/mypy passed for `conversations.py` and `test_api_conversations.py`; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue auditing reader/player presentation and playback DTO text/media references for comparable forbidden-evidence exposure, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Media catalog provenance redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-077.
+- Finding: F-077 found member-readable media asset catalog/search/detail/lineage responses redacting storage URIs and metadata but still exposing internal provider/source IDs, provider kind, actor refs, and lineage source job IDs; member source/provider filters could also infer internal provenance.
+- Summary: Updated the architecture-contracts OpenSpec media catalog scenarios, blanked internal provenance fields in non-admin media response shaping, and rejected member source/provider catalog filters while preserving admin media management responses.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_media_api_member_visibility_acl_and_csrf` and `test_media_api_member_metadata_redaction_across_visible_records` for member/admin provenance field boundaries and internal filter rejection.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_api_member_visibility_acl_and_csrf tests/test_api_media.py::test_media_api_member_metadata_redaction_across_visible_records -q` passed with 2 tests. Focused backend ruff/mypy passed for `media.py` and `test_api_media.py`; `cd backend && uv run pytest tests/test_api_media.py -q` passed with 9 tests; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing reader/player playback DTOs and Web route handlers for comparable internal provenance or provider leakage. Do not push unless explicitly requested after this batch commit.

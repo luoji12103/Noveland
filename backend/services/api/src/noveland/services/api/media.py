@@ -333,6 +333,11 @@ def list_media_assets(
 ) -> list[MediaAssetRecord]:
     try:
         member_visible_only = _member_visible_only(_context)
+        _reject_member_internal_media_filters(
+            member_visible_only,
+            source_event_id=source_event_id,
+            source_invocation_id=source_invocation_id,
+        )
         assets = MediaService(db_session).list_assets(
             world_id,
             MediaAssetListFilters(
@@ -382,6 +387,11 @@ def search_media_assets(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> MediaAssetSearchResult:
     try:
+        member_visible_only = _member_visible_only(context)
+        _reject_member_internal_media_filters(
+            member_visible_only,
+            provider_kind=provider_kind,
+        )
         result = MediaCatalogService(db_session).search_assets(
             world_id,
             MediaAssetSearchFilters(
@@ -403,7 +413,7 @@ def search_media_assets(
                 tags=tuple(_parse_tag_filters([] if tag is None else tag)),
                 limit=limit,
             ),
-            member_visible_only=_member_visible_only(context),
+            member_visible_only=member_visible_only,
         )
         return result.model_copy(
             update={
@@ -1569,6 +1579,25 @@ def _member_visible_only(context: WorldAccessContext) -> bool:
     return not context.is_platform_admin and context.role != "world_admin"
 
 
+def _reject_member_internal_media_filters(
+    member_visible_only: bool,
+    *,
+    source_event_id: uuid.UUID | None = None,
+    source_invocation_id: uuid.UUID | None = None,
+    provider_kind: str | None = None,
+) -> None:
+    if not member_visible_only:
+        return
+    if (
+        source_event_id is not None
+        or source_invocation_id is not None
+        or provider_kind is not None
+    ):
+        raise MediaValidationError(
+            "member media filters cannot target internal provider/source fields"
+        )
+
+
 def _media_asset_record_for_context(
     record: MediaAssetRecord,
     context: WorldAccessContext,
@@ -1580,6 +1609,11 @@ def _media_asset_record_for_context(
             "storage_uri": None,
             "preview_uri": None,
             "thumbnail_uri": None,
+            "provider_kind": None,
+            "source_job_id": None,
+            "source_event_id": None,
+            "source_invocation_id": None,
+            "created_by_actor_ref": "",
             "metadata": _sanitize_member_metadata(record.metadata),
         }
     )
@@ -1600,7 +1634,12 @@ def _media_asset_input_record_for_context(
 ) -> MediaAssetInputRecord:
     if not _member_visible_only(context):
         return record
-    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+    return record.model_copy(
+        update={
+            "source_job_id": None,
+            "metadata": _sanitize_member_metadata(record.metadata),
+        }
+    )
 
 
 def _media_asset_tag_record_for_context(
@@ -1609,7 +1648,12 @@ def _media_asset_tag_record_for_context(
 ) -> MediaAssetTagRecord:
     if not _member_visible_only(context):
         return record
-    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+    return record.model_copy(
+        update={
+            "created_by_actor_ref": "",
+            "metadata": _sanitize_member_metadata(record.metadata),
+        }
+    )
 
 
 def _media_asset_collection_record_for_context(
@@ -1618,7 +1662,12 @@ def _media_asset_collection_record_for_context(
 ) -> MediaAssetCollectionRecord:
     if not _member_visible_only(context):
         return record
-    return record.model_copy(update={"metadata": _sanitize_member_metadata(record.metadata)})
+    return record.model_copy(
+        update={
+            "created_by_actor_ref": "",
+            "metadata": _sanitize_member_metadata(record.metadata),
+        }
+    )
 
 
 def _media_asset_collection_item_record_for_context(

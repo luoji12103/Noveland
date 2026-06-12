@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T10:30:00+08:00
+- Date: 2026-06-12T11:10:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-076 are remediated on this branch; latest batch is F-076 member conversation turn transcript text redaction.
+- Status: F-001 through F-077 are remediated on this branch; latest batch is F-077 member media catalog provenance redaction.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-076 batch: f706908 fix(worlds): sanitize world bible public json.
+- Base before F-077 batch: a8dd50b fix(conversations): sanitize member turn transcript text.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services at batch start: Noveland Postgres was healthy on 55432->5432; Noveland NATS was healthy on 54222->4222 and 58222->8222. No authoritative Noveland API/Web/runtime process was started for this batch.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,19 +26,19 @@
 
 ## Completed This Batch
 
-- Reconfirmed current state before F-076: branch `feature/audit-and-hardening-post-v1-1-rc`, worktree clean, local/remote synchronized at `f706908`, active OpenSpec change valid, and Postgres/NATS healthy.
-- Continued backend forbidden-evidence audit across member-readable conversation turn responses after replay/state was found to expose only clock/sequence/counts.
-- Recorded/remediated F-076: member turn list responses hid `run_id` and `error_text`, but still returned arbitrary `input_text` and `output_text` transcript text verbatim.
-- Updated the architecture-contracts OpenSpec scenario so member conversation turns must blank sensitive-looking transcript text while preserving safe transcript text.
-- Added a conversation API member transcript text sanitizer and applied it to non-admin `_turn_response()` input/output text only; admin responses remain unchanged.
-- Extended conversation API regression coverage so admin seed/advance responses retain dirty transcript text while member turn list responses blank sensitive-looking transcript text and continue hiding run/error fields.
+- Reconfirmed current state before F-077: branch `feature/audit-and-hardening-post-v1-1-rc`, worktree clean, local ahead 1 at `a8dd50b`, active OpenSpec change valid, and Postgres/NATS healthy.
+- Continued backend forbidden-evidence audit across member-readable media catalog/search/detail/lineage and reader media descriptors.
+- Recorded/remediated F-077: member media asset responses hid storage URIs and metadata but still returned provider/source IDs, provider kind, actor refs, and lineage source job IDs; member source/provider filters could infer internal provenance.
+- Updated the architecture-contracts OpenSpec media catalog, lineage, and metadata-bearing DTO scenarios for internal provenance redaction and source/provider filter rejection.
+- Added media API member response shaping for internal provenance fields and rejected member catalog/search filters targeting source event IDs, source invocation IDs, or provider kinds; admin responses remain unchanged.
+- Extended media API regression coverage for member/admin provenance field boundaries and internal filter rejection.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance -q` passed with 1 test.
-- `cd backend && uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py` passed.
-- `cd backend && uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py` passed.
-- `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests.
+- `cd backend && uv run pytest tests/test_api_media.py::test_media_api_member_visibility_acl_and_csrf tests/test_api_media.py::test_media_api_member_metadata_redaction_across_visible_records -q` passed with 2 tests.
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py` passed.
+- `cd backend && uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py` passed.
+- `cd backend && uv run pytest tests/test_api_media.py -q` passed with 9 tests.
 - Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 567 passed and 8 skipped.
 - `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed.
 
@@ -49,8 +49,8 @@
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless explicitly requested.
 
-## Finding F-076
+## Finding F-077
 
-- Conversation turn transcript text is member-visible, but it can still carry forbidden evidence from admin seed text or provider-backed output if not sanitized.
-- The remediation keeps safe transcript text visible to members while blanking sensitive-looking text and preserving full transcript text for admin conversation management.
-- Residual risk: continue auditing reader/player presentation DTOs, playback surfaces, and media descriptors for comparable forbidden-evidence exposure.
+- Member media asset catalog fields are member-visible, but provider/source IDs, provider kind, actor refs, and lineage source job IDs are internal provenance and can reveal operator/provider execution evidence.
+- The remediation keeps safe media asset identity, type, dimensions, visibility, title/description, and sanitized metadata visible to members while blanking internal provenance and preserving full media management records for admins.
+- Residual risk: continue auditing Web media proxy/client rendering and reader/player playback DTOs for comparable internal provenance exposure.

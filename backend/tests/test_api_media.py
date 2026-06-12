@@ -142,6 +142,9 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    source_job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
+    source_event_id = _seed_event(engine, world_id)
+    source_invocation_id = uuid.uuid4()
     visible_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
     private_id = _seed_asset(engine, world_id, primary_id, visibility="private")
     stored = client.media_storage.write_bytes(
@@ -155,6 +158,11 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
         visible_asset.storage_uri = stored.uri
         visible_asset.preview_uri = stored.uri
         visible_asset.thumbnail_uri = stored.uri
+        visible_asset.provider_kind = "fake-provider"
+        visible_asset.source_job_id = source_job_id
+        visible_asset.source_event_id = source_event_id
+        visible_asset.source_invocation_id = source_invocation_id
+        visible_asset.created_by_actor_ref = "user:internal-admin"
         session.commit()
 
     _authenticate_session_only(client, owner_token)
@@ -171,6 +179,18 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     member_list = client.get(f"/worlds/{world_id}/media/assets")
     member_search = client.get(f"/worlds/{world_id}/media/assets/search")
     member_get_visible = client.get(f"/worlds/{world_id}/media/assets/{visible_id}")
+    member_list_by_source_event = client.get(
+        f"/worlds/{world_id}/media/assets",
+        params={"source_event_id": str(source_event_id)},
+    )
+    member_list_by_source_invocation = client.get(
+        f"/worlds/{world_id}/media/assets",
+        params={"source_invocation_id": str(source_invocation_id)},
+    )
+    member_search_by_provider = client.get(
+        f"/worlds/{world_id}/media/assets/search",
+        params={"provider_kind": "fake-provider"},
+    )
     member_private_contexts = client.get(
         f"/worlds/{world_id}/media/assets/{private_id}/contexts"
     )
@@ -202,18 +222,41 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     assert member_list.json()[0]["storage_uri"] is None
     assert member_list.json()[0]["preview_uri"] is None
     assert member_list.json()[0]["thumbnail_uri"] is None
+    assert member_list.json()[0]["provider_kind"] is None
+    assert member_list.json()[0]["source_job_id"] is None
+    assert member_list.json()[0]["source_event_id"] is None
+    assert member_list.json()[0]["source_invocation_id"] is None
+    assert member_list.json()[0]["created_by_actor_ref"] == ""
     assert member_search.status_code == 200
     assert member_search.json()["assets"][0]["storage_uri"] is None
     assert member_search.json()["assets"][0]["preview_uri"] is None
     assert member_search.json()["assets"][0]["thumbnail_uri"] is None
+    assert member_search.json()["assets"][0]["provider_kind"] is None
+    assert member_search.json()["assets"][0]["source_job_id"] is None
+    assert member_search.json()["assets"][0]["source_event_id"] is None
+    assert member_search.json()["assets"][0]["source_invocation_id"] is None
+    assert member_search.json()["assets"][0]["created_by_actor_ref"] == ""
     assert member_get_visible.status_code == 200
     assert member_get_visible.json()["storage_uri"] is None
     assert member_get_visible.json()["preview_uri"] is None
     assert member_get_visible.json()["thumbnail_uri"] is None
+    assert member_get_visible.json()["provider_kind"] is None
+    assert member_get_visible.json()["source_job_id"] is None
+    assert member_get_visible.json()["source_event_id"] is None
+    assert member_get_visible.json()["source_invocation_id"] is None
+    assert member_get_visible.json()["created_by_actor_ref"] == ""
+    assert member_list_by_source_event.status_code == 422
+    assert member_list_by_source_invocation.status_code == 422
+    assert member_search_by_provider.status_code == 422
     assert admin_get_visible.status_code == 200
     assert admin_get_visible.json()["storage_uri"] == stored.uri
     assert admin_get_visible.json()["preview_uri"] == stored.uri
     assert admin_get_visible.json()["thumbnail_uri"] == stored.uri
+    assert admin_get_visible.json()["provider_kind"] == "fake-provider"
+    assert admin_get_visible.json()["source_job_id"] == str(source_job_id)
+    assert admin_get_visible.json()["source_event_id"] == str(source_event_id)
+    assert admin_get_visible.json()["source_invocation_id"] == str(source_invocation_id)
+    assert admin_get_visible.json()["created_by_actor_ref"] == "user:internal-admin"
     assert member_private_contexts.status_code == 404
     assert member_private_references.status_code == 404
     assert member_private_lineage.status_code == 404
@@ -230,6 +273,7 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     primary_id, _fork_id = _seed_worldlines(engine, world_id)
     conversation_id, turn_id = _seed_conversation(engine, world_id, primary_id)
+    source_job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
     asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
     source_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
     leaky_metadata = _leaky_media_metadata()
@@ -256,6 +300,7 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
         json={
             "worldline_id": str(primary_id),
             "input_asset_id": str(source_id),
+            "source_job_id": str(source_job_id),
             "input_role": "reference",
             "metadata": leaky_metadata,
         },
@@ -308,6 +353,7 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
     _authenticate(client, owner_token)
     admin_asset = client.get(f"/worlds/{world_id}/media/assets/{asset_id}")
     admin_references = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/references")
+    admin_lineage = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/lineage")
 
     assert member_id
     assert context.status_code == 201
@@ -320,18 +366,25 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
     assert member_contexts.status_code == 200
     assert member_contexts.json()[0]["metadata"] == expected_metadata
     assert member_inputs.status_code == 200
+    assert member_inputs.json()[0]["source_job_id"] is None
     assert member_inputs.json()[0]["metadata"] == expected_metadata
     assert member_tags.status_code == 200
+    assert member_tags.json()[0]["created_by_actor_ref"] == ""
     assert member_tags.json()[0]["metadata"] == expected_metadata
     assert member_references.status_code == 200
     assert member_references.json()["contexts"][0]["metadata"] == expected_metadata
+    assert member_references.json()["tags"][0]["created_by_actor_ref"] == ""
     assert member_references.json()["tags"][0]["metadata"] == expected_metadata
+    assert member_references.json()["collections"][0]["created_by_actor_ref"] == ""
     assert member_references.json()["collections"][0]["metadata"] == expected_metadata
     assert member_lineage.status_code == 200
+    assert member_lineage.json()["inputs"][0]["source_job_id"] is None
     assert member_lineage.json()["inputs"][0]["metadata"] == expected_metadata
     assert member_collections.status_code == 200
+    assert member_collections.json()[0]["created_by_actor_ref"] == ""
     assert member_collections.json()[0]["metadata"] == expected_metadata
     assert member_collection.status_code == 200
+    assert member_collection.json()["created_by_actor_ref"] == ""
     assert member_collection.json()["metadata"] == expected_metadata
     assert member_collection_items.status_code == 200
     assert member_collection_items.json()[0]["metadata"] == expected_metadata
@@ -339,6 +392,12 @@ def test_media_api_member_metadata_redaction_across_visible_records() -> None:
     assert admin_asset.json()["metadata"]["storage_uri"] == "media://hidden-object"
     assert admin_references.status_code == 200
     assert admin_references.json()["contexts"][0]["metadata"]["raw_prompt"] == "raw prompt"
+    assert admin_references.json()["tags"][0]["created_by_actor_ref"] == f"user:{owner_id}"
+    assert admin_references.json()["collections"][0]["created_by_actor_ref"] == (
+        f"user:{owner_id}"
+    )
+    assert admin_lineage.status_code == 200
+    assert admin_lineage.json()["inputs"][0]["source_job_id"] == str(source_job_id)
 
 
 def test_media_api_jobs_are_admin_only_for_internal_execution_evidence() -> None:
