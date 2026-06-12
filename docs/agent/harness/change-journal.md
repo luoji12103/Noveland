@@ -4832,3 +4832,15 @@
 - Tests added/updated: Added `test_moderation_rejects_unresolved_concrete_target_refs`, covering missing, cross-world, cross-worldline, and valid scene/publication/player-profile moderation targets.
 - Verification: Focused moderation regression first failed because an unresolved `narrative_publication` target returned 201, then passed after remediation; focused backend ruff/mypy passed; related moderation, reader media, player session, and conversation presentation tests passed with 25 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
 - Follow-up notes: Continue backend moderation target breadth, reader/member/player DTO leak-path audits, Web route-handler audits, and product/spec-history drift review. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member calendar text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable agent calendar text remediation for F-133.
+- Finding: F-133 found `backend/services/api/src/noveland/services/api/worlds.py` redacted calendar metadata for ordinary members but returned admin-authored calendar `title`, `description`, and `recurrence_rule` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_calendar_entry_response()` to blank sensitive-looking calendar title, description, and recurrence text for non-admin member responses while preserving safe calendar text and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` for sensitive member calendar text redaction and safe calendar title preservation.
+- Verification: Focused calendar regression first failed because member calendar title text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.

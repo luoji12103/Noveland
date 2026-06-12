@@ -4177,9 +4177,11 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     create_entry = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/calendar",
         json={
-            "title": "Morning scene",
+            "title": "Morning raw_prompt: operator scene",
+            "description": "storage_uri media://private/calendar-evidence",
             "starts_at": "2030-01-01T08:00:00Z",
             "ends_at": "2030-01-01T09:00:00Z",
+            "recurrence_rule": "FREQ=DAILY;X-PATH=/root/private/calendar.ics",
             "metadata": {
                 "source": "api-test",
                 "raw_prompt": "operator calendar prompt",
@@ -4243,11 +4245,19 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert conflicts.json()["conflicts"][0]["conflict_type"] == "calendar_entry_overlap"
     assert create_entry.json()["status"] == "active"
     assert list_entries.status_code == 200
-    assert list_entries.json()[0]["title"] == "Morning scene"
+    assert list_entries.json()[0]["title"] == "Morning raw_prompt: operator scene"
+    assert list_entries.json()[0]["description"] == "storage_uri media://private/calendar-evidence"
+    assert (
+        list_entries.json()[0]["recurrence_rule"]
+        == "FREQ=DAILY;X-PATH=/root/private/calendar.ics"
+    )
     assert list_entries.json()[0]["metadata"]["raw_prompt"] == "operator calendar prompt"
     assert member_entries.status_code == 200
-    assert member_entries.json()[0]["title"] == "Morning scene"
+    assert member_entries.json()[0]["title"] == ""
+    assert member_entries.json()[0]["description"] == ""
+    assert member_entries.json()[0]["recurrence_rule"] == ""
     assert member_entries.json()[0]["metadata"] == {}
+    assert member_entries.json()[1]["title"] == "Overlap scene"
     assert update_entry.status_code == 200
     assert update_entry.json()["title"] == "Morning scene updated"
     assert cancel_entry.status_code == 204

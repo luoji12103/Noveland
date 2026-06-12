@@ -10176,11 +10176,19 @@ def _calendar_entry_response(
         id=entry.id,
         world_id=entry.world_id,
         agent_id=entry.agent_id,
-        title=entry.title,
-        description=entry.description,
+        title=entry.title if include_admin_fields else _sanitize_public_text(entry.title),
+        description=(
+            entry.description
+            if include_admin_fields or entry.description is None
+            else _sanitize_public_text(entry.description)
+        ),
         starts_at=entry.starts_at,
         ends_at=entry.ends_at,
-        recurrence_rule=entry.recurrence_rule,
+        recurrence_rule=(
+            entry.recurrence_rule
+            if include_admin_fields or entry.recurrence_rule is None
+            else _sanitize_public_text(entry.recurrence_rule)
+        ),
         status=entry.status.value if hasattr(entry.status, "value") else str(entry.status),
         metadata=entry.metadata if include_admin_fields else {},
     )

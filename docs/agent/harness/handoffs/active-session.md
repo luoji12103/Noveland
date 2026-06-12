@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-13T03:45:00+08:00
+- Date: 2026-06-13T04:15:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-132 are remediated on this branch; latest batch is F-132 moderation concrete target validation hardening.
+- Status: F-001 through F-133 are remediated on this branch; latest batch is F-133 member agent calendar text redaction hardening.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before the F-132 commit: 19ac3b0470eb884650d4ec91b02d7989f07d4f3d.
+- Current HEAD before the F-133 commit: d0bbc344fd771566bafaced9714e029fac6857f9.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before this continuation: branch was `feature/audit-and-hardening-post-v1-1-rc` at 19ac3b0, local and upstream were synchronized, worktree started clean, active OpenSpec change was in progress, specs strict validation passed with 76 specs, change strict validation passed, and Noveland Postgres/NATS were healthy.
+- Current server status was rechecked before this continuation: branch was `feature/audit-and-hardening-post-v1-1-rc` at d0bbc34, local branch was ahead of upstream by 1 local commit, worktree started clean, active OpenSpec change was in progress, specs strict validation passed with 76 specs, change strict validation passed, and Noveland Postgres/NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,31 +26,31 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime server state from `/root/code/Noveland` after the previous push: branch `feature/audit-and-hardening-post-v1-1-rc`, HEAD `19ac3b0`, local/upstream synchronized, OpenSpec active change valid, specs strict validation passed with 76 specs, and Postgres/NATS healthy.
-- Continued backend moderation target validation audit after F-131.
-- Identified F-132: `ModerationService._validate_target()` allowed arbitrary UUIDs for concrete `scene`, `narrative_publication`, and `player_profile` targets even though these target kinds map to persisted world/worldline-owned models.
-- Added a content-safety-moderation-hardening OpenSpec scenario requiring concrete moderation target refs to resolve within their owning world/worldline scope.
-- Changed `ModerationService` to validate scene targets by world, narrative publication targets by world and supplied worldline, and player profile targets by world and supplied worldline while preserving intentionally free-form `other` and currently non-persistent `plugin_package` behavior.
-- Added moderation API regression coverage for missing, cross-world, cross-worldline, and valid scene/publication/player-profile targets.
+- Reconfirmed realtime server state from `/root/code/Noveland`: branch `feature/audit-and-hardening-post-v1-1-rc`, HEAD `d0bbc34`, local branch ahead of upstream by 1, worktree clean, OpenSpec active change valid, specs strict validation passed with 76 specs, and Postgres/NATS healthy.
+- Continued backend member-readable DTO audit after F-132.
+- Identified F-133: member-readable agent calendar entries redacted metadata but returned admin-authored `title`, `description`, and `recurrence_rule` unchanged, allowing raw prompt/storage/path/secret-like markers in calendar text to reach ordinary members.
+- Added an architecture-contracts OpenSpec scenario requiring sensitive-looking calendar text to be blanked for members while safe calendar text remains visible and admin routes retain full text.
+- Changed `_calendar_entry_response()` so non-admin member responses use existing `_sanitize_public_text()` for title, description, and recurrence rule while preserving metadata redaction and admin visibility.
+- Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` to cover sensitive member calendar text redaction and safe calendar title preservation.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_api_moderation.py::test_moderation_rejects_unresolved_concrete_target_refs -q` first failed because an unresolved `narrative_publication` target returned 201.
+- `cd backend && uv run pytest tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules -q` first failed because member calendar title text containing `raw_prompt` rendered unchanged.
 - The same focused test passed after remediation.
-- `cd backend && uv run ruff check packages/moderation/src/noveland/moderation/service.py tests/test_api_moderation.py` passed.
-- `cd backend && uv run mypy packages/moderation/src/noveland/moderation/service.py tests/test_api_moderation.py` passed.
-- `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_reader_media.py tests/test_api_player_sessions.py tests/test_api_conversation_presentations.py -q` passed with 25 tests.
+- `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed.
+- `cd backend && uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed.
+- `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests.
 - full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
 
 ## Remaining Work
 
-1. Continue backend moderation target breadth and remaining reader/member/player DTO boundary audits.
+1. Continue backend member/player DTO audits for other public text fields with sensitive-looking content.
 2. Continue Web/e2e audit for route handlers, client-side text sinks, EventSource failure assumptions, and role boundaries.
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless the user explicitly asks; keep local branch clean after commits.
 
-## Finding F-132
+## Finding F-133
 
-- Moderation mutations should not persist concrete target refs unless the referenced scene, narrative publication, or player profile exists in the requested world/worldline scope.
-- The remediation adds target-specific ownership checks for these concrete models and preserves existing behavior for intentionally free-form target kinds.
-- Residual risk: plugin package moderation refs remain non-persistent/free-form because there is no concrete ORM target to validate in this boundary; revisit if plugin packages gain persisted UUID ownership.
+- Member agent calendar responses should preserve safe schedule text but must not echo admin/operator evidence markers embedded in calendar title, description, or recurrence rule text.
+- The remediation applies the existing public sensitive-text blanking helper to non-admin calendar text fields and leaves admin responses unchanged.
+- Residual risk: continue auditing other member-readable public text fields that intentionally preserve safe prose but may still need sensitive-looking text blanking.
