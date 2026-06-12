@@ -119,9 +119,9 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           importance: optionalFormString(form, "importance") as CharacterImportance | null,
           canon_status: optionalFormString(form, "canon_status") as ContinuityStatus | null,
           character_category: optionalFormString(form, "character_category") as CharacterCategory | null,
-          character_profile: jsonObject(formString(form, "character_profile")),
+          character_profile: agentBuilderJsonObject(formString(form, "character_profile")),
           is_enabled: form.get("is_enabled") === "on",
-          config: jsonObject(formString(form, "config")),
+          config: agentBuilderJsonObject(formString(form, "config")),
         }),
       "Agent saved.",
     );
@@ -144,7 +144,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           obligation: numberValue(form, "obligation", 0),
           rivalry: numberValue(form, "rivalry", 0),
           debt: numberValue(form, "debt", 0),
-          metadata: jsonObject(formString(form, "metadata")),
+          metadata: agentBuilderJsonObject(formString(form, "metadata")),
         });
         setRelationships((current) => [...current, edge]);
         formElement.reset();
@@ -169,7 +169,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
           obligation: numberValue(form, "obligation", 0),
           rivalry: numberValue(form, "rivalry", 0),
           debt: numberValue(form, "debt", 0),
-          metadata: jsonObject(formString(form, "metadata")),
+          metadata: agentBuilderJsonObject(formString(form, "metadata")),
         });
         setRelationships((current) =>
           current.map((item) => (item.id === relationshipId ? edge : item)),
@@ -208,7 +208,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
         await createAgentObservation(worldId, agentId, {
           observation_type: formString(form, "observation_type") || "manual",
           content: formString(form, "content"),
-          metadata: jsonObject(formString(form, "metadata")),
+          metadata: agentBuilderJsonObject(formString(form, "metadata")),
           confidence_score: optionalNumber(form, "confidence_score"),
         });
         formElement.reset();
@@ -396,13 +396,13 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
               className="text-input"
               name="character_profile"
               rows={5}
-              defaultValue={JSON.stringify(agent.character_profile ?? {}, null, 2)}
+              defaultValue={agentBuilderJsonString(agent.character_profile ?? {})}
             />
             <textarea
               className="text-input"
               name="config"
               rows={4}
-              defaultValue={JSON.stringify(agent.config, null, 2)}
+              defaultValue={agentBuilderJsonString(agent.config)}
             />
             <button className="primary-button" type="submit" disabled={isBusy}>
               Save agent
@@ -435,7 +435,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             <p className="metric-value">{agent.character_category ?? "unset"}</p>
           </div>
         </div>
-        <pre>{JSON.stringify(agent.character_profile ?? {}, null, 2)}</pre>
+        <pre>{agentBuilderJsonString(agent.character_profile ?? {})}</pre>
       </section>
 
       <section className="management-panel" aria-labelledby="agent-autonomy-title">
@@ -522,7 +522,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                   <p>
                     obligation {edge.obligation} / rivalry {edge.rivalry} / debt {edge.debt}
                   </p>
-                  <pre>{JSON.stringify(edge.metadata, null, 2)}</pre>
+                  <pre>{agentBuilderJsonString(edge.metadata)}</pre>
                 </div>
                 {data.canManageSelectedWorld ? (
                   <form
@@ -534,7 +534,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                       className="text-input"
                       name="metadata"
                       rows={2}
-                      defaultValue={JSON.stringify(edge.metadata, null, 2)}
+                      defaultValue={agentBuilderJsonString(edge.metadata)}
                     />
                     <button className="secondary-button" type="submit" disabled={isBusy}>
                       Update edge
@@ -581,13 +581,13 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 className="text-input"
                 name="behavior_policy"
                 rows={4}
-                defaultValue={JSON.stringify(data.agentPersona?.behavior_policy ?? {}, null, 2)}
+                defaultValue={agentBuilderJsonString(data.agentPersona?.behavior_policy ?? {})}
               />
               <textarea
                 className="text-input"
                 name="policy_plugin_config"
                 rows={3}
-                defaultValue={JSON.stringify(data.agentPersona?.policy_plugin_config ?? {}, null, 2)}
+                defaultValue={agentBuilderJsonString(data.agentPersona?.policy_plugin_config ?? {})}
                 placeholder="Policy plugin config"
               />
               <label className="checkbox-label">
@@ -622,7 +622,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 Plugin: {data.agentPersona?.policy_plugin_identifier ?? "No persona plugin configured."}
               </p>
               <p>{data.agentPersona?.persona_text ?? "No persona configured."}</p>
-              <pre>{JSON.stringify(data.agentPersona?.behavior_policy ?? {}, null, 2)}</pre>
+              <pre>{agentBuilderJsonString(data.agentPersona?.behavior_policy ?? {})}</pre>
             </>
           )}
         </section>
@@ -779,7 +779,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
                 <div>
                   <h3>{run.status}</h3>
                   <p>{run.trigger_source}</p>
-                  <p>{run.response_text ?? run.prompt_text}</p>
+                  <p>{safeAgentBuilderText(run.response_text ?? run.prompt_text)}</p>
                 </div>
                 {data.canManageSelectedWorld ? (
                   <button
@@ -808,7 +808,7 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
             <p className="status-detail">
               Conversation turns: {selectedRunDetail.conversation_turns.length}
             </p>
-            <pre>{JSON.stringify(selectedRunDetail.run.diagnostics, null, 2)}</pre>
+            <pre>{agentBuilderJsonString(selectedRunDetail.run.diagnostics)}</pre>
           </section>
         ) : null}
       </section>
@@ -819,9 +819,9 @@ export function AgentBuilder({ worldId, agentId, data }: AgentBuilderProps) {
 function personaInputFromForm(form: FormData) {
   return {
     persona_text: formString(form, "persona_text"),
-    behavior_policy: jsonObject(formString(form, "behavior_policy")),
+    behavior_policy: agentBuilderJsonObject(formString(form, "behavior_policy")),
     policy_plugin_identifier: formString(form, "policy_plugin_identifier"),
-    policy_plugin_config: jsonObject(formString(form, "policy_plugin_config")),
+    policy_plugin_config: agentBuilderJsonObject(formString(form, "policy_plugin_config")),
     is_enabled: form.get("is_enabled") === "on",
   };
 }
@@ -838,6 +838,135 @@ function optionalNumber(form: FormData, key: string): number | null {
 function numberValue(form: FormData, key: string, fallback: number): number {
   const value = optionalNumber(form, key);
   return value ?? fallback;
+}
+
+function agentBuilderJsonString(value: Record<string, unknown>): string {
+  return JSON.stringify(sanitizeAgentBuilderJsonForDisplay(value), null, 2);
+}
+
+function agentBuilderJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizeAgentBuilderJsonForDisplay(jsonObject(rawValue));
+}
+
+function sanitizeAgentBuilderJsonForDisplay(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveAgentBuilderJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeAgentBuilderJsonValue(entry)]),
+  );
+}
+
+function sanitizeAgentBuilderJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeAgentBuilderJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeAgentBuilderJsonForDisplay(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveAgentBuilderString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_AGENT_BUILDER_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_AGENT_BUILDER_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_AGENT_BUILDER_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveAgentBuilderJsonKey(key: string): boolean {
+  const normalized = normalizeAgentBuilderMarker(key);
+  return (
+    EXACT_SENSITIVE_AGENT_BUILDER_JSON_KEYS.has(normalized) ||
+    SENSITIVE_AGENT_BUILDER_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function safeAgentBuilderText(value: string | null): string {
+  if (value === null || value.trim() === "") {
+    return "-";
+  }
+  return looksSensitiveAgentBuilderString(value) ? "[redacted]" : value;
+}
+
+function looksSensitiveAgentBuilderString(value: string): boolean {
+  const normalized = normalizeAgentBuilderMarker(value);
+  return (
+    SENSITIVE_AGENT_BUILDER_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeAgentBuilderToken(value)
+  );
+}
+
+function containsBase64LikeAgentBuilderToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 16 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeAgentBuilderMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function RelationshipScoreInputs({ edge }: { edge?: AgentRelationship }) {

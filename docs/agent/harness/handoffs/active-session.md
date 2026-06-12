@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T09:08:11+00:00
+- Date: 2026-06-12T09:27:33+00:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-098 are remediated on this branch; latest batch is F-098 Web dashboard JSON normalization.
+- Status: F-001 through F-099 are remediated on this branch; latest batch is F-099 Web agent builder evidence normalization.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-098 batch: a9d142b fix(web-runtime): sanitize admin diagnostic text.
+- Base before F-099 batch: f64dd9a fix(web-dashboard): sanitize management json panels.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before the batch: branch was clean at a9d142b and ahead of origin by one local commit; OpenSpec change validation passed; Noveland Postgres and NATS were healthy.
+- Current server status was rechecked before the batch: branch matched origin at f64dd9a with four F-099 working-tree files; OpenSpec specs strict validation passed with 76 specs; Noveland Postgres and NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,21 +26,22 @@
 
 ## Completed This Batch
 
-- Continued Web/e2e security audit after F-097, focusing on remaining world management dashboard JSON rendering and submit surfaces.
-- Recorded/remediated F-098: Web dashboard JSON panels exposed dirty sensitive config evidence from agent config, schedule rule config, provider capabilities, and persona behavior policy, and dashboard JSON form submissions could echo dirty fields.
+- Continued Web/e2e security audit after F-098, focusing on the focused agent builder page and remaining agent detail rendering/submit sinks.
+- Recorded/remediated F-099: Web agent builder JSON panels and run text exposed dirty sensitive agent evidence from character profile/config, relationship metadata, persona policy/config, run summary text, and selected run diagnostics.
 - Updated architecture-contracts OpenSpec before implementation.
-- Added normalized dashboard JSON display and submit sanitization in `WorldManagementDashboard` for agent config, schedule rule config, provider capabilities, persona behavior policy, observation metadata, and narrative artifact metadata.
-- Updated regression coverage to assert dirty dashboard JSON panels are redacted while safe agent config, schedule hours, provider capability flags, and persona behavior fields remain visible.
+- Added normalized agent-builder JSON display and submit sanitization in `AgentBuilder` for agent profile/config, relationship metadata, persona policy/config, and selected run diagnostics.
+- Added sensitive-looking run summary text normalization for agent run prompt/response snippets.
+- Updated regression coverage to assert dirty agent builder JSON/run text are redacted while safe agent profile, config, relationship, persona, and diagnostics fields remain visible.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed against the unpatched component with dirty dashboard JSON visible in editable textareas, then passed with 7 tests after remediation.
-- `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts` passed with 42 tests.
+- `cd web && npm run test -- features/agents/agent-builder.test.tsx` first failed against the unpatched component with dirty agent builder JSON and run text visible, then passed with 2 tests after remediation.
+- `cd web && npm run test -- features/agents/agent-builder.test.tsx lib/worlds/client.test.ts` passed with 37 tests.
 - `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed.
-- Full `cd web && npm run test` passed on rerun with 52 files and 189 tests; a prior full run had one unrelated `media-admin` timing miss, and `cd web && npm run test -- features/admin/media-admin.test.tsx` passed with 4 tests.
+- Full `cd web && npm run test` passed with 52 files and 190 tests; existing `RuntimeAdmin` React act warnings remained warnings, not failures.
 - `cd web && npm run build` passed.
 - `cd web && npm run test:e2e` passed with 21 tests; `next-env.d.ts` was restored afterward and `cd web && npm run check:next-env` passed.
-- OpenSpec strict validations and `git diff --check` passed before commit.
+- OpenSpec strict validations and `git diff --check` passed after docs update.
 
 ## Remaining Work
 
@@ -49,8 +50,8 @@
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless explicitly requested.
 
-## Finding F-098
+## Finding F-099
 
-- Web dashboard JSON rendering and submit handling must treat dirty JSON containing secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, or base64 key/value markers as sensitive.
-- The remediation omits sensitive dashboard JSON keys, redacts sensitive-looking safe-key string values, and preserves safe dashboard configuration across display and submit paths.
+- Web agent builder JSON rendering, submit handling, run summary text, and selected run diagnostics must treat dirty JSON/text containing secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, or base64 key/value markers as sensitive.
+- The remediation omits sensitive agent-builder JSON keys, redacts sensitive-looking safe-key string values, sanitizes submit payloads, and preserves safe agent characterization and operational configuration across display and submit paths.
 - Residual risk: continue route-handler, client rendering, and spec-history drift audits.
