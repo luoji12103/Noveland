@@ -403,6 +403,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** every dynamic identifier segment SHALL be encoded before it is appended to the frontend API path
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
+#### Scenario: Web invocation ledger evidence normalizes sensitive key variants
+- **GIVEN** an authorized admin views invocation or prompt snapshot evidence in the Web invocation ledger
+- **WHEN** evidence JSON contains storage, path, bytes, base64, raw prompt/output, prompt snapshot, secret, token, or auth keys written in snake_case, camelCase, compact, or mixed punctuation forms such as storage_uri, storageUri, raw_prompt, rawPrompt, prompt_snapshot, promptSnapshotId, clientSecret, or bearerToken
+- **THEN** the Web UI SHALL redact those evidence keys and values before rendering the evidence block
+- **AND** safe non-sensitive evidence fields SHALL remain visible.
+
 #### Scenario: Web client manages multimodal diagnostics records
 - **GIVEN** browser-side Web client code issues multimodal diagnostics or eval-run list, detail, or run requests through same-origin API routes
 - **AND** the world or eval-run identifier contains encoded path separators or other reserved path characters
