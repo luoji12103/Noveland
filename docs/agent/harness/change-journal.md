@@ -4625,3 +4625,16 @@
 - Tests added/updated: Added `test_speech_lists_reject_cross_worldline_requests` covering cross-world voice profile, agent voice binding, and transcript list rejection plus valid same-worldline list behavior.
 - Verification: `cd backend && uv run pytest tests/test_api_speech.py::test_speech_lists_reject_cross_worldline_requests -q` first failed with an uncaught `SpeechValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 2 tests; focused backend ruff/mypy passed for speech API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 575 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
 - Follow-up notes: Continue invalid-worldline behavior audit for visual generation list routes, media job/source filters, observability filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening visual generation model asset worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend visual generation admin API worldline isolation remediation for F-116.
+- Finding: F-116 found `GET /worlds/{world_id}/visual-generation/model-assets?worldline_id={other_worldline_id}` relying on service-level worldline validation without catching the resulting `VisualGenerationValidationError`, while valid same-worldline model asset lists returned normally.
+- Summary: Added an architecture-contracts scenario for handled visual generation model-asset list invalid-worldline responses and mapped invalid explicit worldline scopes in the model asset list route to the existing 422 client error while preserving valid list behavior and platform-admin restricted visibility filtering.
+- Files changed: backend/services/api/src/noveland/services/api/visual_generation.py, backend/tests/test_api_visual_generation.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_visual_generation_model_assets_reject_cross_worldline_requests` covering cross-world model asset list rejection and valid same-worldline model asset list behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_visual_generation.py::test_visual_generation_model_assets_reject_cross_worldline_requests -q` first failed with an uncaught `VisualGenerationValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_visual_generation.py -q` passed with 5 tests; focused backend ruff/mypy passed for visual generation API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 576 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for media job/source filters, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.

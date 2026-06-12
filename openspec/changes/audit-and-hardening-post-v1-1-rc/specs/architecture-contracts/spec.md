@@ -67,6 +67,12 @@ The system SHALL treat `world_id` and `worldline_id` as first-class identifiers 
 - **THEN** the API SHALL reject the request with a handled client error instead of surfacing an unhandled service exception
 - **AND** valid worldline-scoped speech list operations SHALL continue to return voice profiles, agent bindings, or transcripts from the resolved worldline scope.
 
+#### Scenario: Visual generation model asset lists reject invalid worldline scope consistently
+- **GIVEN** a visual generation model asset list request includes an explicit `worldline_id`
+- **WHEN** the `worldline_id` is missing from the requested `world_id` or belongs to another world
+- **THEN** the API SHALL reject the request with a handled client error instead of surfacing an unhandled visual generation service exception
+- **AND** valid worldline-scoped model asset list operations SHALL continue to return world-level and matching-worldline model assets according to visibility rules.
+
 ### Requirement: Reader and member APIs hide admin evidence
 The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provider secrets, hidden/developer-only records, storage URIs, filesystem paths, bytes, base64, provider health metadata, and admin diagnostics out of reader/member API responses.
 

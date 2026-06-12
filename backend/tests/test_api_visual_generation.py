@@ -244,6 +244,47 @@ def test_visual_generation_api_acl_csrf_and_restricted_visibility() -> None:
     assert listed_for_admin.json() == []
 
 
+def test_visual_generation_model_assets_reject_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "visual-admin-worldline@example.test")
+    other_admin_id, _ = _seed_user(engine, "visual-other-worldline@example.test")
+    world_id = _seed_world(engine, admin_id)
+    other_world_id = _seed_world(engine, other_admin_id)
+    worldline_id, _agent_id, _scene_id = _seed_world_graph(engine, world_id)
+    other_worldline_id, _other_agent_id, _other_scene_id = _seed_world_graph(
+        engine,
+        other_world_id,
+    )
+    provider_id = _seed_provider(engine, world_id, ProviderAdapterKind.FAKE)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _authenticate(client, admin_token)
+
+    model_asset = client.post(
+        f"/worlds/{world_id}/visual-generation/model-assets",
+        json={
+            "world_id": str(world_id),
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "inventory_kind": "lora",
+            "display_name": "Hero LoRA",
+            "provider_model_name": "hero-lora",
+        },
+    )
+    wrong_worldline = client.get(
+        f"/worlds/{world_id}/visual-generation/model-assets",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    valid_worldline = client.get(
+        f"/worlds/{world_id}/visual-generation/model-assets",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert model_asset.status_code == 201
+    assert wrong_worldline.status_code == 422
+    assert valid_worldline.status_code == 200
+    assert [item["id"] for item in valid_worldline.json()] == [model_asset.json()["id"]]
+
+
 def test_visual_generation_api_rejects_raw_workflow_and_leaky_payloads() -> None:
     client, engine = _client_with_database()
     admin_id, admin_token = _seed_user(engine, "admin@example.test")

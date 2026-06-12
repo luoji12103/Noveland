@@ -186,13 +186,16 @@ def list_model_assets(
     provider_id: uuid.UUID | None = None,
     inventory_kind: Annotated[VisualModelInventoryKind | None, Query()] = None,
 ) -> list[VisualModelAssetRead]:
-    return VisualGenerationService(db_session).list_model_assets(
-        world_id,
-        worldline_id=worldline_id,
-        provider_id=provider_id,
-        inventory_kind=inventory_kind,
-        include_restricted=context.is_platform_admin,
-    )
+    try:
+        return VisualGenerationService(db_session).list_model_assets(
+            world_id,
+            worldline_id=worldline_id,
+            provider_id=provider_id,
+            inventory_kind=inventory_kind,
+            include_restricted=context.is_platform_admin,
+        )
+    except VisualGenerationValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
 
 
 @router.post(
