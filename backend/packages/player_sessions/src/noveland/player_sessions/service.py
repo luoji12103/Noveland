@@ -47,9 +47,7 @@ _LEAKY_KEYS = {
     "storage_uri",
     "token",
 }
-_LEAKY_KEY_MARKERS = {
-    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS
-}
+_LEAKY_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS}
 _LEAK_PATTERN = re.compile(
     r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
     r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
@@ -130,6 +128,8 @@ class PlayerSessionService:
         route_state = _sanitize_json(session_upsert.route_state)
         resume_state = _sanitize_json(session_upsert.resume_state)
         recovery_status = self._effective_recovery_status(
+            world_id=world_id,
+            worldline_id=worldline.id,
             requested=session_upsert.recovery_status,
             conversation=conversation,
             presentation=presentation,
@@ -222,6 +222,8 @@ class PlayerSessionService:
     def _effective_recovery_status(
         self,
         *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
         requested: PlayerRecoveryStatus,
         conversation: ConversationSession | None,
         presentation: ConversationTurnPresentation | None,
@@ -238,27 +240,59 @@ class PlayerSessionService:
             presentation.composite_scene_asset_id,
         ]
         if any(
-            media_id is not None and not self._media_asset_player_safe(media_id)
+            media_id is not None
+            and not self._media_asset_player_safe(world_id, worldline_id, media_id)
             for media_id in media_ids
         ):
             return PlayerRecoveryStatus.MISSING_MEDIA
-        if any(self._media_job_failed(job_id) for job_id in media_ids if job_id is not None):
+        if any(
+            self._media_job_failed(world_id, worldline_id, media_id)
+            for media_id in media_ids
+            if media_id is not None
+        ):
             return PlayerRecoveryStatus.MEDIA_FAILURE
         return requested
 
-    def _media_asset_player_safe(self, media_id: uuid.UUID) -> bool:
+    def _media_asset_player_safe(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_id: uuid.UUID,
+    ) -> bool:
         asset = self._session.get(MediaAsset, media_id)
-        return asset is not None and asset.status == "available" and asset.visibility not in {
-            "developer_only",
-            "hidden",
-        }
+        return (
+            asset is not None
+            and asset.world_id == world_id
+            and asset.worldline_id == worldline_id
+            and asset.status == "available"
+            and asset.visibility
+            not in {
+                "developer_only",
+                "hidden",
+            }
+        )
 
-    def _media_job_failed(self, media_id: uuid.UUID) -> bool:
+    def _media_job_failed(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_id: uuid.UUID,
+    ) -> bool:
         asset = self._session.get(MediaAsset, media_id)
-        if asset is None or asset.source_job_id is None:
+        if (
+            asset is None
+            or asset.world_id != world_id
+            or asset.worldline_id != worldline_id
+            or asset.source_job_id is None
+        ):
             return False
         job = self._session.get(MediaJob, asset.source_job_id)
-        return job is not None and job.status == "failed"
+        return (
+            job is not None
+            and job.world_id == world_id
+            and job.worldline_id == worldline_id
+            and job.status == "failed"
+        )
 
     def _player_actor_or_404(
         self,

@@ -210,6 +210,15 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
             scene_id,
         )
     )
+    cross_media_conversation_id, cross_media_turn_id, cross_media_base_presentation_id = (
+        _seed_conversation(
+            engine,
+            world_id,
+            worldline_id,
+            scene_id,
+        )
+    )
+    fork_worldline_id = _seed_worldline(engine, world_id, "media-fork")
     other_conversation_id, _other_turn_id, _other_presentation_id = _seed_conversation(
         engine,
         other_world_id,
@@ -230,6 +239,13 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
         failed_media_base_presentation_id,
         visibility="player_visible",
         media_job_status="failed",
+    )
+    cross_worldline_media_presentation_id = _attach_media_to_presentation(
+        engine,
+        world_id,
+        fork_worldline_id,
+        cross_media_base_presentation_id,
+        visibility="player_visible",
     )
     failed_conversation_id, _failed_turn_id, _failed_presentation_id = _seed_conversation(
         engine,
@@ -285,6 +301,18 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
         },
         headers=_csrf_headers(client),
     )
+    cross_worldline_media = client.post(
+        f"/worlds/{world_id}/player-sessions/resume",
+        json={
+            "worldline_id": str(worldline_id),
+            "player_actor_id": str(actor_id),
+            "conversation_session_id": str(cross_media_conversation_id),
+            "scene_id": str(scene_id),
+            "last_turn_id": str(cross_media_turn_id),
+            "last_presentation_id": str(cross_worldline_media_presentation_id),
+        },
+        headers=_csrf_headers(client),
+    )
     failed_conversation = client.post(
         f"/worlds/{world_id}/player-sessions/resume",
         json={
@@ -302,6 +330,8 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
     assert hidden_media.json()["recovery_status"] == "missing_media"
     assert failed_media.status_code == 200
     assert failed_media.json()["recovery_status"] == "media_failure"
+    assert cross_worldline_media.status_code == 200
+    assert cross_worldline_media.json()["recovery_status"] == "missing_media"
     assert failed_conversation.status_code == 200
     assert failed_conversation.json()["recovery_status"] == "provider_failure"
     for response in (
@@ -309,6 +339,7 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
         failed_presentation,
         hidden_media,
         failed_media,
+        cross_worldline_media,
         failed_conversation,
     ):
         _assert_no_forbidden_markers(response.json())
