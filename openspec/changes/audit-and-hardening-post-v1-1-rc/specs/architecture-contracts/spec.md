@@ -490,6 +490,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable JSON panels or submitting dashboard JSON payloads
 - **AND** safe dashboard configuration fields such as behavior tone, schedule hours, provider capability flags, and non-sensitive metadata SHALL remain visible.
 
+#### Scenario: Web dashboard runtime and provider status text normalizes sensitive evidence
+- **GIVEN** an authorized platform admin views runtime control state, runtime/world diagnostic rows, or provider profile test status in the Web dashboard
+- **WHEN** runtime/provider status text contains resolved secrets, tokens, authorization headers, raw prompt/output markers, prompt snapshot identifiers, storage URIs, file/object paths, bytes, base64, or local model paths
+- **THEN** the Web UI SHALL redact those sensitive-looking text values before rendering dashboard runtime errors, diagnostic fields, or provider last-test messages
+- **AND** safe runtime, diagnostic, and provider status labels SHALL remain visible.
+
 #### Scenario: Web agent detail panels normalize sensitive agent evidence
 - **GIVEN** an authorized world admin views or updates agent detail records in the Web agent builder
 - **WHEN** agent character profile, agent config, relationship metadata, persona behavior policy, persona plugin config, observation metadata, run summary text, or run diagnostics contain resolved secrets, tokens, authorization headers, raw prompt/output markers, prompt snapshot identifiers, storage URIs, file/object paths, bytes, base64, or local model paths written in common key or value variants

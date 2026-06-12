@@ -1794,7 +1794,7 @@ function RuntimeControlPanel({
               : formatDateTime(runtimeControl.last_heartbeat_at)}
           </p>
           <p className="status-detail">
-            Last error {runtimeControl.last_error ?? "none"}
+            Last error {dashboardOptionalText(runtimeControl.last_error) ?? "none"}
           </p>
         </>
       )}
@@ -1841,9 +1841,10 @@ function DiagnosticList({ diagnostics }: { diagnostics: RuntimeDiagnostic[] }) {
       {diagnostics.slice(0, 8).map((diagnostic) => (
         <article className="resource-row" key={diagnostic.id}>
           <div>
-            <h3>{diagnostic.message}</h3>
+            <h3>{dashboardText(diagnostic.message)}</h3>
             <p>
-              {diagnostic.severity} - {diagnostic.component} - {diagnostic.event_type}
+              {dashboardText(diagnostic.severity)} - {dashboardText(diagnostic.component)} -{" "}
+              {dashboardText(diagnostic.event_type)}
             </p>
             <p className="status-detail">{formatDateTime(diagnostic.occurred_at)}</p>
           </div>
@@ -1891,77 +1892,81 @@ function ProviderProfilesPanel({
         </button>
       </form>
       <div className="resource-list">
-        {profiles.map((profile) => (
-          <article className="resource-row" key={profile.id}>
-            <div>
-              <h3>{profile.name}</h3>
-              <p>
-                {profile.profile_key} - {profile.provider_type} - {profile.model_name} -{" "}
-                {profile.is_enabled ? "Enabled" : "Disabled"}
-              </p>
-              <p className="status-detail">
-                Timeout {profile.timeout_seconds}s - retries {profile.retry_attempts} - rate{" "}
-                {profile.rate_limit_per_minute ?? "unlimited"}/min
-              </p>
-              <p className="status-detail">
-                Last test{" "}
-                {profile.last_test_status === null
-                  ? "never"
-                  : `${profile.last_test_status} at ${optionalDateTime(profile.last_tested_at)}`}
-                {profile.last_test_error === null ? "" : ` - ${profile.last_test_error}`}
-              </p>
-            </div>
-            <form className="inline-form" onSubmit={(event) => void onUpdate(event, profile)}>
-              <input className="text-input" name="name" defaultValue={profile.name} />
-              <input className="text-input" name="base_url" defaultValue={profile.base_url} />
-              <input className="text-input" name="model_name" defaultValue={profile.model_name} />
-              <input className="text-input" name="api_key_ref" defaultValue={profile.api_key_ref} />
-              <input
-                className="text-input"
-                name="timeout_seconds"
-                defaultValue={String(profile.timeout_seconds)}
-              />
-              <input
-                className="text-input"
-                name="retry_attempts"
-                defaultValue={String(profile.retry_attempts)}
-              />
-              <input
-                className="text-input"
-                name="rate_limit_per_minute"
-                defaultValue={profile.rate_limit_per_minute ?? ""}
-                placeholder="Rate limit per minute"
-              />
-              <textarea
-                className="text-input"
-                name="capabilities"
-                defaultValue={dashboardJsonString(profile.capabilities)}
-                rows={3}
-              />
-              <label className="checkbox-label">
-                <input name="is_enabled" type="checkbox" defaultChecked={profile.is_enabled} />
-                Enabled
-              </label>
-              <button className="secondary-button" type="submit" disabled={isBusy}>
-                Save profile
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={isBusy}
-                onClick={() => void onDisable(profile)}
-              >
-                Disable profile
-              </button>
-            </form>
-            <form className="inline-form" onSubmit={(event) => void onTest(event, profile)}>
-              <input className="text-input" name="prompt" placeholder="Reply with OK." />
-              <button className="secondary-button" type="submit" disabled={isBusy}>
-                Test provider
-              </button>
-            </form>
-          </article>
-        ))}
+        {profiles.map((profile) => {
+          const lastTestError = dashboardOptionalText(profile.last_test_error);
+
+          return (
+            <article className="resource-row" key={profile.id}>
+              <div>
+                <h3>{profile.name}</h3>
+                <p>
+                  {profile.profile_key} - {profile.provider_type} - {profile.model_name} -{" "}
+                  {profile.is_enabled ? "Enabled" : "Disabled"}
+                </p>
+                <p className="status-detail">
+                  Timeout {profile.timeout_seconds}s - retries {profile.retry_attempts} - rate{" "}
+                  {profile.rate_limit_per_minute ?? "unlimited"}/min
+                </p>
+                <p className="status-detail">
+                  Last test{" "}
+                  {profile.last_test_status === null
+                    ? "never"
+                    : `${profile.last_test_status} at ${optionalDateTime(profile.last_tested_at)}`}
+                  {lastTestError === null ? "" : ` - ${lastTestError}`}
+                </p>
+              </div>
+              <form className="inline-form" onSubmit={(event) => void onUpdate(event, profile)}>
+                <input className="text-input" name="name" defaultValue={profile.name} />
+                <input className="text-input" name="base_url" defaultValue={profile.base_url} />
+                <input className="text-input" name="model_name" defaultValue={profile.model_name} />
+                <input className="text-input" name="api_key_ref" defaultValue={profile.api_key_ref} />
+                <input
+                  className="text-input"
+                  name="timeout_seconds"
+                  defaultValue={String(profile.timeout_seconds)}
+                />
+                <input
+                  className="text-input"
+                  name="retry_attempts"
+                  defaultValue={String(profile.retry_attempts)}
+                />
+                <input
+                  className="text-input"
+                  name="rate_limit_per_minute"
+                  defaultValue={profile.rate_limit_per_minute ?? ""}
+                  placeholder="Rate limit per minute"
+                />
+                <textarea
+                  className="text-input"
+                  name="capabilities"
+                  defaultValue={dashboardJsonString(profile.capabilities)}
+                  rows={3}
+                />
+                <label className="checkbox-label">
+                  <input name="is_enabled" type="checkbox" defaultChecked={profile.is_enabled} />
+                  Enabled
+                </label>
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save profile
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => void onDisable(profile)}
+                >
+                  Disable profile
+                </button>
+              </form>
+              <form className="inline-form" onSubmit={(event) => void onTest(event, profile)}>
+                <input className="text-input" name="prompt" placeholder="Reply with OK." />
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Test provider
+                </button>
+              </form>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -2264,6 +2269,14 @@ function sanitizeDashboardJsonForDisplay(value: Record<string, unknown>): Record
       .filter(([key]) => !sensitiveDashboardJsonKey(key))
       .map(([key, entry]) => [key, sanitizeDashboardJsonValue(entry)]),
   );
+}
+
+function dashboardText(value: string): string {
+  return looksSensitiveDashboardString(value) ? "[redacted]" : value;
+}
+
+function dashboardOptionalText(value: string | null): string | null {
+  return value === null ? null : dashboardText(value);
 }
 
 function sanitizeDashboardJsonValue(value: unknown): unknown {

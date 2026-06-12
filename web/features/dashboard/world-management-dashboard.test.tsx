@@ -128,6 +128,51 @@ describe("WorldManagementDashboard", () => {
     ).toHaveLength(0);
   });
 
+  it("redacts sensitive runtime and provider status text", () => {
+    const dirtyData: WorldDashboardData = {
+      ...adminDataWithAgent,
+      runtimeControl: {
+        ...adminDataWithAgent.runtimeControl!,
+        last_error:
+          "Provider failed after rawPrompt with Bearer dashboard-token and media://dashboard-secret",
+      },
+      providerProfiles: [
+        {
+          ...adminDataWithAgent.providerProfiles[0],
+          last_test_status: "failed",
+          last_tested_at: "2026-04-17T00:06:00.000Z",
+          last_test_error:
+            "Provider test returned rawOutput from /tmp/dashboard-provider with c2VjcmV0LWRhc2hib2FyZA==",
+        },
+      ],
+      runtimeDiagnostics: [
+        {
+          ...adminDataWithAgent.runtimeDiagnostics[0],
+          component: "runtime",
+          event_type: "runtime.rawPrompt",
+          message: "Runtime leaked promptSnapshotId snapshot-1 and sk-dashboard-secret.",
+        },
+      ],
+      worldDiagnostics: [
+        {
+          ...adminDataWithAgent.worldDiagnostics[0],
+          component: "provider",
+          event_type: "provider.rawOutput",
+          message: "World diagnostic contained storageUri media://world-secret.",
+        },
+      ],
+    };
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={dirtyData} />);
+
+    const renderedText = document.body.textContent ?? "";
+    expect(renderedText).not.toMatch(
+      /rawPrompt|rawOutput|promptSnapshotId|storageUri|media:\/\/|Bearer dashboard-token|sk-dashboard-secret|\/tmp\/dashboard-provider|c2VjcmV0LWRhc2hib2FyZA==/i,
+    );
+    expect(renderedText).toContain("[redacted]");
+    expect(screen.getByText(/Last test failed at/)).toBeInTheDocument();
+  });
+
   it("hides management controls for read-only world members", () => {
     render(<WorldManagementDashboard subject={humanUser} initialData={readOnlyData} />);
 
