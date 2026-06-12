@@ -293,6 +293,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit those rule/config internals while preserving safe scene and location graph identity, names, public descriptions, region/location tags, travel labels, active state, and timing fields
 - **AND** admin routes MAY continue to expose opening and traversal rules required for world management and runtime planning.
 
+#### Scenario: Member reads sensitive-looking scene and location graph text
+- **GIVEN** a world member lists scenes or location edges through member-readable routes
+- **WHEN** scene name, scene description, or location travel label text contains storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64
+- **THEN** the member response SHALL blank the sensitive-looking text while preserving safe scene names, public descriptions, travel labels, rule redaction, and graph identity fields
+- **AND** admin routes MAY continue to expose full scene and location text required for world management and runtime planning.
+
 #### Scenario: Member reads latest snapshot
 - **GIVEN** a world member fetches the latest world snapshot through member-readable routes
 - **WHEN** the snapshot record contains inline payload, payload_uri, payload_location, metadata, created-by event refs, storage refs, bytes, base64, provider refs, or other replay/storage evidence

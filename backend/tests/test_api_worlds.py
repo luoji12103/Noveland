@@ -714,7 +714,8 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
         f"/worlds/{world_id}/scenes",
         json={
             "scene_key": "classroom",
-            "name": "Classroom",
+            "name": "Classroom raw_prompt: operator location",
+            "description": "storage_uri media://private/scene-evidence",
             "region_key": "school",
             "location_tags": ["school", "indoors"],
             "opening_rules": {
@@ -775,7 +776,7 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     )
     updated_edge = client.patch(
         f"/worlds/{world_id}/location-edges/{created_edge.json()['id']}",
-        json={"travel_label": "covered walkway"},
+        json={"travel_label": "covered walkway raw_output: /root/private/path"},
     )
     upsert_presence = client.put(
         f"/worlds/{world_id}/agents/{agent_id}/presence",
@@ -821,6 +822,8 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     member_edges_after_create = client.get(f"/worlds/{world_id}/location-edges")
 
     assert classroom.status_code == 201
+    assert classroom.json()["name"] == "Classroom raw_prompt: operator location"
+    assert classroom.json()["description"] == "storage_uri media://private/scene-evidence"
     assert classroom.json()["region_key"] == "school"
     assert classroom.json()["location_tags"] == ["school", "indoors"]
     assert classroom.json()["opening_rules"] == {
@@ -841,7 +844,7 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert created_edge.json()["target_scene_key"] == "courtyard"
     assert duplicate_edge.status_code == 409
     assert updated_edge.status_code == 200
-    assert updated_edge.json()["travel_label"] == "covered walkway"
+    assert updated_edge.json()["travel_label"] == "covered walkway raw_output: /root/private/path"
     assert upsert_presence.status_code == 200
     assert upsert_presence.json()["current_scene_key"] == "classroom"
     assert upsert_presence.json()["visibility_status"] == "offscreen"
@@ -849,12 +852,15 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert invalid_presence_scene.status_code == 404
     assert [scene["scene_key"] for scene in scenes.json()] == ["classroom", "courtyard"]
     classroom_scene = next(scene for scene in scenes.json() if scene["scene_key"] == "classroom")
+    assert classroom_scene["name"] == "Classroom raw_prompt: operator location"
+    assert classroom_scene["description"] == "storage_uri media://private/scene-evidence"
     assert classroom_scene["opening_rules"] == {
         "weekday": "07:00-18:00",
         "raw_prompt": "operator-only",
         "provider_profile_id": classroom.json()["opening_rules"]["provider_profile_id"],
     }
     assert admin_edges.status_code == 200
+    assert admin_edges.json()[0]["travel_label"] == "covered walkway raw_output: /root/private/path"
     assert admin_edges.json()[0]["traversal_rules"] == {
         "requires": "school_access",
         "raw_prompt": "operator-only",
@@ -879,11 +885,16 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
         scene for scene in member_scenes.json() if scene["scene_key"] == "classroom"
     )
     assert member_classroom["opening_rules"] == {}
-    assert member_classroom["name"] == "Classroom"
+    assert member_classroom["name"] == ""
+    assert member_classroom["description"] == ""
+    member_courtyard = next(
+        scene for scene in member_scenes.json() if scene["scene_key"] == "courtyard"
+    )
+    assert member_courtyard["name"] == "Courtyard"
     assert member_classroom["region_key"] == "school"
     assert member_classroom["location_tags"] == ["school", "indoors"]
     assert member_edges_after_create.status_code == 200
-    assert member_edges_after_create.json()[0]["travel_label"] == "covered walkway"
+    assert member_edges_after_create.json()[0]["travel_label"] == ""
     assert member_edges_after_create.json()[0]["traversal_rules"] == {}
 
 

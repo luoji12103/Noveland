@@ -8197,8 +8197,12 @@ def _scene_response(scene: Scene, *, include_admin_fields: bool = True) -> Scene
         id=scene.id,
         world_id=scene.world_id,
         scene_key=scene.scene_key,
-        name=scene.name,
-        description=scene.description,
+        name=scene.name if include_admin_fields else _sanitize_public_text(scene.name),
+        description=(
+            scene.description
+            if include_admin_fields or scene.description is None
+            else _sanitize_public_text(scene.description)
+        ),
         region_key=scene.region_key,
         location_tags=scene.location_tags,
         opening_rules=scene.opening_rules if include_admin_fields else {},
@@ -8221,7 +8225,11 @@ def _location_edge_response(
         target_scene_id=edge.target_scene_id,
         source_scene_key=source_scene.scene_key,
         target_scene_key=target_scene.scene_key,
-        travel_label=edge.travel_label,
+        travel_label=(
+            edge.travel_label
+            if include_admin_fields or edge.travel_label is None
+            else _sanitize_public_text(edge.travel_label)
+        ),
         traversal_rules=edge.traversal_rules if include_admin_fields else {},
         created_at=edge.created_at,
         updated_at=edge.updated_at,
