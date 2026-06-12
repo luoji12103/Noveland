@@ -118,8 +118,8 @@ async function proxyResponseBody(backendResponse: Response): Promise<ProxyRespon
 }
 
 function shouldSanitizeJsonErrorBody(response: Response): boolean {
-  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-  return !response.ok && contentType.includes("application/json");
+  const mediaType = response.headers.get("content-type")?.toLowerCase().split(";")[0]?.trim() ?? "";
+  return !response.ok && (mediaType === "application/json" || mediaType.endsWith("+json"));
 }
 
 function sanitizeProxyErrorJson(text: string): string | null {

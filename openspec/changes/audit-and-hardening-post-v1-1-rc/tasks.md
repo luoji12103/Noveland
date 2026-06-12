@@ -1293,3 +1293,14 @@
 - Intended remediation: reuse the existing dashboard sensitive-text detection for runtime/provider status text, preserve safe labels and status values, and add Web regression coverage for the affected dashboard text fields.
 - Status: Remediated in Web dashboard runtime/provider status text redaction batch.
 - Verification: `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed because runtime/provider sensitive status text rendered into the document, then passed with 8 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- features/dashboard/world-management-dashboard.tsx features/dashboard/world-management-dashboard.test.tsx` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 206 tests. OpenSpec strict validations and `git diff --check` passed before docs update.
+
+
+### F-122 Web proxy skips sensitive structured +json error bodies
+
+- Severity: Medium
+- Affected boundary: Web API proxy response redaction for backend error bodies.
+- Evidence: Read-only audit showed `web/lib/auth/proxy.ts` only sanitizes non-2xx response bodies when `content-type` contains `application/json`. Structured JSON error media types such as `application/problem+json` and `application/vnd.api+json` are JSON but currently bypass `sanitizeProxyErrorJson()` and can relay sensitive `detail` or nested error fields unchanged.
+- Impact: same-origin Web proxies can leak provider secrets, storage refs, paths, raw prompt/output markers, prompt snapshot refs, tokens, or base64-like evidence when a backend/error middleware uses a structured `+json` content type.
+- Intended remediation: classify `application/json` and `application/*+json` as sanitizable JSON error responses, preserve safe JSON and non-JSON behavior, and add focused proxy regression coverage.
+- Status: Remediated in Web proxy structured JSON error redaction batch.
+- Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 207 tests.

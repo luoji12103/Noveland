@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-13T16:18:00+08:00
+- Date: 2026-06-13T16:24:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-121 are remediated on this branch; latest batch is F-121 Web dashboard runtime/provider status text redaction.
+- Status: F-001 through F-122 are remediated on this branch; latest batch is F-122 Web proxy structured JSON error redaction.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-121 batch: 6f9c3ad fix(player-sessions): require deliverable presentation media.
+- Base before F-122 batch: 9d2da26 fix(dashboard): redact runtime status text.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before this continuation: branch matched origin at 6f9c3ad, worktree started clean, active OpenSpec strict validation passed, specs strict validation passed with 76 specs, and Noveland Postgres/NATS were healthy.
+- Current server status was rechecked before this continuation: branch matched origin at 9d2da26, worktree started clean for F-122 after F-121 push, active OpenSpec strict validation passed, specs strict validation passed with 76 specs, and Noveland Postgres/NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,30 +26,28 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime branch/worktree/OpenSpec/container status using SSH/CLI only.
-- Continued Web security audit around reader/player media playback, Web proxy, server loaders, and dashboard rendering sinks.
-- Identified F-121: `WorldManagementDashboard` reused JSON redaction for config panels but directly rendered runtime `last_error`, runtime/world diagnostic text, and provider `last_test_error` fields.
-- Added an architecture-contracts scenario requiring Web dashboard runtime/provider status text redaction.
-- Added a focused Vitest regression covering runtime last error, runtime/world diagnostic text, and provider last-test error sensitive markers.
-- Reused the dashboard sensitive-string detector through `dashboardText()` / `dashboardOptionalText()` before rendering those status fields.
+- Continued Web proxy security audit after F-121 from a clean pushed branch.
+- Identified F-122: `buildProxyResponse()` only sanitized non-2xx `application/json` proxy error bodies, while structured JSON media types such as `application/problem+json` bypassed sensitive body cleanup.
+- Extended the architecture-contracts proxy error scenario to require `application/json` and `application/*+json` redaction behavior.
+- Added a focused Vitest regression covering `application/problem+json`, sensitive nested `detail` values, and stale content-length removal after sanitization.
+- Changed proxy error content-type classification to strip parameters and accept exact `application/json` or media types ending in `+json`.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed because sensitive runtime/provider status text rendered into the document, then passed with 8 tests after remediation.
+- `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation.
 - `cd web && npm run typecheck -- --pretty false` passed.
-- `cd web && npm run lint -- features/dashboard/world-management-dashboard.tsx features/dashboard/world-management-dashboard.test.tsx` passed via the project lint script.
-- Full `cd web && npm run test` passed with 52 test files and 206 tests.
-- OpenSpec strict validations and `git diff --check` passed before docs update.
+- `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script.
+- Full `cd web && npm run test` passed with 52 test files and 207 tests.
 
 ## Remaining Work
 
-1. Continue Web/e2e audit for playback empty states when media descriptors are absent, route handlers, proxy method exposure, server-side loader response DTOs, role boundary, client-side rendering sinks, local query construction, and proxy/error content-type edge cases.
+1. Continue Web/e2e audit for remaining proxy content-type edges, streaming redaction assumptions, server-side loader response DTOs, client-side text sinks, playback empty states when media descriptors are absent, route handlers, and role boundaries.
 2. Continue backend audits for remaining observability filters, invocation-adjacent filters, media object/reference subroutes, and member/player DTOs.
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Push after successful commits unless the user changes that instruction.
 
-## Finding F-121
+## Finding F-122
 
-- Web dashboard runtime/provider status text should not render sensitive provider/runtime evidence even for platform-admin dashboard surfaces.
-- The remediation preserves safe status labels and only replaces sensitive-looking free text with `[redacted]`.
-- Residual risk: continue auditing adjacent Web text sinks and proxy JSON-error content-type variants.
+- Web proxy error redaction should cover structured JSON error content types, not only exact `application/json`.
+- The remediation preserves safe JSON, binary/no-content, streaming, and auth cookie relay behavior while routing `+json` error bodies through the existing sanitizer.
+- Residual risk: continue auditing event-stream assumptions and remaining Web text sinks.

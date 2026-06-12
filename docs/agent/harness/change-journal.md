@@ -4700,3 +4700,15 @@
 - Tests added/updated: Added `redacts sensitive runtime and provider status text` to `web/features/dashboard/world-management-dashboard.test.tsx`, covering runtime last error, runtime/world diagnostics, and provider last-test error text.
 - Verification: `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed because sensitive runtime/provider status text rendered into the document, then passed with 8 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- features/dashboard/world-management-dashboard.tsx features/dashboard/world-management-dashboard.test.tsx` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 206 tests. OpenSpec strict validations and `git diff --check` passed before docs update.
 - Follow-up notes: Continue Web/e2e audit for remaining client-side text sinks, reader/player media empty states, route handlers, and proxy/error redaction edge cases. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web proxy structured JSON error redaction entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web API proxy structured JSON error redaction remediation for F-122.
+- Finding: F-122 found `web/lib/auth/proxy.ts` only routed non-2xx proxy responses through JSON error sanitization when `content-type` contained `application/json`, leaving structured JSON error media types such as `application/problem+json` and `application/vnd.api+json` to bypass sensitive body cleanup.
+- Summary: Extended the architecture-contracts proxy error scenario to include `application/*+json` media types and changed proxy error detection to sanitize exact `application/json` and `+json` media types after stripping parameters.
+- Files changed: web/lib/auth/proxy.ts, web/lib/auth/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `normalizes sensitive structured json error content types` to `web/lib/auth/proxy.test.ts`, covering `application/problem+json`, sensitive nested fields, and content-length removal after sanitization.
+- Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 207 tests.
+- Follow-up notes: Continue Web/e2e audit for remaining proxy content-type edges, streaming redaction assumptions, server/client text sinks, and reader/player media empty states. Push after successful commits unless the user changes that instruction.

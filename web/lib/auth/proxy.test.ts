@@ -66,6 +66,33 @@ describe("auth proxy helpers", () => {
     expect(body.detail.storageUri).toBeUndefined();
   });
 
+  it("normalizes sensitive structured json error content types", async () => {
+    const backendResponse = new Response(
+      JSON.stringify({
+        detail: {
+          message: "Problem detail leaked rawOutput, Bearer problem-token, and media://problem/object",
+          storageUri: "media://problem/hidden-object",
+        },
+      }),
+      {
+        status: 502,
+        headers: {
+          "content-type": "application/problem+json",
+          "content-length": "200",
+        },
+      },
+    );
+
+    const response = await buildProxyResponse(backendResponse);
+
+    expect(response.status).toBe(502);
+    expect(response.headers.get("content-length")).toBeNull();
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toMatch(/rawOutput|Bearer problem-token|media:\/\//i);
+    expect(body.detail.message).toBe("Request failed.");
+    expect(body.detail.storageUri).toBeUndefined();
+  });
+
   it("leaves safe json error bodies unchanged", async () => {
     const safeBody = JSON.stringify(
       { detail: { message: "Invalid credentials", review_status: "fail" } },

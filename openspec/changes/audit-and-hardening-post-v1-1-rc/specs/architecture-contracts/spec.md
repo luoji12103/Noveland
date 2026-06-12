@@ -662,7 +662,8 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 
 #### Scenario: Web API proxies normalize backend JSON error bodies
 - **GIVEN** same-origin Web API proxies relay non-2xx JSON responses from backend API routes to browser clients
-- **WHEN** the response body `detail`, `detail.message`, or nested error fields contain provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **WHEN** the response content type is `application/json` or a structured `application/*+json` JSON media type
+- **AND** the response body `detail`, `detail.message`, or nested error fields contain provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
 - **THEN** the proxied browser response body SHALL replace or omit the forbidden key or value before it reaches the browser
 - **AND** successful JSON, binary media, no-content responses, safe error summaries, streaming responses, and explicit auth cookie relay behavior SHALL remain unchanged.
 
