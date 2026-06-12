@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T08:53:58+00:00
+- Date: 2026-06-12T09:08:11+00:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-097 are remediated on this branch; latest batch is F-097 Web runtime admin diagnostics text normalization.
+- Status: F-001 through F-098 are remediated on this branch; latest batch is F-098 Web dashboard JSON normalization.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-097 batch: a01c1b3 fix(web-memory): sanitize admin json panels.
+- Base before F-098 batch: a9d142b fix(web-runtime): sanitize admin diagnostic text.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked before the batch: branch was clean at a01c1b3 and aligned with origin after the explicit user-requested push; OpenSpec change validation passed; Noveland Postgres and NATS were healthy.
+- Current server status was rechecked before the batch: branch was clean at a9d142b and ahead of origin by one local commit; OpenSpec change validation passed; Noveland Postgres and NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,17 +26,19 @@
 
 ## Completed This Batch
 
-- Continued Web/e2e security audit after F-096, focusing on runtime admin health notices, external tool policy text/lists, scale readiness text, and runtime diagnostic rows.
-- Recorded/remediated F-097: Web runtime admin diagnostics exposed dirty sensitive text from loader or SSE payloads.
+- Continued Web/e2e security audit after F-097, focusing on remaining world management dashboard JSON rendering and submit surfaces.
+- Recorded/remediated F-098: Web dashboard JSON panels exposed dirty sensitive config evidence from agent config, schedule rule config, provider capabilities, and persona behavior policy, and dashboard JSON form submissions could echo dirty fields.
 - Updated architecture-contracts OpenSpec before implementation.
-- Added defensive runtime text sanitization in `RuntimeAdmin` for runtime health reasons, external tool policy operator messages, compact list items, scale readiness section text, and diagnostic component/message strings.
-- Updated regression coverage to assert dirty loader data and dirty SSE diagnostics are redacted while safe deny reasons, audit fields, readiness areas, and recommendations remain visible.
+- Added normalized dashboard JSON display and submit sanitization in `WorldManagementDashboard` for agent config, schedule rule config, provider capabilities, persona behavior policy, observation metadata, and narrative artifact metadata.
+- Updated regression coverage to assert dirty dashboard JSON panels are redacted while safe agent config, schedule hours, provider capability flags, and persona behavior fields remain visible.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- features/admin/runtime-admin.test.tsx` first failed against the unpatched component with dirty runtime strings visible in the failure DOM, then passed with 3 tests after remediation.
-- `cd web && npm run test -- features/admin/runtime-admin.test.tsx lib/worlds/client.test.ts` passed with 38 tests.
-- `cd web && npm run lint`, `cd web && npm run typecheck`, `cd web && npm run check:next-env`, full `cd web && npm run test`, and `cd web && npm run build` passed.
+- `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed against the unpatched component with dirty dashboard JSON visible in editable textareas, then passed with 7 tests after remediation.
+- `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts` passed with 42 tests.
+- `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed.
+- Full `cd web && npm run test` passed on rerun with 52 files and 189 tests; a prior full run had one unrelated `media-admin` timing miss, and `cd web && npm run test -- features/admin/media-admin.test.tsx` passed with 4 tests.
+- `cd web && npm run build` passed.
 - `cd web && npm run test:e2e` passed with 21 tests; `next-env.d.ts` was restored afterward and `cd web && npm run check:next-env` passed.
 - OpenSpec strict validations and `git diff --check` passed before commit.
 
@@ -47,8 +49,8 @@
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless explicitly requested.
 
-## Finding F-097
+## Finding F-098
 
-- Web runtime admin text rendering must treat dirty loader or SSE text containing secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, or base64 markers as sensitive before rendering.
-- The remediation redacts sensitive-looking runtime health reasons, external tool policy messages/list items, scale readiness text, and diagnostic component/message strings while preserving safe operational strings.
+- Web dashboard JSON rendering and submit handling must treat dirty JSON containing secret, token, authorization, raw prompt/output, prompt snapshot, storage URI, file/object path, local model path, bytes, or base64 key/value markers as sensitive.
+- The remediation omits sensitive dashboard JSON keys, redacts sensitive-looking safe-key string values, and preserves safe dashboard configuration across display and submit paths.
 - Residual risk: continue route-handler, client rendering, and spec-history drift audits.

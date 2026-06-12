@@ -84,6 +84,50 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
   });
 
+  it("redacts sensitive dashboard JSON panels while preserving safe config", () => {
+    const dirtyData: WorldDashboardData = {
+      ...adminDataWithAgent,
+      agents: [
+        {
+          ...adminDataWithAgent.agents[0],
+          config: {
+            safeMode: true,
+            clientSecret: "sk-dashboard-secret",
+            nested: { endpoint: "/v1/chat/completions", storageUri: "media://dashboard-secret" },
+          },
+        },
+      ],
+      scheduleRules: [
+        {
+          ...adminDataWithAgent.scheduleRules[0],
+          config: { hours: [8], rawPrompt: "system prompt", filePath: "/tmp/dashboard.txt" },
+        },
+      ],
+      providerProfiles: [
+        {
+          ...adminDataWithAgent.providerProfiles[0],
+          capabilities: { chat: true, bearerToken: "Bearer dashboard-token", rawOutput: "model output" },
+        },
+      ],
+      agentPersona: {
+        ...adminDataWithAgent.agentPersona!,
+        behavior_policy: { tone: "direct", promptSnapshotId: "snapshot-1" },
+      },
+    };
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={dirtyData} />);
+
+    expect(screen.getByDisplayValue(/safeMode/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/hours/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/"chat":true/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/tone/)).toBeInTheDocument();
+    expect(
+      screen.queryAllByDisplayValue(
+        /clientSecret|sk-dashboard-secret|storageUri|media:\/\/dashboard-secret|rawPrompt|filePath|\/tmp\/dashboard|bearerToken|Bearer dashboard-token|rawOutput|promptSnapshotId|snapshot-1/i,
+      ),
+    ).toHaveLength(0);
+  });
+
   it("hides management controls for read-only world members", () => {
     render(<WorldManagementDashboard subject={humanUser} initialData={readOnlyData} />);
 

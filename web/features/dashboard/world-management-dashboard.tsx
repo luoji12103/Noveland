@@ -462,7 +462,7 @@ export function WorldManagementDashboard({
         display_name,
         kind: formString(form, "kind") as AgentKind,
         home_scene_id: optionalFormString(form, "home_scene_id"),
-        config: jsonObject(formString(form, "config")),
+        config: dashboardJsonObject(formString(form, "config")),
       });
       setAgents((currentAgents) => [...currentAgents, agent].sort(compareAgents));
       setSelectedAgentId(agent.id);
@@ -581,7 +581,7 @@ export function WorldManagementDashboard({
         rule_key,
         name,
         kind: formString(form, "kind") as ScheduleRuleKind,
-        config: jsonObject(formString(form, "config")),
+        config: dashboardJsonObject(formString(form, "config")),
       });
       setScheduleRules((currentRules) => [...currentRules, rule].sort(compareScheduleRules));
       formElement.reset();
@@ -598,7 +598,7 @@ export function WorldManagementDashboard({
       const updatedRule = await updateScheduleRule(selectedWorld.id, rule.id, {
         name: formString(form, "name"),
         kind: formString(form, "kind") as ScheduleRuleKind,
-        config: jsonObject(formString(form, "config")),
+        config: dashboardJsonObject(formString(form, "config")),
         is_enabled: form.get("is_enabled") === "on",
       });
       setScheduleRules((currentRules) => replaceById(currentRules, updatedRule));
@@ -654,7 +654,7 @@ export function WorldManagementDashboard({
       setAgentPersona(
         await updateAgentPersona(selectedWorld.id, selectedAgent.id, {
           persona_text: formString(form, "persona_text"),
-          behavior_policy: jsonObject(formString(form, "behavior_policy")),
+          behavior_policy: dashboardJsonObject(formString(form, "behavior_policy")),
           is_enabled: form.get("is_enabled") === "on",
         }),
       );
@@ -677,7 +677,7 @@ export function WorldManagementDashboard({
       const observation = await createAgentObservation(selectedWorld.id, selectedAgent.id, {
         observation_type: formString(form, "observation_type") || "manual",
         content,
-        metadata: jsonObject(formString(form, "metadata")),
+        metadata: dashboardJsonObject(formString(form, "metadata")),
         observed_at: optionalFormString(form, "observed_at"),
       });
       setAgentObservations((currentObservations) => [observation, ...currentObservations]);
@@ -792,7 +792,7 @@ export function WorldManagementDashboard({
         provider_type: formString(form, "provider_type") as ProviderType,
         base_url: formString(form, "base_url"),
         model_name: formString(form, "model_name"),
-        capabilities: jsonObject(formString(form, "capabilities")),
+        capabilities: dashboardJsonObject(formString(form, "capabilities")),
         api_key_ref: formString(form, "api_key_ref"),
         timeout_seconds: numberFormValue(form, "timeout_seconds", 20),
         retry_attempts: numberFormValue(form, "retry_attempts", 1),
@@ -814,7 +814,7 @@ export function WorldManagementDashboard({
         name: formString(form, "name"),
         base_url: formString(form, "base_url"),
         model_name: formString(form, "model_name"),
-        capabilities: jsonObject(formString(form, "capabilities")),
+        capabilities: dashboardJsonObject(formString(form, "capabilities")),
         api_key_ref: formString(form, "api_key_ref"),
         timeout_seconds: numberFormValue(form, "timeout_seconds", profile.timeout_seconds),
         retry_attempts: numberFormValue(form, "retry_attempts", profile.retry_attempts),
@@ -869,7 +869,7 @@ export function WorldManagementDashboard({
       const updatedAgent = await updateAgent(selectedWorld.id, agent.id, {
         display_name: formString(form, "display_name"),
         home_scene_id: optionalFormString(form, "home_scene_id"),
-        config: jsonObject(formString(form, "config")),
+        config: dashboardJsonObject(formString(form, "config")),
         is_enabled: form.get("is_enabled") === "on",
       });
       setAgents((currentAgents) => replaceById(currentAgents, updatedAgent));
@@ -1251,7 +1251,7 @@ export function WorldManagementDashboard({
                         <textarea
                           className="text-input"
                           name="config"
-                          defaultValue={JSON.stringify(agent.config)}
+                          defaultValue={dashboardJsonString(agent.config)}
                           rows={3}
                         />
                         <label className="checkbox-label">
@@ -1571,7 +1571,7 @@ function ScheduleRulesPanel({
                 <textarea
                   className="text-input"
                   name="config"
-                  defaultValue={JSON.stringify(rule.config)}
+                  defaultValue={dashboardJsonString(rule.config)}
                   rows={3}
                 />
                 <label className="checkbox-label">
@@ -1935,7 +1935,7 @@ function ProviderProfilesPanel({
               <textarea
                 className="text-input"
                 name="capabilities"
-                defaultValue={JSON.stringify(profile.capabilities)}
+                defaultValue={dashboardJsonString(profile.capabilities)}
                 rows={3}
               />
               <label className="checkbox-label">
@@ -2019,7 +2019,7 @@ function AgentPersonaObservationsPanel({
               className="text-input"
               name="behavior_policy"
               placeholder="{}"
-              defaultValue={JSON.stringify(persona?.behavior_policy ?? {})}
+              defaultValue={dashboardJsonString(persona?.behavior_policy ?? {})}
               rows={3}
             />
             <label className="checkbox-label">
@@ -2248,6 +2248,99 @@ function optionalNumberFormValue(form: FormData, key: string): number | null {
     throw new Error(`${key} must be a number.`);
   }
   return parsed;
+}
+
+function dashboardJsonString(value: Record<string, unknown>): string {
+  return JSON.stringify(sanitizeDashboardJsonForDisplay(value));
+}
+
+function dashboardJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizeDashboardJsonForDisplay(jsonObject(rawValue));
+}
+
+function sanitizeDashboardJsonForDisplay(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveDashboardJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeDashboardJsonValue(entry)]),
+  );
+}
+
+function sanitizeDashboardJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeDashboardJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeDashboardJsonForDisplay(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveDashboardString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_DASHBOARD_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_DASHBOARD_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveDashboardJsonKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return (
+    EXACT_SENSITIVE_DASHBOARD_JSON_KEYS.has(normalized) ||
+    SENSITIVE_DASHBOARD_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveDashboardString(value: string): boolean {
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return (
+    SENSITIVE_DASHBOARD_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeDashboardToken(value)
+  );
+}
+
+function containsBase64LikeDashboardToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 16 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
 }
 
 function jsonObject(rawValue: string): Record<string, unknown> {
