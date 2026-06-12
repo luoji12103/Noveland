@@ -4243,6 +4243,16 @@ def test_agent_runs_and_narrative_artifacts_api(
         f"/worlds/{world_id}/agents/{agent_id}/run",
         json={"prompt": "Operator run"},
     )
+    source_calendar_entry_id = uuid.uuid4()
+    source_schedule_rule_id = uuid.uuid4()
+    created_event_id = uuid.uuid4()
+    with Session(engine) as session:
+        run_record = session.get(AgentRuntimeRun, uuid.UUID(run_response.json()["run_id"]))
+        assert run_record is not None
+        run_record.source_calendar_entry_id = source_calendar_entry_id
+        run_record.source_schedule_rule_id = source_schedule_rule_id
+        run_record.created_event_id = created_event_id
+        session.commit()
     list_runs = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
     run_detail = client.get(
         f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
@@ -4280,12 +4290,18 @@ def test_agent_runs_and_narrative_artifacts_api(
     assert list_runs.json()[0]["prompt_text"] == "Operator run"
     assert list_runs.json()[0]["response_text"].startswith("Run completed for: Operator run")
     assert list_runs.json()[0]["provider_profile_id"] is not None
+    assert list_runs.json()[0]["source_calendar_entry_id"] == str(source_calendar_entry_id)
+    assert list_runs.json()[0]["source_schedule_rule_id"] == str(source_schedule_rule_id)
+    assert list_runs.json()[0]["created_event_id"] == str(created_event_id)
     assert list_runs.json()[0]["diagnostics"]["profile_key"] == "runtime-profile"
     assert member_list_runs_after_run.status_code == 200
     assert member_list_runs_after_run.json()[0]["run_id"] == run_response.json()["run_id"]
     assert member_list_runs_after_run.json()[0]["prompt_text"] == ""
     assert member_list_runs_after_run.json()[0]["response_text"] is None
     assert member_list_runs_after_run.json()[0]["provider_profile_id"] is None
+    assert member_list_runs_after_run.json()[0]["source_calendar_entry_id"] is None
+    assert member_list_runs_after_run.json()[0]["source_schedule_rule_id"] is None
+    assert member_list_runs_after_run.json()[0]["created_event_id"] is None
     assert member_list_runs_after_run.json()[0]["diagnostics"] == {}
     assert run_detail.status_code == 200
     assert run_detail.json()["run"]["trigger_source"] == "manual"

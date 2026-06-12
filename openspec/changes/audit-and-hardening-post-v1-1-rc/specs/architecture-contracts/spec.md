@@ -120,7 +120,7 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Member lists agent runtime runs
 - **GIVEN** a world member lists agent runtime runs through member-readable routes
-- **WHEN** agent run records contain prompt text, raw/model response text, provider profile refs, diagnostics, storage refs, bytes, or base64 evidence
+- **WHEN** agent run records contain prompt text, raw/model response text, provider profile refs, diagnostics, source calendar/schedule/event refs, storage refs, bytes, or base64 evidence
 - **THEN** the member response SHALL omit those operator-only run internals while preserving safe run status and timing fields
 - **AND** admin run routes MAY continue to expose execution details required for diagnosis and world management.
 
