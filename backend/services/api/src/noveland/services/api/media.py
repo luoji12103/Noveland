@@ -544,13 +544,16 @@ def get_media_asset(
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: Annotated[uuid.UUID | None, Query()] = None,
 ) -> MediaAssetRecord:
-    record = MediaService(db_session).get_asset(
-        world_id,
-        asset_id,
-        worldline_id=worldline_id,
-        member_visible_only=not _context.is_platform_admin and _context.role != "world_admin",
-        allow_restricted=_context.is_platform_admin,
-    )
+    try:
+        record = MediaService(db_session).get_asset(
+            world_id,
+            asset_id,
+            worldline_id=worldline_id,
+            member_visible_only=not _context.is_platform_admin and _context.role != "world_admin",
+            allow_restricted=_context.is_platform_admin,
+        )
+    except MediaValidationError as exc:
+        raise _unprocessable(str(exc)) from exc
     if record is None:
         raise _not_found()
     return _media_asset_record_for_context(record, _context)

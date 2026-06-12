@@ -4638,3 +4638,16 @@
 - Tests added/updated: Added `test_visual_generation_model_assets_reject_cross_worldline_requests` covering cross-world model asset list rejection and valid same-worldline model asset list behavior.
 - Verification: `cd backend && uv run pytest tests/test_api_visual_generation.py::test_visual_generation_model_assets_reject_cross_worldline_requests -q` first failed with an uncaught `VisualGenerationValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_visual_generation.py -q` passed with 5 tests; focused backend ruff/mypy passed for visual generation API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 576 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
 - Follow-up notes: Continue invalid-worldline behavior audit for media job/source filters, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening media asset detail worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend media member/admin API worldline isolation remediation for F-117.
+- Finding: F-117 found `GET /worlds/{world_id}/media/assets/{asset_id}?worldline_id={other_worldline_id}` relying on service-level worldline validation without catching the resulting `MediaValidationError`, while valid same-worldline asset detail returned normally.
+- Summary: Added an architecture-contracts scenario for handled media asset detail invalid-worldline responses and mapped invalid explicit worldline scopes in the asset detail route to the existing 422 client error while preserving valid detail behavior and member/admin response shaping.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_media_asset_detail_rejects_cross_worldline_requests` covering cross-world media asset detail rejection and valid same-worldline detail behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_asset_detail_rejects_cross_worldline_requests -q` first failed with an uncaught `MediaValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_media.py -q` passed with 10 tests; focused backend ruff/mypy passed for media API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 577 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for media object/detail subroutes, media references, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.

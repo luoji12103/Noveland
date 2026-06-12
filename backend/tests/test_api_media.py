@@ -133,6 +133,32 @@ def test_media_api_admin_crud_context_lineage_and_job_flow() -> None:
         assert [event.payload for event in events] == [{"kind": "seed"}]
 
 
+def test_media_asset_detail_rejects_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "media-owner-worldline@example.test")
+    other_owner_id, _ = _seed_user(engine, "media-other-worldline@example.test")
+    world_id = _seed_world(engine, owner_id)
+    other_world_id = _seed_world(engine, other_owner_id)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    other_primary_id, _other_fork_id = _seed_worldlines(engine, other_world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    _authenticate(client, owner_token)
+
+    wrong_worldline = client.get(
+        f"/worlds/{world_id}/media/assets/{asset_id}",
+        params={"worldline_id": str(other_primary_id)},
+    )
+    valid_worldline = client.get(
+        f"/worlds/{world_id}/media/assets/{asset_id}",
+        params={"worldline_id": str(primary_id)},
+    )
+
+    assert wrong_worldline.status_code == 422
+    assert valid_worldline.status_code == 200
+    assert valid_worldline.json()["id"] == str(asset_id)
+
+
 def test_media_api_member_visibility_acl_and_csrf() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
