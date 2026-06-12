@@ -95,6 +95,70 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
     _assert_no_forbidden_markers(detail.json())
 
 
+def test_reader_media_suppresses_active_content_type_objects() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner-active-media@example.test")
+    member_id, member_token = _seed_user(engine, "member-active-media@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    safe_video_id, safe_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        asset_kind="video",
+        asset_role="video_clip",
+        object_role="original",
+        filename="reader.mp4",
+        content_type="video/mp4",
+        data=b"safe-video-bytes",
+    )
+    unsafe_video_id, unsafe_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        asset_kind="video",
+        asset_role="video_clip",
+        object_role="original",
+        filename="reader.html",
+        content_type="text/html",
+        data=b"<html><script>window.__noveland_probe=1</script></html>",
+    )
+    _seed_reference(
+        engine, world_id, worldline_id, safe_video_id, "narrative_artifact", artifact_id
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        unsafe_video_id,
+        "narrative_artifact",
+        artifact_id,
+    )
+
+    _authenticate_session_only(client, member_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    unsafe_detail = client.get(f"/worlds/{world_id}/reader/media/{unsafe_video_id}")
+    unsafe_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, unsafe_object_id)
+    )
+    safe_download = client.get(_reader_media_download_path(world_id, worldline_id, safe_object_id))
+
+    assert listed.status_code == 200
+    assert [item["asset_id"] for item in listed.json()] == [str(safe_video_id)]
+    assert listed.json()[0]["objects"][0]["content_type"] == "video/mp4"
+    assert unsafe_detail.status_code == 404
+    assert unsafe_download.status_code == 404
+    assert safe_download.status_code == 200
+    assert safe_download.headers["content-type"].startswith("video/mp4")
+
+
 def test_reader_media_suppresses_non_deliverable_assets() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -473,13 +537,18 @@ def _seed_available_asset_with_object(
     visibility: str,
     status: str = "available",
     data: bytes = b"image-bytes",
+    asset_kind: str = "image",
+    asset_role: str = "reference_image",
+    object_role: str = "original",
+    filename: str = "reader.png",
+    content_type: str = "image/png",
 ) -> tuple[uuid.UUID, uuid.UUID]:
     asset_id = uuid.uuid4()
     object_id = uuid.uuid4()
     stored = storage.write_bytes(
-        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/reader.png",
+        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/{filename}",
         data,
-        content_type="image/png",
+        content_type=content_type,
     )
     with Session(engine) as session:
         session.add(
@@ -487,13 +556,13 @@ def _seed_available_asset_with_object(
                 id=asset_id,
                 world_id=world_id,
                 worldline_id=worldline_id,
-                asset_kind="image",
-                asset_role="reference_image",
+                asset_kind=asset_kind,
+                asset_role=asset_role,
                 source_kind="manual_upload",
                 status=status,
                 visibility=visibility,
                 storage_uri=stored.uri,
-                mime_type="image/png",
+                mime_type=content_type,
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
                 created_by_actor_ref="test",
@@ -510,10 +579,10 @@ def _seed_available_asset_with_object(
                 asset_id=asset_id,
                 world_id=world_id,
                 worldline_id=worldline_id,
-                object_role="original",
+                object_role=object_role,
                 storage_uri=stored.uri,
-                filename="reader.png",
-                mime_type="image/png",
+                filename=filename,
+                mime_type=content_type,
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
                 width=100,

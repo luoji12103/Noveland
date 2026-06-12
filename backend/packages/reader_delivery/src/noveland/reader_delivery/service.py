@@ -3,7 +3,13 @@ from __future__ import annotations
 import uuid
 
 from noveland.conversations.models import ConversationSession, ConversationTurn
-from noveland.media.contracts import MediaAssetStatus, MediaReferenceKind, MediaVisibility
+from noveland.media.contracts import (
+    AUDIO_MIME_TYPES,
+    IMAGE_MIME_TYPES,
+    MediaAssetStatus,
+    MediaReferenceKind,
+    MediaVisibility,
+)
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
 from noveland.media.storage import MediaObjectStorage
 from noveland.moderation import ModerationService, ModerationTargetKind
@@ -23,6 +29,12 @@ READER_DELIVERABLE_VISIBILITIES = {
     MediaVisibility.READER_VISIBLE.value,
 }
 READER_DELIVERABLE_KINDS = {"image", "audio", "video"}
+READER_VIDEO_MIME_TYPES = {"video/mp4", "video/ogg", "video/quicktime", "video/webm"}
+READER_SAFE_MIME_TYPES_BY_KIND = {
+    "image": IMAGE_MIME_TYPES,
+    "audio": AUDIO_MIME_TYPES,
+    "video": READER_VIDEO_MIME_TYPES,
+}
 READER_REFERENCE_KINDS = {
     MediaReferenceKind.NARRATIVE_ARTIFACT.value,
     MediaReferenceKind.CONVERSATION_TURN.value,
@@ -200,6 +212,7 @@ class ReaderMediaDeliveryService:
                 ),
             )
             for media_object in objects
+            if _reader_object_content_type_is_safe(asset.asset_kind, media_object.mime_type)
         ]
 
     def _reader_visible_references(
@@ -275,3 +288,11 @@ class ReaderMediaDeliveryService:
             and conversation.world_id == ref.world_id
             and conversation.worldline_id == ref.worldline_id
         )
+
+
+def _reader_object_content_type_is_safe(asset_kind: str, content_type: str) -> bool:
+    allowed = READER_SAFE_MIME_TYPES_BY_KIND.get(asset_kind)
+    if allowed is None:
+        return False
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    return normalized in allowed
