@@ -10409,8 +10409,16 @@ def _narrative_artifact_response(
         agent_id=artifact_record.agent_id,
         source_run_id=artifact_record.source_run_id if include_admin_fields else None,
         source_conversation_id=artifact_record.source_conversation_id,
-        title=artifact_record.title,
-        content=artifact_record.content,
+        title=(
+            artifact_record.title
+            if include_admin_fields
+            else _sanitize_public_text(artifact_record.title)
+        ),
+        content=(
+            artifact_record.content
+            if include_admin_fields
+            else _sanitize_public_text(artifact_record.content)
+        ),
         artifact_kind=artifact_record.artifact_kind.value,
         metadata=artifact_record.metadata if include_admin_fields else {},
         continuity_metadata=(

@@ -4967,8 +4967,8 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     summary_id = _seed_narrative_artifact(
         engine,
         world_id,
-        "Conversation summary",
-        "Summary body",
+        "Conversation raw_prompt summary",
+        "storage_uri media://private/artifact body",
         artifact_kind="conversation_summary",
         source_conversation_id=conversation_id,
         source_run_id=run_id,
@@ -4981,6 +4981,15 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     _publish_narrative_artifact(
         engine, world_id, summary_id, owner_id, publication_gate={"status": "warning"}
     )
+    safe_summary_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Conversation summary",
+        "Summary body",
+        artifact_kind="conversation_summary",
+        source_conversation_id=conversation_id,
+    )
+    _publish_narrative_artifact(engine, world_id, safe_summary_id, owner_id)
     draft_chapter_id = _seed_narrative_artifact(
         engine,
         world_id,
@@ -5003,7 +5012,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         params={
             "artifact_kind": "conversation_summary",
             "source_conversation_id": str(conversation_id),
-            "q": "summary body",
+            "q": "storage_uri",
             "source_kind": "conversation",
             "order_by": "published_at",
             "limit": 1,
@@ -5014,6 +5023,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         params={"q": "chapter", "source_kind": "conversation"},
     )
     detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
+    safe_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{safe_summary_id}")
 
     _authenticate(client, owner_token)
     owner_list = client.get(
@@ -5029,6 +5039,8 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert len(filtered.json()) == 1
     assert filtered.json()[0]["artifact_kind"] == "conversation_summary"
     assert filtered.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert filtered.json()[0]["title"] == ""
+    assert filtered.json()[0]["content"] == ""
     assert filtered.json()[0]["source_run_id"] is None
     assert filtered.json()[0]["metadata"] == {}
     assert filtered.json()[0]["continuity_metadata"] == {}
@@ -5042,6 +5054,8 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert detail.status_code == 200
     assert detail.json()["id"] == str(summary_id)
     assert detail.json()["source_conversation_id"] == str(conversation_id)
+    assert detail.json()["title"] == ""
+    assert detail.json()["content"] == ""
     assert detail.json()["source_run_id"] is None
     assert detail.json()["metadata"] == {}
     assert detail.json()["publication"]["metadata"] == {}
@@ -5053,6 +5067,8 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert owner_list.json()[0]["id"] == str(draft_chapter_id)
     assert owner_list.json()[0]["publication"] is None
     assert owner_detail.status_code == 200
+    assert owner_detail.json()["title"] == "Conversation raw_prompt summary"
+    assert owner_detail.json()["content"] == "storage_uri media://private/artifact body"
     assert owner_detail.json()["source_run_id"] == str(run_id)
     assert owner_detail.json()["metadata"]["raw_prompt"] == "operator-only prompt"
     assert owner_detail.json()["continuity_metadata"]["source"] == "operator"
@@ -5060,6 +5076,9 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert owner_detail.json()["publication"]["source_draft_id"] == str(summary_id)
     assert owner_detail.json()["publication"]["published_by_user_id"] == str(owner_id)
     assert owner_detail.json()["publication"]["publication_gate"]["status"] == "warning"
+    assert safe_detail.status_code == 200
+    assert safe_detail.json()["title"] == "Conversation summary"
+    assert safe_detail.json()["content"] == "Summary body"
     assert hidden.status_code == 404
 
 
