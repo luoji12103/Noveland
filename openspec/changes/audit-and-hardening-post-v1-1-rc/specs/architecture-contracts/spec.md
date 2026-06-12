@@ -445,6 +445,12 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable preset JSON panels or submitting preset JSON payloads
 - **AND** safe preset behavior, calendar schedule, metadata, and operational config fields SHALL remain visible.
 
+#### Scenario: Web world overview panels normalize sensitive world evidence
+- **GIVEN** an authorized world admin or platform admin views, filters, imports, validates, or updates world overview records in the Web world overview console
+- **WHEN** world memory/rules plugin config, world bible JSON, release profile policies/checklists/metadata, world composition rules config, or event payload JSON contain resolved secrets, tokens, authorization headers, raw prompt/output markers, prompt snapshot identifiers, storage URIs, file/object paths, bytes, base64, or local model paths written in common key or value variants
+- **THEN** the Web UI SHALL redact or omit those sensitive keys and values before rendering editable JSON panels, compact event payload summaries, or submitting world-overview JSON payloads
+- **AND** safe world configuration, continuity, release policy, composition validation, and event audit fields SHALL remain visible.
+
 #### Scenario: Web client manages multimodal diagnostics records
 - **GIVEN** browser-side Web client code issues multimodal diagnostics or eval-run list, detail, or run requests through same-origin API routes
 - **AND** the world or eval-run identifier contains encoded path separators or other reserved path characters
