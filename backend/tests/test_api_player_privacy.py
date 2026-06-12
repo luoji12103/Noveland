@@ -65,6 +65,19 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     _seed_player_records(engine, world_id, worldline_id, member_id)
     _seed_player_records(engine, world_id, worldline_id, other_id, choice_key="other-choice")
+    with Session(engine) as session:
+        member = session.get(User, member_id)
+        assert member is not None
+        member.display_name = "Member raw_prompt display"
+        actor = session.scalars(
+            select(PlayerActorProfile).where(
+                PlayerActorProfile.world_id == world_id,
+                PlayerActorProfile.worldline_id == worldline_id,
+                PlayerActorProfile.user_id == member_id,
+            )
+        ).one()
+        actor.display_name = "Player storage_uri media://private/actor"
+        session.commit()
 
     unauthenticated = client.get(f"/worlds/{world_id}/player/privacy/export")
     _authenticate_without_csrf(client, member_token)
@@ -94,6 +107,8 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     assert export_response.status_code == 200
     export = export_response.json()
     assert export["profile"]["email"] == "member@example.test"
+    assert export["profile"]["display_name"] == "[REDACTED]"
+    assert export["player_actors"][0]["display_name"] == "[REDACTED]"
     assert export["counts"] == {
         "player_actors": 1,
         "choices": 1,

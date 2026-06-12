@@ -277,8 +277,8 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 
 #### Scenario: Player exports privacy data
 - **GIVEN** a world member requests a player privacy data export
-- **WHEN** the export includes player choices, journal, notification, or intervention records with applied event refs, source refs, source event refs, choice/event linkage, prompt text, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only evidence
-- **THEN** the export SHALL omit those operator-only internals while preserving safe player-owned titles, bodies, selected options, statuses, target identity fields, and timing fields
+- **WHEN** the export includes profile display names, player actor display names, player choices, journal, notification, or intervention records with applied event refs, source refs, source event refs, choice/event linkage, prompt text, metadata, storage refs, bytes, base64, provider refs, secret/auth refs, or other operator-only evidence
+- **THEN** the export SHALL omit those operator-only internals, redact sensitive-looking profile/actor display names, and preserve safe player-owned names, titles, bodies, selected options, statuses, target identity fields, and timing fields
 - **AND** privacy request audit records SHALL continue to contain safe summaries and actor refs only.
 
 #### Scenario: Member reads sensitive-looking player actor text

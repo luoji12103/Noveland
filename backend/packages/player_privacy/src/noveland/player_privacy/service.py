@@ -311,7 +311,7 @@ class PlayerPrivacyService:
             profile=PlayerPrivacyProfile(
                 user_id=user.id,
                 email=user.email,
-                display_name=user.display_name,
+                display_name=_safe_text(user.display_name),
                 world_role=role,
             ),
             counts=counts,
@@ -319,7 +319,7 @@ class PlayerPrivacyService:
                 PlayerPrivacyActorExport(
                     id=actor.id,
                     worldline_id=actor.worldline_id,
-                    display_name=actor.display_name,
+                    display_name=_safe_text(actor.display_name),
                     current_scene_id=actor.current_scene_id,
                     profile=_sanitize_json(actor.profile_json),
                     is_active=actor.is_active,
