@@ -32,10 +32,27 @@ WORLD_EVENT_PAYLOAD_FORBIDDEN_KEYS = {
     "thumbnail_uri",
     "token",
 }
+WORLD_EVENT_PAYLOAD_FORBIDDEN_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower())
+    for marker in WORLD_EVENT_PAYLOAD_FORBIDDEN_KEYS
+}
+_WORLD_EVENT_PAYLOAD_EXACT_KEY_MARKERS = {
+    "base64",
+    "bytes",
+    "password",
+    "path",
+    "secret",
+    "token",
+}
+_WORLD_EVENT_PAYLOAD_SUBSTRING_KEY_MARKERS = (
+    WORLD_EVENT_PAYLOAD_FORBIDDEN_KEY_MARKERS - _WORLD_EVENT_PAYLOAD_EXACT_KEY_MARKERS
+)
 WORLD_EVENT_PAYLOAD_FORBIDDEN_VALUE_RE = re.compile(
-    r"(media://|object://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"(storage[_ -]?uri|payload[_ -]?uri|preview[_ -]?uri|thumbnail[_ -]?uri|"
+    r"media://|object://|file://|s3://|gs://|/root/|/tmp/|base64,|"
     r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
-    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|"
+    r"file[_ -]?path|filesystem[_ -]?path)",
     re.IGNORECASE,
 )
 _OMIT_WORLD_EVENT_PAYLOAD_VALUE = object()
@@ -51,7 +68,7 @@ def _sanitize_world_event_payload_value(value: Any) -> Any:
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if key_text.strip().lower() in WORLD_EVENT_PAYLOAD_FORBIDDEN_KEYS:
+            if _is_forbidden_world_event_payload_key(key_text):
                 continue
             sanitized_item = _sanitize_world_event_payload_value(item)
             if sanitized_item is not _OMIT_WORLD_EVENT_PAYLOAD_VALUE:
@@ -74,3 +91,11 @@ def _sanitize_world_event_payload_value(value: Any) -> Any:
     if isinstance(value, str) and WORLD_EVENT_PAYLOAD_FORBIDDEN_VALUE_RE.search(value):
         return _OMIT_WORLD_EVENT_PAYLOAD_VALUE
     return value
+
+
+def _is_forbidden_world_event_payload_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in WORLD_EVENT_PAYLOAD_FORBIDDEN_KEY_MARKERS or any(
+        marker and marker in normalized
+        for marker in _WORLD_EVENT_PAYLOAD_SUBSTRING_KEY_MARKERS
+    )

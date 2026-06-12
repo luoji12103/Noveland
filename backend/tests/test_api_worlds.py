@@ -1243,6 +1243,9 @@ def test_offscreen_resolution_sanitizes_persisted_world_event_payload() -> None:
     assert "storage_uri" not in payload_text
     assert "media://" not in payload_text
     assert "raw_prompt" not in payload_text
+    assert "rawPrompt" not in payload_text
+    assert "promptSnapshot" not in payload_text
+    assert "storageUri" not in payload_text
     assert "raw_output" not in payload_text
     assert "/root/" not in payload_text
     assert "base64" not in payload_text
@@ -1334,9 +1337,13 @@ def test_event_store_sanitizes_secret_reveal_event_payload() -> None:
                 "safe_note": "keep this consequence",
                 "storage_uri": "media://private/secret",
                 "raw_prompt": "operator prompt",
+                "rawPrompt": "operator camel prompt",
+                "promptSnapshotId": str(uuid.uuid4()),
                 "nested": {
                     "safe": "kept nested value",
                     "raw_output": "provider output",
+                    "rawOutput": "provider camel output",
+                    "storageUri": "opaque-secret-storage",
                     "path": "/root/private/secret.json",
                 },
                 "items": [
@@ -1374,7 +1381,11 @@ def test_event_store_sanitizes_secret_reveal_event_payload() -> None:
     assert "storage_uri" not in payload_text
     assert "media://" not in payload_text
     assert "raw_prompt" not in payload_text
+    assert "rawPrompt" not in payload_text
+    assert "promptSnapshot" not in payload_text
+    assert "storageUri" not in payload_text
     assert "raw_output" not in payload_text
+    assert "rawOutput" not in payload_text
     assert "/root/" not in payload_text
     assert "base64" not in payload_text
     assert "bytes" not in payload_text
