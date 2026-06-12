@@ -10,7 +10,8 @@ from noveland.conversations.models import (
     ConversationTurn,
     ConversationTurnPresentation,
 )
-from noveland.media.models import MediaAsset, MediaJob
+from noveland.media.contracts import AUDIO_MIME_TYPES, IMAGE_MIME_TYPES
+from noveland.media.models import MediaAsset, MediaJob, MediaObject
 from noveland.player_sessions.contracts import (
     PlayerRecoveryStatus,
     PlayerSessionRead,
@@ -52,6 +53,12 @@ _PLAYER_DELIVERABLE_MEDIA_VISIBILITIES = {
     "world_member",
     "player_visible",
     "reader_visible",
+}
+_PLAYER_VIDEO_MIME_TYPES = {"video/mp4", "video/ogg", "video/quicktime", "video/webm"}
+_PLAYER_SAFE_MIME_TYPES_BY_KIND = {
+    "image": IMAGE_MIME_TYPES,
+    "audio": AUDIO_MIME_TYPES,
+    "video": _PLAYER_VIDEO_MIME_TYPES,
 }
 _LEAK_PATTERN = re.compile(
     r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
@@ -271,6 +278,23 @@ class PlayerSessionService:
             and asset.worldline_id == worldline_id
             and asset.status == "available"
             and asset.visibility in _PLAYER_DELIVERABLE_MEDIA_VISIBILITIES
+            and self._media_asset_has_player_safe_object(asset)
+        )
+
+    def _media_asset_has_player_safe_object(self, asset: MediaAsset) -> bool:
+        allowed = _PLAYER_SAFE_MIME_TYPES_BY_KIND.get(asset.asset_kind)
+        if allowed is None:
+            return False
+        media_objects = self._session.scalars(
+            select(MediaObject).where(
+                MediaObject.world_id == asset.world_id,
+                MediaObject.worldline_id == asset.worldline_id,
+                MediaObject.asset_id == asset.id,
+            )
+        ).all()
+        return any(
+            _normalized_content_type(media_object.mime_type) in allowed
+            for media_object in media_objects
         )
 
     def _media_job_failed(
@@ -359,6 +383,10 @@ class PlayerSessionService:
             created_at=_aware_datetime(session.created_at),
             updated_at=_aware_datetime(session.updated_at),
         )
+
+
+def _normalized_content_type(content_type: str) -> str:
+    return content_type.split(";", 1)[0].strip().lower()
 
 
 def _sanitize_json(value: Any) -> dict[str, Any]:

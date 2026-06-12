@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -16,7 +17,7 @@ from noveland.conversations.models import (
     ConversationTurnPresentation,
 )
 from noveland.core.database import import_model_modules
-from noveland.media.models import MediaAsset, MediaJob
+from noveland.media.models import MediaAsset, MediaJob, MediaObject
 from noveland.player_sessions.models import PlayerSession
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -345,6 +346,109 @@ def test_player_session_validates_references_and_safe_fallbacks() -> None:
         _assert_no_forbidden_markers(response.json())
 
 
+def test_player_session_media_without_safe_reader_objects_is_missing_media() -> None:
+    client, engine = _client_with_database()
+    admin_id, _admin_token = _seed_user(
+        engine, "admin-objectless-media@example.test", platform_admin=True
+    )
+    tester_id, tester_token = _seed_user(engine, "tester-objectless-media@example.test")
+    world_id, worldline_id, scene_id = _seed_world_graph(engine, admin_id)
+    _add_membership(engine, world_id, tester_id, AuthRole.HUMAN_USER)
+    actor_id = _seed_player_actor(engine, world_id, worldline_id, tester_id, scene_id)
+    _authenticate(client, tester_token)
+
+    safe_conversation_id, safe_turn_id, safe_presentation_id = _seed_conversation(
+        engine,
+        world_id,
+        worldline_id,
+        scene_id,
+    )
+    objectless_conversation_id, objectless_turn_id, objectless_presentation_id = (
+        _seed_conversation(
+            engine,
+            world_id,
+            worldline_id,
+            scene_id,
+        )
+    )
+    unsafe_conversation_id, unsafe_turn_id, unsafe_presentation_id = _seed_conversation(
+        engine,
+        world_id,
+        worldline_id,
+        scene_id,
+    )
+    _attach_media_to_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        safe_presentation_id,
+        visibility="player_visible",
+        object_mime_type="image/png",
+    )
+    _attach_media_to_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        objectless_presentation_id,
+        visibility="player_visible",
+        object_mime_type=None,
+    )
+    _attach_media_to_presentation(
+        engine,
+        world_id,
+        worldline_id,
+        unsafe_presentation_id,
+        visibility="player_visible",
+        object_mime_type="text/html",
+    )
+
+    safe_media = client.post(
+        f"/worlds/{world_id}/player-sessions/resume",
+        json={
+            "worldline_id": str(worldline_id),
+            "player_actor_id": str(actor_id),
+            "conversation_session_id": str(safe_conversation_id),
+            "scene_id": str(scene_id),
+            "last_turn_id": str(safe_turn_id),
+            "last_presentation_id": str(safe_presentation_id),
+        },
+        headers=_csrf_headers(client),
+    )
+    objectless_media = client.post(
+        f"/worlds/{world_id}/player-sessions/resume",
+        json={
+            "worldline_id": str(worldline_id),
+            "player_actor_id": str(actor_id),
+            "conversation_session_id": str(objectless_conversation_id),
+            "scene_id": str(scene_id),
+            "last_turn_id": str(objectless_turn_id),
+            "last_presentation_id": str(objectless_presentation_id),
+        },
+        headers=_csrf_headers(client),
+    )
+    unsafe_media = client.post(
+        f"/worlds/{world_id}/player-sessions/resume",
+        json={
+            "worldline_id": str(worldline_id),
+            "player_actor_id": str(actor_id),
+            "conversation_session_id": str(unsafe_conversation_id),
+            "scene_id": str(scene_id),
+            "last_turn_id": str(unsafe_turn_id),
+            "last_presentation_id": str(unsafe_presentation_id),
+        },
+        headers=_csrf_headers(client),
+    )
+
+    assert safe_media.status_code == 200
+    assert safe_media.json()["recovery_status"] == "ready"
+    assert objectless_media.status_code == 200
+    assert objectless_media.json()["recovery_status"] == "missing_media"
+    assert unsafe_media.status_code == 200
+    assert unsafe_media.json()["recovery_status"] == "missing_media"
+    for response in (safe_media, objectless_media, unsafe_media):
+        _assert_no_forbidden_markers(response.json())
+
+
 def test_player_session_private_and_admin_only_media_are_missing_media() -> None:
     client, engine = _client_with_database()
     admin_id, _admin_token = _seed_user(
@@ -428,6 +532,7 @@ def _create_required_tables(engine: Engine) -> None:
         cast(Table, ConversationTurn.__table__),
         cast(Table, MediaJob.__table__),
         cast(Table, MediaAsset.__table__),
+        cast(Table, MediaObject.__table__),
         cast(Table, ConversationTurnPresentation.__table__),
         cast(Table, PlayerSession.__table__),
     ):
@@ -621,9 +726,14 @@ def _attach_media_to_presentation(
     *,
     visibility: str,
     media_job_status: str = "succeeded",
+    object_mime_type: str | None = "image/png",
 ) -> uuid.UUID:
     job_id = uuid.uuid4()
     asset_id = uuid.uuid4()
+    object_id = uuid.uuid4()
+    object_bytes = b"safe-media-bytes"
+    checksum = hashlib.sha256(object_bytes).hexdigest()
+    storage_uri = f"media://worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/object"
     with Session(engine) as session:
         presentation = session.get(ConversationTurnPresentation, presentation_id)
         assert presentation is not None
@@ -653,10 +763,30 @@ def _attach_media_to_presentation(
                 source_kind="composed",
                 status="available",
                 visibility=visibility,
+                storage_uri=storage_uri if object_mime_type is not None else None,
+                mime_type=object_mime_type,
+                size_bytes=len(object_bytes) if object_mime_type is not None else None,
+                checksum_sha256=checksum if object_mime_type is not None else None,
                 source_job_id=job_id,
                 created_by_actor_ref="system:test",
             )
         )
+        if object_mime_type is not None:
+            session.add(
+                MediaObject(
+                    id=object_id,
+                    asset_id=asset_id,
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    object_role="original",
+                    storage_uri=storage_uri,
+                    filename="object.bin",
+                    mime_type=object_mime_type,
+                    size_bytes=len(object_bytes),
+                    checksum_sha256=checksum,
+                    metadata_json={},
+                )
+            )
         presentation.composite_scene_asset_id = asset_id
         presentation.render_state = "visual_rendered"
         session.commit()
