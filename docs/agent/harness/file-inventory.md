@@ -97,6 +97,7 @@ Track key structural files and prevent unregistered sprawl.
 - `web/features/worlds/narrative-reader.test.tsx`
 - `web/features/worlds/narrative-reader.tsx`
 - `web/features/worlds/playback-media.ts`
+- `web/features/worlds/playback-media.test.ts`
 - `web/features/worlds/conversation-scene-view.test.tsx`
 - `web/features/worlds/conversation-scene-view.tsx`
 - `web/features/worlds/conversation-playback.test.tsx`
@@ -974,3 +975,4 @@ If a coding agent created a structural path that is not listed here and did not 
 - 2026-06-13 F-127 kept existing reader delivery ownership in `backend/packages/reader_delivery/src/noveland/reader_delivery/service.py`, with focused coverage in `backend/tests/test_api_reader_media.py`. Reader media descriptors and downloads now expose only safe image/audio/video object MIME types, hiding active content such as text/html from reader routes.
 - 2026-06-13 F-128 kept existing player session service ownership in `backend/packages/player_sessions/src/noveland/player_sessions/service.py`, with focused coverage in `backend/tests/test_api_player_sessions.py`. Player resume recovery now requires referenced presentation media to have at least one safe reader-deliverable media object before advertising ready playback.
 - 2026-06-13 F-129 kept existing player session service ownership in `backend/packages/player_sessions/src/noveland/player_sessions/service.py`, with focused coverage in `backend/tests/test_api_player_sessions.py`. Player resume recovery now requires referenced presentation media to have a reader media descriptor before advertising ready playback.
+- 2026-06-13 F-130 kept existing Web playback/scene media resolver ownership in `web/features/worlds/playback-media.ts`, with focused coverage in new `web/features/worlds/playback-media.test.ts` plus existing playback and scene component tests. Explicit presentation image/audio asset ids now block unrelated referenced-media fallback when they cannot be resolved through reader media descriptors; referenced fallback remains only for turns without explicit presentation ids.

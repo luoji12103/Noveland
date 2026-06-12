@@ -4796,3 +4796,15 @@
 - Tests added/updated: Extended `test_player_session_media_without_safe_reader_objects_is_missing_media` to include safe referenced media that remains ready and no-reference media that returns missing-media.
 - Verification: Temporary CLI reproduction first showed safe-object/no-reference media returning ready while reader descriptors were empty; focused player-session regression passed; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 5 tests; focused backend ruff/mypy passed for player session service and tests; related player/reader/presentation API tests passed with 14 tests; full backend ruff, mypy, and pytest passed with 583 tests and 8 skipped.
 - Follow-up notes: Continue Web playback/scene empty-state audit and backend media reference/moderation descriptor alignment checks. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening Web playback explicit-media fallback entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web reader playback and scene media resolution remediation for F-130.
+- Finding: F-130 found `web/features/worlds/playback-media.ts` fell back to same-turn or same-session referenced media when explicit presentation image/audio asset ids were absent from reader media descriptors, so unavailable canonical presentation media could be replaced with unrelated media.
+- Summary: Added a reader-media-delivery OpenSpec scenario for unresolved explicit presentation media, changed shared playback media resolution to distinguish absent presentation ids from unresolved explicit ids, and blocked referenced fallback for a media kind when a presentation explicitly names media for that kind but no reader descriptor resolves.
+- Files changed: web/features/worlds/playback-media.ts, web/features/worlds/playback-media.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/reader-media-delivery/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `web/features/worlds/playback-media.test.ts` covering unresolved explicit image/audio ids, referenced fallback when no explicit ids exist, and alternate explicit image id resolution before fallback blocking.
+- Verification: `cd web && npm run test -- features/worlds/playback-media.test.ts` first failed because unresolved explicit media substituted `referenced-image`, then passed with 3 tests after remediation; focused playback/scene Web tests passed with 3 files and 11 tests; Web typecheck, full lint, full Vitest with 53 files and 212 tests, Web build, and `check:next-env` passed. OpenSpec strict validations and `git diff --check` passed. Web e2e was not run because the change is isolated to shared media resolution and covered by component/unit tests.
+- Follow-up notes: Continue Web/e2e route-handler and client-side leak audits, plus backend media reference/moderation descriptor alignment checks. Do not push this branch unless the user explicitly asks.

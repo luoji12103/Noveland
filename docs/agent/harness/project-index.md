@@ -202,7 +202,7 @@ Fast orientation for a new coding session.
   - `web/features/worlds/` — world index, overview, narrative management workspace, read-only reader components, conversation playback, and player interactions
   - `web/features/worlds/conversation-playback.tsx` — reader/member-facing conversation playback surface over safe turn, presentation, and reader media DTOs
   - `web/features/worlds/conversation-scene-view.tsx` — reader/member-facing scene view over the same safe turn, presentation, and reader media DTOs
-  - `web/features/worlds/playback-media.ts` — shared reader-safe turn media resolution helpers for playback and scene view
+  - `web/features/worlds/playback-media.ts` — shared reader-safe turn media resolution helpers for playback and scene view, including explicit presentation-media fallback boundaries
   - `web/features/worlds/player-interactions.tsx` — player/member-facing choices, interventions, journal, notifications, and spoiler-safe feedback surface over existing player records
   - `web/features/worlds/player-privacy-controls.tsx` — player/member-facing data export and deletion review request surface over the dedicated player privacy API
   - `web/features/worlds/worldline-browser.tsx` — reader/member-facing read-only worldline branch inventory and safe comparison count surface
@@ -625,3 +625,4 @@ Whenever a new structural file or module is added, update this index.
 - 2026-06-13 F-127 kept existing reader delivery ownership in `backend/packages/reader_delivery/src/noveland/reader_delivery/service.py`, with focused coverage in `backend/tests/test_api_reader_media.py`; reader media delivery now suppresses active content MIME types and only serves whitelisted image/audio/video object content types.
 - 2026-06-13 F-128 kept existing player session service ownership in `backend/packages/player_sessions/src/noveland/player_sessions/service.py`, with focused coverage in `backend/tests/test_api_player_sessions.py`; player resume recovery now treats visible presentation media without a safe reader-deliverable object as missing media instead of ready playback.
 - 2026-06-13 F-129 kept existing player session service ownership in `backend/packages/player_sessions/src/noveland/player_sessions/service.py`, with focused coverage in `backend/tests/test_api_player_sessions.py`; player resume readiness now aligns with `ReaderMediaDeliveryService.get_media()` descriptor availability, including reader-visible reference requirements.
+- 2026-06-13 F-130 updated existing Web playback/scene media resolution in `web/features/worlds/playback-media.ts`, with focused coverage in `web/features/worlds/playback-media.test.ts`; no route, backend, package, or provider boundary changes were introduced.
