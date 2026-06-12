@@ -47,9 +47,13 @@ _LEAKY_KEYS = {
     "storage_uri",
     "token",
 }
+_LEAKY_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"raw_prompt|raw_output|prompt_snapshot|sk-[A-Za-z0-9])",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|sk-[A-Za-z0-9]|bearer\s+)",
     re.IGNORECASE,
 )
 _JSON_LIMIT = 8_000
@@ -357,8 +361,12 @@ def _sanitize_value(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    normalized = key.lower()
-    return normalized in _LEAKY_KEYS or any(marker in normalized for marker in _LEAKY_KEYS)
+    normalized = _normalize_sensitive_key(key)
+    return any(marker and marker in normalized for marker in _LEAKY_KEY_MARKERS)
+
+
+def _normalize_sensitive_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
 def _recovery_label(status: PlayerRecoveryStatus) -> str:

@@ -41,6 +41,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer",
     "authorization",
@@ -95,7 +99,14 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
             "metadata": {
                 "route_state": "scene",
                 "storage_uri": "media://hidden",
-                "nested": {"raw_prompt": "leak"},
+                "rawPrompt": "operator prompt text",
+                "promptSnapshotId": str(uuid.uuid4()),
+                "nested": {
+                    "raw_prompt": "leak",
+                    "rawOutput": "model output",
+                    "storageUri": "opaque-media-object",
+                    "step": "safe",
+                },
             },
         },
         headers=_csrf_headers(client),
@@ -135,6 +146,7 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
     assert body["reporter_user_id"] == str(tester_id)
     assert body["player_actor_id"] == str(actor_id)
     assert body["status"] == "submitted"
+    assert body["metadata"] == {}
     assert [ref["kind"] for ref in body["evidence_refs"]] == [
         "conversation",
         "turn",
@@ -145,6 +157,10 @@ def test_tester_creates_own_feedback_and_admin_triages_without_leaks() -> None:
     assert [item["id"] for item in own_list.json()] == [body["id"]]
     assert admin_list.status_code == 200
     assert [item["id"] for item in admin_list.json()] == [body["id"]]
+    assert admin_list.json()[0]["metadata"] == {
+        "route_state": "scene",
+        "nested": {"step": "safe"},
+    }
     assert triaged.status_code == 200
     assert triaged.json()["status"] == "investigating"
     assert triaged.json()["severity"] == "high"

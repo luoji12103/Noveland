@@ -53,6 +53,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the reporter response SHALL hide those admin-only triage fields while preserving safe report status and severity
 - **AND** admin beta feedback routes MAY continue to expose triage evidence required for repair and moderation workflows.
 
+#### Scenario: Member-owned state JSON uses normalized sensitive-key filtering
+- **GIVEN** a world member creates or reads player resume state or beta feedback metadata through member-readable routes
+- **WHEN** route state, resume state, report metadata, evidence metadata, or repair metadata contains sensitive keys written in snake_case, camelCase, compact, or mixed punctuation forms such as raw_prompt, rawPrompt, rawprompt, storage_uri, storageUri, prompt_snapshot, or promptSnapshotId
+- **THEN** the persisted and returned member-owned JSON SHALL omit those forbidden keys and values while preserving safe state and feedback metadata
+- **AND** admin routes MAY continue to expose only the already-sanitized stored metadata, never raw prompt/output, storage, secret, bytes, or base64 evidence.
+
 
 #### Scenario: Member reads agent character profiles
 - **GIVEN** a world member lists agents through the member-readable agent catalog

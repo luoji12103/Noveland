@@ -62,9 +62,13 @@ _SENSITIVE_KEYS = {
     "storage_uri",
     "token",
 }
+_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _SENSITIVE_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"raw_prompt|raw_output|prompt_snapshot|sk-[A-Za-z0-9]|bearer\s+)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|sk-[A-Za-z0-9]|bearer\s+)",
     re.IGNORECASE,
 )
 _SAFE_TEXT_LIMIT = 1_500
@@ -719,7 +723,7 @@ class BetaFeedbackService:
             sanitized: dict[str, Any] = {}
             for key, item in value.items():
                 key_text = str(key)
-                if key_text.lower() in _SENSITIVE_KEYS:
+                if _is_sensitive_key(key_text):
                     continue
                 clean_item = self._sanitize_json_value(item)
                 if clean_item is not None:
@@ -736,3 +740,8 @@ class BetaFeedbackService:
         if value is None or isinstance(value, bool | int | float):
             return value
         return str(value)[:200]
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _SENSITIVE_KEY_MARKERS)
