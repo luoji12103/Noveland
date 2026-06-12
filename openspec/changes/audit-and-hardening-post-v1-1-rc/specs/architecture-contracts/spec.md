@@ -214,6 +214,12 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **THEN** the member response SHALL omit payload, payload_uri, payload_location, and metadata while preserving safe snapshot identity, worldline, sequence coverage, schema version, status, source event ref, and creation time
 - **AND** admin routes MAY continue to expose snapshot payload and storage evidence required for replay diagnostics and world management.
 
+#### Scenario: Member reads replay state
+- **GIVEN** a world member reads replay state through member-readable routes
+- **WHEN** replay clock state contains source event identifiers or event sequence evidence
+- **THEN** the member response SHALL omit those operator-only replay source refs while preserving safe reconstructed clock state, source sequence, worldline, and aggregate event counts
+- **AND** admin replay routes MAY continue to expose source event refs needed for replay and snapshot diagnosis.
+
 
 #### Scenario: Member reads release profile
 - **GIVEN** a world member fetches the living-world release profile through member-readable routes

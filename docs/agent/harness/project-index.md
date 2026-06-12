@@ -577,3 +577,4 @@ Whenever a new structural file or module is added, update this index.
 
 - 2026-06-12 F-080 kept existing dashboard component ownership in `web/features/dashboard/world-management-dashboard.tsx`, with focused coverage in `web/features/dashboard/world-management-dashboard.test.tsx`; dashboard world selection and post-create navigation now encode world query parameter values before local route replacement.
 - 2026-06-12 F-081 updated existing worlds API agent runtime run response shaping in `backend/services/api/src/noveland/services/api/worlds.py`, with focused coverage in `backend/tests/test_api_worlds.py`; no repository layout or package boundary changes were introduced.
+- 2026-06-12 F-082 updated existing worlds API replay state response shaping in `backend/services/api/src/noveland/services/api/worlds.py`, with focused coverage in `backend/tests/test_api_worlds.py`; no repository layout or package boundary changes were introduced.

@@ -4409,6 +4409,8 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
 
     assert replay.status_code == 200
     assert replay.json()["clock"]["revision"] == 1
+    assert replay.json()["clock"]["last_event_id"] is None
+    assert replay.json()["clock"]["last_event_sequence"] is None
     assert replay.json()["applied_event_count"] == 1
     assert latest_before.status_code == 200
     assert latest_before.json() is None
@@ -4436,6 +4438,8 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert integrity_after.json()["latest_snapshot_id"] == created.json()["id"]
     assert integrity_after.json()["event_gap"] == 0
     assert replay_after.json()["source_sequence"] == 2
+    assert replay_after.json()["clock"]["last_event_id"] is not None
+    assert replay_after.json()["clock"]["last_event_sequence"] == 1
     assert hidden_replay.status_code == 404
     assert hidden_integrity.status_code == 404
 

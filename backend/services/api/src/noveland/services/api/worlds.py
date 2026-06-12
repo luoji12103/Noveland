@@ -6027,10 +6027,12 @@ def replay_state(
     worldline_id: uuid.UUID | None = None,
 ) -> WorldReplayState:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session, load_settings()).replay_state(
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    state = WorldReplayService(db_session, load_settings()).replay_state(
         context.world_id,
         worldline_id=worldline_id,
     )
+    return _replay_state_response(state, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/snapshots/latest", response_model=WorldSnapshotResponse | None)
@@ -10364,6 +10366,22 @@ def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
         wall_time_anchor=state.wall_time_anchor,
         speed_multiplier=str(state.speed_multiplier),
         revision=state.revision,
+    )
+
+
+def _replay_state_response(
+    state: WorldReplayState,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldReplayState:
+    if include_admin_fields or state.clock is None:
+        return state
+    return state.model_copy(
+        update={
+            "clock": state.clock.model_copy(
+                update={"last_event_id": None, "last_event_sequence": None},
+            ),
+        },
     )
 
 
