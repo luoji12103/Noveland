@@ -727,6 +727,11 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **THEN** the proxied browser response body SHALL replace or omit the forbidden key or value before it reaches the browser
 - **AND** successful JSON, binary media, no-content responses, safe error summaries, streaming responses, and explicit auth cookie relay behavior SHALL remain unchanged.
 
+#### Scenario: Web error sanitization recognizes storage and path variants
+- **GIVEN** browser-side clients, server loaders, same-origin API proxies, or event-stream proxies normalize backend error details
+- **WHEN** the backend error text or JSON contains `file://` URLs, `s3://` or `gs://` object-storage refs, absolute server paths such as `/root/...` or `/tmp/...`, local model paths, provider secrets, auth tokens, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** the Web error sanitizer SHALL treat that value as sensitive and return the route-appropriate generic failure text or omit the sensitive JSON field before it reaches browser UI, server error boundaries, or browser-visible proxy responses.
+
 #### Scenario: Web event-stream proxies normalize non-stream JSON errors
 - **GIVEN** a same-origin Web event-stream proxy requests a backend runtime, world, or conversation stream
 - **WHEN** the backend responds before stream establishment with a non-2xx `application/json` or `application/*+json` error body

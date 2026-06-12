@@ -93,6 +93,33 @@ describe("auth proxy helpers", () => {
     expect(body.detail.storageUri).toBeUndefined();
   });
 
+  it("normalizes filesystem and object-storage path variants in json error details", async () => {
+    const backendResponse = new Response(
+      JSON.stringify({
+        detail: {
+          message: "Upload failed at file:///root/code/Noveland/.env and s3://noveland/private/object",
+          debugPath: "/root/code/Noveland/private/provider-output.json",
+          safeCode: "upload_failed",
+        },
+      }),
+      {
+        status: 500,
+        headers: {
+          "content-type": "application/json",
+        },
+      },
+    );
+
+    const response = await buildProxyResponse(backendResponse);
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toMatch(/file:\/\/|s3:\/\/|\/root\/code/i);
+    expect(body.detail.message).toBe("Request failed.");
+    expect(body.detail.debugPath).toBe("[redacted]");
+    expect(body.detail.safeCode).toBe("upload_failed");
+  });
+
   it("leaves safe json error bodies unchanged", async () => {
     const safeBody = JSON.stringify(
       { detail: { message: "Invalid credentials", review_status: "fail" } },

@@ -24,8 +24,8 @@ const SENSITIVE_MARKERS = [
 ];
 
 const SENSITIVE_VALUE_PATTERNS = [
-  /media:\/\//i,
-  /(^|[\s"=:(])\/(?:var|tmp|models)(?:\/|\b)/i,
+  /(?:media|file|s3|gs):\/\//i,
+  /(^|[\s"=:(])\/(?:root|home|srv|app|workspace|mnt|var|tmp|models)(?:\/|\b)/i,
   /[A-Za-z]:\\/,
   /sk-[A-Za-z0-9_-]+/i,
   /Bearer\s+\S+/i,
