@@ -517,12 +517,13 @@ class MemoryService:
         agent_id: uuid.UUID,
         worldline_id: uuid.UUID | None = None,
     ) -> list[MemoryItemRecord]:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         try:
             return list(
                 self._backend_for_scope(world_id).list_memories(
                     world_id,
                     agent_id,
-                    self._worldline_id(world_id, worldline_id),
+                    resolved_worldline_id,
                 )
             )
         except Exception:

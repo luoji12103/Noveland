@@ -7475,10 +7475,14 @@ def list_agent_memory(
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     memory_service = MemoryService(db_session, load_settings())
-    return [
-        _memory_item_response(item)
-        for item in memory_service.list_memories(context.world_id, agent_id, worldline_id)
-    ]
+    try:
+        items = memory_service.list_memories(context.world_id, agent_id, worldline_id)
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return [_memory_item_response(item) for item in items]
 
 
 @router.post(
@@ -7522,11 +7526,17 @@ def get_agent_memory_profile_snapshot(
     worldline_id: uuid.UUID | None = None,
 ) -> MemoryProfileSnapshotResponse | None:
     _agent_or_404(db_session, context.world_id, agent_id)
-    snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
-        context.world_id,
-        agent_id,
-        worldline_id,
-    )
+    try:
+        snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
+            context.world_id,
+            agent_id,
+            worldline_id,
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return None if snapshot is None else _memory_profile_snapshot_response(snapshot)
 
 
@@ -7543,11 +7553,17 @@ def refresh_agent_memory_profile_snapshot(
 ) -> MemoryProfileSnapshotResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
-        context.world_id,
-        agent_id,
-        worldline_id,
-    )
+    try:
+        snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
+            context.world_id,
+            agent_id,
+            worldline_id,
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return _memory_profile_snapshot_response(snapshot)
 
 

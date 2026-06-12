@@ -799,6 +799,9 @@ def test_memory_service_rejects_invalid_worldline_before_backend_search_or_delet
         monkeypatch.setattr(service, "_backend_for_scope", backend_for_scope)
 
         with pytest.raises(MemoryValidationError, match="worldline does not exist for world"):
+            service.list_memories(world_id, agent_id, other_worldline_id)
+
+        with pytest.raises(MemoryValidationError, match="worldline does not exist for world"):
             service.search(
                 MemorySearchRequest(
                     world_id=world_id,
@@ -817,6 +820,7 @@ def test_memory_service_rejects_invalid_worldline_before_backend_search_or_delet
                 ),
             )
 
+    assert backend.list_memory_calls == 0
     assert backend.search_calls == 0
     assert backend.delete_scope_calls == 0
 
@@ -1359,6 +1363,7 @@ def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uu
 
 class _SpyMemoryBackend:
     def __init__(self) -> None:
+        self.list_memory_calls = 0
         self.search_calls = 0
         self.delete_scope_calls = 0
 
@@ -1374,7 +1379,8 @@ class _SpyMemoryBackend:
         agent_id: uuid.UUID,
         worldline_id: uuid.UUID | None = None,
     ) -> Sequence[MemoryItemRecord]:
-        raise AssertionError("list_memories should not be called")
+        self.list_memory_calls += 1
+        return []
 
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:
         self.search_calls += 1

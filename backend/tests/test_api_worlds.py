@@ -4296,6 +4296,18 @@ def test_world_admin_manages_agent_memory() -> None:
         f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
     )
     list_memory = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    bad_worldline_list = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_refresh = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
+        params={"worldline_id": str(other_worldline_id)},
+    )
     search_memory = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
         json={"query_text": "green tea", "limit": 5},
@@ -4331,6 +4343,12 @@ def test_world_admin_manages_agent_memory() -> None:
     assert search_memory.json()[0]["content"] == "Guide likes green tea"
     assert isinstance(search_memory.json()[0]["score"], float)
     assert bad_query.status_code == 422
+    assert bad_worldline_list.status_code == 422
+    assert bad_worldline_list.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_snapshot.status_code == 422
+    assert bad_worldline_snapshot.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_refresh.status_code == 422
+    assert bad_worldline_refresh.json()["detail"] == "worldline does not exist for world"
     assert bad_worldline_search.status_code == 422
     assert bad_worldline_search.json()["detail"] == "worldline does not exist for world"
     assert bad_worldline_forget.status_code == 422
