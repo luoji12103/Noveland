@@ -34,6 +34,8 @@ from noveland.media.contracts import (
     MediaAssetStatus,
     MediaObjectCreate,
     MediaObjectRole,
+    MediaReferenceKind,
+    MediaReferenceRole,
     MediaSourceKind,
     MediaVisibility,
 )
@@ -51,6 +53,7 @@ from noveland.media.models import (
 from noveland.media.service import MediaService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.memory.models import MemoryBackendProfile, MemoryWriteJob
+from noveland.moderation.models import ModerationAction
 from noveland.narrative.models import NarrativeArtifact
 from noveland.providers.models import (
     ProviderBudgetPolicy,
@@ -282,9 +285,9 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
     assert member_get.status_code == 200
     member_presentation = member_get.json()
     assert member_presentation["speaker_agent_id"] == str(agent_id)
-    assert member_presentation["background_asset_id"] == str(background_asset)
-    assert member_presentation["composite_scene_asset_id"] is not None
-    assert member_presentation["tts_media_asset_id"] is not None
+    assert member_presentation["background_asset_id"] is None
+    assert member_presentation["composite_scene_asset_id"] is None
+    assert member_presentation["tts_media_asset_id"] is None
     assert member_presentation["sprite_set_id"] is None
     assert member_presentation["sprite_variant_id"] is None
     assert member_presentation["voice_profile_id"] is None
@@ -322,6 +325,124 @@ def test_conversation_presentation_api_renders_visual_speech_and_transcript() ->
         assert turn.input_text == "hi"
         assert turn.output_text == "hello"
         assert session.scalars(select(MemoryWriteJob)).all() == []
+
+
+def test_member_presentation_get_only_keeps_reader_deliverable_media_ids() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-media-filter@example.test")
+    member_id, member_token = _seed_user(engine, "member-media-filter@example.test")
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    agent_id, _scene_id, conversation_id, turn_id = _seed_agent_scene_conversation(
+        engine,
+        world_id,
+        worldline_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    admin_background_id = _seed_image_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        role=MediaAssetRole.SCENE_BACKGROUND,
+        color=(10, 20, 30, 255),
+    )
+    hidden_composite_id = _seed_image_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        role=MediaAssetRole.COMPOSITE_IMAGE,
+        color=(40, 50, 60, 255),
+        visibility=MediaVisibility.HIDDEN,
+    )
+    private_tts_id = _seed_audio_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        visibility=MediaVisibility.PRIVATE,
+    )
+
+    _authenticate(client, owner_token)
+    admin_put = client.put(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+        json={
+            "speaker_agent_id": str(agent_id),
+            "background_asset_id": str(admin_background_id),
+            "composite_scene_asset_id": str(hidden_composite_id),
+            "tts_media_asset_id": str(private_tts_id),
+        },
+    )
+    admin_get = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+    )
+    _authenticate(client, member_token)
+    member_get = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+    )
+
+    assert admin_put.status_code == 200
+    assert admin_get.status_code == 200
+    assert admin_get.json()["background_asset_id"] == str(admin_background_id)
+    assert admin_get.json()["composite_scene_asset_id"] == str(hidden_composite_id)
+    assert admin_get.json()["tts_media_asset_id"] == str(private_tts_id)
+    assert member_get.status_code == 200
+    assert member_get.json()["background_asset_id"] is None
+    assert member_get.json()["composite_scene_asset_id"] is None
+    assert member_get.json()["tts_media_asset_id"] is None
+
+    visible_background_id = _seed_image_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        role=MediaAssetRole.SCENE_BACKGROUND,
+        color=(70, 80, 90, 255),
+        visibility=MediaVisibility.READER_VISIBLE,
+    )
+    visible_composite_id = _seed_image_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        role=MediaAssetRole.COMPOSITE_IMAGE,
+        color=(100, 110, 120, 255),
+        visibility=MediaVisibility.READER_VISIBLE,
+    )
+    visible_tts_id = _seed_audio_asset(
+        engine,
+        client.presentation_storage,
+        world_id,
+        worldline_id,
+        visibility=MediaVisibility.READER_VISIBLE,
+    )
+    _attach_reader_turn_media(engine, world_id, worldline_id, turn_id, visible_background_id)
+    _attach_reader_turn_media(engine, world_id, worldline_id, turn_id, visible_composite_id)
+    _attach_reader_turn_media(engine, world_id, worldline_id, turn_id, visible_tts_id)
+
+    _authenticate(client, owner_token)
+    visible_put = client.put(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+        json={
+            "speaker_agent_id": str(agent_id),
+            "background_asset_id": str(visible_background_id),
+            "composite_scene_asset_id": str(visible_composite_id),
+            "tts_media_asset_id": str(visible_tts_id),
+        },
+    )
+    _authenticate(client, member_token)
+    visible_member_get = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
+    )
+
+    assert visible_put.status_code == 200
+    assert visible_member_get.status_code == 200
+    assert visible_member_get.json()["background_asset_id"] == str(visible_background_id)
+    assert visible_member_get.json()["composite_scene_asset_id"] == str(visible_composite_id)
+    assert visible_member_get.json()["tts_media_asset_id"] == str(visible_tts_id)
 
 
 def test_conversation_presentation_api_rejects_cross_worldline_asset() -> None:
@@ -414,6 +535,7 @@ def _create_tables(engine: Engine) -> None:
         cast(Table, MediaObject.__table__),
         cast(Table, MediaReference.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, ModerationAction.__table__),
         cast(Table, MediaAssetContext.__table__),
         cast(Table, MediaAssetInput.__table__),
         cast(Table, MediaAssetTag.__table__),
@@ -736,6 +858,7 @@ def _seed_image_asset(
     *,
     role: MediaAssetRole,
     color: tuple[int, int, int, int],
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN,
 ) -> uuid.UUID:
     with Session(engine) as session:
         asset_id = uuid.uuid4()
@@ -752,7 +875,7 @@ def _seed_image_asset(
                 asset_role=role,
                 source_kind=MediaSourceKind.MANUAL_UPLOAD,
                 status=MediaAssetStatus.AVAILABLE,
-                visibility=MediaVisibility.WORLD_ADMIN,
+                visibility=visibility,
                 storage_uri=stored.uri,
                 mime_type="image/png",
                 file_ext="png",
@@ -784,6 +907,8 @@ def _seed_audio_asset(
     storage: LocalMediaObjectStorage,
     world_id: uuid.UUID,
     worldline_id: uuid.UUID,
+    *,
+    visibility: MediaVisibility = MediaVisibility.WORLD_ADMIN,
 ) -> uuid.UUID:
     asset_id = uuid.uuid4()
     stored = storage.write_bytes(
@@ -801,7 +926,7 @@ def _seed_audio_asset(
                 asset_role="transcript_audio",
                 source_kind="manual_upload",
                 status="available",
-                visibility="world_admin",
+                visibility=visibility.value,
                 storage_uri=stored.uri,
                 mime_type="audio/wav",
                 file_ext="wav",
@@ -828,6 +953,29 @@ def _seed_audio_asset(
         )
         session.commit()
     return asset_id
+
+
+def _attach_reader_turn_media(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    turn_id: uuid.UUID,
+    asset_id: uuid.UUID,
+) -> None:
+    with Session(engine) as session:
+        session.add(
+            MediaReference(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                asset_id=asset_id,
+                ref_kind=MediaReferenceKind.CONVERSATION_TURN.value,
+                ref_id=turn_id,
+                ref_role=MediaReferenceRole.OUTPUT.value,
+                metadata_json={},
+            )
+        )
+        session.commit()
 
 
 def _authenticate(client: TestClient, token: str) -> None:

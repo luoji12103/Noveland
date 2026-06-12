@@ -25,6 +25,7 @@ from noveland.media.service import MediaReferenceService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.providers.registry import ProviderNotFoundError, ProviderValidationError
 from noveland.providers.service import ProviderExecutionError
+from noveland.reader_delivery.service import ReaderMediaDeliveryService
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -200,14 +201,31 @@ _OMIT_MEMBER_PRESENTATION_VALUE = object()
 def _presentation_response(
     record: ConversationTurnPresentationRecord,
     context: WorldAccessContext,
+    db_session: Session,
 ) -> ConversationTurnPresentationRecord:
     if _include_admin_presentation_fields(context):
         return record
+    reader_media = ReaderMediaDeliveryService(db_session)
     return record.model_copy(
         update={
             "sprite_set_id": None,
             "sprite_variant_id": None,
             "voice_profile_id": None,
+            "tts_media_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.tts_media_asset_id,
+            ),
+            "background_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.background_asset_id,
+            ),
+            "composite_scene_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.composite_scene_asset_id,
+            ),
             "transcript_id": None,
             "presentation_json": _sanitize_member_presentation_json(record.presentation_json),
         }
@@ -216,6 +234,21 @@ def _presentation_response(
 
 def _include_admin_presentation_fields(context: WorldAccessContext) -> bool:
     return context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+
+
+def _reader_deliverable_asset_id(
+    reader_media: ReaderMediaDeliveryService,
+    record: ConversationTurnPresentationRecord,
+    asset_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if asset_id is None:
+        return None
+    descriptor = reader_media.get_media(
+        record.world_id,
+        asset_id,
+        worldline_id=record.worldline_id,
+    )
+    return asset_id if descriptor is not None else None
 
 
 def _sanitize_member_presentation_json(value: Any) -> dict[str, Any]:
@@ -260,7 +293,7 @@ def get_presentation(
             conversation_id,
             turn_id,
         )
-        return None if record is None else _presentation_response(record, context)
+        return None if record is None else _presentation_response(record, context, db_session)
     except LookupError as exc:
         raise _not_found() from exc
     except ConversationValidationError as exc:

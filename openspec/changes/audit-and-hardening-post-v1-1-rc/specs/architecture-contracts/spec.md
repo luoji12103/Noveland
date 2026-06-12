@@ -45,6 +45,7 @@ The system SHALL keep prompt snapshots, raw prompts, raw outputs, resolved provi
 - **AND** the response SHALL preserve only safe playback fields such as speaker, emotion, render state, visible media asset identifiers, record identifiers, and timestamps
 - **AND** the response SHALL NOT expose internal sprite-set, sprite-variant, voice-profile, transcript, provider, prompt snapshot, model invocation, media job, storage URI/path, bytes, or base64 evidence.
 - **AND** presentation mutation, visual rendering, speech rendering, and audio transcription routes SHALL remain world-admin-only.
+- **AND** media asset identifiers in the member response SHALL be present only when the same asset is reader-deliverable for that worldline.
 
 #### Scenario: Beta feedback reporters do not receive admin triage evidence
 - **GIVEN** a beta feedback reporter can list or fetch their own report through member-readable routes
