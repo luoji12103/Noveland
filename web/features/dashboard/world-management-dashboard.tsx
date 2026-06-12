@@ -140,7 +140,7 @@ export function WorldManagementDashboard({
     if (nextWorldId === "") {
       return;
     }
-    router.replace(`/?world=${nextWorldId}`);
+    router.replace(worldQueryPath(nextWorldId));
     await loadWorld(nextWorldId);
   }
 
@@ -267,7 +267,7 @@ export function WorldManagementDashboard({
       ]);
       setCanManageSelectedWorld(true);
       setMemberCandidates([]);
-      router.replace(`/?world=${world.id}`);
+      router.replace(worldQueryPath(world.id));
       formElement.reset();
     }, "World created.");
   }
@@ -2357,4 +2357,8 @@ function memoryItemDetail(item: MemoryItem): string {
             : null,
   ].filter((part): part is string => part !== null);
   return parts.join(" - ");
+}
+
+function worldQueryPath(worldId: string): string {
+  return `/?world=${encodeURIComponent(worldId)}`;
 }

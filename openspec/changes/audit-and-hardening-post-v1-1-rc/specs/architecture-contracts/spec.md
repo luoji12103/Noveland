@@ -479,6 +479,14 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **AND** query-string filters SHALL be encoded as query data
 - **AND** query-string delimiters SHALL remain encoded inside identifier path segments rather than becoming request query parameters.
 
+
+#### Scenario: Web dashboard world navigation preserves query boundaries
+- **GIVEN** browser-side dashboard code navigates to a selected or newly created world through the local `world` query parameter
+- **AND** the world identifier contains query-string or fragment delimiters
+- **WHEN** the component calls local navigation
+- **THEN** the world identifier SHALL be encoded as a single query parameter value
+- **AND** delimiter characters SHALL NOT become additional query parameters or fragments.
+
 #### Scenario: Web UI links preserve local app route boundaries
 - **GIVEN** browser-side Web UI components render local workspace, agent, conversation, player, reader, or narrative links
 - **AND** the world identifier or nested app route identifier contains encoded path separators or other reserved path characters
