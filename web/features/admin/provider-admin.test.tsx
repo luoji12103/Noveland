@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ProviderAdmin } from "@/features/admin/provider-admin";
 import type { ProviderAdminData } from "@/lib/worlds/server";
+import { updateProviderProfile } from "@/lib/worlds/client";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -35,6 +36,109 @@ describe("ProviderAdmin", () => {
     expect(screen.getByText("1 recent plugin diagnostics")).toBeInTheDocument();
     expect(screen.getByText("plugin.binding_invalid_config")).toBeInTheDocument();
     expect(screen.getByText("missing_plugin - missing.world_rules is not registered.")).toBeInTheDocument();
+  });
+
+
+  it("redacts sensitive provider profile plugin config and capabilities", async () => {
+    vi.mocked(updateProviderProfile).mockResolvedValue(providerData.profiles[0]);
+    const dirtyPluginConfig = {
+      headers: "Bearer profile-token",
+      endpoint: "/v1/chat",
+      json_mode: true,
+      clientSecret: "sk-live-provider-secret",
+      rawPrompt: "actual raw prompt should stay private",
+      storageUri: "media://provider/raw-output",
+      promptSnapshotId: "prompt-snapshot-secret",
+      localModelPath: "/models/private-provider.bin",
+      attachment: "U2VjcmV0UHJvdmlkZXJQYXlsb2Fk",
+    };
+    const dirtyCapabilities = {
+      chat: true,
+      max_tokens: 4096,
+      rawOutput: "actual raw output should stay private",
+      bearerToken: "Bearer capability-token",
+      storageUri: "media://capability/raw-output",
+      evidence: "U2VjcmV0Q2FwYWJpbGl0eVBheWxvYWQ=",
+    };
+    const dirtyData: ProviderAdminData = {
+      ...providerData,
+      profiles: [
+        {
+          ...providerData.profiles[0],
+          plugin_config: dirtyPluginConfig,
+          capabilities: dirtyCapabilities,
+        },
+      ],
+    };
+
+    const { container } = render(<ProviderAdmin data={dirtyData} />);
+
+    const pluginConfigTextarea = container.querySelectorAll<HTMLTextAreaElement>(
+      'textarea[name="plugin_config"]',
+    )[1];
+    const capabilitiesTextarea = container.querySelectorAll<HTMLTextAreaElement>(
+      'textarea[name="capabilities"]',
+    )[1];
+    expect(pluginConfigTextarea.value).toContain('/v1/chat');
+    expect(pluginConfigTextarea.value).toContain('json_mode');
+    expect(pluginConfigTextarea.value).toContain('[redacted]');
+    expect(capabilitiesTextarea.value).toContain('max_tokens');
+    expect(capabilitiesTextarea.value).toContain('[redacted]');
+    for (const dirtyValue of [
+      'clientSecret',
+      'rawPrompt',
+      'storageUri',
+      'promptSnapshotId',
+      'localModelPath',
+      'sk-live-provider-secret',
+      'Bearer profile-token',
+      'actual raw prompt should stay private',
+      'media://provider/raw-output',
+      '/models/private-provider.bin',
+      'U2VjcmV0UHJvdmlkZXJQYXlsb2Fk',
+      'rawOutput',
+      'bearerToken',
+      'Bearer capability-token',
+      'media://capability/raw-output',
+      'U2VjcmV0Q2FwYWJpbGl0eVBheWxvYWQ=',
+    ]) {
+      expect(container).not.toHaveTextContent(dirtyValue);
+      expect(pluginConfigTextarea.value).not.toContain(dirtyValue);
+      expect(capabilitiesTextarea.value).not.toContain(dirtyValue);
+    }
+
+    fireEvent.change(pluginConfigTextarea, {
+      target: { value: JSON.stringify(dirtyPluginConfig, null, 2) },
+    });
+    fireEvent.change(capabilitiesTextarea, {
+      target: { value: JSON.stringify(dirtyCapabilities, null, 2) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+    await waitFor(() => {
+      expect(updateProviderProfile).toHaveBeenCalledWith('profile-1', {
+        name: 'OpenAI Local',
+        plugin_identifier: 'builtin.openai_compatible',
+        plugin_config: {
+          headers: '[redacted]',
+          endpoint: '/v1/chat',
+          json_mode: true,
+          attachment: '[redacted]',
+        },
+        base_url: 'https://api.example.test/v1',
+        model_name: 'gpt-test',
+        api_key_ref: 'missing-ref',
+        capabilities: {
+          chat: true,
+          max_tokens: 4096,
+          evidence: '[redacted]',
+        },
+        timeout_seconds: 20,
+        retry_attempts: 1,
+        rate_limit_per_minute: null,
+        is_enabled: true,
+      });
+    });
   });
 });
 
