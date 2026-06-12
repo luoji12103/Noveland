@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -17,11 +18,16 @@ LEAKY_KEYS = {
     "path",
     "file_path",
     "filesystem_path",
+    "object_storage_path",
+    "object_path",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
     "raw_prompt",
     "raw_output",
     "raw_source",
     "full_raw_source",
 }
+LEAKY_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in LEAKY_KEYS}
 
 
 class AuthoringSourceBatchStatus(StrEnum):
@@ -837,10 +843,15 @@ def _assert_safe_json(value: dict[str, Any], field_name: str) -> None:
     _reject_leaky_json(value)
 
 
+def _is_leaky_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in LEAKY_KEY_MARKERS
+
+
 def _reject_leaky_json(value: object) -> None:
     if isinstance(value, dict):
         for key, item in value.items():
-            if key.lower() in LEAKY_KEYS:
+            if _is_leaky_key(str(key)):
                 raise ValueError(f"{key} is not allowed in authoring JSON")
             _reject_leaky_json(item)
     elif isinstance(value, list | tuple):

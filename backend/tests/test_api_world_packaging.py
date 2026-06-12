@@ -303,7 +303,7 @@ def test_world_package_import_rejects_forbidden_manifest_values() -> None:
     world_id, _worldline_id = _seed_world_graph(engine, owner_id)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     manifest = _valid_manifest()
-    manifest["world"]["rules_config"] = {"storage_uri": "media://private-object"}
+    manifest["world"]["rules_config"] = {"storageUri": "opaque-private-object"}
 
     response = _authenticated_post(
         client,

@@ -1,14 +1,14 @@
 # Active Session Handoff
 
-- Date: 2026-06-12T07:25:08+00:00
+- Date: 2026-06-12T07:40:40+00:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-092 are remediated on this branch; latest batch is F-092 budget and diagnostics leaky-key normalization.
+- Status: F-001 through F-093 are remediated on this branch; latest batch is F-093 package and authoring leaky-key normalization.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Base before F-092 batch: 42007db fix(provider-secrets): normalize sensitive key variants.
+- Base before F-093 batch: 988c614 fix(diagnostics): normalize leaky json key variants.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
 - Current server services at batch start: Noveland Postgres and Noveland NATS were healthy. No authoritative Noveland API/Web/runtime process was started outside project test/e2e commands.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
@@ -26,25 +26,25 @@
 
 ## Completed This Batch
 
-- Continued backend storage/prompt/path key normalization audit after F-091.
-- Recorded/remediated F-092: provider budget policy JSON, multimodal prompt snapshot diagnostics, and narrative quality dashboard evidence checks missed camelCase/compact leaky keys such as `storageUri`, `rawPrompt`, and `promptSnapshotId`.
+- Continued backend import/export and authoring validator audit after F-092.
+- Recorded/remediated F-093: world packaging, authoring, and asset generation contract validators missed camelCase/compact leaky keys such as `storageUri`, `rawPrompt`, `promptSnapshotId`, and `filesystemPath`.
 - Updated architecture-contracts OpenSpec before implementation.
-- Normalized leaky key comparisons in provider budget validation, multimodal diagnostics, and narrative quality dashboard sanitization.
-- Added regression tests so camelCase storage/prompt/prompt-snapshot keys fail before remediation and are rejected, flagged, or sanitized after remediation.
+- Normalized forbidden key comparisons in world packaging, authoring, and asset generation contract validators.
+- Updated regression tests so camelCase storage/prompt/path key variants fail before remediation and are rejected after remediation.
 
 ## Verification This Batch
 
-- `cd backend && uv run pytest tests/test_provider_execution_service.py::test_budget_policy_rejects_camel_case_leaky_metadata tests/test_multimodal_eval_service.py::test_multimodal_eval_detects_camel_case_prompt_snapshot_leaks tests/test_narrative_quality_service.py::test_narrative_quality_dashboard_detects_camel_case_leaky_metadata -q` first failed with 3 failures on unblocked/unflagged camelCase leaky keys, then passed with 3 tests after remediation; `cd backend && uv run pytest tests/test_provider_execution_service.py tests/test_multimodal_eval_service.py tests/test_narrative_quality_service.py -q` passed with 72 tests; focused backend ruff/mypy passed for provider budget, multimodal eval, narrative quality, and their updated tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 572 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- `cd backend && uv run pytest tests/test_api_world_packaging.py::test_world_package_import_rejects_forbidden_manifest_values tests/test_authoring_service.py::test_authoring_json_rejects_leaky_values tests/test_asset_generation_service.py::test_policy_rejects_leaky_json_and_preview_validates_worldline -q` first failed with 3 failures on accepted camelCase leaky keys, then passed with 3 tests after remediation; `cd backend && uv run pytest tests/test_api_world_packaging.py tests/test_authoring_service.py tests/test_asset_generation_service.py tests/test_api_asset_generation.py tests/test_authoring_regression_fixture.py -q` passed with 39 tests; focused backend ruff/mypy passed for world packaging, authoring, asset generation contracts, and their updated tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 572 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
 
 ## Remaining Work
 
 1. Continue Web/e2e audit for remaining local query navigation, route handlers, proxy method exposure, response shaping, role boundary, evidence redaction, and client-side rendering sinks.
-2. Continue backend audits for remaining reader/member/player DTO exposure boundaries and sanitizer normalization drift, especially package-local import/export validators, world packaging, authoring/asset generation JSON validators, and worlds public JSON helpers.
+2. Continue backend audits for remaining reader/member/player DTO exposure boundaries and sanitizer normalization drift, especially Web/server route response shaping, worlds public JSON helpers, and product normal-use paths.
 3. Continue product normal-use/spec-history drift review for v1.1 RC onboarding, resume, feedback, quota/degraded state, import/export, provider reliability UX, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless explicitly requested.
 
-## Finding F-092
+## Finding F-093
 
-- Budget and diagnostics JSON checks must treat snake_case, camelCase, compact, and mixed-punctuation storage/prompt/path keys as equivalent.
-- The remediation rejects provider budget policy JSON with forbidden leaky key variants and flags/sanitizes multimodal and narrative dashboard evidence without removing safe operational metadata.
-- Residual risk: continue auditing remaining package-local import/export validators and Web/server response shaping for the same key-normalization drift.
+- Package, authoring, and asset generation validators must treat snake_case, camelCase, compact, and mixed-punctuation storage/prompt/path keys as equivalent.
+- The remediation rejects forbidden key variants before package import, authoring metadata/config creation, or asset generation policy/proposal acceptance while preserving safe metadata.
+- Residual risk: continue Web/server response-shaping and client-rendering audits for similar boundary drift.
