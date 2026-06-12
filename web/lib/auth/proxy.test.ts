@@ -37,6 +37,56 @@ describe("auth proxy helpers", () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
 
+  it("normalizes sensitive json error details before relaying proxy responses", async () => {
+    const backendResponse = new Response(
+      JSON.stringify({
+        detail: {
+          message: "Provider failed with rawPrompt, Bearer proxy-token, and storageUri media://proxy/object",
+          review_status: "fail",
+          storageUri: "media://proxy/hidden-object",
+        },
+      }),
+      {
+        status: 500,
+        headers: {
+          "content-type": "application/json",
+          "set-cookie": "noveland_session=attacker; Path=/",
+        },
+      },
+    );
+
+    const response = await buildProxyResponse(backendResponse);
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toMatch(/rawPrompt|Bearer proxy-token|media:\/\//i);
+    expect(body.detail.message).toBe("Request failed.");
+    expect(body.detail.review_status).toBe("fail");
+    expect(body.detail.storageUri).toBeUndefined();
+  });
+
+  it("leaves safe json error bodies unchanged", async () => {
+    const safeBody = JSON.stringify(
+      { detail: { message: "Invalid credentials", review_status: "fail" } },
+      null,
+      2,
+    );
+    const contentLength = String(new TextEncoder().encode(safeBody).byteLength);
+    const backendResponse = new Response(safeBody, {
+      status: 400,
+      headers: {
+        "content-type": "application/json",
+        "content-length": contentLength,
+      },
+    });
+
+    const response = await buildProxyResponse(backendResponse);
+
+    expect(response.headers.get("content-length")).toBe(contentLength);
+    await expect(response.text()).resolves.toBe(safeBody);
+  });
+
   it("strips set-cookie headers unless cookie relay is explicitly enabled", async () => {
     const backendResponse = new Response(JSON.stringify({ ok: true }), {
       status: 200,
