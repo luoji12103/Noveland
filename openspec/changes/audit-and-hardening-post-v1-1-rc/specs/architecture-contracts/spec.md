@@ -336,6 +336,12 @@ The system SHALL build same-origin Web proxy backend URLs from fixed backend rou
 - **THEN** backend validators SHALL reject raw persisted or executable provider JSON containing those keys
 - **AND** package exports, persisted safe DTOs, and diagnostic leak checks SHALL omit, redact, or flag those keys using the same normalized sensitive-key semantics.
 
+#### Scenario: Budget and diagnostics JSON normalize storage and prompt key variants
+- **GIVEN** provider budget policy JSON, multimodal prompt-snapshot diagnostics, or narrative quality dashboard evidence contains arbitrary JSON
+- **WHEN** storage, path, bytes, base64, raw prompt/output, or prompt snapshot keys are written in snake_case, camelCase, compact, or mixed punctuation forms such as storage_uri, storageUri, storageuri, raw_prompt, rawPrompt, rawprompt, prompt_snapshot, promptSnapshotId, file_path, or filePath
+- **THEN** provider budget validators SHALL reject persisted policy JSON containing those keys
+- **AND** diagnostics and dashboard responses SHALL flag and sanitize those keys using the same normalized leaky-key semantics while preserving safe operational metadata.
+
 ### Requirement: Web realtime clients preserve backend route boundaries
 The system SHALL build browser-initiated realtime backend URLs from fixed backend route templates and encoded dynamic path segments so decoded identifiers cannot broaden backend route scope.
 

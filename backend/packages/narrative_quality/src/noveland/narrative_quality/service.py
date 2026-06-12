@@ -109,15 +109,22 @@ _LEAK_KEYWORDS = {
     "storage_uri",
     "preview_uri",
     "thumbnail_uri",
+    "raw_prompt",
     "raw_prompt_text",
+    "raw_output",
     "raw_output_text",
     "raw_request_json",
     "raw_response_json",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
     "filesystem_path",
     "file_path",
+    "object_storage_path",
+    "object_path",
     "base64",
     "bytes",
 }
+_LEAK_KEYWORD_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in _LEAK_KEYWORDS}
 _LEAK_PATTERN = re.compile(
     r"(storage_uri|media://|file://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9])",
     re.IGNORECASE,
@@ -5116,8 +5123,8 @@ def _sanitize_json(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    normalized = key.strip().lower()
-    return is_sensitive_key(key) or normalized in _LEAK_KEYWORDS
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return is_sensitive_key(key) or normalized in _LEAK_KEYWORD_MARKERS
 
 
 def _safe_text(value: str) -> str:

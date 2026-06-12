@@ -259,6 +259,26 @@ def test_budget_policy_rejects_camel_case_secret_metadata() -> None:
             )
 
 
+def test_budget_policy_rejects_camel_case_leaky_metadata() -> None:
+    engine = _engine()
+    world_id, _ = _seed_world(engine)
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        with pytest.raises(ValueError, match="unsafe key"):
+            ProviderBudgetService(session).create_policy(
+                ProviderBudgetPolicyCreate(
+                    world_id=world_id,
+                    provider_id=provider_id,
+                    policy_key="leaky-storage-metadata",
+                    metadata_json={
+                        "storageUri": "opaque-storage-ref",
+                        "nested": {"rawPrompt": "hidden prompt"},
+                    },
+                )
+            )
+
+
 def test_emergency_stop_blocks_before_secret_resolution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

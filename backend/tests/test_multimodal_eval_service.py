@@ -135,6 +135,31 @@ def test_multimodal_eval_detects_integrity_and_leak_failures(tmp_path: Path) -> 
     assert diagnostics.metrics["events"]["payload_leak_count"] == 1
 
 
+def test_multimodal_eval_detects_camel_case_prompt_snapshot_leaks(tmp_path: Path) -> None:
+    engine = _engine()
+    storage = LocalMediaObjectStorage(tmp_path)
+    graph = _seed_sample_world(engine, storage)
+    with Session(engine) as session:
+        leaky_snapshot = session.scalars(select(PromptSnapshot)).first()
+        assert leaky_snapshot is not None
+        leaky_snapshot.raw_request_json = {
+            "storageUri": "opaque-storage-ref",
+            "nested": {"rawPrompt": "hidden prompt", "promptSnapshotId": "snap-1"},
+        }
+        session.commit()
+
+    with Session(engine) as session:
+        diagnostics = MultimodalEvalService(session, storage).diagnostics(
+            graph.world_id,
+            worldline_id=graph.worldline_id,
+        )
+
+    codes = {finding.code for finding in diagnostics.blockers}
+    assert diagnostics.status == "failed"
+    assert "prompt_snapshot_raw_or_leaky" in codes
+    assert diagnostics.metrics["invocations"]["prompt_snapshot_leak_count"] == 1
+
+
 def test_multimodal_eval_detects_missing_sprite_voice_and_storage(tmp_path: Path) -> None:
     engine = _engine()
     storage = LocalMediaObjectStorage(tmp_path)

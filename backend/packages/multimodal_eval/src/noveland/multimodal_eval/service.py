@@ -805,7 +805,7 @@ def _contains_secret_value(value: object) -> bool:
 def _json_contains_leaky_value(value: object) -> bool:
     if isinstance(value, dict):
         for key, item in value.items():
-            if str(key).strip().lower() in _LEAKY_JSON_KEYS:
+            if _is_leaky_json_key(str(key)):
                 return True
             if _json_contains_leaky_value(item):
                 return True
@@ -825,7 +825,7 @@ def _json_contains_forbidden_event_payload(value: object) -> bool:
         return True
     if isinstance(value, dict):
         for key, item in value.items():
-            if str(key).strip().lower() in _EVENT_RAW_KEYS:
+            if _is_event_raw_key(str(key)):
                 return True
             if _json_contains_forbidden_event_payload(item):
                 return True
@@ -842,6 +842,27 @@ _LEAKY_JSON_KEYS = {
     "bytes",
     "path",
     "file_path",
+    "filesystem_path",
+    "object_storage_path",
+    "object_path",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
     "raw_bytes",
+    "raw_prompt",
+    "raw_output",
 }
 _EVENT_RAW_KEYS = {"raw_prompt", "raw_prompt_text", "raw_output", "raw_output_text"}
+_LEAKY_JSON_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", key.lower()) for key in _LEAKY_JSON_KEYS
+}
+_EVENT_RAW_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in _EVENT_RAW_KEYS}
+
+
+def _is_leaky_json_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in _LEAKY_JSON_KEY_MARKERS
+
+
+def _is_event_raw_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in _EVENT_RAW_KEY_MARKERS

@@ -1743,6 +1743,34 @@ def test_narrative_quality_dashboard_detects_blockers_and_sanitizes_evidence() -
     assert "raw_prompt" not in serialized
 
 
+def test_narrative_quality_dashboard_detects_camel_case_leaky_metadata() -> None:
+    engine = _engine()
+    world_id, worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
+    provider_id = _seed_text_provider(engine, world_id)
+    _seed_provider_health(
+        engine,
+        provider_id,
+        status="healthy",
+        metadata={
+            "nested": {
+                "storageUri": "opaque-storage-ref",
+                "rawPrompt": "hidden prompt",
+            }
+        },
+    )
+
+    with Session(engine) as session:
+        result = NarrativeQualityService(session).dashboard_summary(world_id, worldline_id)
+
+    codes = {signal.code for signal in result.blockers}
+    assert result.quality_status == "fail"
+    assert "unsafe_provider_health_metadata" in codes
+    serialized = result.model_dump_json().lower()
+    assert "storageuri" not in serialized
+    assert "rawprompt" not in serialized
+    assert "opaque-storage-ref" not in serialized
+
+
 def test_narrative_quality_dashboard_rejects_foreign_worldline() -> None:
     engine = _engine()
     world_id, _worldline_id, _agent_id = _seed_world_agent_and_fact(engine, "Safe fact.")
