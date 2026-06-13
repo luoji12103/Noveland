@@ -201,9 +201,16 @@ class ProviderRegistryService:
         provider_kind: ProviderKind | None = None,
         capability_key: str | None = None,
         provider_id: uuid.UUID | None = None,
+        platform_admin: bool = True,
+        include_hidden: bool = True,
     ) -> ProviderIntegrationRead:
         if provider_id is not None:
-            provider = self.get_provider(world_id, provider_id, platform_admin=True)
+            provider = self.get_provider(
+                world_id,
+                provider_id,
+                platform_admin=platform_admin,
+                include_hidden=include_hidden,
+            )
             if provider is None:
                 raise ProviderNotFoundError("provider integration not found")
             return provider
@@ -211,6 +218,7 @@ class ProviderRegistryService:
             ProviderIntegration.scope_key.in_(_scope_keys(world_id)),
             ProviderIntegration.status == ProviderIntegrationStatus.ACTIVE.value,
         )
+        statement = _apply_visibility(statement, include_hidden, platform_admin)
         if provider_kind is not None:
             statement = statement.where(ProviderIntegration.provider_kind == provider_kind.value)
         if capability_key is not None:

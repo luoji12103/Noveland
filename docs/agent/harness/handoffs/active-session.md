@@ -1,16 +1,16 @@
 # Active Session Handoff
 
-- Date: 2026-06-13T09:00:00+08:00
+- Date: 2026-06-13T09:18:00+08:00
 - Branch: feature/audit-and-hardening-post-v1-1-rc
 - Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
-- Status: F-001 through F-145 are remediated on this branch; latest worktree batch is F-145 Web error storage/path variant redaction hardening pending local commit.
+- Status: F-001 through F-146 are remediated on this branch; latest batch is F-146 provider execution visibility hardening.
 
 ## Current Context
 
 - Active branch: feature/audit-and-hardening-post-v1-1-rc.
-- Current HEAD before the F-145 commit: b7a19a2e67cba752a3c97e2dbadfec32ca91489c.
+- Current HEAD before the F-146 commit: 5134473 fix(web): redact storage path error variants.
 - Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
-- Current server status was rechecked at the start of this batch: branch was `feature/audit-and-hardening-post-v1-1-rc`, local and upstream were even at `b7a19a2`, active OpenSpec change was in progress, specs strict validation passed with 76 specs, Noveland Postgres/NATS were healthy, and API/Web/runtime containers were not running.
+- Current server status was rechecked at the start of this batch: branch was `feature/audit-and-hardening-post-v1-1-rc`, local and upstream were even at `5134473`, active OpenSpec change was in progress, worktree contained the in-progress F-146 edits from the prior handoff, and Noveland Postgres/NATS were healthy.
 - Only .env.example was observed in the repo; do not read or expose real secrets.
 
 ## Guardrails
@@ -26,30 +26,30 @@
 
 ## Completed This Batch
 
-- Reconfirmed realtime server state from `/root/code/Noveland`: branch `feature/audit-and-hardening-post-v1-1-rc`, HEAD `b7a19a2`, local branch even with upstream, active OpenSpec change valid, specs strict validation passed with 76 specs, and Postgres/NATS healthy.
-- Started three read-only CLI subagent audits for backend boundary review, Web security review, and product/spec drift; all exited without modifying the repository.
-- Identified F-145: shared Web backend-error detection missed storage/path variants including `file://`, `s3://`, `gs://`, and `/root/...`, so Web clients, server loaders, API proxies, and event-stream setup error paths could preserve backend filesystem/object-storage evidence in browser-visible errors.
-- Added an architecture-contracts scenario requiring Web error sanitization to recognize storage/path variants.
-- Extended `web/lib/auth/proxy.test.ts` with a failing regression for `file:///root/...`, `s3://...`, and `/root/...` in non-2xx JSON proxy error bodies.
-- Changed `web/lib/safe-error-detail.ts` to classify file URLs, object-storage URL schemes, and common server absolute paths as sensitive while preserving safe business error text.
+- Confirmed realtime server state from `/root/code/Noveland`: branch `feature/audit-and-hardening-post-v1-1-rc`, HEAD `5134473`, local branch even with upstream, active OpenSpec change in progress, and Postgres/NATS healthy.
+- Resumed F-146 from the prior in-progress worktree and inspected the provider execution visibility diff before running tests.
+- Remediated F-146: provider smoke-test and test-invocation routes now pass caller platform-admin context into provider execution requests, and provider registry/execution resolution applies that context before primary/fallback provider adapter execution.
+- Added a provider-system scenario requiring world-admin provider execution to respect registry visibility.
+- Added `test_provider_test_execution_respects_world_admin_visibility`, covering hidden/developer-only global provider rejection for detail, smoke-test, explicit test-invocation, and routed test-invocation, plus no health-check, invocation, or prompt-snapshot writes.
+- Preserved platform-admin diagnostics and existing ProviderExecutionService ownership; no provider execution path was moved into the API router.
 
 ## Verification This Batch
 
-- `cd web && npm run test -- lib/auth/proxy.test.ts -t "filesystem and object-storage"` first failed because the proxied JSON error body still contained `file:///root/...` and `s3://...`.
-- The same focused test passed after remediation.
-- Related Web proxy/client/server-loader suite passed with 14 files and 87 tests.
-- Full Web gate passed: `npm run lint`, `npm run typecheck`, `npm run test` with 53 files and 213 tests, `npm run build`, and `npm run check:next-env`.
-- Final `git diff --check`, `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and the related Web proxy/client/server-loader suite passed after the handoff/doc update.
+- `cd backend && uv run pytest tests/test_api_providers.py::test_provider_test_execution_respects_world_admin_visibility -q` passed.
+- `cd backend && uv run pytest tests/test_api_providers.py tests/test_provider_execution_service.py -q` passed with 31 tests.
+- Focused backend ruff/mypy passed for changed provider/API/test files.
+- `git diff --check`, `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, and `openspec validate --specs --strict` passed; specs validation covered 76 specs.
+- Full backend gate passed: `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` with 588 passed and 8 skipped.
 
 ## Remaining Work
 
-1. Reproduce and triage read-only backend subagent candidates: platform-only/hidden provider execution through provider smoke/test invocation, speech TTS/STT, image generation/edit, and visual-generation provider refs.
+1. Reproduce and triage remaining provider execution visibility candidates: speech TTS/STT, image generation/edit, and visual-generation provider refs.
 2. Reproduce and triage Web subagent candidates: provider admin data and world overview server loaders may serialize raw admin data to client components before display redaction.
 3. Continue product normal-use/spec-history drift review for provider reliability/quota UX, import/export/package UI scope, release notes, and archived v0.9/v1.0/v1.1 evidence.
 4. Do not push unless the user explicitly asks; keep local branch clean after commits.
 
-## Finding F-145
+## Finding F-146
 
-- Web error normalization should not rely only on marker keys or `media://`; object-storage refs and server filesystem paths in backend error values are also forbidden browser-visible evidence.
-- The remediation expands the shared Web sensitive-error detector used by clients, server loaders, API proxies, and event-stream setup error handling.
-- Residual risk: continue auditing Web server loaders and client components for raw admin/provider data serialized into browser props before display-only redaction.
+- World-admin provider execution must not use platform-admin provider visibility unless the caller is a platform admin.
+- The remediation moves caller platform-admin context through `ProviderExecutionRequest`, provider registry explicit/routed resolution, fallback lookup, smoke-test, and test-invocation before adapter execution or evidence writes.
+- Residual risk: continue auditing speech, image, and visual-generation routes for equivalent provider visibility assumptions.

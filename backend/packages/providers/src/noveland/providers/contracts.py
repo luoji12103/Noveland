@@ -401,6 +401,7 @@ class ProviderExecutionRequest(_FrozenContract):
     media_asset_id: uuid.UUID | None = None
     player_actor_id: uuid.UUID | None = None
     actor_ref: str | None = Field(default=None, min_length=1, max_length=160)
+    platform_admin: bool = True
     fallback_provider_id: uuid.UUID | None = None
     fallback_mode: ProviderFallbackMode = ProviderFallbackMode.MANUAL
     fallback_reason: str | None = Field(default=None, min_length=1, max_length=240)

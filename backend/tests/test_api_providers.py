@@ -217,6 +217,73 @@ def test_provider_api_restricts_developer_only_visibility_to_platform_admin() ->
     assert platform_update.json()["visibility"] == "developer_only"
 
 
+def test_provider_test_execution_respects_world_admin_visibility() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    platform_id, platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, platform_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, platform_token)
+    platform_provider = client.post(
+        f"/worlds/{world_id}/providers",
+        json={
+            "scope_kind": "global",
+            "provider_kind": "text_generation",
+            "adapter_kind": "fake",
+            "provider_key": "platform-text",
+            "display_name": "Platform Text",
+            "visibility": "developer_only",
+            "capabilities": [
+                {"capability_key": "supports_text_generation", "capability_json": {"value": True}}
+            ],
+        },
+    )
+    provider_id = platform_provider.json()["id"]
+
+    _authenticate(client, admin_token)
+    hidden_detail = client.get(
+        f"/worlds/{world_id}/providers/{provider_id}",
+        params={"include_hidden": True},
+    )
+    smoke = client.post(
+        f"/worlds/{world_id}/providers/{provider_id}/smoke-test",
+        json={"worldline_id": str(worldline_id), "input_text": "operator smoke"},
+    )
+    explicit_invocation = client.post(
+        f"/worlds/{world_id}/providers/test-invocation",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": provider_id,
+            "input_text": "operator test",
+        },
+    )
+    routed_invocation = client.post(
+        f"/worlds/{world_id}/providers/test-invocation",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_kind": "text_generation",
+            "input_text": "operator auto test",
+        },
+    )
+
+    assert platform_provider.status_code == 201
+    assert hidden_detail.status_code == 404
+    assert smoke.status_code == 404
+    assert explicit_invocation.status_code == 404
+    assert routed_invocation.status_code == 404
+    with Session(engine) as session:
+        assert session.scalars(select(ProviderHealthCheck)).all() == []
+        assert session.scalars(select(ModelInvocation)).all() == []
+        assert session.scalars(select(PromptSnapshot)).all() == []
+
+
 def test_provider_api_rejects_secret_config_and_exposes_auth_ref_only() -> None:
     client, engine = _client_with_database()
     admin_id, admin_token = _seed_user(engine, "admin@example.test")
