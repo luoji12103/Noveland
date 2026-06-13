@@ -85,6 +85,7 @@ from noveland.providers.secrets import (
     reject_sensitive_config,
     safe_auth_metadata,
     sanitize_for_persistence,
+    sanitize_provider_diagnostic_text,
 )
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy.orm import Session
@@ -831,4 +832,4 @@ def _provider_not_active_reason(status: str) -> str:
 
 
 def _safe_error_text(exc: Exception) -> str:
-    return str(sanitize_for_persistence({"error": str(exc)})["error"])
+    return sanitize_provider_diagnostic_text(str(exc))

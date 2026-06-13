@@ -200,6 +200,42 @@ def test_missing_real_provider_secret_writes_safe_failed_invocation() -> None:
         assert "MISSING_OPENAI_API_KEY" not in str(snapshot.raw_request_json)
 
 
+def test_provider_execution_failure_redacts_sensitive_error_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = _engine()
+    world_id, worldline_id = _seed_world(engine)
+
+    def fail_execute(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise RuntimeError(
+            "upstream failed with rawPrompt hidden, storageUri media://provider/raw, "
+            "clientSecret sk-live-secret, Bearer provider-token, and /tmp/provider.log"
+        )
+
+    with Session(engine) as session:
+        provider_id = _seed_provider(session, world_id, ProviderKind.TEXT_GENERATION)
+        service = ProviderExecutionService(session)
+        monkeypatch.setattr(service._fake, "execute", fail_execute)
+        with pytest.raises(RuntimeError):
+            service.execute(
+                ProviderExecutionRequest(
+                    world_id=world_id,
+                    worldline_id=worldline_id,
+                    provider_id=provider_id,
+                    input_text="blocked",
+                )
+            )
+        session.commit()
+
+    with Session(engine) as session:
+        invocation = session.scalars(select(ModelInvocation)).one()
+        snapshot = session.scalars(select(PromptSnapshot)).one()
+        assert invocation.status == "failed"
+        assert invocation.error_text == "[REDACTED]"
+        assert snapshot.raw_response_json == {"error": "[REDACTED]"}
+
+
 def test_disabled_provider_writes_failed_invocation_without_resolving_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

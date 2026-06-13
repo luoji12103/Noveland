@@ -16,6 +16,7 @@ from noveland.providers.secrets import (
     adapter_requires_auth,
     reject_sensitive_config,
     sanitize_for_persistence,
+    sanitize_provider_diagnostic_text,
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -104,7 +105,7 @@ class ProviderHealthService:
             error_text=(
                 None
                 if error_text is None
-                else str(sanitize_for_persistence({"error": error_text})["error"])
+                else sanitize_provider_diagnostic_text(error_text)
             ),
             metadata_json=safe_metadata,
         )

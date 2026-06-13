@@ -5,6 +5,7 @@ from typing import cast
 
 import pytest
 from noveland.auth.models import User
+from noveland.memory.models import MemoryBackendProfile
 from noveland.providers.contracts import (
     ProviderAdapterKind,
     ProviderCapabilityCreate,
@@ -110,6 +111,46 @@ def test_provider_registry_create_list_update_resolve_and_health() -> None:
     assert health.provider_integration_id == world_provider.id
 
 
+def test_provider_health_error_text_redacts_sensitive_values() -> None:
+    engine = _engine()
+    world_id = _seed_world(engine)
+
+    dirty_error = (
+        "upstream failed with clientSecret sk-live-secret, storageUri media://provider/raw, "
+        "rawPrompt hidden, Bearer provider-token, /tmp/provider/error.log, "
+        "and YWJjZGVmZ2hpamtsbW5vcA"
+    )
+
+    with Session(engine) as session:
+        provider = ProviderRegistryService(session).create_provider(
+            ProviderIntegrationCreate(
+                world_id=world_id,
+                scope_kind=ProviderScopeKind.WORLD,
+                provider_kind=ProviderKind.TEXT_GENERATION,
+                adapter_kind=ProviderAdapterKind.FAKE,
+                provider_key="fake-text",
+                display_name="Fake Text",
+            )
+        )
+        health_service = ProviderHealthService(session)
+        dirty = health_service.record_health_check(
+            provider.id,
+            status=ProviderHealthStatus.UNHEALTHY,
+            error_text=dirty_error,
+            metadata_json={"status": "failed"},
+        )
+        safe = health_service.record_health_check(
+            provider.id,
+            status=ProviderHealthStatus.UNHEALTHY,
+            error_text="provider integration is disabled",
+            metadata_json={"status": "failed"},
+        )
+        session.commit()
+
+    assert dirty.error_text == "[REDACTED]"
+    assert safe.error_text == "provider integration is disabled"
+
+
 def test_registry_rejects_incompatible_adapter_kind() -> None:
     engine = _engine()
     world_id = _seed_world(engine)
@@ -210,6 +251,7 @@ def _engine() -> Engine:
     )
     for table in (
         cast(Table, User.__table__),
+        cast(Table, MemoryBackendProfile.__table__),
         cast(Table, World.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, ProviderCapability.__table__),

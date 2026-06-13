@@ -9,6 +9,12 @@ The system SHALL create model_invocations and prompt_snapshots for provider-back
 - **THEN** a failed invocation record SHALL exist
 - **AND** prompt snapshot evidence SHALL be safe and redacted.
 
+#### Scenario: Provider diagnostic error text redacts sensitive values
+- **GIVEN** provider health checks, smoke tests, test invocations, or provider execution failures record diagnostic error text
+- **WHEN** the error text contains resolved provider secrets, authorization headers, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence
+- **THEN** persisted health checks, invocation failure text, and provider API responses SHALL use safe redacted text instead of preserving the forbidden value
+- **AND** safe business errors such as disabled provider, quota limit, or validation names MAY remain visible.
+
 #### Scenario: Legacy provider profile execution is controlled
 - **GIVEN** a legacy provider profile path can trigger model-provider plugins or upstream HTTP providers
 - **WHEN** an operator, runtime loop, agent run, conversation advance, or narrative generation uses that path
