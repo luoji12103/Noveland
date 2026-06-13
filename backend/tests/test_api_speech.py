@@ -220,6 +220,80 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
         assert session.scalars(select(MemoryWriteJob)).all() == []
 
 
+def test_speech_api_rejects_restricted_provider_execution_for_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    platform_id, _platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _agent_id, conversation_id, turn_id = _seed_agent_and_conversation(
+        engine,
+        world_id,
+        worldline_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, platform_id, AuthRole.WORLD_ADMIN)
+    tts_provider_id = _seed_provider(
+        engine,
+        world_id,
+        provider_kind="text_to_speech",
+        provider_key="platform-tts",
+        capabilities=("supports_tts",),
+        scope_kind="global",
+        visibility="developer_only",
+    )
+    stt_provider_id = _seed_provider(
+        engine,
+        world_id,
+        provider_kind="speech_to_text",
+        provider_key="platform-stt",
+        capabilities=("supports_stt",),
+        scope_kind="global",
+        visibility="developer_only",
+    )
+    source_asset_id = _seed_audio_asset(
+        engine,
+        client.speech_storage,
+        world_id,
+        worldline_id,
+        role="transcript_audio",
+    )
+
+    _authenticate(client, owner_token)
+    hidden_detail = client.get(f"/worlds/{world_id}/providers/{tts_provider_id}")
+    tts = client.post(
+        f"/worlds/{world_id}/speech/tts",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(tts_provider_id),
+            "text": "hello",
+        },
+    )
+    stt = client.post(
+        f"/worlds/{world_id}/speech/stt",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(stt_provider_id),
+            "source_asset_id": str(source_asset_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+        },
+    )
+
+    assert hidden_detail.status_code == 404
+    assert tts.status_code == 422
+    assert stt.status_code == 422
+    with Session(engine) as session:
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(ModelInvocation)).all() == []
+        assert session.scalars(select(PromptSnapshot)).all() == []
+        assert session.scalars(select(SpeechTranscript)).all() == []
+
+
 def test_speech_lists_reject_cross_worldline_requests() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "speech-owner@example.test")
@@ -531,15 +605,17 @@ def _seed_provider(
     provider_kind: str,
     provider_key: str,
     capabilities: tuple[str, ...],
+    scope_kind: str = "world",
+    visibility: str = "world_admin",
 ) -> uuid.UUID:
     provider_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ProviderIntegration(
                 id=provider_id,
-                world_id=world_id,
-                scope_kind="world",
-                scope_key=f"world:{world_id}",
+                world_id=None if scope_kind == "global" else world_id,
+                scope_kind=scope_kind,
+                scope_key="global" if scope_kind == "global" else f"world:{world_id}",
                 provider_kind=provider_kind,
                 adapter_kind="fake",
                 provider_key=provider_key,
@@ -547,7 +623,7 @@ def _seed_provider(
                 config_json={},
                 default_params_json={},
                 status="active",
-                visibility="world_admin",
+                visibility=visibility,
             )
         )
         for capability_key in capabilities:

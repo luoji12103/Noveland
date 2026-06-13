@@ -384,7 +384,7 @@ def delete_agent_voice_profile_binding(
 def text_to_speech(
     world_id: uuid.UUID,
     request: TTSRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_speech_storage)],
@@ -394,6 +394,7 @@ def text_to_speech(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return _safe_tts_result(result)
     except (
@@ -416,7 +417,7 @@ def text_to_speech(
 def speech_to_text(
     world_id: uuid.UUID,
     request: STTRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_speech_storage)],
@@ -426,6 +427,7 @@ def speech_to_text(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return _safe_stt_result(result)
     except (

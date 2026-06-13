@@ -56,10 +56,20 @@ class SpeechService:
         request: TTSRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> TTSResult:
         worldline_id = self._worldline_id(world_id, request.worldline_id)
-        provider = self._provider_required(world_id, request.provider_id)
-        self._require_capability(world_id, request.provider_id, "supports_tts")
+        provider = self._provider_required(
+            world_id,
+            request.provider_id,
+            platform_admin=platform_admin,
+        )
+        self._require_capability(
+            world_id,
+            request.provider_id,
+            "supports_tts",
+            platform_admin=platform_admin,
+        )
         voice_profile, binding_overrides = self._resolve_voice_profile(
             world_id,
             worldline_id,
@@ -108,6 +118,7 @@ class SpeechService:
                 media_job_id=job.id,
                 player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         if result.media_job is None or result.output_asset is None:
@@ -138,10 +149,20 @@ class SpeechService:
         request: STTRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> STTResult:
         worldline_id = self._worldline_id(world_id, request.worldline_id)
-        provider = self._provider_required(world_id, request.provider_id)
-        self._require_capability(world_id, request.provider_id, "supports_stt")
+        provider = self._provider_required(
+            world_id,
+            request.provider_id,
+            platform_admin=platform_admin,
+        )
+        self._require_capability(
+            world_id,
+            request.provider_id,
+            "supports_stt",
+            platform_admin=platform_admin,
+        )
         self._validate_turn_refs(world_id, worldline_id, request.conversation_id, request.turn_id)
         self._source_audio_required(world_id, worldline_id, request.source_asset_id)
         job = MediaJobService(self._session).create_job(
@@ -181,6 +202,7 @@ class SpeechService:
                 media_asset_id=request.source_asset_id,
                 player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         transcript = SpeechTranscriptService(self._session).create_transcript(
@@ -318,12 +340,14 @@ class SpeechService:
         self,
         world_id: uuid.UUID,
         provider_id: uuid.UUID,
+        *,
+        platform_admin: bool,
     ) -> ProviderIntegrationRead:
         provider = ProviderRegistryService(self._session).get_provider(
             world_id,
             provider_id,
-            platform_admin=True,
-            include_hidden=True,
+            platform_admin=platform_admin,
+            include_hidden=platform_admin,
         )
         if provider is None:
             raise ProviderValidationError("provider integration not found")
@@ -334,11 +358,13 @@ class SpeechService:
         world_id: uuid.UUID,
         provider_id: uuid.UUID,
         capability_key: str,
+        *,
+        platform_admin: bool,
     ) -> None:
         capabilities = ProviderRegistryService(self._session).list_capabilities(
             world_id,
             provider_id,
-            platform_admin=True,
+            platform_admin=platform_admin,
         )
         if not _capability_true(capabilities, capability_key):
             raise SpeechValidationError(f"provider does not support {capability_key}")

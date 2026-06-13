@@ -56,6 +56,7 @@ class ImageService:
         request: ImageGenerateRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> ImageResult:
         worldline_id = self._worldline_id(world_id, request.worldline_id)
         self._validate_provider_capability(
@@ -63,6 +64,7 @@ class ImageService:
             request.provider_id,
             required_capability="supports_image_generation",
             transparent_background=request.transparent_background,
+            platform_admin=platform_admin,
         )
         for asset_id in request.reference_asset_ids:
             self._asset_required(
@@ -86,7 +88,12 @@ class ImageService:
             },
             actor_ref=actor_ref,
         )
-        provider_kind = _provider_kind_for_generation(world_id, request.provider_id, self._session)
+        provider_kind = _provider_kind_for_generation(
+            world_id,
+            request.provider_id,
+            self._session,
+            platform_admin=platform_admin,
+        )
         result = ProviderExecutionService(self._session, self._storage).execute(
             ProviderExecutionRequest(
                 world_id=world_id,
@@ -107,6 +114,7 @@ class ImageService:
                 media_job_id=job.id,
                 player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         if result.media_job is None or result.output_asset is None:
@@ -137,6 +145,7 @@ class ImageService:
         request: ImageEditRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> ImageResult:
         worldline_id = self._worldline_id(world_id, request.worldline_id)
         self._validate_provider_capability(
@@ -144,6 +153,7 @@ class ImageService:
             request.provider_id,
             required_capability="supports_image_edit",
             transparent_background=request.transparent_background,
+            platform_admin=platform_admin,
         )
         for asset_id in request.input_asset_ids:
             self._asset_required(
@@ -173,7 +183,12 @@ class ImageService:
             },
             actor_ref=actor_ref,
         )
-        provider_kind = _provider_kind_for_edit(world_id, request.provider_id, self._session)
+        provider_kind = _provider_kind_for_edit(
+            world_id,
+            request.provider_id,
+            self._session,
+            platform_admin=platform_admin,
+        )
         result = ProviderExecutionService(self._session, self._storage).execute(
             ProviderExecutionRequest(
                 world_id=world_id,
@@ -196,6 +211,7 @@ class ImageService:
                 media_job_id=job.id,
                 player_actor_id=request.player_actor_id,
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         if result.media_job is None or result.output_asset is None:
@@ -357,17 +373,22 @@ class ImageService:
         *,
         required_capability: str,
         transparent_background: TransparentBackgroundPreference,
+        platform_admin: bool,
     ) -> None:
         registry = ProviderRegistryService(self._session)
         provider = registry.get_provider(
             world_id,
             provider_id,
-            platform_admin=True,
-            include_hidden=True,
+            platform_admin=platform_admin,
+            include_hidden=platform_admin,
         )
         if provider is None:
             raise ProviderValidationError("provider integration not found")
-        capabilities = registry.list_capabilities(world_id, provider_id, platform_admin=True)
+        capabilities = registry.list_capabilities(
+            world_id,
+            provider_id,
+            platform_admin=platform_admin,
+        )
         if not _capability_true(capabilities, required_capability):
             raise MediaValidationError(f"provider does not support {required_capability}")
         if (
@@ -482,12 +503,14 @@ def _provider_kind_for_generation(
     world_id: uuid.UUID,
     provider_id: uuid.UUID,
     session: Session,
+    *,
+    platform_admin: bool,
 ) -> ProviderKind:
     provider = ProviderRegistryService(session).get_provider(
         world_id,
         provider_id,
-        platform_admin=True,
-        include_hidden=True,
+        platform_admin=platform_admin,
+        include_hidden=platform_admin,
     )
     if provider is None:
         raise ProviderValidationError("provider integration not found")
@@ -498,12 +521,14 @@ def _provider_kind_for_edit(
     world_id: uuid.UUID,
     provider_id: uuid.UUID,
     session: Session,
+    *,
+    platform_admin: bool,
 ) -> ProviderKind:
     provider = ProviderRegistryService(session).get_provider(
         world_id,
         provider_id,
-        platform_admin=True,
-        include_hidden=True,
+        platform_admin=platform_admin,
+        include_hidden=platform_admin,
     )
     if provider is None:
         raise ProviderValidationError("provider integration not found")

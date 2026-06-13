@@ -523,7 +523,7 @@ def render_speech(
     turn_id: uuid.UUID,
     request: RenderSpeechRequest,
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_presentation_storage)],
 ) -> ConversationTurnPresentationRecord:
@@ -549,6 +549,7 @@ def render_speech(
                 media_job_id=request.media_job_id,
             ),
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return ConversationPresentationService(db_session).apply_speech_result(
             world_id,
@@ -593,7 +594,7 @@ def transcribe_audio(
     turn_id: uuid.UUID,
     request: TranscribeAudioRequest,
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_presentation_storage)],
 ) -> ConversationTurnPresentationRecord:
@@ -613,6 +614,7 @@ def transcribe_audio(
                 speaker_actor_ref=request.speaker_actor_ref,
             ),
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return ConversationPresentationService(db_session).apply_transcript_result(
             world_id,

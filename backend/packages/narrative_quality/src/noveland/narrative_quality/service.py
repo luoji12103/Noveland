@@ -168,6 +168,7 @@ class NarrativeQualityService:
         request: NarrativeQualityGMProposalGenerateRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> NarrativeQualityGMProposalGenerationResult:
         worldline = worldline_or_404(self._session, world_id, request.worldline_id)
         reject_sensitive_config(request.payload_json, field_name="payload_json")
@@ -179,6 +180,7 @@ class NarrativeQualityService:
             world_id,
             provider_id=request.provider_id,
             capability_key=request.capability_key,
+            platform_admin=platform_admin,
         )
         self._validate_text_provider(provider, source="provider-backed GM proposal")
         context_pack = self._context_pack(world_id, worldline.id, request.context_limit)
@@ -205,6 +207,7 @@ class NarrativeQualityService:
                     "narrative_quality_phase": "v0.6.2",
                 },
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         candidate = _candidate_from_provider_output(
@@ -702,6 +705,7 @@ class NarrativeQualityService:
         request: NarrativeQualityWriterGenerateRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> NarrativeQualityWriterGenerationResult:
         worldline = worldline_or_404(self._session, world_id, request.worldline_id)
         reject_sensitive_config(
@@ -712,6 +716,7 @@ class NarrativeQualityService:
             world_id,
             provider_id=request.provider_id,
             capability_key=request.capability_key,
+            platform_admin=platform_admin,
         )
         self._validate_text_provider(provider, source="Narrative Writer v2")
         conversation: ConversationSessionRecord | None = None
@@ -757,6 +762,7 @@ class NarrativeQualityService:
                     "narrative_quality_phase": "v0.6.5",
                 },
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         content = _safe_generated_text(result.output_text, result.output_json)
@@ -2406,6 +2412,7 @@ class NarrativeQualityService:
         *,
         provider_id: uuid.UUID | None,
         capability_key: str | None,
+        platform_admin: bool,
     ) -> ProviderIntegrationRead:
         registry = ProviderRegistryService(self._session)
         try:
@@ -2413,8 +2420,8 @@ class NarrativeQualityService:
                 provider = registry.get_provider(
                     world_id,
                     provider_id,
-                    platform_admin=True,
-                    include_hidden=True,
+                    platform_admin=platform_admin,
+                    include_hidden=platform_admin,
                 )
                 if provider is None:
                     raise ProviderNotFoundError("provider integration not found")
@@ -2423,6 +2430,8 @@ class NarrativeQualityService:
                 world_id,
                 provider_kind=ProviderKind.TEXT_GENERATION,
                 capability_key=capability_key,
+                platform_admin=platform_admin,
+                include_hidden=platform_admin,
             )
         except (ProviderNotFoundError, ProviderValidationError) as exc:
             raise NarrativeQualityValidationError(str(exc)) from exc
