@@ -720,6 +720,14 @@ The system SHALL build browser-side same-origin API request URLs from fixed fron
 - **AND** loaders that convert backend failures into fixed page `loadError` strings SHALL continue to return those fixed strings.
 
 
+#### Scenario: Web server loaders sanitize client component props before serialization
+- **GIVEN** server-side Web loaders aggregate backend workspace data for client components such as the world overview page
+- **WHEN** backend records contain provider secrets, auth tokens, storage refs, filesystem or object-storage paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence in JSON fields, event payloads, diagnostics, release profiles, world bible records, schedules, or other loader result fields
+- **THEN** the loader result SHALL omit forbidden keys and redact forbidden string values before it is passed as React client props
+- **AND** safe sibling fields SHALL be preserved
+- **AND** client display sanitizers MAY remain as a second layer but SHALL NOT be the first boundary preventing forbidden data from entering serialized browser props.
+
+
 #### Scenario: Web API proxies normalize backend JSON error bodies
 - **GIVEN** same-origin Web API proxies relay non-2xx JSON responses from backend API routes to browser clients
 - **WHEN** the response content type is `application/json` or a structured `application/*+json` JSON media type

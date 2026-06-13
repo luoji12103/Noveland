@@ -5020,3 +5020,16 @@
 - Tests added/updated: Added image and speech API regressions proving ordinary world admins cannot execute global developer-only providers hidden from provider detail routes, and that no media jobs, media assets, speech transcripts, model invocations, or prompt snapshots are written for those rejected requests.
 - Verification: Focused F-147 regressions first failed after fixing the test global-provider seed because image generation and speech STT returned 201 for restricted providers, then passed after remediation; affected image/speech/presentation/authoring/narrative-quality suite passed with 132 tests; focused ruff/mypy passed for changed files; full backend ruff, mypy, and pytest passed with 590 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed before the final documentation update.
 - Follow-up notes: Continue auditing remaining provider-backed world-admin text paths and Web server-loader/client-props serialization; visual-generation control plane remains dry-run/control-plane by contract but should stay in the next read-only review pass. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening Web world workspace loader props entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web world workspace server-loader client-prop sanitization for F-148.
+- Finding: F-148 found `web/lib/worlds/server.ts` `getWorldWorkspaceData()` aggregated world, world bible, release profile, event audit, daily-life, offscreen, diagnostics, schedule, and other backend records and returned them directly to `WorldOverview` as client props while `web/features/worlds/world-overview.tsx` only redacted many dirty fields at display/submit time.
+- Summary: Added an architecture-contracts scenario and applied server-side recursive client-prop sanitization to the world workspace loader result. Forbidden keys are omitted and sensitive-looking strings are replaced before serialization, while safe sibling fields and the existing client display/submit sanitizers are preserved.
+- Files changed: web/lib/worlds/server.ts, web/lib/worlds/server.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `sanitizes world workspace data before client prop serialization` in `web/lib/worlds/server.test.ts`, covering world config, world bible, release profile, event audit, daily-life, offscreen, diagnostics, and schedule dirty JSON with safe sibling preservation.
+- Verification: Focused F-148 regression first failed on serialized dirty props, then passed after remediation; `web/lib/worlds/server.test.ts` passed with 4 tests; `web/features/worlds/world-overview.test.tsx` passed with 5 tests; Web lint, typecheck, full Vitest with 53 files and 214 tests, build, next-env, and Playwright e2e with 21 tests passed; final OpenSpec change/changes/specs strict validations and `git diff --check` passed.
+- Follow-up notes: Continue Web server-loader/client-props audit outside the world overview loader, provider/admin data serialization review, and product/spec drift around provider reliability/quota UX and import/export UI scope. Do not push this branch unless the user explicitly asks.

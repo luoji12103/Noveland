@@ -54,6 +54,26 @@ describe("world server admin loaders", () => {
     await expect(getWorldsIndexData()).rejects.toMatchObject({ message: "World request failed.", status: 500 });
   });
 
+  it("sanitizes world workspace data before client prop serialization", async () => {
+    vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (requestUrl: string) => responseForDirtyWorkspaceLoader(requestUrl)),
+    );
+
+    const data = await getWorldWorkspaceData(worldId, true);
+    const serialized = JSON.stringify(data);
+
+    expect(serialized).toContain("safeWorldSetting");
+    expect(serialized).toContain("safeBibleMetadata");
+    expect(serialized).toContain("safeReleaseMetadata");
+    expect(serialized).toContain("safeEvent");
+    expect(serialized).toContain("safeDiagnostic");
+    expect(serialized).not.toMatch(
+      /clientSecret|sk-workspace-secret|storageUri|media:\/\/workspace|rawPrompt|rawOutput|promptSnapshotId|Bearer workspace-token|\/tmp\/workspace|\/root\/workspace|s3:\/\/workspace|YWJjZGVmZ2hpamtsbW5vcA/i,
+    );
+  });
+
   it("encodes reserved characters in admin backend path segments", async () => {
     vi.stubEnv("NOVELAND_API_BASE_URL", apiBase);
     const fetchMock = vi.fn(async (requestUrl: string) => responseFor(requestUrl));
@@ -258,6 +278,90 @@ function responseFor(requestUrl: string): Response {
   }
 
   throw new Error(`Unexpected backend URL: ${requestUrl}`);
+}
+
+function responseForDirtyWorkspaceLoader(requestUrl: string): Response {
+  const url = new URL(requestUrl);
+  const encodedWorld = encodeURIComponent(worldId);
+  const worldPrefix = `/worlds/${encodedWorld}`;
+
+  if (url.pathname === "/worlds") {
+    return jsonResponse([
+      {
+        id: worldId,
+        name: "World",
+        memory_plugin_config: { safeWorldSetting: true, rawPrompt: "system prompt" },
+        world_rules_plugin_config: {
+          safeWorldRules: true,
+          clientSecret: "sk-workspace-secret",
+          nested: { storageUri: "media://workspace/rules" },
+        },
+      },
+    ]);
+  }
+
+  if (!url.pathname.startsWith(worldPrefix)) {
+    return responseForWorkspaceLoader(requestUrl);
+  }
+
+  if (url.pathname.endsWith("/bible")) {
+    return jsonResponse({
+      id: "bible-1",
+      world_id: worldId,
+      canon_timeline: [{ safeBibleEvent: "festival", rawOutput: "model output" }],
+      setting_rules: { safeSetting: "public", filePath: "/tmp/workspace/bible.json" },
+      forbidden_changes: [{ rule: "no retcon", storageUri: "media://workspace/forbidden" }],
+      sequel_boundaries: { safeBoundary: true, bearerToken: "Bearer workspace-token" },
+      continuity_config: { safeContinuity: true, promptSnapshotId: "snapshot-workspace" },
+      metadata: { safeBibleMetadata: true, bytes: "YWJjZGVmZ2hpamtsbW5vcA" },
+    });
+  }
+
+  if (url.pathname.endsWith("/release-profile")) {
+    return jsonResponse({
+      id: "release-1",
+      world_id: worldId,
+      branch_policy: { safeReleaseBranch: true, storageUri: "s3://workspace/release" },
+      backup_policy: { safeBackup: true, rawPrompt: "backup prompt" },
+      content_review_policy: { safeReview: true },
+      player_permission_policy: { safePermission: true, clientSecret: "sk-workspace-secret" },
+      worldline_policy: { safeWorldline: true },
+      checklist: { safeChecklist: true, localModelPath: "/models/workspace.bin" },
+      metadata: { safeReleaseMetadata: true, bearerToken: "Bearer workspace-token" },
+    });
+  }
+
+  if (url.pathname.endsWith("/events")) {
+    return jsonResponse([
+      {
+        id: "event-1",
+        event_type: "world.note",
+        payload: { safeEvent: "visible", rawPrompt: "event prompt", storageUri: "media://workspace/event" },
+      },
+    ]);
+  }
+
+  if (url.pathname.endsWith("/daily-life/preview")) {
+    return jsonResponse({ safePreview: true, diagnostics: { rawOutput: "preview output" } });
+  }
+
+  if (url.pathname.endsWith("/daily-life/candidates")) {
+    return jsonResponse([{ id: "candidate-1", payload: { safeCandidate: true, promptSnapshotId: "snapshot-workspace" } }]);
+  }
+
+  if (url.pathname.endsWith("/offscreen-events")) {
+    return jsonResponse([{ id: "offscreen-1", payload: { safeOffscreen: true, filePath: "/root/workspace/offscreen.json" } }]);
+  }
+
+  if (url.pathname.endsWith("/diagnostics")) {
+    return jsonResponse([{ id: "diagnostic-1", message: "safeDiagnostic", metadata: { clientSecret: "sk-workspace-secret" } }]);
+  }
+
+  if (url.pathname.endsWith("/schedule-rules")) {
+    return jsonResponse([{ id: "schedule-1", config: { safeSchedule: true, rawPrompt: "schedule prompt" } }]);
+  }
+
+  return responseForWorkspaceLoader(requestUrl);
 }
 
 function responseForWorkspaceLoader(requestUrl: string): Response {

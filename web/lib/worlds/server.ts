@@ -783,7 +783,7 @@ export async function getWorldWorkspaceData(
               ),
             )
           ).flatMap((items) => items ?? []);
-    return {
+    return sanitizeWorldWorkspaceData({
       worlds,
       selectedWorld,
       scenes,
@@ -850,7 +850,7 @@ export async function getWorldWorkspaceData(
       canManageSelectedWorld: memberships !== null,
       isPlatformAdmin,
       loadError: null,
-    };
+    });
   } catch (error) {
     if (error instanceof WorldServerError && error.status === 401) {
       throw error;
@@ -2060,12 +2060,132 @@ function queryString(params: Record<string, QueryValue>): string {
   return encoded === "" ? "" : `?${encoded}`;
 }
 
+function sanitizeWorldWorkspaceData(data: WorldWorkspaceData): WorldWorkspaceData {
+  return sanitizeServerClientPropValue(data) as WorldWorkspaceData;
+}
+
+function sanitizeServerClientPropValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeServerClientPropValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !sensitiveServerClientPropKey(key))
+        .map(([key, entry]) => [key, sanitizeServerClientPropValue(entry)]),
+    );
+  }
+  if (typeof value === "string" && looksSensitiveServerClientPropString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_SERVER_CLIENT_PROP_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_SERVER_CLIENT_PROP_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_SERVER_CLIENT_PROP_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_SERVER_CLIENT_PROP_VALUE_PATTERNS = [
+  /(?:media|file|s3|gs):\/\//i,
+  /(^|[\s"=:(])\/(?:root|home|srv|app|workspace|mnt|var|tmp|models)(?:\/|\b)/i,
+  /[A-Za-z]:\\/,
+  /sk-[A-Za-z0-9_-]+/i,
+  /Bearer\s+\S+/i,
+];
+
+function sensitiveServerClientPropKey(key: string): boolean {
+  const normalized = normalizeServerClientPropMarker(key);
+  return (
+    EXACT_SENSITIVE_SERVER_CLIENT_PROP_KEYS.has(normalized) ||
+    SENSITIVE_SERVER_CLIENT_PROP_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveServerClientPropString(value: string): boolean {
+  const normalized = normalizeServerClientPropMarker(value);
+  return (
+    SENSITIVE_SERVER_CLIENT_PROP_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    SENSITIVE_SERVER_CLIENT_PROP_VALUE_PATTERNS.some((pattern) => pattern.test(value)) ||
+    containsBase64LikeServerClientPropToken(value)
+  );
+}
+
+function containsBase64LikeServerClientPropToken(value: string): boolean {
+  return value.split(/\s+/).some((part) => {
+    const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+    return (
+      normalized.length >= 24 &&
+      normalized.length % 4 === 0 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+      !/^[a-f0-9]{32,}$/i.test(normalized)
+    );
+  });
+}
+
+function normalizeServerClientPropMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function emptyWorldWorkspaceData(
   worlds: World[],
   loadError: string,
   isPlatformAdmin: boolean,
 ): WorldWorkspaceData {
-  return {
+  return sanitizeWorldWorkspaceData({
     worlds,
     selectedWorld: null,
     scenes: [],
@@ -2130,7 +2250,7 @@ function emptyWorldWorkspaceData(
     canManageSelectedWorld: false,
     isPlatformAdmin,
     loadError,
-  };
+  });
 }
 
 function emptyNarrativeReaderListData(
