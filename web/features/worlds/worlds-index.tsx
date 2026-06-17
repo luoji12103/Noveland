@@ -35,7 +35,7 @@ export function WorldsIndex({ worlds, canCreateWorld }: WorldsIndexProps) {
         description: optionalFormString(form, "description"),
       });
       formElement.reset();
-      window.location.assign(`/worlds/${world.id}`);
+      window.location.assign(`/worlds/${encodeURIComponent(world.id)}`);
     } catch (error) {
       setNotice(messageForError(error));
     } finally {
@@ -86,7 +86,7 @@ export function WorldsIndex({ worlds, canCreateWorld }: WorldsIndexProps) {
                   <p>{world.description ?? "No description."}</p>
                 </div>
                 <div className="button-row">
-                  <Link className="secondary-button" href={`/worlds/${world.id}`}>
+                  <Link className="secondary-button" href={`/worlds/${encodeURIComponent(world.id)}`}>
                     Open workspace
                   </Link>
                 </div>

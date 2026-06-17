@@ -79,7 +79,7 @@ import {
   upsertMembership,
   validateWorldComposition,
 } from "@/lib/worlds/client";
-import { subscribeToEventStream } from "@/lib/realtime";
+import { subscribeToEventStream, worldEventStreamPath } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { WorldWorkspaceData } from "@/lib/worlds/server";
 import type {
@@ -197,7 +197,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
       return;
     }
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
-      `/api/worlds/${world.id}/stream`,
+      worldEventStreamPath(world.id),
       (envelope) => {
         if (envelope.payload.clock !== undefined) {
           setClock(envelope.payload.clock);
@@ -246,9 +246,9 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           description: optionalFormString(form, "description"),
           memory_backend_profile_id: optionalFormString(form, "memory_backend_profile_id"),
           memory_plugin_identifier: formString(form, "memory_plugin_identifier"),
-          memory_plugin_config: jsonObject(formString(form, "memory_plugin_config")),
+          memory_plugin_config: worldOverviewJsonObject(formString(form, "memory_plugin_config")),
           world_rules_plugin_identifier: formString(form, "world_rules_plugin_identifier"),
-          world_rules_plugin_config: jsonObject(formString(form, "world_rules_plugin_config")),
+          world_rules_plugin_config: worldOverviewJsonObject(formString(form, "world_rules_plugin_config")),
         }),
       "World saved.",
     );
@@ -1141,13 +1141,13 @@ export function WorldOverview({ data }: WorldOverviewProps) {
         await upsertReleaseProfile(selectedWorld.id, {
           profile_key: formString(form, "profile_key"),
           status: formString(form, "status") as "draft",
-          branch_policy: jsonObject(formString(form, "branch_policy")),
-          backup_policy: jsonObject(formString(form, "backup_policy")),
-          content_review_policy: jsonObject(formString(form, "content_review_policy")),
-          player_permission_policy: jsonObject(formString(form, "player_permission_policy")),
-          worldline_policy: jsonObject(formString(form, "worldline_policy")),
-          checklist: jsonObject(formString(form, "checklist")),
-          metadata: jsonObject(formString(form, "metadata")),
+          branch_policy: worldOverviewJsonObject(formString(form, "branch_policy")),
+          backup_policy: worldOverviewJsonObject(formString(form, "backup_policy")),
+          content_review_policy: worldOverviewJsonObject(formString(form, "content_review_policy")),
+          player_permission_policy: worldOverviewJsonObject(formString(form, "player_permission_policy")),
+          worldline_policy: worldOverviewJsonObject(formString(form, "worldline_policy")),
+          checklist: worldOverviewJsonObject(formString(form, "checklist")),
+          metadata: worldOverviewJsonObject(formString(form, "metadata")),
         });
         formElement.reset();
       },
@@ -1179,12 +1179,12 @@ export function WorldOverview({ data }: WorldOverviewProps) {
       () =>
         upsertWorldBible(selectedWorld.id, {
           source_material: formString(form, "source_material"),
-          canon_timeline: jsonObjectArray(formString(form, "canon_timeline")),
-          setting_rules: jsonObject(formString(form, "setting_rules")),
-          forbidden_changes: jsonObjectArray(formString(form, "forbidden_changes")),
-          sequel_boundaries: jsonObject(formString(form, "sequel_boundaries")),
-          continuity_config: jsonObject(formString(form, "continuity_config")),
-          metadata: jsonObject(formString(form, "metadata")),
+          canon_timeline: worldOverviewJsonObjectArray(formString(form, "canon_timeline")),
+          setting_rules: worldOverviewJsonObject(formString(form, "setting_rules")),
+          forbidden_changes: worldOverviewJsonObjectArray(formString(form, "forbidden_changes")),
+          sequel_boundaries: worldOverviewJsonObject(formString(form, "sequel_boundaries")),
+          continuity_config: worldOverviewJsonObject(formString(form, "continuity_config")),
+          metadata: worldOverviewJsonObject(formString(form, "metadata")),
         }),
       "World bible saved.",
     );
@@ -1358,10 +1358,10 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           rules_config:
             optionalFormString(form, "rules_config") === null
               ? undefined
-              : jsonObject(formString(form, "rules_config")),
+              : worldOverviewJsonObject(formString(form, "rules_config")),
           composition: JSON.parse(formString(form, "composition")),
         });
-        window.location.assign(`/worlds/${importedWorld.id}`);
+        window.location.assign(`/worlds/${encodeURIComponent(importedWorld.id)}`);
       },
       "Composition imported.",
       false,
@@ -1382,7 +1382,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
             rules_config:
               optionalFormString(form, "rules_config") === null
                 ? undefined
-                : jsonObject(formString(form, "rules_config")),
+                : worldOverviewJsonObject(formString(form, "rules_config")),
             composition: JSON.parse(formString(form, "composition")),
           }),
         );
@@ -1489,7 +1489,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               className="text-input"
               name="memory_plugin_config"
               rows={3}
-              defaultValue={JSON.stringify(world.memory_plugin_config, null, 2)}
+              defaultValue={worldOverviewJsonString(world.memory_plugin_config)}
               placeholder="Memory plugin config"
             />
             <select
@@ -1508,7 +1508,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               className="text-input"
               name="world_rules_plugin_config"
               rows={3}
-              defaultValue={JSON.stringify(world.world_rules_plugin_config, null, 2)}
+              defaultValue={worldOverviewJsonString(world.world_rules_plugin_config)}
               placeholder="World rules plugin config"
             />
             <button className="primary-button" type="submit" disabled={isBusy}>
@@ -1556,46 +1556,42 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               className="text-input"
               name="canon_timeline"
               rows={4}
-              defaultValue={JSON.stringify(data.worldBible?.canon_timeline ?? [], null, 2)}
+              defaultValue={worldOverviewJsonString(data.worldBible?.canon_timeline ?? [])}
               placeholder="[]"
             />
             <textarea
               className="text-input"
               name="setting_rules"
               rows={4}
-              defaultValue={JSON.stringify(data.worldBible?.setting_rules ?? {}, null, 2)}
+              defaultValue={worldOverviewJsonString(data.worldBible?.setting_rules ?? {})}
               placeholder="{}"
             />
             <textarea
               className="text-input"
               name="forbidden_changes"
               rows={4}
-              defaultValue={JSON.stringify(data.worldBible?.forbidden_changes ?? [], null, 2)}
+              defaultValue={worldOverviewJsonString(data.worldBible?.forbidden_changes ?? [])}
               placeholder="[]"
             />
             <textarea
               className="text-input"
               name="sequel_boundaries"
               rows={4}
-              defaultValue={JSON.stringify(data.worldBible?.sequel_boundaries ?? {}, null, 2)}
+              defaultValue={worldOverviewJsonString(data.worldBible?.sequel_boundaries ?? {})}
               placeholder="{}"
             />
             <textarea
               className="text-input"
               name="continuity_config"
               rows={4}
-              defaultValue={JSON.stringify(
-                data.worldBible?.continuity_config ?? { status: "post_canon" },
-                null,
-                2,
-              )}
+              defaultValue={worldOverviewJsonString(data.worldBible?.continuity_config ?? { status: "post_canon" })}
               placeholder='{"status":"post_canon"}'
             />
             <textarea
               className="text-input"
               name="metadata"
               rows={3}
-              defaultValue={JSON.stringify(data.worldBible?.metadata ?? {}, null, 2)}
+              defaultValue={worldOverviewJsonString(data.worldBible?.metadata ?? {})}
               placeholder="{}"
             />
             <button className="primary-button" type="submit" disabled={isBusy}>
@@ -2979,65 +2975,43 @@ export function WorldOverview({ data }: WorldOverviewProps) {
                   className="text-input"
                   name="branch_policy"
                   rows={3}
-                  defaultValue={JSON.stringify(
-                    data.releaseProfile?.branch_policy ?? { worldlines: "review forks before publish" },
-                    null,
-                    2,
-                  )}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.branch_policy ?? { worldlines: "review forks before publish" })}
                 />
                 <textarea
                   className="text-input"
                   name="backup_policy"
                   rows={3}
-                  defaultValue={JSON.stringify(
-                    data.releaseProfile?.backup_policy ?? { snapshots: "before beta run" },
-                    null,
-                    2,
-                  )}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.backup_policy ?? { snapshots: "before beta run" })}
                 />
                 <textarea
                   className="text-input"
                   name="content_review_policy"
                   rows={3}
-                  defaultValue={JSON.stringify(
-                    data.releaseProfile?.content_review_policy ?? {
-                      continuity_review: "warnings reviewed",
-                    },
-                    null,
-                    2,
-                  )}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.content_review_policy ?? { continuity_review: "warnings reviewed" })}
                 />
                 <textarea
                   className="text-input"
                   name="player_permission_policy"
                   rows={3}
-                  defaultValue={JSON.stringify(
-                    data.releaseProfile?.player_permission_policy ?? { beta_players: "invited" },
-                    null,
-                    2,
-                  )}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.player_permission_policy ?? { beta_players: "invited" })}
                 />
                 <textarea
                   className="text-input"
                   name="worldline_policy"
                   rows={3}
-                  defaultValue={JSON.stringify(
-                    data.releaseProfile?.worldline_policy ?? { branching: "enabled" },
-                    null,
-                    2,
-                  )}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.worldline_policy ?? { branching: "enabled" })}
                 />
                 <textarea
                   className="text-input"
                   name="checklist"
                   rows={3}
-                  defaultValue={JSON.stringify(data.releaseProfile?.checklist ?? {}, null, 2)}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.checklist ?? {})}
                 />
                 <textarea
                   className="text-input"
                   name="metadata"
                   rows={3}
-                  defaultValue={JSON.stringify(data.releaseProfile?.metadata ?? {}, null, 2)}
+                  defaultValue={worldOverviewJsonString(data.releaseProfile?.metadata ?? {})}
                 />
                 <button className="secondary-button" type="submit" disabled={isBusy}>
                   Save release profile
@@ -3382,16 +3356,16 @@ export function WorldOverview({ data }: WorldOverviewProps) {
           Workspace pages
         </h2>
         <div className="button-row">
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/agents`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/agents`}>
             Build agents
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/conversations`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/conversations`}>
             Open conversations
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/narrative`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/narrative`}>
             Narrative artifacts
           </Link>
-          <Link className="secondary-button" href={`/worlds/${selectedWorld.id}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(selectedWorld.id)}/reader`}>
             Reader
           </Link>
         </div>
@@ -3490,7 +3464,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               className="text-input"
               name="rules_config"
               rows={3}
-              defaultValue={JSON.stringify(selectedWorld.rules_config, null, 2)}
+              defaultValue={worldOverviewJsonString(selectedWorld.rules_config)}
             />
             <textarea
               className="text-input"
@@ -3537,7 +3511,7 @@ export function WorldOverview({ data }: WorldOverviewProps) {
               className="text-input"
               name="rules_config"
               rows={3}
-              defaultValue={JSON.stringify(selectedWorld.rules_config, null, 2)}
+              defaultValue={worldOverviewJsonString(selectedWorld.rules_config)}
             />
             <textarea
               className="text-input"
@@ -3606,6 +3580,133 @@ function signedInteger(form: FormData, key: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+
+function worldOverviewJsonString(value: unknown): string {
+  return JSON.stringify(sanitizeWorldOverviewJsonValue(value), null, 2);
+}
+
+function worldOverviewJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizeWorldOverviewJsonObject(jsonObject(rawValue));
+}
+
+function worldOverviewJsonObjectArray(rawValue: string): Record<string, unknown>[] {
+  return jsonObjectArray(rawValue).map((entry) => sanitizeWorldOverviewJsonObject(entry));
+}
+
+function sanitizeWorldOverviewJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveWorldOverviewJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeWorldOverviewJsonValue(entry)]),
+  );
+}
+
+function sanitizeWorldOverviewJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeWorldOverviewJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeWorldOverviewJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveWorldOverviewString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_WORLD_OVERVIEW_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_WORLD_OVERVIEW_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_WORLD_OVERVIEW_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveWorldOverviewJsonKey(key: string): boolean {
+  const normalized = normalizeWorldOverviewMarker(key);
+  return (
+    EXACT_SENSITIVE_WORLD_OVERVIEW_JSON_KEYS.has(normalized) ||
+    SENSITIVE_WORLD_OVERVIEW_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveWorldOverviewString(value: string): boolean {
+  const normalized = normalizeWorldOverviewMarker(value);
+  return (
+    SENSITIVE_WORLD_OVERVIEW_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeWorldOverviewToken(value)
+  );
+}
+
+function containsBase64LikeWorldOverviewToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 24 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeWorldOverviewMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function selectedValues(form: FormData, key: string): string[] {
   return form
     .getAll(key)
@@ -3621,7 +3722,7 @@ function commaList(value: string): string[] {
 }
 
 function formatPayload(event: WorldEventAuditEntry): string {
-  const payload = JSON.stringify(event.payload);
+  const payload = JSON.stringify(sanitizeWorldOverviewJsonValue(event.payload));
   if (payload.length <= 160) {
     return payload;
   }

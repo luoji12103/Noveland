@@ -15,7 +15,7 @@ from noveland.core.database import import_model_modules
 from noveland.events.models import WorldEventModel
 from noveland.player_privacy.models import PlayerPrivacyRequest
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.worlds.models import (
     InWorldNotification,
@@ -41,6 +41,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer_token",
     "authorization",
@@ -61,8 +65,27 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     _seed_player_records(engine, world_id, worldline_id, member_id)
     _seed_player_records(engine, world_id, worldline_id, other_id, choice_key="other-choice")
+    with Session(engine) as session:
+        member = session.get(User, member_id)
+        assert member is not None
+        member.display_name = "Member raw_prompt display"
+        actor = session.scalars(
+            select(PlayerActorProfile).where(
+                PlayerActorProfile.world_id == world_id,
+                PlayerActorProfile.worldline_id == worldline_id,
+                PlayerActorProfile.user_id == member_id,
+            )
+        ).one()
+        actor.display_name = "Player storage_uri media://private/actor"
+        session.commit()
 
     unauthenticated = client.get(f"/worlds/{world_id}/player/privacy/export")
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_export_request = client.post(
+        f"/worlds/{world_id}/player/privacy/export",
+        json={"worldline_id": str(worldline_id)},
+    )
+
     _authenticate(client, member_token)
     export_response = client.get(
         f"/worlds/{world_id}/player/privacy/export",
@@ -80,9 +103,12 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
     )
 
     assert unauthenticated.status_code == 401
+    assert missing_csrf_export_request.status_code == 403
     assert export_response.status_code == 200
     export = export_response.json()
     assert export["profile"]["email"] == "member@example.test"
+    assert export["profile"]["display_name"] == "[REDACTED]"
+    assert export["player_actors"][0]["display_name"] == "[REDACTED]"
     assert export["counts"] == {
         "player_actors": 1,
         "choices": 1,
@@ -92,9 +118,16 @@ def test_player_privacy_export_is_player_scoped_and_redacted() -> None:
         "conversation_references": 1,
     }
     assert export["choices"][0]["choice_key"] == "member-choice"
+    assert export["player_actors"][0]["profile"]["safe_label"] == "visible"
+    assert "hidden profile prompt" not in str(export).lower()
+    assert export["choices"][0]["applied_event_id"] is None
     assert "prompt" not in export["choices"][0]
     assert "context" not in export["choices"][0]
     assert "consequence_preview" not in export["choices"][0]
+    assert export["journal_entries"][0]["source_ref"] is None
+    assert export["notifications"][0]["source_ref"] is None
+    assert export["interventions"][0]["choice_id"] is None
+    assert export["interventions"][0]["event_id"] is None
     assert export_request_response.status_code == 200
     assert export_request_response.json()["request_id"] is not None
     assert other_export_response.status_code == 200
@@ -121,6 +154,16 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     _seed_player_records(engine, world_id, worldline_id, member_id)
 
     before_events = _count_rows(engine, WorldEventModel)
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_delete_request = client.post(
+        f"/worlds/{world_id}/player/privacy/delete-requests",
+        json={
+            "worldline_id": str(worldline_id),
+            "target_ref_kind": "all_player_data",
+            "reason": "CSRF must be present.",
+        },
+    )
+
     _authenticate(client, member_token)
     created = client.post(
         f"/worlds/{world_id}/player/privacy/delete-requests",
@@ -145,6 +188,12 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     _authenticate(client, other_token)
     other_list = client.get(f"/worlds/{world_id}/player/privacy/requests")
 
+    _authenticate_without_csrf(client, admin_token)
+    missing_csrf_review = client.patch(
+        f"/worlds/{world_id}/player/privacy/requests/{created.json()['id']}",
+        json={"status": "under_review", "review_note": "missing csrf"},
+    )
+
     _authenticate(client, admin_token)
     admin_list = client.get(f"/worlds/{world_id}/player/privacy/requests")
     reviewed = client.patch(
@@ -156,6 +205,7 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
         json={"status": "completed", "review_note": "Should not complete deletion."},
     )
 
+    assert missing_csrf_delete_request.status_code == 403
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "requested"
@@ -166,6 +216,7 @@ def test_delete_request_is_reviewable_and_does_not_mutate_shared_history() -> No
     assert other_list.status_code == 200
     assert other_list.json() == []
     assert admin_list.status_code == 200
+    assert missing_csrf_review.status_code == 403
     assert [item["id"] for item in admin_list.json()] == [body["id"]]
     assert reviewed.status_code == 200
     assert reviewed.json()["status"] == "under_review"
@@ -189,8 +240,13 @@ def test_player_privacy_rejects_cross_worldline_requests() -> None:
         f"/worlds/{world_id}/player/privacy/export",
         params={"worldline_id": str(other_worldline_id)},
     )
+    request_list = client.get(
+        f"/worlds/{world_id}/player/privacy/requests",
+        params={"worldline_id": str(other_worldline_id)},
+    )
 
     assert response.status_code == 404
+    assert request_list.status_code == 404
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:
@@ -364,7 +420,15 @@ def _seed_player_records(
                 actor_ref=f"player:{user_id}:primary",
                 display_name=f"Player {user_id}",
                 current_scene_id=None,
-                profile_json={"redacted_test": {"storage_uri": "media://private-object"}},
+                profile_json={
+                    "safe_label": "visible",
+                    "rawPrompt": "hidden profile prompt",
+                    "promptSnapshotId": str(uuid.uuid4()),
+                    "redacted_test": {
+                        "storage_uri": "media://private-object",
+                        "storageUri": "opaque-profile-storage",
+                    },
+                },
                 is_active=True,
             )
         )
@@ -381,6 +445,7 @@ def _seed_player_records(
                 selected_option="Stay after school.",
                 context_json={"raw_prompt": "internal context"},
                 consequence_preview={"raw_output": "internal consequence"},
+                applied_event_id=uuid.uuid4(),
             )
         )
         session.add(
@@ -409,7 +474,7 @@ def _seed_player_records(
                 title="Club room notice",
                 body="Someone mentioned the letter.",
                 source_event_id=None,
-                source_ref=None,
+                source_ref=str(choice_id),
                 status="unread",
                 metadata_json={"secret": "private"},
             )
@@ -426,7 +491,7 @@ def _seed_player_records(
                 target_scene_id=None,
                 prompt="Raw intervention prompt should not export.",
                 choice_id=choice_id,
-                event_id=None,
+                event_id=uuid.uuid4(),
                 status="recorded",
                 metadata_json={},
                 created_at=now,
@@ -437,6 +502,16 @@ def _seed_player_records(
 
 
 def _authenticate(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_without_csrf(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)
 
 

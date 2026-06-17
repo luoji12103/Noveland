@@ -79,15 +79,22 @@ def test_lower_privilege_admin_surfaces_remain_denied_without_forbidden_tokens()
             {"worldline_id": str(worldline_id)},
         ),
         ("GET", f"/worlds/{world_id}/asset-generation/policies", None),
-        (
-            "GET",
-            f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation",
-            None,
-        ),
     ]
 
     for method, path, params in member_routes:
         response = client.request(method, path, params=params)
+        assert response.status_code == 403, path
+        assert_no_forbidden_tokens(response.text)
+
+    presentation_path = (
+        f"/worlds/{world_id}/conversations/{conversation_id}/turns/{turn_id}/presentation"
+    )
+    for method, path, body in (
+        ("PUT", presentation_path, {"emotion_key": "happy"}),
+        ("PATCH", presentation_path, {"emotion_key": "happy"}),
+        ("POST", f"{presentation_path}/render-visual", {"location_key": "classroom"}),
+    ):
+        response = client.request(method, path, json=body)
         assert response.status_code == 403, path
         assert_no_forbidden_tokens(response.text)
 

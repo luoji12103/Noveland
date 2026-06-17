@@ -1,14 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const replaceMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/worlds/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/worlds/client")>("@/lib/worlds/client");
   return {
     ...actual,
+    createWorld: vi.fn(),
+    getLatestSnapshot: vi.fn(),
+    getReplayState: vi.fn(),
+    getWorldClock: vi.fn(),
+    listAgentCalendar: vi.fn(),
     listAgentMemory: vi.fn(),
     listAgentObservations: vi.fn(),
+    listAgentRuns: vi.fn(),
+    listAgents: vi.fn(),
+    listMemberships: vi.fn(),
     listWorldDiagnostics: vi.fn(),
     listNarrativeArtifacts: vi.fn(),
+    listScheduleRules: vi.fn(),
+    listScenes: vi.fn(),
     runAgent: vi.fn(),
   };
 });
@@ -16,16 +28,24 @@ vi.mock("@/lib/worlds/client", async () => {
 import { WorldManagementDashboard } from "@/features/dashboard/world-management-dashboard";
 import type { AuthSubject } from "@/lib/auth/types";
 import {
+  createWorld,
+  getLatestSnapshot,
+  getReplayState,
+  getWorldClock,
   listAgentMemory,
   listAgentObservations,
+  listAgents,
+  listMemberships,
   listNarrativeArtifacts,
+  listScheduleRules,
+  listScenes,
   listWorldDiagnostics,
   runAgent,
 } from "@/lib/worlds/client";
 import type { WorldDashboardData } from "@/lib/worlds/types";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: replaceMock }),
 }));
 
 describe("WorldManagementDashboard", () => {
@@ -64,6 +84,95 @@ describe("WorldManagementDashboard", () => {
     expect(screen.getByRole("heading", { name: "Owner" })).toBeInTheDocument();
   });
 
+  it("redacts sensitive dashboard JSON panels while preserving safe config", () => {
+    const dirtyData: WorldDashboardData = {
+      ...adminDataWithAgent,
+      agents: [
+        {
+          ...adminDataWithAgent.agents[0],
+          config: {
+            safeMode: true,
+            clientSecret: "sk-dashboard-secret",
+            nested: { endpoint: "/v1/chat/completions", storageUri: "media://dashboard-secret" },
+          },
+        },
+      ],
+      scheduleRules: [
+        {
+          ...adminDataWithAgent.scheduleRules[0],
+          config: { hours: [8], rawPrompt: "system prompt", filePath: "/tmp/dashboard.txt" },
+        },
+      ],
+      providerProfiles: [
+        {
+          ...adminDataWithAgent.providerProfiles[0],
+          capabilities: { chat: true, bearerToken: "Bearer dashboard-token", rawOutput: "model output" },
+        },
+      ],
+      agentPersona: {
+        ...adminDataWithAgent.agentPersona!,
+        behavior_policy: { tone: "direct", promptSnapshotId: "snapshot-1" },
+      },
+    };
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={dirtyData} />);
+
+    expect(screen.getByDisplayValue(/safeMode/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/hours/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/"chat":true/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/tone/)).toBeInTheDocument();
+    expect(
+      screen.queryAllByDisplayValue(
+        /clientSecret|sk-dashboard-secret|storageUri|media:\/\/dashboard-secret|rawPrompt|filePath|\/tmp\/dashboard|bearerToken|Bearer dashboard-token|rawOutput|promptSnapshotId|snapshot-1/i,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("redacts sensitive runtime and provider status text", () => {
+    const dirtyData: WorldDashboardData = {
+      ...adminDataWithAgent,
+      runtimeControl: {
+        ...adminDataWithAgent.runtimeControl!,
+        last_error:
+          "Provider failed after rawPrompt with Bearer dashboard-token and media://dashboard-secret",
+      },
+      providerProfiles: [
+        {
+          ...adminDataWithAgent.providerProfiles[0],
+          last_test_status: "failed",
+          last_tested_at: "2026-04-17T00:06:00.000Z",
+          last_test_error:
+            "Provider test returned rawOutput from /tmp/dashboard-provider with c2VjcmV0LWRhc2hib2FyZA==",
+        },
+      ],
+      runtimeDiagnostics: [
+        {
+          ...adminDataWithAgent.runtimeDiagnostics[0],
+          component: "runtime",
+          event_type: "runtime.rawPrompt",
+          message: "Runtime leaked promptSnapshotId snapshot-1 and sk-dashboard-secret.",
+        },
+      ],
+      worldDiagnostics: [
+        {
+          ...adminDataWithAgent.worldDiagnostics[0],
+          component: "provider",
+          event_type: "provider.rawOutput",
+          message: "World diagnostic contained storageUri media://world-secret.",
+        },
+      ],
+    };
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={dirtyData} />);
+
+    const renderedText = document.body.textContent ?? "";
+    expect(renderedText).not.toMatch(
+      /rawPrompt|rawOutput|promptSnapshotId|storageUri|media:\/\/|Bearer dashboard-token|sk-dashboard-secret|\/tmp\/dashboard-provider|c2VjcmV0LWRhc2hib2FyZA==/i,
+    );
+    expect(renderedText).toContain("[redacted]");
+    expect(screen.getByText(/Last test failed at/)).toBeInTheDocument();
+  });
+
   it("hides management controls for read-only world members", () => {
     render(<WorldManagementDashboard subject={humanUser} initialData={readOnlyData} />);
 
@@ -72,6 +181,77 @@ describe("WorldManagementDashboard", () => {
     expect(screen.queryByRole("button", { name: "Resume clock" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create snapshot" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Home" })).toBeInTheDocument();
+  });
+
+  it("encodes selected world query navigation", async () => {
+    const reservedWorldId = "world/next?tab=admin#frag";
+    vi.mocked(listScenes).mockResolvedValue([]);
+    vi.mocked(listAgents).mockResolvedValue([]);
+    vi.mocked(listMemberships).mockResolvedValue([]);
+    vi.mocked(getWorldClock).mockResolvedValue({
+      ...adminData.clock!,
+      world_id: reservedWorldId,
+    });
+    vi.mocked(getReplayState).mockResolvedValue({
+      ...adminData.replayState!,
+      world_id: reservedWorldId,
+    });
+    vi.mocked(getLatestSnapshot).mockResolvedValue(null);
+    vi.mocked(listScheduleRules).mockResolvedValue([]);
+    vi.mocked(listNarrativeArtifacts).mockResolvedValue([]);
+    vi.mocked(listWorldDiagnostics).mockResolvedValue([]);
+
+    render(
+      <WorldManagementDashboard
+        subject={platformAdmin}
+        initialData={{
+          ...adminData,
+          worlds: [
+            ...adminData.worlds,
+            {
+              ...adminData.worlds[0],
+              id: reservedWorldId,
+              slug: "reserved-world",
+              name: "Reserved World",
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Active world"), { target: { value: reservedWorldId } });
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(`/?world=${encodeURIComponent(reservedWorldId)}`);
+    });
+  });
+
+  it("encodes newly created world query navigation", async () => {
+    const reservedWorldId = "world/new?source=create#frag";
+    vi.mocked(createWorld).mockResolvedValue({
+      ...adminData.worlds[0],
+      id: reservedWorldId,
+      slug: "new-world",
+      name: "New World",
+    });
+    vi.mocked(getWorldClock).mockResolvedValue({
+      ...adminData.clock!,
+      world_id: reservedWorldId,
+    });
+
+    render(<WorldManagementDashboard subject={platformAdmin} initialData={emptyData} />);
+
+    fireEvent.change(screen.getByPlaceholderText("world-slug"), {
+      target: { value: "new-world" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("World name"), {
+      target: { value: "New World" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create world" }));
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith(`/?world=${encodeURIComponent(reservedWorldId)}`);
+    });
   });
 
   it("shows a success notice after running an agent", async () => {

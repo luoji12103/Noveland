@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from noveland.auth import AuthenticatedSubject
+from noveland.auth import AuthenticatedSubject, AuthRole
 from noveland.conversations import (
     ConversationPresentationService,
     ConversationTurnPresentationPatch,
@@ -24,6 +25,7 @@ from noveland.media.service import MediaReferenceService
 from noveland.media.storage import LocalMediaObjectStorage
 from noveland.providers.registry import ProviderNotFoundError, ProviderValidationError
 from noveland.providers.service import ProviderExecutionError
+from noveland.reader_delivery.service import ReaderMediaDeliveryService
 from noveland.services.api.authorization import is_platform_admin
 from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
@@ -31,6 +33,7 @@ from noveland.services.api.dependencies import (
     get_current_subject,
     get_db_session,
     get_world_admin_context,
+    get_world_member_context,
 )
 from noveland.speech.contracts import STTRequest, TTSRequest
 from noveland.speech.service import SpeechService
@@ -138,20 +141,186 @@ def _presentation_storage() -> LocalMediaObjectStorage:
     return LocalMediaObjectStorage(load_settings().object_storage_root / "media")
 
 
+_MEMBER_PRESENTATION_SENSITIVE_KEYS = {
+    "adapter_kind",
+    "api_key",
+    "apikey",
+    "auth_ref",
+    "auth_refs",
+    "authorization",
+    "base64",
+    "bearer_token",
+    "bytes",
+    "client_secret",
+    "compose_media_job_id",
+    "file_path",
+    "filepath",
+    "filesystem_path",
+    "invocation",
+    "invocation_id",
+    "local_path",
+    "media_job",
+    "media_job_id",
+    "model_invocation",
+    "model_invocation_id",
+    "object_path",
+    "password",
+    "path",
+    "private_key",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
+    "provider",
+    "provider_id",
+    "provider_key",
+    "provider_kind",
+    "raw_bytes",
+    "raw_output",
+    "raw_prompt",
+    "resolved_secret",
+    "secret",
+    "secret_ref",
+    "secret_refs",
+    "source_asset_id",
+    "source_media_job_id",
+    "storage_uri",
+    "token",
+    "transcript_id",
+    "tts_media_job_id",
+    "voice_profile_id",
+}
+_MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower())
+    for marker in _MEMBER_PRESENTATION_SENSITIVE_KEYS
+}
+_MEMBER_PRESENTATION_EXACT_KEY_MARKERS = {
+    "base64",
+    "bytes",
+    "invocation",
+    "mediajob",
+    "modelinvocation",
+    "password",
+    "path",
+    "provider",
+    "secret",
+    "token",
+}
+_MEMBER_PRESENTATION_SUBSTRING_KEY_MARKERS = (
+    _MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS - _MEMBER_PRESENTATION_EXACT_KEY_MARKERS
+)
+_MEMBER_PRESENTATION_SENSITIVE_VALUE_RE = re.compile(
+    r"(storage[_ -]?uri|media://|object://|file://|s3://|gs://|/root/|/tmp/|"
+    r"base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|model[_ -]?invocation|"
+    r"media[_ -]?job|file[_ -]?path|filesystem[_ -]?path|object[_ -]?path|"
+    r"provider[_ -]?(kind|key|id)?)",
+    re.IGNORECASE,
+)
+_OMIT_MEMBER_PRESENTATION_VALUE = object()
+
+
+def _presentation_response(
+    record: ConversationTurnPresentationRecord,
+    context: WorldAccessContext,
+    db_session: Session,
+) -> ConversationTurnPresentationRecord:
+    if _include_admin_presentation_fields(context):
+        return record
+    reader_media = ReaderMediaDeliveryService(db_session)
+    return record.model_copy(
+        update={
+            "sprite_set_id": None,
+            "sprite_variant_id": None,
+            "voice_profile_id": None,
+            "tts_media_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.tts_media_asset_id,
+            ),
+            "background_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.background_asset_id,
+            ),
+            "composite_scene_asset_id": _reader_deliverable_asset_id(
+                reader_media,
+                record,
+                record.composite_scene_asset_id,
+            ),
+            "transcript_id": None,
+            "presentation_json": _sanitize_member_presentation_json(record.presentation_json),
+        }
+    )
+
+
+def _include_admin_presentation_fields(context: WorldAccessContext) -> bool:
+    return context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+
+
+def _reader_deliverable_asset_id(
+    reader_media: ReaderMediaDeliveryService,
+    record: ConversationTurnPresentationRecord,
+    asset_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    if asset_id is None:
+        return None
+    descriptor = reader_media.get_media(
+        record.world_id,
+        asset_id,
+        worldline_id=record.worldline_id,
+    )
+    return asset_id if descriptor is not None else None
+
+
+def _sanitize_member_presentation_json(value: Any) -> dict[str, Any]:
+    sanitized = _sanitize_member_presentation_json_value(value)
+    return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _sanitize_member_presentation_json_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for raw_key, item in value.items():
+            key = str(raw_key)
+            if _is_member_presentation_sensitive_key(key):
+                continue
+            clean_item = _sanitize_member_presentation_json_value(item)
+            if clean_item is not _OMIT_MEMBER_PRESENTATION_VALUE:
+                sanitized[key] = clean_item
+        return sanitized
+    if isinstance(value, list | tuple | set):
+        sanitized_list: list[Any] = []
+        for item in value:
+            clean_item = _sanitize_member_presentation_json_value(item)
+            if clean_item is not _OMIT_MEMBER_PRESENTATION_VALUE:
+                sanitized_list.append(clean_item)
+        return sanitized_list
+    if isinstance(value, str) and _MEMBER_PRESENTATION_SENSITIVE_VALUE_RE.search(value):
+        return _OMIT_MEMBER_PRESENTATION_VALUE
+    return value
+
+
+def _is_member_presentation_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in _MEMBER_PRESENTATION_SENSITIVE_KEY_MARKERS or any(
+        marker and marker in normalized for marker in _MEMBER_PRESENTATION_SUBSTRING_KEY_MARKERS
+    )
+
+
 @router.get("", response_model=ConversationTurnPresentationRecord | None)
 def get_presentation(
     world_id: uuid.UUID,
     conversation_id: uuid.UUID,
     turn_id: uuid.UUID,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ConversationTurnPresentationRecord | None:
     try:
-        return ConversationPresentationService(db_session).get_presentation(
+        record = ConversationPresentationService(db_session).get_presentation(
             world_id,
             conversation_id,
             turn_id,
         )
+        return None if record is None else _presentation_response(record, context, db_session)
     except LookupError as exc:
         raise _not_found() from exc
     except ConversationValidationError as exc:
@@ -354,7 +523,7 @@ def render_speech(
     turn_id: uuid.UUID,
     request: RenderSpeechRequest,
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_presentation_storage)],
 ) -> ConversationTurnPresentationRecord:
@@ -380,6 +549,7 @@ def render_speech(
                 media_job_id=request.media_job_id,
             ),
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return ConversationPresentationService(db_session).apply_speech_result(
             world_id,
@@ -424,7 +594,7 @@ def transcribe_audio(
     turn_id: uuid.UUID,
     request: TranscribeAudioRequest,
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_presentation_storage)],
 ) -> ConversationTurnPresentationRecord:
@@ -444,6 +614,7 @@ def transcribe_audio(
                 speaker_actor_ref=request.speaker_actor_ref,
             ),
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
         return ConversationPresentationService(db_session).apply_transcript_result(
             world_id,

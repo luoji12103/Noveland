@@ -595,7 +595,7 @@ def run_provider_smoke_test(
     world_id: uuid.UUID,
     provider_id: uuid.UUID,
     request: ProviderSmokeTestRequestBody,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ProviderSmokeTestResult:
@@ -605,8 +605,8 @@ def run_provider_smoke_test(
         provider = ProviderRegistryService(db_session).get_provider(
             world_id,
             provider_id,
-            platform_admin=True,
-            include_hidden=True,
+            platform_admin=context.is_platform_admin,
+            include_hidden=context.is_platform_admin,
         )
         if provider is None:
             raise ProviderNotFoundError("provider integration not found")
@@ -632,6 +632,7 @@ def run_provider_smoke_test(
                     if is_platform_admin(subject)
                     else f"world_admin:{subject.user_id}"
                 ),
+                platform_admin=context.is_platform_admin,
             )
         )
         ProviderHealthService(db_session).record_health_check(
@@ -703,6 +704,7 @@ def run_provider_test_invocation(
                     if is_platform_admin(subject)
                     else f"world_admin:{subject.user_id}"
                 ),
+                platform_admin=context.is_platform_admin,
             )
         )
     except ProviderNotFoundError as exc:

@@ -31,7 +31,12 @@ vi.mock("@/lib/worlds/client", async () => {
 
 describe("PlayerInteractions", () => {
   it("renders player records without hidden evidence", () => {
-    render(<PlayerInteractions worldId="world-1" data={playerData} />);
+    const data = {
+      ...playerData,
+      resume: { ...playerData.resume!, conversation_session_id: RESERVED_CONVERSATION_ID },
+    };
+
+    render(<PlayerInteractions worldId={RESERVED_WORLD_ID} data={data} />);
 
     expect(screen.getByRole("heading", { name: "Player interactions" })).toBeVisible();
     expect(screen.getAllByText("Member Player").length).toBeGreaterThan(0);
@@ -40,6 +45,16 @@ describe("PlayerInteractions", () => {
     expect(screen.getByRole("heading", { name: "Resume" })).toBeVisible();
     expect(screen.getAllByText("Ready to resume.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("active").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/player/privacy`,
+    );
+    expect(screen.getByRole("link", { name: "Restore scene" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader/conversations/${encodeURIComponent(
+        RESERVED_CONVERSATION_ID,
+      )}/scene`,
+    );
     expect(screen.getByText("0 relationship update(s)")).toBeVisible();
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
@@ -159,6 +174,9 @@ describe("PlayerInteractions", () => {
 function serializedDocument(): string {
   return document.body.textContent ?? "";
 }
+
+const RESERVED_WORLD_ID = "world/player?mode=resume#frag";
+const RESERVED_CONVERSATION_ID = "conversation/live?resume=true#frag";
 
 const playerData: PlayerInteractionData = {
   worlds: [],

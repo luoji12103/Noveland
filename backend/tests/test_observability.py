@@ -41,7 +41,14 @@ def test_diagnostic_details_are_redacted_recursively() -> None:
         {
             "api_key_ref": "safe-ref",
             "authorization": "Bearer secret",
-            "nested": {"session_token": "token", "message": "short"},
+            "nested": {
+                "session_token": "token",
+                "message": "short",
+                "safe_key": (
+                    "failed with sk-live-secret media://hidden /tmp/private raw_prompt "
+                    "base64,AAAA"
+                ),
+            },
             "items": [{"cookie": "secret-cookie"}],
         },
     )
@@ -49,7 +56,13 @@ def test_diagnostic_details_are_redacted_recursively() -> None:
     assert details == {
         "api_key_ref": "[redacted]",
         "authorization": "[redacted]",
-        "nested": {"session_token": "[redacted]", "message": "short"},
+        "nested": {
+            "session_token": "[redacted]",
+            "message": "short",
+            "safe_key": (
+                "failed with [redacted] [redacted] [redacted] [redacted] [redacted]"
+            ),
+        },
         "items": [{"cookie": "[redacted]"}],
     }
 
@@ -76,9 +89,12 @@ def test_diagnostics_service_records_and_lists_recent_events() -> None:
             RuntimeDiagnosticCreate(
                 severity=DiagnosticSeverity.ERROR,
                 component=DiagnosticComponent.PROVIDER,
-                event_type="provider.failed",
-                message="Provider failed",
-                details={"token": "secret", "error": "timeout"},
+                event_type="provider.failed.sk-live-secret",
+                message="Provider failed with sk-live-secret and /tmp/private-file",
+                details={
+                    "token": "secret",
+                    "error": "timeout from media://hidden raw_output",
+                },
                 occurred_at=new_time,
                 world_id=world_id,
             ),
@@ -95,7 +111,12 @@ def test_diagnostics_service_records_and_lists_recent_events() -> None:
 
     assert all_records[0].id == new_record.id
     assert provider_records == [new_record]
-    assert world_records[0].details == {"token": "[redacted]", "error": "timeout"}
+    assert world_records[0].event_type == "provider.failed.[redacted]"
+    assert world_records[0].message == "Provider failed with [redacted] and [redacted]"
+    assert world_records[0].details == {
+        "token": "[redacted]",
+        "error": "timeout from [redacted] [redacted]",
+    }
 
 
 def _engine() -> Engine:

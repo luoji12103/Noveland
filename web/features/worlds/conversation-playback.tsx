@@ -56,12 +56,12 @@ export function ConversationPlayback({ worldId, conversationId, data }: Conversa
       <section className="management-panel playback-grid" aria-labelledby="playback-title">
         <div className="playback-main">
           <div className="button-row">
-            <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+            <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
               Back to reader
             </Link>
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/reader/conversations/${conversationId}/scene`}
+              href={`/worlds/${encodeURIComponent(worldId)}/reader/conversations/${encodeURIComponent(conversationId)}/scene`}
             >
               Scene view
             </Link>

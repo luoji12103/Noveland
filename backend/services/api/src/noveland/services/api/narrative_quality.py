@@ -90,7 +90,7 @@ def preview_narrative_quality_context(
 def generate_provider_backed_gm_proposal(
     world_id: uuid.UUID,
     request: NarrativeQualityGMProposalGenerateRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> NarrativeQualityGMProposalGenerationResult:
@@ -100,6 +100,7 @@ def generate_provider_backed_gm_proposal(
             world_id,
             request,
             actor_ref=actor_ref,
+            platform_admin=context.is_platform_admin,
         )
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc
@@ -159,7 +160,7 @@ def review_presentation_alignment(
 def generate_narrative_writer_v2_draft(
     world_id: uuid.UUID,
     request: NarrativeQualityWriterGenerateRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> NarrativeQualityWriterGenerationResult:
@@ -169,6 +170,7 @@ def generate_narrative_writer_v2_draft(
             world_id,
             request,
             actor_ref=actor_ref,
+            platform_admin=context.is_platform_admin,
         )
     except NarrativeQualityValidationError as exc:
         raise _unprocessable(str(exc)) from exc

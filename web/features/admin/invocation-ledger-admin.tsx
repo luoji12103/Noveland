@@ -611,32 +611,47 @@ function sanitizeEvidence(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     const output: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value as Record<string, unknown>).slice(0, 24)) {
-      output[key] = sensitiveKey(key) ? "[redacted]" : sanitizeEvidence(item);
+      if (sensitiveKey(key)) {
+        output[`redacted_${Object.keys(output).length + 1}`] = "[redacted]";
+      } else {
+        output[key] = sanitizeEvidence(item);
+      }
     }
     return output;
   }
   return value ?? "-";
 }
 
+const SENSITIVE_EVIDENCE_KEY_MARKERS = [
+  "apikey",
+  "token",
+  "bearertoken",
+  "authorization",
+  "secret",
+  "clientsecret",
+  "accesskey",
+  "password",
+  "privatekey",
+  "storageuri",
+  "previewuri",
+  "thumbnailuri",
+  "objectstoragepath",
+  "objectpath",
+  "filesystempath",
+  "filepath",
+  "path",
+  "rawbytes",
+  "bytes",
+  "base64",
+  "rawprompt",
+  "rawoutput",
+  "promptsnapshot",
+  "promptsnapshotid",
+];
+
 function sensitiveKey(key: string): boolean {
-  return [
-    "api_key",
-    "apikey",
-    "token",
-    "bearer_token",
-    "authorization",
-    "secret",
-    "client_secret",
-    "access_key",
-    "password",
-    "private_key",
-    "storage_uri",
-    "file_path",
-    "path",
-    "raw_bytes",
-    "bytes",
-    "base64",
-  ].some((part) => key.toLowerCase().includes(part));
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return SENSITIVE_EVIDENCE_KEY_MARKERS.some((marker) => normalized.includes(marker));
 }
 
 function sensitiveValue(value: string): boolean {

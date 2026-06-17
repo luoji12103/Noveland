@@ -110,6 +110,46 @@ def test_images_api_generate_compose_and_acl() -> None:
         assert session.scalars(select(ModelInvocation)).one().media_asset_id == uuid.UUID(asset_id)
 
 
+def test_images_api_rejects_restricted_provider_execution_for_world_admin() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test")
+    platform_id, _platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, admin_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, platform_id, AuthRole.WORLD_ADMIN)
+    provider_id = _seed_provider(
+        engine,
+        world_id,
+        scope_kind="global",
+        visibility="developer_only",
+        provider_key="platform-image",
+    )
+
+    _authenticate(client, admin_token)
+    hidden_detail = client.get(f"/worlds/{world_id}/providers/{provider_id}")
+    generated = client.post(
+        f"/worlds/{world_id}/images/generate",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(provider_id),
+            "prompt": "draw restricted provider",
+        },
+    )
+
+    assert hidden_detail.status_code == 404
+    assert generated.status_code == 422
+    with Session(engine) as session:
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(MediaAsset)).all() == []
+        assert session.scalars(select(ModelInvocation)).all() == []
+        assert session.scalars(select(PromptSnapshot)).all() == []
+
+
 def test_images_api_rejects_transparency_without_capability() -> None:
     client, engine = _client_with_database()
     admin_id, admin_token = _seed_user(engine, "admin@example.test")
@@ -275,23 +315,30 @@ def _add_membership(
         session.commit()
 
 
-def _seed_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+def _seed_provider(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    scope_kind: str = "world",
+    visibility: str = "world_admin",
+    provider_key: str = "fake-image",
+) -> uuid.UUID:
     provider_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ProviderIntegration(
                 id=provider_id,
-                world_id=world_id,
-                scope_kind="world",
-                scope_key=f"world:{world_id}",
+                world_id=None if scope_kind == "global" else world_id,
+                scope_kind=scope_kind,
+                scope_key="global" if scope_kind == "global" else f"world:{world_id}",
                 provider_kind="image_generation",
                 adapter_kind="fake",
-                provider_key="fake-image",
+                provider_key=provider_key,
                 display_name="Fake Image",
                 config_json={},
                 default_params_json={},
                 status="active",
-                visibility="world_admin",
+                visibility=visibility,
             )
         )
         session.add(

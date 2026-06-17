@@ -1083,6 +1083,7 @@ class AuthoringService:
         request: AuthoringCharacterMemoryDistillRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> AuthoringCharacterMemoryDistillResult:
         worldline_id = self._worldline_id(world_id, request.worldline_id)
         run = self._run_required(world_id, run_id)
@@ -1116,6 +1117,7 @@ class AuthoringService:
                 },
                 model_name=request.model_name,
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         persona_payload = _persona_payload(

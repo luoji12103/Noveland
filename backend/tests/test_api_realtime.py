@@ -8,7 +8,7 @@ from typing import cast
 import pytest
 from fastapi.testclient import TestClient
 from noveland.adapters.models import ProviderProfile
-from noveland.agents.models import AgentRuntimeRun
+from noveland.agents.models import Agent, AgentRuntimeRun
 from noveland.auth import AuthRole
 from noveland.auth.contracts import AuthSessionStatus
 from noveland.auth.models import AuthSession, PlatformRoleAssignment, User
@@ -123,6 +123,214 @@ def test_world_stream_replays_narrative_artifacts_with_publication(
     assert artifact["publication"]["reader_visible"] is True
 
 
+def test_world_stream_hides_admin_evidence_for_member_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _client, engine = _client_with_database(monkeypatch)
+    owner_id, _token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(
+        engine,
+        world_id,
+        objective="operator-only objective",
+        opening_prompt="raw_prompt: reveal hidden plan",
+        writer_config={
+            "provider_profile_id": str(uuid.uuid4()),
+            "style_guide": "raw_output: draft",
+        },
+    )
+    published_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        owner_id,
+        artifact_metadata={"storage_uri": "media://private/object"},
+        published_metadata={"raw_prompt": "do not stream"},
+    )
+    hidden_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        owner_id,
+        title="Hidden artifact",
+        content="Hidden draft body",
+        publication_status="unpublished",
+        reader_visible=False,
+    )
+    _seed_agent_run(engine, world_id)
+    _seed_world_diagnostic(engine, world_id)
+
+    member_delta = realtime_api.collect_world_stream_delta(
+        world_id,
+        None,
+        include_admin_fields=False,
+    )
+    admin_delta = realtime_api.collect_world_stream_delta(world_id, None)
+
+    assert member_delta is not None
+    member_payload = member_delta["payload"]
+    assert member_payload["diagnostics"] == []
+    assert member_payload["agent_runs"] == []
+    assert [artifact["id"] for artifact in member_payload["narrative_artifacts"]] == [
+        str(published_id)
+    ]
+    member_artifact = member_payload["narrative_artifacts"][0]
+    assert member_artifact["source_run_id"] is None
+    assert member_artifact["metadata"] == {}
+    assert member_artifact["publication"]["metadata"] == {}
+    assert member_artifact["publication"]["published_by_user_id"] is None
+    member_conversation = next(
+        item for item in member_payload["conversations"] if item["id"] == str(conversation_id)
+    )
+    assert member_conversation["objective"] == ""
+    assert member_conversation["opening_prompt"] == ""
+    assert member_conversation["policy"] == {}
+    assert member_conversation["writer_config"] == {}
+
+    assert admin_delta is not None
+    admin_payload = admin_delta["payload"]
+    assert admin_payload["diagnostics"][0]["details"]["raw_prompt"] == "operator prompt"
+    assert admin_payload["agent_runs"][0]["prompt_text"] == "raw_prompt: system plan"
+    assert {artifact["id"] for artifact in admin_payload["narrative_artifacts"]} == {
+        str(published_id),
+        str(hidden_id),
+    }
+    admin_conversation = next(
+        item for item in admin_payload["conversations"] if item["id"] == str(conversation_id)
+    )
+    assert admin_conversation["opening_prompt"] == "raw_prompt: reveal hidden plan"
+    assert admin_conversation["writer_config"]["style_guide"] == "raw_output: draft"
+
+    later_hidden_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        owner_id,
+        title="Later hidden artifact",
+        content="Later hidden body",
+        publication_status="unpublished",
+        reader_visible=False,
+    )
+    member_hidden_delta = realtime_api.collect_world_stream_delta(
+        world_id,
+        member_delta["cursor"],
+        include_admin_fields=False,
+    )
+    admin_hidden_delta = realtime_api.collect_world_stream_delta(world_id, admin_delta["cursor"])
+
+    assert member_hidden_delta is None
+    assert admin_hidden_delta is not None
+    assert [
+        artifact["id"] for artifact in admin_hidden_delta["payload"]["narrative_artifacts"]
+    ] == [str(later_hidden_id)]
+
+
+def test_conversation_stream_hides_admin_evidence_for_member_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _client, engine = _client_with_database(monkeypatch)
+    owner_id, _token = _seed_user(engine, "owner@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(
+        engine,
+        world_id,
+        opening_prompt="raw_prompt: conversation controls",
+        policy_config={"max_turn_budget": 12},
+        writer_config={"style_guide": "raw_output: writer trace"},
+    )
+    run_id = uuid.uuid4()
+    _seed_turn(
+        engine,
+        conversation_id,
+        0,
+        "Visible dialogue",
+        run_id=run_id,
+        error_text="provider raw_output traceback",
+    )
+    _seed_turn(
+        engine,
+        conversation_id,
+        1,
+        "raw_prompt: provider traceback payload",
+    )
+    _seed_conversation_diagnostic(engine, world_id, conversation_id)
+
+    member_delta = realtime_api.collect_conversation_stream_delta(
+        world_id,
+        conversation_id,
+        None,
+        include_admin_fields=False,
+    )
+    admin_delta = realtime_api.collect_conversation_stream_delta(world_id, conversation_id, None)
+
+    assert member_delta is not None
+    member_payload = member_delta["payload"]
+    assert member_payload["diagnostics"] == []
+    assert member_payload["session"]["opening_prompt"] == ""
+    assert member_payload["session"]["policy"] == {}
+    assert member_payload["session"]["writer_config"] == {}
+    assert member_payload["turns"][0]["input_text"] == "Visible dialogue"
+    assert member_payload["turns"][0]["output_text"] == "Visible dialogue"
+    assert member_payload["turns"][0]["run_id"] is None
+    assert member_payload["turns"][0]["error_text"] is None
+    assert member_payload["turns"][1]["input_text"] == ""
+    assert member_payload["turns"][1]["output_text"] == ""
+
+    assert admin_delta is not None
+    admin_payload = admin_delta["payload"]
+    assert admin_payload["diagnostics"][0]["details"]["conversation_id"] == str(
+        conversation_id
+    )
+    assert admin_payload["session"]["opening_prompt"] == "raw_prompt: conversation controls"
+    assert admin_payload["session"]["writer_config"]["style_guide"] == "raw_output: writer trace"
+    assert admin_payload["turns"][0]["run_id"] == str(run_id)
+    assert admin_payload["turns"][0]["error_text"] == "provider raw_output traceback"
+    assert admin_payload["turns"][1]["input_text"] == "raw_prompt: provider traceback payload"
+    assert admin_payload["turns"][1]["output_text"] == "raw_prompt: provider traceback payload"
+
+
+def test_conversation_live_member_snapshot_hides_sensitive_turn_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database(monkeypatch)
+    owner_id, _owner_token = _seed_user(engine, "live-owner@example.test")
+    member_id, member_token = _seed_user(engine, "live-member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(engine, world_id)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_turn(engine, conversation_id, 0, "raw_output: provider traceback payload")
+
+    client.cookies.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, member_token)
+    with client.websocket_connect(
+        f"/worlds/{world_id}/conversations/{conversation_id}/live",
+        headers={"origin": "http://testserver"},
+    ) as websocket:
+        snapshot = websocket.receive_json()
+
+    assert snapshot["type"] == "session_snapshot"
+    assert snapshot["payload"]["turns"][0]["input_text"] == ""
+    assert snapshot["payload"]["turns"][0]["output_text"] == ""
+    assert snapshot["payload"]["turns"][0]["run_id"] is None
+    assert snapshot["payload"]["turns"][0]["error_text"] is None
+
+
+def test_conversation_live_websocket_rejects_cross_port_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, engine = _client_with_database(monkeypatch)
+    owner_id, owner_token = _seed_user(engine, "owner-cross-port@example.test")
+    world_id = _seed_world(engine, owner_id)
+    conversation_id = _seed_conversation(engine, world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    client.cookies.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, owner_token)
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(
+            f"/worlds/{world_id}/conversations/{conversation_id}/live",
+            headers={"origin": "http://testserver:4444"},
+        ) as websocket:
+            websocket.receive_json()
+
+
 def test_conversation_live_websocket_enforces_origin_and_admin_controls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -133,6 +341,7 @@ def test_conversation_live_websocket_enforces_origin_and_admin_controls(
     conversation_id = _seed_conversation(engine, world_id)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _seed_conversation_diagnostic(engine, world_id, conversation_id)
 
     client.cookies.clear()
     client.cookies.set(SESSION_COOKIE_NAME, owner_token)
@@ -165,7 +374,7 @@ def test_conversation_live_websocket_enforces_origin_and_admin_controls(
         f"/worlds/{world_id}/conversations/{conversation_id}/live",
         headers={"origin": "http://testserver"},
     ) as websocket:
-        websocket.receive_json()
+        member_snapshot = websocket.receive_json()
         websocket.send_json(
             {
                 "command": "advance",
@@ -179,6 +388,10 @@ def test_conversation_live_websocket_enforces_origin_and_admin_controls(
     assert ack["type"] == "ack"
     assert appended["type"] == "turn_appended"
     assert appended["payload"]["turn_index"] == 0
+    assert member_snapshot["type"] == "session_snapshot"
+    assert member_snapshot["payload"]["diagnostics"] == []
+    assert member_snapshot["payload"]["session"]["opening_prompt"] == ""
+    assert member_snapshot["payload"]["session"]["writer_config"] == {}
     assert error["type"] == "error"
     assert error["payload"]["message"] == "Forbidden"
 
@@ -220,6 +433,7 @@ def _create_tables(engine: Engine) -> None:
         WorldClockStateModel.__table__,
         WorldClockTransitionModel.__table__,
         ProviderProfile.__table__,
+        Agent.__table__,
         AgentRuntimeRun.__table__,
         MemoryBackendProfile.__table__,
         ConversationSession.__table__,
@@ -304,7 +518,43 @@ def _add_membership(
         session.commit()
 
 
-def _seed_conversation(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+def _conversation_policy_config(
+    overrides: dict[str, object] | None = None,
+) -> dict[str, object]:
+    config: dict[str, object] = {
+        "error_policy": "retry_once_then_fail",
+        "max_consecutive_failed_turns": 2,
+        "loop_guard_window": 4,
+        "repeat_output_threshold": 3,
+    }
+    if overrides is not None:
+        config.update(overrides)
+    return config
+
+
+def _conversation_writer_config(
+    overrides: dict[str, object] | None = None,
+) -> dict[str, object]:
+    config: dict[str, object] = {
+        "provider_profile_id": None,
+        "auto_generate_on_complete": False,
+        "generate_summary": True,
+        "generate_chapter": True,
+    }
+    if overrides is not None:
+        config.update(overrides)
+    return config
+
+
+def _seed_conversation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    objective: str = "",
+    opening_prompt: str = "",
+    policy_config: dict[str, object] | None = None,
+    writer_config: dict[str, object] | None = None,
+) -> uuid.UUID:
     conversation_id = uuid.uuid4()
     now = datetime.now(UTC)
     with Session(engine) as session:
@@ -318,22 +568,12 @@ def _seed_conversation(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
                 scope_type="world",
                 mode="manual_chain",
                 status="draft",
-                objective="",
-                opening_prompt="",
+                objective=objective,
+                opening_prompt=opening_prompt,
                 max_turns=6,
                 next_turn_index=0,
-                policy_config={
-                    "error_policy": "retry_once_then_fail",
-                    "max_consecutive_failed_turns": 2,
-                    "loop_guard_window": 4,
-                    "repeat_output_threshold": 3,
-                },
-                writer_config={
-                    "provider_profile_id": None,
-                    "auto_generate_on_complete": False,
-                    "generate_summary": True,
-                    "generate_chapter": True,
-                },
+                policy_config=_conversation_policy_config(policy_config),
+                writer_config=_conversation_writer_config(writer_config),
                 terminal_reason=None,
                 created_at=now,
                 updated_at=now,
@@ -343,7 +583,15 @@ def _seed_conversation(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
     return conversation_id
 
 
-def _seed_turn(engine: Engine, conversation_id: uuid.UUID, turn_index: int, text: str) -> None:
+def _seed_turn(
+    engine: Engine,
+    conversation_id: uuid.UUID,
+    turn_index: int,
+    text: str,
+    *,
+    run_id: uuid.UUID | None = None,
+    error_text: str | None = None,
+) -> None:
     with Session(engine) as session:
         session.add(
             ConversationTurn(
@@ -355,8 +603,8 @@ def _seed_turn(engine: Engine, conversation_id: uuid.UUID, turn_index: int, text
                 input_text=text,
                 output_text=text,
                 status="succeeded",
-                run_id=None,
-                error_text=None,
+                run_id=run_id,
+                error_text=error_text,
             )
         )
         session.commit()
@@ -399,6 +647,13 @@ def _seed_narrative_artifact(
     engine: Engine,
     world_id: uuid.UUID,
     owner_id: uuid.UUID,
+    *,
+    title: str = "Published realtime artifact",
+    content: str = "Reader-visible body",
+    artifact_metadata: dict[str, object] | None = None,
+    publication_status: str = "published",
+    reader_visible: bool = True,
+    published_metadata: dict[str, object] | None = None,
 ) -> uuid.UUID:
     artifact_id = uuid.uuid4()
     now = datetime.now(UTC)
@@ -410,10 +665,10 @@ def _seed_narrative_artifact(
                 agent_id=None,
                 source_run_id=None,
                 source_conversation_id=None,
-                title="Published realtime artifact",
-                content="Reader-visible body",
+                title=title,
+                content=content,
                 artifact_kind="world_summary",
-                artifact_metadata={},
+                artifact_metadata=artifact_metadata or {},
                 created_at=now,
                 updated_at=now,
             )
@@ -425,10 +680,10 @@ def _seed_narrative_artifact(
                 world_id=world_id,
                 artifact_id=artifact_id,
                 source_draft_id=artifact_id,
-                status="published",
-                reader_visible=True,
-                published_metadata={"channel": "reader"},
-                published_at=now,
+                status=publication_status,
+                reader_visible=reader_visible,
+                published_metadata=published_metadata or {"channel": "reader"},
+                published_at=now if publication_status == "published" else None,
                 unpublished_at=None,
                 published_by_user_id=owner_id,
                 created_at=now,
@@ -437,6 +692,61 @@ def _seed_narrative_artifact(
         )
         session.commit()
     return artifact_id
+
+
+def _seed_agent_run(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    agent_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            Agent(
+                id=agent_id,
+                world_id=world_id,
+                agent_key=f"agent-{str(agent_id)[:8]}",
+                display_name="Realtime agent",
+                kind="role_agent",
+                character_profile={},
+                config={},
+                is_enabled=True,
+            )
+        )
+        session.add(
+            AgentRuntimeRun(
+                id=run_id,
+                world_id=world_id,
+                worldline_id=None,
+                agent_id=agent_id,
+                provider_profile_id=None,
+                source_calendar_entry_id=None,
+                source_schedule_rule_id=None,
+                created_event_id=None,
+                status="succeeded",
+                trigger_source="manual",
+                prompt_text="raw_prompt: system plan",
+                response_text="raw_output: generated answer",
+                diagnostics={"storage_uri": "media://private/run"},
+                started_at=now,
+                finished_at=now,
+            )
+        )
+        session.commit()
+    return run_id
+
+
+def _seed_world_diagnostic(engine: Engine, world_id: uuid.UUID) -> None:
+    with Session(engine) as session:
+        RuntimeDiagnosticsService(session).record(
+            RuntimeDiagnosticCreate(
+                severity=DiagnosticSeverity.WARNING,
+                component=DiagnosticComponent.AGENT,
+                event_type="agent.run_failed",
+                message="Agent run failed.",
+                details={"raw_prompt": "operator prompt"},
+                world_id=world_id,
+            )
+        )
+        session.commit()
 
 
 def _authenticate(client: TestClient, token: str) -> None:

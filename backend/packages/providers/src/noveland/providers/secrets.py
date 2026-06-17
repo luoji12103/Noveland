@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,11 +14,46 @@ SENSITIVE_KEYS = {
     "bearer_token",
     "authorization",
     "secret",
+    "secret_key",
     "client_secret",
     "access_key",
     "password",
     "private_key",
 }
+SENSITIVE_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in SENSITIVE_KEYS}
+SENSITIVE_TEXT_MARKERS = {
+    "accesstoken",
+    "apikey",
+    "authorization",
+    "bearertoken",
+    "clientsecret",
+    "filesystempath",
+    "filepath",
+    "localmodelpath",
+    "objectpath",
+    "objectstoragepath",
+    "privatekey",
+    "promptsnapshot",
+    "promptsnapshotid",
+    "rawbytes",
+    "rawoutput",
+    "rawprompt",
+    "refreshtoken",
+    "secretkey",
+    "storagepath",
+    "storageuri",
+    "storageurl",
+}
+SENSITIVE_TEXT_PATTERNS = (
+    re.compile(r"(?:media|object|file|s3|gs)://", re.IGNORECASE),
+    re.compile(
+        r"(^|[\s\"=:(])/(?:root|home|srv|app|workspace|mnt|var|tmp|models)(?:/|\b)",
+        re.IGNORECASE,
+    ),
+    re.compile(r"[A-Za-z]:\\"),
+    re.compile(r"sk-[A-Za-z0-9_-]+", re.IGNORECASE),
+    re.compile(r"Bearer\s+\S+", re.IGNORECASE),
+)
 REDACTED = "[REDACTED]"
 _ALIASES = {
     "openai:default": "env:OPENAI_API_KEY",
@@ -101,6 +137,10 @@ def validate_auth_ref_reference(auth_ref: str | None) -> str | None:
     raise ProviderSecretValidationError("auth_ref must be a provider secret reference")
 
 
+def sanitize_provider_diagnostic_text(value: str) -> str:
+    return REDACTED if _looks_sensitive_text(value) else value
+
+
 def sanitize_for_persistence(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
@@ -167,5 +207,32 @@ def _first_sensitive_path(value: Any, *, prefix: str = "") -> str | None:
     return None
 
 
+def is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in SENSITIVE_KEY_MARKERS
+
+
 def _is_sensitive_key(key: str) -> bool:
-    return key.strip().lower() in SENSITIVE_KEYS
+    return is_sensitive_key(key)
+
+
+def _looks_sensitive_text(value: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", value.lower())
+    if any(marker in normalized for marker in SENSITIVE_TEXT_MARKERS):
+        return True
+    if any(pattern.search(value) for pattern in SENSITIVE_TEXT_PATTERNS):
+        return True
+    return _contains_base64_like_token(value)
+
+
+def _contains_base64_like_token(value: str) -> bool:
+    for part in re.split(r"\s+", value):
+        normalized = re.sub(r"[^A-Za-z0-9+/=]", "", part)
+        if (
+            len(normalized) >= 24
+            and len(normalized) % 4 == 0
+            and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", normalized) is not None
+            and re.fullmatch(r"[a-f0-9]{32,}", normalized, flags=re.IGNORECASE) is None
+        ):
+            return True
+    return False

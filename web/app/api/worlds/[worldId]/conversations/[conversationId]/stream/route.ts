@@ -14,5 +14,8 @@ export async function GET(
   { params }: ConversationStreamRouteProps,
 ): Promise<Response> {
   const { worldId, conversationId } = await params;
-  return proxyEventStream(request, `/worlds/${worldId}/conversations/${conversationId}/stream`);
+  return proxyEventStream(
+    request,
+    `/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(conversationId)}/stream`,
+  );
 }

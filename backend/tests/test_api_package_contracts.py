@@ -72,7 +72,7 @@ def test_package_contract_reports_registry_and_secret_issues() -> None:
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     payload = _valid_contract()
     payload["plugins"][0]["plugin_identifier"] = "missing.plugin"
-    payload["providers"][0]["config_template"] = {"nested": {"api_key": "secret-value"}}
+    payload["providers"][0]["config_template"] = {"nested": {"clientSecret": "secret-value"}}
     payload["providers"][0]["auth_ref"] = "plain-secret-value"
 
     response = _authenticated_post(
@@ -302,7 +302,8 @@ def _seed_provider(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
                 auth_ref="env:OPENAI_API_KEY",
                 config_json={
                     "metadata": {
-                        "safe_note": "uses storage_uri media://internal as redaction test"
+                        "safe_note": "uses storage_uri media://internal as redaction test",
+                        "clientSecret": "secret-value",
                     },
                     "password": "secret-value",
                 },

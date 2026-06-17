@@ -155,7 +155,7 @@ export function PrivateBetaOnboarding({ data }: PrivateBetaOnboardingProps) {
                 ) : (
                   <div className="private-beta-actions">
                     <p>{item.player_profile.display_name}</p>
-                    <Link className="secondary-button" href={`/worlds/${item.world_id}/player`}>
+                    <Link className="secondary-button" href={`/worlds/${encodeURIComponent(item.world_id)}/player`}>
                       Open player surface
                     </Link>
                   </div>

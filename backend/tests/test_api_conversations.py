@@ -42,7 +42,7 @@ from noveland.memory.models import (
     MemoryWriteJob,
     MemoryWriteLog,
 )
-from noveland.narrative.models import NarrativeArtifact
+from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.observability.models import RuntimeDiagnosticEvent
 from noveland.services.api.app import create_app
 from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
@@ -80,7 +80,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     first_agent_id = _seed_agent(engine, world_id, "guide", scene_id)
     second_agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
     fork_id = _seed_fork_worldline(engine, world_id)
-    _seed_provider_profile(engine)
+    provider_profile_id = _seed_provider_profile(engine)
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
 
@@ -89,8 +89,11 @@ def test_conversation_api_enforces_access_and_manual_advance(
         profile: object,
         prompt: str,
     ) -> ProviderCompletion:
-        del self, profile
-        return ProviderCompletion(text=f"reply for {prompt}", raw_response={"ok": True})
+        del self, profile, prompt
+        return ProviderCompletion(
+            text="Agent response with raw_output media://private/turn",
+            raw_response={"ok": True},
+        )
 
     monkeypatch.setattr(ProviderProfileService, "invoke_profile", fake_invoke_profile)
 
@@ -99,17 +102,51 @@ def test_conversation_api_enforces_access_and_manual_advance(
         f"/worlds/{world_id}/conversations",
         json={
             "session_key": "manual-chain",
-            "title": "Manual chain",
+            "title": "Manual raw_prompt chain",
             "scope_type": "scene",
             "mode": "manual_chain",
             "worldline_id": str(fork_id),
             "scene_id": str(scene_id),
+            "objective": "operator-only objective with raw_prompt marker",
+            "opening_prompt": "operator-only opening prompt",
             "max_turns": 3,
+            "policy": {
+                **_policy_json(),
+                "max_turn_budget": 3,
+            },
+            "writer_config": {
+                **_writer_config_json(),
+                "provider_profile_id": str(provider_profile_id),
+                "style_guide": "operator-only style guide",
+                "source_constraints": "operator-only source constraints",
+                "include_prompt_preview": True,
+            },
+            "memory_config": {
+                "write_turn_memory": True,
+                "retrieve_memory": True,
+                "max_context_items": 7,
+                "query_window": 9,
+                "include_recent_turns": True,
+                "include_agent_observations": True,
+                "memory_query_strategy": "transcript",
+            },
+            "group_context": {"raw_output": "operator-only group context"},
+        },
+    )
+    conversation_id = create_response.json()["id"]
+    safe_create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "safe-manual-chain",
+            "title": "Manual chain",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
             "policy": _policy_json(),
             "writer_config": _writer_config_json(),
         },
     )
-    conversation_id = create_response.json()["id"]
+    safe_conversation_id = safe_create_response.json()["id"]
     replace_participants = client.put(
         f"/worlds/{world_id}/conversations/{conversation_id}/participants",
         json=[
@@ -119,7 +156,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
     )
     seed_response = client.post(
         f"/worlds/{world_id}/conversations/{conversation_id}/seed",
-        json={"input_text": "Operator seed"},
+        json={"input_text": "Operator seed with raw_prompt /root/private/seed.txt"},
     )
     advance_response = client.post(f"/worlds/{world_id}/conversations/{conversation_id}/advance")
     speaker_preview = client.get(
@@ -128,6 +165,7 @@ def test_conversation_api_enforces_access_and_manual_advance(
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/conversations")
+    member_detail = client.get(f"/worlds/{world_id}/conversations/{conversation_id}")
     member_turns = client.get(f"/worlds/{world_id}/conversations/{conversation_id}/turns")
     member_speaker_preview = client.get(
         f"/worlds/{world_id}/conversations/{conversation_id}/speaker-preview",
@@ -151,20 +189,70 @@ def test_conversation_api_enforces_access_and_manual_advance(
         }
 
     assert create_response.status_code == 201
+    assert safe_create_response.status_code == 201
+    assert create_response.json()["title"] == "Manual raw_prompt chain"
+    assert safe_create_response.json()["title"] == "Manual chain"
     assert create_response.json()["worldline_id"] == str(fork_id)
+    assert create_response.json()["objective"] == "operator-only objective with raw_prompt marker"
+    assert create_response.json()["opening_prompt"] == "operator-only opening prompt"
+    assert create_response.json()["policy"]["max_turn_budget"] == 3
+    assert create_response.json()["writer_config"]["provider_profile_id"] == str(
+        provider_profile_id,
+    )
+    assert create_response.json()["writer_config"]["writer_plugin_config"]["group_context"] == {
+        "raw_output": "operator-only group context",
+    }
+    assert create_response.json()["memory_config"]["memory_query_strategy"] == "transcript"
+    assert create_response.json()["group_context"]["raw_output"] == (
+        "operator-only group context"
+    )
     assert replace_participants.status_code == 200
     assert seed_response.status_code == 200
+    assert seed_response.json()["input_text"] == (
+        "Operator seed with raw_prompt /root/private/seed.txt"
+    )
     assert advance_response.status_code == 200
     assert advance_response.json()["turn"]["speaker_agent_id"] == str(first_agent_id)
+    assert advance_response.json()["turn"]["output_text"] == (
+        "Agent response with raw_output media://private/turn"
+    )
+    assert advance_response.json()["turn"]["run_id"] is not None
+    assert advance_response.json()["turn"]["error_text"] is None
     assert speaker_preview.status_code == 200
     assert speaker_preview.json()["policy_mode"] == "round_robin"
     assert speaker_preview.json()["selected_agent_id"] == str(second_agent_id)
     assert member_list.status_code == 200
+    assert member_detail.status_code == 200
+    member_sessions = {session["id"]: session for session in member_list.json()}
+    member_session = member_sessions[str(conversation_id)]
+    safe_member_session = member_sessions[str(safe_conversation_id)]
+    assert member_session["id"] == str(conversation_id)
+    assert member_session["title"] == ""
+    assert safe_member_session["title"] == "Manual chain"
+    assert member_session["objective"] == ""
+    assert member_session["opening_prompt"] == ""
+    assert member_session["policy"]["manual_next_agent_id"] is None
+    assert member_session["writer_config"]["provider_profile_id"] is None
+    assert member_session["writer_config"]["writer_plugin_identifier"] == ""
+    assert member_session["writer_config"]["writer_plugin_config"] == {}
+    assert member_session["writer_config"]["style_guide"] == ""
+    assert member_session["writer_config"]["source_constraints"] == ""
+    assert member_session["writer_config"]["include_prompt_preview"] is False
+    assert member_session["memory_config"]["retrieve_memory"] is False
+    assert member_session["memory_config"]["memory_query_strategy"] == ""
+    assert member_session["group_context"] == {}
+    assert member_detail.json()["title"] == ""
+    assert member_detail.json()["objective"] == ""
+    assert member_detail.json()["writer_config"]["writer_plugin_config"] == {}
     assert member_turns.status_code == 200
     assert member_speaker_preview.status_code == 403
     assert member_diagnostics.status_code == 403
     assert memory_summary.status_code == 403
     assert [turn["speaker_kind"] for turn in member_turns.json()] == ["operator", "agent"]
+    assert member_turns.json()[0]["input_text"] == ""
+    assert member_turns.json()[1]["output_text"] == ""
+    assert member_turns.json()[1]["run_id"] is None
+    assert member_turns.json()[1]["error_text"] is None
     assert member_advance.status_code == 403
     assert stranger_list.status_code == 404
     assert event_worldline_ids == {fork_id}
@@ -388,6 +476,125 @@ def test_conversation_api_stop_and_diagnostics() -> None:
     )
 
 
+def test_conversation_narrative_listing_redacts_member_evidence() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id, "conversation-narrative-world")
+    scene_id = _seed_scene(engine, world_id, "story-room")
+    agent_id = _seed_agent(engine, world_id, "scribe", scene_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    _authenticate(client, owner_token)
+    create_response = client.post(
+        f"/worlds/{world_id}/conversations",
+        json={
+            "session_key": "member-narrative-session",
+            "title": "Member narrative session",
+            "scope_type": "scene",
+            "mode": "manual_chain",
+            "scene_id": str(scene_id),
+            "policy": _policy_json(),
+            "writer_config": _writer_config_json(),
+        },
+    )
+    conversation_id = uuid.UUID(create_response.json()["id"])
+    published_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Published summary",
+        "Published summary body",
+        agent_id=agent_id,
+        source_run_id=uuid.uuid4(),
+        metadata={
+            "raw_prompt": "operator-only prompt",
+            "storage_uri": "media://private/artifact",
+        },
+        publish=True,
+        reader_visible=True,
+    )
+    sensitive_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Published raw_prompt summary",
+        "storage_uri media://private/artifact body",
+        agent_id=agent_id,
+        source_run_id=uuid.uuid4(),
+        metadata={"raw_output": "operator-only generated text"},
+        publish=True,
+        reader_visible=True,
+    )
+    draft_chapter_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Draft chapter",
+        "Draft chapter body",
+        artifact_kind="chapter_draft",
+        metadata={"raw_output": "operator-only draft"},
+    )
+    hidden_summary_id = _seed_conversation_narrative_artifact(
+        engine,
+        world_id,
+        conversation_id,
+        "Hidden summary",
+        "Hidden summary body",
+        metadata={"storage_uri": "media://hidden/artifact"},
+        publish=True,
+        reader_visible=False,
+    )
+
+    _authenticate(client, member_token)
+    member_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
+    )
+
+    _authenticate(client, owner_token)
+    admin_response = client.get(
+        f"/worlds/{world_id}/conversations/{conversation_id}/narrative",
+    )
+
+    assert create_response.status_code == 201
+    assert member_response.status_code == 200
+    member_artifacts = {artifact["id"]: artifact for artifact in member_response.json()}
+    assert set(member_artifacts) == {str(published_summary_id), str(sensitive_summary_id)}
+    assert member_artifacts[str(published_summary_id)]["source_run_id"] is None
+    assert member_artifacts[str(published_summary_id)]["source_conversation_id"] == str(
+        conversation_id,
+    )
+    assert member_artifacts[str(published_summary_id)]["metadata"] == {}
+    assert member_artifacts[str(published_summary_id)]["title"] == "Published summary"
+    assert member_artifacts[str(published_summary_id)]["content"] == "Published summary body"
+    assert member_artifacts[str(sensitive_summary_id)]["source_run_id"] is None
+    assert member_artifacts[str(sensitive_summary_id)]["metadata"] == {}
+    assert member_artifacts[str(sensitive_summary_id)]["title"] == ""
+    assert member_artifacts[str(sensitive_summary_id)]["content"] == ""
+    assert admin_response.status_code == 200
+    assert {artifact["id"] for artifact in admin_response.json()} == {
+        str(hidden_summary_id),
+        str(draft_chapter_id),
+        str(published_summary_id),
+        str(sensitive_summary_id),
+    }
+    admin_published = next(
+        artifact
+        for artifact in admin_response.json()
+        if artifact["id"] == str(published_summary_id)
+    )
+    assert admin_published["source_run_id"] is not None
+    assert admin_published["metadata"]["raw_prompt"] == "operator-only prompt"
+    admin_sensitive = next(
+        artifact
+        for artifact in admin_response.json()
+        if artifact["id"] == str(sensitive_summary_id)
+    )
+    assert admin_sensitive["title"] == "Published raw_prompt summary"
+    assert admin_sensitive["content"] == "storage_uri media://private/artifact body"
+
+
 def test_conversation_narrative_generation_and_listing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -522,6 +729,7 @@ def _client_with_database() -> tuple[TestClient, Engine]:
         cast(Table, ConversationParticipant.__table__),
         cast(Table, ConversationTurn.__table__),
         cast(Table, NarrativeArtifact.__table__),
+        cast(Table, NarrativePublication.__table__),
         cast(Table, SecretRecord.__table__),
         cast(Table, CharacterKnowledgeFact.__table__),
         cast(Table, CharacterEmotionalState.__table__),
@@ -620,6 +828,54 @@ def _seed_agent(
         )
         session.commit()
     return agent_id
+
+
+def _seed_conversation_narrative_artifact(
+    engine: Engine,
+    world_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    title: str,
+    content: str,
+    *,
+    agent_id: uuid.UUID | None = None,
+    source_run_id: uuid.UUID | None = None,
+    artifact_kind: str = "conversation_summary",
+    metadata: dict[str, object] | None = None,
+    publish: bool = False,
+    reader_visible: bool = True,
+) -> uuid.UUID:
+    artifact_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                agent_id=agent_id,
+                source_run_id=source_run_id,
+                source_conversation_id=conversation_id,
+                title=title,
+                content=content,
+                artifact_kind=artifact_kind,
+                artifact_metadata=metadata or {},
+            ),
+        )
+        if publish:
+            session.add(
+                NarrativePublication(
+                    id=uuid.uuid4(),
+                    world_id=world_id,
+                    artifact_id=artifact_id,
+                    source_draft_id=artifact_id,
+                    status="published",
+                    reader_visible=reader_visible,
+                    published_metadata={"publication_gate": {"status": "pass"}},
+                    published_at=now,
+                    published_by_user_id=None,
+                ),
+            )
+        session.commit()
+    return artifact_id
 
 
 def _seed_provider_profile(engine: Engine) -> uuid.UUID:

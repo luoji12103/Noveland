@@ -95,8 +95,8 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
         display_name: formString(form, "display_name"),
         base_url: optionalFormString(form, "base_url"),
         auth_ref: optionalFormString(form, "auth_ref"),
-        config_json: jsonObject(formString(form, "config_json")),
-        default_params_json: jsonObject(formString(form, "default_params_json")),
+        config_json: sanitizeProviderJsonForDisplay(jsonObject(formString(form, "config_json"))),
+        default_params_json: sanitizeProviderJsonForDisplay(jsonObject(formString(form, "default_params_json"))),
         status: formString(form, "status") as ProviderIntegrationStatus,
         visibility: formString(form, "visibility") as ProviderVisibility,
         capabilities: parseCapabilities(formString(form, "capabilities")),
@@ -117,8 +117,8 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
           display_name: formString(form, "display_name"),
           base_url: optionalFormString(form, "base_url"),
           auth_ref: optionalFormString(form, "auth_ref"),
-          config_json: jsonObject(formString(form, "config_json")),
-          default_params_json: jsonObject(formString(form, "default_params_json")),
+          config_json: sanitizeProviderJsonForDisplay(jsonObject(formString(form, "config_json"))),
+          default_params_json: sanitizeProviderJsonForDisplay(jsonObject(formString(form, "default_params_json"))),
           status: formString(form, "status") as ProviderIntegrationStatus,
           visibility: formString(form, "visibility") as ProviderVisibility,
           capabilities: parseCapabilities(formString(form, "capabilities")),
@@ -255,13 +255,21 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
           <textarea
             className="text-input"
             name="config_json"
-            defaultValue={JSON.stringify(selectedTemplate?.config_json ?? {}, null, 2)}
+            defaultValue={JSON.stringify(
+              sanitizeProviderJsonForDisplay(selectedTemplate?.config_json ?? {}),
+              null,
+              2,
+            )}
             rows={3}
           />
           <textarea
             className="text-input"
             name="default_params_json"
-            defaultValue={JSON.stringify(selectedTemplate?.default_params_json ?? {}, null, 2)}
+            defaultValue={JSON.stringify(
+              sanitizeProviderJsonForDisplay(selectedTemplate?.default_params_json ?? {}),
+              null,
+              2,
+            )}
             rows={3}
           />
           <textarea
@@ -269,9 +277,11 @@ export function ProviderIntegrationAdmin({ worldId, data }: ProviderIntegrationA
             name="capabilities"
             rows={4}
             defaultValue={JSON.stringify(
-              selectedTemplate?.capabilities ?? [
-                { capability_key: "image.generate", capability_json: {} },
-              ],
+              sanitizeProviderCapabilitiesForDisplay(
+                selectedTemplate?.capabilities ?? [
+                  { capability_key: "image.generate", capability_json: {} },
+                ],
+              ),
               null,
               2,
             )}
@@ -498,19 +508,19 @@ function ProviderDetail({
           className="text-input"
           name="config_json"
           rows={4}
-          defaultValue={JSON.stringify(provider.config_json, null, 2)}
+          defaultValue={JSON.stringify(sanitizeProviderJsonForDisplay(provider.config_json), null, 2)}
         />
         <textarea
           className="text-input"
           name="default_params_json"
           rows={4}
-          defaultValue={JSON.stringify(provider.default_params_json, null, 2)}
+          defaultValue={JSON.stringify(sanitizeProviderJsonForDisplay(provider.default_params_json), null, 2)}
         />
         <textarea
           className="text-input"
           name="capabilities"
           rows={4}
-          defaultValue={JSON.stringify(capabilities, null, 2)}
+          defaultValue={JSON.stringify(sanitizeProviderCapabilitiesForDisplay(capabilities), null, 2)}
         />
         <AdminActionBar>
           <button className="primary-button" type="submit" disabled={isBusy}>
@@ -623,10 +633,86 @@ function parseCapabilities(value: string): ProviderCapabilityInput[] {
         record.capability_json !== null &&
         typeof record.capability_json === "object" &&
         !Array.isArray(record.capability_json)
-          ? (record.capability_json as Record<string, unknown>)
+          ? sanitizeProviderJsonForDisplay(record.capability_json as Record<string, unknown>)
           : {},
     };
   });
+}
+
+function sanitizeProviderCapabilitiesForDisplay<T extends ProviderCapabilityInput>(
+  capabilities: T[],
+): T[] {
+  return capabilities.map(
+    (capability) =>
+      ({
+        ...capability,
+        capability_json: sanitizeProviderJsonForDisplay(capability.capability_json),
+      }) as T,
+  );
+}
+
+function sanitizeProviderJsonForDisplay(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveProviderJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeProviderJsonValue(entry)]),
+  );
+}
+
+function sanitizeProviderJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeProviderJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeProviderJsonForDisplay(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveProviderString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_PROVIDER_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_PROVIDER_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveProviderJsonKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return (
+    EXACT_SENSITIVE_PROVIDER_JSON_KEYS.has(normalized) ||
+    SENSITIVE_PROVIDER_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveProviderString(value: string): boolean {
+  return /media:\/\/|base64|\/var\/|\/tmp\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value);
 }
 
 function restrictedVisibility(provider: ProviderIntegration): boolean {
@@ -634,7 +720,7 @@ function restrictedVisibility(provider: ProviderIntegration): boolean {
 }
 
 function safeJsonSummary(value: Record<string, unknown>): string {
-  const keys = Object.keys(value);
+  const keys = Object.keys(value).filter((key) => !sensitiveProviderJsonKey(key));
   if (keys.length === 0) {
     return "{}";
   }

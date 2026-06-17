@@ -13,14 +13,35 @@ describe("ConversationPlayback", () => {
     expect(screen.getByText("Guide replies to the reader.")).toBeInTheDocument();
     expect(screen.getByLabelText("Turn audio")).toHaveAttribute(
       "src",
-      "/api/worlds/world-1/reader/media/objects/audio-object-1/download",
+      `/api/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${AUDIO_OBJECT_ID}/download`,
     );
     expect(screen.getByLabelText("Reader-safe scene media")).toHaveStyle({
       backgroundImage:
-        "url(/api/worlds/world-1/reader/media/objects/composite-object-1/download)",
+        `url(/api/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${COMPOSITE_OBJECT_ID}/download)`,
     });
     expect(serializedDocument()).not.toMatch(
       /storage_uri|media:\/\/|base64|raw_prompt|raw_output|api_key|secret|\/var\/|\/tmp\//i,
+    );
+  });
+
+  it("encodes reader route links for reserved identifiers", () => {
+    render(
+      <ConversationPlayback
+        worldId={RESERVED_WORLD_ID}
+        conversationId={RESERVED_CONVERSATION_ID}
+        data={playbackData}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Back to reader" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader`,
+    );
+    expect(screen.getByRole("link", { name: "Scene view" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader/conversations/${encodeURIComponent(
+        RESERVED_CONVERSATION_ID,
+      )}/scene`,
     );
   });
 
@@ -49,6 +70,13 @@ describe("ConversationPlayback", () => {
 function serializedDocument(): string {
   return document.body.textContent ?? "";
 }
+
+const RESERVED_WORLD_ID = "world/reader?mode=playback#frag";
+const RESERVED_CONVERSATION_ID = "conversation/live?debug=true#frag";
+const READER_WORLD_ID = "11111111-1111-4111-8111-111111111111";
+const READER_WORLDLINE_ID = "11111111-2222-4111-8111-111111111111";
+const COMPOSITE_OBJECT_ID = "22222222-2222-4222-8222-222222222222";
+const AUDIO_OBJECT_ID = "33333333-3333-4333-8333-333333333333";
 
 const playbackData: ConversationPlaybackData = {
   worlds: [],
@@ -188,7 +216,7 @@ const playbackData: ConversationPlaybackData = {
       duration_ms: null,
       objects: [
         {
-          object_id: "composite-object-1",
+          object_id: COMPOSITE_OBJECT_ID,
           object_role: "original",
           content_type: "image/png",
           size: 12,
@@ -198,7 +226,7 @@ const playbackData: ConversationPlaybackData = {
           duration_ms: null,
           sample_rate_hz: null,
           audio_channels: null,
-          download_url: "/worlds/world-1/reader/media/objects/composite-object-1/download",
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${COMPOSITE_OBJECT_ID}/download`,
         },
       ],
       references: [
@@ -229,7 +257,7 @@ const playbackData: ConversationPlaybackData = {
       duration_ms: 1000,
       objects: [
         {
-          object_id: "audio-object-1",
+          object_id: AUDIO_OBJECT_ID,
           object_role: "original",
           content_type: "audio/wav",
           size: 20,
@@ -239,7 +267,7 @@ const playbackData: ConversationPlaybackData = {
           duration_ms: 1000,
           sample_rate_hz: 24000,
           audio_channels: 1,
-          download_url: "/worlds/world-1/reader/media/objects/audio-object-1/download",
+          download_url: `/worlds/${READER_WORLD_ID}/reader/media/worldlines/${READER_WORLDLINE_ID}/objects/${AUDIO_OBJECT_ID}/download`,
         },
       ],
       references: [

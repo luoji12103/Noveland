@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
@@ -68,6 +69,32 @@ from noveland.worlds.models import World
 from noveland.worlds.worldlines import ensure_primary_worldline, primary_worldline_or_none
 from sqlalchemy import ColumnElement, Select, and_, func, join, or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
+
+_RAW_SECRET_VALUE_PATTERN = re.compile(
+    r"(?:^sk-[A-Za-z0-9]|BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY|"
+    r"Bearer\s+[A-Za-z0-9._~+/=-]+|AIza[0-9A-Za-z_-]{20,})",
+    re.IGNORECASE,
+)
+_SENSITIVE_CONFIG_KEY_SUFFIXES = (
+    "apikey",
+    "clientsecret",
+    "accesskey",
+    "privatekey",
+    "password",
+    "token",
+    "secret",
+)
+_SENSITIVE_CONFIG_KEY_EXACT = {
+    "authorization",
+    "bearertoken",
+}
+_MEMORY_BACKEND_CONFIG_FIELDS = (
+    "vector_store_config",
+    "llm_config",
+    "embedder_config",
+    "reranker_config",
+)
+
 
 MEMORY_BACKFILL_EVENT_NAMES = frozenset(
     {
@@ -144,6 +171,13 @@ class MemoryBackendProfileService:
     ) -> MemoryBackendProfileRecord:
         if self._profile_key_exists(profile_create.profile_key):
             raise MemoryValidationError("Memory backend profile key already exists")
+        _validate_memory_backend_profile_secret_boundary(
+            vector_store_config=profile_create.vector_store_config,
+            llm_config=profile_create.llm_config,
+            embedder_config=profile_create.embedder_config,
+            reranker_config=profile_create.reranker_config,
+            secret_refs=profile_create.secret_refs,
+        )
         model = MemoryBackendProfile(
             profile_key=profile_create.profile_key,
             name=profile_create.name,
@@ -164,6 +198,7 @@ class MemoryBackendProfileService:
         model: MemoryBackendProfile,
         profile_update: MemoryBackendProfileUpdate,
     ) -> MemoryBackendProfileRecord:
+        _validate_memory_backend_profile_update_secret_boundary(profile_update)
         if "name" in profile_update.model_fields_set and profile_update.name is not None:
             model.name = profile_update.name
         if "vector_store_config" in profile_update.model_fields_set:
@@ -194,6 +229,94 @@ class MemoryBackendProfileService:
             ).first()
             is not None
         )
+
+
+def _validate_memory_backend_profile_secret_boundary(
+    *,
+    vector_store_config: dict[str, Any],
+    llm_config: dict[str, Any],
+    embedder_config: dict[str, Any],
+    reranker_config: dict[str, Any],
+    secret_refs: dict[str, str],
+) -> None:
+    for field_name, value in (
+        ("vector_store_config", vector_store_config),
+        ("llm_config", llm_config),
+        ("embedder_config", embedder_config),
+        ("reranker_config", reranker_config),
+    ):
+        _reject_sensitive_memory_backend_config(value, field_name=field_name)
+    _validate_memory_backend_secret_refs(secret_refs)
+
+
+def _validate_memory_backend_profile_update_secret_boundary(
+    profile_update: MemoryBackendProfileUpdate,
+) -> None:
+    for field_name in _MEMORY_BACKEND_CONFIG_FIELDS:
+        if field_name in profile_update.model_fields_set:
+            value = getattr(profile_update, field_name) or {}
+            _reject_sensitive_memory_backend_config(value, field_name=field_name)
+    if "secret_refs" in profile_update.model_fields_set:
+        _validate_memory_backend_secret_refs(profile_update.secret_refs or {})
+
+
+def _reject_sensitive_memory_backend_config(value: Any, *, field_name: str) -> None:
+    path = _first_sensitive_memory_backend_config_path(value)
+    if path is not None:
+        raise MemoryValidationError(f"{field_name} contains raw secret material: {path}")
+
+
+def _first_sensitive_memory_backend_config_path(
+    value: Any,
+    *,
+    prefix: str = "",
+) -> str | None:
+    if isinstance(value, dict):
+        for raw_key, item in value.items():
+            key = str(raw_key)
+            path = key if prefix == "" else f"{prefix}.{key}"
+            if _is_sensitive_memory_backend_config_key(key):
+                return path
+            nested = _first_sensitive_memory_backend_config_path(item, prefix=path)
+            if nested is not None:
+                return nested
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            path = f"{prefix}[{index}]" if prefix else f"[{index}]"
+            nested = _first_sensitive_memory_backend_config_path(item, prefix=path)
+            if nested is not None:
+                return nested
+    elif isinstance(value, str) and _looks_like_raw_memory_backend_secret(value):
+        return prefix or "<value>"
+    return None
+
+
+def _validate_memory_backend_secret_refs(secret_refs: dict[str, str]) -> None:
+    for raw_slot, raw_ref in secret_refs.items():
+        slot = str(raw_slot)
+        ref = str(raw_ref)
+        path = f"secret_refs.{slot}"
+        if slot.strip() == "":
+            raise MemoryValidationError("secret_refs contains an empty slot name")
+        if ref.strip() == "":
+            raise MemoryValidationError(f"{path} must be a memory backend secret reference")
+        if ref != ref.strip() or "\n" in ref or "\r" in ref:
+            raise MemoryValidationError(f"{path} must be a single memory backend secret reference")
+        if len(ref) > 200:
+            raise MemoryValidationError(f"{path} is too long")
+        if _looks_like_raw_memory_backend_secret(ref):
+            raise MemoryValidationError(f"{path} must not contain raw secret material")
+
+
+def _is_sensitive_memory_backend_config_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]", "", key.strip().lower())
+    if normalized in _SENSITIVE_CONFIG_KEY_EXACT:
+        return True
+    return any(normalized.endswith(suffix) for suffix in _SENSITIVE_CONFIG_KEY_SUFFIXES)
+
+
+def _looks_like_raw_memory_backend_secret(value: str) -> bool:
+    return _RAW_SECRET_VALUE_PATTERN.search(value.strip()) is not None
 
 
 class MemoryService:
@@ -394,20 +517,23 @@ class MemoryService:
         agent_id: uuid.UUID,
         worldline_id: uuid.UUID | None = None,
     ) -> list[MemoryItemRecord]:
+        resolved_worldline_id = self._worldline_id(world_id, worldline_id)
         try:
             return list(
                 self._backend_for_scope(world_id).list_memories(
                     world_id,
                     agent_id,
-                    self._worldline_id(world_id, worldline_id),
+                    resolved_worldline_id,
                 )
             )
         except Exception:
             return []
 
     def search(self, request: MemorySearchRequest) -> MemorySearchResult:
+        resolved_worldline_id = self._worldline_id(request.world_id, request.worldline_id)
+        resolved_request = request.model_copy(update={"worldline_id": resolved_worldline_id})
         try:
-            result = self._backend_for_scope(request.world_id).search(request)
+            result = self._backend_for_scope(request.world_id).search(resolved_request)
         except Exception:
             result = MemorySearchResult(
                 backend=self._scope_backend_name(request.world_id), items=[], latency_ms=None
@@ -415,7 +541,7 @@ class MemoryService:
         self._session.add(
             MemoryRetrievalLog(
                 world_id=request.world_id,
-                worldline_id=self._worldline_id(request.world_id, request.worldline_id),
+                worldline_id=resolved_worldline_id,
                 agent_id=request.agent_id,
                 backend_profile_id=self._world_or_404(request.world_id).memory_backend_profile_id,
                 backend=result.backend,
@@ -530,15 +656,17 @@ class MemoryService:
         return _snapshot_record(model)
 
     def delete_scope(self, scope: MemoryDeleteScope) -> MemoryDeleteResult:
+        resolved_worldline_id = self._worldline_id(scope.world_id, scope.worldline_id)
+        resolved_scope = scope.model_copy(update={"worldline_id": resolved_worldline_id})
         try:
-            result = self._backend_for_scope(scope.world_id).delete_scope(scope)
+            result = self._backend_for_scope(scope.world_id).delete_scope(resolved_scope)
         except Exception as exc:
             raise MemoryPrivacyDeletionError(str(exc)) from exc
         if scope.run_id is None:
             self._scrub_local_scope_data(
                 scope.world_id,
                 scope.agent_id,
-                self._worldline_id(scope.world_id, scope.worldline_id),
+                resolved_worldline_id,
             )
         self._session.flush()
         return result

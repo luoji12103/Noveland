@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -41,6 +42,13 @@ router = APIRouter(tags=["realtime"])
 STREAM_POLL_INTERVAL_SECONDS = 1.0
 STREAM_KEEPALIVE_SECONDS = 15.0
 
+CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE = re.compile(
+    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    re.IGNORECASE,
+)
+
 
 @router.get("/runtime/stream")
 async def runtime_stream(request: Request) -> StreamingResponse:
@@ -53,10 +61,14 @@ async def runtime_stream(request: Request) -> StreamingResponse:
 
 @router.get("/worlds/{world_id}/stream")
 async def world_stream(world_id: uuid.UUID, request: Request) -> StreamingResponse:
-    _authenticate_world_request(request, world_id)
+    can_manage = _authenticate_world_request(request, world_id)
     return _stream_response(
         request,
-        lambda cursor: collect_world_stream_delta(world_id, cursor),
+        lambda cursor: collect_world_stream_delta(
+            world_id,
+            cursor,
+            include_admin_fields=can_manage,
+        ),
     )
 
 
@@ -66,10 +78,15 @@ async def conversation_stream(
     conversation_id: uuid.UUID,
     request: Request,
 ) -> StreamingResponse:
-    _authenticate_world_request(request, world_id)
+    can_manage = _authenticate_world_request(request, world_id)
     return _stream_response(
         request,
-        lambda cursor: collect_conversation_stream_delta(world_id, conversation_id, cursor),
+        lambda cursor: collect_conversation_stream_delta(
+            world_id,
+            conversation_id,
+            cursor,
+            include_admin_fields=can_manage,
+        ),
     )
 
 
@@ -98,7 +115,12 @@ async def conversation_live(
                 can_manage = True
             except HTTPException:
                 can_manage = False
-            snapshot = _conversation_snapshot(session, world_id, conversation_id)
+            snapshot = _conversation_snapshot(
+                session,
+                world_id,
+                conversation_id,
+                include_admin_fields=can_manage,
+            )
             session.commit()
     except HTTPException as exc:
         await websocket.close(code=_websocket_close_code(exc.status_code), reason=exc.detail)
@@ -214,7 +236,12 @@ def collect_runtime_stream_delta(cursor: str | None) -> dict[str, Any] | None:
     )
 
 
-def collect_world_stream_delta(world_id: uuid.UUID, cursor: str | None) -> dict[str, Any] | None:
+def collect_world_stream_delta(
+    world_id: uuid.UUID,
+    cursor: str | None,
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any] | None:
     parsed = _decode_cursor(cursor)
     with get_session_factory()() as session:
         clock_view = WorldClockService(session).view(world_id)
@@ -228,6 +255,7 @@ def collect_world_stream_delta(world_id: uuid.UUID, cursor: str | None) -> dict[
             session,
             world_id,
             parsed.get("narrative_artifact"),
+            include_admin_fields=include_admin_fields,
         )
         conversations = _world_conversations_since(
             session,
@@ -242,12 +270,27 @@ def collect_world_stream_delta(world_id: uuid.UUID, cursor: str | None) -> dict[
             return None
 
         payload: dict[str, Any] = {
-            "diagnostics": [_diagnostic_payload(record) for record in diagnostics],
-            "agent_runs": [_agent_run_payload(model) for model in agent_runs],
-            "narrative_artifacts": [
-                _narrative_artifact_with_publication_payload(row) for row in artifacts
+            "diagnostics": (
+                [_diagnostic_payload(record) for record in diagnostics]
+                if include_admin_fields
+                else []
+            ),
+            "agent_runs": (
+                [_agent_run_payload(model) for model in agent_runs]
+                if include_admin_fields
+                else []
+            ),
+            "narrative_artifacts": _narrative_artifact_payloads(
+                artifacts,
+                include_admin_fields=include_admin_fields,
+            ),
+            "conversations": [
+                _conversation_session_payload(
+                    model,
+                    include_admin_fields=include_admin_fields,
+                )
+                for model in conversations
             ],
-            "conversations": [_conversation_session_payload(model) for model in conversations],
         }
         if clock_changed:
             payload["clock"] = _world_clock_payload(clock_view)
@@ -294,6 +337,8 @@ def collect_conversation_stream_delta(
     world_id: uuid.UUID,
     conversation_id: uuid.UUID,
     cursor: str | None,
+    *,
+    include_admin_fields: bool = True,
 ) -> dict[str, Any] | None:
     parsed = _decode_cursor(cursor)
     with get_session_factory()() as session:
@@ -318,11 +363,24 @@ def collect_conversation_stream_delta(
             return None
 
         payload: dict[str, Any] = {
-            "turns": [_conversation_turn_payload(turn) for turn in turns],
-            "diagnostics": [_diagnostic_payload(record) for record in diagnostics],
+            "turns": [
+                _conversation_turn_payload(
+                    turn,
+                    include_admin_fields=include_admin_fields,
+                )
+                for turn in turns
+            ],
+            "diagnostics": (
+                [_diagnostic_payload(record) for record in diagnostics]
+                if include_admin_fields
+                else []
+            ),
         }
         if session_changed:
-            payload["session"] = jsonable_encoder(session_record.model_dump(mode="json"))
+            payload["session"] = _conversation_session_payload(
+                session_record,
+                include_admin_fields=include_admin_fields,
+            )
 
         next_cursor = _encode_cursor(
             {
@@ -472,30 +530,48 @@ def _conversation_snapshot(
     session: Any,
     world_id: uuid.UUID,
     conversation_id: uuid.UUID,
+    *,
+    include_admin_fields: bool = True,
 ) -> dict[str, Any]:
     service = ConversationService(session)
     session_record = service.get_session(world_id, conversation_id)
-    return _conversation_snapshot_from_service(service, session_record)
+    return _conversation_snapshot_from_service(
+        service,
+        session_record,
+        include_admin_fields=include_admin_fields,
+    )
 
 
 def _conversation_snapshot_from_service(
     service: ConversationService,
     session_record: Any,
+    *,
+    include_admin_fields: bool = True,
 ) -> dict[str, Any]:
     return {
-        "session": jsonable_encoder(session_record.model_dump(mode="json")),
+        "session": _conversation_session_payload(
+            session_record,
+            include_admin_fields=include_admin_fields,
+        ),
         "participants": [
             jsonable_encoder(participant.model_dump(mode="json"))
             for participant in service.list_participants(session_record.world_id, session_record.id)
         ],
         "turns": [
-            jsonable_encoder(turn.model_dump(mode="json"))
+            _conversation_turn_payload(
+                turn,
+                include_admin_fields=include_admin_fields,
+            )
             for turn in service.list_turns(session_record.world_id, session_record.id)
         ],
-        "diagnostics": [
-            _diagnostic_payload(record)
-            for record in service.list_diagnostics(session_record.world_id, session_record.id)
-        ],
+        "diagnostics": (
+            [
+                _diagnostic_payload(record)
+                for record in service.list_diagnostics(session_record.world_id, session_record.id)
+            ]
+            if include_admin_fields
+            else []
+        ),
     }
 
 
@@ -505,12 +581,21 @@ def _authenticate_runtime_request(request: Request) -> AuthenticatedSubject:
     return subject
 
 
-def _authenticate_world_request(request: Request, world_id: uuid.UUID) -> AuthenticatedSubject:
+def _authenticate_world_request(request: Request, world_id: uuid.UUID) -> bool:
     subject = _authenticate_http_subject(request)
     with get_session_factory()() as session:
         require_world_member(session, subject, world_id)
+        can_manage = _can_manage_world(session, subject, world_id)
         session.commit()
-    return subject
+    return can_manage
+
+
+def _can_manage_world(session: Any, subject: AuthenticatedSubject, world_id: uuid.UUID) -> bool:
+    try:
+        require_world_admin(session, subject, world_id)
+    except HTTPException:
+        return False
+    return True
 
 
 def _authenticate_http_subject(request: Request) -> AuthenticatedSubject:
@@ -699,6 +784,8 @@ def _world_narrative_artifacts_since(
     session: Any,
     world_id: uuid.UUID,
     cursor: dict[str, str] | None,
+    *,
+    include_admin_fields: bool = True,
 ) -> list[tuple[NarrativeArtifact, NarrativePublication | None]]:
     statement = (
         select(NarrativeArtifact, NarrativePublication)
@@ -708,6 +795,11 @@ def _world_narrative_artifacts_since(
         )
         .where(NarrativeArtifact.world_id == world_id)
     )
+    if not include_admin_fields:
+        statement = statement.where(
+            NarrativePublication.status == "published",
+            NarrativePublication.reader_visible.is_(True),
+        )
     if cursor is None or cursor.get("at") is None or cursor.get("id") is None:
         return list(
             session.execute(statement.order_by(NarrativeArtifact.created_at.desc()).limit(10)).all()
@@ -921,7 +1013,11 @@ def _provider_profile_payload(model: ProviderProfile) -> dict[str, Any]:
     )
 
 
-def _conversation_turn_payload(model: ConversationTurn) -> dict[str, Any]:
+def _conversation_turn_payload(
+    model: Any,
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any]:
     return cast(
         dict[str, Any],
         jsonable_encoder(
@@ -931,16 +1027,32 @@ def _conversation_turn_payload(model: ConversationTurn) -> dict[str, Any]:
             "turn_index": model.turn_index,
             "speaker_kind": model.speaker_kind,
             "speaker_agent_id": model.speaker_agent_id,
-            "input_text": model.input_text,
-            "output_text": model.output_text,
+            "input_text": _member_safe_turn_text(
+                model.input_text,
+                include_admin_fields=include_admin_fields,
+            ),
+            "output_text": (
+                None
+                if model.output_text is None
+                else _member_safe_turn_text(
+                    model.output_text,
+                    include_admin_fields=include_admin_fields,
+                )
+            ),
             "status": model.status,
-            "run_id": model.run_id,
-            "error_text": model.error_text,
+            "run_id": model.run_id if include_admin_fields else None,
+            "error_text": model.error_text if include_admin_fields else None,
             "created_at": model.created_at,
             "updated_at": model.updated_at,
         },
         ),
     )
+
+
+def _member_safe_turn_text(value: str, *, include_admin_fields: bool) -> str:
+    if include_admin_fields:
+        return value
+    return "" if CONVERSATION_MEMBER_TEXT_FORBIDDEN_VALUE_RE.search(value) else value
 
 
 def _diagnostic_payload(record: Any) -> dict[str, Any]:
@@ -990,7 +1102,11 @@ def _agent_run_payload(model: AgentRuntimeRun) -> dict[str, Any]:
     )
 
 
-def _narrative_artifact_payload(model: NarrativeArtifact) -> dict[str, Any]:
+def _narrative_artifact_payload(
+    model: NarrativeArtifact,
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any]:
     return cast(
         dict[str, Any],
         jsonable_encoder(
@@ -998,12 +1114,12 @@ def _narrative_artifact_payload(model: NarrativeArtifact) -> dict[str, Any]:
             "id": model.id,
             "world_id": model.world_id,
             "agent_id": model.agent_id,
-            "source_run_id": model.source_run_id,
+            "source_run_id": model.source_run_id if include_admin_fields else None,
             "source_conversation_id": model.source_conversation_id,
             "title": model.title,
             "content": model.content,
             "artifact_kind": model.artifact_kind,
-            "metadata": model.artifact_metadata,
+            "metadata": model.artifact_metadata if include_admin_fields else {},
             "created_at": model.created_at,
             "publication": None,
         },
@@ -1011,18 +1127,57 @@ def _narrative_artifact_payload(model: NarrativeArtifact) -> dict[str, Any]:
     )
 
 
+def _narrative_artifact_payloads(
+    rows: list[tuple[NarrativeArtifact, NarrativePublication | None]],
+    *,
+    include_admin_fields: bool,
+) -> list[dict[str, Any]]:
+    payloads: list[dict[str, Any]] = []
+    for row in rows:
+        payload = _narrative_artifact_with_publication_payload(
+            row,
+            include_admin_fields=include_admin_fields,
+        )
+        if payload is not None:
+            payloads.append(payload)
+    return payloads
+
+
 def _narrative_artifact_with_publication_payload(
     row: tuple[NarrativeArtifact, NarrativePublication | None],
-) -> dict[str, Any]:
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any] | None:
     artifact, publication = row
-    payload = _narrative_artifact_payload(artifact)
+    if (
+        not include_admin_fields
+        and (
+            publication is None
+            or publication.status != "published"
+            or not publication.reader_visible
+        )
+    ):
+        return None
+    payload = _narrative_artifact_payload(
+        artifact,
+        include_admin_fields=include_admin_fields,
+    )
     payload["publication"] = (
-        None if publication is None else _narrative_publication_payload(publication)
+        None
+        if publication is None
+        else _narrative_publication_payload(
+            publication,
+            include_admin_fields=include_admin_fields,
+        )
     )
     return payload
 
 
-def _narrative_publication_payload(model: NarrativePublication) -> dict[str, Any]:
+def _narrative_publication_payload(
+    model: NarrativePublication,
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any]:
     return cast(
         dict[str, Any],
         jsonable_encoder(
@@ -1030,13 +1185,15 @@ def _narrative_publication_payload(model: NarrativePublication) -> dict[str, Any
                 "id": model.id,
                 "world_id": model.world_id,
                 "artifact_id": model.artifact_id,
-                "source_draft_id": model.source_draft_id,
+                "source_draft_id": model.source_draft_id if include_admin_fields else None,
                 "status": model.status,
                 "reader_visible": model.reader_visible,
-                "metadata": model.published_metadata,
+                "metadata": model.published_metadata if include_admin_fields else {},
                 "published_at": model.published_at,
                 "unpublished_at": model.unpublished_at,
-                "published_by_user_id": model.published_by_user_id,
+                "published_by_user_id": (
+                    model.published_by_user_id if include_admin_fields else None
+                ),
                 "created_at": model.created_at,
                 "updated_at": model.updated_at,
             },
@@ -1044,7 +1201,11 @@ def _narrative_publication_payload(model: NarrativePublication) -> dict[str, Any
     )
 
 
-def _conversation_session_payload(model: ConversationSession) -> dict[str, Any]:
+def _conversation_session_payload(
+    model: Any,
+    *,
+    include_admin_fields: bool = True,
+) -> dict[str, Any]:
     return cast(
         dict[str, Any],
         jsonable_encoder(
@@ -1057,18 +1218,42 @@ def _conversation_session_payload(model: ConversationSession) -> dict[str, Any]:
             "scope_type": model.scope_type,
             "mode": model.mode,
             "status": model.status,
-            "objective": model.objective,
-            "opening_prompt": model.opening_prompt,
+            "objective": model.objective if include_admin_fields else "",
+            "opening_prompt": model.opening_prompt if include_admin_fields else "",
             "max_turns": model.max_turns,
             "next_turn_index": model.next_turn_index,
-            "policy": model.policy_config,
-            "writer_config": model.writer_config,
+            "policy": _conversation_config_payload(
+                model,
+                "policy_config",
+                "policy",
+                include_admin_fields=include_admin_fields,
+            ),
+            "writer_config": _conversation_config_payload(
+                model,
+                "writer_config",
+                "writer_config",
+                include_admin_fields=include_admin_fields,
+            ),
             "terminal_reason": model.terminal_reason,
             "created_at": model.created_at,
             "updated_at": model.updated_at,
         },
         ),
     )
+
+
+def _conversation_config_payload(
+    model: Any,
+    orm_field: str,
+    record_field: str,
+    *,
+    include_admin_fields: bool,
+) -> Any:
+    if not include_admin_fields:
+        return {}
+    if hasattr(model, orm_field):
+        return getattr(model, orm_field)
+    return getattr(model, record_field)
 
 
 def _stream_envelope(
@@ -1182,7 +1367,32 @@ def _origin_allowed(origin: str | None, request_url: str) -> bool:
     request_parsed = urlparse(request_url)
     if origin_url.hostname is None or request_parsed.hostname is None:
         return False
-    return origin_url.hostname == request_parsed.hostname
+    expected_origin_scheme = _http_scheme_for_websocket_request(request_parsed.scheme)
+    if origin_url.scheme != expected_origin_scheme:
+        return False
+    return (
+        origin_url.hostname == request_parsed.hostname
+        and _effective_port(origin_url.scheme, origin_url.port)
+        == _effective_port(request_parsed.scheme, request_parsed.port)
+    )
+
+
+def _http_scheme_for_websocket_request(request_scheme: str) -> str:
+    if request_scheme == "ws":
+        return "http"
+    if request_scheme == "wss":
+        return "https"
+    return request_scheme
+
+
+def _effective_port(scheme: str, port: int | None) -> int | None:
+    if port is not None:
+        return port
+    if scheme in {"http", "ws"}:
+        return 80
+    if scheme in {"https", "wss"}:
+        return 443
+    return None
 
 
 def _websocket_close_code(status_code: int) -> int:

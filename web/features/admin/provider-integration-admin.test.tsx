@@ -42,6 +42,24 @@ describe("ProviderIntegrationAdmin", () => {
     expect(screen.getByText("Fake image")).toBeInTheDocument();
     expect(screen.getAllByText(/env:OPENAI_API_KEY/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/sk-live-secret/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/sk-live-secret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/clientSecret/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/clientSecret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/rawPrompt/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/rawPrompt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/storageUri/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/storageUri/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/bearerToken/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/bearerToken/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/promptSnapshotId/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/promptSnapshotId/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/opaque-storage-ref/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/hidden provider prompt/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/rawOutput/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/hidden provider output/)).not.toBeInTheDocument();
+    expect(screen.getAllByDisplayValue(/model_discovery_path/).length).toBeGreaterThan(0);
+    expect(screen.getAllByDisplayValue(/chat_completions_path/).length).toBeGreaterThan(0);
+    expect(screen.getAllByDisplayValue(/temperature/).length).toBeGreaterThan(0);
     expect(screen.getByText("This provider uses restricted visibility. Non-platform users only see it when backend ACLs allow access.")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Provider capabilities" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Provider health checks" })).toBeInTheDocument();
@@ -173,8 +191,19 @@ const providerData: ProviderIntegrationAdminData = {
       base_url: null,
       auth_ref: "env:OPENAI_API_KEY",
       auth_ref_configured: true,
-      config_json: {},
-      default_params_json: {},
+      config_json: {
+        model_discovery_path: "/models",
+        chat_completions_path: "/chat/completions",
+        clientSecret: "sk-live-secret",
+        rawPrompt: "hidden provider prompt",
+        storageUri: "opaque-storage-ref",
+        nested: { filePath: "/var/noveland/provider" },
+      },
+      default_params_json: {
+        temperature: 0.7,
+        bearerToken: "Bearer sk-live-secret",
+        promptSnapshotId: "snapshot-hidden",
+      },
       status: "active",
       visibility: "developer_only",
       created_at: "2026-05-13T00:00:00.000Z",
@@ -187,7 +216,7 @@ const providerData: ProviderIntegrationAdminData = {
         id: "capability-1",
         provider_integration_id: "provider-1",
         capability_key: "image.generate",
-        capability_json: { transparent: true },
+        capability_json: { transparent: true, rawOutput: "hidden provider output" },
         created_at: "2026-05-13T00:00:00.000Z",
         updated_at: "2026-05-13T00:00:00.000Z",
       },
@@ -202,7 +231,7 @@ const providerData: ProviderIntegrationAdminData = {
         latency_ms: 4,
         checked_at: "2026-05-13T00:00:00.000Z",
         error_text: null,
-        metadata_json: { auth_resolved: true },
+        metadata_json: { auth_resolved: true, clientSecret: "sk-live-secret" },
       },
     ],
   },

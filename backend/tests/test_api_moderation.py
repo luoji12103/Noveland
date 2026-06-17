@@ -22,11 +22,11 @@ from noveland.moderation.models import ModerationAction, ModerationIncident, Mod
 from noveland.narrative.models import NarrativeArtifact, NarrativePublication
 from noveland.providers.models import ProviderIntegration
 from noveland.services.api.app import create_app
-from noveland.services.api.csrf import SESSION_COOKIE_NAME
+from noveland.services.api.csrf import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SESSION_COOKIE_NAME
 from noveland.services.api.dependencies import get_db_session
 from noveland.services.api.media import _media_storage
 from noveland.services.api.reader_media import _reader_media_storage
-from noveland.worlds.models import World, Worldline, WorldMembership
+from noveland.worlds.models import PlayerActorProfile, Scene, World, Worldline, WorldMembership
 from sqlalchemy import Table, create_engine, func, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -42,6 +42,10 @@ FORBIDDEN_MARKERS = (
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "promptsnapshot",
+    "rawprompt",
+    "rawoutput",
+    "storageuri",
     "api_key",
     "bearer_token",
     "authorization",
@@ -62,10 +66,18 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     target_id = _seed_conversation(engine, world_id, worldline_id)
 
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
     unauthenticated = client.post(
         f"/worlds/{world_id}/moderation/reports",
         json=_report_payload(worldline_id, target_id),
+        headers={CSRF_HEADER_NAME: "csrf-token"},
     )
+    _authenticate_without_csrf(client, member_token)
+    missing_csrf_report = client.post(
+        f"/worlds/{world_id}/moderation/reports",
+        json=_report_payload(worldline_id, target_id),
+    )
+
     _authenticate(client, member_token)
     created = client.post(
         f"/worlds/{world_id}/moderation/reports",
@@ -83,6 +95,12 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     _authenticate(client, other_token)
     other_list = client.get(f"/worlds/{world_id}/moderation/reports")
 
+    _authenticate_without_csrf(client, admin_token)
+    missing_csrf_review = client.patch(
+        f"/worlds/{world_id}/moderation/reports/{created.json()['id']}",
+        json={"status": "under_review", "review_note": "missing csrf"},
+    )
+
     _authenticate(client, admin_token)
     admin_list = client.get(f"/worlds/{world_id}/moderation/reports")
     reviewed = client.patch(
@@ -91,16 +109,19 @@ def test_reader_can_create_report_and_admin_can_review_without_leaks() -> None:
     )
 
     assert unauthenticated.status_code == 401
+    assert missing_csrf_report.status_code == 403
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "submitted"
     assert body["reporter_user_id"] == str(member_id)
     assert body["worldline_id"] == str(worldline_id)
     assert body["evidence_refs"][0]["kind"] == "conversation_session"
+    assert body["metadata"] == {"client_note": "safe", "nested": {"safe": "kept"}}
     assert unsafe.status_code == 400
     assert member_list.status_code == 403
     assert other_list.status_code == 403
     assert admin_list.status_code == 200
+    assert missing_csrf_review.status_code == 403
     assert [item["id"] for item in admin_list.json()] == [body["id"]]
     assert reviewed.status_code == 200
     assert reviewed.json()["status"] == "under_review"
@@ -125,6 +146,121 @@ def test_moderation_rejects_cross_worldline_report_targets() -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_moderation_rejects_unresolved_concrete_target_refs() -> None:
+    client, engine = _client_with_database()
+    admin_id, admin_token = _seed_user(engine, "admin@example.test", platform_admin=True)
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id, worldline_id = _seed_world_graph(engine, admin_id)
+    other_worldline_id = _seed_worldline(engine, world_id, "secondary")
+    other_world_id, _other_worldline_id = _seed_world_graph(
+        engine, admin_id, slug="other-target-scope"
+    )
+    _add_membership(engine, world_id, admin_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    publication_id = _seed_publication(engine, world_id, worldline_id)
+    other_publication_id = _seed_publication(engine, world_id, other_worldline_id)
+    player_profile_id = _seed_player_profile(engine, world_id, worldline_id, member_id)
+    other_player_profile_id = _seed_player_profile(engine, world_id, other_worldline_id, member_id)
+    scene_id = _seed_scene(engine, world_id)
+    other_scene_id = _seed_scene(engine, other_world_id)
+    random_target_id = uuid.uuid4()
+
+    _authenticate(client, member_token)
+    missing_publication_report = client.post(
+        f"/worlds/{world_id}/moderation/reports",
+        json={
+            **_report_payload(worldline_id, random_target_id),
+            "target_ref_kind": "narrative_publication",
+            "target_ref_id": str(random_target_id),
+        },
+    )
+    cross_worldline_publication_report = client.post(
+        f"/worlds/{world_id}/moderation/reports",
+        json={
+            **_report_payload(worldline_id, other_publication_id),
+            "target_ref_kind": "narrative_publication",
+            "target_ref_id": str(other_publication_id),
+        },
+    )
+    valid_publication_report = client.post(
+        f"/worlds/{world_id}/moderation/reports",
+        json={
+            **_report_payload(worldline_id, publication_id),
+            "target_ref_kind": "narrative_publication",
+            "target_ref_id": str(publication_id),
+        },
+    )
+
+    _authenticate(client, admin_token)
+    missing_scene_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "action_kind": "note_only",
+            "target_ref_kind": "scene",
+            "target_ref_id": str(random_target_id),
+            "reason": "Scene report should target a real scene.",
+        },
+    )
+    cross_world_scene_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "action_kind": "note_only",
+            "target_ref_kind": "scene",
+            "target_ref_id": str(other_scene_id),
+            "reason": "Scene report should stay in world scope.",
+        },
+    )
+    valid_scene_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "action_kind": "note_only",
+            "target_ref_kind": "scene",
+            "target_ref_id": str(scene_id),
+            "reason": "Scene report targets an existing scene.",
+        },
+    )
+    missing_profile_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "worldline_id": str(worldline_id),
+            "action_kind": "note_only",
+            "target_ref_kind": "player_profile",
+            "target_ref_id": str(random_target_id),
+            "reason": "Player report should target a real profile.",
+        },
+    )
+    cross_worldline_profile_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "worldline_id": str(worldline_id),
+            "action_kind": "note_only",
+            "target_ref_kind": "player_profile",
+            "target_ref_id": str(other_player_profile_id),
+            "reason": "Player report should stay in worldline scope.",
+        },
+    )
+    valid_profile_action = client.post(
+        f"/worlds/{world_id}/moderation/actions",
+        json={
+            "worldline_id": str(worldline_id),
+            "action_kind": "note_only",
+            "target_ref_kind": "player_profile",
+            "target_ref_id": str(player_profile_id),
+            "reason": "Player report targets an existing profile.",
+        },
+    )
+
+    assert missing_publication_report.status_code == 404
+    assert cross_worldline_publication_report.status_code == 404
+    assert valid_publication_report.status_code == 201
+    assert missing_scene_action.status_code == 404
+    assert cross_world_scene_action.status_code == 404
+    assert valid_scene_action.status_code == 201
+    assert missing_profile_action.status_code == 404
+    assert cross_worldline_profile_action.status_code == 404
+    assert valid_profile_action.status_code == 201
 
 
 def test_moderation_action_is_audited_without_automatic_execution_or_provider_secret_leak() -> None:
@@ -275,7 +411,7 @@ def test_applied_moderation_takedown_hides_reader_media_without_admin_route_chan
 
     _authenticate(client, member_token)
     before_list = client.get(f"/worlds/{world_id}/reader/media")
-    before_download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    before_download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate(client, admin_token)
     action = client.post(
@@ -293,7 +429,7 @@ def test_applied_moderation_takedown_hides_reader_media_without_admin_route_chan
     _authenticate(client, member_token)
     after_list = client.get(f"/worlds/{world_id}/reader/media")
     after_detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
-    after_download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    after_download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate(client, admin_token)
     admin_download = client.get(f"/worlds/{world_id}/media/objects/{object_id}/download")
@@ -464,7 +600,16 @@ def _report_payload(worldline_id: uuid.UUID, target_id: uuid.UUID) -> dict[str, 
                 "worldline_id": str(worldline_id),
             }
         ],
-        "metadata": {"client_note": "safe"},
+        "metadata": {
+            "client_note": "safe",
+            "rawPrompt": "hidden moderation prompt",
+            "promptSnapshotId": str(uuid.uuid4()),
+            "nested": {
+                "rawOutput": "hidden moderation output",
+                "storageUri": "opaque-moderation-storage",
+                "safe": "kept",
+            },
+        },
     }
 
 
@@ -511,7 +656,9 @@ def _create_required_tables(engine: Engine) -> None:
         cast(Table, World.__table__),
         cast(Table, Worldline.__table__),
         cast(Table, WorldMembership.__table__),
+        cast(Table, Scene.__table__),
         cast(Table, ConversationSession.__table__),
+        cast(Table, PlayerActorProfile.__table__),
         cast(Table, WorldEventModel.__table__),
         cast(Table, ProviderIntegration.__table__),
         cast(Table, NarrativeArtifact.__table__),
@@ -594,6 +741,24 @@ def _seed_world_graph(
     return world_id, worldline_id
 
 
+def _seed_worldline(engine: Engine, world_id: uuid.UUID, key: str) -> uuid.UUID:
+    worldline_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Worldline(
+                id=worldline_id,
+                world_id=world_id,
+                worldline_key=key,
+                name=key.title(),
+                status="active",
+                created_by_actor_ref="system:test",
+                metadata_json={},
+            )
+        )
+        session.commit()
+    return worldline_id
+
+
 def _add_membership(
     engine: Engine,
     world_id: uuid.UUID,
@@ -671,6 +836,81 @@ def _seed_provider(
         )
         session.commit()
     return provider_id
+
+
+def _seed_scene(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+    scene_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            Scene(
+                id=scene_id,
+                world_id=world_id,
+                scene_key=f"scene-{scene_id.hex[:8]}",
+                name="Moderation scene",
+                is_active=True,
+            )
+        )
+        session.commit()
+    return scene_id
+
+
+def _seed_player_profile(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> uuid.UUID:
+    profile_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            PlayerActorProfile(
+                id=profile_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                user_id=user_id,
+                actor_ref=f"player:{user_id}",
+                display_name="Moderation Player",
+                profile_json={},
+                is_active=True,
+            )
+        )
+        session.commit()
+    return profile_id
+
+
+def _seed_publication(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> uuid.UUID:
+    publication_id = uuid.uuid4()
+    artifact_id = uuid.uuid4()
+    with Session(engine) as session:
+        session.add(
+            NarrativeArtifact(
+                id=artifact_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                title="Moderation chapter",
+                content="Reader-safe content",
+                artifact_kind="chapter_draft",
+                artifact_metadata={},
+            )
+        )
+        session.add(
+            NarrativePublication(
+                id=publication_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                artifact_id=artifact_id,
+                status="published",
+                reader_visible=True,
+                published_metadata={},
+                published_at=datetime.now(UTC),
+            )
+        )
+        session.commit()
+    return publication_id
 
 
 def _seed_published_artifact(
@@ -822,7 +1062,24 @@ def _seed_beta_feedback(
     return feedback_id
 
 
+def _reader_media_download_path(
+    world_id: uuid.UUID, worldline_id: uuid.UUID, object_id: uuid.UUID
+) -> str:
+    return (
+        f"/worlds/{world_id}/reader/media/worldlines/"
+        f"{worldline_id}/objects/{object_id}/download"
+    )
+
+
 def _authenticate(client: TestClient, token: str) -> None:
+    client.cookies.clear()
+    client.headers.clear()
+    client.cookies.set(SESSION_COOKIE_NAME, token)
+    client.cookies.set(CSRF_COOKIE_NAME, "csrf-token")
+    client.headers.update({CSRF_HEADER_NAME: "csrf-token"})
+
+
+def _authenticate_without_csrf(client: TestClient, token: str) -> None:
     client.cookies.clear()
     client.headers.clear()
     client.cookies.set(SESSION_COOKIE_NAME, token)

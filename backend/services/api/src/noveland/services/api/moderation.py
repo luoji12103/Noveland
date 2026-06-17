@@ -19,6 +19,7 @@ from noveland.moderation import (
     ModerationService,
     ModerationValidationError,
 )
+from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
     get_db_session,
@@ -52,6 +53,7 @@ def list_moderation_reports(
     "/reports",
     response_model=ModerationReportRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def create_moderation_report(
     world_id: uuid.UUID,
@@ -73,7 +75,11 @@ def create_moderation_report(
         raise _bad_request(str(exc)) from exc
 
 
-@router.patch("/reports/{report_id}", response_model=ModerationReportRead)
+@router.patch(
+    "/reports/{report_id}",
+    response_model=ModerationReportRead,
+    dependencies=[Depends(require_csrf)],
+)
 def review_moderation_report(
     world_id: uuid.UUID,
     report_id: uuid.UUID,
@@ -99,6 +105,7 @@ def review_moderation_report(
     "/safety-reviews",
     response_model=ModerationReportRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def create_moderation_safety_review(
     world_id: uuid.UUID,
@@ -124,6 +131,7 @@ def create_moderation_safety_review(
     "/feedback-escalations",
     response_model=ModerationReportRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def escalate_feedback_to_moderation(
     world_id: uuid.UUID,
@@ -166,6 +174,7 @@ def list_moderation_actions(
     "/actions",
     response_model=ModerationActionRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def create_moderation_action(
     world_id: uuid.UUID,
@@ -209,6 +218,7 @@ def list_moderation_incidents(
     "/incidents",
     response_model=ModerationIncidentRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def create_moderation_incident(
     world_id: uuid.UUID,
@@ -229,7 +239,11 @@ def create_moderation_incident(
         raise _bad_request(str(exc)) from exc
 
 
-@router.patch("/incidents/{incident_id}", response_model=ModerationIncidentRead)
+@router.patch(
+    "/incidents/{incident_id}",
+    response_model=ModerationIncidentRead,
+    dependencies=[Depends(require_csrf)],
+)
 def review_moderation_incident(
     world_id: uuid.UUID,
     incident_id: uuid.UUID,

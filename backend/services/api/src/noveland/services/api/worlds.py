@@ -75,6 +75,7 @@ from noveland.memory import (
 from noveland.memory import (
     MemorySearchRequest as MemoryLookupRequest,
 )
+from noveland.memory.errors import MemoryValidationError
 from noveland.memory.models import MemoryBackendProfile
 from noveland.narrative import (
     NarrativeArtifactKind,
@@ -180,6 +181,41 @@ from sqlalchemy.orm import Session
 
 SLUG_PATTERN = r"^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$"
 SLUG_RE = re.compile(SLUG_PATTERN)
+PUBLIC_JSON_FORBIDDEN_KEYS = {
+    "api_key",
+    "apikey",
+    "auth_ref",
+    "auth_refs",
+    "authorization",
+    "base64",
+    "bearer_token",
+    "bytes",
+    "client_secret",
+    "file_path",
+    "filesystem_path",
+    "password",
+    "path",
+    "preview_uri",
+    "private_key",
+    "prompt_snapshot",
+    "raw_bytes",
+    "raw_output",
+    "raw_prompt",
+    "resolved_secret",
+    "secret",
+    "secret_ref",
+    "secret_refs",
+    "storage_uri",
+    "thumbnail_uri",
+    "token",
+}
+PUBLIC_JSON_FORBIDDEN_VALUE_RE = re.compile(
+    r"(media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot)",
+    re.IGNORECASE,
+)
+_OMIT_PUBLIC_JSON_VALUE = object()
 
 WorldRole = Literal["world_admin", "human_user"]
 AgentKind = Literal["role_agent", "narrative_agent"]
@@ -2607,7 +2643,7 @@ class WorldSnapshotResponse(BaseModel):
     payload_uri: str | None
     payload_location: str | None
     metadata: dict[str, Any]
-    created_by_event_id: uuid.UUID
+    created_by_event_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -2658,7 +2694,8 @@ def list_worlds(
             .where(WorldMembership.user_id == subject.user_id)
             .order_by(World.slug),
         ).all()
-    return [_world_response(world) for world in worlds]
+    include_admin_fields = is_platform_admin(subject)
+    return [_world_response(world, include_admin_fields=include_admin_fields) for world in worlds]
 
 
 @root_router.get("/agent-presets", response_model=list[AgentPresetResponse])
@@ -3025,7 +3062,11 @@ def get_world(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldResponse:
-    return _world_response(_world_or_404(db_session, context.world_id))
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return _world_response(
+        _world_or_404(db_session, context.world_id),
+        include_admin_fields=can_manage,
+    )
 
 
 @router.get("/{world_id}/bible", response_model=WorldBibleResponse | None)
@@ -3034,10 +3075,14 @@ def get_world_bible(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> WorldBibleResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     bible = db_session.scalars(
         select(WorldBible).where(WorldBible.world_id == context.world_id),
     ).one_or_none()
-    return None if bible is None else _world_bible_response(bible)
+    return None if bible is None else _world_bible_response(
+        bible,
+        include_admin_fields=can_manage,
+    )
 
 
 @router.put("/{world_id}/bible", response_model=WorldBibleResponse)
@@ -3071,6 +3116,7 @@ def list_worldlines(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[WorldlineResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _world_or_404(db_session, context.world_id)
     ensure_primary_worldline(db_session, context.world_id)
     worldlines = db_session.scalars(
@@ -3078,7 +3124,10 @@ def list_worldlines(
         .where(Worldline.world_id == context.world_id)
         .order_by(Worldline.parent_worldline_id.is_not(None), Worldline.created_at),
     ).all()
-    return [_worldline_response(worldline) for worldline in worldlines]
+    return [
+        _worldline_response(worldline, include_admin_fields=can_manage)
+        for worldline in worldlines
+    ]
 
 
 @router.post(
@@ -3456,7 +3505,7 @@ def list_player_actors(
     actors = db_session.scalars(
         statement.order_by(PlayerActorProfile.display_name),
     ).all()
-    return [_player_actor_response(actor) for actor in actors]
+    return [_player_actor_response(actor, include_admin_fields=can_manage) for actor in actors]
 
 
 @router.put("/{world_id}/player-actors", response_model=PlayerActorResponse)
@@ -3481,9 +3530,9 @@ def bind_player_actor(
         user_id=user_id,
         display_name=actor_bind.display_name,
         current_scene_id=actor_bind.current_scene_id,
-        profile=actor_bind.profile,
+        profile=_sanitize_public_json(actor_bind.profile),
     )
-    return _player_actor_response(actor)
+    return _player_actor_response(actor, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/player-choices", response_model=list[PlayerChoiceResponse])
@@ -3514,7 +3563,9 @@ def list_player_choices(
     choices = db_session.scalars(
         statement.order_by(PlayerChoiceRecord.created_at.desc()).limit(limit),
     ).all()
-    return [_player_choice_response(choice) for choice in choices]
+    return [
+        _player_choice_response(choice, include_admin_fields=can_manage) for choice in choices
+    ]
 
 
 @router.post(
@@ -3554,7 +3605,7 @@ def record_player_choice(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
-    return _player_choice_response(choice)
+    return _player_choice_response(choice, include_admin_fields=can_manage)
 
 
 @router.post(
@@ -3579,10 +3630,22 @@ def preview_player_choice_consequences(
         effects=choice_create.effects,
     )
     return ChoiceConsequencePreviewResponse(
-        relationship_updates=preview.relationship_updates,
-        faction_updates=preview.faction_updates,
-        offscreen_events=preview.offscreen_events,
-        diagnostics=preview.diagnostics,
+        relationship_updates=(
+            preview.relationship_updates
+            if can_manage
+            else _sanitize_public_json_list(preview.relationship_updates)
+        ),
+        faction_updates=(
+            preview.faction_updates
+            if can_manage
+            else _sanitize_public_json_list(preview.faction_updates)
+        ),
+        offscreen_events=(
+            preview.offscreen_events
+            if can_manage
+            else _sanitize_public_json_list(preview.offscreen_events)
+        ),
+        diagnostics=preview.diagnostics if can_manage else [],
     )
 
 
@@ -4697,12 +4760,13 @@ def get_living_world_dashboard(
     worldline_id: uuid.UUID | None = None,
 ) -> LivingWorldDashboardResponse:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     dashboard = LivingWorldGuardrailService(db_session).dashboard(
         world_id=context.world_id,
         worldline_id=worldline_id,
         user_id=context.subject.user_id,
     )
-    return _living_world_dashboard_response(dashboard)
+    return _living_world_dashboard_response(dashboard, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/knowledge", response_model=list[KnowledgeFactResponse])
@@ -4960,8 +5024,9 @@ def list_player_journal(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     requested_user_id = user_id or context.subject.user_id
-    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if requested_user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     statement = select(PlayerJournalEntry).where(
         PlayerJournalEntry.world_id == context.world_id,
@@ -4971,7 +5036,7 @@ def list_player_journal(
     entries = db_session.scalars(
         statement.order_by(PlayerJournalEntry.created_at.desc()).limit(limit)
     ).all()
-    return [_journal_entry_response(entry) for entry in entries]
+    return [_journal_entry_response(entry, include_admin_fields=can_manage) for entry in entries]
 
 
 @router.post(
@@ -5017,12 +5082,13 @@ def list_notifications(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     statement = select(InWorldNotification).where(
         InWorldNotification.world_id == context.world_id,
         InWorldNotification.worldline_id == resolved_worldline.id,
         InWorldNotification.user_id == context.subject.user_id,
     )
-    if context.role == AuthRole.WORLD_ADMIN.value:
+    if can_manage:
         statement = select(InWorldNotification).where(
             InWorldNotification.world_id == context.world_id,
             InWorldNotification.worldline_id == resolved_worldline.id,
@@ -5032,7 +5098,10 @@ def list_notifications(
     notifications = db_session.scalars(
         statement.order_by(InWorldNotification.created_at.desc()).limit(limit)
     ).all()
-    return [_notification_response(notification) for notification in notifications]
+    return [
+        _notification_response(notification, include_admin_fields=can_manage)
+        for notification in notifications
+    ]
 
 
 @router.post(
@@ -5077,15 +5146,16 @@ def list_interventions(
         context.world_id,
         worldline_id,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     requested_user_id = user_id or context.subject.user_id
-    if requested_user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if requested_user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     statement = select(PlayerInterventionRecord).where(
         PlayerInterventionRecord.world_id == context.world_id,
         PlayerInterventionRecord.worldline_id == resolved_worldline.id,
         PlayerInterventionRecord.user_id == requested_user_id,
     )
-    if context.role == AuthRole.WORLD_ADMIN.value and user_id is None:
+    if can_manage and user_id is None:
         statement = select(PlayerInterventionRecord).where(
             PlayerInterventionRecord.world_id == context.world_id,
             PlayerInterventionRecord.worldline_id == resolved_worldline.id,
@@ -5095,7 +5165,10 @@ def list_interventions(
     interventions = db_session.scalars(
         statement.order_by(PlayerInterventionRecord.created_at.desc()).limit(limit),
     ).all()
-    return [_intervention_response(intervention) for intervention in interventions]
+    return [
+        _intervention_response(intervention, include_admin_fields=can_manage)
+        for intervention in interventions
+    ]
 
 
 @router.post(
@@ -5110,8 +5183,9 @@ def create_intervention(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> PlayerInterventionResponse:
     require_csrf(request)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     user_id = intervention_create.user_id or context.subject.user_id
-    if user_id != context.subject.user_id and context.role != AuthRole.WORLD_ADMIN.value:
+    if user_id != context.subject.user_id and not can_manage:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     if intervention_create.target_agent_id is not None:
         _agent_or_404(db_session, context.world_id, intervention_create.target_agent_id)
@@ -5134,7 +5208,7 @@ def create_intervention(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
-    return _intervention_response(intervention)
+    return _intervention_response(intervention, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/gm-style-reviews", response_model=list[GMStyleReviewResponse])
@@ -5542,8 +5616,12 @@ def get_release_profile(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> ReleaseProfileResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     profile = LivingWorldBetaService(db_session).get_release_profile(world_id=context.world_id)
-    return None if profile is None else _release_profile_response(profile)
+    return None if profile is None else _release_profile_response(
+        profile,
+        include_admin_fields=can_manage,
+    )
 
 
 @router.put("/{world_id}/release-profile", response_model=ReleaseProfileResponse)
@@ -5950,10 +6028,12 @@ def replay_state(
     worldline_id: uuid.UUID | None = None,
 ) -> WorldReplayState:
     _world_or_404(db_session, context.world_id)
-    return WorldReplayService(db_session, load_settings()).replay_state(
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    state = WorldReplayService(db_session, load_settings()).replay_state(
         context.world_id,
         worldline_id=worldline_id,
     )
+    return _replay_state_response(state, include_admin_fields=can_manage)
 
 
 @router.get("/{world_id}/snapshots/latest", response_model=WorldSnapshotResponse | None)
@@ -5963,13 +6043,14 @@ def latest_snapshot(
     worldline_id: uuid.UUID | None = None,
 ) -> WorldSnapshotResponse | None:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     snapshot = WorldReplayService(db_session, load_settings()).latest_snapshot(
         context.world_id,
         worldline_id=worldline_id,
     )
     if snapshot is None:
         return None
-    return _snapshot_response(snapshot)
+    return _snapshot_response(snapshot, include_admin_fields=can_manage)
 
 
 @router.get(
@@ -6046,8 +6127,9 @@ def list_schedule_rules(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[ScheduleRuleResponse]:
     _world_or_404(db_session, context.world_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _schedule_rule_response(rule)
+        _schedule_rule_response(rule, include_admin_fields=can_manage)
         for rule in CalendarService(db_session).list_rules(context.world_id)
     ]
 
@@ -6409,7 +6491,8 @@ def list_scenes(
     scenes = db_session.scalars(
         select(Scene).where(Scene.world_id == context.world_id).order_by(Scene.scene_key),
     ).all()
-    return [_scene_response(scene) for scene in scenes]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_scene_response(scene, include_admin_fields=can_manage) for scene in scenes]
 
 
 @router.post(
@@ -6491,7 +6574,10 @@ def list_location_edges(
         .where(SceneLocationEdge.world_id == context.world_id)
         .order_by(SceneLocationEdge.created_at),
     ).all()
-    return [_location_edge_response(db_session, edge) for edge in edges]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _location_edge_response(db_session, edge, include_admin_fields=can_manage) for edge in edges
+    ]
 
 
 @router.post(
@@ -6559,12 +6645,19 @@ def list_organizations(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[OrganizationResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     organizations = db_session.scalars(
         select(WorldOrganization)
         .where(WorldOrganization.world_id == context.world_id)
         .order_by(WorldOrganization.organization_key),
     ).all()
-    return [_organization_response(organization) for organization in organizations]
+    return [
+        _organization_response(
+            organization,
+            include_admin_fields=can_manage,
+        )
+        for organization in organizations
+    ]
 
 
 @router.post(
@@ -6645,6 +6738,7 @@ def list_organization_memberships(
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[OrganizationMembershipResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _organization_or_404(db_session, context.world_id, organization_id)
     memberships = db_session.scalars(
         select(OrganizationMembership)
@@ -6654,7 +6748,12 @@ def list_organization_memberships(
         )
         .order_by(OrganizationMembership.created_at),
     ).all()
-    return [_organization_membership_response(db_session, membership) for membership in memberships]
+    return [
+        _organization_membership_response(
+            db_session, membership, include_admin_fields=can_manage
+        )
+        for membership in memberships
+    ]
 
 
 @router.post(
@@ -6737,6 +6836,7 @@ def list_faction_tracks(
     db_session: Annotated[Session, Depends(get_db_session)],
     worldline_id: uuid.UUID | None = None,
 ) -> list[FactionProgressTrackResponse]:
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     _organization_or_404(db_session, context.world_id, organization_id)
     resolved_worldline = LivingWorldGMService(db_session).worldline_or_404(
         context.world_id,
@@ -6751,7 +6851,12 @@ def list_faction_tracks(
         )
         .order_by(FactionProgressTrack.track_key),
     ).all()
-    return [_faction_track_response(db_session, track) for track in tracks]
+    return [
+        _faction_track_response(
+            db_session, track, include_admin_fields=can_manage
+        )
+        for track in tracks
+    ]
 
 
 @router.post(
@@ -7016,7 +7121,8 @@ def list_agents(
     agents = db_session.scalars(
         select(Agent).where(Agent.world_id == context.world_id).order_by(Agent.agent_key),
     ).all()
-    return [_agent_response(agent) for agent in agents]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [_agent_response(agent, include_admin_fields=can_manage) for agent in agents]
 
 
 @router.get(
@@ -7043,7 +7149,11 @@ def list_agent_relationships(
         )
         .order_by(AgentRelationshipEdge.relationship_type, AgentRelationshipEdge.created_at),
     ).all()
-    return [_agent_relationship_response(db_session, edge) for edge in edges]
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return [
+        _agent_relationship_response(db_session, edge, include_admin_fields=can_manage)
+        for edge in edges
+    ]
 
 
 @router.get(
@@ -7068,7 +7178,12 @@ def get_agent_presence(
             AgentPresenceState.agent_id == agent_id,
         ),
     ).one_or_none()
-    return None if presence is None else _presence_response(db_session, presence)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
+    return (
+        None
+        if presence is None
+        else _presence_response(db_session, presence, include_admin_fields=can_manage)
+    )
 
 
 @router.put(
@@ -7254,8 +7369,9 @@ def list_agent_calendar(
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> list[CalendarEntryResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _calendar_entry_response(entry)
+        _calendar_entry_response(entry, include_admin_fields=can_manage)
         for entry in CalendarService(db_session).list_entries(context.world_id, agent_id)
     ]
 
@@ -7359,10 +7475,14 @@ def list_agent_memory(
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     memory_service = MemoryService(db_session, load_settings())
-    return [
-        _memory_item_response(item)
-        for item in memory_service.list_memories(context.world_id, agent_id, worldline_id)
-    ]
+    try:
+        items = memory_service.list_memories(context.world_id, agent_id, worldline_id)
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return [_memory_item_response(item) for item in items]
 
 
 @router.post(
@@ -7377,9 +7497,8 @@ def search_agent_memory(
 ) -> list[MemoryItemResponse]:
     _agent_or_404(db_session, context.world_id, agent_id)
     memory_service = MemoryService(db_session, load_settings())
-    return [
-        _memory_item_response(item)
-        for item in memory_service.search(
+    try:
+        result = memory_service.search(
             MemoryLookupRequest(
                 world_id=context.world_id,
                 worldline_id=search_request.worldline_id,
@@ -7387,8 +7506,13 @@ def search_agent_memory(
                 query_text=search_request.query_text,
                 limit=search_request.limit,
             )
-        ).items
-    ]
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return [_memory_item_response(item) for item in result.items]
 
 
 @router.get(
@@ -7402,11 +7526,17 @@ def get_agent_memory_profile_snapshot(
     worldline_id: uuid.UUID | None = None,
 ) -> MemoryProfileSnapshotResponse | None:
     _agent_or_404(db_session, context.world_id, agent_id)
-    snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
-        context.world_id,
-        agent_id,
-        worldline_id,
-    )
+    try:
+        snapshot = MemoryService(db_session, load_settings()).get_profile_snapshot(
+            context.world_id,
+            agent_id,
+            worldline_id,
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return None if snapshot is None else _memory_profile_snapshot_response(snapshot)
 
 
@@ -7423,11 +7553,17 @@ def refresh_agent_memory_profile_snapshot(
 ) -> MemoryProfileSnapshotResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
-        context.world_id,
-        agent_id,
-        worldline_id,
-    )
+    try:
+        snapshot = MemoryService(db_session, load_settings()).refresh_profile_snapshot(
+            context.world_id,
+            agent_id,
+            worldline_id,
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return _memory_profile_snapshot_response(snapshot)
 
 
@@ -7444,13 +7580,19 @@ def forget_agent_memory(
 ) -> MemoryDeleteResponse:
     require_csrf(request)
     _agent_or_404(db_session, context.world_id, agent_id)
-    result = MemoryService(db_session, load_settings()).delete_scope(
-        MemoryDeleteScope(
-            world_id=context.world_id,
-            worldline_id=worldline_id,
-            agent_id=agent_id,
-        ),
-    )
+    try:
+        result = MemoryService(db_session, load_settings()).delete_scope(
+            MemoryDeleteScope(
+                world_id=context.world_id,
+                worldline_id=worldline_id,
+                agent_id=agent_id,
+            ),
+        )
+    except MemoryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     return MemoryDeleteResponse(backend=result.backend, deleted_count=result.deleted_count)
 
 
@@ -7602,8 +7744,9 @@ def list_agent_runs(
         ProviderProfileService(db_session, settings),
         settings,
     )
+    can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _agent_run_response(run)
+        _agent_run_response(run, include_admin_fields=can_manage)
         for run in orchestrator.list_runs(context.world_id, agent_id, worldline_id)
     ]
 
@@ -7728,7 +7871,7 @@ def list_narrative_artifacts(
 ) -> list[NarrativeArtifactResponse]:
     can_manage = context.is_platform_admin or context.role == AuthRole.WORLD_ADMIN.value
     return [
-        _narrative_artifact_response(artifact)
+        _narrative_artifact_response(artifact, include_admin_fields=can_manage)
         for artifact in NarrativeArtifactService(db_session).list_artifacts_with_publications(
             context.world_id,
             artifact_kind=None if artifact_kind is None else NarrativeArtifactKind(artifact_kind),
@@ -7763,7 +7906,7 @@ def get_narrative_artifact(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Narrative artifact not found",
         )
-    return _narrative_artifact_response(artifact)
+    return _narrative_artifact_response(artifact, include_admin_fields=can_manage)
 
 
 @router.post(
@@ -8026,33 +8169,47 @@ def deactivate_agent(
     db_session.flush()
 
 
-def _world_response(world: World) -> WorldResponse:
+def _world_response(
+    world: World,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldResponse:
     return WorldResponse(
         id=world.id,
         owner_user_id=world.owner_user_id,
         slug=world.slug,
-        name=world.name,
-        description=world.description,
-        rules_config=world.rules_config,
-        memory_plugin_identifier=world.memory_plugin_identifier,
-        memory_backend_profile_id=world.memory_backend_profile_id,
-        memory_plugin_config=world.memory_plugin_config,
-        world_rules_plugin_identifier=world.world_rules_plugin_identifier,
-        world_rules_plugin_config=world.world_rules_plugin_config,
+        name=world.name if include_admin_fields else _sanitize_public_text(world.name),
+        description=(
+            world.description
+            if include_admin_fields or world.description is None
+            else _sanitize_public_text(world.description)
+        ),
+        rules_config=world.rules_config if include_admin_fields else {},
+        memory_plugin_identifier=world.memory_plugin_identifier if include_admin_fields else "",
+        memory_backend_profile_id=world.memory_backend_profile_id if include_admin_fields else None,
+        memory_plugin_config=world.memory_plugin_config if include_admin_fields else {},
+        world_rules_plugin_identifier=(
+            world.world_rules_plugin_identifier if include_admin_fields else ""
+        ),
+        world_rules_plugin_config=world.world_rules_plugin_config if include_admin_fields else {},
         is_active=world.is_active,
     )
 
 
-def _scene_response(scene: Scene) -> SceneResponse:
+def _scene_response(scene: Scene, *, include_admin_fields: bool = True) -> SceneResponse:
     return SceneResponse(
         id=scene.id,
         world_id=scene.world_id,
         scene_key=scene.scene_key,
-        name=scene.name,
-        description=scene.description,
+        name=scene.name if include_admin_fields else _sanitize_public_text(scene.name),
+        description=(
+            scene.description
+            if include_admin_fields or scene.description is None
+            else _sanitize_public_text(scene.description)
+        ),
         region_key=scene.region_key,
         location_tags=scene.location_tags,
-        opening_rules=scene.opening_rules,
+        opening_rules=scene.opening_rules if include_admin_fields else {},
         is_active=scene.is_active,
     )
 
@@ -8060,6 +8217,8 @@ def _scene_response(scene: Scene) -> SceneResponse:
 def _location_edge_response(
     db_session: Session,
     edge: SceneLocationEdge,
+    *,
+    include_admin_fields: bool = True,
 ) -> SceneLocationEdgeResponse:
     source_scene = _scene_or_404(db_session, edge.world_id, edge.source_scene_id)
     target_scene = _scene_or_404(db_session, edge.world_id, edge.target_scene_id)
@@ -8070,24 +8229,44 @@ def _location_edge_response(
         target_scene_id=edge.target_scene_id,
         source_scene_key=source_scene.scene_key,
         target_scene_key=target_scene.scene_key,
-        travel_label=edge.travel_label,
-        traversal_rules=edge.traversal_rules,
+        travel_label=(
+            edge.travel_label
+            if include_admin_fields or edge.travel_label is None
+            else _sanitize_public_text(edge.travel_label)
+        ),
+        traversal_rules=edge.traversal_rules if include_admin_fields else {},
         created_at=edge.created_at,
         updated_at=edge.updated_at,
     )
 
 
-def _organization_response(organization: WorldOrganization) -> OrganizationResponse:
+def _organization_response(
+    organization: WorldOrganization,
+    *,
+    include_admin_fields: bool = True,
+) -> OrganizationResponse:
     return OrganizationResponse(
         id=organization.id,
         world_id=organization.world_id,
         organization_key=organization.organization_key,
-        name=organization.name,
+        name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         organization_type=cast(OrganizationType, organization.organization_type),
-        description=organization.description,
-        public_summary=organization.public_summary,
-        hidden_summary=organization.hidden_summary,
-        metadata=organization.metadata_json,
+        description=(
+            organization.description
+            if include_admin_fields or organization.description is None
+            else _sanitize_public_text(organization.description)
+        ),
+        public_summary=(
+            organization.public_summary
+            if include_admin_fields or organization.public_summary is None
+            else _sanitize_public_text(organization.public_summary)
+        ),
+        hidden_summary=organization.hidden_summary if include_admin_fields else None,
+        metadata=organization.metadata_json if include_admin_fields else {},
         is_active=organization.is_active,
         created_at=organization.created_at,
         updated_at=organization.updated_at,
@@ -8097,6 +8276,8 @@ def _organization_response(organization: WorldOrganization) -> OrganizationRespo
 def _organization_membership_response(
     db_session: Session,
     membership: OrganizationMembership,
+    *,
+    include_admin_fields: bool = True,
 ) -> OrganizationMembershipResponse:
     organization = _organization_or_404(db_session, membership.world_id, membership.organization_id)
     agent = _agent_or_404(db_session, membership.world_id, membership.agent_id)
@@ -8105,16 +8286,28 @@ def _organization_membership_response(
         world_id=membership.world_id,
         organization_id=membership.organization_id,
         organization_key=organization.organization_key,
-        organization_name=organization.name,
+        organization_name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         agent_id=membership.agent_id,
         agent_key=agent.agent_key,
         agent_display_name=agent.display_name,
-        role_title=membership.role_title,
+        role_title=(
+            membership.role_title
+            if include_admin_fields or membership.role_title is None
+            else _sanitize_public_text(membership.role_title)
+        ),
         visibility=cast(OrganizationVisibility, membership.visibility),
         loyalty=membership.loyalty,
         influence=membership.influence,
-        responsibilities=membership.responsibilities,
-        metadata=membership.metadata_json,
+        responsibilities=(
+            membership.responsibilities
+            if include_admin_fields
+            else [_sanitize_public_text(item) for item in membership.responsibilities]
+        ),
+        metadata=membership.metadata_json if include_admin_fields else {},
         created_at=membership.created_at,
         updated_at=membership.updated_at,
     )
@@ -8123,6 +8316,8 @@ def _organization_membership_response(
 def _faction_track_response(
     db_session: Session,
     track: FactionProgressTrack,
+    *,
+    include_admin_fields: bool = True,
 ) -> FactionProgressTrackResponse:
     organization = _organization_or_404(db_session, track.world_id, track.organization_id)
     return FactionProgressTrackResponse(
@@ -8131,20 +8326,33 @@ def _faction_track_response(
         worldline_id=track.worldline_id,
         organization_id=track.organization_id,
         organization_key=organization.organization_key,
-        organization_name=organization.name,
+        organization_name=(
+            organization.name
+            if include_admin_fields
+            else _sanitize_public_text(organization.name)
+        ),
         track_key=track.track_key,
-        name=track.name,
+        name=track.name if include_admin_fields else _sanitize_public_text(track.name),
         track_type=cast(FactionTrackType, track.track_type),
         progress=track.progress,
         pressure=track.pressure,
-        summary=track.summary,
-        metadata=track.metadata_json,
+        summary=(
+            track.summary
+            if include_admin_fields or track.summary is None
+            else _sanitize_public_text(track.summary)
+        ),
+        metadata=track.metadata_json if include_admin_fields else {},
         created_at=track.created_at,
         updated_at=track.updated_at,
     )
 
 
-def _presence_response(db_session: Session, presence: AgentPresenceState) -> AgentPresenceResponse:
+def _presence_response(
+    db_session: Session,
+    presence: AgentPresenceState,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentPresenceResponse:
     agent = _agent_or_404(db_session, presence.world_id, presence.agent_id)
     scene = (
         None
@@ -8163,8 +8371,8 @@ def _presence_response(db_session: Session, presence: AgentPresenceState) -> Age
         current_scene_name=None if scene is None else scene.name,
         visibility_status=cast(PresenceVisibilityStatus, presence.visibility_status),
         encounter_eligible=presence.encounter_eligible,
-        scheduled_movement=presence.scheduled_movement,
-        last_event_id=presence.last_event_id,
+        scheduled_movement=presence.scheduled_movement if include_admin_fields else {},
+        last_event_id=presence.last_event_id if include_admin_fields else None,
         created_at=presence.created_at,
         updated_at=presence.updated_at,
     )
@@ -8228,19 +8436,27 @@ def _offscreen_resolution_response(result: Any) -> OffscreenResolutionResponse:
     )
 
 
-def _worldline_response(worldline: Worldline) -> WorldlineResponse:
+def _worldline_response(
+    worldline: Worldline,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldlineResponse:
     return WorldlineResponse(
         id=worldline.id,
         world_id=worldline.world_id,
         worldline_key=worldline.worldline_key,
-        name=worldline.name,
-        description=worldline.description,
+        name=worldline.name if include_admin_fields else _sanitize_public_text(worldline.name),
+        description=(
+            worldline.description
+            if include_admin_fields or worldline.description is None
+            else _sanitize_public_text(worldline.description)
+        ),
         parent_worldline_id=worldline.parent_worldline_id,
         forked_from_snapshot_id=worldline.forked_from_snapshot_id,
         fork_event_sequence=worldline.fork_event_sequence,
         status=cast(WorldlineStatus, worldline.status),
         created_by_actor_ref=worldline.created_by_actor_ref,
-        metadata=worldline.metadata_json,
+        metadata=worldline.metadata_json if include_admin_fields else {},
         created_at=worldline.created_at,
         updated_at=worldline.updated_at,
     )
@@ -8356,23 +8572,81 @@ def _resolution_rule_dry_run_response(
     )
 
 
-def _player_actor_response(actor: PlayerActorProfile) -> PlayerActorResponse:
+def _sanitize_public_json(value: Any) -> dict[str, Any]:
+    sanitized = _sanitize_public_json_value(value)
+    return sanitized if isinstance(sanitized, dict) else {}
+
+
+def _sanitize_public_json_list(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized = _sanitize_public_json_value(value)
+    if not isinstance(sanitized, list):
+        return []
+    return [item for item in sanitized if isinstance(item, dict)]
+
+
+def _sanitize_public_text(value: str) -> str:
+    return "" if PUBLIC_JSON_FORBIDDEN_VALUE_RE.search(value) else value
+
+
+def _sanitize_public_json_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if key_text.strip().lower() in PUBLIC_JSON_FORBIDDEN_KEYS:
+                continue
+            sanitized_item = _sanitize_public_json_value(item)
+            if sanitized_item is not _OMIT_PUBLIC_JSON_VALUE:
+                sanitized[key_text] = sanitized_item
+        return sanitized
+    if isinstance(value, list):
+        sanitized_list = []
+        for item in value:
+            sanitized_item = _sanitize_public_json_value(item)
+            if sanitized_item is not _OMIT_PUBLIC_JSON_VALUE:
+                sanitized_list.append(sanitized_item)
+        return sanitized_list
+    if isinstance(value, tuple):
+        return [
+            sanitized_item
+            for item in value
+            if (sanitized_item := _sanitize_public_json_value(item))
+            is not _OMIT_PUBLIC_JSON_VALUE
+        ]
+    if isinstance(value, str) and PUBLIC_JSON_FORBIDDEN_VALUE_RE.search(value):
+        return _OMIT_PUBLIC_JSON_VALUE
+    return value
+
+
+def _player_actor_response(
+    actor: PlayerActorProfile,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerActorResponse:
     return PlayerActorResponse(
         id=actor.id,
         world_id=actor.world_id,
         worldline_id=actor.worldline_id,
         user_id=actor.user_id,
         actor_ref=actor.actor_ref,
-        display_name=actor.display_name,
+        display_name=(
+            actor.display_name
+            if include_admin_fields
+            else _sanitize_public_text(actor.display_name)
+        ),
         current_scene_id=actor.current_scene_id,
-        profile=actor.profile_json,
+        profile=_sanitize_public_json(actor.profile_json),
         is_active=actor.is_active,
         created_at=actor.created_at,
         updated_at=actor.updated_at,
     )
 
 
-def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
+def _player_choice_response(
+    choice: PlayerChoiceRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerChoiceResponse:
     return PlayerChoiceResponse(
         id=choice.id,
         world_id=choice.world_id,
@@ -8381,11 +8655,23 @@ def _player_choice_response(choice: PlayerChoiceRecord) -> PlayerChoiceResponse:
         player_actor_id=choice.player_actor_id,
         choice_key=choice.choice_key,
         choice_kind=cast(PlayerChoiceKind, choice.choice_kind),
-        prompt=choice.prompt,
-        selected_option=choice.selected_option,
-        context=choice.context_json,
-        consequence_preview=choice.consequence_preview,
-        applied_event_id=choice.applied_event_id,
+        prompt=choice.prompt if include_admin_fields else "",
+        selected_option=(
+            choice.selected_option
+            if include_admin_fields
+            else _sanitize_public_text(choice.selected_option)
+        ),
+        context=(
+            choice.context_json
+            if include_admin_fields
+            else _sanitize_public_json(choice.context_json)
+        ),
+        consequence_preview=(
+            choice.consequence_preview
+            if include_admin_fields
+            else _sanitize_public_json(choice.consequence_preview)
+        ),
+        applied_event_id=choice.applied_event_id if include_admin_fields else None,
         created_at=choice.created_at,
         updated_at=choice.updated_at,
     )
@@ -8945,7 +9231,11 @@ def _relationship_repair_response(repair: RelationshipRepairRecord) -> Relations
     )
 
 
-def _journal_entry_response(entry: PlayerJournalEntry) -> JournalEntryResponse:
+def _journal_entry_response(
+    entry: PlayerJournalEntry,
+    *,
+    include_admin_fields: bool = True,
+) -> JournalEntryResponse:
     return JournalEntryResponse(
         id=entry.id,
         world_id=entry.world_id,
@@ -8953,36 +9243,52 @@ def _journal_entry_response(entry: PlayerJournalEntry) -> JournalEntryResponse:
         user_id=entry.user_id,
         player_actor_id=entry.player_actor_id,
         entry_kind=cast(JournalEntryKind, entry.entry_kind),
-        title=entry.title,
-        body=entry.body,
-        source_event_id=entry.source_event_id,
-        source_ref=entry.source_ref,
+        title=entry.title if include_admin_fields else _sanitize_public_text(entry.title),
+        body=entry.body if include_admin_fields else _sanitize_public_text(entry.body),
+        source_event_id=entry.source_event_id if include_admin_fields else None,
+        source_ref=entry.source_ref if include_admin_fields else None,
         visibility=cast(JournalVisibility, entry.visibility),
-        metadata=entry.metadata_json,
+        metadata=entry.metadata_json if include_admin_fields else {},
         created_at=entry.created_at,
         updated_at=entry.updated_at,
     )
 
 
-def _notification_response(notification: InWorldNotification) -> InWorldNotificationResponse:
+def _notification_response(
+    notification: InWorldNotification,
+    *,
+    include_admin_fields: bool = True,
+) -> InWorldNotificationResponse:
     return InWorldNotificationResponse(
         id=notification.id,
         world_id=notification.world_id,
         worldline_id=notification.worldline_id,
         user_id=notification.user_id,
         notification_kind=cast(NotificationKind, notification.notification_kind),
-        title=notification.title,
-        body=notification.body,
-        source_event_id=notification.source_event_id,
-        source_ref=notification.source_ref,
+        title=(
+            notification.title
+            if include_admin_fields
+            else _sanitize_public_text(notification.title)
+        ),
+        body=(
+            notification.body
+            if include_admin_fields
+            else _sanitize_public_text(notification.body)
+        ),
+        source_event_id=notification.source_event_id if include_admin_fields else None,
+        source_ref=notification.source_ref if include_admin_fields else None,
         status=cast(NotificationStatus, notification.status),
-        metadata=notification.metadata_json,
+        metadata=notification.metadata_json if include_admin_fields else {},
         created_at=notification.created_at,
         updated_at=notification.updated_at,
     )
 
 
-def _intervention_response(intervention: PlayerInterventionRecord) -> PlayerInterventionResponse:
+def _intervention_response(
+    intervention: PlayerInterventionRecord,
+    *,
+    include_admin_fields: bool = True,
+) -> PlayerInterventionResponse:
     return PlayerInterventionResponse(
         id=intervention.id,
         world_id=intervention.world_id,
@@ -8992,11 +9298,11 @@ def _intervention_response(intervention: PlayerInterventionRecord) -> PlayerInte
         intervention_kind=cast(InterventionKind, intervention.intervention_kind),
         target_agent_id=intervention.target_agent_id,
         target_scene_id=intervention.target_scene_id,
-        prompt=intervention.prompt,
-        choice_id=intervention.choice_id,
-        event_id=intervention.event_id,
+        prompt=intervention.prompt if include_admin_fields else "",
+        choice_id=intervention.choice_id if include_admin_fields else None,
+        event_id=intervention.event_id if include_admin_fields else None,
         status=cast(InterventionStatus, intervention.status),
-        metadata=intervention.metadata_json,
+        metadata=intervention.metadata_json if include_admin_fields else {},
         created_at=intervention.created_at,
         updated_at=intervention.updated_at,
     )
@@ -9039,12 +9345,14 @@ def _narrative_continuity_review_response(
 
 def _living_world_dashboard_response(
     dashboard: LivingWorldDashboard,
+    *,
+    include_admin_fields: bool = True,
 ) -> LivingWorldDashboardResponse:
     return LivingWorldDashboardResponse(
         world_id=dashboard.world_id,
         worldline_id=dashboard.worldline_id,
         knowledge_count=dashboard.knowledge_count,
-        hidden_secret_count=dashboard.hidden_secret_count,
+        hidden_secret_count=dashboard.hidden_secret_count if include_admin_fields else 0,
         emotional_state_count=dashboard.emotional_state_count,
         open_hook_count=dashboard.open_hook_count,
         unread_notification_count=dashboard.unread_notification_count,
@@ -9170,19 +9478,22 @@ def _authoring_import_job_response(job: AuthoringImportJob) -> AuthoringImportJo
     )
 
 
-def _release_profile_response(profile: LivingWorldReleaseProfile) -> ReleaseProfileResponse:
+def _release_profile_response(
+    profile: LivingWorldReleaseProfile,
+    include_admin_fields: bool = True,
+) -> ReleaseProfileResponse:
     return ReleaseProfileResponse(
         id=profile.id,
         world_id=profile.world_id,
         profile_key=profile.profile_key,
         status=cast(ReleaseProfileStatus, profile.status),
-        branch_policy=profile.branch_policy,
-        backup_policy=profile.backup_policy,
-        content_review_policy=profile.content_review_policy,
-        player_permission_policy=profile.player_permission_policy,
-        worldline_policy=profile.worldline_policy,
-        checklist=profile.checklist,
-        metadata=profile.metadata_json,
+        branch_policy=profile.branch_policy if include_admin_fields else {},
+        backup_policy=profile.backup_policy if include_admin_fields else {},
+        content_review_policy=profile.content_review_policy if include_admin_fields else {},
+        player_permission_policy=profile.player_permission_policy if include_admin_fields else {},
+        worldline_policy=profile.worldline_policy if include_admin_fields else {},
+        checklist=profile.checklist if include_admin_fields else {},
+        metadata=profile.metadata_json if include_admin_fields else {},
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
@@ -9219,17 +9530,36 @@ def _beta_checklist_item_response(item: BetaChecklistItem) -> BetaChecklistItemR
     )
 
 
-def _world_bible_response(bible: WorldBible) -> WorldBibleResponse:
+def _world_bible_response(
+    bible: WorldBible,
+    include_admin_fields: bool = True,
+) -> WorldBibleResponse:
     return WorldBibleResponse(
         id=bible.id,
         world_id=bible.world_id,
-        source_material=bible.source_material,
-        canon_timeline=bible.canon_timeline,
-        setting_rules=bible.setting_rules,
-        forbidden_changes=bible.forbidden_changes,
-        sequel_boundaries=bible.sequel_boundaries,
-        continuity_config=bible.continuity_config,
-        metadata=bible.metadata_json,
+        source_material=bible.source_material if include_admin_fields else "",
+        canon_timeline=(
+            bible.canon_timeline
+            if include_admin_fields
+            else _sanitize_public_json_list(bible.canon_timeline)
+        ),
+        setting_rules=(
+            bible.setting_rules
+            if include_admin_fields
+            else _sanitize_public_json(bible.setting_rules)
+        ),
+        forbidden_changes=(
+            bible.forbidden_changes
+            if include_admin_fields
+            else _sanitize_public_json_list(bible.forbidden_changes)
+        ),
+        sequel_boundaries=(
+            bible.sequel_boundaries
+            if include_admin_fields
+            else _sanitize_public_json(bible.sequel_boundaries)
+        ),
+        continuity_config=bible.continuity_config if include_admin_fields else {},
+        metadata=bible.metadata_json if include_admin_fields else {},
         continuity_status=_continuity_status_from_metadata(bible.continuity_config),
         created_at=bible.created_at,
         updated_at=bible.updated_at,
@@ -9255,23 +9585,37 @@ def _user_summary_response(user: User) -> UserSummaryResponse:
     )
 
 
-def _agent_response(agent: Agent) -> AgentResponse:
+def _agent_response(
+    agent: Agent,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentResponse:
     return AgentResponse(
         id=agent.id,
         world_id=agent.world_id,
         home_scene_id=agent.home_scene_id,
-        source_preset_id=agent.source_preset_id,
-        source_preset_version=agent.source_preset_version,
+        source_preset_id=agent.source_preset_id if include_admin_fields else None,
+        source_preset_version=agent.source_preset_version if include_admin_fields else None,
         agent_key=agent.agent_key,
-        display_name=agent.display_name,
+        display_name=(
+            agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(agent.display_name)
+        ),
         kind=cast(AgentKind, agent.kind),
-        provider_profile_id=_provider_profile_id_from_config(agent.config),
+        provider_profile_id=(
+            _provider_profile_id_from_config(agent.config) if include_admin_fields else None
+        ),
         narrative_role=cast(NarrativeRole | None, agent.narrative_role),
         importance=cast(CharacterImportance | None, agent.importance),
         canon_status=cast(ContinuityStatus | None, agent.canon_status),
         character_category=cast(CharacterCategory | None, agent.character_category),
-        character_profile=agent.character_profile,
-        config=agent.config,
+        character_profile=(
+            agent.character_profile
+            if include_admin_fields
+            else _sanitize_public_json(agent.character_profile)
+        ),
+        config=agent.config if include_admin_fields else {},
         is_enabled=agent.is_enabled,
     )
 
@@ -9279,6 +9623,8 @@ def _agent_response(agent: Agent) -> AgentResponse:
 def _agent_relationship_response(
     db_session: Session,
     edge: AgentRelationshipEdge,
+    *,
+    include_admin_fields: bool = True,
 ) -> AgentRelationshipResponse:
     source_agent = _agent_or_404(db_session, edge.world_id, edge.source_agent_id)
     target_agent = _agent_or_404(db_session, edge.world_id, edge.target_agent_id)
@@ -9288,10 +9634,18 @@ def _agent_relationship_response(
         worldline_id=edge.worldline_id,
         source_agent_id=edge.source_agent_id,
         source_agent_key=source_agent.agent_key,
-        source_display_name=source_agent.display_name,
+        source_display_name=(
+            source_agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(source_agent.display_name)
+        ),
         target_agent_id=edge.target_agent_id,
         target_agent_key=target_agent.agent_key,
-        target_display_name=target_agent.display_name,
+        target_display_name=(
+            target_agent.display_name
+            if include_admin_fields
+            else _sanitize_public_text(target_agent.display_name)
+        ),
         relationship_type=cast(RelationshipType, edge.relationship_type),
         affection=edge.affection,
         trust=edge.trust,
@@ -9300,7 +9654,7 @@ def _agent_relationship_response(
         obligation=edge.obligation,
         rivalry=edge.rivalry,
         debt=edge.debt,
-        metadata=edge.metadata_json,
+        metadata=edge.metadata_json if include_admin_fields else {},
         created_at=edge.created_at,
         updated_at=edge.updated_at,
     )
@@ -9881,29 +10235,45 @@ def _agent_config_with_provider_profile_id(
     return next_config
 
 
-def _calendar_entry_response(entry: CalendarEntryResponse | Any) -> CalendarEntryResponse:
+def _calendar_entry_response(
+    entry: CalendarEntryResponse | Any,
+    *,
+    include_admin_fields: bool = True,
+) -> CalendarEntryResponse:
     return CalendarEntryResponse(
         id=entry.id,
         world_id=entry.world_id,
         agent_id=entry.agent_id,
-        title=entry.title,
-        description=entry.description,
+        title=entry.title if include_admin_fields else _sanitize_public_text(entry.title),
+        description=(
+            entry.description
+            if include_admin_fields or entry.description is None
+            else _sanitize_public_text(entry.description)
+        ),
         starts_at=entry.starts_at,
         ends_at=entry.ends_at,
-        recurrence_rule=entry.recurrence_rule,
+        recurrence_rule=(
+            entry.recurrence_rule
+            if include_admin_fields or entry.recurrence_rule is None
+            else _sanitize_public_text(entry.recurrence_rule)
+        ),
         status=entry.status.value if hasattr(entry.status, "value") else str(entry.status),
-        metadata=entry.metadata,
+        metadata=entry.metadata if include_admin_fields else {},
     )
 
 
-def _schedule_rule_response(rule: ScheduleRuleResponse | Any) -> ScheduleRuleResponse:
+def _schedule_rule_response(
+    rule: ScheduleRuleResponse | Any,
+    *,
+    include_admin_fields: bool = True,
+) -> ScheduleRuleResponse:
     return ScheduleRuleResponse(
         id=rule.id,
         world_id=rule.world_id,
         rule_key=rule.rule_key,
-        name=rule.name,
+        name=rule.name if include_admin_fields else _sanitize_public_text(rule.name),
         kind=rule.kind.value if hasattr(rule.kind, "value") else str(rule.kind),
-        config=rule.config,
+        config=rule.config if include_admin_fields else {},
         is_enabled=rule.is_enabled,
     )
 
@@ -9990,21 +10360,25 @@ def _memory_profile_snapshot_response(
     return MemoryProfileSnapshotResponse(**snapshot.model_dump())
 
 
-def _agent_run_response(run: AgentRunExecution) -> AgentRunResponse:
+def _agent_run_response(
+    run: AgentRunExecution,
+    *,
+    include_admin_fields: bool = True,
+) -> AgentRunResponse:
     return AgentRunResponse(
         run_id=run.run_id,
         world_id=run.world_id,
         worldline_id=run.worldline_id,
         agent_id=run.agent_id,
         status=run.status,
-        prompt_text=run.prompt_text,
-        response_text=run.response_text,
-        provider_profile_id=run.provider_profile_id,
+        prompt_text=run.prompt_text if include_admin_fields else "",
+        response_text=run.response_text if include_admin_fields else None,
+        provider_profile_id=run.provider_profile_id if include_admin_fields else None,
         trigger_source=run.trigger_source,
-        source_calendar_entry_id=run.source_calendar_entry_id,
-        source_schedule_rule_id=run.source_schedule_rule_id,
-        created_event_id=run.created_event_id,
-        diagnostics=redact_diagnostic_details(run.diagnostics),
+        source_calendar_entry_id=run.source_calendar_entry_id if include_admin_fields else None,
+        source_schedule_rule_id=run.source_schedule_rule_id if include_admin_fields else None,
+        created_event_id=run.created_event_id if include_admin_fields else None,
+        diagnostics=redact_diagnostic_details(run.diagnostics) if include_admin_fields else {},
         started_at=run.started_at,
         finished_at=run.finished_at,
     )
@@ -10020,6 +10394,8 @@ def _agent_observation_response(observation: AgentObservationRecord) -> AgentObs
 
 def _narrative_artifact_response(
     artifact: NarrativeArtifactRecord | NarrativeArtifactWithPublication,
+    *,
+    include_admin_fields: bool = True,
 ) -> NarrativeArtifactResponse:
     if isinstance(artifact, NarrativeArtifactWithPublication):
         publication = artifact.publication
@@ -10031,36 +10407,63 @@ def _narrative_artifact_response(
         id=artifact_record.id,
         world_id=artifact_record.world_id,
         agent_id=artifact_record.agent_id,
-        source_run_id=artifact_record.source_run_id,
+        source_run_id=artifact_record.source_run_id if include_admin_fields else None,
         source_conversation_id=artifact_record.source_conversation_id,
-        title=artifact_record.title,
-        content=artifact_record.content,
+        title=(
+            artifact_record.title
+            if include_admin_fields
+            else _sanitize_public_text(artifact_record.title)
+        ),
+        content=(
+            artifact_record.content
+            if include_admin_fields
+            else _sanitize_public_text(artifact_record.content)
+        ),
         artifact_kind=artifact_record.artifact_kind.value,
-        metadata=artifact_record.metadata,
-        continuity_metadata=_continuity_metadata(artifact_record.metadata),
-        continuity_status=_continuity_status_from_metadata(artifact_record.metadata),
+        metadata=artifact_record.metadata if include_admin_fields else {},
+        continuity_metadata=(
+            _continuity_metadata(artifact_record.metadata) if include_admin_fields else {}
+        ),
+        continuity_status=(
+            _continuity_status_from_metadata(artifact_record.metadata)
+            if include_admin_fields
+            else None
+        ),
         created_at=artifact_record.created_at,
-        publication=None if publication is None else _narrative_publication_response(publication),
+        publication=(
+            None
+            if publication is None
+            else _narrative_publication_response(
+                publication,
+                include_admin_fields=include_admin_fields,
+            )
+        ),
     )
 
 
 def _narrative_publication_response(
     publication: NarrativePublicationRecord,
+    *,
+    include_admin_fields: bool = True,
 ) -> NarrativePublicationResponse:
     return NarrativePublicationResponse(
         id=publication.id,
         world_id=publication.world_id,
         artifact_id=publication.artifact_id,
-        source_draft_id=publication.source_draft_id,
+        source_draft_id=publication.source_draft_id if include_admin_fields else None,
         status=publication.status.value,
         reader_visible=publication.reader_visible,
-        metadata=publication.metadata,
+        metadata=publication.metadata if include_admin_fields else {},
         published_at=publication.published_at,
         unpublished_at=publication.unpublished_at,
-        published_by_user_id=publication.published_by_user_id,
+        published_by_user_id=publication.published_by_user_id if include_admin_fields else None,
         created_at=publication.created_at,
         updated_at=publication.updated_at,
-        publication_gate=publication.metadata.get("publication_gate"),
+        publication_gate=(
+            publication.metadata.get("publication_gate")
+            if include_admin_fields
+            else None
+        ),
     )
 
 
@@ -10074,6 +10477,22 @@ def _clock_response(clock_view: WorldClockView) -> WorldClockResponse:
         wall_time_anchor=state.wall_time_anchor,
         speed_multiplier=str(state.speed_multiplier),
         revision=state.revision,
+    )
+
+
+def _replay_state_response(
+    state: WorldReplayState,
+    *,
+    include_admin_fields: bool = True,
+) -> WorldReplayState:
+    if include_admin_fields or state.clock is None:
+        return state
+    return state.model_copy(
+        update={
+            "clock": state.clock.model_copy(
+                update={"last_event_id": None, "last_event_sequence": None},
+            ),
+        },
     )
 
 
@@ -10122,7 +10541,10 @@ def _world_event_response(event: WorldEventModel) -> WorldEventResponse:
     )
 
 
-def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
+def _snapshot_response(
+    snapshot: WorldSnapshotRecord,
+    include_admin_fields: bool = True,
+) -> WorldSnapshotResponse:
     return WorldSnapshotResponse(
         id=snapshot.id,
         world_id=snapshot.world_id,
@@ -10130,11 +10552,11 @@ def _snapshot_response(snapshot: WorldSnapshotRecord) -> WorldSnapshotResponse:
         covers_event_sequence=snapshot.covers_event_sequence,
         schema_version=snapshot.schema_version,
         status=snapshot.status.value,
-        payload=snapshot.payload,
-        payload_uri=snapshot.payload_uri,
-        payload_location=_snapshot_payload_location(snapshot),
-        metadata=snapshot.metadata,
-        created_by_event_id=snapshot.created_by_event_id,
+        payload=snapshot.payload if include_admin_fields else None,
+        payload_uri=snapshot.payload_uri if include_admin_fields else None,
+        payload_location=_snapshot_payload_location(snapshot) if include_admin_fields else None,
+        metadata=snapshot.metadata if include_admin_fields else {},
+        created_by_event_id=snapshot.created_by_event_id if include_admin_fields else None,
         created_at=snapshot.created_at,
     )
 

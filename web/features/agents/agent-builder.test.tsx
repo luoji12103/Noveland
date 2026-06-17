@@ -27,6 +27,7 @@ vi.mock("next/navigation", () => ({
 import { AgentBuilder } from "@/features/agents/agent-builder";
 import {
   createAgentRelationship,
+  getAgentRunDetail,
   updateAgent,
   updateAgentRelationship,
 } from "@/lib/worlds/client";
@@ -36,6 +37,107 @@ describe("AgentBuilder", () => {
   afterEach(() => {
     vi.clearAllMocks();
     refresh.mockReset();
+  });
+
+  it("redacts sensitive agent builder JSON and run text", async () => {
+    const dirtyData: AgentDetailData = {
+      ...agentData,
+      selectedAgent: {
+        ...agentData.selectedAgent!,
+        character_profile: {
+          story_function: "route heroine",
+          clientSecret: "sk-agent-secret",
+          nested: { storageUri: "media://agent-secret" },
+        },
+        config: { safeMode: true, rawPrompt: "system prompt", filePath: "/tmp/agent-config.json" },
+      },
+      relationships: [
+        {
+          ...agentData.relationships[0],
+          metadata: { reason: "shared promise", bearerToken: "Bearer agent-token" },
+        },
+      ],
+      agentPersona: {
+        id: "persona-1",
+        world_id: "world-1",
+        agent_id: "agent-1",
+        persona_text: "Careful guide.",
+        behavior_policy: { tone: "direct", promptSnapshotId: "snapshot-agent" },
+        policy_plugin_identifier: "builtin.default_persona_policy",
+        policy_plugin_config: { endpoint: "/v1/chat/completions", rawOutput: "model output" },
+        is_enabled: true,
+        created_at: "2026-05-05T00:00:00.000Z",
+        updated_at: "2026-05-05T00:00:00.000Z",
+      },
+      agentRuns: [
+        {
+          run_id: "run-1",
+          world_id: "world-1",
+          agent_id: "agent-1",
+          status: "failed",
+          prompt_text: "Prompt with rawPrompt and media://run-secret",
+          response_text: "Response with sk-run-secret",
+          provider_profile_id: "profile-1",
+          trigger_source: "manual",
+          source_calendar_entry_id: null,
+          source_schedule_rule_id: null,
+          created_event_id: null,
+          diagnostics: { promptSnapshotId: "snapshot-run" },
+          started_at: "2026-05-05T00:00:00.000Z",
+          finished_at: "2026-05-05T00:00:01.000Z",
+        },
+      ],
+    };
+    vi.mocked(updateAgent).mockResolvedValue({
+      ...dirtyData.selectedAgent!,
+      character_profile: { story_function: "route heroine", nested: {} },
+      config: { safeMode: true },
+    });
+    vi.mocked(getAgentRunDetail).mockResolvedValue({
+      run: {
+        ...dirtyData.agentRuns[0],
+        diagnostics: { safe: "ok", rawOutput: "model output", storageUri: "media://diag-secret" },
+      },
+      provider_profile: null,
+      conversation_turns: [],
+    });
+
+    render(<AgentBuilder worldId="world-1" agentId="agent-1" data={dirtyData} />);
+
+    expect(screen.getByDisplayValue(/story_function/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/safeMode/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/shared promise/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/tone/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/rawPrompt|media:\/\/run-secret|sk-run-secret/i);
+    expect(
+      screen.queryAllByDisplayValue(
+        /clientSecret|sk-agent-secret|storageUri|media:\/\/agent-secret|rawPrompt|filePath|\/tmp\/agent-config|bearerToken|Bearer agent-token|promptSnapshotId|snapshot-agent|rawOutput/i,
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save agent" }));
+
+    await waitFor(() => {
+      expect(updateAgent).toHaveBeenCalledWith(
+        "world-1",
+        "agent-1",
+        expect.objectContaining({
+          character_profile: { story_function: "route heroine", nested: {} },
+          config: { safeMode: true },
+        }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(updateAgent).mock.calls[0][2])).not.toMatch(
+      /clientSecret|sk-agent-secret|storageUri|media:\/\/agent-secret|rawPrompt|filePath|\/tmp\/agent-config/i,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Inspect run" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Run inspector")).toBeInTheDocument();
+    });
+    expect(document.body.textContent).toContain("safe");
+    expect(document.body.textContent).not.toMatch(/rawOutput|storageUri|media:\/\/diag-secret|snapshot-run/i);
   });
 
   it("renders character profile and submits relationship updates", async () => {

@@ -58,9 +58,13 @@ _LEAKY_KEYS = {
     "raw_output",
     "prompt_snapshot",
 }
+_LEAKY_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"sk-[A-Za-z0-9]|raw_prompt|raw_output)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw[-_ ]?prompt|raw[-_ ]?output|"
+    r"prompt[-_ ]?snapshot|file[-_ ]?path|filesystem[-_ ]?path|bearer\s+)",
     re.IGNORECASE,
 )
 _REDACTED = "[REDACTED]"
@@ -125,14 +129,17 @@ class PlayerPrivacyService:
         include_all_users: bool = False,
         limit: int = 100,
     ) -> list[PlayerPrivacyRequestRead]:
+        resolved_worldline_id = (
+            None if worldline_id is None else self._resolve_worldline_id(world_id, worldline_id)
+        )
         statement = (
             select(PlayerPrivacyRequest)
             .where(PlayerPrivacyRequest.world_id == world_id)
             .order_by(PlayerPrivacyRequest.created_at.desc())
             .limit(max(1, min(limit, 200)))
         )
-        if worldline_id is not None:
-            statement = statement.where(PlayerPrivacyRequest.worldline_id == worldline_id)
+        if resolved_worldline_id is not None:
+            statement = statement.where(PlayerPrivacyRequest.worldline_id == resolved_worldline_id)
         if not include_all_users:
             if user_id is None:
                 raise PlayerPrivacyValidationError("user_id is required")
@@ -304,7 +311,7 @@ class PlayerPrivacyService:
             profile=PlayerPrivacyProfile(
                 user_id=user.id,
                 email=user.email,
-                display_name=user.display_name,
+                display_name=_safe_text(user.display_name),
                 world_role=role,
             ),
             counts=counts,
@@ -312,7 +319,7 @@ class PlayerPrivacyService:
                 PlayerPrivacyActorExport(
                     id=actor.id,
                     worldline_id=actor.worldline_id,
-                    display_name=actor.display_name,
+                    display_name=_safe_text(actor.display_name),
                     current_scene_id=actor.current_scene_id,
                     profile=_sanitize_json(actor.profile_json),
                     is_active=actor.is_active,
@@ -329,7 +336,7 @@ class PlayerPrivacyService:
                     choice_key=choice.choice_key,
                     choice_kind=choice.choice_kind,
                     selected_option=_safe_text(choice.selected_option),
-                    applied_event_id=choice.applied_event_id,
+                    applied_event_id=None,
                     created_at=choice.created_at,
                     updated_at=choice.updated_at,
                 )
@@ -343,7 +350,7 @@ class PlayerPrivacyService:
                     entry_kind=entry.entry_kind,
                     title=_safe_text(entry.title),
                     body=_safe_text(entry.body),
-                    source_ref=entry.source_ref,
+                    source_ref=None,
                     visibility=entry.visibility,
                     created_at=entry.created_at,
                     updated_at=entry.updated_at,
@@ -357,7 +364,7 @@ class PlayerPrivacyService:
                     notification_kind=notification.notification_kind,
                     title=_safe_text(notification.title),
                     body=_safe_text(notification.body),
-                    source_ref=notification.source_ref,
+                    source_ref=None,
                     status=notification.status,
                     created_at=notification.created_at,
                     updated_at=notification.updated_at,
@@ -372,8 +379,8 @@ class PlayerPrivacyService:
                     intervention_kind=intervention.intervention_kind,
                     target_agent_id=intervention.target_agent_id,
                     target_scene_id=intervention.target_scene_id,
-                    choice_id=intervention.choice_id,
-                    event_id=intervention.event_id,
+                    choice_id=None,
+                    event_id=None,
                     status=intervention.status,
                     created_at=intervention.created_at,
                     updated_at=intervention.updated_at,
@@ -474,7 +481,8 @@ def _sanitize_json(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    return key.strip().lower() in _LEAKY_KEYS
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _LEAKY_KEY_MARKERS)
 
 
 def _safe_text(value: str) -> str:

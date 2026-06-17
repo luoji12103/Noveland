@@ -13,6 +13,7 @@ from noveland.player_privacy import (
     PlayerPrivacyService,
     PlayerPrivacyValidationError,
 )
+from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
     get_db_session,
@@ -42,7 +43,7 @@ def preview_player_privacy_export(
         raise _not_found() from exc
 
 
-@router.post("/export", response_model=PlayerPrivacyExport)
+@router.post("/export", response_model=PlayerPrivacyExport, dependencies=[Depends(require_csrf)])
 def create_player_privacy_export_request(
     world_id: uuid.UUID,
     context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
@@ -73,19 +74,25 @@ def list_player_privacy_requests(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> list[PlayerPrivacyRequestRead]:
     _ = world_id
-    return PlayerPrivacyService(db_session).list_requests(
-        context.world_id,
-        worldline_id=worldline_id,
-        user_id=context.subject.user_id,
-        include_all_users=context.is_platform_admin or context.role == "world_admin",
-        limit=limit,
-    )
+    try:
+        return PlayerPrivacyService(db_session).list_requests(
+            context.world_id,
+            worldline_id=worldline_id,
+            user_id=context.subject.user_id,
+            include_all_users=context.is_platform_admin or context.role == "world_admin",
+            limit=limit,
+        )
+    except PlayerPrivacyNotFoundError as exc:
+        raise _not_found() from exc
+    except PlayerPrivacyValidationError as exc:
+        raise _bad_request(str(exc)) from exc
 
 
 @router.post(
     "/delete-requests",
     response_model=PlayerPrivacyRequestRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
 )
 def create_player_delete_request(
     world_id: uuid.UUID,
@@ -107,7 +114,11 @@ def create_player_delete_request(
         raise _bad_request(str(exc)) from exc
 
 
-@router.patch("/requests/{request_id}", response_model=PlayerPrivacyRequestRead)
+@router.patch(
+    "/requests/{request_id}",
+    response_model=PlayerPrivacyRequestRead,
+    dependencies=[Depends(require_csrf)],
+)
 def review_player_privacy_request(
     world_id: uuid.UUID,
     request_id: uuid.UUID,

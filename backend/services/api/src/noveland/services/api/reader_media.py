@@ -33,10 +33,32 @@ def list_reader_media(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ) -> list[ReaderMediaDescriptor]:
     _ = context
-    return ReaderMediaDeliveryService(db_session).list_media(
+    try:
+        return ReaderMediaDeliveryService(db_session).list_media(
+            world_id,
+            worldline_id=worldline_id,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise _not_found() from exc
+
+
+@router.get("/worldlines/{worldline_id}/objects/{object_id}/download")
+def download_reader_media_object_for_worldline(
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    object_id: uuid.UUID,
+    context: Annotated[WorldAccessContext, Depends(get_world_member_context)],
+    db_session: Annotated[Session, Depends(get_db_session)],
+    storage: Annotated[LocalMediaObjectStorage, Depends(_reader_media_storage)],
+) -> FastAPIResponse:
+    _ = context
+    return _download_reader_media_object_response(
         world_id,
-        worldline_id=worldline_id,
-        limit=limit,
+        worldline_id,
+        object_id,
+        db_session,
+        storage,
     )
 
 
@@ -50,13 +72,31 @@ def download_reader_media_object(
     worldline_id: uuid.UUID | None = None,
 ) -> FastAPIResponse:
     _ = context
+    if worldline_id is None:
+        raise _not_found()
+    return _download_reader_media_object_response(
+        world_id,
+        worldline_id,
+        object_id,
+        db_session,
+        storage,
+    )
+
+
+def _download_reader_media_object_response(
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    object_id: uuid.UUID,
+    db_session: Session,
+    storage: LocalMediaObjectStorage,
+) -> FastAPIResponse:
     try:
         result = ReaderMediaDeliveryService(db_session, storage=storage).read_object(
             world_id,
             object_id,
             worldline_id=worldline_id,
         )
-    except (MediaStorageError, OSError) as exc:
+    except (MediaStorageError, OSError, ValueError) as exc:
         raise _not_found() from exc
     if result is None:
         raise _not_found()
@@ -77,11 +117,14 @@ def get_reader_media(
     worldline_id: uuid.UUID | None = None,
 ) -> ReaderMediaDescriptor:
     _ = context
-    descriptor = ReaderMediaDeliveryService(db_session).get_media(
-        world_id,
-        asset_id,
-        worldline_id=worldline_id,
-    )
+    try:
+        descriptor = ReaderMediaDeliveryService(db_session).get_media(
+            world_id,
+            asset_id,
+            worldline_id=worldline_id,
+        )
+    except ValueError as exc:
+        raise _not_found() from exc
     if descriptor is None:
         raise _not_found()
     return descriptor

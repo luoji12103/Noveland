@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createProviderIntegration,
+  deleteProviderIntegration,
   discoverProviderModels,
   listProviderCapabilities,
   listProviderHealthChecks,
@@ -121,6 +122,70 @@ describe("provider integration client", () => {
       "/api/worlds/world-1/providers/provider-1/health-check",
       "/api/worlds/world-1/providers/provider-1/health-checks?limit=10",
       "/api/worlds/world-1/providers/provider-1/smoke-test",
+    ]);
+  });
+
+  it("encodes provider integration API identifier path segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([providerTemplate]))
+      .mockResolvedValueOnce(jsonResponse({ discovery_status: "succeeded", models: [] }))
+      .mockResolvedValueOnce(jsonResponse(providerRecord))
+      .mockResolvedValueOnce(jsonResponse(providerRecord, { status: 201 }))
+      .mockResolvedValueOnce(jsonResponse(providerRecord))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "cap-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "health-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "health-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ smoke_status: "succeeded", provider: providerRecord }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/admin?tab=1#frag";
+    const providerId = "provider/live?mode=smoke#frag";
+
+    await listProviderIntegrations(worldId, {
+      include_global: true,
+      include_hidden: false,
+      capability_key: "text.generate",
+    });
+    await listProviderTemplates(worldId);
+    await discoverProviderModels(worldId, { provider_id: providerId });
+    await createProviderIntegration(worldId, {
+      scope_kind: "world",
+      provider_kind: "text_generation",
+      adapter_kind: "fake",
+      provider_key: "fake-text",
+      display_name: "Fake text",
+      base_url: null,
+      auth_ref: "env:OPENAI_API_KEY",
+      config_json: {},
+      default_params_json: {},
+      status: "active",
+      visibility: "world_admin",
+      capabilities: [{ capability_key: "text.generate", capability_json: {} }],
+    });
+    await updateProviderIntegration(worldId, providerId, { status: "disabled" });
+    await deleteProviderIntegration(worldId, providerId);
+    await listProviderCapabilities(worldId, providerId);
+    await runProviderHealthCheck(worldId, providerId);
+    await listProviderHealthChecks(worldId, providerId, 10);
+    await runProviderSmokeTest(worldId, providerId, { input_text: "smoke" });
+
+    const worldSegment = encodeURIComponent(worldId);
+    const providerSegment = encodeURIComponent(providerId);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/providers?include_global=true&include_hidden=false&capability_key=text.generate`,
+      `/api/worlds/${worldSegment}/providers/templates`,
+      `/api/worlds/${worldSegment}/providers/model-discovery`,
+      `/api/worlds/${worldSegment}/providers`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}/capabilities`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}/health-check`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}/health-checks?limit=10`,
+      `/api/worlds/${worldSegment}/providers/${providerSegment}/smoke-test`,
     ]);
   });
 });

@@ -38,7 +38,7 @@ from noveland.providers.registry import (
     ProviderRegistryService,
     ProviderValidationError,
 )
-from noveland.providers.secrets import REDACTED, SENSITIVE_KEYS, reject_sensitive_config
+from noveland.providers.secrets import REDACTED, is_sensitive_key, reject_sensitive_config
 from noveland.providers.service import ProviderExecutionService
 from noveland.speech.models import AgentVoiceProfileBinding, SpeechStyleMapping, VoiceProfile
 from noveland.speech.voice_profiles import SpeechValidationError, VoiceProfileService
@@ -109,15 +109,22 @@ _LEAK_KEYWORDS = {
     "storage_uri",
     "preview_uri",
     "thumbnail_uri",
+    "raw_prompt",
     "raw_prompt_text",
+    "raw_output",
     "raw_output_text",
     "raw_request_json",
     "raw_response_json",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
     "filesystem_path",
     "file_path",
+    "object_storage_path",
+    "object_path",
     "base64",
     "bytes",
 }
+_LEAK_KEYWORD_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in _LEAK_KEYWORDS}
 _LEAK_PATTERN = re.compile(
     r"(storage_uri|media://|file://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9])",
     re.IGNORECASE,
@@ -161,6 +168,7 @@ class NarrativeQualityService:
         request: NarrativeQualityGMProposalGenerateRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> NarrativeQualityGMProposalGenerationResult:
         worldline = worldline_or_404(self._session, world_id, request.worldline_id)
         reject_sensitive_config(request.payload_json, field_name="payload_json")
@@ -172,6 +180,7 @@ class NarrativeQualityService:
             world_id,
             provider_id=request.provider_id,
             capability_key=request.capability_key,
+            platform_admin=platform_admin,
         )
         self._validate_text_provider(provider, source="provider-backed GM proposal")
         context_pack = self._context_pack(world_id, worldline.id, request.context_limit)
@@ -198,6 +207,7 @@ class NarrativeQualityService:
                     "narrative_quality_phase": "v0.6.2",
                 },
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         candidate = _candidate_from_provider_output(
@@ -695,6 +705,7 @@ class NarrativeQualityService:
         request: NarrativeQualityWriterGenerateRequest,
         *,
         actor_ref: str,
+        platform_admin: bool = True,
     ) -> NarrativeQualityWriterGenerationResult:
         worldline = worldline_or_404(self._session, world_id, request.worldline_id)
         reject_sensitive_config(
@@ -705,6 +716,7 @@ class NarrativeQualityService:
             world_id,
             provider_id=request.provider_id,
             capability_key=request.capability_key,
+            platform_admin=platform_admin,
         )
         self._validate_text_provider(provider, source="Narrative Writer v2")
         conversation: ConversationSessionRecord | None = None
@@ -750,6 +762,7 @@ class NarrativeQualityService:
                     "narrative_quality_phase": "v0.6.5",
                 },
                 actor_ref=actor_ref,
+                platform_admin=platform_admin,
             )
         )
         content = _safe_generated_text(result.output_text, result.output_json)
@@ -2399,6 +2412,7 @@ class NarrativeQualityService:
         *,
         provider_id: uuid.UUID | None,
         capability_key: str | None,
+        platform_admin: bool,
     ) -> ProviderIntegrationRead:
         registry = ProviderRegistryService(self._session)
         try:
@@ -2406,8 +2420,8 @@ class NarrativeQualityService:
                 provider = registry.get_provider(
                     world_id,
                     provider_id,
-                    platform_admin=True,
-                    include_hidden=True,
+                    platform_admin=platform_admin,
+                    include_hidden=platform_admin,
                 )
                 if provider is None:
                     raise ProviderNotFoundError("provider integration not found")
@@ -2416,6 +2430,8 @@ class NarrativeQualityService:
                 world_id,
                 provider_kind=ProviderKind.TEXT_GENERATION,
                 capability_key=capability_key,
+                platform_admin=platform_admin,
+                include_hidden=platform_admin,
             )
         except (ProviderNotFoundError, ProviderValidationError) as exc:
             raise NarrativeQualityValidationError(str(exc)) from exc
@@ -5116,8 +5132,8 @@ def _sanitize_json(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    normalized = key.strip().lower()
-    return normalized in SENSITIVE_KEYS or normalized in _LEAK_KEYWORDS
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return is_sensitive_key(key) or normalized in _LEAK_KEYWORD_MARKERS
 
 
 def _safe_text(value: str) -> str:

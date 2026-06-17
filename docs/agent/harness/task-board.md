@@ -1,15 +1,63 @@
 # Task Board
 
 ## Open
-- None
+- Post-v1.1 RC Web/e2e security audit
+- Post-v1.1 RC product normal-use audit
+- Post-v1.1 RC spec/history compliance audit
+- Post-v1.1 RC remediation batches after confirmed findings
 
 ## In Progress
-- None
+- Post-v1.1 RC audit and hardening OpenSpec change
+- Web/e2e security audit
 
 ## Blocked
 - None
 
 ## Done
+- Post-v1.1 RC audit F-059 Web proxy request body byte-preservation hardening
+- Post-v1.1 RC audit F-058 media response safety header hardening
+- Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening
+- Post-v1.1 RC audit F-056 Memory backend profile secret-reference persistence boundary hardening
+- Post-v1.1 RC audit F-055 Auth login CSRF session-fixation boundary hardening
+- Post-v1.1 RC audit F-054 Web non-auth proxy Set-Cookie boundary hardening
+- Post-v1.1 RC audit F-053 Web UI local app route link path-boundary hardening
+- Post-v1.1 RC audit F-046 Web event/episode/group/relationship/conflict/rumor/dashboard client path boundary hardening
+- Post-v1.1 RC audit F-043 Web organization/agent/calendar/schedule API client path boundary remediation
+- Post-v1.1 RC audit F-042 Web clock/replay/scene API client path boundary remediation
+- Post-v1.1 RC audit F-041 Web core world API client path boundary remediation
+- Post-v1.1 RC audit F-040 Web server admin loader backend path boundary remediation
+- Post-v1.1 RC audit F-039 Web multimodal diagnostics API client path boundary remediation
+- Post-v1.1 RC audit F-038 Web invocation ledger API client path boundary remediation
+- Post-v1.1 RC audit F-037 Web media admin API client path boundary remediation
+- Post-v1.1 RC audit F-036 Web visual admin API client path boundary remediation
+- Post-v1.1 RC audit F-035 Web speech admin API client path boundary remediation
+- Post-v1.1 RC audit F-034 Web provider integration API client path boundary remediation
+- Post-v1.1 RC audit F-033 Web conversation API client path boundary remediation
+- Post-v1.1 RC audit F-032 Web conversation live socket path boundary remediation
+- Post-v1.1 RC audit F-031 Web memory backend proxy query preservation remediation
+- Post-v1.1 RC audit F-030 Web realtime stream proxy path boundary remediation
+- Post-v1.1 RC audit F-029 member conversation turn runtime evidence redaction
+- Post-v1.1 RC audit F-028 member scene/location graph rule redaction
+- Post-v1.1 RC audit F-027 player privacy export evidence redaction
+- Post-v1.1 RC audit F-026 member conversation narrative artifact visibility/evidence redaction
+- Post-v1.1 RC audit F-025 member conversation session orchestration redaction
+- Post-v1.1 RC audit F-024 member agent presence scheduling evidence redaction
+- Post-v1.1 RC audit F-023 member world bible source/config redaction
+- Post-v1.1 RC audit F-022 member release profile policy/evidence redaction
+- Post-v1.1 RC audit F-021 member latest snapshot payload/storage redaction
+- Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
+- Post-v1.1 RC audit F-019 member journal/notification/intervention evidence redaction
+- Post-v1.1 RC audit F-018 member living world dashboard hidden count redaction
+- Post-v1.1 RC audit F-017 member player choice preview diagnostics redaction
+- Post-v1.1 RC audit F-016 member player choice prompt redaction
+- Post-v1.1 RC audit F-015 member worldline metadata redaction
+- Post-v1.1 RC audit F-014 member organization membership/faction track metadata redaction
+- Post-v1.1 RC audit F-006 member media metadata redaction
+- Post-v1.1 RC audit F-005 media lineage related asset redaction
+- Post-v1.1 RC audit F-004 media job admin boundary remediation
+- Post-v1.1 RC audit F-003 member media storage reference redaction
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary remediation
+- Post-v1.1 RC audit preflight, OpenSpec scaffold, and initial harness state
 - v1.1 Normal Use / Release Candidate OpenSpec archive and release notes
 - v1.1 Phase 8 Release Candidate Gate fast-forward merge
 - v1.1 Phase 8 Release Candidate Gate full backend/OpenSpec gate
@@ -470,3 +518,33 @@
   performance annotations, provider integrations,
   upload/download policy, asset embeddings/similarity search, and Web surfaces
   in separate feature-named branches.
+- Post-v1.1 RC audit and hardening backend CSRF batch 1 complete
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary recorded
+- Post-v1.1 RC audit F-002 legacy provider profile execution boundary remediation
+- Post-v1.1 RC audit F-003 member media storage reference redaction
+- Post-v1.1 RC audit F-007 realtime member stream redaction
+- Post-v1.1 RC audit F-008 member agent run list redaction
+- Post-v1.1 RC audit F-009 member agent catalog redaction
+- Post-v1.1 RC audit F-010 member world profile redaction
+- Post-v1.1 RC audit F-011 member schedule rule redaction
+- Post-v1.1 RC audit F-012 member narrative artifact REST redaction
+- Post-v1.1 RC audit F-013 member organization list redaction
+- Post-v1.1 RC audit F-014 member organization membership/faction track redaction
+- Post-v1.1 RC audit F-015 member worldline metadata redaction
+- Post-v1.1 RC audit F-016 member player choice prompt redaction
+- Post-v1.1 RC audit F-017 member player choice preview diagnostics redaction
+- Post-v1.1 RC audit F-018 member living-world dashboard hidden count redaction
+- Post-v1.1 RC audit F-019 member journal/notification/intervention redaction
+- Post-v1.1 RC audit F-020 member relationship/calendar metadata redaction
+- Post-v1.1 RC audit F-044 Web daily-life/offscreen client path boundary hardening
+- Post-v1.1 RC audit F-045 Web story/route/ending/authoring/release/beta client path boundary hardening
+- Post-v1.1 RC audit F-046 Web event/episode/group/relationship/conflict/rumor/dashboard client path boundary hardening
+- Post-v1.1 RC audit F-047 Web knowledge/secret/player/privacy/review client path boundary hardening
+- Post-v1.1 RC audit F-048 Web agent memory/run/persona/narrative client path boundary hardening
+- Post-v1.1 RC audit F-049 Web membership/candidate/diagnostics client path boundary hardening
+- Post-v1.1 RC audit F-050 Web admin preset/memory/provider client path boundary hardening
+- Post-v1.1 RC audit F-051 Web private beta/beta feedback client path boundary hardening
+- Post-v1.1 RC audit F-052 Web server workspace loader backend path boundary hardening
+- Post-v1.1 RC audit F-057 Web reader media download URL route-boundary hardening
+- Post-v1.1 RC audit F-058 media response safety header hardening
+- Post-v1.1 RC audit F-059 Web proxy request body byte-preservation hardening

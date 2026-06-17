@@ -4,6 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from noveland.services.api.csrf import require_csrf
 from noveland.services.api.dependencies import (
     WorldAccessContext,
     get_db_session,
@@ -48,7 +49,11 @@ def import_world_package_preview(
     return WorldPackagingService(db_session).preview_import(request.manifest)
 
 
-@router.post("/import-apply", response_model=WorldPackageApplyResult)
+@router.post(
+    "/import-apply",
+    response_model=WorldPackageApplyResult,
+    dependencies=[Depends(require_csrf)],
+)
 def apply_world_package_import(
     world_id: uuid.UUID,
     request: WorldPackageApplyRequest,

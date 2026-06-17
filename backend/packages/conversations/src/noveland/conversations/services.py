@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from noveland.agents.models import Agent
 from noveland.conversations.contracts import (
@@ -39,18 +40,20 @@ from noveland.conversations.models import (
     ConversationTurn,
 )
 from noveland.events import WorldEventAppend, WorldEventStore
-from noveland.observability import (
+from noveland.observability.contracts import (
     DiagnosticComponent,
     DiagnosticSeverity,
     RuntimeDiagnosticCreate,
     RuntimeDiagnosticRecord,
-    RuntimeDiagnosticsService,
 )
 from noveland.worlds.living_context import LivingWorldContextSelector
 from noveland.worlds.models import Worldline
 from noveland.worlds.worldlines import ensure_primary_worldline
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from noveland.observability.services import RuntimeDiagnosticsService
 
 CONVERSATION_SESSION_STARTED_EVENT_NAME = "conversation.session_started"
 CONVERSATION_TURN_COMPLETED_EVENT_NAME = "conversation.turn_completed"
@@ -64,10 +67,16 @@ SYSTEM_ACTOR_REF = "system:conversation"
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
+def _runtime_diagnostics_service(session: Session) -> RuntimeDiagnosticsService:
+    from noveland.observability.services import RuntimeDiagnosticsService
+
+    return RuntimeDiagnosticsService(session)
+
+
 class ConversationService:
     def __init__(self, session: Session, actor_ref: str = SYSTEM_ACTOR_REF) -> None:
         self._session = session
-        self._diagnostics = RuntimeDiagnosticsService(session)
+        self._diagnostics: RuntimeDiagnosticsService = _runtime_diagnostics_service(session)
         self._actor_ref = actor_ref
 
     def list_sessions(self, world_id: uuid.UUID) -> list[ConversationSessionRecord]:

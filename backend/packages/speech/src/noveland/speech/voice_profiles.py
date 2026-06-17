@@ -300,7 +300,11 @@ class VoiceProfileService:
         asset = self._session.get(MediaAsset, asset_id)
         if asset is None or asset.world_id != world_id or asset.asset_kind != MediaAssetKind.AUDIO:
             raise SpeechValidationError("voice reference asset must be an audio asset")
-        if worldline_id is not None and asset.worldline_id != worldline_id:
+        if worldline_id is None:
+            raise SpeechValidationError(
+                "world-level voice profiles cannot reference worldline media assets"
+            )
+        if asset.worldline_id != worldline_id:
             raise SpeechValidationError("voice reference asset must match profile worldline")
 
 

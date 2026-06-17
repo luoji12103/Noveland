@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -186,10 +187,14 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
     assert binding.json()["is_default"] is True
     assert style.status_code == 201
     assert tts.status_code == 201
-    assert tts.json()["output_asset"]["asset_role"] == "speech_audio"
-    assert tts.json()["output_objects"][0]["mime_type"] == "audio/wav"
+    tts_body = tts.json()
+    assert tts_body["output_asset"]["asset_role"] == "speech_audio"
+    assert tts_body["output_objects"][0]["mime_type"] == "audio/wav"
+    _assert_safe_speech_response(tts_body)
     assert stt.status_code == 201
-    assert stt.json()["transcript"]["transcript_text"] == "fake transcript"
+    stt_body = stt.json()
+    assert stt_body["transcript"]["transcript_text"] == "fake transcript"
+    _assert_safe_speech_response(stt_body)
     assert transcripts.status_code == 200
     assert transcripts.json()[0]["source_asset_id"] == str(source_asset_id)
     assert owner_profiles.status_code == 200
@@ -215,8 +220,189 @@ def test_speech_api_voice_profiles_tts_stt_and_acl() -> None:
         assert session.scalars(select(MemoryWriteJob)).all() == []
 
 
+def test_speech_api_rejects_restricted_provider_execution_for_world_admin() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    platform_id, _platform_token = _seed_user(
+        engine,
+        "platform@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    _agent_id, conversation_id, turn_id = _seed_agent_and_conversation(
+        engine,
+        world_id,
+        worldline_id,
+    )
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, platform_id, AuthRole.WORLD_ADMIN)
+    tts_provider_id = _seed_provider(
+        engine,
+        world_id,
+        provider_kind="text_to_speech",
+        provider_key="platform-tts",
+        capabilities=("supports_tts",),
+        scope_kind="global",
+        visibility="developer_only",
+    )
+    stt_provider_id = _seed_provider(
+        engine,
+        world_id,
+        provider_kind="speech_to_text",
+        provider_key="platform-stt",
+        capabilities=("supports_stt",),
+        scope_kind="global",
+        visibility="developer_only",
+    )
+    source_asset_id = _seed_audio_asset(
+        engine,
+        client.speech_storage,
+        world_id,
+        worldline_id,
+        role="transcript_audio",
+    )
+
+    _authenticate(client, owner_token)
+    hidden_detail = client.get(f"/worlds/{world_id}/providers/{tts_provider_id}")
+    tts = client.post(
+        f"/worlds/{world_id}/speech/tts",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(tts_provider_id),
+            "text": "hello",
+        },
+    )
+    stt = client.post(
+        f"/worlds/{world_id}/speech/stt",
+        json={
+            "worldline_id": str(worldline_id),
+            "provider_id": str(stt_provider_id),
+            "source_asset_id": str(source_asset_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+        },
+    )
+
+    assert hidden_detail.status_code == 404
+    assert tts.status_code == 422
+    assert stt.status_code == 422
+    with Session(engine) as session:
+        assert session.scalars(select(MediaJob)).all() == []
+        assert session.scalars(select(ModelInvocation)).all() == []
+        assert session.scalars(select(PromptSnapshot)).all() == []
+        assert session.scalars(select(SpeechTranscript)).all() == []
+
+
+def test_speech_lists_reject_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "speech-owner@example.test")
+    other_owner_id, _ = _seed_user(engine, "speech-other@example.test")
+    world_id = _seed_world(engine, owner_id)
+    other_world_id = _seed_world(engine, other_owner_id)
+    worldline_id = _seed_worldline(engine, world_id)
+    other_worldline_id = _seed_worldline(engine, other_world_id)
+    agent_id, _, _ = _seed_agent_and_conversation(engine, world_id, worldline_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    source_asset_id = _seed_audio_asset(
+        engine,
+        client.speech_storage,
+        world_id,
+        worldline_id,
+        role="transcript_audio",
+    )
+
+    _authenticate(client, owner_token)
+    profile = client.post(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        json={
+            "worldline_id": str(worldline_id),
+            "profile_key": "hero",
+            "display_name": "Hero",
+        },
+    )
+    assert profile.status_code == 201
+    binding = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        json={
+            "worldline_id": str(worldline_id),
+            "voice_profile_id": profile.json()["id"],
+        },
+    )
+    assert binding.status_code == 201
+    with Session(engine) as session:
+        session.add(
+            SpeechTranscript(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline_id,
+                source_asset_id=source_asset_id,
+                transcript_text="hello",
+                status="available",
+            )
+        )
+        session.commit()
+
+    wrong_profiles = client.get(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    wrong_bindings = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    wrong_transcripts = client.get(
+        f"/worlds/{world_id}/speech/transcripts",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    valid_profiles = client.get(
+        f"/worlds/{world_id}/speech/voice-profiles",
+        params={"worldline_id": str(worldline_id)},
+    )
+    valid_bindings = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/voice-profiles",
+        params={"worldline_id": str(worldline_id)},
+    )
+    valid_transcripts = client.get(
+        f"/worlds/{world_id}/speech/transcripts",
+        params={"worldline_id": str(worldline_id)},
+    )
+
+    assert wrong_profiles.status_code == 422
+    assert wrong_bindings.status_code == 422
+    assert wrong_transcripts.status_code == 422
+    assert valid_profiles.status_code == 200
+    assert [record["profile_key"] for record in valid_profiles.json()] == ["hero"]
+    assert valid_bindings.status_code == 200
+    assert valid_bindings.json()[0]["voice_profile_id"] == profile.json()["id"]
+    assert valid_transcripts.status_code == 200
+    assert valid_transcripts.json()[0]["source_asset_id"] == str(source_asset_id)
+
+
 class _SpeechApiClient(TestClient):
     speech_storage: LocalMediaObjectStorage
+
+
+def _assert_safe_speech_response(body: dict[str, object]) -> None:
+    serialized = json.dumps(body)
+    assert "storage_uri" not in serialized
+    assert "media://" not in serialized
+    assert "request_json" not in serialized
+    assert "result_json" not in serialized
+    assert "provider_config_json" not in serialized
+    invocation = body["model_invocation"]
+    assert isinstance(invocation, dict)
+    for forbidden_field in (
+        "input_text",
+        "output_text",
+        "input_json",
+        "output_json",
+        "request_params_json",
+        "response_metadata_json",
+        "error_text",
+    ):
+        assert forbidden_field not in invocation
+
 
 
 def _client_with_database() -> tuple[_SpeechApiClient, Engine]:
@@ -419,15 +605,17 @@ def _seed_provider(
     provider_kind: str,
     provider_key: str,
     capabilities: tuple[str, ...],
+    scope_kind: str = "world",
+    visibility: str = "world_admin",
 ) -> uuid.UUID:
     provider_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             ProviderIntegration(
                 id=provider_id,
-                world_id=world_id,
-                scope_kind="world",
-                scope_key=f"world:{world_id}",
+                world_id=None if scope_kind == "global" else world_id,
+                scope_kind=scope_kind,
+                scope_key="global" if scope_kind == "global" else f"world:{world_id}",
                 provider_kind=provider_kind,
                 adapter_kind="fake",
                 provider_key=provider_key,
@@ -435,7 +623,7 @@ def _seed_provider(
                 config_json={},
                 default_params_json={},
                 status="active",
-                visibility="world_admin",
+                visibility=visibility,
             )
         )
         for capability_key in capabilities:

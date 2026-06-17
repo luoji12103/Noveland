@@ -107,7 +107,7 @@ describe("visual admin client", () => {
     }
   });
 
-  it("runs resolver previews without csrf and compose scene with csrf", async () => {
+  it("uses csrf for resolver previews and compose scene", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
@@ -137,10 +137,110 @@ describe("visual admin client", () => {
       "/api/worlds/world-1/visual/resolve-background",
       "/api/worlds/world-1/visual/compose-scene",
     ]);
-    expect((fetchMock.mock.calls[0][1].headers as Headers).get("X-CSRF-Token")).toBeNull();
-    expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBeNull();
-    expect((fetchMock.mock.calls[2][1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    }
     expect(fetchMock.mock.calls[2][0]).not.toContain("media://");
+  });
+
+  it("encodes visual admin API identifier path segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(spriteSet))
+      .mockResolvedValueOnce(jsonResponse(spriteSet))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(spriteVariant))
+      .mockResolvedValueOnce(jsonResponse(spriteVariant))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse(spriteResolveResult))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(sceneBackground))
+      .mockResolvedValueOnce(jsonResponse(sceneBackground))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse(backgroundResolveResult))
+      .mockResolvedValueOnce(jsonResponse(composeResult));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/visual?tab=admin#frag";
+    const spriteSetId = "sprite/set?agent=akari#frag";
+    const variantId = "variant/happy?pose=front#frag";
+    const backgroundId = "background/roof?weather=clear#frag";
+
+    await listSpriteSets(worldId, {
+      worldline_id: "worldline/main?branch=1#frag",
+      agent_id: "agent/main?role=hero#frag",
+    });
+    await createSpriteSet(worldId, {
+      worldline_id: "worldline-1",
+      agent_id: "agent-1",
+      style_key: "default",
+      display_name: "Akari default",
+      status: "active",
+      visibility: "world_admin",
+      metadata_json: {},
+    });
+    await updateSpriteSet(worldId, spriteSetId, { display_name: "Akari saved" });
+    await deleteSpriteSet(worldId, spriteSetId);
+    await listSpriteVariants(worldId, spriteSetId);
+    await createSpriteVariant(worldId, spriteSetId, {
+      worldline_id: "worldline-1",
+      asset_id: "asset-1",
+      expression_key: "neutral",
+      mood_tags: [],
+      priority: 100,
+      is_default: true,
+      status: "active",
+      visibility: "world_admin",
+      metadata_json: {},
+    });
+    await updateSpriteVariant(worldId, spriteSetId, variantId, { expression_key: "happy" });
+    await deleteSpriteVariant(worldId, spriteSetId, variantId);
+    await resolveSprite(worldId, { worldline_id: "worldline-1", agent_id: "agent-1", expression_key: "happy" });
+    await listSceneBackgrounds(worldId, { worldline_id: "worldline/main?branch=1#frag" });
+    await createSceneBackground(worldId, {
+      worldline_id: "worldline-1",
+      location_key: "school_rooftop",
+      asset_id: "background-asset-1",
+      priority: 100,
+      is_default: true,
+      status: "active",
+      visibility: "world_admin",
+      metadata_json: {},
+    });
+    await updateSceneBackground(worldId, backgroundId, { weather_key: "clear" });
+    await deleteSceneBackground(worldId, backgroundId);
+    await resolveBackground(worldId, { worldline_id: "worldline-1", location_key: "school_rooftop" });
+    await composeScene(worldId, {
+      worldline_id: "worldline-1",
+      background_asset_id: "background-asset-1",
+      layers: [{ asset_id: "asset-1", x: 100, y: 120, z_index: 1 }],
+      metadata_json: { purpose: "admin_preview" },
+    });
+
+    const worldSegment = encodeURIComponent(worldId);
+    const spriteSetSegment = encodeURIComponent(spriteSetId);
+    const variantSegment = encodeURIComponent(variantId);
+    const backgroundSegment = encodeURIComponent(backgroundId);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets?worldline_id=worldline%2Fmain%3Fbranch%3D1%23frag&agent_id=agent%2Fmain%3Frole%3Dhero%23frag",
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets",
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment,
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment,
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment + "/variants",
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment + "/variants",
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment + "/variants/" + variantSegment,
+      "/api/worlds/" + worldSegment + "/visual/sprite-sets/" + spriteSetSegment + "/variants/" + variantSegment,
+      "/api/worlds/" + worldSegment + "/visual/resolve-sprite",
+      "/api/worlds/" + worldSegment + "/visual/backgrounds?worldline_id=worldline%2Fmain%3Fbranch%3D1%23frag",
+      "/api/worlds/" + worldSegment + "/visual/backgrounds",
+      "/api/worlds/" + worldSegment + "/visual/backgrounds/" + backgroundSegment,
+      "/api/worlds/" + worldSegment + "/visual/backgrounds/" + backgroundSegment,
+      "/api/worlds/" + worldSegment + "/visual/resolve-background",
+      "/api/worlds/" + worldSegment + "/visual/compose-scene",
+    ]);
   });
 });
 

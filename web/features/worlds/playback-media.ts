@@ -28,13 +28,14 @@ export function resolveTurnMedia(
         || (reference.ref_kind === "conversation_session" && reference.ref_id === conversationId),
     ),
   );
+  const imageAssetIds = [presentation?.composite_scene_asset_id, presentation?.background_asset_id];
+  const audioAssetIds = [presentation?.tts_media_asset_id];
   const image =
-    assetFromId(mediaByAssetId, presentation?.composite_scene_asset_id, "image")
-    ?? assetFromId(mediaByAssetId, presentation?.background_asset_id, "image")
-    ?? preferredReferencedMedia(referenced, "image");
+    mediaFromPresentationIds(mediaByAssetId, imageAssetIds, "image")
+    ?? preferredReferencedMediaWhenPresentationIsUnset(referenced, imageAssetIds, "image");
   const audio =
-    assetFromId(mediaByAssetId, presentation?.tts_media_asset_id, "audio")
-    ?? preferredReferencedMedia(referenced, "audio");
+    mediaFromPresentationIds(mediaByAssetId, audioAssetIds, "audio")
+    ?? preferredReferencedMediaWhenPresentationIsUnset(referenced, audioAssetIds, "audio");
   return {
     image,
     imageObject: primaryObject(image),
@@ -87,6 +88,30 @@ function assetFromId(
   }
   const media = mediaByAssetId.get(assetId) ?? null;
   return media?.asset_kind === kind ? media : null;
+}
+
+function mediaFromPresentationIds(
+  mediaByAssetId: Map<string, ReaderMediaDescriptor>,
+  assetIds: Array<string | null | undefined>,
+  kind: "image" | "audio",
+): ReaderMediaDescriptor | null {
+  for (const assetId of assetIds) {
+    const media = assetFromId(mediaByAssetId, assetId, kind);
+    if (media !== null) {
+      return media;
+    }
+  }
+  return null;
+}
+
+function preferredReferencedMediaWhenPresentationIsUnset(
+  media: ReaderMediaDescriptor[],
+  presentationAssetIds: Array<string | null | undefined>,
+  kind: "image" | "audio",
+): ReaderMediaDescriptor | null {
+  return presentationAssetIds.some((assetId) => assetId !== null && assetId !== undefined)
+    ? null
+    : preferredReferencedMedia(media, kind);
 }
 
 function preferredReferencedMedia(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 import json
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -117,6 +118,16 @@ STRESS_FORBIDDEN_REPORT_MARKERS = (
     "bytes",
     "base64",
 )
+SENSITIVE_VALUE_PATTERN = re.compile(
+    r"(sk-[A-Za-z0-9][A-Za-z0-9_.-]*|"
+    r"bearer\s+[^\s,;]+|"
+    r"media://[^\s,;]+|file://[^\s,;]+|s3://[^\s,;]+|gs://[^\s,;]+|"
+    r"/root/[^\s,;]*|/tmp/[^\s,;]*|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt_snapshot|resolved_secret|"
+    r"authorization|base64,?[A-Za-z0-9+/=]*"
+    r")",
+    re.IGNORECASE,
+)
 
 
 class RuntimeDiagnosticsService:
@@ -128,8 +139,8 @@ class RuntimeDiagnosticsService:
             id=uuid.uuid4(),
             severity=diagnostic_create.severity.value,
             component=diagnostic_create.component.value,
-            event_type=diagnostic_create.event_type,
-            message=diagnostic_create.message,
+            event_type=redact_diagnostic_text(diagnostic_create.event_type),
+            message=redact_diagnostic_text(diagnostic_create.message),
             details=redact_diagnostic_details(diagnostic_create.details),
             occurred_at=diagnostic_create.occurred_at or datetime.now(UTC),
             world_id=diagnostic_create.world_id,
@@ -257,9 +268,16 @@ def _redact_value(value: Any) -> Any:
         return output
     if isinstance(value, list | tuple):
         return [_redact_value(item) for item in value]
-    if isinstance(value, str) and len(value) > 500:
-        return f"{value[:500]}..."
+    if isinstance(value, str):
+        return redact_diagnostic_text(value)
     return value
+
+
+def redact_diagnostic_text(value: str) -> str:
+    redacted = SENSITIVE_VALUE_PATTERN.sub(REDACTED_VALUE, value)
+    if len(redacted) > 500:
+        return f"{redacted[:500]}..."
+    return redacted
 
 
 def _is_sensitive_key(key: str) -> bool:
@@ -5067,9 +5085,9 @@ def _record(model: RuntimeDiagnosticEvent) -> RuntimeDiagnosticRecord:
         id=model.id,
         severity=DiagnosticSeverity(model.severity),
         component=DiagnosticComponent(model.component),
-        event_type=model.event_type,
-        message=model.message,
-        details=model.details,
+        event_type=redact_diagnostic_text(model.event_type),
+        message=redact_diagnostic_text(model.message),
+        details=redact_diagnostic_details(model.details),
         occurred_at=_utc(model.occurred_at),
         world_id=model.world_id,
         agent_id=model.agent_id,

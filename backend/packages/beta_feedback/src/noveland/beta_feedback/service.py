@@ -62,9 +62,13 @@ _SENSITIVE_KEYS = {
     "storage_uri",
     "token",
 }
+_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _SENSITIVE_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"raw_prompt|raw_output|prompt_snapshot|sk-[A-Za-z0-9]|bearer\s+)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|sk-[A-Za-z0-9]|bearer\s+)",
     re.IGNORECASE,
 )
 _SAFE_TEXT_LIMIT = 1_500
@@ -74,6 +78,17 @@ _WORLDLINELESS_EVIDENCE = {
     BetaFeedbackEvidenceKind.PROVIDER,
     BetaFeedbackEvidenceKind.PERSONA,
     BetaFeedbackEvidenceKind.QUOTA,
+    BetaFeedbackEvidenceKind.UX,
+    BetaFeedbackEvidenceKind.OTHER,
+}
+_MEMBER_VISIBLE_EVIDENCE = {
+    BetaFeedbackEvidenceKind.WORLDLINE,
+    BetaFeedbackEvidenceKind.SCENE,
+    BetaFeedbackEvidenceKind.CONVERSATION,
+    BetaFeedbackEvidenceKind.TURN,
+    BetaFeedbackEvidenceKind.PRESENTATION,
+    BetaFeedbackEvidenceKind.MEDIA_ASSET,
+    BetaFeedbackEvidenceKind.PLAYER_ACTOR,
     BetaFeedbackEvidenceKind.UX,
     BetaFeedbackEvidenceKind.OTHER,
 }
@@ -141,7 +156,7 @@ class BetaFeedbackService:
         )
         self._session.add(report)
         self._session.flush()
-        return self._read(report)
+        return self._read(report, include_admin_fields=actor_is_admin)
 
     def list_reports(
         self,
@@ -172,7 +187,10 @@ class BetaFeedbackService:
             statement = statement.where(BetaFeedbackReport.status == status.value)
         if issue_type is not None:
             statement = statement.where(BetaFeedbackReport.issue_type == issue_type)
-        return [self._read(report) for report in self._session.scalars(statement).all()]
+        return [
+            self._read(report, include_admin_fields=actor_is_admin)
+            for report in self._session.scalars(statement).all()
+        ]
 
     def get_report(
         self,
@@ -186,7 +204,7 @@ class BetaFeedbackService:
         report = self._report_or_404(world_id, report_id)
         if not actor_is_admin and report.reporter_user_id != actor_user_id:
             raise BetaFeedbackNotFoundError("beta feedback report not found")
-        return self._read(report)
+        return self._read(report, include_admin_fields=actor_is_admin)
 
     def triage_report(
         self,
@@ -223,7 +241,7 @@ class BetaFeedbackService:
         report.triaged_by_actor_ref = actor_ref
         report.triaged_at = datetime.now(UTC)
         self._session.flush()
-        return self._read(report)
+        return self._read(report, include_admin_fields=True)
 
     def link_repair_proposals(
         self,
@@ -259,7 +277,7 @@ class BetaFeedbackService:
                 report.status = BetaFeedbackReportStatus.LINKED_TO_REPAIR.value
                 report.triaged_by_actor_ref = actor_ref
                 report.triaged_at = datetime.now(UTC)
-            updated.append(self._read(report))
+            updated.append(self._read(report, include_admin_fields=True))
         self._session.flush()
         return updated
 
@@ -605,7 +623,12 @@ class BetaFeedbackService:
             raise BetaFeedbackNotFoundError(message)
         return model
 
-    def _read(self, report: BetaFeedbackReport) -> BetaFeedbackReportRead:
+    def _read(
+        self,
+        report: BetaFeedbackReport,
+        *,
+        include_admin_fields: bool = True,
+    ) -> BetaFeedbackReportRead:
         return BetaFeedbackReportRead(
             id=report.id,
             world_id=report.world_id,
@@ -620,24 +643,54 @@ class BetaFeedbackService:
             reporter_note=(
                 None if report.reporter_note is None else self._safe_text(report.reporter_note)
             ),
-            evidence_refs=tuple(
-                BetaFeedbackEvidenceRef.model_validate(item)
-                for item in self._sanitize_json_array(report.evidence_refs_json, "evidence_refs")
+            evidence_refs=self._evidence_refs_for_read(
+                report,
+                include_admin_fields=include_admin_fields,
             ),
-            repair_proposal_refs=tuple(
-                BetaFeedbackRepairProposalRef.model_validate(item)
-                for item in self._sanitize_json_array(
-                    report.repair_proposal_refs_json,
-                    "repair_proposal_refs",
-                )
-            ),
-            triage_note=None if report.triage_note is None else self._safe_text(report.triage_note),
-            triaged_by_actor_ref=report.triaged_by_actor_ref,
-            triaged_at=report.triaged_at,
-            moderation_report_id=report.moderation_report_id,
-            metadata=self._sanitize_json_object(report.metadata_json, "metadata"),
+            repair_proposal_refs=()
+            if not include_admin_fields
+            else self._repair_refs_for_read(report),
+            triage_note=None
+            if not include_admin_fields or report.triage_note is None
+            else self._safe_text(report.triage_note),
+            triaged_by_actor_ref=report.triaged_by_actor_ref if include_admin_fields else None,
+            triaged_at=report.triaged_at if include_admin_fields else None,
+            moderation_report_id=report.moderation_report_id if include_admin_fields else None,
+            metadata=self._sanitize_json_object(report.metadata_json, "metadata")
+            if include_admin_fields
+            else {},
             created_at=report.created_at,
             updated_at=report.updated_at,
+        )
+
+    def _evidence_refs_for_read(
+        self,
+        report: BetaFeedbackReport,
+        *,
+        include_admin_fields: bool,
+    ) -> tuple[BetaFeedbackEvidenceRef, ...]:
+        refs = [
+            BetaFeedbackEvidenceRef.model_validate(item)
+            for item in self._sanitize_json_array(report.evidence_refs_json, "evidence_refs")
+        ]
+        if include_admin_fields:
+            return tuple(refs)
+        return tuple(
+            ref.model_copy(update={"metadata": {}})
+            for ref in refs
+            if ref.kind in _MEMBER_VISIBLE_EVIDENCE
+        )
+
+    def _repair_refs_for_read(
+        self,
+        report: BetaFeedbackReport,
+    ) -> tuple[BetaFeedbackRepairProposalRef, ...]:
+        return tuple(
+            BetaFeedbackRepairProposalRef.model_validate(item)
+            for item in self._sanitize_json_array(
+                report.repair_proposal_refs_json,
+                "repair_proposal_refs",
+            )
         )
 
     def _validate_safe_text(self, value: str | None, field_name: str) -> None:
@@ -670,7 +723,7 @@ class BetaFeedbackService:
             sanitized: dict[str, Any] = {}
             for key, item in value.items():
                 key_text = str(key)
-                if key_text.lower() in _SENSITIVE_KEYS:
+                if _is_sensitive_key(key_text):
                     continue
                 clean_item = self._sanitize_json_value(item)
                 if clean_item is not None:
@@ -687,3 +740,8 @@ class BetaFeedbackService:
         if value is None or isinstance(value, bool | int | float):
             return value
         return str(value)[:200]
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _SENSITIVE_KEY_MARKERS)

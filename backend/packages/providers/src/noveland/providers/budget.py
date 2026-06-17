@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, time
@@ -31,9 +32,16 @@ LEAKY_KEYS = {
     "bytes",
     "path",
     "file_path",
+    "filesystem_path",
+    "object_storage_path",
+    "object_path",
+    "prompt_snapshot",
+    "prompt_snapshot_id",
+    "raw_bytes",
     "raw_prompt",
     "raw_output",
 }
+LEAKY_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in LEAKY_KEYS}
 
 
 class ProviderBudgetError(RuntimeError):
@@ -420,12 +428,17 @@ def _normalize_key(value: object) -> str | None:
     return normalized or None
 
 
+def _is_leaky_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in LEAKY_KEY_MARKERS
+
+
 def _first_leaky_path(value: Any, *, prefix: str = "") -> str | None:
     if isinstance(value, dict):
         for key, item in value.items():
             key_text = str(key)
             path = key_text if prefix == "" else f"{prefix}.{key_text}"
-            if key_text.strip().lower() in LEAKY_KEYS:
+            if _is_leaky_key(key_text):
                 return path
             nested = _first_leaky_path(item, prefix=path)
             if nested is not None:

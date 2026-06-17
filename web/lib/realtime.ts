@@ -33,6 +33,15 @@ export type ConversationLiveMessage = {
   payload: Record<string, unknown>;
 };
 
+
+export function worldEventStreamPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}/stream`;
+}
+
+export function conversationEventStreamPath(worldId: string, conversationId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(conversationId)}/stream`;
+}
+
 export function subscribeToEventStream<TPayload>(
   path: string,
   onEnvelope: (envelope: StreamEnvelope<TPayload>) => void,
@@ -62,7 +71,9 @@ export function createConversationLiveSocket(
   } = {},
 ): WebSocket {
   const socket = new WebSocket(
-    `${getAuthApiWebSocketBaseUrl()}/worlds/${worldId}/conversations/${conversationId}/live`,
+    `${getAuthApiWebSocketBaseUrl()}/worlds/${encodeURIComponent(
+      worldId,
+    )}/conversations/${encodeURIComponent(conversationId)}/live`,
   );
   socket.addEventListener("open", () => {
     handlers.onOpen?.();

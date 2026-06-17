@@ -47,6 +47,13 @@ describe("InvocationLedgerAdmin", () => {
     expect(screen.queryByText(/\/var\/noveland/)).not.toBeInTheDocument();
     expect(screen.queryByText(/sk-live-secret/)).not.toBeInTheDocument();
     expect(screen.queryByText(/YmFzZTY0/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/storageUri/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/rawPrompt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/promptSnapshotId/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/opaque-storage-ref/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/hidden prompt/)).not.toBeInTheDocument();
+    expect(screen.getByText(/"source": "admin"/)).toBeInTheDocument();
+    expect(screen.getByText(/"result": "ok"/)).toBeInTheDocument();
   });
 
   it("filters, selects, tags, deletes tags, and redacts invocations through client helpers", async () => {
@@ -211,8 +218,12 @@ const promptSnapshot: PromptSnapshot = {
   template_version: 1,
   raw_prompt_text: "hello world",
   raw_messages_json: [{ role: "user", content: "hello world" }],
-  raw_request_json: { Authorization: "Bearer sk-live-secret", storage_uri: "media://hidden-object" },
-  raw_response_json: { file_path: "/var/noveland/object" },
+  raw_request_json: {
+    Authorization: "Bearer sk-live-secret",
+    storageUri: "opaque-storage-ref",
+    rawPrompt: "hidden prompt",
+  },
+  raw_response_json: { filePath: "/var/noveland/object", promptSnapshotId: "snapshot-hidden" },
   raw_output_text: "audio asset created",
   normalized_output_json: { base64: "YmFzZTY0" },
   prompt_context_snapshot_json: {},

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   cancelMediaJob,
+  listMediaAssetReferences,
   listMediaAssets,
   listMediaJobs,
   listMediaObjects,
@@ -90,14 +91,129 @@ describe("media admin client", () => {
     expect(url).not.toContain("media://");
   });
 
+  it("encodes reserved characters in media admin route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(jsonResponse([])))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(mediaAsset))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(mediaJob))
+      .mockResolvedValueOnce(jsonResponse(mediaJob))
+      .mockResolvedValueOnce(jsonResponse({ asset: mediaAsset, object: mediaObject }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/alpha?admin=true#frag";
+    const assetId = "asset/input?role=source#frag";
+    const jobId = "job/retry?force=true#frag";
+    const objectId = "object/main?download=1#frag";
+
+    await listMediaAssets(worldId, { contains_text: "sprite/one?x=1#y" });
+    await listMediaObjects(worldId, assetId);
+    await updateMediaAsset(worldId, assetId, { title: "Encoded" });
+    await listMediaAssetReferences(worldId, assetId);
+    await listMediaReferences(worldId, { asset_id: assetId });
+    await listMediaJobs(worldId, { provider_kind: "fake/provider?x=1#frag" });
+    await cancelMediaJob(worldId, jobId);
+    await retryMediaJob(worldId, jobId);
+    await uploadMediaAsset(worldId, {
+      file: new File(["image-bytes"], "sprite.png", { type: "image/png" }),
+      asset_kind: "image",
+      asset_role: "character_sprite",
+      visibility: "world_admin",
+    });
+
+    const encodedWorld = encodeURIComponent(worldId);
+    const encodedAsset = encodeURIComponent(assetId);
+    const encodedJob = encodeURIComponent(jobId);
+    const calls = fetchMock.mock.calls.map((call) => call[0]);
+
+    expect(calls).toEqual([
+      `/api/worlds/${encodedWorld}/media/assets?contains_text=sprite%2Fone%3Fx%3D1%23y`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}/objects`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}`,
+      `/api/worlds/${encodedWorld}/media/assets/${encodedAsset}/references`,
+      `/api/worlds/${encodedWorld}/media/references?asset_id=asset%2Finput%3Frole%3Dsource%23frag`,
+      `/api/worlds/${encodedWorld}/media/jobs?provider_kind=fake%2Fprovider%3Fx%3D1%23frag`,
+      `/api/worlds/${encodedWorld}/media/jobs/${encodedJob}/cancel`,
+      `/api/worlds/${encodedWorld}/media/jobs/${encodedJob}/retry`,
+      `/api/worlds/${encodedWorld}/media/assets/upload`,
+    ]);
+    expect(mediaObjectDownloadPath(worldId, objectId)).toBe(
+      `/api/worlds/${encodedWorld}/media/objects/${encodeURIComponent(objectId)}/download`,
+    );
+  });
+
   it("builds safe backend download paths from object ids only", () => {
+    const readerWorldId = "11111111-1111-4111-8111-111111111111";
+    const readerWorldlineId = "11111111-2222-4111-8111-111111111111";
+    const readerObjectId = "22222222-2222-4222-8222-222222222222";
+    const readerDownloadPath =
+      `/api/worlds/${readerWorldId}/reader/media/worldlines/${readerWorldlineId}/objects/${readerObjectId}/download`;
+
     expect(mediaObjectDownloadPath("world-1", "object-1")).toBe(
       "/api/worlds/world-1/media/objects/object-1/download",
     );
     expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/worldlines/${readerWorldlineId}/objects/${readerObjectId}/download`,
+      ),
+    ).toBe(readerDownloadPath);
+    expect(readerMediaObjectDownloadPath(readerDownloadPath)).toBe(readerDownloadPath);
+    expect(readerMediaObjectDownloadPath("media://hidden/object")).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/worldlines/${readerWorldlineId}/objects/${readerObjectId}/download?token=secret`,
+      ),
+    ).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/worldlines/${readerWorldlineId}/objects/${readerObjectId}/download/extra`,
+      ),
+    ).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(`/worlds/${readerWorldId}/media/objects/${readerObjectId}/download`),
+    ).toBeNull();
+    expect(
+      readerMediaObjectDownloadPath(
+        `/worlds/${readerWorldId}/reader/media/objects/${readerObjectId}/download`,
+      ),
+    ).toBeNull();
+    expect(
       readerMediaObjectDownloadPath("/worlds/world-1/reader/media/objects/object-1/download"),
-    ).toBe("/api/worlds/world-1/reader/media/objects/object-1/download");
-    expect(readerMediaObjectDownloadPath("media://hidden/object")).toBe("");
+    ).toBeNull();
+  });
+
+  it("normalizes sensitive upload error details", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail:
+              "Upload failed after reading storageUri media://hidden/object from /var/noveland/media with rawOutput",
+          },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    await expect(
+      uploadMediaAsset("world-1", {
+        file: new File(["image-bytes"], "sprite.png", { type: "image/png" }),
+        asset_kind: "image",
+        asset_role: "character_sprite",
+        visibility: "world_admin",
+      }),
+    ).rejects.toMatchObject({
+      message: "Media upload failed.",
+      status: 500,
+    });
   });
 });
 

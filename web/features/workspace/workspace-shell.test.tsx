@@ -27,35 +27,39 @@ describe("WorkspaceShell", () => {
         }}
         title="World"
         intro="Workspace"
-        worldId="world-1"
+        worldId={RESERVED_WORLD_ID}
       >
         <p>Content</p>
       </WorkspaceShell>,
     );
 
+    const worldPath = `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}`;
+
     expect(screen.getAllByRole("link", { name: "Providers" })[0]).toHaveAttribute(
       "href",
-      "/worlds/world-1/providers",
+      `${worldPath}/providers`,
     );
     expect(screen.getByRole("link", { name: "Media" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/media",
+      `${worldPath}/media`,
     );
     expect(screen.getByRole("link", { name: "Visual" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/visual",
+      `${worldPath}/visual`,
     );
     expect(screen.getByRole("link", { name: "Speech" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/speech",
+      `${worldPath}/speech`,
     );
     expect(screen.getByRole("link", { name: "Invocations" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/invocations",
+      `${worldPath}/invocations`,
     );
     expect(screen.getByRole("link", { name: "Diagnostics" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/diagnostics",
+      `${worldPath}/diagnostics`,
     );
   });
+
+const RESERVED_WORLD_ID = "world/admin?scope=true#frag";
 });

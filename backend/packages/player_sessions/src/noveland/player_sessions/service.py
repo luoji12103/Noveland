@@ -47,9 +47,16 @@ _LEAKY_KEYS = {
     "storage_uri",
     "token",
 }
+_LEAKY_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS}
+_PLAYER_DELIVERABLE_MEDIA_VISIBILITIES = {
+    "world_member",
+    "player_visible",
+    "reader_visible",
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"raw_prompt|raw_output|prompt_snapshot|sk-[A-Za-z0-9])",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|sk-[A-Za-z0-9]|bearer\s+)",
     re.IGNORECASE,
 )
 _JSON_LIMIT = 8_000
@@ -126,6 +133,8 @@ class PlayerSessionService:
         route_state = _sanitize_json(session_upsert.route_state)
         resume_state = _sanitize_json(session_upsert.resume_state)
         recovery_status = self._effective_recovery_status(
+            world_id=world_id,
+            worldline_id=worldline.id,
             requested=session_upsert.recovery_status,
             conversation=conversation,
             presentation=presentation,
@@ -218,6 +227,8 @@ class PlayerSessionService:
     def _effective_recovery_status(
         self,
         *,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
         requested: PlayerRecoveryStatus,
         conversation: ConversationSession | None,
         presentation: ConversationTurnPresentation | None,
@@ -234,27 +245,63 @@ class PlayerSessionService:
             presentation.composite_scene_asset_id,
         ]
         if any(
-            media_id is not None and not self._media_asset_player_safe(media_id)
+            media_id is not None
+            and not self._media_asset_player_safe(world_id, worldline_id, media_id)
             for media_id in media_ids
         ):
             return PlayerRecoveryStatus.MISSING_MEDIA
-        if any(self._media_job_failed(job_id) for job_id in media_ids if job_id is not None):
+        if any(
+            self._media_job_failed(world_id, worldline_id, media_id)
+            for media_id in media_ids
+            if media_id is not None
+        ):
             return PlayerRecoveryStatus.MEDIA_FAILURE
         return requested
 
-    def _media_asset_player_safe(self, media_id: uuid.UUID) -> bool:
-        asset = self._session.get(MediaAsset, media_id)
-        return asset is not None and asset.status == "available" and asset.visibility not in {
-            "developer_only",
-            "hidden",
-        }
+    def _media_asset_player_safe(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_id: uuid.UUID,
+    ) -> bool:
+        from noveland.reader_delivery.service import ReaderMediaDeliveryService
 
-    def _media_job_failed(self, media_id: uuid.UUID) -> bool:
         asset = self._session.get(MediaAsset, media_id)
-        if asset is None or asset.source_job_id is None:
+        return (
+            asset is not None
+            and asset.world_id == world_id
+            and asset.worldline_id == worldline_id
+            and asset.status == "available"
+            and asset.visibility in _PLAYER_DELIVERABLE_MEDIA_VISIBILITIES
+            and ReaderMediaDeliveryService(self._session).get_media(
+                world_id,
+                media_id,
+                worldline_id=worldline_id,
+            )
+            is not None
+        )
+
+    def _media_job_failed(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        media_id: uuid.UUID,
+    ) -> bool:
+        asset = self._session.get(MediaAsset, media_id)
+        if (
+            asset is None
+            or asset.world_id != world_id
+            or asset.worldline_id != worldline_id
+            or asset.source_job_id is None
+        ):
             return False
         job = self._session.get(MediaJob, asset.source_job_id)
-        return job is not None and job.status == "failed"
+        return (
+            job is not None
+            and job.world_id == world_id
+            and job.worldline_id == worldline_id
+            and job.status == "failed"
+        )
 
     def _player_actor_or_404(
         self,
@@ -322,6 +369,7 @@ class PlayerSessionService:
         )
 
 
+
 def _sanitize_json(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise PlayerSessionValidationError("state payload must be an object")
@@ -357,8 +405,12 @@ def _sanitize_value(value: Any) -> Any:
 
 
 def _is_leaky_key(key: str) -> bool:
-    normalized = key.lower()
-    return normalized in _LEAKY_KEYS or any(marker in normalized for marker in _LEAKY_KEYS)
+    normalized = _normalize_sensitive_key(key)
+    return any(marker and marker in normalized for marker in _LEAKY_KEY_MARKERS)
+
+
+def _normalize_sensitive_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
 
 
 def _recovery_label(status: PlayerRecoveryStatus) -> str:

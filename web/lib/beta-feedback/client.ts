@@ -1,5 +1,6 @@
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type {
   BetaFeedbackIssueType,
   BetaFeedbackReport,
@@ -22,8 +23,9 @@ export function listBetaFeedbackReports(
   appendOptional(search, "status", filters.status);
   appendOptional(search, "issue_type", filters.issue_type);
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
+  const worldSegment = encodeURIComponent(worldId);
   return betaFeedbackRequest<BetaFeedbackReport[]>(
-    `/api/worlds/${worldId}/beta-feedback/reports${suffix}`,
+    `/api/worlds/${worldSegment}/beta-feedback/reports${suffix}`,
     { method: "GET" },
   );
 }
@@ -32,7 +34,8 @@ export function createBetaFeedbackReport(
   worldId: string,
   input: BetaFeedbackReportCreateInput,
 ): Promise<BetaFeedbackReport> {
-  return betaFeedbackRequest<BetaFeedbackReport>(`/api/worlds/${worldId}/beta-feedback/reports`, {
+  const worldSegment = encodeURIComponent(worldId);
+  return betaFeedbackRequest<BetaFeedbackReport>(`/api/worlds/${worldSegment}/beta-feedback/reports`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -44,8 +47,10 @@ export function triageBetaFeedbackReport(
   reportId: string,
   input: BetaFeedbackReportTriageInput,
 ): Promise<BetaFeedbackReport> {
+  const worldSegment = encodeURIComponent(worldId);
+  const reportSegment = encodeURIComponent(reportId);
   return betaFeedbackRequest<BetaFeedbackReport>(
-    `/api/worlds/${worldId}/beta-feedback/reports/${reportId}/triage`,
+    `/api/worlds/${worldSegment}/beta-feedback/reports/${reportSegment}/triage`,
     {
       method: "PATCH",
       body: input,
@@ -94,7 +99,9 @@ async function csrfToken(): Promise<string> {
 async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : null;
+    return typeof body.detail === "string"
+      ? normalizeBackendErrorDetail(body.detail, "Beta feedback request failed.")
+      : null;
   } catch {
     return null;
   }

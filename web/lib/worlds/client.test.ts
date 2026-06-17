@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  advanceConversation,
+  advanceWorldClock,
   applyAuthoringTemplate,
   applyRelationshipRepair,
   cancelAgentCalendarEntry,
@@ -11,6 +13,7 @@ import {
   createAgentRelationship,
   createAuthoringTemplate,
   createBetaChecklist,
+  createConversation,
   createDailyEpisode,
   createEndingCandidate,
   createFactionTrack,
@@ -31,6 +34,8 @@ import {
   createOrganizationMembership,
   createAgentPreset,
   createPlayerJournalEntry,
+  createPlayerDeleteRequest,
+  createPlayerPrivacyExport,
   createPlotThread,
   createProviderProfile,
   createRelationshipRepair,
@@ -40,6 +45,7 @@ import {
   createSnapshot,
   createRumor,
   createRumorPropagation,
+  createScene,
   createSceneBeat,
   createSecret,
   createStoryHook,
@@ -52,6 +58,7 @@ import {
   getExternalToolPolicy,
   getReleaseProfile,
   getLivingWorldDashboard,
+  getAgentMemoryProfileSnapshot,
   previewConversationNarrativePrompt,
   getCalendarConflicts,
   getDailyLifePreview,
@@ -59,7 +66,9 @@ import {
   getAgentPresence,
   getNarrativeArtifact,
   createWorld,
+  deactivateAgent,
   deactivateAgentPreset,
+  disableScheduleRule,
   deleteMemoryBackendProfile,
   disableProviderProfile,
   dryRunEndingCandidate,
@@ -72,15 +81,19 @@ import {
   exportWorldComposition,
   executeGroupInteraction,
   forkWorldline,
+  forgetAgentMemory,
   getRuntimeControl,
   getRuntimeStatus,
   getScaleReadiness,
   getLatestSnapshot,
   getAgentPersona,
+  getMemoryBackendProfileHealth,
+  getMemoryBackendProfileLogs,
   getAgentPresetUpdatePreview,
   getReplayState,
   getSnapshotIntegrity,
   getWorldBible,
+  getWorldClock,
   generateDailyLifeCandidates,
   listAuthoringTemplates,
   listBetaChecklistItems,
@@ -113,21 +126,27 @@ import {
   listRouteAffinities,
   listRouteMilestones,
   listLongRunEvals,
+  listMemberships,
   listRumors,
   listRumorPropagations,
   listNarrativeContinuityReviews,
   listNotifications,
   listSecrets,
   listSceneBeats,
+  listScenes,
   listStoryHooks,
   listWorldEvents,
   listFilteredNarrativeArtifacts,
+  listConversationParticipants,
+  listConversations,
+  listConversationTurns,
   listClockTransitions,
   listRuntimeDiagnostics,
   listAgentRuns,
   listAgentObservations,
   listMemoryBackendProfiles,
   listMemoryBackendProfileJobs,
+  pauseConversation,
   pauseWorldClock,
   previewAuthoringTemplate,
   previewPlayerChoiceConsequences,
@@ -138,16 +157,22 @@ import {
   revealSecret,
   reviewGMProposal,
   resumeWorldClock,
+  listAgentCalendar,
   listAgentMemory,
   listAgentRelationships,
   listNarrativeArtifacts,
   listConversationNarrativeArtifacts,
   listAgentPresets,
+  listAgents,
   listProviderProfiles,
   listProviderHealth,
   listPluginCatalog,
   runAgent,
+  runMemoryBackendProfileEvalSmoke,
+  refreshAgentMemoryProfileSnapshot,
   refreshAgentObservations,
+  replaceConversationParticipants,
+  resumeConversation,
   retryMemoryWriteJob,
   resolveOrganizationConflict,
   skipWorldClock,
@@ -156,15 +181,22 @@ import {
   listWorldDiagnostics,
   planGMMacroEvents,
   searchAgentMemory,
+  seedConversation,
+  startConversation,
+  stopConversation,
   testProviderProfile,
   importWorldComposition,
   validateWorldComposition,
+  deleteMembership,
   updateMemoryBackendProfile,
   updateAgent,
+  updateAgentCalendarEntry,
+  updateConversation,
   updateEventTriggerCondition,
   updateFactionTrack,
   updateGMAgenda,
   updateLocationEdge,
+  upsertMembership,
   updateOrganization,
   updateOrganizationMembership,
   updateAgentRelationship,
@@ -177,12 +209,15 @@ import {
   validateAgentPersona,
   updateRuntimeControl,
   updateScheduleRule,
+  updateScene,
+  updateWorld,
   upsertAgentPresence,
   upsertEmotionalState,
   upsertKnowledgeFact,
   upsertReleaseProfile,
   upsertRouteAffinity,
   upsertWorldBible,
+  upsertPlayerSessionResume,
   listWorldlines,
 } from "@/lib/worlds/client";
 
@@ -540,6 +575,622 @@ describe("world client", () => {
     ]);
   });
 
+  it("encodes reserved characters in organization, agent, calendar, and schedule route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentOrganizationId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentOrganizationId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentMembershipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentMembershipId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentTrackId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentTrackId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentRelationshipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentRelationshipId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "presence" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentCalendarEntryId }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentCalendarEntryId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ conflict_count: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentScheduleRuleId }))
+      .mockResolvedValueOnce(jsonResponse({ preview: true }))
+      .mockResolvedValueOnce(jsonResponse({ id: orgAgentScheduleRuleId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listOrganizations(orgAgentWorldId);
+    await createOrganization(orgAgentWorldId, {
+      organization_key: "org",
+      name: "Organization",
+      organization_type: "club",
+    });
+    await updateOrganization(orgAgentWorldId, orgAgentOrganizationId, { is_active: false });
+    await listOrganizationMemberships(orgAgentWorldId, orgAgentOrganizationId);
+    await createOrganizationMembership(orgAgentWorldId, orgAgentOrganizationId, {
+      agent_id: orgAgentAgentId,
+      role_title: "President",
+    });
+    await updateOrganizationMembership(orgAgentWorldId, orgAgentOrganizationId, orgAgentMembershipId, {
+      loyalty: 80,
+    });
+    await listFactionTracks(orgAgentWorldId, orgAgentOrganizationId, {
+      worldline_id: orgAgentWorldlineId,
+    });
+    await createFactionTrack(orgAgentWorldId, orgAgentOrganizationId, {
+      worldline_id: orgAgentWorldlineId,
+      track_key: "track",
+      name: "Track",
+      track_type: "goal",
+    });
+    await updateFactionTrack(orgAgentWorldId, orgAgentOrganizationId, orgAgentTrackId, {
+      progress: 50,
+    });
+    await listAgents(orgAgentWorldId);
+    await listAgentRelationships(orgAgentWorldId, orgAgentAgentId, {
+      worldline_id: orgAgentWorldlineId,
+    });
+    await createAgentRelationship(orgAgentWorldId, orgAgentAgentId, {
+      source_agent_id: orgAgentAgentId,
+      target_agent_id: "agent-target",
+      relationship_type: "friendship",
+    });
+    await updateAgentRelationship(orgAgentWorldId, orgAgentAgentId, orgAgentRelationshipId, {
+      trust: 20,
+    });
+    await getAgentPresence(orgAgentWorldId, orgAgentAgentId, { worldline_id: orgAgentWorldlineId });
+    await upsertAgentPresence(orgAgentWorldId, orgAgentAgentId, {
+      worldline_id: orgAgentWorldlineId,
+      current_scene_id: "scene-1",
+    });
+    await listAgentCalendar(orgAgentWorldId, orgAgentAgentId);
+    await createAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, {
+      title: "Class",
+      starts_at: "2030-01-01T08:00:00Z",
+    });
+    await updateAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, orgAgentCalendarEntryId, {
+      status: "cancelled",
+    });
+    await cancelAgentCalendarEntry(orgAgentWorldId, orgAgentAgentId, orgAgentCalendarEntryId);
+    await listScheduleRules(orgAgentWorldId);
+    await getCalendarConflicts(orgAgentWorldId, {
+      start_world_time: "2030-01-01T08:00:00Z",
+      horizon_hours: 12,
+      limit: 5,
+    });
+    await createScheduleRule(orgAgentWorldId, {
+      rule_key: "weekday",
+      name: "Weekday",
+      kind: "weekday",
+    });
+    await previewScheduleRule(orgAgentWorldId, { kind: "weekday" });
+    await updateScheduleRule(orgAgentWorldId, orgAgentScheduleRuleId, { is_enabled: false });
+    await disableScheduleRule(orgAgentWorldId, orgAgentScheduleRuleId);
+
+    const worldSegment = encodeURIComponent(orgAgentWorldId);
+    const organizationSegment = encodeURIComponent(orgAgentOrganizationId);
+    const membershipSegment = encodeURIComponent(orgAgentMembershipId);
+    const trackSegment = encodeURIComponent(orgAgentTrackId);
+    const agentSegment = encodeURIComponent(orgAgentAgentId);
+    const relationshipSegment = encodeURIComponent(orgAgentRelationshipId);
+    const entrySegment = encodeURIComponent(orgAgentCalendarEntryId);
+    const ruleSegment = encodeURIComponent(orgAgentScheduleRuleId);
+    const worldlineSegment = encodeURIComponent(orgAgentWorldlineId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/organizations`,
+      `/api/worlds/${worldSegment}/organizations`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/memberships/${membershipSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks`,
+      `/api/worlds/${worldSegment}/organizations/${organizationSegment}/faction-tracks/${trackSegment}`,
+      `/api/worlds/${worldSegment}/agents`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/relationships/${relationshipSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/presence?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/presence`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar/${entrySegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/calendar/${entrySegment}`,
+      `/api/worlds/${worldSegment}/schedule-rules`,
+      `/api/worlds/${worldSegment}/calendar/conflicts?start_world_time=2030-01-01T08%3A00%3A00Z&horizon_hours=12&limit=5`,
+      `/api/worlds/${worldSegment}/schedule-rules`,
+      `/api/worlds/${worldSegment}/schedule-rules/preview`,
+      `/api/worlds/${worldSegment}/schedule-rules/${ruleSegment}`,
+      `/api/worlds/${worldSegment}/schedule-rules/${ruleSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in daily-life and offscreen route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ candidate_count: 0, candidates: [] }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "offscreen" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(
+        jsonResponse({ processed_count: 1, resolved_count: 1, failed_count: 0 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getDailyLifePreview(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      start_world_time: "2030-01-01T08:00:00Z",
+      horizon_hours: 12,
+      limit: 5,
+    });
+    await generateDailyLifeCandidates(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      horizon_hours: 6,
+      limit: 3,
+    });
+    await listDailyLifeCandidates(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      status: "candidate",
+      limit: 4,
+    });
+    await createOffscreenEvent(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      title: "Offscreen",
+      due_at: "2030-01-01T10:00:00Z",
+    });
+    await listOffscreenEvents(dailyLifeWorldId, {
+      worldline_id: dailyLifeWorldlineId,
+      status: "pending",
+      limit: 2,
+    });
+    await resolveOffscreenEvents(dailyLifeWorldId, 7, dailyLifeWorldlineId);
+
+    const worldSegment = encodeURIComponent(dailyLifeWorldId);
+    const worldlineSegment = encodeURIComponent(dailyLifeWorldlineId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/daily-life/preview?worldline_id=${worldlineSegment}&start_world_time=2030-01-01T08%3A00%3A00Z&horizon_hours=12&limit=5`,
+      `/api/worlds/${worldSegment}/daily-life/generate`,
+      `/api/worlds/${worldSegment}/daily-life/candidates?worldline_id=${worldlineSegment}&status=candidate&limit=4`,
+      `/api/worlds/${worldSegment}/offscreen-events`,
+      `/api/worlds/${worldSegment}/offscreen-events?worldline_id=${worldlineSegment}&status=pending&limit=2`,
+      `/api/worlds/${worldSegment}/offscreen-events/resolve?limit=7&worldline_id=${worldlineSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in story, route, ending, authoring, release, and beta route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "hook" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "thread" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "route" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "milestone" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteEndingId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "eval" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteTemplateId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "preview-job" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "apply-job" }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "release" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: storyRouteChecklistRunId }))
+      .mockResolvedValueOnce(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listStoryHooks(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createStoryHook(storyRouteWorldId, {
+      hook_key: "promise",
+      title: "Promise",
+      hook_type: "promise",
+      summary: "Promise summary",
+    });
+    await listPlotThreads(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createPlotThread(storyRouteWorldId, {
+      thread_key: "thread",
+      title: "Thread",
+      thread_type: "personal",
+      summary: "Thread summary",
+    });
+    await listRouteAffinities(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      agent_id: storyRouteAgentId,
+      status: "active",
+    });
+    await upsertRouteAffinity(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      agent_id: storyRouteAgentId,
+      route_key: "route",
+    });
+    await listRouteMilestones(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createRouteMilestone(storyRouteWorldId, { milestone_key: "milestone", title: "Milestone" });
+    await listEndingCandidates(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      status: "available",
+      ending_type: "normal",
+    });
+    await createEndingCandidate(storyRouteWorldId, {
+      ending_key: "ending",
+      title: "Ending",
+      ending_type: "normal",
+    });
+    await dryRunEndingCandidate(storyRouteWorldId, storyRouteEndingId, {
+      worldline_id: storyRouteWorldlineId,
+    });
+    await listLongRunEvals(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createLongRunEval(storyRouteWorldId, { eval_key: "eval" });
+    await listAuthoringTemplates(storyRouteWorldId, { template_kind: "world_bundle" });
+    await createAuthoringTemplate(storyRouteWorldId, {
+      template_key: "template",
+      template_kind: "world_bundle",
+      name: "Template",
+    });
+    await previewAuthoringTemplate(storyRouteWorldId, storyRouteTemplateId, {
+      target_worldline_id: storyRouteWorldlineId,
+    });
+    await applyAuthoringTemplate(storyRouteWorldId, storyRouteTemplateId, {
+      target_worldline_id: storyRouteWorldlineId,
+      duplicate_policy: "skip",
+    });
+    await getReleaseProfile(storyRouteWorldId);
+    await upsertReleaseProfile(storyRouteWorldId, { status: "ready" });
+    await listBetaChecklists(storyRouteWorldId, { worldline_id: storyRouteWorldlineId });
+    await createBetaChecklist(storyRouteWorldId, {
+      worldline_id: storyRouteWorldlineId,
+      run_key: "beta",
+    });
+    await listBetaChecklistItems(storyRouteWorldId, storyRouteChecklistRunId);
+
+    const worldSegment = encodeURIComponent(storyRouteWorldId);
+    const worldlineSegment = encodeURIComponent(storyRouteWorldlineId);
+    const agentSegment = encodeURIComponent(storyRouteAgentId);
+    const endingSegment = encodeURIComponent(storyRouteEndingId);
+    const templateSegment = encodeURIComponent(storyRouteTemplateId);
+    const checklistSegment = encodeURIComponent(storyRouteChecklistRunId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/story-hooks?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/story-hooks`,
+      `/api/worlds/${worldSegment}/plot-threads?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/plot-threads`,
+      `/api/worlds/${worldSegment}/route-affinities?worldline_id=${worldlineSegment}&agent_id=${agentSegment}&status=active`,
+      `/api/worlds/${worldSegment}/route-affinities`,
+      `/api/worlds/${worldSegment}/route-milestones?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/route-milestones`,
+      `/api/worlds/${worldSegment}/ending-candidates?worldline_id=${worldlineSegment}&status=available&ending_type=normal`,
+      `/api/worlds/${worldSegment}/ending-candidates`,
+      `/api/worlds/${worldSegment}/ending-candidates/${endingSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/long-run-evals?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/long-run-evals`,
+      `/api/worlds/${worldSegment}/authoring-templates?template_kind=world_bundle`,
+      `/api/worlds/${worldSegment}/authoring-templates`,
+      `/api/worlds/${worldSegment}/authoring-templates/${templateSegment}/preview`,
+      `/api/worlds/${worldSegment}/authoring-templates/${templateSegment}/apply`,
+      `/api/worlds/${worldSegment}/release-profile`,
+      `/api/worlds/${worldSegment}/release-profile`,
+      `/api/worlds/${worldSegment}/beta-checklists?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/beta-checklists`,
+      `/api/worlds/${worldSegment}/beta-checklists/${checklistSegment}/items`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in event, episode, group, relationship, conflict, rumor, and dashboard route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConditionId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConditionId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "beat" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "episode" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowContextId }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "conversation" } }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowSuggestionId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConflictId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowConflictId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "rumor" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowPropagationId }))
+      .mockResolvedValueOnce(jsonResponse({ id: eventFlowPropagationId }))
+      .mockResolvedValueOnce(jsonResponse({ worldline_id: eventFlowWorldlineId }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listEventTriggerConditions(eventFlowWorldId);
+    await createEventTriggerCondition(eventFlowWorldId, { condition_key: "event", name: "Event" });
+    await updateEventTriggerCondition(eventFlowWorldId, eventFlowConditionId, { status: "inactive" });
+    await dryRunEventTriggerCondition(eventFlowWorldId, eventFlowConditionId, {
+      worldline_id: eventFlowWorldlineId,
+    });
+    await listSceneBeats(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createSceneBeat(eventFlowWorldId, { title: "Beat" });
+    await listDailyEpisodes(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createDailyEpisode(eventFlowWorldId, { title: "Episode" });
+    await listGroupInteractions(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createGroupInteraction(eventFlowWorldId, {
+      context_key: "group",
+      title: "Group",
+      interaction_type: "club",
+    });
+    await executeGroupInteraction(eventFlowWorldId, eventFlowContextId, {
+      session_key: "group-session",
+    });
+    await listRelationshipSuggestions(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await generateRelationshipSuggestions(eventFlowWorldId, {
+      worldline_id: eventFlowWorldlineId,
+      limit: 5,
+    });
+    await updateRelationshipSuggestion(eventFlowWorldId, eventFlowSuggestionId, {
+      status: "accepted",
+    });
+    await listOrganizationConflicts(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createOrganizationConflict(eventFlowWorldId, {
+      organization_id: "org-1",
+      title: "Conflict",
+      summary: "Conflict summary",
+    });
+    await resolveOrganizationConflict(eventFlowWorldId, eventFlowConflictId);
+    await listRumors(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createRumor(eventFlowWorldId, {
+      rumor_key: "rumor",
+      title: "Rumor",
+      content: "Rumor content",
+    });
+    await listRumorPropagations(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+    await createRumorPropagation(eventFlowWorldId, {
+      rumor_id: "rumor-1",
+      propagation_reason: "Shared",
+    });
+    await deliverRumorPropagation(eventFlowWorldId, eventFlowPropagationId);
+    await getLivingWorldDashboard(eventFlowWorldId, { worldline_id: eventFlowWorldlineId });
+
+    const worldSegment = encodeURIComponent(eventFlowWorldId);
+    const worldlineSegment = encodeURIComponent(eventFlowWorldlineId);
+    const conditionSegment = encodeURIComponent(eventFlowConditionId);
+    const contextSegment = encodeURIComponent(eventFlowContextId);
+    const suggestionSegment = encodeURIComponent(eventFlowSuggestionId);
+    const conflictSegment = encodeURIComponent(eventFlowConflictId);
+    const propagationSegment = encodeURIComponent(eventFlowPropagationId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/event-trigger-conditions`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions/${conditionSegment}`,
+      `/api/worlds/${worldSegment}/event-trigger-conditions/${conditionSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/scene-beats?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/scene-beats`,
+      `/api/worlds/${worldSegment}/daily-episodes?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/daily-episodes`,
+      `/api/worlds/${worldSegment}/group-interactions?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/group-interactions`,
+      `/api/worlds/${worldSegment}/group-interactions/${contextSegment}/execute`,
+      `/api/worlds/${worldSegment}/relationship-suggestions?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/relationship-suggestions/generate?worldline_id=${worldlineSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/relationship-suggestions/${suggestionSegment}`,
+      `/api/worlds/${worldSegment}/organization-conflicts?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/organization-conflicts`,
+      `/api/worlds/${worldSegment}/organization-conflicts/${conflictSegment}/resolve`,
+      `/api/worlds/${worldSegment}/rumors?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/rumors`,
+      `/api/worlds/${worldSegment}/rumor-propagations?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/rumor-propagations`,
+      `/api/worlds/${worldSegment}/rumor-propagations/${propagationSegment}/deliver`,
+      `/api/worlds/${worldSegment}/living-world-dashboard?worldline_id=${worldlineSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in clock, replay, and scene route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "paused" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "running" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ source_sequence: 1 }))
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphSceneId }))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphSceneId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphEdgeId }))
+      .mockResolvedValueOnce(jsonResponse({ id: sceneGraphEdgeId }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getWorldClock(sceneGraphWorldId);
+    await pauseWorldClock(sceneGraphWorldId, "pause");
+    await resumeWorldClock(sceneGraphWorldId, "2", "resume");
+    await advanceWorldClock(sceneGraphWorldId, "advance");
+    await skipWorldClock(sceneGraphWorldId, "2030-01-01T00:00:00Z");
+    await listClockTransitions(sceneGraphWorldId, 5);
+    await getReplayState(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await getLatestSnapshot(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await createSnapshot(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await getSnapshotIntegrity(sceneGraphWorldId, { worldline_id: sceneGraphWorldlineId });
+    await listWorldEvents(sceneGraphWorldId, {
+      worldline_id: sceneGraphWorldlineId,
+      event_name: "agent.run_succeeded?debug=true#frag",
+      actor_ref: sceneGraphActorRef,
+      limit: 5,
+    });
+    await listScenes(sceneGraphWorldId);
+    await createScene(sceneGraphWorldId, { scene_key: "scene", name: "Scene" });
+    await updateScene(sceneGraphWorldId, sceneGraphSceneId, { name: "Updated" });
+    await deactivateScene(sceneGraphWorldId, sceneGraphSceneId);
+    await listLocationEdges(sceneGraphWorldId);
+    await createLocationEdge(sceneGraphWorldId, {
+      source_scene_id: sceneGraphSceneId,
+      target_scene_id: "scene-target",
+    });
+    await updateLocationEdge(sceneGraphWorldId, sceneGraphEdgeId, { travel_label: "Path" });
+
+    const worldSegment = encodeURIComponent(sceneGraphWorldId);
+    const sceneSegment = encodeURIComponent(sceneGraphSceneId);
+    const edgeSegment = encodeURIComponent(sceneGraphEdgeId);
+    const worldlineSegment = encodeURIComponent(sceneGraphWorldlineId);
+    const actorSegment = encodeURIComponent(sceneGraphActorRef);
+    const eventSegment = encodeURIComponent("agent.run_succeeded?debug=true#frag");
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/clock`,
+      `/api/worlds/${worldSegment}/clock/pause`,
+      `/api/worlds/${worldSegment}/clock/resume`,
+      `/api/worlds/${worldSegment}/clock/advance`,
+      `/api/worlds/${worldSegment}/clock/skip`,
+      `/api/worlds/${worldSegment}/clock/transitions?limit=5`,
+      `/api/worlds/${worldSegment}/replay/state?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots/latest?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/snapshots/integrity?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/events?worldline_id=${worldlineSegment}&event_name=${eventSegment}&actor_ref=${actorSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/scenes`,
+      `/api/worlds/${worldSegment}/scenes`,
+      `/api/worlds/${worldSegment}/scenes/${sceneSegment}`,
+      `/api/worlds/${worldSegment}/scenes/${sceneSegment}`,
+      `/api/worlds/${worldSegment}/location-edges`,
+      `/api/worlds/${worldSegment}/location-edges`,
+      `/api/worlds/${worldSegment}/location-edges/${edgeSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in core world route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ id: worldId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "forked" }))
+      .mockResolvedValueOnce(jsonResponse({ base_worldline_id: baseWorldlineId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agendaId }))
+      .mockResolvedValueOnce(jsonResponse({ id: agendaId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse({ id: proposalId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: ruleId }))
+      .mockResolvedValueOnce(jsonResponse({ id: ruleId }))
+      .mockResolvedValueOnce(jsonResponse({ matched: true }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "player-actor" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "resume" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ preview: true }))
+      .mockResolvedValueOnce(jsonResponse({ id: "choice" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateWorld(worldId, { name: "Renamed" });
+    await listWorldlines(worldId);
+    await forkWorldline(worldId, {
+      source_worldline_id: baseWorldlineId,
+      worldline_key: "core-route",
+      name: "Core Route",
+    });
+    await compareWorldlines(worldId, baseWorldlineId, compareWorldlineId);
+    await listGMAgendas(worldId, { worldline_id: worldlineId });
+    await createGMAgenda(worldId, { worldline_id: worldlineId, title: "Agenda", summary: "Summary" });
+    await updateGMAgenda(worldId, agendaId, { status: "paused" });
+    await listGMProposals(worldId, { status: "proposed", limit: 5 });
+    await createGMProposal(worldId, {
+      worldline_id: worldlineId,
+      title: "Proposal",
+      reason: "Reason",
+      event_name: "gm.route_beat",
+    });
+    await reviewGMProposal(worldId, proposalId, { status: "resolved" });
+    await draftLowRiskGMProposal(worldId, proposalId);
+    await listResolutionRules(worldId);
+    await createResolutionRule(worldId, { rule_key: "rule", name: "Rule" });
+    await updateResolutionRule(worldId, ruleId, { status: "inactive" });
+    await dryRunResolutionRule(worldId, ruleId, { worldline_id: worldlineId });
+    await listPlayerActors(worldId, { worldline_id: worldlineId, user_id: userId });
+    await bindPlayerActor(worldId, { display_name: "Player" });
+    await upsertPlayerSessionResume(worldId, {
+      worldline_id: worldlineId,
+      player_actor_id: "actor-1",
+    });
+    await listPlayerChoices(worldId, { worldline_id: worldlineId, user_id: userId, limit: 5 });
+    await previewPlayerChoiceConsequences(worldId, playerChoiceInput);
+    await recordPlayerChoice(worldId, playerChoiceInput);
+
+    const worldSegment = encodeURIComponent(worldId);
+    const baseSegment = encodeURIComponent(baseWorldlineId);
+    const compareSegment = encodeURIComponent(compareWorldlineId);
+    const agendaSegment = encodeURIComponent(agendaId);
+    const proposalSegment = encodeURIComponent(proposalId);
+    const ruleSegment = encodeURIComponent(ruleId);
+    const worldlineSegment = encodeURIComponent(worldlineId);
+    const userSegment = encodeURIComponent(userId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}`,
+      `/api/worlds/${worldSegment}/worldlines`,
+      `/api/worlds/${worldSegment}/worldlines/fork`,
+      `/api/worlds/${worldSegment}/worldlines/${baseSegment}/compare/${compareSegment}`,
+      `/api/worlds/${worldSegment}/gm/agendas?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/gm/agendas`,
+      `/api/worlds/${worldSegment}/gm/agendas/${agendaSegment}`,
+      `/api/worlds/${worldSegment}/gm/proposals?status=proposed&limit=5`,
+      `/api/worlds/${worldSegment}/gm/proposals`,
+      `/api/worlds/${worldSegment}/gm/proposals/${proposalSegment}/review`,
+      `/api/worlds/${worldSegment}/gm/proposals/${proposalSegment}/draft-low-risk`,
+      `/api/worlds/${worldSegment}/resolution-rules`,
+      `/api/worlds/${worldSegment}/resolution-rules`,
+      `/api/worlds/${worldSegment}/resolution-rules/${ruleSegment}`,
+      `/api/worlds/${worldSegment}/resolution-rules/${ruleSegment}/dry-run?worldline_id=${worldlineSegment}`,
+      `/api/worlds/${worldSegment}/player-actors?worldline_id=${worldlineSegment}&user_id=${userSegment}`,
+      `/api/worlds/${worldSegment}/player-actors`,
+      `/api/worlds/${worldSegment}/player-sessions/resume`,
+      `/api/worlds/${worldSegment}/player-choices?worldline_id=${worldlineSegment}&user_id=${userSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/player-choices/preview`,
+      `/api/worlds/${worldSegment}/player-choices`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
   it("maps plot, route, and rumor flow requests", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
@@ -667,6 +1318,371 @@ describe("world client", () => {
       "/api/worlds/world-1/rumor-propagations",
       "/api/worlds/world-1/rumor-propagations/propagation-2/deliver",
     ]);
+  });
+
+  it("encodes reserved characters in knowledge, secret, repair, player, privacy, and review route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "knowledge" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailSecretId }))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailSecretId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "emotion" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailRepairId }))
+      .mockResolvedValueOnce(jsonResponse({ id: reviewGuardrailRepairId }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "journal" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "notification" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "intervention" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "export" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "delete-request" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "gm-style-review" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "continuity-review" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listKnowledgeFacts(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      agent_id: reviewGuardrailAgentId,
+      limit: 5,
+    });
+    await upsertKnowledgeFact(reviewGuardrailWorldId, {
+      agent_id: reviewGuardrailAgentId,
+      fact_key: "knowledge",
+      content: "Knowledge",
+    });
+    await listSecrets(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "hidden",
+      limit: 4,
+    });
+    await createSecret(reviewGuardrailWorldId, {
+      secret_key: "secret",
+      title: "Secret",
+      content: "Secret content",
+    });
+    await revealSecret(reviewGuardrailWorldId, reviewGuardrailSecretId);
+    await listEmotionalStates(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      agent_id: reviewGuardrailAgentId,
+    });
+    await upsertEmotionalState(reviewGuardrailWorldId, {
+      agent_id: reviewGuardrailAgentId,
+      mood: "tense",
+    });
+    await listRelationshipRepairs(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "proposed",
+      limit: 3,
+    });
+    await createRelationshipRepair(reviewGuardrailWorldId, {
+      relationship_id: "relationship-1",
+      repair_kind: "apology",
+      reason: "Repair",
+    });
+    await applyRelationshipRepair(reviewGuardrailWorldId, reviewGuardrailRepairId);
+    await listPlayerJournal(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      user_id: reviewGuardrailUserId,
+      limit: 2,
+    });
+    await createPlayerJournalEntry(reviewGuardrailWorldId, {
+      entry_kind: "event",
+      title: "Journal",
+      body: "Body",
+    });
+    await listNotifications(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "unread",
+      limit: 6,
+    });
+    await createNotification(reviewGuardrailWorldId, {
+      notification_kind: "rumor",
+      title: "Notice",
+      body: "Body",
+    });
+    await listInterventions(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      user_id: reviewGuardrailUserId,
+      status: "recorded",
+      limit: 7,
+    });
+    await createIntervention(reviewGuardrailWorldId, {
+      player_actor_id: "actor-1",
+      intervention_kind: "contact",
+      prompt: "Prompt",
+    });
+    await createPlayerPrivacyExport(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      target_ref_kind: "player_profile",
+      target_ref_id: "actor-1",
+      reason: "Export",
+    });
+    await createPlayerDeleteRequest(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      target_ref_kind: "player_profile",
+      target_ref_id: "actor-1",
+      reason: "Delete",
+    });
+    await listGMStyleReviews(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "warning",
+      limit: 8,
+    });
+    await createGMStyleReview(reviewGuardrailWorldId, {
+      source_kind: "manual",
+      reviewed_text: "Review",
+    });
+    await listNarrativeContinuityReviews(reviewGuardrailWorldId, {
+      worldline_id: reviewGuardrailWorldlineId,
+      status: "warning",
+      limit: 9,
+    });
+    await createNarrativeContinuityReview(reviewGuardrailWorldId, {
+      source_kind: "manual",
+      reviewed_text: "Continuity",
+    });
+
+    const worldSegment = encodeURIComponent(reviewGuardrailWorldId);
+    const worldlineSegment = encodeURIComponent(reviewGuardrailWorldlineId);
+    const agentSegment = encodeURIComponent(reviewGuardrailAgentId);
+    const userSegment = encodeURIComponent(reviewGuardrailUserId);
+    const secretSegment = encodeURIComponent(reviewGuardrailSecretId);
+    const repairSegment = encodeURIComponent(reviewGuardrailRepairId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/knowledge?worldline_id=${worldlineSegment}&agent_id=${agentSegment}&limit=5`,
+      `/api/worlds/${worldSegment}/knowledge`,
+      `/api/worlds/${worldSegment}/secrets?worldline_id=${worldlineSegment}&status=hidden&limit=4`,
+      `/api/worlds/${worldSegment}/secrets`,
+      `/api/worlds/${worldSegment}/secrets/${secretSegment}/reveal`,
+      `/api/worlds/${worldSegment}/emotional-states?worldline_id=${worldlineSegment}&agent_id=${agentSegment}`,
+      `/api/worlds/${worldSegment}/emotional-states`,
+      `/api/worlds/${worldSegment}/relationship-repairs?worldline_id=${worldlineSegment}&status=proposed&limit=3`,
+      `/api/worlds/${worldSegment}/relationship-repairs`,
+      `/api/worlds/${worldSegment}/relationship-repairs/${repairSegment}/apply`,
+      `/api/worlds/${worldSegment}/player-journal?worldline_id=${worldlineSegment}&user_id=${userSegment}&limit=2`,
+      `/api/worlds/${worldSegment}/player-journal`,
+      `/api/worlds/${worldSegment}/notifications?worldline_id=${worldlineSegment}&status=unread&limit=6`,
+      `/api/worlds/${worldSegment}/notifications`,
+      `/api/worlds/${worldSegment}/interventions?worldline_id=${worldlineSegment}&user_id=${userSegment}&status=recorded&limit=7`,
+      `/api/worlds/${worldSegment}/interventions`,
+      `/api/worlds/${worldSegment}/player/privacy/export`,
+      `/api/worlds/${worldSegment}/player/privacy/delete-requests`,
+      `/api/worlds/${worldSegment}/gm-style-reviews?worldline_id=${worldlineSegment}&status=warning&limit=8`,
+      `/api/worlds/${worldSegment}/gm-style-reviews`,
+      `/api/worlds/${worldSegment}/narrative-continuity-reviews?worldline_id=${worldlineSegment}&status=warning&limit=9`,
+      `/api/worlds/${worldSegment}/narrative-continuity-reviews`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in agent memory, run, persona, observation, narrative, and agent route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "snapshot" }))
+      .mockResolvedValueOnce(jsonResponse({ backend: "memory", deleted_count: 1 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeRunId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "persona" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "persona" }))
+      .mockResolvedValueOnce(jsonResponse({ valid: true, issues: [] }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "observation" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: "run" }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeArtifactId }))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeArtifactId }))
+      .mockResolvedValueOnce(jsonResponse({ id: "publication" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "publication" }))
+      .mockResolvedValueOnce(jsonResponse({ id: agentNarrativeAgentId }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId);
+    await searchAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId, {
+      query_text: "memory",
+      limit: 2,
+    });
+    await getAgentMemoryProfileSnapshot(agentNarrativeWorldId, agentNarrativeAgentId);
+    await refreshAgentMemoryProfileSnapshot(agentNarrativeWorldId, agentNarrativeAgentId);
+    await forgetAgentMemory(agentNarrativeWorldId, agentNarrativeAgentId);
+    await listAgentRuns(agentNarrativeWorldId, agentNarrativeAgentId);
+    await getAgentRunDetail(agentNarrativeWorldId, agentNarrativeAgentId, agentNarrativeRunId);
+    await getAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId);
+    await updateAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId, {
+      persona_text: "Guide",
+    });
+    await validateAgentPersona(agentNarrativeWorldId, agentNarrativeAgentId, {
+      persona_text: "Guide",
+    });
+    await listAgentObservations(agentNarrativeWorldId, agentNarrativeAgentId);
+    await createAgentObservation(agentNarrativeWorldId, agentNarrativeAgentId, {
+      observation_type: "memory",
+      content: "Observation",
+    });
+    await refreshAgentObservations(agentNarrativeWorldId, agentNarrativeAgentId);
+    await runAgent(agentNarrativeWorldId, agentNarrativeAgentId, {
+      prompt: "Run",
+    });
+    await listNarrativeArtifacts(agentNarrativeWorldId);
+    await listFilteredNarrativeArtifacts(agentNarrativeWorldId, {
+      source_conversation_id: agentNarrativeConversationId,
+      q: "artifact",
+      limit: 3,
+    });
+    await getNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId);
+    await createNarrativeArtifact(agentNarrativeWorldId, {
+      title: "Artifact",
+      content: "Body",
+    });
+    await publishNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId, {
+      reader_visible: true,
+    });
+    await unpublishNarrativeArtifact(agentNarrativeWorldId, agentNarrativeArtifactId);
+    await updateAgent(agentNarrativeWorldId, agentNarrativeAgentId, {
+      display_name: "Guide",
+    });
+    await deactivateAgent(agentNarrativeWorldId, agentNarrativeAgentId);
+
+    const worldSegment = encodeURIComponent(agentNarrativeWorldId);
+    const agentSegment = encodeURIComponent(agentNarrativeAgentId);
+    const runSegment = encodeURIComponent(agentNarrativeRunId);
+    const artifactSegment = encodeURIComponent(agentNarrativeArtifactId);
+    const conversationSegment = encodeURIComponent(agentNarrativeConversationId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/search`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/profile-snapshot`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/profile-snapshot/refresh`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/memory/forget`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/runs`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/runs/${runSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/persona/validate`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/observations/refresh`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}/run`,
+      `/api/worlds/${worldSegment}/narrative-artifacts`,
+      `/api/worlds/${worldSegment}/narrative-artifacts?source_conversation_id=${conversationSegment}&q=artifact&limit=3`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}`,
+      `/api/worlds/${worldSegment}/narrative-artifacts`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}/publish`,
+      `/api/worlds/${worldSegment}/narrative-artifacts/${artifactSegment}/unpublish`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}`,
+      `/api/worlds/${worldSegment}/agents/${agentSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[3][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in membership, candidate, and diagnostics route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ user_id: membershipBoundaryUserId, role: "world_admin" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await listMemberships(membershipBoundaryWorldId);
+    await upsertMembership(membershipBoundaryWorldId, membershipBoundaryUserId, "world_admin");
+    await deleteMembership(membershipBoundaryWorldId, membershipBoundaryUserId);
+    await listMemberCandidates(membershipBoundaryWorldId, "user/name?invite=true#frag", 4);
+    await listWorldDiagnostics(membershipBoundaryWorldId);
+
+    const worldSegment = encodeURIComponent(membershipBoundaryWorldId);
+    const userSegment = encodeURIComponent(membershipBoundaryUserId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/memberships`,
+      `/api/worlds/${worldSegment}/memberships/${userSegment}`,
+      `/api/worlds/${worldSegment}/memberships/${userSegment}`,
+      `/api/worlds/${worldSegment}/member-candidates?limit=4&query=user%2Fname%3Finvite%3Dtrue%23frag`,
+      `/api/worlds/${worldSegment}/diagnostics`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[1][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
+  });
+
+  it("encodes reserved characters in admin preset, memory, and provider route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const adminPresetId = "preset/admin?preview=true#frag";
+    const memoryProfileId = "memory/profile?logs=true#frag";
+    const memoryJobId = "job/memory?retry=true#frag";
+    const providerProfileId = "provider/profile?test=true#frag";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ id: adminPresetId }))
+      .mockResolvedValueOnce(jsonResponse({ preset_id: adminPresetId, agents: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ id: memoryProfileId }))
+      .mockResolvedValueOnce(jsonResponse({ status: "healthy" }))
+      .mockResolvedValueOnce(jsonResponse({ entries: [] }))
+      .mockResolvedValueOnce(jsonResponse({ jobs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ status: "passed" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ id: memoryJobId, status: "pending" }))
+      .mockResolvedValueOnce(jsonResponse({ id: providerProfileId }))
+      .mockResolvedValueOnce(jsonResponse({ status: "success" }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAgentPreset(adminPresetId, { name: "Updated preset" });
+    await getAgentPresetUpdatePreview(adminPresetId);
+    await deactivateAgentPreset(adminPresetId);
+    await updateMemoryBackendProfile(memoryProfileId, { name: "Updated memory" });
+    await getMemoryBackendProfileHealth(memoryProfileId);
+    await getMemoryBackendProfileLogs(memoryProfileId, 7);
+    await listMemoryBackendProfileJobs(memoryProfileId, { status: "failed", limit: 5 });
+    await runMemoryBackendProfileEvalSmoke(memoryProfileId);
+    await deleteMemoryBackendProfile(memoryProfileId);
+    await retryMemoryWriteJob(memoryJobId);
+    await updateProviderProfile(providerProfileId, { name: "Updated provider" });
+    await testProviderProfile(providerProfileId, "Reply with OK.");
+    await disableProviderProfile(providerProfileId);
+
+    const presetSegment = encodeURIComponent(adminPresetId);
+    const memoryProfileSegment = encodeURIComponent(memoryProfileId);
+    const memoryJobSegment = encodeURIComponent(memoryJobId);
+    const providerProfileSegment = encodeURIComponent(providerProfileId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/agent-presets/${presetSegment}`,
+      `/api/agent-presets/${presetSegment}/update-preview`,
+      `/api/agent-presets/${presetSegment}`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/health`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/logs?limit=7`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/jobs?status=failed&limit=5`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}/eval-smoke`,
+      `/api/memory-backend-profiles/${memoryProfileSegment}`,
+      `/api/memory-write-jobs/${memoryJobSegment}/retry`,
+      `/api/provider-profiles/${providerProfileSegment}`,
+      `/api/provider-profiles/${providerProfileSegment}/test-call`,
+      `/api/provider-profiles/${providerProfileSegment}`,
+    ]);
+    const mutatingHeaders = fetchMock.mock.calls[0][1].headers as Headers;
+    expect(mutatingHeaders.get("X-CSRF-Token")).toBe("csrf-token");
   });
 
   it("maps knowledge, player, and guardrail requests", async () => {
@@ -979,6 +1995,7 @@ describe("world client", () => {
   });
 
   it("maps memory requests", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse([{ id: "memory-1" }]))
@@ -992,6 +2009,9 @@ describe("world client", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/worlds/world-1/agents/agent-1/memory/search");
     expect(fetchMock.mock.calls[1][1].body).toBe(
       JSON.stringify({ query_text: "green tea", limit: 5 }),
+    );
+    expect((fetchMock.mock.calls[1][1].headers as Headers).get("X-CSRF-Token")).toBe(
+      "csrf-token",
     );
   });
 
@@ -1159,6 +2179,115 @@ describe("world client", () => {
     );
   });
 
+  it("encodes conversation API identifier path segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([{ id: "session-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1" }, 201))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1" }))
+      .mockResolvedValueOnce(jsonResponse([{ agent_id: "agent-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ agent_id: "agent-1" }]))
+      .mockResolvedValueOnce(jsonResponse([{ id: "turn-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ session_id: "session-1" }))
+      .mockResolvedValueOnce(jsonResponse({ latest_hit_count: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ operator_message: "ok" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-1" }]))
+      .mockResolvedValueOnce(jsonResponse({ prompt_text: "Prompt" }))
+      .mockResolvedValueOnce(jsonResponse([{ id: "artifact-2" }]))
+      .mockResolvedValueOnce(jsonResponse({ id: "turn-2" }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session-1" }, turn: { id: "turn-3" } }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "paused" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "running" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "session-1", status: "stopped" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/admin?tab=1#frag";
+    const conversationId = "conversation/debug?x=1#frag";
+
+    await listConversations(worldId);
+    await createConversation(worldId, {
+      session_key: "session-1",
+      title: "Session",
+      scope_type: "world",
+      mode: "manual_chain",
+      policy: {
+        error_policy: "fail_session",
+        max_consecutive_failed_turns: 1,
+        loop_guard_window: 3,
+        repeat_output_threshold: 2,
+        speaker_policy: "round_robin",
+        manual_next_agent_id: null,
+        participant_repeat_cooldown: 0,
+        min_enabled_participants: 1,
+        max_turn_budget: null,
+      },
+      writer_config: {
+        provider_profile_id: null,
+        writer_plugin_identifier: "builtin",
+        writer_plugin_config: {},
+        auto_generate_on_complete: false,
+        generate_summary: true,
+        generate_chapter: false,
+        style_guide: "",
+        target_length: "brief",
+        source_constraints: "",
+        include_prompt_preview: false,
+      },
+      memory_config: {
+        write_turn_memory: false,
+        retrieve_memory: false,
+        max_context_items: 0,
+        query_window: 0,
+        include_recent_turns: false,
+        include_agent_observations: false,
+        memory_query_strategy: "objective",
+      },
+    });
+    await updateConversation(worldId, conversationId, { title: "Updated" });
+    await listConversationParticipants(worldId, conversationId);
+    await replaceConversationParticipants(worldId, conversationId, [
+      { agent_id: "agent-1", turn_order: 0 },
+    ]);
+    await listConversationTurns(worldId, conversationId);
+    await getConversationSpeakerPreview(worldId, conversationId);
+    await getConversationMemorySummary(worldId, conversationId);
+    await getConversationDiagnosticsSummary(worldId, conversationId);
+    await listConversationNarrativeArtifacts(worldId, conversationId);
+    await previewConversationNarrativePrompt(worldId, conversationId, "summary_only");
+    await generateConversationNarrativeArtifacts(worldId, conversationId, "summary_only");
+    await seedConversation(worldId, conversationId, { input_text: "hello" });
+    await advanceConversation(worldId, conversationId);
+    await startConversation(worldId, conversationId);
+    await pauseConversation(worldId, conversationId);
+    await resumeConversation(worldId, conversationId);
+    await stopConversation(worldId, conversationId);
+
+    const worldSegment = encodeURIComponent(worldId);
+    const conversationSegment = encodeURIComponent(conversationId);
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${worldSegment}/conversations`,
+      `/api/worlds/${worldSegment}/conversations`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/participants`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/participants`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/turns`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/speaker-preview`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/memory/summary`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/diagnostics/summary`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative/preview`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/narrative/generate`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/seed`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/advance`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/start`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/pause`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/resume`,
+      `/api/worlds/${worldSegment}/conversations/${conversationSegment}/stop`,
+    ]);
+  });
+
   it("maps calendar conflict requests", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ conflict_count: 0 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -1270,6 +2399,29 @@ describe("world client", () => {
     });
   });
 
+  it("normalizes sensitive backend error details", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            detail: {
+              message:
+                "World write failed with rawPrompt, storageUri media://world/object, Bearer world-token, and c2VjcmV0LXdvcmxkLWVycm9yLXByb29m",
+            },
+          },
+          500,
+        ),
+      ),
+    );
+
+    await expect(createWorld({ slug: "first-world", name: "First World" })).rejects.toMatchObject({
+      message: "World request failed.",
+      status: 500,
+    });
+  });
+
   it("summarizes structured publication gate errors", async () => {
     document.cookie = "noveland_csrf=csrf-token; Path=/";
     vi.stubGlobal(
@@ -1297,6 +2449,64 @@ describe("world client", () => {
     });
   });
 });
+
+const orgAgentWorldId = "world/org?admin=true#frag";
+const orgAgentOrganizationId = "org/student?active=true#frag";
+const orgAgentMembershipId = "membership/student?role=true#frag";
+const orgAgentTrackId = "track/faction?goal=true#frag";
+const orgAgentAgentId = "agent/guide?role=true#frag";
+const orgAgentRelationshipId = "relationship/guide?target=true#frag";
+const orgAgentCalendarEntryId = "calendar/class?time=true#frag";
+const orgAgentScheduleRuleId = "schedule/weekday?enabled=true#frag";
+const orgAgentWorldlineId = "worldline/org?branch=true#frag";
+const dailyLifeWorldId = "world/daily?admin=true#frag";
+const dailyLifeWorldlineId = "worldline/daily?branch=true#frag";
+const storyRouteWorldId = "world/story?admin=true#frag";
+const storyRouteWorldlineId = "worldline/story?branch=true#frag";
+const storyRouteAgentId = "agent/story?role=true#frag";
+const storyRouteEndingId = "ending/normal?dry=true#frag";
+const storyRouteTemplateId = "template/source?preview=true#frag";
+const storyRouteChecklistRunId = "checklist/beta?items=true#frag";
+const eventFlowWorldId = "world/event?admin=true#frag";
+const eventFlowWorldlineId = "worldline/event?branch=true#frag";
+const eventFlowConditionId = "condition/event?dry=true#frag";
+const eventFlowContextId = "group/context?execute=true#frag";
+const eventFlowSuggestionId = "suggestion/relation?accept=true#frag";
+const eventFlowConflictId = "conflict/org?resolve=true#frag";
+const eventFlowPropagationId = "propagation/rumor?deliver=true#frag";
+const reviewGuardrailWorldId = "world/review?admin=true#frag";
+const reviewGuardrailWorldlineId = "worldline/review?branch=true#frag";
+const reviewGuardrailAgentId = "agent/review?role=true#frag";
+const reviewGuardrailUserId = "user/review?email=true#frag";
+const reviewGuardrailSecretId = "secret/reveal?hidden=true#frag";
+const reviewGuardrailRepairId = "repair/apply?status=true#frag";
+const agentNarrativeWorldId = "world/agent?admin=true#frag";
+const agentNarrativeAgentId = "agent/memory?role=true#frag";
+const agentNarrativeRunId = "run/detail?trace=true#frag";
+const agentNarrativeArtifactId = "artifact/story?publish=true#frag";
+const agentNarrativeConversationId = "conversation/source?q=true#frag";
+const membershipBoundaryWorldId = "world/members?admin=true#frag";
+const membershipBoundaryUserId = "user/member?role=true#frag";
+const sceneGraphWorldId = "world/scene?clock=true#frag";
+const sceneGraphWorldlineId = "worldline/clock?branch=1#frag";
+const sceneGraphSceneId = "scene/location?active=true#frag";
+const sceneGraphEdgeId = "edge/location?active=true#frag";
+const sceneGraphActorRef = "agent/guide?role=narrator#frag";
+const worldId = "world/core?admin=true#frag";
+const baseWorldlineId = "worldline/base?branch=1#frag";
+const compareWorldlineId = "worldline/compare?branch=2#frag";
+const worldlineId = "worldline/live?branch=main#frag";
+const agendaId = "agenda/gm?draft=true#frag";
+const proposalId = "proposal/gm?review=true#frag";
+const ruleId = "rule/resolution?dry=true#frag";
+const userId = "user/player?email=true#frag";
+const playerChoiceInput = {
+  player_actor_id: "actor/player?active=true#frag",
+  choice_key: "help",
+  choice_kind: "intervention" as const,
+  prompt: "Help?",
+  selected_option: "Yes",
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

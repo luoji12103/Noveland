@@ -253,14 +253,46 @@ export const visualVisibilityOptions: VisualVisibility[] = [
   "hidden",
 ];
 
+function worldPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}`;
+}
+
+function visualPath(worldId: string): string {
+  return `${worldPath(worldId)}/visual`;
+}
+
+function spriteSetsPath(worldId: string): string {
+  return `${visualPath(worldId)}/sprite-sets`;
+}
+
+function spriteSetPath(worldId: string, spriteSetId: string): string {
+  return `${spriteSetsPath(worldId)}/${encodeURIComponent(spriteSetId)}`;
+}
+
+function spriteVariantsPath(worldId: string, spriteSetId: string): string {
+  return `${spriteSetPath(worldId, spriteSetId)}/variants`;
+}
+
+function spriteVariantPath(worldId: string, spriteSetId: string, variantId: string): string {
+  return `${spriteVariantsPath(worldId, spriteSetId)}/${encodeURIComponent(variantId)}`;
+}
+
+function backgroundsPath(worldId: string): string {
+  return `${visualPath(worldId)}/backgrounds`;
+}
+
+function backgroundPath(worldId: string, backgroundId: string): string {
+  return `${backgroundsPath(worldId)}/${encodeURIComponent(backgroundId)}`;
+}
+
 export function listSpriteSets(worldId: string, filters: SpriteSetFilters): Promise<SpriteSet[]> {
-  return adminRequest<SpriteSet[]>(`/api/worlds/${worldId}/visual/sprite-sets${query(filters)}`, {
+  return adminRequest<SpriteSet[]>(`${spriteSetsPath(worldId)}${query(filters)}`, {
     method: "GET",
   });
 }
 
 export function createSpriteSet(worldId: string, input: SpriteSetInput): Promise<SpriteSet> {
-  return adminRequest<SpriteSet>(`/api/worlds/${worldId}/visual/sprite-sets`, {
+  return adminRequest<SpriteSet>(spriteSetsPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -272,7 +304,7 @@ export function updateSpriteSet(
   spriteSetId: string,
   input: SpriteSetUpdateInput,
 ): Promise<SpriteSet> {
-  return adminRequest<SpriteSet>(`/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}`, {
+  return adminRequest<SpriteSet>(spriteSetPath(worldId, spriteSetId), {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -280,7 +312,7 @@ export function updateSpriteSet(
 }
 
 export function deleteSpriteSet(worldId: string, spriteSetId: string): Promise<void> {
-  return adminRequest<void>(`/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}`, {
+  return adminRequest<void>(spriteSetPath(worldId, spriteSetId), {
     method: "DELETE",
     csrf: true,
   });
@@ -291,7 +323,7 @@ export function listSpriteVariants(
   spriteSetId: string,
 ): Promise<SpriteVariant[]> {
   return adminRequest<SpriteVariant[]>(
-    `/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}/variants`,
+    spriteVariantsPath(worldId, spriteSetId),
     { method: "GET" },
   );
 }
@@ -302,7 +334,7 @@ export function createSpriteVariant(
   input: SpriteVariantInput,
 ): Promise<SpriteVariant> {
   return adminRequest<SpriteVariant>(
-    `/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}/variants`,
+    spriteVariantsPath(worldId, spriteSetId),
     {
       method: "POST",
       body: input,
@@ -318,7 +350,7 @@ export function updateSpriteVariant(
   input: SpriteVariantUpdateInput,
 ): Promise<SpriteVariant> {
   return adminRequest<SpriteVariant>(
-    `/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}/variants/${variantId}`,
+    spriteVariantPath(worldId, spriteSetId, variantId),
     {
       method: "PATCH",
       body: input,
@@ -333,7 +365,7 @@ export function deleteSpriteVariant(
   variantId: string,
 ): Promise<void> {
   return adminRequest<void>(
-    `/api/worlds/${worldId}/visual/sprite-sets/${spriteSetId}/variants/${variantId}`,
+    spriteVariantPath(worldId, spriteSetId, variantId),
     {
       method: "DELETE",
       csrf: true,
@@ -345,9 +377,10 @@ export function resolveSprite(
   worldId: string,
   input: SpriteResolveInput,
 ): Promise<SpriteResolveResult> {
-  return adminRequest<SpriteResolveResult>(`/api/worlds/${worldId}/visual/resolve-sprite`, {
+  return adminRequest<SpriteResolveResult>(`${visualPath(worldId)}/resolve-sprite`, {
     method: "POST",
     body: input,
+    csrf: true,
   });
 }
 
@@ -356,7 +389,7 @@ export function listSceneBackgrounds(
   filters: SceneBackgroundFilters,
 ): Promise<SceneBackground[]> {
   return adminRequest<SceneBackground[]>(
-    `/api/worlds/${worldId}/visual/backgrounds${query(filters)}`,
+    `${backgroundsPath(worldId)}${query(filters)}`,
     { method: "GET" },
   );
 }
@@ -365,7 +398,7 @@ export function createSceneBackground(
   worldId: string,
   input: SceneBackgroundInput,
 ): Promise<SceneBackground> {
-  return adminRequest<SceneBackground>(`/api/worlds/${worldId}/visual/backgrounds`, {
+  return adminRequest<SceneBackground>(backgroundsPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -378,7 +411,7 @@ export function updateSceneBackground(
   input: SceneBackgroundUpdateInput,
 ): Promise<SceneBackground> {
   return adminRequest<SceneBackground>(
-    `/api/worlds/${worldId}/visual/backgrounds/${backgroundId}`,
+    backgroundPath(worldId, backgroundId),
     {
       method: "PATCH",
       body: input,
@@ -388,7 +421,7 @@ export function updateSceneBackground(
 }
 
 export function deleteSceneBackground(worldId: string, backgroundId: string): Promise<void> {
-  return adminRequest<void>(`/api/worlds/${worldId}/visual/backgrounds/${backgroundId}`, {
+  return adminRequest<void>(backgroundPath(worldId, backgroundId), {
     method: "DELETE",
     csrf: true,
   });
@@ -399,10 +432,11 @@ export function resolveBackground(
   input: BackgroundResolveInput,
 ): Promise<BackgroundResolveResult> {
   return adminRequest<BackgroundResolveResult>(
-    `/api/worlds/${worldId}/visual/resolve-background`,
+    `${visualPath(worldId)}/resolve-background`,
     {
       method: "POST",
       body: input,
+      csrf: true,
     },
   );
 }
@@ -411,7 +445,7 @@ export function composeScene(
   worldId: string,
   input: SceneComposeInput,
 ): Promise<SceneComposeResult> {
-  return adminRequest<SceneComposeResult>(`/api/worlds/${worldId}/visual/compose-scene`, {
+  return adminRequest<SceneComposeResult>(`${visualPath(worldId)}/compose-scene`, {
     method: "POST",
     body: input,
     csrf: true,

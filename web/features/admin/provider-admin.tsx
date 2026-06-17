@@ -60,11 +60,11 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
             | "openai_compatible"
             | "anthropic_compatible",
           plugin_identifier: optionalFormString(form, "plugin_identifier"),
-          plugin_config: jsonObject(formString(form, "plugin_config")),
+          plugin_config: providerAdminJsonObject(formString(form, "plugin_config")),
           base_url: formString(form, "base_url"),
           model_name: formString(form, "model_name"),
           api_key_ref: formString(form, "api_key_ref"),
-          capabilities: jsonObject(formString(form, "capabilities")),
+          capabilities: providerAdminJsonObject(formString(form, "capabilities")),
           timeout_seconds: numberFormValue(form, "timeout_seconds", 20),
           retry_attempts: numberFormValue(form, "retry_attempts", 1),
           rate_limit_per_minute: optionalNumberFormValue(form, "rate_limit_per_minute"),
@@ -83,11 +83,11 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
         updateProviderProfile(profileId, {
           name: formString(form, "name"),
           plugin_identifier: optionalFormString(form, "plugin_identifier"),
-          plugin_config: jsonObject(formString(form, "plugin_config")),
+          plugin_config: providerAdminJsonObject(formString(form, "plugin_config")),
           base_url: formString(form, "base_url"),
           model_name: formString(form, "model_name"),
           api_key_ref: formString(form, "api_key_ref"),
-          capabilities: jsonObject(formString(form, "capabilities")),
+          capabilities: providerAdminJsonObject(formString(form, "capabilities")),
           timeout_seconds: numberFormValue(form, "timeout_seconds", 20),
           retry_attempts: numberFormValue(form, "retry_attempts", 1),
           rate_limit_per_minute: optionalNumberFormValue(form, "rate_limit_per_minute"),
@@ -219,7 +219,7 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
                     <PluginConfigFields
                       plugins={modelProviderPlugins}
                       selectedIdentifier={profile.plugin_identifier}
-                      config={profile.plugin_config}
+                      config={sanitizeProviderAdminJsonObject(profile.plugin_config)}
                       textareaId={`provider-${profile.id}-plugin-config`}
                       textareaName="plugin_config"
                     />
@@ -227,7 +227,7 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
                       className="text-input"
                       name="capabilities"
                       rows={3}
-                      defaultValue={JSON.stringify(profile.capabilities, null, 2)}
+                      defaultValue={providerAdminJsonString(profile.capabilities)}
                     />
                     <label className="checkbox-label">
                       <input name="is_enabled" type="checkbox" defaultChecked={profile.is_enabled} />
@@ -272,6 +272,128 @@ export function ProviderAdmin({ data }: ProviderAdminProps) {
       <PluginBindingIssues bindings={data.pluginBindings} diagnostics={data.pluginDiagnostics} />
     </section>
   );
+}
+
+function providerAdminJsonString(value: Record<string, unknown>): string {
+  return JSON.stringify(sanitizeProviderAdminJsonObject(value), null, 2);
+}
+
+function providerAdminJsonObject(rawValue: string): Record<string, unknown> {
+  return sanitizeProviderAdminJsonObject(jsonObject(rawValue));
+}
+
+function sanitizeProviderAdminJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveProviderAdminJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeProviderAdminJsonValue(entry)]),
+  );
+}
+
+function sanitizeProviderAdminJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeProviderAdminJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeProviderAdminJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveProviderAdminString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_PROVIDER_ADMIN_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_PROVIDER_ADMIN_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_PROVIDER_ADMIN_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveProviderAdminJsonKey(key: string): boolean {
+  const normalized = normalizeProviderAdminMarker(key);
+  return (
+    EXACT_SENSITIVE_PROVIDER_ADMIN_JSON_KEYS.has(normalized) ||
+    SENSITIVE_PROVIDER_ADMIN_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveProviderAdminString(value: string): boolean {
+  const normalized = normalizeProviderAdminMarker(value);
+  return (
+    SENSITIVE_PROVIDER_ADMIN_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeProviderAdminToken(value)
+  );
+}
+
+function containsBase64LikeProviderAdminToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 24 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeProviderAdminMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function ProviderHealthSummary({

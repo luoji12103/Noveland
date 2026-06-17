@@ -1994,13 +1994,13 @@ def test_source_asset_rejects_cross_worldline_media_asset() -> None:
 
 def test_authoring_json_rejects_leaky_values() -> None:
     graph_id = uuid.uuid4()
-    with pytest.raises(ValueError, match="storage_uri"):
+    with pytest.raises(ValueError, match="storage"):
         AuthoringSourceBatchCreate(
             world_id=graph_id,
             worldline_id=uuid.uuid4(),
             batch_key="bad",
             display_name="Bad",
-            metadata_json={"nested": {"storage_uri": "local://leak"}},
+            metadata_json={"nested": {"storageUri": "opaque-storage-ref"}},
         )
     with pytest.raises(ValueError, match="base64"):
         AuthoringProposalDraft(

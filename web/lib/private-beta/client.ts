@@ -1,5 +1,6 @@
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type {
   PrivateBetaOnboardingStatus,
   PrivateBetaPlayerProfileInput,
@@ -26,8 +27,9 @@ export function bootstrapPrivateBetaPlayerProfile(
   worldId: string,
   input: PrivateBetaPlayerProfileInput,
 ): Promise<PrivateBetaPlayerProfileResult> {
+  const worldSegment = encodeURIComponent(worldId);
   return privateBetaRequest<PrivateBetaPlayerProfileResult>(
-    `/api/worlds/${worldId}/private-beta/onboarding/player-profile`,
+    `/api/worlds/${worldSegment}/private-beta/onboarding/player-profile`,
     {
       method: "POST",
       body: input,
@@ -78,7 +80,9 @@ async function csrfToken(): Promise<string> {
 async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
-    return typeof body.detail === "string" ? body.detail : null;
+    return typeof body.detail === "string"
+      ? normalizeBackendErrorDetail(body.detail, "Private beta request failed.")
+      : null;
   } catch {
     return null;
   }

@@ -515,7 +515,7 @@ def distill_authoring_character_memory(
     world_id: uuid.UUID,
     run_id: uuid.UUID,
     request: AuthoringCharacterMemoryDistillRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
 ) -> AuthoringCharacterMemoryDistillResult:
@@ -525,6 +525,7 @@ def distill_authoring_character_memory(
             run_id,
             request,
             actor_ref=f"user:{subject.user_id}",
+            platform_admin=context.is_platform_admin,
         )
     except AuthoringNotFoundError as exc:
         raise _not_found() from exc

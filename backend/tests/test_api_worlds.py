@@ -155,12 +155,34 @@ def test_platform_admin_can_create_list_and_update_worlds() -> None:
 
 def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None:
     client, engine = _client_with_database()
-    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
     member_id, member_token = _seed_user(engine, "member@example.test")
     _stranger_id, stranger_token = _seed_user(engine, "stranger@example.test")
     world_id = _seed_world(engine, owner_id, "shared-world")
+    safe_world_id = _seed_world(engine, owner_id, "safe-shared-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    _add_membership(engine, safe_world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, safe_world_id, member_id, AuthRole.HUMAN_USER)
+    with Session(engine) as session:
+        world = session.get(World, world_id)
+        assert world is not None
+        world.name = "Shared raw_prompt: operator world"
+        world.description = "storage_uri media://private/world-summary"
+        world.rules_config = {"raw_prompt": "operator-only rules"}
+        world.memory_plugin_identifier = "builtin.mem0_oss"
+        world.memory_backend_profile_id = uuid.uuid4()
+        world.memory_plugin_config = {"storage_uri": "memory://private/profile"}
+        world.world_rules_plugin_identifier = "builtin.default_world_rules"
+        world.world_rules_plugin_config = {"provider_profile_id": str(uuid.uuid4())}
+        safe_world = session.get(World, safe_world_id)
+        assert safe_world is not None
+        safe_world.name = "Safe Shared World"
+        safe_world.description = "Friendly public world."
+        session.commit()
+
+    _authenticate(client, owner_token)
+    owner_get = client.get(f"/worlds/{world_id}")
 
     _authenticate(client, member_token)
     member_list = client.get("/worlds")
@@ -172,8 +194,34 @@ def test_world_member_can_read_but_not_mutate_and_non_member_is_hidden() -> None
     stranger_list = client.get("/worlds")
     stranger_get = client.get(f"/worlds/{world_id}")
 
-    assert [item["id"] for item in member_list.json()] == [str(world_id)]
+    assert owner_get.status_code == 200
+    assert owner_get.json()["name"] == "Shared raw_prompt: operator world"
+    assert owner_get.json()["description"] == "storage_uri media://private/world-summary"
+    assert owner_get.json()["rules_config"]["raw_prompt"] == "operator-only rules"
+    assert owner_get.json()["memory_backend_profile_id"] is not None
+    assert owner_get.json()["memory_plugin_config"]["storage_uri"] == "memory://private/profile"
+    assert owner_get.json()["world_rules_plugin_config"]["provider_profile_id"]
+    member_worlds = {item["id"]: item for item in member_list.json()}
+    assert set(member_worlds) == {str(world_id), str(safe_world_id)}
+    assert member_worlds[str(world_id)]["name"] == ""
+    assert member_worlds[str(world_id)]["description"] == ""
+    assert member_worlds[str(world_id)]["rules_config"] == {}
+    assert member_worlds[str(world_id)]["memory_plugin_identifier"] == ""
+    assert member_worlds[str(world_id)]["memory_backend_profile_id"] is None
+    assert member_worlds[str(world_id)]["memory_plugin_config"] == {}
+    assert member_worlds[str(world_id)]["world_rules_plugin_identifier"] == ""
+    assert member_worlds[str(world_id)]["world_rules_plugin_config"] == {}
+    assert member_worlds[str(safe_world_id)]["name"] == "Safe Shared World"
+    assert member_worlds[str(safe_world_id)]["description"] == "Friendly public world."
     assert member_get.status_code == 200
+    assert member_get.json()["name"] == ""
+    assert member_get.json()["description"] == ""
+    assert member_get.json()["rules_config"] == {}
+    assert member_get.json()["memory_plugin_identifier"] == ""
+    assert member_get.json()["memory_backend_profile_id"] is None
+    assert member_get.json()["memory_plugin_config"] == {}
+    assert member_get.json()["world_rules_plugin_identifier"] == ""
+    assert member_get.json()["world_rules_plugin_config"] == {}
     assert member_patch.status_code == 403
     assert member_candidates.status_code == 403
     assert stranger_list.json() == []
@@ -376,14 +424,34 @@ def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
         f"/worlds/{world_id}/bible",
         json={
             "source_material": "Original ending and sequel notes.",
-            "canon_timeline": [{"label": "Finale", "world_time": "2030-01-01"}],
-            "setting_rules": {"school": "closed on Sunday"},
-            "forbidden_changes": [{"rule": "Do not revive resolved antagonist"}],
-            "sequel_boundaries": {"starts_after": "original finale"},
+            "canon_timeline": [
+                {
+                    "label": "Finale",
+                    "world_time": "2030-01-01",
+                    "storage_uri": "media://private/world-bible",
+                    "nested": {"raw_prompt": "operator prompt"},
+                },
+            ],
+            "setting_rules": {
+                "school": "closed on Sunday",
+                "notes": ["safe note", "/root/private/canon.txt"],
+                "raw_output": "provider output",
+            },
+            "forbidden_changes": [
+                {"rule": "Do not revive resolved antagonist", "secret_ref": "canon-key"},
+            ],
+            "sequel_boundaries": {
+                "starts_after": "original finale",
+                "evidence": "data:audio/wav;base64,AAAA",
+            },
             "continuity_config": {"status": "post_canon", "tone": "daily"},
             "metadata": {"source": "operator"},
         },
     )
+    _authenticate(client, member_token)
+    member_read_with_public_values = client.get(f"/worlds/{world_id}/bible")
+
+    _authenticate(client, owner_token)
     updated = client.put(
         f"/worlds/{world_id}/bible",
         json={
@@ -399,10 +467,40 @@ def test_world_bible_api_preserves_continuity_contract_and_access() -> None:
     assert created.status_code == 200
     assert created.json()["source_material"] == "Original ending and sequel notes."
     assert created.json()["continuity_status"] == "post_canon"
+    assert created.json()["canon_timeline"][0]["storage_uri"] == "media://private/world-bible"
+    assert created.json()["setting_rules"]["raw_output"] == "provider output"
     assert created.json()["metadata"] == {"source": "operator"}
+    assert member_read_with_public_values.status_code == 200
+    member_bible = member_read_with_public_values.json()
+    assert member_bible["source_material"] == ""
+    assert member_bible["canon_timeline"] == [
+        {"label": "Finale", "world_time": "2030-01-01", "nested": {}},
+    ]
+    assert member_bible["setting_rules"] == {"school": "closed on Sunday", "notes": ["safe note"]}
+    assert member_bible["forbidden_changes"] == [
+        {"rule": "Do not revive resolved antagonist"},
+    ]
+    assert member_bible["sequel_boundaries"] == {"starts_after": "original finale"}
+    assert member_bible["continuity_config"] == {}
+    assert member_bible["metadata"] == {}
+    assert member_bible["continuity_status"] == "post_canon"
+
+    _authenticate(client, member_token)
+    member_read_after_create = client.get(f"/worlds/{world_id}/bible")
+
     assert updated.status_code == 200
     assert updated.json()["source_material"] == "Updated sequel notes."
+    assert updated.json()["continuity_config"] == {"continuity_status": "alternate"}
     assert updated.json()["continuity_status"] == "alternate"
+    assert member_read_after_create.status_code == 200
+    assert member_read_after_create.json()["source_material"] == ""
+    assert member_read_after_create.json()["canon_timeline"] == []
+    assert member_read_after_create.json()["setting_rules"] == {}
+    assert member_read_after_create.json()["forbidden_changes"] == []
+    assert member_read_after_create.json()["sequel_boundaries"] == {}
+    assert member_read_after_create.json()["continuity_config"] == {}
+    assert member_read_after_create.json()["metadata"] == {}
+    assert member_read_after_create.json()["continuity_status"] == "alternate"
 
 
 def test_agent_character_metadata_and_continuity_surfaces_are_compatible() -> None:
@@ -506,8 +604,18 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     other_world_id = _seed_world(engine, other_owner_id, "other-relationship-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
-    source_agent_id = _seed_agent(engine, world_id, "source")
-    target_agent_id = _seed_agent(engine, world_id, "target")
+    source_agent_id = _seed_agent(
+        engine,
+        world_id,
+        "source",
+        display_name="Source raw_prompt: relationship source",
+    )
+    target_agent_id = _seed_agent(
+        engine,
+        world_id,
+        "target",
+        display_name="Target storage_uri media://private/relationship-target",
+    )
     other_agent_id = _seed_agent(engine, other_world_id, "outside")
 
     _authenticate(client, member_token)
@@ -546,7 +654,11 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
             "relationship_type": "friendship",
             "affection": 42,
             "trust": 35,
-            "metadata": {"reason": "shared promise"},
+            "metadata": {
+                "reason": "shared promise",
+                "raw_prompt": "operator relationship prompt",
+                "storage_uri": "relationship://private/evidence",
+            },
         },
     )
     duplicate = client.post(
@@ -559,9 +671,18 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     )
     updated = client.patch(
         f"/worlds/{world_id}/agents/{source_agent_id}/relationships/{created.json()['id']}",
-        json={"trust": 55, "metadata": {"reason": "kept promise"}},
+        json={
+            "trust": 55,
+            "metadata": {
+                "reason": "kept promise",
+                "raw_output": "operator relationship output",
+                "storage_uri": "relationship://private/updated",
+            },
+        },
     )
     listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
+    _authenticate(client, member_token)
+    member_listed = client.get(f"/worlds/{world_id}/agents/{source_agent_id}/relationships")
     with Session(engine) as session:
         relationship_events = session.scalars(
             select(WorldEventModel)
@@ -579,15 +700,30 @@ def test_agent_relationship_graph_enforces_world_scope_and_updates_edges() -> No
     assert cross_world.status_code == 404
     assert created.status_code == 201
     assert created.json()["source_agent_key"] == "source"
+    assert created.json()["source_display_name"] == "Source raw_prompt: relationship source"
     assert created.json()["target_agent_key"] == "target"
+    assert created.json()["target_display_name"] == (
+        "Target storage_uri media://private/relationship-target"
+    )
     assert created.json()["relationship_type"] == "friendship"
     assert created.json()["affection"] == 42
     assert duplicate.status_code == 409
     assert updated.status_code == 200
     assert updated.json()["trust"] == 55
-    assert updated.json()["metadata"] == {"reason": "kept promise"}
+    assert updated.json()["metadata"]["reason"] == "kept promise"
+    assert updated.json()["metadata"]["raw_output"] == "operator relationship output"
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == created.json()["id"]
+    assert listed.json()[0]["source_display_name"] == "Source raw_prompt: relationship source"
+    assert listed.json()[0]["target_display_name"] == (
+        "Target storage_uri media://private/relationship-target"
+    )
+    assert listed.json()[0]["metadata"]["raw_output"] == "operator relationship output"
+    assert member_listed.status_code == 200
+    assert member_listed.json()[0]["id"] == created.json()["id"]
+    assert member_listed.json()[0]["source_display_name"] == ""
+    assert member_listed.json()[0]["target_display_name"] == ""
+    assert member_listed.json()[0]["metadata"] == {}
     assert [event.event_name for event in relationship_events] == [
         "relationship.edge_created",
         "relationship.edge_updated",
@@ -616,10 +752,15 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
         f"/worlds/{world_id}/scenes",
         json={
             "scene_key": "classroom",
-            "name": "Classroom",
+            "name": "Classroom raw_prompt: operator location",
+            "description": "storage_uri media://private/scene-evidence",
             "region_key": "school",
             "location_tags": ["school", "indoors"],
-            "opening_rules": {"weekday": "07:00-18:00"},
+            "opening_rules": {
+                "weekday": "07:00-18:00",
+                "raw_prompt": "operator-only",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         },
     )
     courtyard = client.post(
@@ -660,7 +801,11 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
             "source_scene_id": classroom_id,
             "target_scene_id": courtyard_id,
             "travel_label": "walkway",
-            "traversal_rules": {"requires": "school_access"},
+            "traversal_rules": {
+                "requires": "school_access",
+                "raw_prompt": "operator-only",
+                "storage_uri": "media://private/location-plan",
+            },
         },
     )
     duplicate_edge = client.post(
@@ -669,7 +814,7 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     )
     updated_edge = client.patch(
         f"/worlds/{world_id}/location-edges/{created_edge.json()['id']}",
-        json={"travel_label": "covered walkway"},
+        json={"travel_label": "covered walkway raw_output: /root/private/path"},
     )
     upsert_presence = client.put(
         f"/worlds/{world_id}/agents/{agent_id}/presence",
@@ -677,22 +822,53 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
             "current_scene_id": classroom_id,
             "visibility_status": "offscreen",
             "encounter_eligible": False,
-            "scheduled_movement": {"next_scene_id": courtyard_id},
+            "scheduled_movement": {"next_scene_id": courtyard_id, "raw_prompt": "operator-only"},
         },
     )
+    admin_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
     invalid_presence_scene = client.put(
         f"/worlds/{world_id}/agents/{agent_id}/presence",
         json={"current_scene_id": str(other_scene_id)},
     )
     scenes = client.get(f"/worlds/{world_id}/scenes")
+    admin_edges = client.get(f"/worlds/{world_id}/location-edges")
+
+    with Session(engine) as session:
+        presence_event = WorldEventStore(session).append_event(
+            WorldEventAppend(
+                world_id=world_id,
+                event_name="presence.operator_plan",
+                payload={"summary": "operator scheduling evidence"},
+                wall_time=datetime(2026, 5, 6, 12, 0, tzinfo=UTC),
+                world_time=datetime(2030, 1, 3, 8, 0, tzinfo=UTC),
+                actor_ref="system:test",
+            ),
+        )
+        presence_state = session.scalars(
+            select(AgentPresenceState).where(
+                AgentPresenceState.world_id == world_id,
+                AgentPresenceState.agent_id == agent_id,
+            ),
+        ).one()
+        presence_state.last_event_id = presence_event.id
+        session.commit()
+    admin_presence_with_event = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
 
     _authenticate(client, member_token)
     member_presence = client.get(f"/worlds/{world_id}/agents/{agent_id}/presence")
+    member_scenes = client.get(f"/worlds/{world_id}/scenes")
+    member_edges_after_create = client.get(f"/worlds/{world_id}/location-edges")
 
     assert classroom.status_code == 201
+    assert classroom.json()["name"] == "Classroom raw_prompt: operator location"
+    assert classroom.json()["description"] == "storage_uri media://private/scene-evidence"
     assert classroom.json()["region_key"] == "school"
     assert classroom.json()["location_tags"] == ["school", "indoors"]
-    assert classroom.json()["opening_rules"] == {"weekday": "07:00-18:00"}
+    assert classroom.json()["opening_rules"] == {
+        "weekday": "07:00-18:00",
+        "raw_prompt": "operator-only",
+        "provider_profile_id": classroom.json()["opening_rules"]["provider_profile_id"],
+    }
     assert member_edges.status_code == 200
     assert member_edges.json() == []
     assert member_create_edge.status_code == 403
@@ -706,15 +882,58 @@ def test_location_graph_and_agent_presence_enforce_world_scope() -> None:
     assert created_edge.json()["target_scene_key"] == "courtyard"
     assert duplicate_edge.status_code == 409
     assert updated_edge.status_code == 200
-    assert updated_edge.json()["travel_label"] == "covered walkway"
+    assert updated_edge.json()["travel_label"] == "covered walkway raw_output: /root/private/path"
     assert upsert_presence.status_code == 200
     assert upsert_presence.json()["current_scene_key"] == "classroom"
     assert upsert_presence.json()["visibility_status"] == "offscreen"
     assert upsert_presence.json()["encounter_eligible"] is False
     assert invalid_presence_scene.status_code == 404
     assert [scene["scene_key"] for scene in scenes.json()] == ["classroom", "courtyard"]
+    classroom_scene = next(scene for scene in scenes.json() if scene["scene_key"] == "classroom")
+    assert classroom_scene["name"] == "Classroom raw_prompt: operator location"
+    assert classroom_scene["description"] == "storage_uri media://private/scene-evidence"
+    assert classroom_scene["opening_rules"] == {
+        "weekday": "07:00-18:00",
+        "raw_prompt": "operator-only",
+        "provider_profile_id": classroom.json()["opening_rules"]["provider_profile_id"],
+    }
+    assert admin_edges.status_code == 200
+    assert admin_edges.json()[0]["travel_label"] == "covered walkway raw_output: /root/private/path"
+    assert admin_edges.json()[0]["traversal_rules"] == {
+        "requires": "school_access",
+        "raw_prompt": "operator-only",
+        "storage_uri": "media://private/location-plan",
+    }
+    assert admin_presence.status_code == 200
+    assert admin_presence.json()["scheduled_movement"] == {
+        "next_scene_id": courtyard_id,
+        "raw_prompt": "operator-only",
+    }
+    assert admin_presence.json()["last_event_id"] is None
+    assert admin_presence_with_event.status_code == 200
+    assert admin_presence_with_event.json()["last_event_id"] == str(presence_event.id)
     assert member_presence.status_code == 200
-    assert member_presence.json()["scheduled_movement"] == {"next_scene_id": courtyard_id}
+    assert member_presence.json()["current_scene_key"] == "classroom"
+    assert member_presence.json()["visibility_status"] == "offscreen"
+    assert member_presence.json()["encounter_eligible"] is False
+    assert member_presence.json()["scheduled_movement"] == {}
+    assert member_presence.json()["last_event_id"] is None
+    assert member_scenes.status_code == 200
+    member_classroom = next(
+        scene for scene in member_scenes.json() if scene["scene_key"] == "classroom"
+    )
+    assert member_classroom["opening_rules"] == {}
+    assert member_classroom["name"] == ""
+    assert member_classroom["description"] == ""
+    member_courtyard = next(
+        scene for scene in member_scenes.json() if scene["scene_key"] == "courtyard"
+    )
+    assert member_courtyard["name"] == "Courtyard"
+    assert member_classroom["region_key"] == "school"
+    assert member_classroom["location_tags"] == ["school", "indoors"]
+    assert member_edges_after_create.status_code == 200
+    assert member_edges_after_create.json()[0]["travel_label"] == ""
+    assert member_edges_after_create.json()[0]["traversal_rules"] == {}
 
 
 def test_organization_memberships_and_faction_tracks_append_events() -> None:
@@ -745,11 +964,15 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
         f"/worlds/{world_id}/organizations",
         json={
             "organization_key": "student-council",
-            "name": "Student Council",
+            "name": "Student Council raw_prompt: organization name",
             "organization_type": "club",
-            "public_summary": "Runs school events.",
+            "description": "Runs safe school events.",
+            "public_summary": "storage_uri media://private/org-summary",
             "hidden_summary": "Tracks the old club room incident.",
-            "metadata": {"founded": "post-canon"},
+            "metadata": {
+                "founded": "post-canon",
+                "raw_prompt": "operator-only organization prompt",
+            },
         },
     )
     organization_id = created_org.json()["id"]
@@ -773,12 +996,15 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
         f"/worlds/{world_id}/organizations/{organization_id}/memberships",
         json={
             "agent_id": str(agent_id),
-            "role_title": "President",
+            "role_title": "President raw_output: membership role",
             "visibility": "public",
             "loyalty": 80,
             "influence": 70,
-            "responsibilities": ["agenda"],
-            "metadata": {"route": "student-council"},
+            "responsibilities": ["agenda", "storage_uri media://private/responsibility"],
+            "metadata": {
+                "raw_prompt": "operator-only membership prompt",
+                "storage_uri": "media://private/membership-note",
+            },
         },
     )
     duplicate_membership = client.post(
@@ -793,14 +1019,25 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     list_memberships = client.get(
         f"/worlds/{world_id}/organizations/{organization_id}/memberships",
     )
+    admin_list = client.get(f"/worlds/{world_id}/organizations")
+    _authenticate(client, member_token)
+    member_list_after_create = client.get(f"/worlds/{world_id}/organizations")
+    member_list_memberships = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/memberships",
+    )
+    _authenticate(client, owner_token)
     created_track = client.post(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
         json={
             "track_key": "festival-plan",
-            "name": "Festival Plan",
+            "name": "Festival Plan raw_prompt: track name",
             "track_type": "goal",
             "progress": 10,
             "pressure": 20,
+            "metadata": {
+                "raw_prompt": "operator-only faction prompt",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         },
     )
     duplicate_track = client.post(
@@ -814,11 +1051,16 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     updated_track = client.patch(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks/"
         f"{created_track.json()['id']}",
-        json={"progress": 35, "summary": "Venue confirmed."},
+        json={"progress": 35, "summary": "Venue confirmed raw_output: /root/faction-plan"},
     )
     list_tracks = client.get(
         f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
     )
+    _authenticate(client, member_token)
+    member_list_tracks = client.get(
+        f"/worlds/{world_id}/organizations/{organization_id}/faction-tracks",
+    )
+    _authenticate(client, owner_token)
     organization_events = client.get(
         f"/worlds/{world_id}/events",
         params={"importance": "organization"},
@@ -829,7 +1071,29 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert member_create.status_code == 403
     assert created_org.status_code == 201
     assert created_org.json()["organization_key"] == "student-council"
-    assert created_org.json()["metadata"] == {"founded": "post-canon"}
+    assert created_org.json()["name"] == "Student Council raw_prompt: organization name"
+    assert created_org.json()["description"] == "Runs safe school events."
+    assert created_org.json()["public_summary"] == "storage_uri media://private/org-summary"
+    assert created_org.json()["hidden_summary"] == "Tracks the old club room incident."
+    assert created_org.json()["metadata"]["raw_prompt"] == "operator-only organization prompt"
+    assert admin_list.status_code == 200
+    assert admin_list.json()[0]["name"] == "Student Council raw_prompt: organization name"
+    assert admin_list.json()[0]["description"] == "Runs safe school events."
+    assert admin_list.json()[0]["public_summary"] == "storage_uri media://private/org-summary"
+    assert admin_list.json()[0]["hidden_summary"] == "Tracks the old club room incident."
+    assert admin_list.json()[0]["metadata"]["raw_prompt"] == "operator-only organization prompt"
+    assert member_list_after_create.status_code == 200
+    assert member_list_after_create.json()[0]["name"] == ""
+    assert member_list_after_create.json()[0]["description"] == "Runs safe school events."
+    assert member_list_after_create.json()[0]["public_summary"] == ""
+    assert member_list_after_create.json()[0]["hidden_summary"] is None
+    assert member_list_after_create.json()[0]["metadata"] == {}
+    assert member_list_memberships.status_code == 200
+    assert member_list_memberships.json()[0]["organization_name"] == ""
+    assert member_list_memberships.json()[0]["agent_key"] == "club-president"
+    assert member_list_memberships.json()[0]["role_title"] == ""
+    assert member_list_memberships.json()[0]["responsibilities"] == ["agenda", ""]
+    assert member_list_memberships.json()[0]["metadata"] == {}
     assert duplicate_org.status_code == 409
     assert updated_org.status_code == 200
     assert updated_org.json()["organization_type"] == "faction"
@@ -838,18 +1102,41 @@ def test_organization_memberships_and_faction_tracks_append_events() -> None:
     assert created_membership.status_code == 201
     assert created_membership.json()["agent_key"] == "club-president"
     assert created_membership.json()["loyalty"] == 80
+    assert created_membership.json()["role_title"] == "President raw_output: membership role"
+    assert created_membership.json()["responsibilities"] == [
+        "agenda",
+        "storage_uri media://private/responsibility",
+    ]
     assert duplicate_membership.status_code == 409
     assert updated_membership.status_code == 200
     assert updated_membership.json()["visibility"] == "hidden"
     assert updated_membership.json()["loyalty"] == 85
     assert [item["agent_key"] for item in list_memberships.json()] == ["club-president"]
+    assert list_memberships.json()[0]["organization_name"] == (
+        "Student Council raw_prompt: organization name"
+    )
+    assert list_memberships.json()[0]["role_title"] == "President raw_output: membership role"
+    assert list_memberships.json()[0]["metadata"]["raw_prompt"] == (
+        "operator-only membership prompt"
+    )
     assert created_track.status_code == 201
     assert created_track.json()["progress"] == 10
+    assert created_track.json()["name"] == "Festival Plan raw_prompt: track name"
     assert duplicate_track.status_code == 409
     assert updated_track.status_code == 200
     assert updated_track.json()["progress"] == 35
     assert list_tracks.status_code == 200
-    assert list_tracks.json()[0]["summary"] == "Venue confirmed."
+    assert list_tracks.json()[0]["organization_name"] == (
+        "Student Council raw_prompt: organization name"
+    )
+    assert list_tracks.json()[0]["name"] == "Festival Plan raw_prompt: track name"
+    assert list_tracks.json()[0]["summary"] == "Venue confirmed raw_output: /root/faction-plan"
+    assert list_tracks.json()[0]["metadata"]["raw_prompt"] == "operator-only faction prompt"
+    assert member_list_tracks.status_code == 200
+    assert member_list_tracks.json()[0]["organization_name"] == ""
+    assert member_list_tracks.json()[0]["name"] == ""
+    assert member_list_tracks.json()[0]["summary"] == ""
+    assert member_list_tracks.json()[0]["metadata"] == {}
     assert organization_events.status_code == 200
     assert organization_events.json()[0]["event_name"] == "organization.faction_progress_updated"
     assert organization_events.json()[0]["payload"]["previous_progress"] == 10
@@ -976,6 +1263,209 @@ def test_daily_life_and_offscreen_event_queue_are_world_scoped() -> None:
     assert presence.json()["current_scene_id"] == str(scene_id)
     assert presence.json()["last_event_id"] == resolved.json()["event_ids"][0]
     assert other_queue_status == "pending"
+
+
+def test_offscreen_resolution_sanitizes_persisted_world_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-offscreen-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "offscreen-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    queued = client.post(
+        f"/worlds/{world_id}/offscreen-events",
+        json={
+            "event_name": "living_world.offscreen_payload_check",
+            "title": "Due unsafe offscreen payload",
+            "due_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+            "importance": "daily",
+            "payload": {
+                "summary": "safe summary",
+                "safe_number": 3,
+                "storage_uri": "media://private/offscreen",
+                "raw_prompt": "operator prompt",
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "path": "/root/private/offscreen.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"bytes": "base64,aaaa"},
+                    "visible note",
+                    "media://private/list-entry",
+                ],
+            },
+        },
+    )
+    resolved = client.post(f"/worlds/{world_id}/offscreen-events/resolve", params={"limit": 5})
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(resolved.json()["event_ids"][0]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert queued.status_code == 201
+    assert resolved.status_code == 200
+    assert resolved.json()["resolved_count"] == 1
+    assert payload["summary"] == "safe summary"
+    assert payload["safe_number"] == 3
+    assert payload["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in payload["items"]
+    assert "visible note" in payload["items"]
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "rawPrompt" not in payload_text
+    assert "promptSnapshot" not in payload_text
+    assert "storageUri" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+    assert "bytes" not in payload_text
+
+
+def test_gm_proposal_resolution_sanitizes_persisted_world_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-gm-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "gm-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+
+    _authenticate(client, owner_token)
+    proposal = client.post(
+        f"/worlds/{world_id}/gm/proposals",
+        json={
+            "title": "Safe proposal title",
+            "reason": "Exercise proposal payload persistence.",
+            "event_name": "gm.unsafe_payload_check",
+            "importance": "route",
+            "proposed_payload": {
+                "beat": "safe beat",
+                "safe_number": 7,
+                "storage_uri": "media://private/gm-proposal",
+                "raw_prompt": "operator prompt",
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "path": "/root/private/gm-proposal.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"base64": "base64,bbbb"},
+                    "visible note",
+                    "file:///tmp/private-entry",
+                ],
+            },
+        },
+    )
+    proposal_id = proposal.json()["id"]
+    reviewed = client.post(
+        f"/worlds/{world_id}/gm/proposals/{proposal_id}/review",
+        json={"status": "resolved", "review_note": "Accepted for payload test."},
+    )
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(reviewed.json()["resolved_event_id"]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert proposal.status_code == 201
+    assert reviewed.status_code == 200
+    assert reviewed.json()["resolved_event_id"] is not None
+    assert payload["beat"] == "safe beat"
+    assert payload["safe_number"] == 7
+    assert payload["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in payload["items"]
+    assert "visible note" in payload["items"]
+    assert payload["proposal_id"] == proposal_id
+    assert payload["proposal_title"] == "Safe proposal title"
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+
+
+def test_event_store_sanitizes_secret_reveal_event_payload() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-secret-payload@example.test")
+    world_id = _seed_world(engine, owner_id, "secret-payload-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    agent_id = _seed_agent(engine, world_id, "secret-holder")
+
+    _authenticate(client, owner_token)
+    secret = client.post(
+        f"/worlds/{world_id}/secrets",
+        json={
+            "secret_key": "hidden-letter",
+            "title": "Safe hidden letter",
+            "content": "The letter was left in the club room.",
+            "holder_agent_ids": [str(agent_id)],
+            "consequence_metadata": {
+                "safe_note": "keep this consequence",
+                "storage_uri": "media://private/secret",
+                "raw_prompt": "operator prompt",
+                "rawPrompt": "operator camel prompt",
+                "promptSnapshotId": str(uuid.uuid4()),
+                "nested": {
+                    "safe": "kept nested value",
+                    "raw_output": "provider output",
+                    "rawOutput": "provider camel output",
+                    "storageUri": "opaque-secret-storage",
+                    "path": "/root/private/secret.json",
+                },
+                "items": [
+                    {"safe": "kept list value"},
+                    {"bytes": "base64,cccc"},
+                    "visible note",
+                    "s3://private/secret-entry",
+                ],
+            },
+        },
+    )
+    secret_id = secret.json()["id"]
+    revealed = client.post(f"/worlds/{world_id}/secrets/{secret_id}/reveal")
+
+    with Session(engine) as session:
+        event = session.scalars(
+            select(WorldEventModel).where(
+                WorldEventModel.id == uuid.UUID(revealed.json()["revealed_event_id"]),
+            ),
+        ).one()
+        payload = event.payload
+
+    payload_text = json.dumps(payload, sort_keys=True)
+    assert secret.status_code == 201
+    assert revealed.status_code == 200
+    assert revealed.json()["revealed_event_id"] is not None
+    assert payload["secret_id"] == secret_id
+    assert payload["secret_key"] == "hidden-letter"
+    assert payload["title"] == "Safe hidden letter"
+    consequence = payload["consequence_metadata"]
+    assert consequence["safe_note"] == "keep this consequence"
+    assert consequence["nested"]["safe"] == "kept nested value"
+    assert {"safe": "kept list value"} in consequence["items"]
+    assert "visible note" in consequence["items"]
+    assert "storage_uri" not in payload_text
+    assert "media://" not in payload_text
+    assert "raw_prompt" not in payload_text
+    assert "rawPrompt" not in payload_text
+    assert "promptSnapshot" not in payload_text
+    assert "storageUri" not in payload_text
+    assert "raw_output" not in payload_text
+    assert "rawOutput" not in payload_text
+    assert "/root/" not in payload_text
+    assert "base64" not in payload_text
+    assert "bytes" not in payload_text
 
 
 def test_gm_choices_and_worldlines_are_scoped_and_copy_branch_state() -> None:
@@ -1722,7 +2212,6 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
             "holder_agent_ids": [str(target_agent_id)],
         },
     )
-    revealed = client.post(f"/worlds/{world_id}/secrets/{secret.json()['id']}/reveal")
     emotional_state = client.put(
         f"/worlds/{world_id}/emotional-states",
         json={
@@ -1765,18 +2254,31 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     journal = client.post(
         f"/worlds/{world_id}/player-journal",
         json={
+            "user_id": str(member_id),
             "entry_kind": "event",
             "title": "Late rehearsal",
-            "body": "The route tension moved without direct intervention.",
+            "body": "raw_prompt operator journal prompt",
+            "source_event_id": resolved.json()["event_ids"][0],
+            "source_ref": "event:late-rehearsal",
+            "metadata": {
+                "raw_prompt": "operator journal prompt",
+                "storage_uri": "journal://private/evidence",
+            },
         },
     )
     notification = client.post(
         f"/worlds/{world_id}/notifications",
         json={
+            "user_id": str(member_id),
             "notification_kind": "rumor",
-            "title": "Club room rumor",
-            "body": "Someone mentioned a hidden letter.",
+            "title": "media://private/club-room-rumor",
+            "body": "raw_output operator notification output",
             "source_event_id": resolved.json()["event_ids"][0],
+            "source_ref": "event:club-room-rumor",
+            "metadata": {
+                "raw_output": "operator notification output",
+                "storage_uri": "notification://private/evidence",
+            },
         },
     )
     intervention = client.post(
@@ -1824,7 +2326,10 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
         f"/worlds/{world_id}/worldlines/fork",
         json={"worldline_key": "knowledge-alt", "name": "Knowledge Alt"},
     )
-    member_journal = client.get(f"/worlds/{world_id}/player-journal")
+    member_journal = client.get(
+        f"/worlds/{world_id}/player-journal",
+        params={"user_id": str(member_id)},
+    )
     member_notifications = client.get(f"/worlds/{world_id}/notifications")
     with Session(engine) as session:
         choice_events = session.scalars(
@@ -1840,17 +2345,10 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
                 MemoryWriteJob.dedupe_key.like("relationship:%repair:%"),
             ),
         ).all()
-        secret_knowledge = session.scalars(
-            select(CharacterKnowledgeFact).where(
-                CharacterKnowledgeFact.world_id == world_id,
-                CharacterKnowledgeFact.agent_id == target_agent_id,
-                CharacterKnowledgeFact.fact_key == "secret:hidden-letter",
-            ),
-        ).one()
-
     _authenticate(client, member_token)
     member_journal_after_auth = client.get(f"/worlds/{world_id}/player-journal")
     member_notifications_after_auth = client.get(f"/worlds/{world_id}/notifications")
+    member_dashboard_after_auth = client.get(f"/worlds/{world_id}/living-world-dashboard")
 
     assert member_knowledge.status_code == 403
     assert queued.status_code == 201
@@ -1859,9 +2357,6 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert knowledge.status_code == 200
     assert knowledge.json()["agent_display_name"] == "rival"
     assert secret.status_code == 201
-    assert revealed.status_code == 200
-    assert revealed.json()["status"] == "revealed"
-    assert secret_knowledge.knowledge_kind == "secret"
     assert emotional_state.status_code == 200
     assert emotional_state.json()["mood"] == "restless"
     assert applied_repair.status_code == 200
@@ -1902,11 +2397,13 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert listed_continuity_reviews.status_code == 200
     assert listed_continuity_reviews.json()[0]["status"] == "warning"
     assert dashboard.status_code == 200
-    assert dashboard.json()["knowledge_count"] >= 2
-    assert dashboard.json()["hidden_secret_count"] == 0
+    assert dashboard.json()["knowledge_count"] >= 1
+    assert dashboard.json()["hidden_secret_count"] == 1
     assert dashboard.json()["emotional_state_count"] == 1
-    assert dashboard.json()["unread_notification_count"] == 1
+    assert dashboard.json()["unread_notification_count"] == 0
     assert dashboard.json()["pending_intervention_count"] == 1
+    assert member_dashboard_after_auth.status_code == 200
+    assert member_dashboard_after_auth.json()["hidden_secret_count"] == 0
     assert fork_with_old_sequence.status_code == 422
     assert "historical event fork reconstruction is not supported" in fork_with_old_sequence.json()[
         "detail"
@@ -1914,9 +2411,38 @@ def test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes() -> None:
     assert fork.status_code == 201
     assert fork.json()["parent_worldline_id"] == primary["id"]
     assert member_journal.status_code == 200
+    assert member_journal.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
+    assert member_journal.json()[0]["source_ref"] == "event:late-rehearsal"
+    assert member_journal.json()[0]["body"] == "raw_prompt operator journal prompt"
+    assert member_journal.json()[0]["metadata"]["raw_prompt"] == "operator journal prompt"
     assert member_notifications.status_code == 200
-    assert member_journal_after_auth.json() == []
-    assert member_notifications_after_auth.json() == []
+    assert member_notifications.json()[0]["source_event_id"] == resolved.json()["event_ids"][0]
+    assert member_notifications.json()[0]["source_ref"] == "event:club-room-rumor"
+    assert member_notifications.json()[0]["title"] == "media://private/club-room-rumor"
+    assert member_notifications.json()[0]["body"] == "raw_output operator notification output"
+    assert (
+        member_notifications.json()[0]["metadata"]["raw_output"]
+        == "operator notification output"
+    )
+    assert member_journal_after_auth.status_code == 200
+    assert member_journal_after_auth.json()[0]["title"] == "Late rehearsal"
+    assert member_journal_after_auth.json()[0]["body"] == ""
+    assert member_journal_after_auth.json()[0]["source_event_id"] is None
+    assert member_journal_after_auth.json()[0]["source_ref"] is None
+    assert member_journal_after_auth.json()[0]["metadata"] == {}
+    assert member_notifications_after_auth.status_code == 200
+    assert member_notifications_after_auth.json()[0]["title"] == ""
+    assert member_notifications_after_auth.json()[0]["body"] == ""
+    assert member_notifications_after_auth.json()[0]["source_event_id"] is None
+    assert member_notifications_after_auth.json()[0]["source_ref"] is None
+    assert member_notifications_after_auth.json()[0]["metadata"] == {}
+    member_text_payload = json.dumps(
+        member_journal_after_auth.json() + member_notifications_after_auth.json(),
+        sort_keys=True,
+    )
+    assert "media://" not in member_text_payload
+    assert "raw_prompt" not in member_text_payload
+    assert "raw_output" not in member_text_payload
 
 
 def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist() -> None:
@@ -2461,6 +2987,11 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
         },
     )
     release_profile_read = client.get(f"/worlds/{world_id}/release-profile")
+
+    _authenticate(client, member_token)
+    member_release_profile_after_create = client.get(f"/worlds/{world_id}/release-profile")
+
+    _authenticate(client, owner_token)
     invalid_ending = client.post(
         f"/worlds/{world_id}/ending-candidates",
         json={
@@ -2588,6 +3119,18 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     assert released_profile.status_code == 422
     assert "release_launch_gate_missing" in released_profile.text
     assert release_profile_read.json()["branch_policy"] == {"forks": "enabled"}
+    admin_gate_decision = release_profile_read.json()["checklist"]["gate_decision"]
+    assert admin_gate_decision["evidence_refs"] == evidence_refs
+    assert member_release_profile_after_create.status_code == 200
+    assert member_release_profile_after_create.json()["id"] == release_profile.json()["id"]
+    assert member_release_profile_after_create.json()["status"] == "ready"
+    assert member_release_profile_after_create.json()["branch_policy"] == {}
+    assert member_release_profile_after_create.json()["backup_policy"] == {}
+    assert member_release_profile_after_create.json()["content_review_policy"] == {}
+    assert member_release_profile_after_create.json()["player_permission_policy"] == {}
+    assert member_release_profile_after_create.json()["worldline_policy"] == {}
+    assert member_release_profile_after_create.json()["checklist"] == {}
+    assert member_release_profile_after_create.json()["metadata"] == {}
     assert invalid_ending.status_code == 422
     assert "min_route_affinity cannot exceed max_route_affinity" in invalid_ending.text
     assert ending_cross_worldline.status_code == 404
@@ -2621,6 +3164,114 @@ def test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist(
     }
 
 
+def test_platform_admin_manages_player_records_without_world_membership() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner@example.test")
+    member_id, _member_token = _seed_user(engine, "member@example.test")
+    _platform_user_id, platform_token = _seed_user(
+        engine,
+        "platform-admin@example.test",
+        platform_admin=True,
+    )
+    world_id = _seed_world(engine, owner_id, "platform-player-records-world")
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+
+    with Session(engine) as session:
+        worldline = ensure_primary_worldline(session, world_id)
+        actor_id = uuid.uuid4()
+        session.add(
+            PlayerActorProfile(
+                id=actor_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                actor_ref="player:member",
+                display_name="Member Player",
+                profile_json={},
+            ),
+        )
+        session.add(
+            PlayerJournalEntry(
+                id=uuid.uuid4(),
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                player_actor_id=actor_id,
+                entry_kind="event",
+                title="Operator journal title",
+                body="raw_prompt operator journal body",
+                source_ref="event:operator-journal",
+                visibility="world_admin",
+                metadata_json={"raw_prompt": "operator journal prompt"},
+            ),
+        )
+        notification_id = uuid.uuid4()
+        session.add(
+            InWorldNotification(
+                id=notification_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                notification_kind="incident",
+                title="Operator notification title",
+                body="raw_output operator notification body",
+                source_ref="event:operator-notification",
+                metadata_json={"raw_output": "operator notification output"},
+            ),
+        )
+        intervention_id = uuid.uuid4()
+        session.add(
+            PlayerInterventionRecord(
+                id=intervention_id,
+                world_id=world_id,
+                worldline_id=worldline.id,
+                user_id=member_id,
+                player_actor_id=actor_id,
+                intervention_kind="contact",
+                prompt="Operator intervention prompt",
+                metadata_json={"raw_prompt": "operator intervention prompt"},
+            ),
+        )
+        session.commit()
+
+    _authenticate(client, platform_token)
+    journal = client.get(
+        f"/worlds/{world_id}/player-journal",
+        params={"user_id": str(member_id)},
+    )
+    notifications = client.get(f"/worlds/{world_id}/notifications")
+    interventions = client.get(f"/worlds/{world_id}/interventions")
+    created_intervention = client.post(
+        f"/worlds/{world_id}/interventions",
+        json={
+            "user_id": str(member_id),
+            "player_actor_id": str(actor_id),
+            "intervention_kind": "contact",
+            "prompt": "Platform-created intervention prompt",
+            "metadata": {"raw_prompt": "platform intervention prompt"},
+        },
+    )
+
+    assert journal.status_code == 200
+    assert journal.json()[0]["source_ref"] == "event:operator-journal"
+    assert journal.json()[0]["metadata"]["raw_prompt"] == "operator journal prompt"
+    assert notifications.status_code == 200
+    assert any(item["id"] == str(notification_id) for item in notifications.json())
+    notification = next(item for item in notifications.json() if item["id"] == str(notification_id))
+    assert notification["source_ref"] == "event:operator-notification"
+    assert notification["metadata"]["raw_output"] == "operator notification output"
+    assert interventions.status_code == 200
+    assert any(item["id"] == str(intervention_id) for item in interventions.json())
+    intervention = next(item for item in interventions.json() if item["id"] == str(intervention_id))
+    assert intervention["prompt"] == "Operator intervention prompt"
+    assert intervention["metadata"]["raw_prompt"] == "operator intervention prompt"
+    assert created_intervention.status_code == 201
+    assert created_intervention.json()["user_id"] == str(member_id)
+    assert created_intervention.json()["prompt"] == "Platform-created intervention prompt"
+    assert created_intervention.json()["metadata"]["raw_prompt"] == "platform intervention prompt"
+
+
 def test_world_member_can_use_own_player_interaction_records_without_admin_scope() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner-player-ui@example.test")
@@ -2632,22 +3283,85 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     _add_membership(engine, world_id, other_id, AuthRole.HUMAN_USER)
     scene_id = _seed_scene(engine, world_id, "club-room")
     agent_id = _seed_agent(engine, world_id, "guide", scene_id=scene_id)
+    expected_member_profile = {
+        "safe": "visible",
+        "nested": {"safe_note": "kept"},
+        "items": ["public-note", {"safe_item": "kept"}],
+    }
+    expected_historical_profile = {
+        "safe": "historical-visible",
+        "nested": {"safe_note": "historical-kept"},
+        "items": ["historical-note", {"safe_item": "historical-kept"}],
+    }
+    expected_choice_context = {
+        "safe": "visible-choice-context",
+        "nested": {"safe_note": "choice-kept"},
+        "items": ["choice-note", {"safe_item": "choice-kept"}],
+    }
+    dirty_preview_effects = {
+        "relationship_updates": [
+            {"agent_id": str(agent_id), "affection_delta": 5, "raw_prompt": "preview prompt"},
+        ],
+        "faction_updates": [
+            {
+                "track_key": "festival",
+                "progress_delta": 7,
+                "storage_uri": "media://private/faction",
+            },
+        ],
+        "offscreen_events": [
+            {
+                "title": "Safe preview event",
+                "storage_uri": "media://private/preview-event",
+                "raw_output": "provider output",
+                "payload": {"safe": "kept", "path": "/root/private/payload.json"},
+            },
+        ],
+    }
+    expected_choice_preview = {
+        "relationship_updates": [],
+        "faction_updates": [],
+        "offscreen_events": [{"title": "Safe offscreen event"}],
+        "diagnostics": [
+            "0 relationship update(s)",
+            "0 faction update(s)",
+            "1 offscreen event(s)",
+        ],
+    }
 
     _authenticate(client, owner_token)
     owner_actor = client.put(
         f"/worlds/{world_id}/player-actors",
         json={
             "user_id": str(other_id),
-            "display_name": "Other Player",
+            "display_name": "Other raw_prompt: admin player actor",
             "current_scene_id": str(scene_id),
         },
     )
     assert owner_actor.status_code == 200
+    assert owner_actor.json()["display_name"] == "Other raw_prompt: admin player actor"
 
     _authenticate(client, member_token)
     member_actor = client.put(
         f"/worlds/{world_id}/player-actors",
-        json={"display_name": "Member Player", "current_scene_id": str(scene_id)},
+        json={
+            "display_name": "Member raw_prompt: /root/private/player-actor",
+            "current_scene_id": str(scene_id),
+            "profile": {
+                "safe": "visible",
+                "storage_uri": "media://private/player-profile",
+                "nested": {
+                    "safe_note": "kept",
+                    "raw_prompt": "operator-only prompt",
+                },
+                "items": [
+                    "public-note",
+                    "media://private/list-entry",
+                    {"safe_item": "kept", "raw_output": "provider output"},
+                ],
+                "path": "/root/private/player-profile.json",
+            },
+        },
     )
     other_actor_attempt = client.put(
         f"/worlds/{world_id}/player-actors",
@@ -2657,6 +3371,33 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "current_scene_id": str(scene_id),
         },
     )
+    assert member_actor.status_code == 200
+    assert member_actor.json()["display_name"] == ""
+    assert member_actor.json()["profile"] == expected_member_profile
+
+    with Session(engine) as session:
+        persisted_member_actor = session.get(
+            PlayerActorProfile,
+            uuid.UUID(member_actor.json()["id"]),
+        )
+        assert persisted_member_actor is not None
+        persisted_profile_after_bind = persisted_member_actor.profile_json
+        persisted_member_actor.profile_json = {
+            "safe": "historical-visible",
+            "storage_uri": "media://private/historical-profile",
+            "nested": {
+                "safe_note": "historical-kept",
+                "raw_prompt": "historical operator prompt",
+            },
+            "items": [
+                "historical-note",
+                "media://private/historical-list-entry",
+                {"safe_item": "historical-kept", "raw_output": "provider output"},
+            ],
+            "path": "/root/private/historical-player-profile.json",
+        }
+        session.commit()
+
     listed_actors = client.get(f"/worlds/{world_id}/player-actors")
     preview = client.post(
         f"/worlds/{world_id}/player-choices/preview",
@@ -2666,7 +3407,7 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "choice_kind": "route",
             "prompt": "Help with festival preparations?",
             "selected_option": "Stay after school.",
-            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
+            "effects": dirty_preview_effects,
             "apply": False,
         },
     )
@@ -2678,8 +3419,32 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "choice_kind": "route",
             "prompt": "Help with festival preparations?",
             "selected_option": "Stay after school.",
-            "effects": {"relationship_updates": [], "faction_updates": [], "offscreen_events": []},
-            "apply": True,
+            "context": {
+                "safe": "visible-choice-context",
+                "storage_uri": "media://private/choice-context",
+                "nested": {
+                    "safe_note": "choice-kept",
+                    "raw_prompt": "choice operator prompt",
+                },
+                "items": [
+                    "choice-note",
+                    "media://private/choice-list-entry",
+                    {"safe_item": "choice-kept", "raw_output": "provider output"},
+                ],
+                "path": "/root/private/choice-context.json",
+            },
+            "effects": {
+                "relationship_updates": [],
+                "faction_updates": [],
+                "offscreen_events": [
+                    {
+                        "title": "Safe offscreen event",
+                        "storage_uri": "media://private/offscreen-event",
+                        "raw_output": "provider output",
+                    },
+                ],
+            },
+            "apply": False,
         },
     )
     other_choice_attempt = client.post(
@@ -2696,6 +3461,21 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
     )
     listed_choices = client.get(f"/worlds/{world_id}/player-choices")
     other_choices = client.get(f"/worlds/{world_id}/player-choices?user_id={other_id}")
+    _authenticate(client, owner_token)
+    admin_preview = client.post(
+        f"/worlds/{world_id}/player-choices/preview",
+        json={
+            "user_id": str(member_id),
+            "player_actor_id": member_actor.json()["id"],
+            "choice_key": "stay-after-school",
+            "choice_kind": "route",
+            "prompt": "Help with festival preparations?",
+            "selected_option": "Stay after school.",
+            "effects": dirty_preview_effects,
+        },
+    )
+    admin_listed_choices = client.get(f"/worlds/{world_id}/player-choices")
+    _authenticate(client, member_token)
     intervention = client.post(
         f"/worlds/{world_id}/interventions",
         json={
@@ -2703,8 +3483,15 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             "intervention_kind": "contact",
             "target_agent_id": str(agent_id),
             "prompt": "Send a short message after school.",
+            "metadata": {
+                "raw_prompt": "operator intervention prompt",
+                "storage_uri": "intervention://private/evidence",
+            },
         },
     )
+    listed_interventions = client.get(f"/worlds/{world_id}/interventions")
+    _authenticate(client, owner_token)
+    admin_listed_interventions = client.get(f"/worlds/{world_id}/interventions")
 
     with Session(engine) as session:
         choice_event = session.scalars(
@@ -2720,23 +3507,94 @@ def test_world_member_can_use_own_player_interaction_records_without_admin_scope
             ),
         ).one()
 
-    assert member_actor.status_code == 200
+    assert persisted_profile_after_bind == expected_member_profile
     assert other_actor_attempt.status_code == 403
     assert listed_actors.status_code == 200
+    assert listed_actors.json()[0]["display_name"] == ""
+    listed_profile = listed_actors.json()[0]["profile"]
+    assert listed_profile == expected_historical_profile
+    listed_profile_text = json.dumps(listed_profile, sort_keys=True)
+    assert "storage_uri" not in listed_profile_text
+    assert "media://" not in listed_profile_text
+    assert "raw_prompt" not in listed_profile_text
+    assert "raw_output" not in listed_profile_text
+    assert "/root/" not in listed_profile_text
     assert [actor["user_id"] for actor in listed_actors.json()] == [str(member_id)]
     assert preview.status_code == 200
-    assert preview.json()["diagnostics"] == [
-        "0 relationship update(s)",
-        "0 faction update(s)",
-        "0 offscreen event(s)",
+    assert preview.json()["diagnostics"] == []
+    assert preview.json()["relationship_updates"] == [
+        {"agent_id": str(agent_id), "affection_delta": 5}
     ]
+    assert preview.json()["faction_updates"] == [
+        {"track_key": "festival", "progress_delta": 7}
+    ]
+    assert preview.json()["offscreen_events"] == [
+        {"title": "Safe preview event", "payload": {"safe": "kept"}}
+    ]
+    preview_text = json.dumps(preview.json(), sort_keys=True)
+    assert "storage_uri" not in preview_text
+    assert "media://" not in preview_text
+    assert "raw_prompt" not in preview_text
+    assert "raw_output" not in preview_text
+    assert "/root/" not in preview_text
+    assert admin_preview.status_code == 200
+    assert admin_preview.json()["diagnostics"] == [
+        "1 relationship update(s)",
+        "1 faction update(s)",
+        "1 offscreen event(s)",
+    ]
+    assert admin_preview.json()["relationship_updates"][0]["raw_prompt"] == "preview prompt"
+    assert admin_preview.json()["faction_updates"][0]["storage_uri"] == "media://private/faction"
+    assert admin_preview.json()["offscreen_events"][0]["raw_output"] == "provider output"
     assert choice.status_code == 201
     assert choice.json()["user_id"] == str(member_id)
+    assert choice.json()["prompt"] == ""
+    assert choice.json()["selected_option"] == "Stay after school."
+    assert choice.json()["applied_event_id"] is None
+    assert choice.json()["context"] == expected_choice_context
+    assert choice.json()["consequence_preview"] == expected_choice_preview
+    choice_text = json.dumps(choice.json(), sort_keys=True)
+    assert "storage_uri" not in choice_text
+    assert "media://" not in choice_text
+    assert "raw_prompt" not in choice_text
+    assert "raw_output" not in choice_text
+    assert "/root/" not in choice_text
     assert other_choice_attempt.status_code == 403
     assert listed_choices.status_code == 200
     assert [item["user_id"] for item in listed_choices.json()] == [str(member_id)]
+    assert listed_choices.json()[0]["prompt"] == ""
+    assert listed_choices.json()[0]["selected_option"] == "Stay after school."
+    assert listed_choices.json()[0]["applied_event_id"] is None
+    assert listed_choices.json()[0]["context"] == expected_choice_context
+    assert listed_choices.json()[0]["consequence_preview"] == expected_choice_preview
     assert other_choices.status_code == 403
+    assert admin_listed_choices.status_code == 200
+    assert admin_listed_choices.json()[0]["prompt"] == "Help with festival preparations?"
+    assert admin_listed_choices.json()[0]["applied_event_id"] == str(choice_event.id)
+    assert admin_listed_choices.json()[0]["context"]["storage_uri"] == (
+        "media://private/choice-context"
+    )
+    assert admin_listed_choices.json()[0]["consequence_preview"]["offscreen_events"][0][
+        "raw_output"
+    ] == "provider output"
     assert intervention.status_code == 201
+    assert intervention.json()["prompt"] == ""
+    assert intervention.json()["choice_id"] is None
+    assert intervention.json()["event_id"] is None
+    assert intervention.json()["metadata"] == {}
+    assert listed_interventions.status_code == 200
+    assert listed_interventions.json()[0]["prompt"] == ""
+    assert listed_interventions.json()[0]["choice_id"] is None
+    assert listed_interventions.json()[0]["event_id"] is None
+    assert listed_interventions.json()[0]["metadata"] == {}
+    assert admin_listed_interventions.status_code == 200
+    assert admin_listed_interventions.json()[0]["prompt"] == "Send a short message after school."
+    assert admin_listed_interventions.json()[0]["choice_id"] is not None
+    assert admin_listed_interventions.json()[0]["event_id"] is not None
+    assert (
+        admin_listed_interventions.json()[0]["metadata"]["raw_prompt"]
+        == "operator intervention prompt"
+    )
     serialized_payloads = f"{choice_event.payload} {intervention_event.payload}"
     assert "Help with festival preparations?" not in serialized_payloads
     assert "Stay after school." not in serialized_payloads
@@ -2769,6 +3627,12 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
     )
 
     assert listed.status_code == 200
+    listed_worldlines = {item["id"]: item for item in listed.json()}
+    assert listed_worldlines[str(primary_id)]["name"] == ""
+    assert listed_worldlines[str(primary_id)]["description"] == "Primary branch stays readable."
+    assert listed_worldlines[str(fork_id)]["name"] == "Fork"
+    assert listed_worldlines[str(fork_id)]["description"] == ""
+    assert [item["metadata"] for item in listed.json()] == [{}, {}]
     assert comparison.status_code == 200
     assert comparison.json() == {
         "base_worldline_id": str(primary_id),
@@ -2789,6 +3653,7 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
     assert "secret" not in serialized
 
     _authenticate(client, owner_token)
+    admin_listed = client.get(f"/worlds/{world_id}/worldlines")
     admin_fork = client.post(
         f"/worlds/{world_id}/worldlines/fork",
         json={
@@ -2796,6 +3661,22 @@ def test_world_member_can_read_safe_worldline_comparison_without_mutation() -> N
             "worldline_key": "admin-fork",
             "name": "Admin Fork",
         },
+    )
+    assert admin_listed.status_code == 200
+    admin_worldlines = {item["id"]: item for item in admin_listed.json()}
+    assert admin_worldlines[str(primary_id)]["name"] == (
+        "Primary raw_prompt: operator worldline"
+    )
+    assert admin_worldlines[str(primary_id)]["description"] == "Primary branch stays readable."
+    assert admin_worldlines[str(fork_id)]["name"] == "Fork"
+    assert admin_worldlines[str(fork_id)]["description"] == (
+        "storage_uri media://private/worldline-description"
+    )
+    assert admin_listed.json()[0]["metadata"]["raw_prompt"] == (
+        "operator-only primary worldline prompt"
+    )
+    assert admin_listed.json()[1]["metadata"]["raw_prompt"] == (
+        "operator-only fork worldline prompt"
     )
     assert admin_fork.status_code == 201
 
@@ -2935,9 +3816,16 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
         platform_admin=True,
     )
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
     world_id = _seed_world(engine, owner_id, "agent-preset-world")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     _seed_provider_profile(engine, profile_key="preset-provider")
+    expected_member_character_profile = {
+        "safe": "public characterization",
+        "nested": {"safe_note": "kept"},
+        "items": ["public-note", {"safe_item": "kept"}],
+    }
 
     _authenticate(client, platform_token)
     preset_response = client.post(
@@ -2966,8 +3854,23 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
         f"/worlds/{world_id}/agents",
         json={
             "agent_key": "narrator",
-            "display_name": "Narrator",
+            "display_name": "Narrator raw_output: /root/private/narrator",
             "preset_id": preset_id,
+            "character_profile": {
+                "safe": "public characterization",
+                "storage_uri": "media://private/agent-profile",
+                "nested": {
+                    "safe_note": "kept",
+                    "raw_prompt": "operator-only profile prompt",
+                },
+                "items": [
+                    "public-note",
+                    "media://private/agent-list-entry",
+                    {"safe_item": "kept", "raw_output": "provider output"},
+                ],
+                "secret_refs": ["runtime/provider/key"],
+                "path": "/root/private/agent-profile.json",
+            },
             "config": {"style": "override", "temperature": 0.2},
         },
     )
@@ -2976,6 +3879,7 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     calendar = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
 
     assert create_agent.status_code == 201
+    assert create_agent.json()["display_name"] == "Narrator raw_output: /root/private/narrator"
     assert create_agent.json()["kind"] == "narrative_agent"
     assert create_agent.json()["source_preset_id"] == preset_id
     assert create_agent.json()["source_preset_version"] == 1
@@ -2985,6 +3889,12 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
     assert create_agent.json()["config"]["style"] == "override"
     assert create_agent.json()["config"]["length"] == "short"
     assert create_agent.json()["config"]["temperature"] == 0.2
+    assert create_agent.json()["character_profile"]["storage_uri"] == (
+        "media://private/agent-profile"
+    )
+    assert create_agent.json()["character_profile"]["nested"]["raw_prompt"] == (
+        "operator-only profile prompt"
+    )
     assert persona.status_code == 200
     assert persona.json()["persona_text"] == "Always narrates in scene."
     assert calendar.status_code == 200
@@ -2998,11 +3908,41 @@ def test_create_agent_from_preset_materializes_persona_calendar_and_provider_map
 
     _authenticate(client, owner_token)
     agents = client.get(f"/worlds/{world_id}/agents")
+    _authenticate(client, member_token)
+    member_agents = client.get(f"/worlds/{world_id}/agents")
 
     assert updated_preset.status_code == 200
     assert updated_preset.json()["version"] == 2
     assert agents.status_code == 200
+    assert agents.json()[0]["display_name"] == "Narrator raw_output: /root/private/narrator"
+    assert agents.json()[0]["source_preset_id"] == preset_id
     assert agents.json()[0]["source_preset_version"] == 1
+    assert agents.json()[0]["provider_profile_id"] == str(
+        _provider_profile_id_by_key(engine, "preset-provider"),
+    )
+    assert agents.json()[0]["config"]["style"] == "override"
+    assert agents.json()[0]["config"]["length"] == "short"
+    assert agents.json()[0]["character_profile"]["storage_uri"] == (
+        "media://private/agent-profile"
+    )
+    assert member_agents.status_code == 200
+    assert member_agents.json()[0]["id"] == agent_id
+    assert member_agents.json()[0]["display_name"] == ""
+    assert member_agents.json()[0]["source_preset_id"] is None
+    assert member_agents.json()[0]["source_preset_version"] is None
+    assert member_agents.json()[0]["provider_profile_id"] is None
+    assert member_agents.json()[0]["config"] == {}
+    assert member_agents.json()[0]["character_profile"] == expected_member_character_profile
+    member_character_profile_text = json.dumps(
+        member_agents.json()[0]["character_profile"],
+        sort_keys=True,
+    )
+    assert "storage_uri" not in member_character_profile_text
+    assert "media://" not in member_character_profile_text
+    assert "raw_prompt" not in member_character_profile_text
+    assert "raw_output" not in member_character_profile_text
+    assert "secret_refs" not in member_character_profile_text
+    assert "/root/" not in member_character_profile_text
 
 
 def test_agent_preset_update_preview_reports_stale_and_current_agents() -> None:
@@ -3284,6 +4224,17 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     agent_id = _seed_agent(engine, world_id, "guide")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    seeded_rule_id = _seed_schedule_rule(engine, world_id, rule_key="daily-prompt")
+    with Session(engine) as session:
+        seeded_rule = session.get(WorldScheduleRule, seeded_rule_id)
+        assert seeded_rule is not None
+        seeded_rule.name = "Daily raw_prompt: operator schedule"
+        seeded_rule.config = {
+            "provider_profile_id": str(uuid.uuid4()),
+            "raw_prompt": "operator schedule instruction",
+            "storage_uri": "schedule://private/rule",
+        }
+        session.commit()
 
     _authenticate(client, member_token)
     member_rules = client.get(f"/worlds/{world_id}/schedule-rules")
@@ -3323,10 +4274,16 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     create_entry = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/calendar",
         json={
-            "title": "Morning scene",
+            "title": "Morning raw_prompt: operator scene",
+            "description": "storage_uri media://private/calendar-evidence",
             "starts_at": "2030-01-01T08:00:00Z",
             "ends_at": "2030-01-01T09:00:00Z",
-            "metadata": {"source": "api-test"},
+            "recurrence_rule": "FREQ=DAILY;X-PATH=/root/private/calendar.ics",
+            "metadata": {
+                "source": "api-test",
+                "raw_prompt": "operator calendar prompt",
+                "storage_uri": "calendar://private/evidence",
+            },
         },
     )
     create_overlapping_entry = client.post(
@@ -3346,6 +4303,9 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
         },
     )
     list_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+    _authenticate(client, member_token)
+    member_entries = client.get(f"/worlds/{world_id}/agents/{agent_id}/calendar")
+    _authenticate(client, owner_token)
     update_entry = client.patch(
         f"/worlds/{world_id}/agents/{agent_id}/calendar/{create_entry.json()['id']}",
         json={"title": "Morning scene updated"},
@@ -3355,6 +4315,9 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     )
 
     assert member_rules.status_code == 200
+    assert member_rules.json()[0]["rule_key"] == "daily-prompt"
+    assert member_rules.json()[0]["name"] == ""
+    assert member_rules.json()[0]["config"] == {}
     assert member_create_rule.status_code == 403
     assert member_preview.status_code == 403
     assert member_conflicts.status_code == 403
@@ -3363,7 +4326,21 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert preview_rule.json()["match_count"] == 1
     assert preview_rule.json()["affected_agent_count"] == 1
     assert preview_rule.json()["matches"][0]["world_time"].startswith("2030-01-01T08:00:00")
+    admin_rules = client.get(f"/worlds/{world_id}/schedule-rules")
+    _authenticate(client, member_token)
+    member_rules_after_create = client.get(f"/worlds/{world_id}/schedule-rules")
+    _authenticate(client, owner_token)
+
     assert create_rule.status_code == 201
+    assert admin_rules.status_code == 200
+    assert admin_rules.json()[0]["name"] == "Daily raw_prompt: operator schedule"
+    assert admin_rules.json()[0]["config"]["raw_prompt"] == "operator schedule instruction"
+    assert admin_rules.json()[0]["config"]["storage_uri"] == "schedule://private/rule"
+    assert member_rules_after_create.status_code == 200
+    assert member_rules_after_create.json()[0]["name"] == ""
+    assert member_rules_after_create.json()[1]["rule_key"] == "weekday"
+    assert member_rules_after_create.json()[1]["name"] == "Weekday Updated"
+    assert member_rules_after_create.json()[1]["config"] == {}
     assert duplicate_rule.status_code == 409
     assert update_rule.status_code == 200
     assert update_rule.json()["name"] == "Weekday Updated"
@@ -3375,7 +4352,19 @@ def test_world_admin_manages_calendar_entries_and_schedule_rules() -> None:
     assert conflicts.json()["conflicts"][0]["conflict_type"] == "calendar_entry_overlap"
     assert create_entry.json()["status"] == "active"
     assert list_entries.status_code == 200
-    assert list_entries.json()[0]["title"] == "Morning scene"
+    assert list_entries.json()[0]["title"] == "Morning raw_prompt: operator scene"
+    assert list_entries.json()[0]["description"] == "storage_uri media://private/calendar-evidence"
+    assert (
+        list_entries.json()[0]["recurrence_rule"]
+        == "FREQ=DAILY;X-PATH=/root/private/calendar.ics"
+    )
+    assert list_entries.json()[0]["metadata"]["raw_prompt"] == "operator calendar prompt"
+    assert member_entries.status_code == 200
+    assert member_entries.json()[0]["title"] == ""
+    assert member_entries.json()[0]["description"] == ""
+    assert member_entries.json()[0]["recurrence_rule"] == ""
+    assert member_entries.json()[0]["metadata"] == {}
+    assert member_entries.json()[1]["title"] == "Overlap scene"
     assert update_entry.status_code == 200
     assert update_entry.json()["title"] == "Morning scene updated"
     assert cancel_entry.status_code == 204
@@ -3386,6 +4375,8 @@ def test_world_admin_manages_agent_memory() -> None:
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
     member_id, member_token = _seed_user(engine, "member@example.test")
     world_id = _seed_world(engine, owner_id, "memory-world")
+    other_world_id = _seed_world(engine, owner_id, "other-memory-world")
+    _, other_worldline_id = _seed_worldlines(engine, other_world_id)
     agent_id = _seed_agent(engine, world_id, "guide")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
@@ -3422,6 +4413,18 @@ def test_world_admin_manages_agent_memory() -> None:
         f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
     )
     list_memory = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
+    bad_worldline_list = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_snapshot = client.get(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot",
+        params={"worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_refresh = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/profile-snapshot/refresh",
+        params={"worldline_id": str(other_worldline_id)},
+    )
     search_memory = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
         json={"query_text": "green tea", "limit": 5},
@@ -3429,6 +4432,14 @@ def test_world_admin_manages_agent_memory() -> None:
     bad_query = client.post(
         f"/worlds/{world_id}/agents/{agent_id}/memory/search",
         json={"query_text": ""},
+    )
+    bad_worldline_search = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/search",
+        json={"query_text": "green tea", "worldline_id": str(other_worldline_id)},
+    )
+    bad_worldline_forget = client.post(
+        f"/worlds/{world_id}/agents/{agent_id}/memory/forget",
+        params={"worldline_id": str(other_worldline_id)},
     )
     forget_memory = client.post(f"/worlds/{world_id}/agents/{agent_id}/memory/forget")
     after_forget = client.get(f"/worlds/{world_id}/agents/{agent_id}/memory")
@@ -3449,6 +4460,16 @@ def test_world_admin_manages_agent_memory() -> None:
     assert search_memory.json()[0]["content"] == "Guide likes green tea"
     assert isinstance(search_memory.json()[0]["score"], float)
     assert bad_query.status_code == 422
+    assert bad_worldline_list.status_code == 422
+    assert bad_worldline_list.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_snapshot.status_code == 422
+    assert bad_worldline_snapshot.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_refresh.status_code == 422
+    assert bad_worldline_refresh.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_search.status_code == 422
+    assert bad_worldline_search.json()["detail"] == "worldline does not exist for world"
+    assert bad_worldline_forget.status_code == 422
+    assert bad_worldline_forget.json()["detail"] == "worldline does not exist for world"
     assert forget_memory.status_code == 200
     assert forget_memory.json()["deleted_count"] == 1
     assert after_forget.json() == []
@@ -3496,6 +4517,16 @@ def test_agent_runs_and_narrative_artifacts_api(
         f"/worlds/{world_id}/agents/{agent_id}/run",
         json={"prompt": "Operator run"},
     )
+    source_calendar_entry_id = uuid.uuid4()
+    source_schedule_rule_id = uuid.uuid4()
+    created_event_id = uuid.uuid4()
+    with Session(engine) as session:
+        run_record = session.get(AgentRuntimeRun, uuid.UUID(run_response.json()["run_id"]))
+        assert run_record is not None
+        run_record.source_calendar_entry_id = source_calendar_entry_id
+        run_record.source_schedule_rule_id = source_schedule_rule_id
+        run_record.created_event_id = created_event_id
+        session.commit()
     list_runs = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
     run_detail = client.get(
         f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
@@ -3504,6 +4535,7 @@ def test_agent_runs_and_narrative_artifacts_api(
     member_run_detail = client.get(
         f"/worlds/{world_id}/agents/{agent_id}/runs/{run_response.json()['run_id']}",
     )
+    member_list_runs_after_run = client.get(f"/worlds/{world_id}/agents/{agent_id}/runs")
     _authenticate(client, owner_token)
     create_artifact = client.post(
         f"/worlds/{world_id}/narrative-artifacts",
@@ -3529,6 +4561,22 @@ def test_agent_runs_and_narrative_artifacts_api(
     assert run_response.json()["diagnostics"]["profile_key"] == "runtime-profile"
     assert list_runs.status_code == 200
     assert list_runs.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert list_runs.json()[0]["prompt_text"] == "Operator run"
+    assert list_runs.json()[0]["response_text"].startswith("Run completed for: Operator run")
+    assert list_runs.json()[0]["provider_profile_id"] is not None
+    assert list_runs.json()[0]["source_calendar_entry_id"] == str(source_calendar_entry_id)
+    assert list_runs.json()[0]["source_schedule_rule_id"] == str(source_schedule_rule_id)
+    assert list_runs.json()[0]["created_event_id"] == str(created_event_id)
+    assert list_runs.json()[0]["diagnostics"]["profile_key"] == "runtime-profile"
+    assert member_list_runs_after_run.status_code == 200
+    assert member_list_runs_after_run.json()[0]["run_id"] == run_response.json()["run_id"]
+    assert member_list_runs_after_run.json()[0]["prompt_text"] == ""
+    assert member_list_runs_after_run.json()[0]["response_text"] is None
+    assert member_list_runs_after_run.json()[0]["provider_profile_id"] is None
+    assert member_list_runs_after_run.json()[0]["source_calendar_entry_id"] is None
+    assert member_list_runs_after_run.json()[0]["source_schedule_rule_id"] is None
+    assert member_list_runs_after_run.json()[0]["created_event_id"] is None
+    assert member_list_runs_after_run.json()[0]["diagnostics"] == {}
     assert run_detail.status_code == 200
     assert run_detail.json()["run"]["trigger_source"] == "manual"
     assert run_detail.json()["provider_profile"]["profile_key"] == "runtime-profile"
@@ -3626,12 +4674,17 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     integrity_after = client.get(f"/worlds/{world_id}/snapshots/integrity")
     replay_after = client.get(f"/worlds/{world_id}/replay/state")
 
+    _authenticate(client, member_token)
+    member_latest_after = client.get(f"/worlds/{world_id}/snapshots/latest")
+
     _authenticate(client, stranger_token)
     hidden_replay = client.get(f"/worlds/{world_id}/replay/state")
     hidden_integrity = client.get(f"/worlds/{world_id}/snapshots/integrity")
 
     assert replay.status_code == 200
     assert replay.json()["clock"]["revision"] == 1
+    assert replay.json()["clock"]["last_event_id"] is None
+    assert replay.json()["clock"]["last_event_sequence"] is None
     assert replay.json()["applied_event_count"] == 1
     assert latest_before.status_code == 200
     assert latest_before.json() is None
@@ -3643,11 +4696,27 @@ def test_replay_and_snapshot_api_reads_state_and_creates_snapshot() -> None:
     assert created.json()["schema_version"] == "world_state.v1"
     assert latest_after.status_code == 200
     assert latest_after.json()["id"] == created.json()["id"]
+    assert latest_after.json()["created_by_event_id"] == created.json()["created_by_event_id"]
+    assert latest_after.json()["created_by_event_id"] is not None
+    assert latest_after.json()["payload_uri"].startswith(f"object://worlds/{world_id}/")
+    assert latest_after.json()["payload_location"] == "object"
+    assert latest_after.json()["metadata"]["storage"] == "local_object"
+    assert member_latest_after.status_code == 200
+    member_snapshot = member_latest_after.json()
+    assert member_snapshot["id"] == created.json()["id"]
+    assert member_snapshot["covers_event_sequence"] == created.json()["covers_event_sequence"]
+    assert member_snapshot["payload"] is None
+    assert member_snapshot["payload_uri"] is None
+    assert member_snapshot["payload_location"] is None
+    assert member_snapshot["created_by_event_id"] is None
+    assert member_snapshot["metadata"] == {}
     assert integrity_after.status_code == 200
     assert integrity_after.json()["status"] == "ok"
     assert integrity_after.json()["latest_snapshot_id"] == created.json()["id"]
     assert integrity_after.json()["event_gap"] == 0
     assert replay_after.json()["source_sequence"] == 2
+    assert replay_after.json()["clock"]["last_event_id"] is not None
+    assert replay_after.json()["clock"]["last_event_sequence"] == 1
     assert hidden_replay.status_code == 404
     assert hidden_integrity.status_code == 404
 
@@ -3876,7 +4945,43 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     conversation_id = _seed_conversation(engine, world_id, "reader-conversation")
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    agent_id = _seed_agent(engine, world_id, "guide")
+    run_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            AgentRuntimeRun(
+                id=run_id,
+                world_id=world_id,
+                agent_id=agent_id,
+                status="succeeded",
+                trigger_source="manual",
+                prompt_text="Operator-only prompt",
+                response_text="Operator-only response",
+                diagnostics={"raw_output": "operator-only"},
+                started_at=now,
+                finished_at=now,
+            ),
+        )
+        session.commit()
     summary_id = _seed_narrative_artifact(
+        engine,
+        world_id,
+        "Conversation raw_prompt summary",
+        "storage_uri media://private/artifact body",
+        artifact_kind="conversation_summary",
+        source_conversation_id=conversation_id,
+        source_run_id=run_id,
+        artifact_metadata={
+            "continuity": {"status": "post_canon", "source": "operator"},
+            "raw_prompt": "operator-only prompt",
+            "storage_uri": "media://private/artifact",
+        },
+    )
+    _publish_narrative_artifact(
+        engine, world_id, summary_id, owner_id, publication_gate={"status": "warning"}
+    )
+    safe_summary_id = _seed_narrative_artifact(
         engine,
         world_id,
         "Conversation summary",
@@ -3884,7 +4989,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         artifact_kind="conversation_summary",
         source_conversation_id=conversation_id,
     )
-    _publish_narrative_artifact(engine, world_id, summary_id, owner_id)
+    _publish_narrative_artifact(engine, world_id, safe_summary_id, owner_id)
     draft_chapter_id = _seed_narrative_artifact(
         engine,
         world_id,
@@ -3907,7 +5012,7 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         params={
             "artifact_kind": "conversation_summary",
             "source_conversation_id": str(conversation_id),
-            "q": "summary body",
+            "q": "storage_uri",
             "source_kind": "conversation",
             "order_by": "published_at",
             "limit": 1,
@@ -3918,12 +5023,14 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
         params={"q": "chapter", "source_kind": "conversation"},
     )
     detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
+    safe_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{safe_summary_id}")
 
     _authenticate(client, owner_token)
     owner_list = client.get(
         f"/worlds/{world_id}/narrative-artifacts",
         params={"source_conversation_id": str(conversation_id), "publication_status": "draft"},
     )
+    owner_detail = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
 
     _authenticate(client, stranger_token)
     hidden = client.get(f"/worlds/{world_id}/narrative-artifacts/{summary_id}")
@@ -3932,17 +5039,46 @@ def test_narrative_reader_api_supports_filters_and_detail_for_world_members() ->
     assert len(filtered.json()) == 1
     assert filtered.json()[0]["artifact_kind"] == "conversation_summary"
     assert filtered.json()[0]["source_conversation_id"] == str(conversation_id)
+    assert filtered.json()[0]["title"] == ""
+    assert filtered.json()[0]["content"] == ""
+    assert filtered.json()[0]["source_run_id"] is None
+    assert filtered.json()[0]["metadata"] == {}
+    assert filtered.json()[0]["continuity_metadata"] == {}
+    assert filtered.json()[0]["continuity_status"] is None
+    assert filtered.json()[0]["publication"]["source_draft_id"] is None
+    assert filtered.json()[0]["publication"]["metadata"] == {}
+    assert filtered.json()[0]["publication"]["published_by_user_id"] is None
+    assert filtered.json()[0]["publication"]["publication_gate"] is None
     assert hidden_draft_search.status_code == 200
     assert hidden_draft_search.json() == []
     assert detail.status_code == 200
     assert detail.json()["id"] == str(summary_id)
     assert detail.json()["source_conversation_id"] == str(conversation_id)
+    assert detail.json()["title"] == ""
+    assert detail.json()["content"] == ""
+    assert detail.json()["source_run_id"] is None
+    assert detail.json()["metadata"] == {}
+    assert detail.json()["publication"]["metadata"] == {}
+    assert detail.json()["publication"]["published_by_user_id"] is None
     assert owner_list.status_code == 200
     assert [item["artifact_kind"] for item in owner_list.json()] == [
         "chapter_draft",
     ]
     assert owner_list.json()[0]["id"] == str(draft_chapter_id)
     assert owner_list.json()[0]["publication"] is None
+    assert owner_detail.status_code == 200
+    assert owner_detail.json()["title"] == "Conversation raw_prompt summary"
+    assert owner_detail.json()["content"] == "storage_uri media://private/artifact body"
+    assert owner_detail.json()["source_run_id"] == str(run_id)
+    assert owner_detail.json()["metadata"]["raw_prompt"] == "operator-only prompt"
+    assert owner_detail.json()["continuity_metadata"]["source"] == "operator"
+    assert owner_detail.json()["continuity_status"] == "post_canon"
+    assert owner_detail.json()["publication"]["source_draft_id"] == str(summary_id)
+    assert owner_detail.json()["publication"]["published_by_user_id"] == str(owner_id)
+    assert owner_detail.json()["publication"]["publication_gate"]["status"] == "warning"
+    assert safe_detail.status_code == 200
+    assert safe_detail.json()["title"] == "Conversation summary"
+    assert safe_detail.json()["content"] == "Summary body"
     assert hidden.status_code == 404
 
 
@@ -4276,6 +5412,7 @@ def _seed_agent(
     source_preset_id: uuid.UUID | None = None,
     source_preset_version: int | None = None,
     provider_profile_id: uuid.UUID | None = None,
+    display_name: str | None = None,
 ) -> uuid.UUID:
     agent_id = uuid.uuid4()
     with Session(engine) as session:
@@ -4287,7 +5424,7 @@ def _seed_agent(
                 source_preset_id=source_preset_id,
                 source_preset_version=source_preset_version,
                 agent_key=agent_key,
-                display_name=agent_key,
+                display_name=display_name or agent_key,
                 kind="role_agent",
                 config=(
                     {}
@@ -4321,15 +5458,24 @@ def _add_membership(
 def _seed_worldlines(engine: Engine, world_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
     with Session(engine) as session:
         primary = ensure_primary_worldline(session, world_id)
+        primary.name = "Primary raw_prompt: operator worldline"
+        primary.description = "Primary branch stays readable."
+        primary.metadata_json = {
+            "raw_prompt": "operator-only primary worldline prompt",
+            "storage_uri": "media://private/worldline-primary",
+        }
         fork = Worldline(
             world_id=world_id,
             worldline_key=f"fork-{uuid.uuid4().hex[:8]}",
             name="Fork",
-            description="Forked test worldline",
+            description="storage_uri media://private/worldline-description",
             parent_worldline_id=primary.id,
             status="active",
             created_by_actor_ref="test:api-worlds",
-            metadata_json={},
+            metadata_json={
+                "raw_prompt": "operator-only fork worldline prompt",
+                "provider_profile_id": str(uuid.uuid4()),
+            },
         )
         session.add(fork)
         session.commit()
@@ -4402,14 +5548,19 @@ def _seed_agent_preset(
     return preset_id
 
 
-def _seed_schedule_rule(engine: Engine, world_id: uuid.UUID) -> uuid.UUID:
+def _seed_schedule_rule(
+    engine: Engine,
+    world_id: uuid.UUID,
+    *,
+    rule_key: str = "weekday",
+) -> uuid.UUID:
     rule_id = uuid.uuid4()
     with Session(engine) as session:
         session.add(
             WorldScheduleRule(
                 id=rule_id,
                 world_id=world_id,
-                rule_key="weekday",
+                rule_key=rule_key,
                 name="Weekday",
                 kind="weekday",
                 config={"window": "day"},
@@ -4467,6 +5618,7 @@ def _seed_narrative_artifact(
     *,
     artifact_kind: str,
     source_conversation_id: uuid.UUID | None = None,
+    source_run_id: uuid.UUID | None = None,
     artifact_metadata: dict[str, object] | None = None,
 ) -> uuid.UUID:
     artifact_id = uuid.uuid4()
@@ -4476,7 +5628,7 @@ def _seed_narrative_artifact(
                 id=artifact_id,
                 world_id=world_id,
                 agent_id=None,
-                source_run_id=None,
+                source_run_id=source_run_id,
                 source_conversation_id=source_conversation_id,
                 title=title,
                 content=content,

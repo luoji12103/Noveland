@@ -76,6 +76,62 @@ describe("invocation ledger admin client", () => {
       expect((call[1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
     }
   });
+
+  it("encodes reserved characters in invocation ledger route segments", async () => {
+    document.cookie = "noveland_csrf=csrf-token; Path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ invocations: [invocation] }))
+      .mockResolvedValueOnce(jsonResponse(invocation))
+      .mockResolvedValueOnce(jsonResponse(promptSnapshot))
+      .mockResolvedValueOnce(jsonResponse([tag]))
+      .mockResolvedValueOnce(jsonResponse(tag))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ ...invocation, redaction_status: "redacted" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const worldId = "world/ledger?admin=true#frag";
+    const invocationId = "invocation/raw?prompt=true#frag";
+    const tagId = "tag/redact?x=1#frag";
+
+    await listInvocations(worldId, {
+      contains_text: "raw/prompt?x=1#frag",
+      tag: ["audit/path?x=1#frag"],
+      include_hidden: true,
+    });
+    await getInvocation(worldId, invocationId);
+    await getPromptSnapshot(worldId, invocationId);
+    await listInvocationTags(worldId, invocationId);
+    await createInvocationTag(worldId, invocationId, {
+      tag_type: "audit",
+      tag_key: "path",
+      tag_value: "encoded",
+    });
+    await deleteInvocationTag(worldId, invocationId, tagId);
+    await redactInvocation(worldId, invocationId, {
+      redaction_status: "checksum_only",
+      mode: "checksum_only",
+      reason: "reserved chars",
+    });
+
+    const encodedWorld = encodeURIComponent(worldId);
+    const encodedInvocation = encodeURIComponent(invocationId);
+    const encodedTag = encodeURIComponent(tagId);
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      `/api/worlds/${encodedWorld}/model-invocations?contains_text=raw%2Fprompt%3Fx%3D1%23frag&tag=audit%2Fpath%3Fx%3D1%23frag&include_hidden=true`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}/prompt-snapshot`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}/tags`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}/tags`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}/tags/${encodedTag}`,
+      `/api/worlds/${encodedWorld}/model-invocations/${encodedInvocation}/redact`,
+    ]);
+    for (const call of fetchMock.mock.calls.slice(4)) {
+      expect((call[1].headers as Headers).get("X-CSRF-Token")).toBe("csrf-token");
+    }
+  });
+
 });
 
 const invocation = {

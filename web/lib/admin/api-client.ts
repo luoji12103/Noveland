@@ -1,5 +1,6 @@
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 
 export class AdminClientError extends Error {
   constructor(
@@ -60,12 +61,12 @@ async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return normalizeBackendErrorDetail(body.detail, "Admin request failed.");
     }
     if (body.detail !== null && typeof body.detail === "object" && !Array.isArray(body.detail)) {
       const detail = body.detail as Record<string, unknown>;
       if (typeof detail.message === "string") {
-        return detail.message;
+        return normalizeBackendErrorDetail(detail.message, "Admin request failed.");
       }
     }
   } catch {

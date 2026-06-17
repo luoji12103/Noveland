@@ -5,9 +5,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-vi.mock("@/lib/realtime", () => ({
-  subscribeToEventStream: vi.fn(() => undefined),
-}));
+vi.mock("@/lib/realtime", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/realtime")>("@/lib/realtime");
+  return {
+    ...actual,
+    subscribeToEventStream: vi.fn(() => undefined),
+  };
+});
 
 vi.mock("@/lib/worlds/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/worlds/client")>(
@@ -18,6 +22,9 @@ vi.mock("@/lib/worlds/client", async () => {
     getCalendarConflicts: vi.fn(),
     getDailyLifePreview: vi.fn(),
     generateDailyLifeCandidates: vi.fn(),
+    importWorldComposition: vi.fn(),
+    updateWorld: vi.fn(),
+    upsertWorldBible: vi.fn(),
     compareWorldlines: vi.fn(),
     createBetaChecklist: vi.fn(),
     createEndingCandidate: vi.fn(),
@@ -34,6 +41,7 @@ vi.mock("@/lib/worlds/client", async () => {
 });
 
 import { WorldOverview } from "@/features/worlds/world-overview";
+import { subscribeToEventStream } from "@/lib/realtime";
 import {
   compareWorldlines,
   createBetaChecklist,
@@ -44,6 +52,9 @@ import {
   getCalendarConflicts,
   getDailyLifePreview,
   generateDailyLifeCandidates,
+  importWorldComposition,
+  updateWorld,
+  upsertWorldBible,
   listOffscreenEvents,
   listWorldEvents,
   previewScheduleRule,
@@ -58,6 +69,152 @@ describe("WorldOverview", () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
+
+  it("redacts sensitive world overview JSON and submit payloads", async () => {
+    const dirtyData: WorldWorkspaceData = {
+      ...workspaceData,
+      selectedWorld: {
+        ...workspaceData.selectedWorld!,
+        rules_config: { safeRule: true, rawOutput: "rules output" },
+        memory_plugin_config: {
+          safeMemory: true,
+          clientSecret: "sk-world-secret",
+          nested: { storageUri: "media://world-secret" },
+        },
+        world_rules_plugin_config: {
+          safeRules: true,
+          bearerToken: "Bearer world-token",
+          promptSnapshotId: "snapshot-world-rules",
+        },
+      },
+      worldBible: {
+        id: "world-bible-1",
+        world_id: "world-1",
+        source_material: "Safe source",
+        canon_timeline: [{ year: 2030, event: "festival", rawPrompt: "system prompt" }],
+        setting_rules: { genre: "school", filePath: "/tmp/world-bible.json" },
+        forbidden_changes: [{ rule: "no retcon", storageUri: "media://forbidden-secret" }],
+        sequel_boundaries: { route: "after ending", promptSnapshotId: "snapshot-bible" },
+        continuity_config: { status: "post_canon", rawOutput: "model output" },
+        continuity_status: "post_canon",
+        metadata: { safeMeta: true, bytes: "YWJjZGVmZ2hpamtsbW5vcA==" },
+        created_at: "2026-05-05T00:00:00.000Z",
+        updated_at: "2026-05-05T00:00:00.000Z",
+      },
+      releaseProfile: {
+        ...workspaceData.releaseProfile!,
+        branch_policy: { branch_review: true, storageUri: "media://release-secret" },
+        backup_policy: { snapshot_before_beta: true, rawPrompt: "backup prompt" },
+        content_review_policy: { continuity_review_required: true, filePath: "/tmp/release.json" },
+        player_permission_policy: { invite_only: true, bearerToken: "Bearer release-token" },
+        worldline_policy: { forks_allowed: true, promptSnapshotId: "snapshot-release" },
+        checklist: { sample_world_required: true, rawOutput: "checklist output" },
+        metadata: { safeRelease: true, clientSecret: "sk-release-secret" },
+      },
+      worldEventAudit: [
+        {
+          ...eventRow("event-dirty", 9, "agent.run_failed"),
+          payload: { safe: "visible", rawPrompt: "event prompt", storageUri: "media://event-secret" },
+        },
+      ],
+    };
+    vi.mocked(updateWorld).mockResolvedValue(dirtyData.selectedWorld!);
+    vi.mocked(upsertWorldBible).mockResolvedValue(dirtyData.worldBible!);
+    vi.mocked(upsertReleaseProfile).mockResolvedValue(dirtyData.releaseProfile!);
+    vi.mocked(validateWorldComposition).mockResolvedValue({
+      valid: true,
+      blocking_issue_count: 0,
+      warning_issue_count: 0,
+      issues: [],
+    });
+    vi.mocked(importWorldComposition).mockResolvedValue(dirtyData.selectedWorld!);
+
+    render(<WorldOverview data={dirtyData} />);
+
+    expect(screen.getByDisplayValue(/safeMemory/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/safeRules/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/festival/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/safeRelease/)).toBeInTheDocument();
+    expect(document.body.textContent).toContain("safe");
+    expect(document.body.textContent).not.toMatch(/rawPrompt|media:\/\/event-secret/i);
+    expect(
+      screen.queryAllByDisplayValue(
+        /clientSecret|sk-world-secret|storageUri|media:\/\/world-secret|bearerToken|Bearer world-token|promptSnapshotId|snapshot-world-rules|rawPrompt|filePath|\/tmp\/world-bible|media:\/\/forbidden-secret|snapshot-bible|rawOutput|bytes|YWJjZGVmZ2hpamtsbW5vcA|media:\/\/release-secret|Bearer release-token|snapshot-release|sk-release-secret/i,
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.submit(screen.getByRole("button", { name: "Save world" }).closest("form") as HTMLFormElement);
+    await waitFor(() => {
+      expect(updateWorld).toHaveBeenCalledWith(
+        "world-1",
+        expect.objectContaining({
+          memory_plugin_config: { safeMemory: true, nested: {} },
+          world_rules_plugin_config: { safeRules: true },
+        }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(updateWorld).mock.calls[0][1])).not.toMatch(
+      /clientSecret|sk-world-secret|storageUri|media:\/\/world-secret|bearerToken|Bearer world-token|promptSnapshotId/i,
+    );
+
+    fireEvent.submit(screen.getByRole("button", { name: "Save world bible" }).closest("form") as HTMLFormElement);
+    await waitFor(() => {
+      expect(upsertWorldBible).toHaveBeenCalledWith(
+        "world-1",
+        expect.objectContaining({
+          canon_timeline: [expect.objectContaining({ year: 2030, event: "festival" })],
+          setting_rules: { genre: "school" },
+          metadata: { safeMeta: true },
+        }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(upsertWorldBible).mock.calls[0][1])).not.toMatch(
+      /rawPrompt|filePath|\/tmp\/world-bible|storageUri|media:\/\/forbidden-secret|promptSnapshotId|snapshot-bible|rawOutput|bytes|YWJjZGVmZ2hpamtsbW5vcA/i,
+    );
+
+    fireEvent.submit(formForHeading("Release profile"));
+    await waitFor(() => {
+      expect(upsertReleaseProfile).toHaveBeenCalledWith(
+        "world-1",
+        expect.objectContaining({
+          branch_policy: { branch_review: true },
+          backup_policy: { snapshot_before_beta: true },
+          metadata: { safeRelease: true },
+        }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(upsertReleaseProfile).mock.calls[0][1])).not.toMatch(
+      /storageUri|media:\/\/release-secret|rawPrompt|filePath|\/tmp\/release|bearerToken|Bearer release-token|promptSnapshotId|snapshot-release|rawOutput|clientSecret|sk-release-secret/i,
+    );
+
+    const validateForm = screen.getByRole("button", { name: "Validate composition" }).closest("form") as HTMLFormElement;
+    setFormValue(validateForm, "slug", "validated-world");
+    setFormValue(validateForm, "name", "Validated World");
+    setFormValue(validateForm, "rules_config", JSON.stringify({ safeRule: true, storageUri: "media://validate-secret" }));
+    setFormValue(validateForm, "composition", JSON.stringify(compositionExport));
+    fireEvent.submit(validateForm);
+    await waitFor(() => {
+      expect(validateWorldComposition).toHaveBeenCalledWith(
+        expect.objectContaining({ rules_config: { safeRule: true } }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(validateWorldComposition).mock.calls[0][0])).not.toMatch(
+      /storageUri|media:\/\/validate-secret/i,
+    );
+
+    const importForm = screen.getByRole("button", { name: "Import as new world" }).closest("form") as HTMLFormElement;
+    setFormValue(importForm, "slug", "imported-world");
+    setFormValue(importForm, "name", "Imported World");
+    setFormValue(importForm, "rules_config", JSON.stringify({ safeImport: true, rawPrompt: "import prompt" }));
+    setFormValue(importForm, "composition", JSON.stringify(compositionExport));
+    fireEvent.submit(importForm);
+    await waitFor(() => {
+      expect(importWorldComposition).toHaveBeenCalledWith(
+        expect.objectContaining({ rules_config: { safeImport: true } }),
+      );
+    });
+    expect(JSON.stringify(vi.mocked(importWorldComposition).mock.calls[0][0])).not.toMatch(/rawPrompt|import prompt/i);
+  }, 10000);
 
   it("renders and filters world event audit rows for world admins", async () => {
     vi.mocked(listWorldEvents).mockResolvedValue([eventRow("event-2", 2, "agent.run_failed")]);
@@ -320,6 +477,52 @@ describe("WorldOverview", () => {
       }),
     );
   }, 40000);
+
+  it("encodes workspace shortcut links for reserved world identifiers", () => {
+    render(
+      <WorldOverview
+        data={{
+          ...workspaceData,
+          selectedWorld: { ...workspaceData.selectedWorld!, id: RESERVED_WORLD_ID },
+        }}
+      />,
+    );
+
+    const worldPath = `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}`;
+
+    expect(screen.getByRole("link", { name: "Build agents" })).toHaveAttribute(
+      "href",
+      `${worldPath}/agents`,
+    );
+    expect(screen.getByRole("link", { name: "Open conversations" })).toHaveAttribute(
+      "href",
+      `${worldPath}/conversations`,
+    );
+    expect(screen.getByRole("link", { name: "Narrative artifacts" })).toHaveAttribute(
+      "href",
+      `${worldPath}/narrative`,
+    );
+    expect(screen.getByRole("link", { name: "Reader" })).toHaveAttribute(
+      "href",
+      `${worldPath}/reader`,
+    );
+  });
+
+
+  it("encodes world EventSource paths for reserved world identifiers", () => {
+    render(
+      <WorldOverview
+        data={{
+          ...workspaceData,
+          selectedWorld: { ...workspaceData.selectedWorld!, id: RESERVED_WORLD_ID },
+        }}
+      />,
+    );
+
+    expect(vi.mocked(subscribeToEventStream).mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/stream`,
+    );
+  });
 
   it("submits V2 beta, release, route, ending, and worldline form contracts", async () => {
     vi.mocked(forkWorldline).mockResolvedValue(undefined as never);
@@ -625,6 +828,8 @@ const compositionExport = {
   schedule_rules: [],
   preset_references: [],
 };
+
+const RESERVED_WORLD_ID = "world/overview?mode=shortcuts#frag";
 
 function eventRow(id: string, sequence: number, eventName: string): WorldEventAuditEntry {
   return {

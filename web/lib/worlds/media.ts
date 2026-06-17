@@ -1,6 +1,7 @@
 import { AdminClientError, adminRequest } from "@/lib/admin/api-client";
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 
 export type MediaAssetKind = "image" | "audio" | "video" | "document" | "other";
 export type MediaAssetStatus = "registered" | "available" | "failed" | "deleted";
@@ -352,11 +353,47 @@ export const mediaJobStatusOptions: MediaJobStatus[] = [
   "cancelled",
 ];
 
+function worldPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}`;
+}
+
+function mediaPath(worldId: string): string {
+  return `${worldPath(worldId)}/media`;
+}
+
+function mediaAssetsPath(worldId: string): string {
+  return `${mediaPath(worldId)}/assets`;
+}
+
+function mediaAssetPath(worldId: string, assetId: string): string {
+  return `${mediaAssetsPath(worldId)}/${encodeURIComponent(assetId)}`;
+}
+
+function mediaAssetObjectsPath(worldId: string, assetId: string): string {
+  return `${mediaAssetPath(worldId, assetId)}/objects`;
+}
+
+function mediaAssetReferencesPath(worldId: string, assetId: string): string {
+  return `${mediaAssetPath(worldId, assetId)}/references`;
+}
+
+function mediaReferencesPath(worldId: string): string {
+  return `${mediaPath(worldId)}/references`;
+}
+
+function mediaJobsPath(worldId: string): string {
+  return `${mediaPath(worldId)}/jobs`;
+}
+
+function mediaJobPath(worldId: string, jobId: string): string {
+  return `${mediaJobsPath(worldId)}/${encodeURIComponent(jobId)}`;
+}
+
 export function listMediaAssets(
   worldId: string,
   filters: MediaAssetFilters = {},
 ): Promise<MediaAsset[]> {
-  return adminRequest<MediaAsset[]>(`/api/worlds/${worldId}/media/assets${query(filters)}`, {
+  return adminRequest<MediaAsset[]>(`${mediaAssetsPath(worldId)}${query(filters)}`, {
     method: "GET",
   });
 }
@@ -366,7 +403,7 @@ export function updateMediaAsset(
   assetId: string,
   input: MediaAssetUpdateInput,
 ): Promise<MediaAsset> {
-  return adminRequest<MediaAsset>(`/api/worlds/${worldId}/media/assets/${assetId}`, {
+  return adminRequest<MediaAsset>(mediaAssetPath(worldId, assetId), {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -374,7 +411,7 @@ export function updateMediaAsset(
 }
 
 export function listMediaObjects(worldId: string, assetId: string): Promise<MediaObject[]> {
-  return adminRequest<MediaObject[]>(`/api/worlds/${worldId}/media/assets/${assetId}/objects`, {
+  return adminRequest<MediaObject[]>(mediaAssetObjectsPath(worldId, assetId), {
     method: "GET",
   });
 }
@@ -383,36 +420,35 @@ export function listMediaAssetReferences(
   worldId: string,
   assetId: string,
 ): Promise<MediaAssetReferences> {
-  return adminRequest<MediaAssetReferences>(
-    `/api/worlds/${worldId}/media/assets/${assetId}/references`,
-    { method: "GET" },
-  );
+  return adminRequest<MediaAssetReferences>(mediaAssetReferencesPath(worldId, assetId), {
+    method: "GET",
+  });
 }
 
 export function listMediaReferences(
   worldId: string,
   filters: MediaReferenceFilters = {},
 ): Promise<MediaReference[]> {
-  return adminRequest<MediaReference[]>(`/api/worlds/${worldId}/media/references${query(filters)}`, {
+  return adminRequest<MediaReference[]>(`${mediaReferencesPath(worldId)}${query(filters)}`, {
     method: "GET",
   });
 }
 
 export function listMediaJobs(worldId: string, filters: MediaJobFilters = {}): Promise<MediaJob[]> {
-  return adminRequest<MediaJob[]>(`/api/worlds/${worldId}/media/jobs${query(filters)}`, {
+  return adminRequest<MediaJob[]>(`${mediaJobsPath(worldId)}${query(filters)}`, {
     method: "GET",
   });
 }
 
 export function cancelMediaJob(worldId: string, jobId: string): Promise<MediaJob> {
-  return adminRequest<MediaJob>(`/api/worlds/${worldId}/media/jobs/${jobId}/cancel`, {
+  return adminRequest<MediaJob>(`${mediaJobPath(worldId, jobId)}/cancel`, {
     method: "POST",
     csrf: true,
   });
 }
 
 export function retryMediaJob(worldId: string, jobId: string): Promise<MediaJob> {
-  return adminRequest<MediaJob>(`/api/worlds/${worldId}/media/jobs/${jobId}/retry`, {
+  return adminRequest<MediaJob>(`${mediaJobPath(worldId, jobId)}/retry`, {
     method: "POST",
     csrf: true,
   });
@@ -432,7 +468,7 @@ export async function uploadMediaAsset(
   appendFormValue(formData, "description", input.description);
   formData.set("metadata_json", JSON.stringify(input.metadata ?? {}));
 
-  const response = await fetch(`/api/worlds/${worldId}/media/assets/upload`, {
+  const response = await fetch(`${mediaAssetsPath(worldId)}/upload`, {
     method: "POST",
     headers: new Headers([[CSRF_HEADER_NAME, await csrfToken()]]),
     credentials: "include",
@@ -447,17 +483,20 @@ export async function uploadMediaAsset(
 }
 
 export function mediaObjectDownloadPath(worldId: string, objectId: string): string {
-  return `/api/worlds/${worldId}/media/objects/${objectId}/download`;
+  return `${mediaPath(worldId)}/objects/${encodeURIComponent(objectId)}/download`;
 }
 
-export function readerMediaObjectDownloadPath(downloadUrl: string): string {
-  if (downloadUrl.startsWith("/api/worlds/")) {
-    return downloadUrl;
+const UUID_PATH_SEGMENT = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+const READER_MEDIA_DOWNLOAD_PATH_PATTERN = new RegExp(
+  `^/api/worlds/${UUID_PATH_SEGMENT}/reader/media/worldlines/${UUID_PATH_SEGMENT}/objects/${UUID_PATH_SEGMENT}/download$`,
+);
+
+export function readerMediaObjectDownloadPath(downloadUrl: string): string | null {
+  const path = downloadUrl.startsWith("/worlds/") ? `/api${downloadUrl}` : downloadUrl;
+  if (READER_MEDIA_DOWNLOAD_PATH_PATTERN.test(path)) {
+    return path;
   }
-  if (downloadUrl.startsWith("/worlds/")) {
-    return `/api${downloadUrl}`;
-  }
-  return "";
+  return null;
 }
 
 function query(filters: Record<string, unknown>): string {
@@ -489,7 +528,7 @@ async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return normalizeBackendErrorDetail(body.detail, "Media upload failed.");
     }
   } catch {
     return null;

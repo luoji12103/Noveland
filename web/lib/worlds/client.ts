@@ -1,5 +1,6 @@
 import { readCookie, requestCsrf } from "@/lib/auth/client";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/lib/auth/types";
+import { normalizeBackendErrorDetail } from "@/lib/safe-error-detail";
 import type {
   Agent,
   AgentCreateInput,
@@ -226,7 +227,7 @@ export function createWorld(input: WorldCreateInput): Promise<World> {
 }
 
 export function updateWorld(worldId: string, input: WorldUpdateInput): Promise<World> {
-  return worldRequest<World>(`/api/worlds/${worldId}`, {
+  return worldRequest<World>(worldApiPath(worldId), {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -234,24 +235,24 @@ export function updateWorld(worldId: string, input: WorldUpdateInput): Promise<W
 }
 
 export function deactivateWorld(worldId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}`, { method: "DELETE", csrf: true });
+  return worldRequest<void>(worldApiPath(worldId), { method: "DELETE", csrf: true });
 }
 
 export function exportWorldComposition(worldId: string): Promise<WorldCompositionExport> {
-  return worldRequest<WorldCompositionExport>(`/api/worlds/${worldId}/composition-export`, {
+  return worldRequest<WorldCompositionExport>(`${worldApiPath(worldId)}/composition-export`, {
     method: "GET",
   });
 }
 
 export function getWorldBible(worldId: string): Promise<WorldBible | null> {
-  return worldRequest<WorldBible | null>(`/api/worlds/${worldId}/bible`, { method: "GET" });
+  return worldRequest<WorldBible | null>(`${worldApiPath(worldId)}/bible`, { method: "GET" });
 }
 
 export function upsertWorldBible(
   worldId: string,
   input: WorldBibleInput,
 ): Promise<WorldBible> {
-  return worldRequest<WorldBible>(`/api/worlds/${worldId}/bible`, {
+  return worldRequest<WorldBible>(`${worldApiPath(worldId)}/bible`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -259,11 +260,11 @@ export function upsertWorldBible(
 }
 
 export function listWorldlines(worldId: string): Promise<Worldline[]> {
-  return worldRequest<Worldline[]>(`/api/worlds/${worldId}/worldlines`, { method: "GET" });
+  return worldRequest<Worldline[]>(`${worldApiPath(worldId)}/worldlines`, { method: "GET" });
 }
 
 export function forkWorldline(worldId: string, input: WorldlineForkInput): Promise<Worldline> {
-  return worldRequest<Worldline>(`/api/worlds/${worldId}/worldlines/fork`, {
+  return worldRequest<Worldline>(`${worldApiPath(worldId)}/worldlines/fork`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -276,7 +277,7 @@ export function compareWorldlines(
   compareWorldlineId: string,
 ): Promise<WorldlineComparison> {
   return worldRequest<WorldlineComparison>(
-    `/api/worlds/${worldId}/worldlines/${baseWorldlineId}/compare/${compareWorldlineId}`,
+    `${worldApiPath(worldId)}/worldlines/${pathSegment(baseWorldlineId)}/compare/${pathSegment(compareWorldlineId)}`,
     { method: "GET" },
   );
 }
@@ -285,13 +286,13 @@ export function listGMAgendas(
   worldId: string,
   filters: WorldlineScopedFilters = {},
 ): Promise<GMAgenda[]> {
-  return worldRequest<GMAgenda[]>(`/api/worlds/${worldId}/gm/agendas${worldlineSuffix(filters)}`, {
+  return worldRequest<GMAgenda[]>(`${worldApiPath(worldId)}/gm/agendas${worldlineSuffix(filters)}`, {
     method: "GET",
   });
 }
 
 export function createGMAgenda(worldId: string, input: GMAgendaCreateInput): Promise<GMAgenda> {
-  return worldRequest<GMAgenda>(`/api/worlds/${worldId}/gm/agendas`, {
+  return worldRequest<GMAgenda>(`${worldApiPath(worldId)}/gm/agendas`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -303,7 +304,7 @@ export function updateGMAgenda(
   agendaId: string,
   input: GMAgendaUpdateInput,
 ): Promise<GMAgenda> {
-  return worldRequest<GMAgenda>(`/api/worlds/${worldId}/gm/agendas/${agendaId}`, {
+  return worldRequest<GMAgenda>(`${worldApiPath(worldId)}/gm/agendas/${pathSegment(agendaId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -321,7 +322,7 @@ export function listGMProposals(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<GMEventProposal[]>(
-    `/api/worlds/${worldId}/gm/proposals${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/gm/proposals${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -330,7 +331,7 @@ export function createGMProposal(
   worldId: string,
   input: GMProposalCreateInput,
 ): Promise<GMEventProposal> {
-  return worldRequest<GMEventProposal>(`/api/worlds/${worldId}/gm/proposals`, {
+  return worldRequest<GMEventProposal>(`${worldApiPath(worldId)}/gm/proposals`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -343,7 +344,7 @@ export function reviewGMProposal(
   input: GMProposalReviewInput,
 ): Promise<GMEventProposal> {
   return worldRequest<GMEventProposal>(
-    `/api/worlds/${worldId}/gm/proposals/${proposalId}/review`,
+    `${worldApiPath(worldId)}/gm/proposals/${pathSegment(proposalId)}/review`,
     {
       method: "POST",
       body: input,
@@ -356,7 +357,7 @@ export function planGMMacroEvents(
   worldId: string,
   input: GMMacroPlanInput = {},
 ): Promise<GMMacroPlan> {
-  return worldRequest<GMMacroPlan>(`/api/worlds/${worldId}/gm/macro-plan`, {
+  return worldRequest<GMMacroPlan>(`${worldApiPath(worldId)}/gm/macro-plan`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -368,7 +369,7 @@ export function draftLowRiskGMProposal(
   proposalId: string,
 ): Promise<SceneBeatDraft | DailyEpisodeDraft> {
   return worldRequest<SceneBeatDraft | DailyEpisodeDraft>(
-    `/api/worlds/${worldId}/gm/proposals/${proposalId}/draft-low-risk`,
+    `${worldApiPath(worldId)}/gm/proposals/${pathSegment(proposalId)}/draft-low-risk`,
     {
       method: "POST",
       csrf: true,
@@ -377,7 +378,7 @@ export function draftLowRiskGMProposal(
 }
 
 export function listResolutionRules(worldId: string): Promise<EventResolutionRule[]> {
-  return worldRequest<EventResolutionRule[]>(`/api/worlds/${worldId}/resolution-rules`, {
+  return worldRequest<EventResolutionRule[]>(`${worldApiPath(worldId)}/resolution-rules`, {
     method: "GET",
   });
 }
@@ -386,7 +387,7 @@ export function createResolutionRule(
   worldId: string,
   input: EventResolutionRuleCreateInput,
 ): Promise<EventResolutionRule> {
-  return worldRequest<EventResolutionRule>(`/api/worlds/${worldId}/resolution-rules`, {
+  return worldRequest<EventResolutionRule>(`${worldApiPath(worldId)}/resolution-rules`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -399,7 +400,7 @@ export function updateResolutionRule(
   input: EventResolutionRuleUpdateInput,
 ): Promise<EventResolutionRule> {
   return worldRequest<EventResolutionRule>(
-    `/api/worlds/${worldId}/resolution-rules/${ruleId}`,
+    `${worldApiPath(worldId)}/resolution-rules/${pathSegment(ruleId)}`,
     {
       method: "PATCH",
       body: input,
@@ -414,7 +415,7 @@ export function dryRunResolutionRule(
   filters: WorldlineScopedFilters = {},
 ): Promise<ResolutionRuleDryRun> {
   return worldRequest<ResolutionRuleDryRun>(
-    `/api/worlds/${worldId}/resolution-rules/${ruleId}/dry-run${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/resolution-rules/${pathSegment(ruleId)}/dry-run${worldlineSuffix(filters)}`,
     {
       method: "POST",
       csrf: true,
@@ -429,7 +430,7 @@ export function listPlayerActors(
   const search = new URLSearchParams();
   appendOptional(search, "worldline_id", filters.worldline_id);
   appendOptional(search, "user_id", filters.user_id);
-  return worldRequest<PlayerActor[]>(`/api/worlds/${worldId}/player-actors${searchSuffix(search)}`, {
+  return worldRequest<PlayerActor[]>(`${worldApiPath(worldId)}/player-actors${searchSuffix(search)}`, {
     method: "GET",
   });
 }
@@ -438,7 +439,7 @@ export function bindPlayerActor(
   worldId: string,
   input: PlayerActorBindInput,
 ): Promise<PlayerActor> {
-  return worldRequest<PlayerActor>(`/api/worlds/${worldId}/player-actors`, {
+  return worldRequest<PlayerActor>(`${worldApiPath(worldId)}/player-actors`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -449,7 +450,7 @@ export function upsertPlayerSessionResume(
   worldId: string,
   input: PlayerSessionResumeInput,
 ): Promise<PlayerSessionResume> {
-  return worldRequest<PlayerSessionResume>(`/api/worlds/${worldId}/player-sessions/resume`, {
+  return worldRequest<PlayerSessionResume>(`${worldApiPath(worldId)}/player-sessions/resume`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -467,7 +468,7 @@ export function listPlayerChoices(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<PlayerChoice[]>(
-    `/api/worlds/${worldId}/player-choices${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/player-choices${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -476,7 +477,7 @@ export function recordPlayerChoice(
   worldId: string,
   input: PlayerChoiceCreateInput,
 ): Promise<PlayerChoice> {
-  return worldRequest<PlayerChoice>(`/api/worlds/${worldId}/player-choices`, {
+  return worldRequest<PlayerChoice>(`${worldApiPath(worldId)}/player-choices`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -488,7 +489,7 @@ export function previewPlayerChoiceConsequences(
   input: PlayerChoiceCreateInput,
 ): Promise<ChoiceConsequencePreview> {
   return worldRequest<ChoiceConsequencePreview>(
-    `/api/worlds/${worldId}/player-choices/preview`,
+    `${worldApiPath(worldId)}/player-choices/preview`,
     {
       method: "POST",
       body: input,
@@ -535,7 +536,7 @@ export function updateAgentPreset(
   presetId: string,
   input: AgentPresetUpdateInput,
 ): Promise<AgentPreset> {
-  return apiRequest<AgentPreset>(`/api/agent-presets/${presetId}`, {
+  return apiRequest<AgentPreset>(`/api/agent-presets/${pathSegment(presetId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -546,24 +547,24 @@ export function getAgentPresetUpdatePreview(
   presetId: string,
 ): Promise<AgentPresetUpdatePreview> {
   return apiRequest<AgentPresetUpdatePreview>(
-    `/api/agent-presets/${presetId}/update-preview`,
+    `/api/agent-presets/${pathSegment(presetId)}/update-preview`,
     { method: "GET" },
   );
 }
 
 export function deactivateAgentPreset(presetId: string): Promise<void> {
-  return apiRequest<void>(`/api/agent-presets/${presetId}`, {
+  return apiRequest<void>(`/api/agent-presets/${pathSegment(presetId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
 export function getWorldClock(worldId: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock`, { method: "GET" });
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock`, { method: "GET" });
 }
 
 export function pauseWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/pause`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/pause`, {
     method: "POST",
     body: reason === undefined ? {} : { reason },
     csrf: true,
@@ -575,7 +576,7 @@ export function resumeWorldClock(
   speed_multiplier?: string,
   reason?: string,
 ): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/resume`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/resume`, {
     method: "POST",
     body: {
       ...(speed_multiplier === undefined || speed_multiplier === "" ? {} : { speed_multiplier }),
@@ -586,7 +587,7 @@ export function resumeWorldClock(
 }
 
 export function advanceWorldClock(worldId: string, reason?: string): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/advance`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/advance`, {
     method: "POST",
     body: reason === undefined ? {} : { reason },
     csrf: true,
@@ -598,7 +599,7 @@ export function skipWorldClock(
   target_world_time: string,
   reason?: string,
 ): Promise<WorldClock> {
-  return worldRequest<WorldClock>(`/api/worlds/${worldId}/clock/skip`, {
+  return worldRequest<WorldClock>(`${worldApiPath(worldId)}/clock/skip`, {
     method: "POST",
     body: { target_world_time, ...(reason === undefined ? {} : { reason }) },
     csrf: true,
@@ -607,7 +608,7 @@ export function skipWorldClock(
 
 export function listClockTransitions(worldId: string, limit = 20): Promise<WorldClockTransition[]> {
   return worldRequest<WorldClockTransition[]>(
-    `/api/worlds/${worldId}/clock/transitions?limit=${encodeURIComponent(String(limit))}`,
+    `${worldApiPath(worldId)}/clock/transitions?limit=${encodeURIComponent(String(limit))}`,
     { method: "GET" },
   );
 }
@@ -616,7 +617,7 @@ export function getReplayState(
   worldId: string,
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldReplayState> {
-  return worldRequest<WorldReplayState>(`/api/worlds/${worldId}/replay/state${worldlineSuffix(filters)}`, {
+  return worldRequest<WorldReplayState>(`${worldApiPath(worldId)}/replay/state${worldlineSuffix(filters)}`, {
     method: "GET",
   });
 }
@@ -626,7 +627,7 @@ export function getLatestSnapshot(
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshot | null> {
   return worldRequest<WorldSnapshot | null>(
-    `/api/worlds/${worldId}/snapshots/latest${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/snapshots/latest${worldlineSuffix(filters)}`,
     {
       method: "GET",
     },
@@ -637,7 +638,7 @@ export function createSnapshot(
   worldId: string,
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshot> {
-  return worldRequest<WorldSnapshot>(`/api/worlds/${worldId}/snapshots${worldlineSuffix(filters)}`, {
+  return worldRequest<WorldSnapshot>(`${worldApiPath(worldId)}/snapshots${worldlineSuffix(filters)}`, {
     method: "POST",
     csrf: true,
   });
@@ -648,7 +649,7 @@ export function getSnapshotIntegrity(
   filters: WorldlineScopedFilters = {},
 ): Promise<WorldSnapshotIntegrity> {
   return worldRequest<WorldSnapshotIntegrity>(
-    `/api/worlds/${worldId}/snapshots/integrity${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/snapshots/integrity${worldlineSuffix(filters)}`,
     {
       method: "GET",
     },
@@ -686,17 +687,17 @@ export function listWorldEvents(
     search.set("limit", String(filters.limit));
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
-  return worldRequest<WorldEventAuditEntry[]>(`/api/worlds/${worldId}/events${suffix}`, {
+  return worldRequest<WorldEventAuditEntry[]>(`${worldApiPath(worldId)}/events${suffix}`, {
     method: "GET",
   });
 }
 
 export function listScenes(worldId: string): Promise<Scene[]> {
-  return worldRequest<Scene[]>(`/api/worlds/${worldId}/scenes`, { method: "GET" });
+  return worldRequest<Scene[]>(`${worldApiPath(worldId)}/scenes`, { method: "GET" });
 }
 
 export function createScene(worldId: string, input: SceneCreateInput): Promise<Scene> {
-  return worldRequest<Scene>(`/api/worlds/${worldId}/scenes`, {
+  return worldRequest<Scene>(`${worldApiPath(worldId)}/scenes`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -708,7 +709,7 @@ export function updateScene(
   sceneId: string,
   input: SceneUpdateInput,
 ): Promise<Scene> {
-  return worldRequest<Scene>(`/api/worlds/${worldId}/scenes/${sceneId}`, {
+  return worldRequest<Scene>(`${worldApiPath(worldId)}/scenes/${pathSegment(sceneId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -716,14 +717,14 @@ export function updateScene(
 }
 
 export function deactivateScene(worldId: string, sceneId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/scenes/${sceneId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/scenes/${pathSegment(sceneId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
 export function listLocationEdges(worldId: string): Promise<SceneLocationEdge[]> {
-  return worldRequest<SceneLocationEdge[]>(`/api/worlds/${worldId}/location-edges`, {
+  return worldRequest<SceneLocationEdge[]>(`${worldApiPath(worldId)}/location-edges`, {
     method: "GET",
   });
 }
@@ -732,7 +733,7 @@ export function createLocationEdge(
   worldId: string,
   input: SceneLocationEdgeCreateInput,
 ): Promise<SceneLocationEdge> {
-  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges`, {
+  return worldRequest<SceneLocationEdge>(`${worldApiPath(worldId)}/location-edges`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -744,7 +745,7 @@ export function updateLocationEdge(
   edgeId: string,
   input: SceneLocationEdgeUpdateInput,
 ): Promise<SceneLocationEdge> {
-  return worldRequest<SceneLocationEdge>(`/api/worlds/${worldId}/location-edges/${edgeId}`, {
+  return worldRequest<SceneLocationEdge>(`${worldApiPath(worldId)}/location-edges/${pathSegment(edgeId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -752,7 +753,7 @@ export function updateLocationEdge(
 }
 
 export function listOrganizations(worldId: string): Promise<WorldOrganization[]> {
-  return worldRequest<WorldOrganization[]>(`/api/worlds/${worldId}/organizations`, {
+  return worldRequest<WorldOrganization[]>(`${worldApiPath(worldId)}/organizations`, {
     method: "GET",
   });
 }
@@ -761,7 +762,7 @@ export function createOrganization(
   worldId: string,
   input: OrganizationCreateInput,
 ): Promise<WorldOrganization> {
-  return worldRequest<WorldOrganization>(`/api/worlds/${worldId}/organizations`, {
+  return worldRequest<WorldOrganization>(`${worldApiPath(worldId)}/organizations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -774,7 +775,7 @@ export function updateOrganization(
   input: OrganizationUpdateInput,
 ): Promise<WorldOrganization> {
   return worldRequest<WorldOrganization>(
-    `/api/worlds/${worldId}/organizations/${organizationId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}`,
     {
       method: "PATCH",
       body: input,
@@ -788,7 +789,7 @@ export function listOrganizationMemberships(
   organizationId: string,
 ): Promise<OrganizationMembership[]> {
   return worldRequest<OrganizationMembership[]>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships`,
     { method: "GET" },
   );
 }
@@ -799,7 +800,7 @@ export function createOrganizationMembership(
   input: OrganizationMembershipCreateInput,
 ): Promise<OrganizationMembership> {
   return worldRequest<OrganizationMembership>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships`,
     {
       method: "POST",
       body: input,
@@ -815,7 +816,7 @@ export function updateOrganizationMembership(
   input: OrganizationMembershipUpdateInput,
 ): Promise<OrganizationMembership> {
   return worldRequest<OrganizationMembership>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/memberships/${membershipId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/memberships/${pathSegment(membershipId)}`,
     {
       method: "PATCH",
       body: input,
@@ -830,7 +831,7 @@ export function listFactionTracks(
   filters: WorldlineScopedFilters = {},
 ): Promise<FactionProgressTrack[]> {
   return worldRequest<FactionProgressTrack[]>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -841,7 +842,7 @@ export function createFactionTrack(
   input: FactionProgressTrackCreateInput,
 ): Promise<FactionProgressTrack> {
   return worldRequest<FactionProgressTrack>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks`,
     {
       method: "POST",
       body: input,
@@ -857,7 +858,7 @@ export function updateFactionTrack(
   input: FactionProgressTrackUpdateInput,
 ): Promise<FactionProgressTrack> {
   return worldRequest<FactionProgressTrack>(
-    `/api/worlds/${worldId}/organizations/${organizationId}/faction-tracks/${trackId}`,
+    `${worldApiPath(worldId)}/organizations/${pathSegment(organizationId)}/faction-tracks/${pathSegment(trackId)}`,
     {
       method: "PATCH",
       body: input,
@@ -867,7 +868,7 @@ export function updateFactionTrack(
 }
 
 export function listAgents(worldId: string): Promise<Agent[]> {
-  return worldRequest<Agent[]>(`/api/worlds/${worldId}/agents`, { method: "GET" });
+  return worldRequest<Agent[]>(`${worldApiPath(worldId)}/agents`, { method: "GET" });
 }
 
 export function listAgentRelationships(
@@ -876,7 +877,7 @@ export function listAgentRelationships(
   filters: WorldlineScopedFilters = {},
 ): Promise<AgentRelationship[]> {
   return worldRequest<AgentRelationship[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -887,7 +888,7 @@ export function createAgentRelationship(
   input: AgentRelationshipCreateInput,
 ): Promise<AgentRelationship> {
   return worldRequest<AgentRelationship>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships`,
     {
       method: "POST",
       body: input,
@@ -903,7 +904,7 @@ export function updateAgentRelationship(
   input: AgentRelationshipUpdateInput,
 ): Promise<AgentRelationship> {
   return worldRequest<AgentRelationship>(
-    `/api/worlds/${worldId}/agents/${agentId}/relationships/${relationshipId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/relationships/${pathSegment(relationshipId)}`,
     {
       method: "PATCH",
       body: input,
@@ -918,7 +919,7 @@ export function getAgentPresence(
   filters: WorldlineScopedFilters = {},
 ): Promise<AgentPresence | null> {
   return worldRequest<AgentPresence | null>(
-    `/api/worlds/${worldId}/agents/${agentId}/presence${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/presence${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -928,7 +929,7 @@ export function upsertAgentPresence(
   agentId: string,
   input: AgentPresenceInput,
 ): Promise<AgentPresence> {
-  return worldRequest<AgentPresence>(`/api/worlds/${worldId}/agents/${agentId}/presence`, {
+  return worldRequest<AgentPresence>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/presence`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -936,7 +937,7 @@ export function upsertAgentPresence(
 }
 
 export function listAgentCalendar(worldId: string, agentId: string): Promise<CalendarEntry[]> {
-  return worldRequest<CalendarEntry[]>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+  return worldRequest<CalendarEntry[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar`, {
     method: "GET",
   });
 }
@@ -946,7 +947,7 @@ export function createAgentCalendarEntry(
   agentId: string,
   input: CalendarEntryCreateInput,
 ): Promise<CalendarEntry> {
-  return worldRequest<CalendarEntry>(`/api/worlds/${worldId}/agents/${agentId}/calendar`, {
+  return worldRequest<CalendarEntry>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -960,7 +961,7 @@ export function updateAgentCalendarEntry(
   input: CalendarEntryUpdateInput,
 ): Promise<CalendarEntry> {
   return worldRequest<CalendarEntry>(
-    `/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar/${pathSegment(entryId)}`,
     {
       method: "PATCH",
       body: input,
@@ -974,14 +975,14 @@ export function cancelAgentCalendarEntry(
   agentId: string,
   entryId: string,
 ): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}/calendar/${entryId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/calendar/${pathSegment(entryId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
 export function listScheduleRules(worldId: string): Promise<ScheduleRule[]> {
-  return worldRequest<ScheduleRule[]>(`/api/worlds/${worldId}/schedule-rules`, { method: "GET" });
+  return worldRequest<ScheduleRule[]>(`${worldApiPath(worldId)}/schedule-rules`, { method: "GET" });
 }
 
 export function getCalendarConflicts(
@@ -1000,7 +1001,7 @@ export function getCalendarConflicts(
   }
   const query = search.toString();
   return worldRequest<CalendarConflictReport>(
-    `/api/worlds/${worldId}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
+    `${worldApiPath(worldId)}/calendar/conflicts${query === "" ? "" : `?${query}`}`,
     { method: "GET" },
   );
 }
@@ -1021,7 +1022,7 @@ export function getDailyLifePreview(
     search.set("limit", String(filters.limit));
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
-  return worldRequest<DailyLifePreview>(`/api/worlds/${worldId}/daily-life/preview${suffix}`, {
+  return worldRequest<DailyLifePreview>(`${worldApiPath(worldId)}/daily-life/preview${suffix}`, {
     method: "GET",
   });
 }
@@ -1030,7 +1031,7 @@ export function generateDailyLifeCandidates(
   worldId: string,
   input: DailyLifeGenerateInput = {},
 ): Promise<DailyLifeEventCandidate[]> {
-  return worldRequest<DailyLifeEventCandidate[]>(`/api/worlds/${worldId}/daily-life/generate`, {
+  return worldRequest<DailyLifeEventCandidate[]>(`${worldApiPath(worldId)}/daily-life/generate`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1051,7 +1052,7 @@ export function listDailyLifeCandidates(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<DailyLifeEventCandidate[]>(
-    `/api/worlds/${worldId}/daily-life/candidates${suffix}`,
+    `${worldApiPath(worldId)}/daily-life/candidates${suffix}`,
     { method: "GET" },
   );
 }
@@ -1060,7 +1061,7 @@ export function createOffscreenEvent(
   worldId: string,
   input: OffscreenEventCreateInput,
 ): Promise<OffscreenEventQueueItem> {
-  return worldRequest<OffscreenEventQueueItem>(`/api/worlds/${worldId}/offscreen-events`, {
+  return worldRequest<OffscreenEventQueueItem>(`${worldApiPath(worldId)}/offscreen-events`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1081,7 +1082,7 @@ export function listOffscreenEvents(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<OffscreenEventQueueItem[]>(
-    `/api/worlds/${worldId}/offscreen-events${suffix}`,
+    `${worldApiPath(worldId)}/offscreen-events${suffix}`,
     { method: "GET" },
   );
 }
@@ -1095,7 +1096,7 @@ export function resolveOffscreenEvents(
   search.set("limit", String(limit));
   appendOptional(search, "worldline_id", worldlineId);
   return worldRequest<OffscreenResolution>(
-    `/api/worlds/${worldId}/offscreen-events/resolve?${search.toString()}`,
+    `${worldApiPath(worldId)}/offscreen-events/resolve?${search.toString()}`,
     {
       method: "POST",
       csrf: true,
@@ -1107,7 +1108,7 @@ export function createScheduleRule(
   worldId: string,
   input: ScheduleRuleCreateInput,
 ): Promise<ScheduleRule> {
-  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules`, {
+  return worldRequest<ScheduleRule>(`${worldApiPath(worldId)}/schedule-rules`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1118,7 +1119,7 @@ export function previewScheduleRule(
   worldId: string,
   input: ScheduleRulePreviewInput,
 ): Promise<ScheduleRulePreview> {
-  return worldRequest<ScheduleRulePreview>(`/api/worlds/${worldId}/schedule-rules/preview`, {
+  return worldRequest<ScheduleRulePreview>(`${worldApiPath(worldId)}/schedule-rules/preview`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1130,7 +1131,7 @@ export function updateScheduleRule(
   ruleId: string,
   input: ScheduleRuleUpdateInput,
 ): Promise<ScheduleRule> {
-  return worldRequest<ScheduleRule>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+  return worldRequest<ScheduleRule>(`${worldApiPath(worldId)}/schedule-rules/${pathSegment(ruleId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -1138,7 +1139,7 @@ export function updateScheduleRule(
 }
 
 export function disableScheduleRule(worldId: string, ruleId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/schedule-rules/${ruleId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/schedule-rules/${pathSegment(ruleId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -1149,7 +1150,7 @@ export function listStoryHooks(
   filters: WorldlineScopedFilters = {},
 ): Promise<StoryHook[]> {
   return worldRequest<StoryHook[]>(
-    `/api/worlds/${worldId}/story-hooks${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/story-hooks${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1158,7 +1159,7 @@ export function createStoryHook(
   worldId: string,
   input: StoryHookCreateInput,
 ): Promise<StoryHook> {
-  return worldRequest<StoryHook>(`/api/worlds/${worldId}/story-hooks`, {
+  return worldRequest<StoryHook>(`${worldApiPath(worldId)}/story-hooks`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1170,7 +1171,7 @@ export function listPlotThreads(
   filters: WorldlineScopedFilters = {},
 ): Promise<PlotThread[]> {
   return worldRequest<PlotThread[]>(
-    `/api/worlds/${worldId}/plot-threads${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/plot-threads${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1179,7 +1180,7 @@ export function createPlotThread(
   worldId: string,
   input: PlotThreadCreateInput,
 ): Promise<PlotThread> {
-  return worldRequest<PlotThread>(`/api/worlds/${worldId}/plot-threads`, {
+  return worldRequest<PlotThread>(`${worldApiPath(worldId)}/plot-threads`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1195,7 +1196,7 @@ export function listRouteAffinities(
   appendOptional(search, "agent_id", filters.agent_id);
   appendOptional(search, "status", filters.status);
   return worldRequest<RouteAffinity[]>(
-    `/api/worlds/${worldId}/route-affinities${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/route-affinities${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1204,7 +1205,7 @@ export function upsertRouteAffinity(
   worldId: string,
   input: RouteAffinityUpsertInput,
 ): Promise<RouteAffinity> {
-  return worldRequest<RouteAffinity>(`/api/worlds/${worldId}/route-affinities`, {
+  return worldRequest<RouteAffinity>(`${worldApiPath(worldId)}/route-affinities`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1216,7 +1217,7 @@ export function listRouteMilestones(
   filters: WorldlineScopedFilters = {},
 ): Promise<RouteMilestone[]> {
   return worldRequest<RouteMilestone[]>(
-    `/api/worlds/${worldId}/route-milestones${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/route-milestones${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1225,7 +1226,7 @@ export function createRouteMilestone(
   worldId: string,
   input: RouteMilestoneCreateInput,
 ): Promise<RouteMilestone> {
-  return worldRequest<RouteMilestone>(`/api/worlds/${worldId}/route-milestones`, {
+  return worldRequest<RouteMilestone>(`${worldApiPath(worldId)}/route-milestones`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1241,7 +1242,7 @@ export function listEndingCandidates(
   appendOptional(search, "status", filters.status);
   appendOptional(search, "ending_type", filters.ending_type);
   return worldRequest<EndingCandidate[]>(
-    `/api/worlds/${worldId}/ending-candidates${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/ending-candidates${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1250,7 +1251,7 @@ export function createEndingCandidate(
   worldId: string,
   input: EndingCandidateCreateInput,
 ): Promise<EndingCandidate> {
-  return worldRequest<EndingCandidate>(`/api/worlds/${worldId}/ending-candidates`, {
+  return worldRequest<EndingCandidate>(`${worldApiPath(worldId)}/ending-candidates`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1263,7 +1264,7 @@ export function dryRunEndingCandidate(
   filters: WorldlineScopedFilters = {},
 ): Promise<EndingDryRun> {
   return worldRequest<EndingDryRun>(
-    `/api/worlds/${worldId}/ending-candidates/${endingId}/dry-run${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/ending-candidates/${pathSegment(endingId)}/dry-run${worldlineSuffix(filters)}`,
     { method: "POST", csrf: true },
   );
 }
@@ -1273,7 +1274,7 @@ export function listLongRunEvals(
   filters: WorldlineScopedFilters = {},
 ): Promise<LongRunEvalRun[]> {
   return worldRequest<LongRunEvalRun[]>(
-    `/api/worlds/${worldId}/long-run-evals${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/long-run-evals${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1282,7 +1283,7 @@ export function createLongRunEval(
   worldId: string,
   input: LongRunEvalCreateInput,
 ): Promise<LongRunEvalRun> {
-  return worldRequest<LongRunEvalRun>(`/api/worlds/${worldId}/long-run-evals`, {
+  return worldRequest<LongRunEvalRun>(`${worldApiPath(worldId)}/long-run-evals`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1296,7 +1297,7 @@ export function listAuthoringTemplates(
   const search = new URLSearchParams();
   appendOptional(search, "template_kind", filters.template_kind);
   return worldRequest<AuthoringTemplate[]>(
-    `/api/worlds/${worldId}/authoring-templates${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/authoring-templates${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1305,7 +1306,7 @@ export function createAuthoringTemplate(
   worldId: string,
   input: AuthoringTemplateCreateInput,
 ): Promise<AuthoringTemplate> {
-  return worldRequest<AuthoringTemplate>(`/api/worlds/${worldId}/authoring-templates`, {
+  return worldRequest<AuthoringTemplate>(`${worldApiPath(worldId)}/authoring-templates`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1318,7 +1319,7 @@ export function previewAuthoringTemplate(
   input: AuthoringTemplateApplyInput = {},
 ): Promise<AuthoringImportJob> {
   return worldRequest<AuthoringImportJob>(
-    `/api/worlds/${worldId}/authoring-templates/${templateId}/preview`,
+    `${worldApiPath(worldId)}/authoring-templates/${pathSegment(templateId)}/preview`,
     {
       method: "POST",
       body: input,
@@ -1333,7 +1334,7 @@ export function applyAuthoringTemplate(
   input: AuthoringTemplateApplyInput = {},
 ): Promise<AuthoringImportJob> {
   return worldRequest<AuthoringImportJob>(
-    `/api/worlds/${worldId}/authoring-templates/${templateId}/apply`,
+    `${worldApiPath(worldId)}/authoring-templates/${pathSegment(templateId)}/apply`,
     {
       method: "POST",
       body: input,
@@ -1343,7 +1344,7 @@ export function applyAuthoringTemplate(
 }
 
 export function getReleaseProfile(worldId: string): Promise<LivingWorldReleaseProfile | null> {
-  return worldRequest<LivingWorldReleaseProfile | null>(`/api/worlds/${worldId}/release-profile`, {
+  return worldRequest<LivingWorldReleaseProfile | null>(`${worldApiPath(worldId)}/release-profile`, {
     method: "GET",
   });
 }
@@ -1352,7 +1353,7 @@ export function upsertReleaseProfile(
   worldId: string,
   input: ReleaseProfileUpsertInput,
 ): Promise<LivingWorldReleaseProfile> {
-  return worldRequest<LivingWorldReleaseProfile>(`/api/worlds/${worldId}/release-profile`, {
+  return worldRequest<LivingWorldReleaseProfile>(`${worldApiPath(worldId)}/release-profile`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1364,7 +1365,7 @@ export function listBetaChecklists(
   filters: WorldlineScopedFilters = {},
 ): Promise<BetaChecklistRun[]> {
   return worldRequest<BetaChecklistRun[]>(
-    `/api/worlds/${worldId}/beta-checklists${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/beta-checklists${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1373,7 +1374,7 @@ export function createBetaChecklist(
   worldId: string,
   input: BetaChecklistRunCreateInput,
 ): Promise<BetaChecklistRun> {
-  return worldRequest<BetaChecklistRun>(`/api/worlds/${worldId}/beta-checklists`, {
+  return worldRequest<BetaChecklistRun>(`${worldApiPath(worldId)}/beta-checklists`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1385,14 +1386,14 @@ export function listBetaChecklistItems(
   runId: string,
 ): Promise<BetaChecklistItem[]> {
   return worldRequest<BetaChecklistItem[]>(
-    `/api/worlds/${worldId}/beta-checklists/${runId}/items`,
+    `${worldApiPath(worldId)}/beta-checklists/${pathSegment(runId)}/items`,
     { method: "GET" },
   );
 }
 
 export function listEventTriggerConditions(worldId: string): Promise<EventTriggerCondition[]> {
   return worldRequest<EventTriggerCondition[]>(
-    `/api/worlds/${worldId}/event-trigger-conditions`,
+    `${worldApiPath(worldId)}/event-trigger-conditions`,
     { method: "GET" },
   );
 }
@@ -1402,7 +1403,7 @@ export function createEventTriggerCondition(
   input: EventTriggerConditionCreateInput,
 ): Promise<EventTriggerCondition> {
   return worldRequest<EventTriggerCondition>(
-    `/api/worlds/${worldId}/event-trigger-conditions`,
+    `${worldApiPath(worldId)}/event-trigger-conditions`,
     {
       method: "POST",
       body: input,
@@ -1417,7 +1418,7 @@ export function updateEventTriggerCondition(
   input: EventTriggerConditionUpdateInput,
 ): Promise<EventTriggerCondition> {
   return worldRequest<EventTriggerCondition>(
-    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}`,
+    `${worldApiPath(worldId)}/event-trigger-conditions/${pathSegment(conditionId)}`,
     {
       method: "PATCH",
       body: input,
@@ -1432,7 +1433,7 @@ export function dryRunEventTriggerCondition(
   filters: WorldlineScopedFilters = {},
 ): Promise<TriggerConditionDryRun> {
   return worldRequest<TriggerConditionDryRun>(
-    `/api/worlds/${worldId}/event-trigger-conditions/${conditionId}/dry-run${worldlineSuffix(
+    `${worldApiPath(worldId)}/event-trigger-conditions/${pathSegment(conditionId)}/dry-run${worldlineSuffix(
       filters,
     )}`,
     { method: "POST", csrf: true },
@@ -1444,7 +1445,7 @@ export function listSceneBeats(
   filters: WorldlineScopedFilters = {},
 ): Promise<SceneBeatDraft[]> {
   return worldRequest<SceneBeatDraft[]>(
-    `/api/worlds/${worldId}/scene-beats${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/scene-beats${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1453,7 +1454,7 @@ export function createSceneBeat(
   worldId: string,
   input: SceneBeatDraftCreateInput,
 ): Promise<SceneBeatDraft> {
-  return worldRequest<SceneBeatDraft>(`/api/worlds/${worldId}/scene-beats`, {
+  return worldRequest<SceneBeatDraft>(`${worldApiPath(worldId)}/scene-beats`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1465,7 +1466,7 @@ export function listDailyEpisodes(
   filters: WorldlineScopedFilters = {},
 ): Promise<DailyEpisodeDraft[]> {
   return worldRequest<DailyEpisodeDraft[]>(
-    `/api/worlds/${worldId}/daily-episodes${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/daily-episodes${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1474,7 +1475,7 @@ export function createDailyEpisode(
   worldId: string,
   input: DailyEpisodeDraftCreateInput,
 ): Promise<DailyEpisodeDraft> {
-  return worldRequest<DailyEpisodeDraft>(`/api/worlds/${worldId}/daily-episodes`, {
+  return worldRequest<DailyEpisodeDraft>(`${worldApiPath(worldId)}/daily-episodes`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1486,7 +1487,7 @@ export function listGroupInteractions(
   filters: WorldlineScopedFilters = {},
 ): Promise<GroupInteractionContext[]> {
   return worldRequest<GroupInteractionContext[]>(
-    `/api/worlds/${worldId}/group-interactions${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/group-interactions${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1495,7 +1496,7 @@ export function createGroupInteraction(
   worldId: string,
   input: GroupInteractionCreateInput,
 ): Promise<GroupInteractionContext> {
-  return worldRequest<GroupInteractionContext>(`/api/worlds/${worldId}/group-interactions`, {
+  return worldRequest<GroupInteractionContext>(`${worldApiPath(worldId)}/group-interactions`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1508,7 +1509,7 @@ export function executeGroupInteraction(
   input: GroupInteractionExecuteInput = {},
 ): Promise<GroupInteractionExecution> {
   return worldRequest<GroupInteractionExecution>(
-    `/api/worlds/${worldId}/group-interactions/${contextId}/execute`,
+    `${worldApiPath(worldId)}/group-interactions/${pathSegment(contextId)}/execute`,
     {
       method: "POST",
       body: input,
@@ -1522,7 +1523,7 @@ export function listRelationshipSuggestions(
   filters: WorldlineScopedFilters = {},
 ): Promise<RelationshipEventSuggestion[]> {
   return worldRequest<RelationshipEventSuggestion[]>(
-    `/api/worlds/${worldId}/relationship-suggestions${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/relationship-suggestions${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1537,7 +1538,7 @@ export function generateRelationshipSuggestions(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<RelationshipEventSuggestion[]>(
-    `/api/worlds/${worldId}/relationship-suggestions/generate${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/relationship-suggestions/generate${searchSuffix(search)}`,
     { method: "POST", csrf: true },
   );
 }
@@ -1548,7 +1549,7 @@ export function updateRelationshipSuggestion(
   input: RelationshipSuggestionUpdateInput,
 ): Promise<RelationshipEventSuggestion> {
   return worldRequest<RelationshipEventSuggestion>(
-    `/api/worlds/${worldId}/relationship-suggestions/${suggestionId}`,
+    `${worldApiPath(worldId)}/relationship-suggestions/${pathSegment(suggestionId)}`,
     {
       method: "PATCH",
       body: input,
@@ -1562,7 +1563,7 @@ export function listOrganizationConflicts(
   filters: WorldlineScopedFilters = {},
 ): Promise<OrganizationConflict[]> {
   return worldRequest<OrganizationConflict[]>(
-    `/api/worlds/${worldId}/organization-conflicts${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/organization-conflicts${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1571,7 +1572,7 @@ export function createOrganizationConflict(
   worldId: string,
   input: OrganizationConflictCreateInput,
 ): Promise<OrganizationConflict> {
-  return worldRequest<OrganizationConflict>(`/api/worlds/${worldId}/organization-conflicts`, {
+  return worldRequest<OrganizationConflict>(`${worldApiPath(worldId)}/organization-conflicts`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1583,7 +1584,7 @@ export function resolveOrganizationConflict(
   conflictId: string,
 ): Promise<OrganizationConflict> {
   return worldRequest<OrganizationConflict>(
-    `/api/worlds/${worldId}/organization-conflicts/${conflictId}/resolve`,
+    `${worldApiPath(worldId)}/organization-conflicts/${pathSegment(conflictId)}/resolve`,
     { method: "POST", csrf: true },
   );
 }
@@ -1593,13 +1594,13 @@ export function listRumors(
   filters: WorldlineScopedFilters = {},
 ): Promise<Rumor[]> {
   return worldRequest<Rumor[]>(
-    `/api/worlds/${worldId}/rumors${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/rumors${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
 
 export function createRumor(worldId: string, input: RumorCreateInput): Promise<Rumor> {
-  return worldRequest<Rumor>(`/api/worlds/${worldId}/rumors`, {
+  return worldRequest<Rumor>(`${worldApiPath(worldId)}/rumors`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1611,7 +1612,7 @@ export function listRumorPropagations(
   filters: WorldlineScopedFilters = {},
 ): Promise<RumorPropagation[]> {
   return worldRequest<RumorPropagation[]>(
-    `/api/worlds/${worldId}/rumor-propagations${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/rumor-propagations${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1620,7 +1621,7 @@ export function createRumorPropagation(
   worldId: string,
   input: RumorPropagationCreateInput,
 ): Promise<RumorPropagation> {
-  return worldRequest<RumorPropagation>(`/api/worlds/${worldId}/rumor-propagations`, {
+  return worldRequest<RumorPropagation>(`${worldApiPath(worldId)}/rumor-propagations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1632,7 +1633,7 @@ export function deliverRumorPropagation(
   propagationId: string,
 ): Promise<RumorPropagation> {
   return worldRequest<RumorPropagation>(
-    `/api/worlds/${worldId}/rumor-propagations/${propagationId}/deliver`,
+    `${worldApiPath(worldId)}/rumor-propagations/${pathSegment(propagationId)}/deliver`,
     { method: "POST", csrf: true },
   );
 }
@@ -1642,7 +1643,7 @@ export function getLivingWorldDashboard(
   filters: WorldlineScopedFilters = {},
 ): Promise<LivingWorldDashboard> {
   return worldRequest<LivingWorldDashboard>(
-    `/api/worlds/${worldId}/living-world-dashboard${worldlineSuffix(filters)}`,
+    `${worldApiPath(worldId)}/living-world-dashboard${worldlineSuffix(filters)}`,
     { method: "GET" },
   );
 }
@@ -1658,7 +1659,7 @@ export function listKnowledgeFacts(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<CharacterKnowledgeFact[]>(
-    `/api/worlds/${worldId}/knowledge${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/knowledge${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1667,7 +1668,7 @@ export function upsertKnowledgeFact(
   worldId: string,
   input: KnowledgeFactUpsertInput,
 ): Promise<CharacterKnowledgeFact> {
-  return worldRequest<CharacterKnowledgeFact>(`/api/worlds/${worldId}/knowledge`, {
+  return worldRequest<CharacterKnowledgeFact>(`${worldApiPath(worldId)}/knowledge`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1684,13 +1685,13 @@ export function listSecrets(
   if (filters.limit !== undefined) {
     search.set("limit", String(filters.limit));
   }
-  return worldRequest<SecretRecord[]>(`/api/worlds/${worldId}/secrets${searchSuffix(search)}`, {
+  return worldRequest<SecretRecord[]>(`${worldApiPath(worldId)}/secrets${searchSuffix(search)}`, {
     method: "GET",
   });
 }
 
 export function createSecret(worldId: string, input: SecretCreateInput): Promise<SecretRecord> {
-  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets`, {
+  return worldRequest<SecretRecord>(`${worldApiPath(worldId)}/secrets`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1698,7 +1699,7 @@ export function createSecret(worldId: string, input: SecretCreateInput): Promise
 }
 
 export function revealSecret(worldId: string, secretId: string): Promise<SecretRecord> {
-  return worldRequest<SecretRecord>(`/api/worlds/${worldId}/secrets/${secretId}/reveal`, {
+  return worldRequest<SecretRecord>(`${worldApiPath(worldId)}/secrets/${pathSegment(secretId)}/reveal`, {
     method: "POST",
     csrf: true,
   });
@@ -1712,7 +1713,7 @@ export function listEmotionalStates(
   appendOptional(search, "worldline_id", filters.worldline_id);
   appendOptional(search, "agent_id", filters.agent_id);
   return worldRequest<CharacterEmotionalState[]>(
-    `/api/worlds/${worldId}/emotional-states${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/emotional-states${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1721,7 +1722,7 @@ export function upsertEmotionalState(
   worldId: string,
   input: EmotionalStateUpsertInput,
 ): Promise<CharacterEmotionalState> {
-  return worldRequest<CharacterEmotionalState>(`/api/worlds/${worldId}/emotional-states`, {
+  return worldRequest<CharacterEmotionalState>(`${worldApiPath(worldId)}/emotional-states`, {
     method: "PUT",
     body: input,
     csrf: true,
@@ -1739,7 +1740,7 @@ export function listRelationshipRepairs(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<RelationshipRepairRecord[]>(
-    `/api/worlds/${worldId}/relationship-repairs${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/relationship-repairs${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1748,7 +1749,7 @@ export function createRelationshipRepair(
   worldId: string,
   input: RelationshipRepairCreateInput,
 ): Promise<RelationshipRepairRecord> {
-  return worldRequest<RelationshipRepairRecord>(`/api/worlds/${worldId}/relationship-repairs`, {
+  return worldRequest<RelationshipRepairRecord>(`${worldApiPath(worldId)}/relationship-repairs`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1760,7 +1761,7 @@ export function applyRelationshipRepair(
   repairId: string,
 ): Promise<RelationshipRepairRecord> {
   return worldRequest<RelationshipRepairRecord>(
-    `/api/worlds/${worldId}/relationship-repairs/${repairId}/apply`,
+    `${worldApiPath(worldId)}/relationship-repairs/${pathSegment(repairId)}/apply`,
     { method: "POST", csrf: true },
   );
 }
@@ -1776,7 +1777,7 @@ export function listPlayerJournal(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<PlayerJournalEntry[]>(
-    `/api/worlds/${worldId}/player-journal${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/player-journal${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1785,7 +1786,7 @@ export function createPlayerJournalEntry(
   worldId: string,
   input: JournalEntryCreateInput,
 ): Promise<PlayerJournalEntry> {
-  return worldRequest<PlayerJournalEntry>(`/api/worlds/${worldId}/player-journal`, {
+  return worldRequest<PlayerJournalEntry>(`${worldApiPath(worldId)}/player-journal`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1803,7 +1804,7 @@ export function listNotifications(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<InWorldNotification[]>(
-    `/api/worlds/${worldId}/notifications${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/notifications${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1812,7 +1813,7 @@ export function createNotification(
   worldId: string,
   input: NotificationCreateInput,
 ): Promise<InWorldNotification> {
-  return worldRequest<InWorldNotification>(`/api/worlds/${worldId}/notifications`, {
+  return worldRequest<InWorldNotification>(`${worldApiPath(worldId)}/notifications`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1835,7 +1836,7 @@ export function listInterventions(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<PlayerInterventionRecord[]>(
-    `/api/worlds/${worldId}/interventions${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/interventions${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1844,7 +1845,7 @@ export function createIntervention(
   worldId: string,
   input: InterventionCreateInput,
 ): Promise<PlayerInterventionRecord> {
-  return worldRequest<PlayerInterventionRecord>(`/api/worlds/${worldId}/interventions`, {
+  return worldRequest<PlayerInterventionRecord>(`${worldApiPath(worldId)}/interventions`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1855,7 +1856,7 @@ export function createPlayerPrivacyExport(
   worldId: string,
   input: PlayerPrivacyRequestCreateInput,
 ): Promise<PlayerPrivacyExport> {
-  return worldRequest<PlayerPrivacyExport>(`/api/worlds/${worldId}/player/privacy/export`, {
+  return worldRequest<PlayerPrivacyExport>(`${worldApiPath(worldId)}/player/privacy/export`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1867,7 +1868,7 @@ export function createPlayerDeleteRequest(
   input: PlayerPrivacyRequestCreateInput,
 ): Promise<PlayerPrivacyRequest> {
   return worldRequest<PlayerPrivacyRequest>(
-    `/api/worlds/${worldId}/player/privacy/delete-requests`,
+    `${worldApiPath(worldId)}/player/privacy/delete-requests`,
     {
       method: "POST",
       body: input,
@@ -1887,7 +1888,7 @@ export function listGMStyleReviews(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<GMStyleReview[]>(
-    `/api/worlds/${worldId}/gm-style-reviews${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/gm-style-reviews${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1896,7 +1897,7 @@ export function createGMStyleReview(
   worldId: string,
   input: GMStyleReviewCreateInput,
 ): Promise<GMStyleReview> {
-  return worldRequest<GMStyleReview>(`/api/worlds/${worldId}/gm-style-reviews`, {
+  return worldRequest<GMStyleReview>(`${worldApiPath(worldId)}/gm-style-reviews`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -1914,7 +1915,7 @@ export function listNarrativeContinuityReviews(
     search.set("limit", String(filters.limit));
   }
   return worldRequest<NarrativeContinuityReview[]>(
-    `/api/worlds/${worldId}/narrative-continuity-reviews${searchSuffix(search)}`,
+    `${worldApiPath(worldId)}/narrative-continuity-reviews${searchSuffix(search)}`,
     { method: "GET" },
   );
 }
@@ -1924,7 +1925,7 @@ export function createNarrativeContinuityReview(
   input: NarrativeContinuityReviewCreateInput,
 ): Promise<NarrativeContinuityReview> {
   return worldRequest<NarrativeContinuityReview>(
-    `/api/worlds/${worldId}/narrative-continuity-reviews`,
+    `${worldApiPath(worldId)}/narrative-continuity-reviews`,
     {
       method: "POST",
       body: input,
@@ -1934,7 +1935,7 @@ export function createNarrativeContinuityReview(
 }
 
 export function listAgentMemory(worldId: string, agentId: string): Promise<MemoryItem[]> {
-  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory`, {
+  return worldRequest<MemoryItem[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory`, {
     method: "GET",
   });
 }
@@ -1944,9 +1945,10 @@ export function searchAgentMemory(
   agentId: string,
   input: MemorySearchInput,
 ): Promise<MemoryItem[]> {
-  return worldRequest<MemoryItem[]>(`/api/worlds/${worldId}/agents/${agentId}/memory/search`, {
+  return worldRequest<MemoryItem[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/search`, {
     method: "POST",
     body: input,
+    csrf: true,
   });
 }
 
@@ -1955,7 +1957,7 @@ export function getAgentMemoryProfileSnapshot(
   agentId: string,
 ): Promise<MemoryProfileSnapshot | null> {
   return worldRequest<MemoryProfileSnapshot | null>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/profile-snapshot`,
     { method: "GET" },
   );
 }
@@ -1965,7 +1967,7 @@ export function refreshAgentMemoryProfileSnapshot(
   agentId: string,
 ): Promise<MemoryProfileSnapshot> {
   return worldRequest<MemoryProfileSnapshot>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/profile-snapshot/refresh`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/profile-snapshot/refresh`,
     {
       method: "POST",
       csrf: true,
@@ -1978,7 +1980,7 @@ export function forgetAgentMemory(
   agentId: string,
 ): Promise<{ backend: string; deleted_count: number | null }> {
   return worldRequest<{ backend: string; deleted_count: number | null }>(
-    `/api/worlds/${worldId}/agents/${agentId}/memory/forget`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/memory/forget`,
     {
       method: "POST",
       csrf: true,
@@ -1987,7 +1989,7 @@ export function forgetAgentMemory(
 }
 
 export function listAgentRuns(worldId: string, agentId: string): Promise<AgentRun[]> {
-  return worldRequest<AgentRun[]>(`/api/worlds/${worldId}/agents/${agentId}/runs`, {
+  return worldRequest<AgentRun[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/runs`, {
     method: "GET",
   });
 }
@@ -1998,13 +2000,13 @@ export function getAgentRunDetail(
   runId: string,
 ): Promise<AgentRunDetail> {
   return worldRequest<AgentRunDetail>(
-    `/api/worlds/${worldId}/agents/${agentId}/runs/${runId}`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/runs/${pathSegment(runId)}`,
     { method: "GET" },
   );
 }
 
 export function getAgentPersona(worldId: string, agentId: string): Promise<AgentPersona | null> {
-  return worldRequest<AgentPersona | null>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+  return worldRequest<AgentPersona | null>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona`, {
     method: "GET",
   });
 }
@@ -2014,7 +2016,7 @@ export function updateAgentPersona(
   agentId: string,
   input: AgentPersonaUpdateInput,
 ): Promise<AgentPersona> {
-  return worldRequest<AgentPersona>(`/api/worlds/${worldId}/agents/${agentId}/persona`, {
+  return worldRequest<AgentPersona>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2027,7 +2029,7 @@ export function validateAgentPersona(
   input: AgentPersonaUpdateInput,
 ): Promise<PersonaPolicyValidation> {
   return worldRequest<PersonaPolicyValidation>(
-    `/api/worlds/${worldId}/agents/${agentId}/persona/validate`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/persona/validate`,
     {
       method: "POST",
       body: input,
@@ -2052,7 +2054,7 @@ export function listAgentObservations(
   worldId: string,
   agentId: string,
 ): Promise<AgentObservation[]> {
-  return worldRequest<AgentObservation[]>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+  return worldRequest<AgentObservation[]>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations`, {
     method: "GET",
   });
 }
@@ -2062,7 +2064,7 @@ export function createAgentObservation(
   agentId: string,
   input: AgentObservationCreateInput,
 ): Promise<AgentObservation> {
-  return worldRequest<AgentObservation>(`/api/worlds/${worldId}/agents/${agentId}/observations`, {
+  return worldRequest<AgentObservation>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2074,7 +2076,7 @@ export function refreshAgentObservations(
   agentId: string,
 ): Promise<AgentObservation[]> {
   return worldRequest<AgentObservation[]>(
-    `/api/worlds/${worldId}/agents/${agentId}/observations/refresh`,
+    `${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/observations/refresh`,
     {
       method: "POST",
       csrf: true,
@@ -2083,7 +2085,7 @@ export function refreshAgentObservations(
 }
 
 export function runAgent(worldId: string, agentId: string, input: AgentRunCreateInput): Promise<AgentRun> {
-  return worldRequest<AgentRun>(`/api/worlds/${worldId}/agents/${agentId}/run`, {
+  return worldRequest<AgentRun>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}/run`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2091,7 +2093,7 @@ export function runAgent(worldId: string, agentId: string, input: AgentRunCreate
 }
 
 export function listNarrativeArtifacts(worldId: string): Promise<NarrativeArtifact[]> {
-  return worldRequest<NarrativeArtifact[]>(`/api/worlds/${worldId}/narrative-artifacts`, {
+  return worldRequest<NarrativeArtifact[]>(`${worldApiPath(worldId)}/narrative-artifacts`, {
     method: "GET",
   });
 }
@@ -2124,7 +2126,7 @@ export function listFilteredNarrativeArtifacts(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/narrative-artifacts${suffix}`,
+    `${worldApiPath(worldId)}/narrative-artifacts${suffix}`,
     {
       method: "GET",
     },
@@ -2135,7 +2137,7 @@ export function getNarrativeArtifact(
   worldId: string,
   artifactId: string,
 ): Promise<NarrativeArtifact> {
-  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts/${artifactId}`, {
+  return worldRequest<NarrativeArtifact>(`${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}`, {
     method: "GET",
   });
 }
@@ -2144,7 +2146,7 @@ export function createNarrativeArtifact(
   worldId: string,
   input: NarrativeArtifactCreateInput,
 ): Promise<NarrativeArtifact> {
-  return worldRequest<NarrativeArtifact>(`/api/worlds/${worldId}/narrative-artifacts`, {
+  return worldRequest<NarrativeArtifact>(`${worldApiPath(worldId)}/narrative-artifacts`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2157,7 +2159,7 @@ export function publishNarrativeArtifact(
   input: NarrativePublicationInput = {},
 ): Promise<NarrativePublication> {
   return worldRequest<NarrativePublication>(
-    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/publish`,
+    `${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}/publish`,
     {
       method: "POST",
       body: input,
@@ -2172,7 +2174,7 @@ export function unpublishNarrativeArtifact(
   input: NarrativePublicationInput = {},
 ): Promise<NarrativePublication> {
   return worldRequest<NarrativePublication>(
-    `/api/worlds/${worldId}/narrative-artifacts/${artifactId}/unpublish`,
+    `${worldApiPath(worldId)}/narrative-artifacts/${pathSegment(artifactId)}/unpublish`,
     {
       method: "POST",
       body: input,
@@ -2182,7 +2184,7 @@ export function unpublishNarrativeArtifact(
 }
 
 export function createAgent(worldId: string, input: AgentCreateInput): Promise<Agent> {
-  return worldRequest<Agent>(`/api/worlds/${worldId}/agents`, {
+  return worldRequest<Agent>(`${worldApiPath(worldId)}/agents`, {
     method: "POST",
     body: input,
     csrf: true,
@@ -2194,7 +2196,7 @@ export function updateAgent(
   agentId: string,
   input: AgentUpdateInput,
 ): Promise<Agent> {
-  return worldRequest<Agent>(`/api/worlds/${worldId}/agents/${agentId}`, {
+  return worldRequest<Agent>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2202,14 +2204,22 @@ export function updateAgent(
 }
 
 export function deactivateAgent(worldId: string, agentId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/agents/${agentId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/agents/${pathSegment(agentId)}`, {
     method: "DELETE",
     csrf: true,
   });
 }
 
+function conversationCollectionPath(worldId: string): string {
+  return `/api/worlds/${encodeURIComponent(worldId)}/conversations`;
+}
+
+function conversationPath(worldId: string, conversationId: string): string {
+  return `${conversationCollectionPath(worldId)}/${encodeURIComponent(conversationId)}`;
+}
+
 export function listConversations(worldId: string): Promise<ConversationSession[]> {
-  return worldRequest<ConversationSession[]>(`/api/worlds/${worldId}/conversations`, {
+  return worldRequest<ConversationSession[]>(conversationCollectionPath(worldId), {
     method: "GET",
   });
 }
@@ -2218,7 +2228,7 @@ export function createConversation(
   worldId: string,
   input: ConversationCreateInput,
 ): Promise<ConversationSession> {
-  return worldRequest<ConversationSession>(`/api/worlds/${worldId}/conversations`, {
+  return worldRequest<ConversationSession>(conversationCollectionPath(worldId), {
     method: "POST",
     body: input,
     csrf: true,
@@ -2230,14 +2240,11 @@ export function updateConversation(
   conversationId: string,
   input: ConversationUpdateInput,
 ): Promise<ConversationSession> {
-  return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}`,
-    {
-      method: "PATCH",
-      body: input,
-      csrf: true,
-    },
-  );
+  return worldRequest<ConversationSession>(conversationPath(worldId, conversationId), {
+    method: "PATCH",
+    body: input,
+    csrf: true,
+  });
 }
 
 export function listConversationParticipants(
@@ -2245,7 +2252,7 @@ export function listConversationParticipants(
   conversationId: string,
 ): Promise<ConversationParticipant[]> {
   return worldRequest<ConversationParticipant[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    `${conversationPath(worldId, conversationId)}/participants`,
     { method: "GET" },
   );
 }
@@ -2256,7 +2263,7 @@ export function replaceConversationParticipants(
   input: ConversationParticipantInput[],
 ): Promise<ConversationParticipant[]> {
   return worldRequest<ConversationParticipant[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/participants`,
+    `${conversationPath(worldId, conversationId)}/participants`,
     {
       method: "PUT",
       body: input,
@@ -2270,7 +2277,7 @@ export function listConversationTurns(
   conversationId: string,
 ): Promise<ConversationTurn[]> {
   return worldRequest<ConversationTurn[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/turns`,
+    `${conversationPath(worldId, conversationId)}/turns`,
     { method: "GET" },
   );
 }
@@ -2280,7 +2287,7 @@ export function getConversationSpeakerPreview(
   conversationId: string,
 ): Promise<ConversationSpeakerPreview> {
   return worldRequest<ConversationSpeakerPreview>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/speaker-preview`,
+    `${conversationPath(worldId, conversationId)}/speaker-preview`,
     { method: "GET" },
   );
 }
@@ -2290,7 +2297,7 @@ export function getConversationMemorySummary(
   conversationId: string,
 ): Promise<ConversationMemorySummary> {
   return worldRequest<ConversationMemorySummary>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/memory/summary`,
+    `${conversationPath(worldId, conversationId)}/memory/summary`,
     { method: "GET" },
   );
 }
@@ -2300,7 +2307,7 @@ export function getConversationDiagnosticsSummary(
   conversationId: string,
 ): Promise<ConversationDiagnosticsSummary> {
   return worldRequest<ConversationDiagnosticsSummary>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/diagnostics/summary`,
+    `${conversationPath(worldId, conversationId)}/diagnostics/summary`,
     { method: "GET" },
   );
 }
@@ -2310,7 +2317,7 @@ export function listConversationNarrativeArtifacts(
   conversationId: string,
 ): Promise<NarrativeArtifact[]> {
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative`,
+    `${conversationPath(worldId, conversationId)}/narrative`,
     { method: "GET" },
   );
 }
@@ -2322,7 +2329,7 @@ export function generateConversationNarrativeArtifacts(
   provider_profile_id?: string | null,
 ): Promise<NarrativeArtifact[]> {
   return worldRequest<NarrativeArtifact[]>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/generate`,
+    `${conversationPath(worldId, conversationId)}/narrative/generate`,
     {
       method: "POST",
       body: {
@@ -2341,7 +2348,7 @@ export function previewConversationNarrativePrompt(
   provider_profile_id?: string | null,
 ): Promise<ConversationNarrativePromptPreview> {
   return worldRequest<ConversationNarrativePromptPreview>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/narrative/preview`,
+    `${conversationPath(worldId, conversationId)}/narrative/preview`,
     {
       method: "POST",
       body: {
@@ -2359,7 +2366,7 @@ export function seedConversation(
   input: ConversationSeedInput,
 ): Promise<ConversationTurn> {
   return worldRequest<ConversationTurn>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/seed`,
+    `${conversationPath(worldId, conversationId)}/seed`,
     {
       method: "POST",
       body: input,
@@ -2373,7 +2380,7 @@ export function advanceConversation(
   conversationId: string,
 ): Promise<ConversationAdvanceResult> {
   return worldRequest<ConversationAdvanceResult>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/advance`,
+    `${conversationPath(worldId, conversationId)}/advance`,
     {
       method: "POST",
       csrf: true,
@@ -2386,7 +2393,7 @@ export function startConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/start`,
+    `${conversationPath(worldId, conversationId)}/start`,
     {
       method: "POST",
       csrf: true,
@@ -2399,7 +2406,7 @@ export function pauseConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/pause`,
+    `${conversationPath(worldId, conversationId)}/pause`,
     {
       method: "POST",
       csrf: true,
@@ -2412,7 +2419,7 @@ export function resumeConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/resume`,
+    `${conversationPath(worldId, conversationId)}/resume`,
     {
       method: "POST",
       csrf: true,
@@ -2425,7 +2432,7 @@ export function stopConversation(
   conversationId: string,
 ): Promise<ConversationSession> {
   return worldRequest<ConversationSession>(
-    `/api/worlds/${worldId}/conversations/${conversationId}/stop`,
+    `${conversationPath(worldId, conversationId)}/stop`,
     {
       method: "POST",
       csrf: true,
@@ -2434,7 +2441,7 @@ export function stopConversation(
 }
 
 export function listMemberships(worldId: string): Promise<Membership[]> {
-  return worldRequest<Membership[]>(`/api/worlds/${worldId}/memberships`, { method: "GET" });
+  return worldRequest<Membership[]>(`${worldApiPath(worldId)}/memberships`, { method: "GET" });
 }
 
 export function upsertMembership(
@@ -2442,7 +2449,7 @@ export function upsertMembership(
   userId: string,
   role: WorldRole,
 ): Promise<Membership> {
-  return worldRequest<Membership>(`/api/worlds/${worldId}/memberships/${userId}`, {
+  return worldRequest<Membership>(`${worldApiPath(worldId)}/memberships/${pathSegment(userId)}`, {
     method: "PUT",
     body: { user_id: userId, role },
     csrf: true,
@@ -2450,7 +2457,7 @@ export function upsertMembership(
 }
 
 export function deleteMembership(worldId: string, userId: string): Promise<void> {
-  return worldRequest<void>(`/api/worlds/${worldId}/memberships/${userId}`, {
+  return worldRequest<void>(`${worldApiPath(worldId)}/memberships/${pathSegment(userId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2466,7 +2473,7 @@ export function listMemberCandidates(
     params.set("query", query.trim());
   }
   return worldRequest<MemberCandidate[]>(
-    `/api/worlds/${worldId}/member-candidates?${params.toString()}`,
+    `${worldApiPath(worldId)}/member-candidates?${params.toString()}`,
     { method: "GET" },
   );
 }
@@ -2500,7 +2507,7 @@ export function listRuntimeDiagnostics(): Promise<RuntimeDiagnostic[]> {
 }
 
 export function listWorldDiagnostics(worldId: string): Promise<RuntimeDiagnostic[]> {
-  return worldRequest<RuntimeDiagnostic[]>(`/api/worlds/${worldId}/diagnostics`, {
+  return worldRequest<RuntimeDiagnostic[]>(`${worldApiPath(worldId)}/diagnostics`, {
     method: "GET",
   });
 }
@@ -2531,15 +2538,18 @@ export function updateMemoryBackendProfile(
   profileId: string,
   input: MemoryBackendProfileUpdateInput,
 ): Promise<MemoryBackendProfile> {
-  return apiRequest<MemoryBackendProfile>(`/api/memory-backend-profiles/${profileId}`, {
-    method: "PATCH",
-    body: input,
-    csrf: true,
-  });
+  return apiRequest<MemoryBackendProfile>(
+    `/api/memory-backend-profiles/${pathSegment(profileId)}`,
+    {
+      method: "PATCH",
+      body: input,
+      csrf: true,
+    },
+  );
 }
 
 export function deleteMemoryBackendProfile(profileId: string): Promise<void> {
-  return apiRequest<void>(`/api/memory-backend-profiles/${profileId}`, {
+  return apiRequest<void>(`/api/memory-backend-profiles/${pathSegment(profileId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2549,7 +2559,7 @@ export function getMemoryBackendProfileHealth(
   profileId: string,
 ): Promise<MemoryBackendHealth> {
   return apiRequest<MemoryBackendHealth>(
-    `/api/memory-backend-profiles/${profileId}/health`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/health`,
     { method: "GET" },
   );
 }
@@ -2559,7 +2569,9 @@ export function getMemoryBackendProfileLogs(
   limit = 20,
 ): Promise<MemoryBackendLogs> {
   return apiRequest<MemoryBackendLogs>(
-    `/api/memory-backend-profiles/${profileId}/logs?limit=${encodeURIComponent(String(limit))}`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/logs?limit=${encodeURIComponent(
+      String(limit),
+    )}`,
     { method: "GET" },
   );
 }
@@ -2584,23 +2596,26 @@ export function listMemoryBackendProfileJobs(
   }
   const suffix = search.size === 0 ? "" : `?${search.toString()}`;
   return apiRequest<MemoryWriteJobList>(
-    `/api/memory-backend-profiles/${profileId}/jobs${suffix}`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/jobs${suffix}`,
     { method: "GET" },
   );
 }
 
 export function retryMemoryWriteJob(jobId: string): Promise<MemoryWriteJob> {
-  return apiRequest<MemoryWriteJob>(`/api/memory-write-jobs/${jobId}/retry`, {
-    method: "POST",
-    csrf: true,
-  });
+  return apiRequest<MemoryWriteJob>(
+    `/api/memory-write-jobs/${pathSegment(jobId)}/retry`,
+    {
+      method: "POST",
+      csrf: true,
+    },
+  );
 }
 
 export function runMemoryBackendProfileEvalSmoke(
   profileId: string,
 ): Promise<MemoryEvalResult> {
   return apiRequest<MemoryEvalResult>(
-    `/api/memory-backend-profiles/${profileId}/eval-smoke`,
+    `/api/memory-backend-profiles/${pathSegment(profileId)}/eval-smoke`,
     {
       method: "POST",
       csrf: true,
@@ -2620,7 +2635,7 @@ export function updateProviderProfile(
   profileId: string,
   input: ProviderProfileUpdateInput,
 ): Promise<ProviderProfile> {
-  return apiRequest<ProviderProfile>(`/api/provider-profiles/${profileId}`, {
+  return apiRequest<ProviderProfile>(`/api/provider-profiles/${pathSegment(profileId)}`, {
     method: "PATCH",
     body: input,
     csrf: true,
@@ -2628,7 +2643,7 @@ export function updateProviderProfile(
 }
 
 export function disableProviderProfile(profileId: string): Promise<void> {
-  return apiRequest<void>(`/api/provider-profiles/${profileId}`, {
+  return apiRequest<void>(`/api/provider-profiles/${pathSegment(profileId)}`, {
     method: "DELETE",
     csrf: true,
   });
@@ -2638,11 +2653,14 @@ export function testProviderProfile(
   profileId: string,
   prompt?: string,
 ): Promise<ProviderTestCallResult> {
-  return apiRequest<ProviderTestCallResult>(`/api/provider-profiles/${profileId}/test-call`, {
-    method: "POST",
-    body: prompt === undefined || prompt.trim() === "" ? {} : { prompt },
-    csrf: true,
-  });
+  return apiRequest<ProviderTestCallResult>(
+    `/api/provider-profiles/${pathSegment(profileId)}/test-call`,
+    {
+      method: "POST",
+      body: prompt === undefined || prompt.trim() === "" ? {} : { prompt },
+      csrf: true,
+    },
+  );
 }
 
 type WorldRequestOptions = {
@@ -2650,6 +2668,14 @@ type WorldRequestOptions = {
   body?: unknown;
   csrf?: boolean;
 };
+
+function worldApiPath(worldId: string): string {
+  return `/api/worlds/${pathSegment(worldId)}`;
+}
+
+function pathSegment(value: string): string {
+  return encodeURIComponent(value);
+}
 
 function appendOptional(search: URLSearchParams, key: string, value: string | null | undefined) {
   if (value !== undefined && value !== null && value !== "") {
@@ -2712,7 +2738,7 @@ async function errorDetail(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return normalizeBackendErrorDetail(body.detail, "World request failed.");
     }
     if (body.detail !== null && typeof body.detail === "object" && !Array.isArray(body.detail)) {
       const detail = body.detail as Record<string, unknown>;
@@ -2720,9 +2746,9 @@ async function errorDetail(response: Response): Promise<string | null> {
       const reviewStatus =
         typeof detail.review_status === "string" ? detail.review_status : null;
       if (message !== null && reviewStatus !== null) {
-        return `${message} (${reviewStatus})`;
+        return normalizeBackendErrorDetail(`${message} (${reviewStatus})`, "World request failed.");
       }
-      return message;
+      return message === null ? null : normalizeBackendErrorDetail(message, "World request failed.");
     }
     return null;
   } catch {

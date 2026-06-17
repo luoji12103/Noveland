@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/worlds/client", async () => {
@@ -21,6 +21,8 @@ vi.mock("@/lib/worlds/client", async () => {
 });
 
 vi.mock("@/lib/realtime", () => ({
+  conversationEventStreamPath: (worldId: string, conversationId: string) =>
+    `/api/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(conversationId)}/stream`,
   createConversationLiveSocket: vi.fn(() => ({
     close: vi.fn(),
     readyState: 3,
@@ -43,6 +45,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { ConversationDetail } from "@/features/conversations/conversation-detail";
+import { createConversationLiveSocket, subscribeToEventStream } from "@/lib/realtime";
 import {
   generateConversationNarrativeArtifacts,
   getConversationMemorySummary,
@@ -131,6 +134,67 @@ describe("ConversationDetail", () => {
     expect(screen.getByText("Memory summary")).toBeInTheDocument();
   });
 
+
+  it("normalizes sensitive live command error notices", async () => {
+    render(
+      <ConversationDetail
+        worldId="world-1"
+        conversationId="conversation-1"
+        data={adminData}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(createConversationLiveSocket).toHaveBeenCalled();
+    });
+    const handlers = vi.mocked(createConversationLiveSocket).mock.calls[0]?.[2];
+
+    act(() => {
+      handlers?.onMessage?.({
+        type: "error",
+        occurred_at: "2026-04-21T00:00:05.000Z",
+        payload: {
+          message: "rawPrompt leaked Bearer live-token and media://live/object",
+        },
+      });
+    });
+
+    expect(screen.getByText("Live conversation command failed.")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/rawPrompt leaked|Bearer live-token|media:\/\/live\/object/i),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      handlers?.onMessage?.({
+        type: "error",
+        occurred_at: "2026-04-21T00:00:06.000Z",
+        payload: { message: "Forbidden" },
+      });
+    });
+
+    expect(screen.getByText("Forbidden")).toBeInTheDocument();
+  });
+
+
+  it("encodes conversation EventSource paths for reserved identifiers", () => {
+    const worldId = "world/conversations?mode=detail#frag";
+    const conversationId = "conversation/live?view=stream#frag";
+
+    render(
+      <ConversationDetail
+        worldId={worldId}
+        conversationId={conversationId}
+        data={adminData}
+      />,
+    );
+
+    expect(vi.mocked(subscribeToEventStream).mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(
+        conversationId,
+      )}/stream`,
+    );
+  });
+
   it("updates writer config and generates conversation narrative", async () => {
     vi.mocked(updateConversation).mockResolvedValue(adminData.conversation!);
     vi.mocked(generateConversationNarrativeArtifacts).mockResolvedValue(
@@ -199,6 +263,88 @@ describe("ConversationDetail", () => {
       );
     });
     expect(screen.getByText("Conversation summary")).toBeInTheDocument();
+  });
+
+
+  it("redacts sensitive writer plugin config from display and submit payloads", async () => {
+    vi.mocked(updateConversation).mockResolvedValue(adminData.conversation!);
+    const dirtyWriterConfig = {
+      tone: "quiet",
+      nested: {
+        safe_note: "reader-safe",
+        release_label: "seven-day-beta-eval",
+        rawOutput: "actual raw output should stay server-side",
+      },
+      clientSecret: "sk-live-writer-secret",
+      bearerToken: "Bearer writer-token",
+      storageUri: "media://writer/raw-output",
+      promptSnapshotId: "prompt-snapshot-secret",
+      attachment: "U2VjcmV0V3JpdGVyQnl0ZXM=",
+    };
+    const dirtyData: ConversationDetailData = {
+      ...adminData,
+      conversation: {
+        ...adminData.conversation!,
+        writer_config: {
+          ...adminData.conversation!.writer_config,
+          writer_plugin_config: dirtyWriterConfig,
+        },
+      },
+    };
+
+    render(
+      <ConversationDetail
+        worldId="world-1"
+        conversationId="conversation-1"
+        data={dirtyData}
+      />,
+    );
+
+    const writerConfig = screen.getByLabelText("Writer plugin config") as HTMLTextAreaElement;
+    expect(writerConfig.value).toContain("quiet");
+    expect(writerConfig.value).toContain("reader-safe");
+    expect(writerConfig.value).toContain("seven-day-beta-eval");
+    expect(writerConfig.value).toContain("[redacted]");
+    expect(writerConfig.value).not.toContain("clientSecret");
+    expect(writerConfig.value).not.toContain("bearerToken");
+    expect(writerConfig.value).not.toContain("storageUri");
+    expect(writerConfig.value).not.toContain("promptSnapshotId");
+    expect(writerConfig.value).not.toContain("media://writer/raw-output");
+    expect(writerConfig.value).not.toContain("sk-live-writer-secret");
+    expect(writerConfig.value).not.toContain("Bearer writer-token");
+    expect(writerConfig.value).not.toContain("actual raw output should stay server-side");
+    expect(writerConfig.value).not.toContain("U2VjcmV0V3JpdGVyQnl0ZXM=");
+
+    fireEvent.change(writerConfig, {
+      target: {
+        value: JSON.stringify(dirtyWriterConfig, null, 2),
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save writer config" }));
+
+    await waitFor(() => {
+      expect(updateConversation).toHaveBeenCalledWith("world-1", "conversation-1", {
+        writer_config: {
+          provider_profile_id: "profile-1",
+          writer_plugin_identifier: "builtin.default_narrative_writer",
+          writer_plugin_config: {
+            tone: "quiet",
+            nested: {
+              safe_note: "reader-safe",
+              release_label: "seven-day-beta-eval",
+            },
+            attachment: "[redacted]",
+          },
+          auto_generate_on_complete: true,
+          generate_summary: true,
+          generate_chapter: true,
+          style_guide: "",
+          target_length: "standard",
+          source_constraints: "",
+          include_prompt_preview: true,
+        },
+      });
+    });
   });
 
   it("stops a conversation and hides admin controls for read-only members", async () => {

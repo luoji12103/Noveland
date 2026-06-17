@@ -77,16 +77,29 @@ def test_anthropic_compatible_provider_extracts_text() -> None:
     assert requests[0].headers["x-api-key"] == "secret-key"
 
 
-def test_provider_service_requires_configured_api_key_ref() -> None:
+def test_provider_profile_service_blocks_legacy_execution_before_transport() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
     engine = create_engine("sqlite+pysqlite:///:memory:")
-    with Session(engine) as session, pytest.raises(ProviderConfigurationError):
-        ProviderProfileService(
+    with Session(engine) as session:
+        service = ProviderProfileService(
             session,
-            AppSettings(provider_api_keys_json={}),
-        ).invoke_profile(
-            _profile_record(ProviderType.OPENAI_COMPATIBLE, api_key_ref="missing-ref"),
-            "hello",
+            AppSettings(provider_api_keys_json={"provider-ref": "secret-key"}),
+            httpx.MockTransport(handler),
         )
+
+        with pytest.raises(ProviderConfigurationError) as exc_info:
+            service.invoke_profile(
+                _profile_record(ProviderType.OPENAI_COMPATIBLE),
+                "hello",
+            )
+
+    assert "ProviderExecutionService" in str(exc_info.value)
+    assert requests == []
 
 
 def test_provider_retries_transient_errors_and_classifies_final_failure() -> None:
@@ -110,31 +123,31 @@ def test_provider_retries_transient_errors_and_classifies_final_failure() -> Non
     assert exc_info.value.error_code is ProviderErrorCode.TRANSIENT
 
 
-def test_provider_rate_limiter_blocks_over_limit_calls() -> None:
-    profile = _profile_record(ProviderType.OPENAI_COMPATIBLE, rate_limit_per_minute=1)
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
-
+def test_provider_profile_service_blocks_legacy_execution_before_secret_lookup() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:")
     with Session(engine) as session:
         service = ProviderProfileService(
             session,
-            AppSettings(provider_api_keys_json={"provider-ref": "secret-key"}),
-            httpx.MockTransport(handler),
+            AppSettings(provider_api_keys_json={}),
         )
 
-        assert service.invoke_profile(profile, "hello").text == "ok"
-        with pytest.raises(ProviderInvocationError) as exc_info:
-            service.invoke_profile(profile, "again")
-    assert exc_info.value.error_code is ProviderErrorCode.RATE_LIMITED
+        with pytest.raises(ProviderConfigurationError) as exc_info:
+            service.invoke_profile(
+                _profile_record(ProviderType.OPENAI_COMPATIBLE, api_key_ref="missing-ref"),
+                "hello",
+            )
+
+    assert "ProviderExecutionService" in str(exc_info.value)
+    assert "missing-ref" not in str(exc_info.value)
 
 
 def test_provider_test_profile_updates_last_test_state() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:")
     cast(Table, ProviderProfile.__table__).create(engine)
+    requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
         return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
 
     with Session(engine) as session:
@@ -155,11 +168,16 @@ def test_provider_test_profile_updates_last_test_state() -> None:
             httpx.MockTransport(handler),
         ).test_profile(profile)
 
-        assert result.status is ProviderTestStatus.SUCCESS
-        assert result.text_preview == "OK"
+        assert result.status is ProviderTestStatus.FAILED
+        assert result.text_preview is None
+        assert result.error_code is ProviderErrorCode.CONFIGURATION
+        assert result.error_message is not None
+        assert "ProviderExecutionService" in result.error_message
+        assert "secret-key" not in result.error_message
+        assert requests == []
         assert profile.last_tested_at is not None
-        assert profile.last_test_status == "success"
-        assert profile.last_test_error is None
+        assert profile.last_test_status == "failed"
+        assert profile.last_test_error == result.error_message
 
 
 def _profile_record(

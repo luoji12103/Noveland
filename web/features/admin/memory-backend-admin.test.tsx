@@ -25,6 +25,25 @@ describe("MemoryBackendAdmin", () => {
     expect(screen.getByText("conversation_turn")).toBeInTheDocument();
     expect(screen.getByText("Retry: retryable / age 300s / last log failed")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry job" })).toBeEnabled();
+    expect(screen.queryByText(/sk-live-secret/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/sk-live-secret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/clientSecret/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/clientSecret/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/bearerToken/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/bearerToken/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/rawPrompt/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/rawPrompt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/storageUri/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/storageUri/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/promptSnapshotId/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/promptSnapshotId/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/hidden memory prompt/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/hidden memory prompt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/opaque-memory-storage/)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/opaque-memory-storage/)).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue(/collection_name/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/env:MEMORY_OPENAI_API_KEY/)).toBeInTheDocument();
+    expect(screen.getByText(/safe_metric/)).toBeInTheDocument();
   });
 });
 
@@ -35,21 +54,66 @@ const memoryData: MemoryBackendAdminData = {
       profile_key: "primary-mem0",
       name: "Primary Mem0",
       backend_kind: "mem0_oss",
-      vector_store_config: {},
-      llm_config: {},
-      embedder_config: {},
-      reranker_config: {},
-      secret_refs: {},
+      vector_store_config: {
+        collection_name: "agent_memory",
+        storageUri: "opaque-memory-storage",
+        nested: { filePath: "/var/noveland/memory" },
+      },
+      llm_config: {
+        model: "safe-model",
+        clientSecret: "sk-live-secret",
+        rawPrompt: "hidden memory prompt",
+      },
+      embedder_config: { dimensions: 1536, bearerToken: "Bearer sk-live-secret" },
+      reranker_config: { promptSnapshotId: "snapshot-hidden" },
+      secret_refs: {
+        openai_api_key: "env:MEMORY_OPENAI_API_KEY",
+        dirty_ref: "sk-live-secret",
+      },
       is_enabled: true,
       created_at: "2026-04-17T00:00:00.000Z",
       updated_at: "2026-04-17T00:00:00.000Z",
     },
   ],
   profileHealth: {
-    "memory-profile-1": { backend: "mem0_oss", status: "ok", details: {} },
+    "memory-profile-1": {
+      backend: "mem0_oss",
+      status: "ok",
+      details: { safe_metric: "ok", clientSecret: "sk-live-secret" },
+    },
   },
   profileLogs: {
-    "memory-profile-1": { write_logs: [], retrieval_logs: [] },
+    "memory-profile-1": {
+      write_logs: [
+        {
+          id: "write-log-1",
+          job_id: "job-1",
+          backend: "mem0_oss",
+          success: false,
+          latency_ms: 5,
+          request_summary: { rawPrompt: "hidden memory prompt", safe_request: "ok" },
+          response_summary: { storageUri: "opaque-memory-storage" },
+          correlation_ids: { promptSnapshotId: "snapshot-hidden" },
+          occurred_at: "2026-04-17T00:05:00.000Z",
+        },
+      ],
+      retrieval_logs: [
+        {
+          id: "retrieval-log-1",
+          world_id: "world-1",
+          worldline_id: "worldline-1",
+          agent_id: "agent-1",
+          backend_profile_id: "memory-profile-1",
+          backend: "mem0_oss",
+          query_text: "safe query",
+          hit_count: 1,
+          selected_item_ids: ["item-1"],
+          latency_ms: 4,
+          context_item_count: 1,
+          occurred_at: "2026-04-17T00:06:00.000Z",
+        },
+      ],
+    },
   },
   profileJobs: {
     "memory-profile-1": {

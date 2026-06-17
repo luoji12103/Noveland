@@ -27,7 +27,7 @@ describe("AgentList", () => {
   it("shows preset preview and sends preset_id when creating an agent", async () => {
     vi.mocked(createAgent).mockResolvedValue({
       ...workspaceData.agents[0],
-      id: "agent-2",
+      id: RESERVED_AGENT_ID,
       agent_key: "scribe",
       display_name: "Scribe",
       source_preset_id: "preset-1",
@@ -38,7 +38,7 @@ describe("AgentList", () => {
       value: { assign },
     });
 
-    render(<AgentList worldId="world-1" data={workspaceData} />);
+    render(<AgentList worldId={RESERVED_WORLD_ID} data={workspaceData} />);
 
     fireEvent.change(screen.getAllByRole("combobox")[0], {
       target: { value: "preset-1" },
@@ -56,13 +56,32 @@ describe("AgentList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
 
     await waitFor(() => {
-      expect(createAgent).toHaveBeenCalledWith("world-1", expect.objectContaining({
+      expect(createAgent).toHaveBeenCalledWith(RESERVED_WORLD_ID, expect.objectContaining({
         agent_key: "scribe",
         display_name: "Scribe",
         preset_id: "preset-1",
       }));
     });
-    expect(assign).toHaveBeenCalledWith("/worlds/world-1/agents/agent-2");
+    expect(assign).toHaveBeenCalledWith(
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/agents/${encodeURIComponent(RESERVED_AGENT_ID)}`,
+    );
+  });
+
+  it("encodes local builder links for reserved route characters", () => {
+    render(
+      <AgentList
+        worldId={RESERVED_WORLD_ID}
+        data={{
+          ...workspaceData,
+          agents: [{ ...workspaceData.agents[0], id: RESERVED_AGENT_ID }],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Open builder" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/agents/${encodeURIComponent(RESERVED_AGENT_ID)}`,
+    );
   });
 
   it("renders source preset labels and hides write controls for read-only users", () => {
@@ -83,6 +102,9 @@ describe("AgentList", () => {
     expect(screen.queryByRole("button", { name: "Disable agent" })).not.toBeInTheDocument();
   });
 });
+
+const RESERVED_WORLD_ID = "world/admin?scope=true#frag";
+const RESERVED_AGENT_ID = "agent/detail?mode=edit#frag";
 
 const workspaceData: AgentWorkspaceData = {
   worlds: [

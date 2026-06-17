@@ -26,7 +26,9 @@ import type {
 
 describe("narrative reader", () => {
   it("renders reader list filters and artifact links", () => {
-    render(<NarrativeReaderList worldId="world-1" data={listData} />);
+    const data = readerListDataWithReservedIds();
+
+    render(<NarrativeReaderList worldId={RESERVED_WORLD_ID} data={data} />);
 
     expect(screen.getByRole("heading", { name: "Reader filters" })).toBeVisible();
     expect(screen.getByDisplayValue("summary")).toBeVisible();
@@ -35,7 +37,7 @@ describe("narrative reader", () => {
     expect(screen.getByDisplayValue("Publication timeline")).toBeVisible();
     expect(screen.getByRole("link", { name: "Manual Chain summary" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/reader/artifact-1",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader/${encodeURIComponent(RESERVED_ARTIFACT_ID)}`,
     );
     expect(screen.getByText("Conversation: Manual Chain")).toBeVisible();
     expect(screen.getAllByText("Published Apr 21, 2026, 12:03 AM")[0]).toBeVisible();
@@ -43,20 +45,80 @@ describe("narrative reader", () => {
   });
 
   it("renders artifact detail with source conversation link", () => {
-    render(<NarrativeReaderDetail worldId="world-1" data={detailData} />);
+    const data = readerDetailDataWithReservedIds();
+
+    render(<NarrativeReaderDetail worldId={RESERVED_WORLD_ID} data={data} />);
 
     expect(screen.getByRole("heading", { name: "Manual Chain summary" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Back to reader" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/reader",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader`,
     );
     expect(screen.getByRole("link", { name: "Open source conversation" })).toHaveAttribute(
       "href",
-      "/worlds/world-1/conversations/conversation-1",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/conversations/${encodeURIComponent(
+        RESERVED_CONVERSATION_ID,
+      )}`,
+    );
+    expect(screen.getByRole("link", { name: "Open playback" })).toHaveAttribute(
+      "href",
+      `/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/reader/conversations/${encodeURIComponent(
+        RESERVED_CONVERSATION_ID,
+      )}/playback`,
     );
     expect(screen.getByText("Summary body")).toBeVisible();
     expect(screen.getByText("Published Apr 21, 2026, 12:03 AM")).toBeVisible();
     expect(screen.getByText(/generation_mode/)).toBeVisible();
+  });
+
+
+  it("redacts sensitive artifact metadata from reader detail", () => {
+    const dirtyData: NarrativeReaderDetailData = {
+      ...detailData,
+      artifact: {
+        ...detailData.artifact!,
+        metadata: {
+          generation_mode: "manual",
+          safe_label: "reader-safe",
+          release_label: "seven-day-beta-eval",
+          nested: {
+            safe_note: "keep-visible",
+            rawPrompt: "actual raw prompt should stay private",
+          },
+          clientSecret: "sk-live-reader-secret",
+          bearerToken: "Bearer reader-token",
+          storageUri: "media://reader/raw-output",
+          promptSnapshotId: "prompt-snapshot-secret",
+          attachment: "U2VjcmV0UmVhZGVyQnl0ZXM=",
+        },
+      },
+    };
+
+    const { container } = render(<NarrativeReaderDetail worldId="world-1" data={dirtyData} />);
+
+    expect(container).toHaveTextContent("generation_mode");
+    expect(container).toHaveTextContent("reader-safe");
+    expect(container).toHaveTextContent("seven-day-beta-eval");
+    expect(container).toHaveTextContent("keep-visible");
+    expect(container).toHaveTextContent("[redacted]");
+    expect(container).not.toHaveTextContent("clientSecret");
+    expect(container).not.toHaveTextContent("bearerToken");
+    expect(container).not.toHaveTextContent("storageUri");
+    expect(container).not.toHaveTextContent("promptSnapshotId");
+    expect(container).not.toHaveTextContent("media://reader/raw-output");
+    expect(container).not.toHaveTextContent("sk-live-reader-secret");
+    expect(container).not.toHaveTextContent("Bearer reader-token");
+    expect(container).not.toHaveTextContent("actual raw prompt should stay private");
+    expect(container).not.toHaveTextContent("U2VjcmV0UmVhZGVyQnl0ZXM=");
+  });
+
+
+  it("encodes reader EventSource paths for reserved world identifiers", () => {
+    render(<NarrativeReaderList worldId={RESERVED_WORLD_ID} data={listData} />);
+
+    expect(subscribeToEventStream.mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(RESERVED_WORLD_ID)}/stream`,
+    );
   });
 
   it("merges published stream updates into the reader list", () => {
@@ -94,6 +156,40 @@ describe("narrative reader", () => {
     expect(screen.getByRole("link", { name: "Streamed published summary" })).toBeVisible();
   });
 });
+
+const RESERVED_WORLD_ID = "world/reader?mode=list#frag";
+const RESERVED_ARTIFACT_ID = "artifact/reader?draft=false#frag";
+const RESERVED_CONVERSATION_ID = "conversation/source?mode=play#frag";
+
+function readerListDataWithReservedIds(): NarrativeReaderListData {
+  const conversation = { ...conversations[0], id: RESERVED_CONVERSATION_ID };
+  const artifact = {
+    ...artifacts[0],
+    id: RESERVED_ARTIFACT_ID,
+    source_conversation_id: RESERVED_CONVERSATION_ID,
+    publication: {
+      ...artifacts[0].publication,
+      artifact_id: RESERVED_ARTIFACT_ID,
+      source_draft_id: RESERVED_ARTIFACT_ID,
+    },
+  };
+
+  return {
+    ...listData,
+    conversations: [conversation],
+    narrativeArtifacts: [artifact],
+  };
+}
+
+function readerDetailDataWithReservedIds(): NarrativeReaderDetailData {
+  const list = readerListDataWithReservedIds();
+
+  return {
+    ...detailData,
+    conversations: list.conversations,
+    artifact: list.narrativeArtifacts[0],
+  };
+}
 
 const conversations = [
   {

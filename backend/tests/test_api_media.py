@@ -133,6 +133,32 @@ def test_media_api_admin_crud_context_lineage_and_job_flow() -> None:
         assert [event.payload for event in events] == [{"kind": "seed"}]
 
 
+def test_media_asset_detail_rejects_cross_worldline_requests() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "media-owner-worldline@example.test")
+    other_owner_id, _ = _seed_user(engine, "media-other-worldline@example.test")
+    world_id = _seed_world(engine, owner_id)
+    other_world_id = _seed_world(engine, other_owner_id)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    other_primary_id, _other_fork_id = _seed_worldlines(engine, other_world_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    _authenticate(client, owner_token)
+
+    wrong_worldline = client.get(
+        f"/worlds/{world_id}/media/assets/{asset_id}",
+        params={"worldline_id": str(other_primary_id)},
+    )
+    valid_worldline = client.get(
+        f"/worlds/{world_id}/media/assets/{asset_id}",
+        params={"worldline_id": str(primary_id)},
+    )
+
+    assert wrong_worldline.status_code == 422
+    assert valid_worldline.status_code == 200
+    assert valid_worldline.json()["id"] == str(asset_id)
+
+
 def test_media_api_member_visibility_acl_and_csrf() -> None:
     client, engine = _client_with_database()
     owner_id, owner_token = _seed_user(engine, "owner@example.test")
@@ -142,8 +168,28 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
     _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
     primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    source_job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
+    source_event_id = _seed_event(engine, world_id)
+    source_invocation_id = uuid.uuid4()
     visible_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
     private_id = _seed_asset(engine, world_id, primary_id, visibility="private")
+    stored = client.media_storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{primary_id}/assets/{visible_id}/member-visible",
+        b"visible-bytes",
+        content_type="image/png",
+    )
+    with Session(engine) as session:
+        visible_asset = session.get(MediaAsset, visible_id)
+        assert visible_asset is not None
+        visible_asset.storage_uri = stored.uri
+        visible_asset.preview_uri = stored.uri
+        visible_asset.thumbnail_uri = stored.uri
+        visible_asset.provider_kind = "fake-provider"
+        visible_asset.source_job_id = source_job_id
+        visible_asset.source_event_id = source_event_id
+        visible_asset.source_invocation_id = source_invocation_id
+        visible_asset.created_by_actor_ref = "user:internal-admin"
+        session.commit()
 
     _authenticate_session_only(client, owner_token)
     missing_csrf = client.post(
@@ -157,7 +203,20 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
 
     _authenticate(client, member_token)
     member_list = client.get(f"/worlds/{world_id}/media/assets")
+    member_search = client.get(f"/worlds/{world_id}/media/assets/search")
     member_get_visible = client.get(f"/worlds/{world_id}/media/assets/{visible_id}")
+    member_list_by_source_event = client.get(
+        f"/worlds/{world_id}/media/assets",
+        params={"source_event_id": str(source_event_id)},
+    )
+    member_list_by_source_invocation = client.get(
+        f"/worlds/{world_id}/media/assets",
+        params={"source_invocation_id": str(source_invocation_id)},
+    )
+    member_search_by_provider = client.get(
+        f"/worlds/{world_id}/media/assets/search",
+        params={"provider_kind": "fake-provider"},
+    )
     member_private_contexts = client.get(
         f"/worlds/{world_id}/media/assets/{private_id}/contexts"
     )
@@ -176,6 +235,9 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
         },
     )
 
+    _authenticate(client, owner_token)
+    admin_get_visible = client.get(f"/worlds/{world_id}/media/assets/{visible_id}")
+
     _authenticate(client, stranger_token)
     stranger_list = client.get(f"/worlds/{world_id}/media/assets")
 
@@ -183,12 +245,224 @@ def test_media_api_member_visibility_acl_and_csrf() -> None:
     assert missing_csrf.status_code == 403
     assert member_list.status_code == 200
     assert [asset["id"] for asset in member_list.json()] == [str(visible_id)]
+    assert member_list.json()[0]["storage_uri"] is None
+    assert member_list.json()[0]["preview_uri"] is None
+    assert member_list.json()[0]["thumbnail_uri"] is None
+    assert member_list.json()[0]["provider_kind"] is None
+    assert member_list.json()[0]["source_job_id"] is None
+    assert member_list.json()[0]["source_event_id"] is None
+    assert member_list.json()[0]["source_invocation_id"] is None
+    assert member_list.json()[0]["created_by_actor_ref"] == ""
+    assert member_search.status_code == 200
+    assert member_search.json()["assets"][0]["storage_uri"] is None
+    assert member_search.json()["assets"][0]["preview_uri"] is None
+    assert member_search.json()["assets"][0]["thumbnail_uri"] is None
+    assert member_search.json()["assets"][0]["provider_kind"] is None
+    assert member_search.json()["assets"][0]["source_job_id"] is None
+    assert member_search.json()["assets"][0]["source_event_id"] is None
+    assert member_search.json()["assets"][0]["source_invocation_id"] is None
+    assert member_search.json()["assets"][0]["created_by_actor_ref"] == ""
     assert member_get_visible.status_code == 200
+    assert member_get_visible.json()["storage_uri"] is None
+    assert member_get_visible.json()["preview_uri"] is None
+    assert member_get_visible.json()["thumbnail_uri"] is None
+    assert member_get_visible.json()["provider_kind"] is None
+    assert member_get_visible.json()["source_job_id"] is None
+    assert member_get_visible.json()["source_event_id"] is None
+    assert member_get_visible.json()["source_invocation_id"] is None
+    assert member_get_visible.json()["created_by_actor_ref"] == ""
+    assert member_list_by_source_event.status_code == 422
+    assert member_list_by_source_invocation.status_code == 422
+    assert member_search_by_provider.status_code == 422
+    assert admin_get_visible.status_code == 200
+    assert admin_get_visible.json()["storage_uri"] == stored.uri
+    assert admin_get_visible.json()["preview_uri"] == stored.uri
+    assert admin_get_visible.json()["thumbnail_uri"] == stored.uri
+    assert admin_get_visible.json()["provider_kind"] == "fake-provider"
+    assert admin_get_visible.json()["source_job_id"] == str(source_job_id)
+    assert admin_get_visible.json()["source_event_id"] == str(source_event_id)
+    assert admin_get_visible.json()["source_invocation_id"] == str(source_invocation_id)
+    assert admin_get_visible.json()["created_by_actor_ref"] == "user:internal-admin"
     assert member_private_contexts.status_code == 404
     assert member_private_references.status_code == 404
     assert member_private_lineage.status_code == 404
     assert member_create.status_code == 403
     assert stranger_list.status_code == 404
+
+
+def test_media_api_member_metadata_redaction_across_visible_records() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, turn_id = _seed_conversation(engine, world_id, primary_id)
+    source_job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
+    asset_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    source_id = _seed_asset(engine, world_id, primary_id, visibility="world_member")
+    leaky_metadata = _leaky_media_metadata()
+    expected_metadata = _safe_member_media_metadata()
+    with Session(engine) as session:
+        asset = session.get(MediaAsset, asset_id)
+        assert asset is not None
+        asset.metadata_json = dict(leaky_metadata)
+        session.commit()
+
+    _authenticate(client, owner_token)
+    context = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/contexts",
+        json={
+            "worldline_id": str(primary_id),
+            "conversation_id": str(conversation_id),
+            "turn_id": str(turn_id),
+            "context_role": "attachment",
+            "metadata": leaky_metadata,
+        },
+    )
+    input_record = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/inputs",
+        json={
+            "worldline_id": str(primary_id),
+            "input_asset_id": str(source_id),
+            "source_job_id": str(source_job_id),
+            "input_role": "reference",
+            "metadata": leaky_metadata,
+        },
+    )
+    tag = client.post(
+        f"/worlds/{world_id}/media/assets/{asset_id}/tags",
+        json={
+            "worldline_id": str(primary_id),
+            "tag_type": "audit",
+            "tag_key": "safe",
+            "tag_value": "visible",
+            "visibility": "world_member",
+            "metadata": leaky_metadata,
+        },
+    )
+    collection = client.post(
+        f"/worlds/{world_id}/media/collections",
+        json={
+            "worldline_id": str(primary_id),
+            "collection_kind": "audit",
+            "title": "Visible",
+            "visibility": "world_member",
+            "metadata": leaky_metadata,
+        },
+    )
+    collection_id = collection.json()["id"]
+    collection_item = client.post(
+        f"/worlds/{world_id}/media/collections/{collection_id}/items",
+        json={
+            "worldline_id": str(primary_id),
+            "asset_id": str(asset_id),
+            "role": "member",
+            "metadata": leaky_metadata,
+        },
+    )
+
+    _authenticate(client, member_token)
+    member_asset = client.get(f"/worlds/{world_id}/media/assets/{asset_id}")
+    member_contexts = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/contexts")
+    member_inputs = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/inputs")
+    member_tags = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/tags")
+    member_references = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/references")
+    member_lineage = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/lineage")
+    member_collections = client.get(f"/worlds/{world_id}/media/collections")
+    member_collection = client.get(f"/worlds/{world_id}/media/collections/{collection_id}")
+    member_collection_items = client.get(
+        f"/worlds/{world_id}/media/collections/{collection_id}/items"
+    )
+
+    _authenticate(client, owner_token)
+    admin_asset = client.get(f"/worlds/{world_id}/media/assets/{asset_id}")
+    admin_references = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/references")
+    admin_lineage = client.get(f"/worlds/{world_id}/media/assets/{asset_id}/lineage")
+
+    assert member_id
+    assert context.status_code == 201
+    assert input_record.status_code == 201
+    assert tag.status_code == 201
+    assert collection.status_code == 201
+    assert collection_item.status_code == 201
+    assert member_asset.status_code == 200
+    assert member_asset.json()["metadata"] == expected_metadata
+    assert "rawPrompt" not in str(member_asset.json())
+    assert "promptSnapshot" not in str(member_asset.json())
+    assert "storageUri" not in str(member_asset.json())
+    assert member_contexts.status_code == 200
+    assert member_contexts.json()[0]["metadata"] == expected_metadata
+    assert member_inputs.status_code == 200
+    assert member_inputs.json()[0]["source_job_id"] is None
+    assert member_inputs.json()[0]["metadata"] == expected_metadata
+    assert member_tags.status_code == 200
+    assert member_tags.json()[0]["created_by_actor_ref"] == ""
+    assert member_tags.json()[0]["metadata"] == expected_metadata
+    assert member_references.status_code == 200
+    assert member_references.json()["contexts"][0]["metadata"] == expected_metadata
+    assert member_references.json()["tags"][0]["created_by_actor_ref"] == ""
+    assert member_references.json()["tags"][0]["metadata"] == expected_metadata
+    assert member_references.json()["collections"][0]["created_by_actor_ref"] == ""
+    assert member_references.json()["collections"][0]["metadata"] == expected_metadata
+    assert member_lineage.status_code == 200
+    assert member_lineage.json()["inputs"][0]["source_job_id"] is None
+    assert member_lineage.json()["inputs"][0]["metadata"] == expected_metadata
+    assert member_collections.status_code == 200
+    assert member_collections.json()[0]["created_by_actor_ref"] == ""
+    assert member_collections.json()[0]["metadata"] == expected_metadata
+    assert member_collection.status_code == 200
+    assert member_collection.json()["created_by_actor_ref"] == ""
+    assert member_collection.json()["metadata"] == expected_metadata
+    assert member_collection_items.status_code == 200
+    assert member_collection_items.json()[0]["metadata"] == expected_metadata
+    assert admin_asset.status_code == 200
+    assert admin_asset.json()["metadata"]["storage_uri"] == "media://hidden-object"
+    assert admin_references.status_code == 200
+    assert admin_references.json()["contexts"][0]["metadata"]["raw_prompt"] == "raw prompt"
+    assert admin_references.json()["tags"][0]["created_by_actor_ref"] == f"user:{owner_id}"
+    assert admin_references.json()["collections"][0]["created_by_actor_ref"] == (
+        f"user:{owner_id}"
+    )
+    assert admin_lineage.status_code == 200
+    assert admin_lineage.json()["inputs"][0]["source_job_id"] == str(source_job_id)
+
+
+def test_media_api_jobs_are_admin_only_for_internal_execution_evidence() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner@example.test")
+    member_id, member_token = _seed_user(engine, "member@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    primary_id, _fork_id = _seed_worldlines(engine, world_id)
+    job_id = _seed_job_with_internal_evidence(engine, world_id, primary_id)
+
+    _authenticate(client, member_token)
+    member_list = client.get(f"/worlds/{world_id}/media/jobs")
+    member_get = client.get(f"/worlds/{world_id}/media/jobs/{job_id}")
+
+    _authenticate(client, owner_token)
+    admin_list = client.get(
+        f"/worlds/{world_id}/media/jobs", params={"worldline_id": str(primary_id)}
+    )
+    admin_get = client.get(f"/worlds/{world_id}/media/jobs/{job_id}")
+
+    assert member_id
+    assert member_list.status_code == 403
+    assert member_get.status_code == 403
+    assert admin_list.status_code == 200
+    assert [item["id"] for item in admin_list.json()] == [str(job_id)]
+    assert admin_get.status_code == 200
+    assert admin_get.json()["provider_config_json"] == {"api_key": "sk-media-job-secret"}
+    assert admin_get.json()["request_json"] == {
+        "prompt": "raw prompt",
+        "storage_uri": "media://private-object",
+        "bytes": "base64-data",
+    }
+    assert admin_get.json()["result_json"] == {"raw_output": "raw provider output"}
+    assert admin_get.json()["error_text"] == "/tmp/private-media-job failed"
 
 
 def test_media_api_rejects_narrative_artifact_and_cross_worldline_contexts() -> None:
@@ -227,6 +501,18 @@ def test_media_api_member_can_read_visible_fork_asset_references() -> None:
     _primary_id, fork_id = _seed_worldlines(engine, world_id)
     source_id = _seed_asset(engine, world_id, fork_id, visibility="world_member")
     output_id = _seed_asset(engine, world_id, fork_id, visibility="world_member")
+    stored = client.media_storage.write_bytes(
+        f"worlds/{world_id}/worldlines/{fork_id}/assets/{source_id}/lineage-related",
+        b"lineage-related",
+        content_type="image/png",
+    )
+    with Session(engine) as session:
+        source_asset = session.get(MediaAsset, source_id)
+        assert source_asset is not None
+        source_asset.storage_uri = stored.uri
+        source_asset.preview_uri = stored.uri
+        source_asset.thumbnail_uri = stored.uri
+        session.commit()
 
     _authenticate(client, owner_token)
     created_input = client.post(
@@ -242,9 +528,20 @@ def test_media_api_member_can_read_visible_fork_asset_references() -> None:
     lineage = client.get(f"/worlds/{world_id}/media/assets/{output_id}/lineage")
     references = client.get(f"/worlds/{world_id}/media/assets/{source_id}/references")
 
+    _authenticate(client, owner_token)
+    admin_lineage = client.get(f"/worlds/{world_id}/media/assets/{output_id}/lineage")
+
     assert created_input.status_code == 201
     assert lineage.status_code == 200
     assert lineage.json()["inputs"][0]["input_asset_id"] == str(source_id)
+    assert lineage.json()["related_assets"][0]["id"] == str(source_id)
+    assert lineage.json()["related_assets"][0]["storage_uri"] is None
+    assert lineage.json()["related_assets"][0]["preview_uri"] is None
+    assert lineage.json()["related_assets"][0]["thumbnail_uri"] is None
+    assert admin_lineage.status_code == 200
+    assert admin_lineage.json()["related_assets"][0]["storage_uri"] == stored.uri
+    assert admin_lineage.json()["related_assets"][0]["preview_uri"] == stored.uri
+    assert admin_lineage.json()["related_assets"][0]["thumbnail_uri"] == stored.uri
     assert references.status_code == 200
     assert references.json()["input_count"] == 1
 
@@ -312,10 +609,12 @@ def test_media_api_upload_download_objects_and_restricted_visibility() -> None:
     assert download.status_code == 200
     assert download.content == b"image-bytes"
     assert download.headers["content-type"].startswith("image/png")
+    assert download.headers["x-content-type-options"] == "nosniff"
     assert member_download.status_code == 403
     assert owner_hidden_download.status_code == 404
     assert platform_hidden_download.status_code == 200
     assert platform_hidden_download.content == b"hidden-bytes"
+    assert platform_hidden_download.headers["x-content-type-options"] == "nosniff"
 
 
 def test_media_api_generic_references_turn_media_and_job_patch() -> None:
@@ -686,6 +985,72 @@ def _seed_asset(
         )
         session.commit()
     return asset_id
+
+
+def _leaky_media_metadata() -> dict[str, object]:
+    return {
+        "safe": "keep",
+        "storage_uri": "media://hidden-object",
+        "raw_prompt": "raw prompt",
+        "rawPrompt": "operator prompt",
+        "promptSnapshotId": str(uuid.uuid4()),
+        "bytes": "base64-data",
+        "nested": {
+            "safe": "nested",
+            "filesystem_path": "/tmp/private-file",
+            "rawOutput": "provider output",
+            "storageUri": "opaque-storage-ref",
+        },
+        "items": ["visible", "media://hidden-list-item"],
+        "token": "sk-metadata-secret",
+    }
+
+
+def _safe_member_media_metadata() -> dict[str, object]:
+    return {"safe": "keep", "nested": {"safe": "nested"}, "items": ["visible"]}
+
+
+def _seed_job_with_internal_evidence(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> uuid.UUID:
+    job_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            MediaJob(
+                id=job_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                conversation_id=None,
+                turn_id=None,
+                agent_id=None,
+                job_kind="image_generation",
+                provider_kind="fake",
+                status="failed",
+                priority=0,
+                cancel_policy=None,
+                deadline_hint=None,
+                dedupe_key=None,
+                invalidation_key=None,
+                source_event_id=None,
+                source_invocation_id=None,
+                provider_config_json={"api_key": "sk-media-job-secret"},
+                request_json={
+                    "prompt": "raw prompt",
+                    "storage_uri": "media://private-object",
+                    "bytes": "base64-data",
+                },
+                result_json={"raw_output": "raw provider output"},
+                error_text="/tmp/private-media-job failed",
+                created_by_actor_ref="system:test",
+                started_at=now,
+                finished_at=now,
+            )
+        )
+        session.commit()
+    return job_id
 
 
 def _seed_object(

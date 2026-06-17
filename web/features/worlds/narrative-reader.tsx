@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { mergeById, subscribeToEventStream } from "@/lib/realtime";
+import { mergeById, subscribeToEventStream, worldEventStreamPath } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type {
   NarrativeReaderDetailData,
@@ -27,7 +27,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
 
   useEffect(() => {
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
-      `/api/worlds/${worldId}/stream`,
+      worldEventStreamPath(worldId),
       (envelope) => {
         const publishedArtifacts = envelope.payload.narrative_artifacts.filter(
           (artifact) =>
@@ -108,7 +108,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
           <button className="primary-button" type="submit">
             Apply filters
           </button>
-          <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
             Clear
           </Link>
         </form>
@@ -136,7 +136,7 @@ export function NarrativeReaderList({ worldId, data }: NarrativeReaderListProps)
                 <article className="resource-row" key={artifact.id}>
                   <div>
                     <h3>
-                      <Link href={`/worlds/${worldId}/reader/${artifact.id}`}>{artifact.title}</Link>
+                      <Link href={`/worlds/${encodeURIComponent(worldId)}/reader/${encodeURIComponent(artifact.id)}`}>{artifact.title}</Link>
                     </h3>
                     <p>
                       {artifact.artifact_kind} - {formatDateTime(artifact.created_at)}
@@ -252,13 +252,13 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
 
       <section className="management-panel" aria-labelledby="artifact-title">
         <div className="button-row">
-          <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+          <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
             Back to reader
           </Link>
           {sourceConversation !== null ? (
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/conversations/${sourceConversation.id}`}
+              href={`/worlds/${encodeURIComponent(worldId)}/conversations/${encodeURIComponent(sourceConversation.id)}`}
             >
               Open source conversation
             </Link>
@@ -266,7 +266,7 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
           {sourceConversation !== null ? (
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/reader/conversations/${sourceConversation.id}/playback`}
+              href={`/worlds/${encodeURIComponent(worldId)}/reader/conversations/${encodeURIComponent(sourceConversation.id)}/playback`}
             >
               Open playback
             </Link>
@@ -303,7 +303,7 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
             <div>
               <h3>Metadata</h3>
               <p style={{ whiteSpace: "pre-wrap" }}>
-                {JSON.stringify(data.artifact.metadata, null, 2)}
+                {narrativeReaderJsonString(data.artifact.metadata)}
               </p>
             </div>
           </article>
@@ -311,6 +311,124 @@ export function NarrativeReaderDetail({ worldId, data }: NarrativeReaderDetailPr
       </section>
     </section>
   );
+}
+
+function narrativeReaderJsonString(value: unknown): string {
+  return JSON.stringify(sanitizeNarrativeReaderJsonValue(value), null, 2);
+}
+
+function sanitizeNarrativeReaderJsonObject(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !sensitiveNarrativeReaderJsonKey(key))
+      .map(([key, entry]) => [key, sanitizeNarrativeReaderJsonValue(entry)]),
+  );
+}
+
+function sanitizeNarrativeReaderJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeNarrativeReaderJsonValue(entry));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeNarrativeReaderJsonObject(value as Record<string, unknown>);
+  }
+  if (typeof value === "string" && looksSensitiveNarrativeReaderString(value)) {
+    return "[redacted]";
+  }
+  return value;
+}
+
+const EXACT_SENSITIVE_NARRATIVE_READER_JSON_KEYS = new Set([
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "password",
+  "secret",
+  "token",
+]);
+
+const SENSITIVE_NARRATIVE_READER_JSON_KEY_MARKERS = [
+  "accesstoken",
+  "bearertoken",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "privatekey",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+const SENSITIVE_NARRATIVE_READER_TEXT_MARKERS = [
+  "accesstoken",
+  "apikey",
+  "authorization",
+  "base64",
+  "bearertoken",
+  "bytes",
+  "clientsecret",
+  "filesystempath",
+  "filepath",
+  "localmodelpath",
+  "objectpath",
+  "objectstoragepath",
+  "promptsnapshot",
+  "promptsnapshotid",
+  "rawbytes",
+  "rawoutput",
+  "rawprompt",
+  "refreshtoken",
+  "secretkey",
+  "storagepath",
+  "storageuri",
+  "storageurl",
+];
+
+function sensitiveNarrativeReaderJsonKey(key: string): boolean {
+  const normalized = normalizeNarrativeReaderMarker(key);
+  return (
+    EXACT_SENSITIVE_NARRATIVE_READER_JSON_KEYS.has(normalized) ||
+    SENSITIVE_NARRATIVE_READER_JSON_KEY_MARKERS.some((marker) => normalized.includes(marker))
+  );
+}
+
+function looksSensitiveNarrativeReaderString(value: string): boolean {
+  const normalized = normalizeNarrativeReaderMarker(value);
+  return (
+    SENSITIVE_NARRATIVE_READER_TEXT_MARKERS.some((marker) => normalized.includes(marker)) ||
+    /media:\/\/|\/var\/|\/tmp\/|\/models\/|[A-Za-z]:\\|sk-[A-Za-z0-9_-]+|Bearer\s+\S+/i.test(value) ||
+    containsBase64LikeNarrativeReaderToken(value)
+  );
+}
+
+function containsBase64LikeNarrativeReaderToken(value: string): boolean {
+  return value
+    .split(/\s+/)
+    .some((part) => {
+      const normalized = part.replace(/[^A-Za-z0-9+/=]/g, "");
+      return (
+        normalized.length >= 24 &&
+        normalized.length % 4 === 0 &&
+        /^[A-Za-z0-9+/]+={0,2}$/.test(normalized) &&
+        !/^[a-f0-9]{32,}$/i.test(normalized)
+      );
+    });
+}
+
+function normalizeNarrativeReaderMarker(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 function formatDateTime(value: string): string {

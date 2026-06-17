@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import re
 import uuid
 
 from noveland.conversations.models import ConversationSession, ConversationTurn
-from noveland.media.contracts import MediaAssetStatus, MediaReferenceKind, MediaVisibility
+from noveland.media.contracts import (
+    AUDIO_MIME_TYPES,
+    IMAGE_MIME_TYPES,
+    MediaAssetStatus,
+    MediaReferenceKind,
+    MediaVisibility,
+)
 from noveland.media.models import MediaAsset, MediaObject, MediaReference
 from noveland.media.storage import MediaObjectStorage
 from noveland.moderation import ModerationService, ModerationTargetKind
@@ -13,6 +20,7 @@ from noveland.reader_delivery.contracts import (
     ReaderMediaObjectDescriptor,
     ReaderMediaReferenceDescriptor,
 )
+from noveland.worlds.models import Worldline
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,11 +30,26 @@ READER_DELIVERABLE_VISIBILITIES = {
     MediaVisibility.READER_VISIBLE.value,
 }
 READER_DELIVERABLE_KINDS = {"image", "audio", "video"}
+READER_VIDEO_MIME_TYPES = {"video/mp4", "video/ogg", "video/quicktime", "video/webm"}
+READER_SAFE_MIME_TYPES_BY_KIND = {
+    "image": IMAGE_MIME_TYPES,
+    "audio": AUDIO_MIME_TYPES,
+    "video": READER_VIDEO_MIME_TYPES,
+}
 READER_REFERENCE_KINDS = {
     MediaReferenceKind.NARRATIVE_ARTIFACT.value,
     MediaReferenceKind.CONVERSATION_TURN.value,
     MediaReferenceKind.CONVERSATION_SESSION.value,
 }
+
+READER_MEDIA_FORBIDDEN_TEXT_RE = re.compile(
+    r"(storage[_ -]?uri|media://|object://|file://|s3://|gs://|/root/|/tmp/|"
+    r"base64,|BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|bearer\s+|authorization|"
+    r"raw[_ -]?prompt|raw[_ -]?output|prompt[_ -]?snapshot|"
+    r"provider[_ -]?(kind|key|id)|secret[_ -]?ref|auth[_ -]?ref|"
+    r"file[_ -]?path|filesystem[_ -]?path|object[_ -]?path|bytes)",
+    re.IGNORECASE,
+)
 
 
 class ReaderMediaDeliveryService:
@@ -38,6 +61,7 @@ class ReaderMediaDeliveryService:
     ) -> None:
         self._session = session
         self._storage = storage
+        self._moderation = ModerationService(session)
 
     def list_media(
         self,
@@ -46,6 +70,7 @@ class ReaderMediaDeliveryService:
         worldline_id: uuid.UUID | None = None,
         limit: int = 100,
     ) -> list[ReaderMediaDescriptor]:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         statement = (
             select(MediaAsset)
             .where(
@@ -57,8 +82,8 @@ class ReaderMediaDeliveryService:
             .order_by(MediaAsset.created_at.desc())
             .limit(max(1, min(limit, 200)))
         )
-        if worldline_id is not None:
-            statement = statement.where(MediaAsset.worldline_id == worldline_id)
+        if resolved_worldline_id is not None:
+            statement = statement.where(MediaAsset.worldline_id == resolved_worldline_id)
         descriptors: list[ReaderMediaDescriptor] = []
         for asset in self._session.scalars(statement).all():
             descriptor = self._descriptor_for_asset(asset)
@@ -73,10 +98,11 @@ class ReaderMediaDeliveryService:
         *,
         worldline_id: uuid.UUID | None = None,
     ) -> ReaderMediaDescriptor | None:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         asset = self._session.get(MediaAsset, asset_id)
         if asset is None or asset.world_id != world_id:
             return None
-        if worldline_id is not None and asset.worldline_id != worldline_id:
+        if resolved_worldline_id is not None and asset.worldline_id != resolved_worldline_id:
             return None
         return self._descriptor_for_asset(asset)
 
@@ -87,12 +113,13 @@ class ReaderMediaDeliveryService:
         *,
         worldline_id: uuid.UUID | None = None,
     ) -> tuple[ReaderMediaObjectDescriptor, bytes] | None:
+        resolved_worldline_id = self._validated_worldline_id(world_id, worldline_id)
         if self._storage is None:
             return None
         media_object = self._session.get(MediaObject, object_id)
         if media_object is None or media_object.world_id != world_id:
             return None
-        if worldline_id is not None and media_object.worldline_id != worldline_id:
+        if resolved_worldline_id is not None and media_object.worldline_id != resolved_worldline_id:
             return None
         asset = self._session.get(MediaAsset, media_object.asset_id)
         if (
@@ -108,6 +135,18 @@ class ReaderMediaDeliveryService:
             if object_descriptor.object_id == object_id:
                 return object_descriptor, self._storage.read_bytes(media_object.storage_uri)
         return None
+
+    def _validated_worldline_id(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID | None,
+    ) -> uuid.UUID | None:
+        if worldline_id is None:
+            return None
+        worldline = self._session.get(Worldline, worldline_id)
+        if worldline is None or worldline.world_id != world_id:
+            raise ValueError("worldline not found")
+        return worldline.id
 
     def _descriptor_for_asset(self, asset: MediaAsset) -> ReaderMediaDescriptor | None:
         if not self._asset_is_reader_deliverable(asset):
@@ -128,8 +167,8 @@ class ReaderMediaDeliveryService:
             asset_kind=asset.asset_kind,
             asset_role=asset.asset_role,
             visibility=asset.visibility,
-            title=asset.title,
-            description=asset.description,
+            title=_safe_reader_text(asset.title),
+            description=_safe_reader_text(asset.description),
             content_type=primary.content_type,
             size=primary.size,
             width=primary.width,
@@ -142,11 +181,30 @@ class ReaderMediaDeliveryService:
         )
 
     def _asset_is_moderation_suppressed(self, asset: MediaAsset) -> bool:
-        return ModerationService(self._session).target_is_suppressed(
+        return self._target_is_moderation_suppressed(
             asset.world_id,
+            asset.worldline_id,
+            ModerationTargetKind.WORLDLINE,
+            asset.worldline_id,
+        ) or self._target_is_moderation_suppressed(
+            asset.world_id,
+            asset.worldline_id,
             ModerationTargetKind.MEDIA_ASSET,
             asset.id,
-            worldline_id=asset.worldline_id,
+        )
+
+    def _target_is_moderation_suppressed(
+        self,
+        world_id: uuid.UUID,
+        worldline_id: uuid.UUID,
+        target_kind: ModerationTargetKind,
+        target_id: uuid.UUID,
+    ) -> bool:
+        return self._moderation.target_is_suppressed(
+            world_id,
+            target_kind,
+            target_id,
+            worldline_id=worldline_id,
         )
 
     def _asset_is_reader_deliverable(self, asset: MediaAsset) -> bool:
@@ -179,11 +237,12 @@ class ReaderMediaDeliveryService:
                 sample_rate_hz=media_object.sample_rate_hz,
                 audio_channels=media_object.audio_channels,
                 download_url=(
-                    f"/worlds/{media_object.world_id}/reader/media/objects/"
-                    f"{media_object.id}/download"
+                    f"/worlds/{media_object.world_id}/reader/media/worldlines/"
+                    f"{media_object.worldline_id}/objects/{media_object.id}/download"
                 ),
             )
             for media_object in objects
+            if _reader_object_content_type_is_safe(asset.asset_kind, media_object.mime_type)
         ]
 
     def _reader_visible_references(
@@ -237,8 +296,15 @@ class ReaderMediaDeliveryService:
                 NarrativePublication.reader_visible.is_(True),
             )
         ).first()
-        return publication is not None and (
-            publication.worldline_id is None or publication.worldline_id == ref.worldline_id
+        if publication is None or (
+            publication.worldline_id is not None and publication.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.NARRATIVE_PUBLICATION,
+            publication.id,
         )
 
     def _conversation_turn_is_reader_visible(self, ref: MediaReference) -> bool:
@@ -246,16 +312,49 @@ class ReaderMediaDeliveryService:
         if turn is None:
             return False
         conversation = self._session.get(ConversationSession, turn.session_id)
-        return (
-            conversation is not None
-            and conversation.world_id == ref.world_id
-            and conversation.worldline_id == ref.worldline_id
+        if (
+            conversation is None
+            or conversation.world_id != ref.world_id
+            or conversation.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_SESSION,
+            conversation.id,
+        ) and not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_TURN,
+            ref.ref_id,
         )
 
     def _conversation_session_is_reader_visible(self, ref: MediaReference) -> bool:
         conversation = self._session.get(ConversationSession, ref.ref_id)
-        return (
-            conversation is not None
-            and conversation.world_id == ref.world_id
-            and conversation.worldline_id == ref.worldline_id
+        if (
+            conversation is None
+            or conversation.world_id != ref.world_id
+            or conversation.worldline_id != ref.worldline_id
+        ):
+            return False
+        return not self._target_is_moderation_suppressed(
+            ref.world_id,
+            ref.worldline_id,
+            ModerationTargetKind.CONVERSATION_SESSION,
+            conversation.id,
         )
+
+
+def _reader_object_content_type_is_safe(asset_kind: str, content_type: str) -> bool:
+    allowed = READER_SAFE_MIME_TYPES_BY_KIND.get(asset_kind)
+    if allowed is None:
+        return False
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    return normalized in allowed
+
+
+def _safe_reader_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return "" if READER_MEDIA_FORBIDDEN_TEXT_RE.search(value) else value

@@ -1,5 +1,305 @@
 # Change Journal
 
+## Post-v1.1 RC Audit and Hardening Web proxy request body preservation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin proxy request body byte-preservation remediation for F-059.
+- Finding: F-059 found `web/lib/worlds/media.ts` sending media uploads as `FormData` to `/api/worlds/{world_id}/media/assets/upload` while `web/lib/worlds/proxy.ts` decoded every non-GET request body with `request.text()` before forwarding it. The same text-decoding pattern existed in auth, generic API, runtime, and private-beta proxy helpers.
+- Summary: Added an architecture-contracts OpenSpec scenario for Web proxy request body byte preservation, changed auth, generic API, worlds, runtime, and private-beta proxy helpers to forward non-GET request bodies as raw `ArrayBuffer` bytes, and kept empty request bodies absent when forwarding to the backend.
+- Files changed: `web/lib/auth/proxy.ts`, `web/lib/api-proxy.ts`, `web/lib/worlds/proxy.ts`, `web/lib/runtime/proxy.ts`, `web/lib/private-beta/proxy.ts`, `web/lib/worlds/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Updated world proxy JSON-body assertions to decode the forwarded `ArrayBuffer`, and added binary upload coverage proving non-UTF-8 bytes survive proxy forwarding unchanged while existing cookie, CSRF, query, Set-Cookie stripping, and safe response-header coverage still passes.
+- Verification: `cd web && npm run test -- lib/worlds/proxy.test.ts lib/auth/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts` passed with 5 files and 14 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 179 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import. `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining route handler method exposure, proxy response/request edge cases, role-boundary rendering, client-side leaks, and product normal-use drift. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening media response safety header boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend media byte download response and Web proxy safe response-header preservation remediation for F-058.
+- Finding: F-058 found reader media downloads setting `X-Content-Type-Options: nosniff` at the backend boundary while `web/lib/auth/proxy.ts` `buildProxyResponse()` dropped that header through same-origin Web API proxies. Admin media downloads in `backend/services/api/src/noveland/services/api/media.py` also returned raw media bytes without a nosniff header.
+- Summary: Added an architecture-contracts OpenSpec scenario for Web proxy media response safety headers, added nosniff to backend admin media byte downloads, and changed `buildProxyResponse()` to preserve a small safe response-header allowlist (`content-type`, `content-disposition`, `content-length`, and `x-content-type-options`) while continuing to strip backend `Set-Cookie` unless auth proxy calls explicitly opt in.
+- Files changed: `backend/services/api/src/noveland/services/api/media.py`, `backend/tests/test_api_media.py`, `web/lib/auth/proxy.ts`, `web/lib/worlds/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded media API download coverage to assert admin media downloads set nosniff for normal and platform-admin hidden-object downloads; added world proxy coverage proving media safety headers are preserved while backend `Set-Cookie` remains stripped.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_api_upload_download_objects_and_restricted_visibility` passed with 1 test; `cd web && npm run test -- lib/worlds/proxy.test.ts` passed with 1 file and 4 tests; `cd backend && uv run pytest tests/test_api_media.py tests/test_api_reader_media.py` passed with 14 tests; `cd web && npm run test -- lib/auth/proxy.test.ts lib/worlds/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts` passed with 5 files and 13 tests; `cd backend && uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py` passed; `cd backend && uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py` passed; `cd backend && uv run pytest` passed with 563 tests and 8 skipped; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 178 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import. `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining route handler method exposure, proxy response shaping beyond the safe allowlist, role-boundary rendering, client-side leaks, and product normal-use drift. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web reader media download route boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web reader playback and scene media descriptor download URL boundary remediation for F-057.
+- Finding: F-057 found `web/lib/worlds/media.ts` accepting any descriptor `download_url` beginning with `/api/worlds/` or `/worlds/` and returning it for `<audio src>` or CSS `url(...)` rendering in `web/features/worlds/conversation-playback.tsx` and `web/features/worlds/conversation-scene-view.tsx`, while the backend reader media service emits only `/worlds/{world_uuid}/reader/media/objects/{object_uuid}/download` paths.
+- Summary: Added an architecture-contracts OpenSpec scenario for reader media rendering path boundaries, tightened `readerMediaObjectDownloadPath()` to accept only exact UUID reader-media object download routes and return `null` for non-backend schemes, query strings, fragments, extra path segments, alternate world routes, or non-UUID test paths, and updated playback/scene fixtures to use backend-contract UUID media URLs.
+- Files changed: `web/lib/worlds/media.ts`, `web/lib/worlds/media.test.ts`, `web/features/worlds/conversation-playback.test.tsx`, `web/features/worlds/conversation-scene-view.test.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded media helper coverage for accepted `/worlds/.../reader/media/objects/.../download` and `/api/worlds/.../reader/media/objects/.../download` UUID paths plus rejected `media://`, query, extra-path, non-reader media, and non-UUID descriptor URLs; updated playback and scene component tests to assert rendered safe media uses backend-contract UUID download paths.
+- Verification: `cd web && npm run test -- lib/worlds/media.test.ts features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx` passed with 3 files and 13 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 177 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handlers, proxy method/response shaping, admin/player/member boundary rendering, and product normal-use drift. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Memory backend profile secret-reference boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend memory backend profile config and secret-reference persistence boundary remediation for F-056.
+- Finding: F-056 found `MemoryBackendProfileService` persisting `vector_store_config`, `llm_config`, `embedder_config`, `reranker_config`, and `secret_refs` directly from API requests while runtime APIs returned those fields and Web admin rendered `secret_refs` back into form state. The mem0 backend treats `secret_refs` as lookup keys into `NOVELAND_MEMORY_BACKEND_SECRETS_JSON`, but no validation prevented direct `api_key` config or obvious raw secret values from being stored and returned.
+- Summary: Added an architecture-contracts OpenSpec scenario for memory backend profile secret-reference boundaries, added service-layer validation that rejects sensitive config keys and raw-secret-looking config values, validates `secret_refs` as non-empty single reference names, and preserves safe reference lookup behavior.
+- Files changed: `backend/packages/memory/src/noveland/memory/service.py`, `backend/tests/test_memory_backend.py`, `backend/tests/test_api_runtime.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added memory service and runtime API regressions proving direct secret config and raw secret refs are rejected while safe reference names persist and are returned without echoing rejected secret material.
+- Verification: `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_backend_profile_rejects_raw_secret_material tests/test_api_runtime.py::test_memory_backend_profile_api_rejects_raw_secret_material` passed with 2 tests; `cd backend && uv run pytest tests/test_memory_backend.py tests/test_api_runtime.py` passed with 26 tests; `cd backend && uv run ruff check .` passed; `cd backend && uv run mypy .` passed; `cd backend && uv run pytest` passed with 563 passed and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handler method exposure, response shaping, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Auth login CSRF boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend auth login session-cookie creation and Web auth client login CSRF request construction for F-055.
+- Finding: F-055 found backend `/auth/login` creating `noveland_session` and `noveland_csrf` cookies without requiring double-submit CSRF, while the Web login client did not send `X-CSRF-Token` even though the login form had pre-fetched a CSRF cookie.
+- Summary: Added an architecture-contracts OpenSpec scenario for CSRF-protected login, required `require_csrf(request)` before backend login session creation, moved Web login CSRF acquisition into `web/lib/auth/client.ts`, and kept logout CSRF behavior intact.
+- Files changed: `backend/services/api/src/noveland/services/api/auth.py`, `backend/tests/test_api_auth.py`, `backend/tests/test_api_auth_integration.py`, `web/lib/auth/client.ts`, `web/lib/auth/client.test.ts`, `web/features/auth/login-form.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added backend regression coverage proving login rejects missing CSRF before setting session cookies, updated backend auth/integration login helpers to send explicit double-submit CSRF headers, and expanded Web auth client coverage for CSRF fetch/header behavior, existing-cookie reuse, failed login, logout CSRF, and exact cookie reads.
+- Verification: `cd backend && uv run pytest tests/test_api_auth.py` passed with 7 tests; `cd backend && uv run pytest tests/test_api_auth_integration.py` skipped 3 integration tests because `NOVELAND_TEST_DATABASE_URL` was not set; `cd backend && uv run ruff check .` passed; `cd backend && uv run mypy .` passed; `cd backend && uv run pytest` passed with 561 passed and 8 skipped; `cd web && npm run test -- lib/auth/client.test.ts features/auth/login-form.test.tsx` passed with 2 files and 9 tests; `cd web && npm run typecheck` passed; `cd web && npm run lint` passed; full `cd web && npm run test` passed with 51 files and 177 tests, with existing runtime-admin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 passed; `cd web && npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handler method exposure, response shaping, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web non-auth proxy Set-Cookie boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin non-auth proxy response cookie-mutation boundary remediation for F-054.
+- Finding: F-054 found the shared `buildProxyResponse()` helper in `web/lib/auth/proxy.ts` unconditionally forwarding backend `Set-Cookie` headers while non-auth proxy helpers in `web/lib/api-proxy.ts`, `web/lib/worlds/proxy.ts`, `web/lib/runtime/proxy.ts`, and `web/lib/private-beta/proxy.ts` reused that helper.
+- Summary: Added an architecture-contracts OpenSpec scenario for non-auth Web proxies, made `Set-Cookie` relay opt-in on `buildProxyResponse()`, kept `proxyAuthRequest()` explicitly opted in for login/logout/CSRF flows, and left non-auth proxies on the existing status/body/content-type/cache-control relay contract without cookie mutation headers.
+- Files changed: `web/lib/auth/proxy.ts`, `web/lib/auth/proxy.test.ts`, `web/lib/worlds/proxy.test.ts`, `web/lib/runtime/proxy.test.ts`, `web/lib/api-proxy.test.ts`, `web/lib/private-beta/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added focused coverage proving auth proxy requests continue relaying backend cookie mutations while generic API, world, runtime, and private beta non-auth proxies strip backend `Set-Cookie` headers.
+- Verification: `npm run test -- lib/auth/proxy.test.ts lib/worlds/proxy.test.ts lib/runtime/proxy.test.ts lib/private-beta/proxy.test.ts lib/api-proxy.test.ts` passed with 5 files and 12 tests; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 51 files and 175 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handler method exposure, response shaping beyond cookies, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web UI local app route link path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web local app route link and navigation path-boundary remediation for F-053.
+- Finding: F-053 found workspace navigation, world index navigation, agent builder links, conversation transcript links, player resume/privacy links, overview shortcut links, reader playback/scene links, and narrative reader links constructing `/worlds/...` local app routes from decoded world and nested identifiers without encoding every dynamic segment.
+- Summary: Added an architecture-contracts OpenSpec delta for Web UI local app links, encoded world, agent, conversation, narrative artifact, resume conversation, imported world, and overview shortcut route segments at the existing component call sites, and preserved existing media download helpers.
+- Files changed: `web/features/worlds/worlds-index.tsx`, `web/features/agents/agent-list.tsx`, `web/features/conversations/conversation-list.tsx`, `web/features/workspace/workspace-shell.tsx`, `web/features/worlds/player-interactions.tsx`, `web/features/worlds/world-overview.tsx`, `web/features/worlds/conversation-playback.tsx`, `web/features/worlds/conversation-scene-view.tsx`, `web/features/worlds/narrative-reader.tsx`, focused Web tests, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added reserved-character route-link coverage for worlds index, agent list, conversation list, workspace shell navigation, player resume/privacy links, overview shortcuts, playback/scene navigation, and narrative reader list/detail links.
+- Verification: `npm run test -- features/agents/agent-list.test.tsx features/conversations/conversation-list.test.tsx features/workspace/workspace-shell.test.tsx features/worlds/worlds-index.test.tsx features/worlds/player-interactions.test.tsx features/worlds/conversation-playback.test.tsx features/worlds/conversation-scene-view.test.tsx features/worlds/narrative-reader.test.tsx features/worlds/world-overview.test.tsx` passed with 9 files and 25 tests; a focused source scan for raw local `/worlds/` route interpolation patterns in `web/features`, `web/components`, and `web/app` returned no matches; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 49 files and 169 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit on remaining Next route handlers and proxy modules, especially CSRF forwarding, method exposure, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction remains SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web server workspace loader backend path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Server-rendered Web world workspace, agent, conversation, player, reader, worldline, and memory backend admin loader backend API path-boundary remediation for F-052.
+- Finding: F-052 found `web/lib/worlds/server.ts` building backend API paths from decoded `worldId`, `agentId`, `conversationId`, `artifactId`, worldline IDs, backend record IDs, and memory backend profile IDs without encoding every dynamic segment.
+- Summary: Added an architecture-contracts OpenSpec delta for Web server workspace loaders, then routed world paths through `serverWorldPath()` and nested identifiers through `pathSegment()` while preserving existing query filters as query data. This extends the earlier admin-loader path-boundary hardening to the remaining server-rendered workspace loaders and platform memory backend loader.
+- Files changed: `web/lib/worlds/server.ts`, `web/lib/worlds/server.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded Web server loader coverage to exercise representative workspace, agent detail, conversation detail/playback, player interaction, worldline comparison, narrative reader detail, and memory backend admin paths with identifiers containing `/`, `?`, and `#`.
+- Verification: `npm run test -- lib/worlds/server.test.ts` passed with 2 tests; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 47 files and 163 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining Next route handlers and proxy modules, especially CSRF forwarding, response header behavior, method exposure, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction for this session is SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web private beta/beta feedback client path boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin private beta onboarding, beta feedback, and player-surface route path-boundary remediation for F-051.
+- Finding: F-051 found `web/lib/private-beta/client.ts`, `web/lib/beta-feedback/client.ts`, and `web/features/private-beta/private-beta-onboarding.tsx` building API paths or player links from decoded `worldId`/`reportId` values without encoding dynamic path segments.
+- Summary: Reused the existing architecture-contracts Web API client route-boundary delta, then encoded private beta world identifiers, beta feedback world/report identifiers, and the private beta player-surface world route segment. Feedback filters continue to use `URLSearchParams` as query data.
+- Files changed: `web/lib/private-beta/client.ts`, `web/lib/private-beta/client.test.ts`, `web/lib/beta-feedback/client.ts`, `web/lib/beta-feedback/client.test.ts`, `web/features/private-beta/private-beta-onboarding.tsx`, `web/features/private-beta/private-beta-onboarding.test.tsx`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added private beta and beta feedback client coverage proving world/report identifiers containing `/`, `?`, and `#` stay encoded inside same-origin API path segments; updated private beta onboarding component coverage proving the player-surface link encodes the world route segment without leaking invite tokens or internal fields.
+- Verification: `npm run test -- lib/private-beta/client.test.ts lib/beta-feedback/client.test.ts features/private-beta/private-beta-onboarding.test.tsx` passed with 3 files and 6 tests; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 47 files and 162 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining client/proxy modules and Next route handlers, especially CSRF forwarding, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Current user instruction for this session is SSH/CLI-only, and completed commits should be pushed immediately while incomplete work remains uncommitted.
+
+## Post-v1.1 RC Audit and Hardening Web admin preset/memory/provider API client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin platform admin preset, memory backend, memory write job, and provider profile API path-boundary remediation for F-050.
+- Finding: F-050 found `web/lib/worlds/client.ts` building agent preset, memory backend profile, memory write job retry, and provider profile helper URLs from decoded preset/profile/job identifiers without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring platform admin Web helpers to preserve same-origin route boundaries, then encoded preset, memory backend profile, memory write job, and provider profile identifiers for the scoped helper group. Existing memory log/job filters remain query data.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving preset, memory backend profile, memory write job, and provider profile identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing platform admin helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 35 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 158 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit outside `web/lib/worlds/client.ts`, especially other client/proxy modules and Next route handlers for CSRF forwarding, method exposure, response header behavior, role boundary, evidence redaction, client-side data leaks, XSS-prone rendering sinks, and admin/player/member boundary drift. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web event/episode/group/relationship/conflict/rumor/dashboard API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin event trigger, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, and living-world dashboard API path-boundary remediation for F-046.
+- Finding: F-046 found `web/lib/worlds/client.ts` building event trigger condition, scene beat, daily episode, group interaction, relationship suggestion, organization conflict, rumor, rumor propagation, and living-world dashboard helper URLs from decoded `worldId` and nested identifier values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring these browser-side Web helpers to preserve same-origin route boundaries, then encoded world, condition, group context, relationship suggestion, organization conflict, and rumor propagation identifiers for the scoped helper group. Existing worldline filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, worldline, condition, group context, relationship suggestion, organization conflict, and rumor propagation identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 31 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 154 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this event/episode/group/relationship/conflict/rumor/dashboard scope, especially knowledge, secrets, emotional states, relationship repairs, player journal/notifications/interventions, reviews, agent memory/persona/observation/run, narrative artifacts, memberships, member candidates, and diagnostics helpers, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web organization/agent/calendar/schedule API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin organization, agent, calendar, and schedule API path-boundary remediation for F-043.
+- Finding: F-043 found `web/lib/worlds/client.ts` building organization, membership, faction track, agent relationship, agent presence, agent calendar, schedule rule, and calendar conflict helper URLs from decoded `worldId` and nested identifier values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring these browser-side Web helpers to preserve same-origin route boundaries, then encoded world, organization, membership, track, agent, relationship, calendar entry, and schedule rule identifiers for the scoped helper group. Existing filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, organization, membership, track, agent, relationship, calendar entry, schedule rule, and worldline identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing organization/agent/calendar/schedule helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 28 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 151 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this organization/agent/calendar/schedule scope, especially daily-life/offscreen and later living-world helper groups, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web clock/replay/scene API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin clock, replay, snapshot, event audit, scene, and location-edge API path-boundary remediation for F-042.
+- Finding: F-042 found `web/lib/worlds/client.ts` building clock, replay, snapshot, event audit, scene, and location-edge helper URLs from decoded `worldId`, `sceneId`, and `edgeId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring these browser-side Web helpers to preserve same-origin route boundaries, then encoded world, scene, and location-edge identifiers for the scoped helper group. Existing filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, worldline, actor-ref, event-name, scene, and location-edge identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing clock/replay/scene helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 27 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 150 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this clock/replay/scene scope, especially organization/agent/calendar/schedule and later living-world helper groups, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web core world API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin core world API path-boundary remediation for F-041.
+- Finding: F-041 found `web/lib/worlds/client.ts` building core world management, worldline, GM, resolution rule, player actor, session resume, and player choice helper URLs from decoded `worldId` and nested identifier values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side core world API clients to preserve same-origin route boundaries, then encoded world and nested identifiers for the scoped core helper group. Existing filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web worlds client helper coverage proving world, worldline, agenda, proposal, resolution rule, and user identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments or query values across representative read and state-changing core world helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 26 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 149 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue the Web/e2e security audit for remaining `web/lib/worlds/client.ts` helper path construction outside this core group, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web server admin loader backend path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Server-rendered Web admin loader backend API path-boundary remediation for F-040.
+- Finding: F-040 found `web/lib/worlds/server.ts` building provider, media, visual, speech, invocation, and multimodal diagnostics admin backend fetch paths from decoded `worldId` and nested backend record identifiers without encoding dynamic path segments; selected worldline filters in the same loader group were also appended without query encoding.
+- Summary: Added an architecture-contracts OpenSpec delta requiring Web server admin loaders to preserve backend API route boundaries, then encoded world and nested record identifiers for the affected admin loader group. Loader query strings now use a shared `URLSearchParams` helper for this remediation scope.
+- Files changed: `web/lib/worlds/server.ts`, `web/lib/worlds/server.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web server loader coverage proving world, provider, media asset, sprite set, agent, invocation, and worldline identifiers containing `/`, `?`, and `#` remain encoded inside representative backend API path segments or query values.
+- Verification: `npm run test -- lib/worlds/server.test.ts` passed with 1 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 45 files and 148 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` was attempted twice and hit existing flake points, first at publication blocker after 12 passed and 8 skipped, then at scene view after 15 passed and 5 skipped; focused reruns for publication blocker and scene view passed, and a focused group covering the skipped player/privacy/worldline/release-gate/member tests passed with 5 passed; `npm run check:next-env` passed after restoring the expected `.next/types/routes.d.ts` import regenerated by e2e/dev; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining server-side Web data loader path construction outside this admin-loader scope, broader `web/lib/worlds/client.ts` helper path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web multimodal diagnostics API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin multimodal diagnostics API path-boundary remediation for F-039.
+- Finding: F-039 found `web/lib/worlds/diagnostics.ts` building multimodal diagnostics, eval-run list/detail, and eval execution helper URLs from decoded `worldId` and `runId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side multimodal diagnostics API clients to preserve same-origin route boundaries, then encoded world and eval-run identifiers for diagnostics, eval-run collection/detail, and eval execution helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/diagnostics.ts`, `web/lib/worlds/diagnostics.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web diagnostics helper coverage proving world and eval-run identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing diagnostics helpers.
+- Verification: `npm run test -- lib/worlds/diagnostics.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 147 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this diagnostics scope, server-side Web data loader path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web invocation ledger API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin invocation ledger API path-boundary remediation for F-038.
+- Finding: F-038 found `web/lib/worlds/invocations.ts` building model invocation list, detail, prompt snapshot, tag, tag deletion, and redaction helper URLs from decoded `worldId`, `invocationId`, and `tagId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side invocation ledger API clients to preserve same-origin route boundaries, then encoded world, invocation, and tag identifiers for invocation collection/detail, prompt snapshot, tags, tag deletion, and redaction helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/invocations.ts`, `web/lib/worlds/invocations.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web invocation ledger helper coverage proving world, invocation, and tag identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing invocation helpers.
+- Verification: `npm run test -- lib/worlds/invocations.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 146 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this invocation-ledger scope, diagnostics helpers, server-side Web data loader path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web media admin API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin media admin API path-boundary remediation for F-037.
+- Finding: F-037 found `web/lib/worlds/media.ts` building media asset, object, reference, job, upload, and download helper URLs from decoded `worldId`, `assetId`, `jobId`, and `objectId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side media admin API clients to preserve same-origin route boundaries, then encoded world, asset, job, and object identifiers for media asset collection/detail, asset objects, asset references, media references, media jobs, job cancel/retry, upload, and object download helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/media.ts`, `web/lib/worlds/media.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web media helper coverage proving world, asset, job, and object identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing media helpers.
+- Verification: `npm run test -- lib/worlds/media.test.ts` passed with 5 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 145 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this media-admin scope, server-side Web data loader path construction, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web visual admin API client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin visual admin API path-boundary remediation for F-036.
+- Finding: F-036 found `web/lib/worlds/visual.ts` building sprite set, sprite variant, scene background, resolver, and compose-scene helper URLs from decoded `worldId`, `spriteSetId`, `variantId`, and `backgroundId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side visual admin API clients to preserve same-origin route boundaries, then encoded world, sprite set, sprite variant, and background identifiers for sprite set collection/detail, sprite variants, scene backgrounds, resolver previews, and compose-scene helper paths. Existing visual filters remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/visual.ts`, `web/lib/worlds/visual.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web visual helper coverage proving world, sprite set, sprite variant, and background identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing visual helpers.
+- Verification: `npm run test -- lib/worlds/visual.test.ts` passed with 4 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 144 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this visual-admin scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e stability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web speech admin API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin speech admin API path-boundary remediation for F-035.
+- Finding: F-035 found `web/lib/worlds/speech.ts` building speech voice profile, agent voice binding, style mapping, transcript, TTS, and STT helper URLs from decoded `worldId`, `agentId`, `voiceProfileId`, `bindingId`, and `mappingId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side speech admin API clients to preserve same-origin route boundaries, then encoded world, agent, voice profile, binding, and style mapping identifiers for speech collection/detail, agent voice binding, style mapping, transcript, TTS, and STT helper paths. Existing filter objects remain query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/speech.ts`, `web/lib/worlds/speech.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web speech helper coverage proving world, agent, voice profile, binding, and style mapping identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing speech helpers.
+- Verification: `npm run test -- lib/worlds/speech.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 143 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run check:next-env` passed; full `npm run test:e2e` was attempted and failed on the workspace/conversation e2e after 11 passed and 9 skipped, then the focused workspace/conversation rerun failed at a different runtime notice assertion, and a second focused rerun passed; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this speech-admin scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e instability. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web provider integration API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin provider integration API path-boundary remediation for F-034.
+- Finding: F-034 found `web/lib/worlds/provider-integrations.ts` building provider configuration, model discovery, capability, health-check, history, and smoke-test helper URLs from decoded `worldId` and `providerId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side provider integration API clients to preserve same-origin route boundaries, then encoded world and provider identifiers for provider collection, templates, model-discovery, detail, capabilities, health-check, health-check history, and smoke-test helper paths. The health-check history limit remains query data built with `URLSearchParams`.
+- Files changed: `web/lib/worlds/provider-integrations.ts`, `web/lib/worlds/provider-integrations.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web provider integration helper coverage proving world/provider identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing provider helpers.
+- Verification: `npm run test -- lib/worlds/provider-integrations.test.ts` passed with 5 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 142 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run check:next-env` passed; `npm run test:e2e` passed with 21 passed; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this provider-integration scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web conversation API client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web same-origin conversation API path-boundary remediation for F-033.
+- Finding: F-033 found `web/lib/worlds/client.ts` building conversation read and state-changing control helper URLs from decoded `worldId` and `conversationId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-side same-origin API clients to preserve route boundaries, then encoded world and conversation identifiers for scoped conversation collection/detail, participants, turns, narrative, diagnostics, seed, advance, start, pause, resume, and stop helper paths.
+- Files changed: `web/lib/worlds/client.ts`, `web/lib/worlds/client.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added Web client helper coverage proving world/conversation identifiers containing `/`, `?`, and `#` remain encoded inside same-origin API path segments across representative read and state-changing conversation helpers.
+- Verification: `npm run test -- lib/worlds/client.test.ts passed with 25 passed; npm run lint passed; npm run typecheck passed; full npm run test passed with 44 files and 141 tests; npm run build passed; npm run check:next-env passed; npm run test:e2e passed with 21 passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.`
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction outside this conversation-helper scope, Next route handlers, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web conversation live socket path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Browser-side Web realtime live socket path-boundary remediation for F-032.
+- Finding: F-032 found `web/lib/realtime.ts` building conversation live WebSocket URLs from decoded `worldId` and `conversationId` values without encoding dynamic path segments.
+- Summary: Added an architecture-contracts OpenSpec delta requiring browser-initiated realtime URLs to preserve backend route boundaries, then encoded world and conversation identifiers before opening conversation live-control sockets.
+- Files changed: `web/lib/realtime.ts`, `web/lib/realtime.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added browser-side realtime helper coverage proving world/conversation identifiers containing `/`, `?`, and `#` remain encoded inside WebSocket path segments.
+- Verification: `npm run test -- lib/realtime.test.ts` passed with 2 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 44 files and 140 tests; `npm run build` passed; `npm run check:next-env` passed; full `npm run test:e2e` was attempted and failed on the scene-view safe-media test after 15 passed and 5 skipped, then the failing scene-view test passed on focused rerun; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining client helper path construction, CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web memory backend proxy query entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin runtime proxy query preservation remediation for F-031.
+- Finding: F-031 found memory backend jobs/logs route handlers embedding the request query into the backend path argument before `proxyRuntimeRequest` appended the same query again.
+- Summary: Added an architecture-contracts OpenSpec delta requiring runtime proxy query parameters to be appended exactly once, then removed route-local query concatenation from memory backend jobs/logs route handlers.
+- Files changed: `web/app/api/memory-backend-profiles/[profileId]/jobs/route.ts`, `web/app/api/memory-backend-profiles/[profileId]/logs/route.ts`, `web/lib/runtime/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Added runtime proxy route-handler coverage proving jobs/logs query strings are forwarded exactly once and encoded profile IDs remain path segments.
+- Verification: `npm run test -- lib/runtime/proxy.test.ts` passed with 2 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 43 files and 138 tests; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for CSRF forwarding, method exposure, response header behavior, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web realtime stream proxy path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin realtime stream proxy path-boundary remediation for F-030.
+- Finding: F-030 found `web/app/api/worlds/[worldId]/stream/route.ts` and `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts` forwarding decoded route parameters directly into backend stream paths without encoding.
+- Summary: Added an architecture-contracts OpenSpec delta requiring Web API proxies to preserve backend route boundaries with fixed path templates and encoded dynamic segments, then encoded world and conversation stream identifiers before forwarding to backend SSE endpoints.
+- Files changed: `web/app/api/worlds/[worldId]/stream/route.ts`, `web/app/api/worlds/[worldId]/conversations/[conversationId]/stream/route.ts`, `web/lib/realtime/proxy.test.ts`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Expanded realtime proxy coverage to call the world and conversation stream route handlers with decoded identifiers containing `/`, asserting the backend fetch URL keeps those slashes encoded inside identifier segments while preserving the query string.
+- Verification: `npm run test -- lib/realtime/proxy.test.ts` passed with 3 passed; `npm run lint` passed; `npm run typecheck` passed; full `npm run test` passed with 42 files and 136 tests; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed before commit.
+- Follow-up notes: Continue the Web/e2e security audit for remaining Next route handlers, CSRF forwarding, client rendering/XSS sinks, admin/player/member boundary leaks, and project e2e gaps. Do not use browser/computer-use plugins and do not push unless explicitly requested.
+
 ## v1.1 Normal Use / Release Candidate archive entry
 
 - Date: 2026-05-22
@@ -131,6 +431,61 @@
 - Tests added/updated: N/A, merge bookkeeping only after the already-passing Phase 6 backend/OpenSpec gate.
 - Docs updated: OpenSpec task `7.6`, task board, active handoff, and change journal.
 - Follow-up notes: Start Phase 7 on `feature/v1.1-7-user-facing-polish` from clean local `main`, read/use `impeccable`, and keep polish scoped to existing user/operator flows. No push performed.
+
+## post-v1.1 RC audit F-014 membership/faction track metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-014 remediation.
+- Summary: Redacted ordinary member organization membership and faction progress track metadata in member-readable list responses while preserving admin metadata visibility for world management. The fix keeps safe organization identity, agent identity, role, visibility, responsibility, progress, pressure, summary, and timing fields available to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_organization_memberships_and_faction_tracks_append_events` to prove admin membership/faction metadata retention and ordinary member list redaction. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-014, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for worldline metadata, player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
+## post-v1.1 RC audit F-015 worldline metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-015 remediation.
+- Summary: Redacted ordinary member worldline metadata in member-readable list responses while preserving admin metadata visibility for branch management. The fix keeps safe branch identity, parent/fork references, status, actor refs, and timing fields visible to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_read_safe_worldline_comparison_without_mutation` to prove admin worldline metadata retention and ordinary member list redaction. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-015, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for player choices, dashboard hidden counts, journal/notification/intervention metadata, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
+## post-v1.1 RC audit F-016 player choice prompt redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-016 remediation.
+- Summary: Redacted ordinary member player choice prompt text in create/list responses while preserving admin prompt visibility for world management and review. The fix keeps safe choice identity, selected option, context, consequence preview, applied event refs, and timing fields visible to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` to prove member choice prompt redaction on create/list responses and admin list retention. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-016, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for player choice preview diagnostics, dashboard hidden counts, journal/notification/intervention metadata/source fields, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
+## post-v1.1 RC audit F-017 player choice preview diagnostics redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-017 remediation.
+- Summary: Redacted ordinary member player choice preview diagnostics while preserving admin diagnostics visibility for world management and review. The fix keeps safe relationship, faction, and offscreen consequence preview fields available to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` to prove member preview diagnostics redaction and admin preview diagnostics retention. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-017, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for dashboard hidden counts, journal/notification/intervention metadata/source fields, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
+
+## post-v1.1 RC audit F-018 living world dashboard hidden count redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit F-018 remediation.
+- Summary: Redacted ordinary member living-world dashboard hidden secret counts while preserving admin visibility for world management and review. The fix keeps safe aggregate dashboard counters available to members.
+- Files changed: `backend/services/api/src/noveland/services/api/worlds.py`, `backend/tests/test_api_worlds.py`, `openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md`, `openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md`, and harness docs.
+- Tests added/updated: Extended `test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes` to prove admin dashboard hidden secret count retention and ordinary member dashboard redaction to zero. Targeted checks passed: focused pytest, focused ruff, focused mypy, OpenSpec change/spec validation, and `git diff --check`.
+- Docs updated: OpenSpec architecture-contracts delta, OpenSpec tasks finding F-018, task board, active handoff, project index, file inventory, and change journal.
+- Follow-up notes: Continue the backend member-readable DTO audit for journal/notification/intervention metadata/source fields, agent relationship metadata, and calendar metadata before moving to Web/e2e security. No push performed.
 
 ## Entry format
 
@@ -3212,3 +3567,1482 @@
 - Verification: Targeted backend tests passed (`21 passed`), targeted Web tests passed (`9 passed`), full backend ruff/mypy/pytest passed (`453 passed, 7 skipped`), full Web lint/typecheck/unit/build/check:next-env passed (`128 unit tests`), Web e2e passed on rerun (`21 passed`), docker compose config passed, OpenSpec strict changes/specs validation passed, and `git diff --check` passed.
 - Flaky notes: The first full Web e2e run timed out on the existing broad `world admin manages workspace pages and conversations` scenario while waiting for participant save. The isolated scenario passed immediately, and the subsequent full e2e run passed.
 - Follow-up notes: Fast-forward merge Phase 1 to local `main`. Next accepted v0.9 work is Phase 2 Visual Generation Control Plane planning; do not start Phase 2 until explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening preflight entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: OpenSpec-governed post-v1.1 release-candidate audit setup and initial handoff only.
+- Summary: Reconfirmed realtime git/OpenSpec/service/test-entry status from the server, read current harness/architecture/v0.9-v1.1 archive and release-note context, created `openspec/changes/audit-and-hardening-post-v1-1-rc/`, and defined the audit/hardening proposal, design, spec delta, and task plan. No implementation files were changed.
+- Files changed: `openspec/changes/audit-and-hardening-post-v1-1-rc/**`, `docs/agent/harness/{project-index.md,file-inventory.md,task-board.md,handoffs/active-session.md,change-journal.md}`.
+- Tests added/updated: N/A, planning and audit setup only.
+- Verification: `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; initial baseline had `openspec validate --specs --strict` passing 76 specs and no active changes before this branch.
+- Follow-up notes: Start backend security audit first. Record concrete findings before implementation fixes. Do not push.
+
+## Post-v1.1 RC Audit and Hardening backend CSRF batch entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend security audit batch 1, focused on CSRF coverage for persisted cookie-authenticated mutations.
+- Finding: F-001 found moderation report/review/action/incident mutations, player privacy export/delete/review mutations, and world package import apply lacked CSRF protection while relying on browser session cookies.
+- Summary: Added OpenSpec deltas for moderation, player privacy, and world packaging CSRF expectations; added decorator-level Depends(require_csrf) on persisted mutation routes; preserved non-persisting login, validate, resolve, memory search, and package preview POST behavior for later policy review.
+- Files changed: backend/services/api/src/noveland/services/api/moderation.py, backend/services/api/src/noveland/services/api/player_privacy.py, backend/services/api/src/noveland/services/api/world_packaging.py, backend/tests/test_api_moderation.py, backend/tests/test_api_player_privacy.py, backend/tests/test_api_world_packaging.py, openspec/changes/audit-and-hardening-post-v1-1-rc/**, and harness docs.
+- Tests added/updated: Missing-CSRF regression assertions for moderation report create/review, player privacy export/delete/review, and world package import apply.
+- Verification: uv run pytest tests/test_api_moderation.py tests/test_api_player_privacy.py tests/test_api_world_packaging.py passed with 18 passed; uv run ruff check on the six touched backend/test files passed; uv run mypy on the same six files passed.
+- Follow-up notes: Continue backend audit with worldline isolation, provider spend/secret boundaries, forbidden response/event data, and the remaining non-persisting POST policy review. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening provider boundary finding entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend provider spend/secret boundary read-only audit.
+- Finding: F-002 found legacy ProviderProfileService execution paths that can call provider plugins/httpx directly from provider-profile test calls, runtime agent runs, conversation advancement, and narrative generation without ProviderExecutionService.
+- Summary: Added OpenSpec deltas for provider-system and cost-quota-enforcement requiring legacy profile execution to route through ProviderExecutionService or be blocked/degraded before external spend. No business code was changed in this finding-only batch.
+- Files changed: openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/cost-quota-enforcement/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: N/A, finding/spec-record batch only.
+- Verification: pending OpenSpec strict validation and git diff --check before commit.
+- Follow-up notes: Next implementation batch should choose a compatibility strategy for legacy provider profiles and add regression tests proving no legacy path executes hidden provider spend outside ProviderExecutionService. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening provider boundary remediation entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend provider spend/secret boundary remediation for F-002.
+- Finding: F-002 found legacy ProviderProfileService execution paths that could call provider plugins/httpx directly without ProviderExecutionService, quota checks, safe auth metadata, or centralized provider execution failure handling.
+- Summary: Blocked legacy ProviderProfileService.invoke_profile before API key lookup, rate-limit accounting, plugin provider creation, or HTTP transport. Provider profile test calls now persist a failed configuration result with a safe migration message instead of executing hidden external spend. Direct provider adapter unit tests remain available for adapter behavior, while service-level legacy execution is disabled/degraded until migrated to ProviderExecutionService.
+- Files changed: backend/packages/adapters/src/noveland/adapters/model_provider.py, backend/tests/test_model_provider.py, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Service-level regression tests proving legacy execution is blocked before mock transport execution and before missing secret-ref disclosure, plus provider test-call state coverage for failed/degraded legacy execution.
+- Verification: uv run pytest tests/test_model_provider.py tests/test_api_runtime.py tests/test_runtime_daemon.py passed with 20 passed; uv run ruff check packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; uv run mypy packages/adapters/src/noveland/adapters/model_provider.py tests/test_model_provider.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed.
+- Follow-up notes: Future migration should map or replace platform provider profiles with world-scoped ProviderExecutionService provider integrations. Continue backend audit with worldline isolation and forbidden-data exposure paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening member media storage reference remediation entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-003.
+- Finding: F-003 found member media asset list/search/get routes using get_world_member_context but returning MediaAssetRecord, whose storage_uri, preview_uri, and thumbnail_uri fields were copied directly from media assets.
+- Summary: Added an architecture-contracts OpenSpec delta for member media asset storage-reference redaction, then redacted asset-level storage_uri, preview_uri, and thumbnail_uri from non-admin member media asset list/search/get responses. World admins and platform admins retain the internal storage reference fields for media management.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Media API member visibility regression now seeds a member-visible asset with internal storage references and asserts list/search/get redact them for members while preserving them for world admins.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 12 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed.
+- Follow-up notes: Continue forbidden-data audit for member-facing media metadata, media contexts/inputs/references, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening media job admin boundary remediation entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-004.
+- Finding: F-004 found member media job list/detail routes using get_world_member_context while returning MediaJobRecord, which includes provider_config_json, request_json, result_json, error_text, and created_by_actor_ref.
+- Summary: Added an architecture-contracts OpenSpec delta requiring media job execution diagnostics to stay out of member responses, then made media job list/detail admin-only via the existing world admin dependency. Admin media management keeps job internals for operator diagnosis.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a Media API regression that seeds provider config, raw prompt-like request JSON, storage_uri, bytes/base64 marker, raw output-like result JSON, and error_text; ordinary world members now receive 403 on list/detail while world admins retain diagnostics.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
+- Follow-up notes: Continue forbidden-data audit for member-facing media lineage related_assets, metadata-bearing contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening media lineage related asset redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-005.
+- Finding: F-005 found member media lineage responses returning related_assets from MediaLineageService.lineage without API-layer member redaction, leaving storage_uri, preview_uri, and thumbnail_uri visible on nested MediaAssetRecord values.
+- Summary: Added an architecture-contracts OpenSpec delta for member media lineage related asset redaction, then shaped MediaAssetLineage.related_assets through the existing media asset context redaction helper. World admins retain related asset storage references for media management.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the visible fork lineage regression to seed related asset storage references and assert member lineage redacts storage_uri, preview_uri, and thumbnail_uri while admin lineage preserves them.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 13 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; git diff --check passed before commit.
+- Follow-up notes: Continue forbidden-data audit for metadata-bearing media contexts/inputs/references/collections/tags, world event payloads, reader/player DTOs, and worldline isolation paths. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening member media metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-006.
+- Finding: F-006 found member-readable media asset, context, input, tag, collection, item, references, and lineage DTOs carrying admin-authored arbitrary metadata without response sanitization.
+- Summary: Added an architecture-contracts OpenSpec delta for member media metadata-bearing DTO redaction, then added API-layer recursive member metadata sanitization. Member responses now omit sensitive metadata keys and leak-pattern values such as storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, and base64 while retaining safe metadata. Admin responses preserve full metadata.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a Media API regression that writes leaky metadata through visible asset/context/input/tag/collection/item records, verifies member top-level and nested metadata is sanitized, and verifies admin asset/reference metadata preserves internal fields.
+- Verification: uv run pytest tests/test_api_media.py tests/test_api_reader_media.py passed with 14 passed; uv run ruff check services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; uv run mypy services/api/src/noveland/services/api/media.py tests/test_api_media.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for world event payloads, reader/player DTOs, and worldline isolation paths, then move to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening realtime member stream redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-007.
+- Finding: F-007 found member-authenticated realtime world and conversation streams exposing admin diagnostics, agent run prompt/response text, run diagnostics, hidden/unpublished narrative artifacts, and conversation policy/writer internals.
+- Summary: Added an architecture-contracts OpenSpec delta for member realtime stream shaping, then made world and conversation stream payloads role-aware. World admins retain operator diagnostics and execution details; ordinary members receive safe clock, reader-visible published narrative artifacts, safe conversation updates, and no diagnostic/run internals. Conversation live snapshots now apply the same member-safe shaping.
+- Files changed: backend/services/api/src/noveland/services/api/realtime.py, backend/tests/test_api_realtime.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Realtime API regressions compare admin vs member world stream payloads, member vs admin conversation stream payloads, and member WebSocket live snapshots.
+- Verification: uv run pytest tests/test_api_realtime.py passed with 6 passed; uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for non-realtime reader/player DTOs, worldline isolation, and Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening agent run list redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-008.
+- Finding: F-008 found the member-readable agent run list REST API exposing run prompt_text, response_text, provider_profile_id, and diagnostics to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member agent runtime run list shaping, then made list_agent_runs role-aware. World admins retain operator run internals; ordinary members receive safe run identifiers, status/source linkage, and timing fields with prompt, response, provider, and diagnostics redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded agent run API regression coverage to compare admin run list internals with member redacted run list payloads while preserving worldline filtering coverage.
+- Verification: uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api tests/test_api_worlds.py::test_agent_run_apis_filter_by_worldline passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining non-realtime reader/player/member DTOs and worldline isolation, then Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening agent catalog redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-009.
+- Finding: F-009 found the member-readable agent catalog REST API exposing provider_profile_id and full agent config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member agent catalog shaping, then made list_agents role-aware. World admins retain provider/config details; ordinary members receive safe public agent identity and characterization fields with provider refs and config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded agent preset/materialization API coverage to compare admin agent catalog provider/config visibility against member-redacted catalog payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping tests/test_api_worlds.py::test_world_admin_manages_scenes_agents_and_conflicts tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening world profile redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-010.
+- Finding: F-010 found member-readable world profile/list REST APIs exposing rules_config, memory backend profile refs, memory plugin config, world rules plugin identifiers, and plugin config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member world profile shaping, then made world list/get responses role-aware. Platform/world admins retain world configuration details; ordinary members receive safe public world identity fields with rules, plugin identifiers/config, and backend profile refs redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded member world read regression coverage to compare admin world profile config visibility against member list/get redaction.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_member_can_read_but_not_mutate_and_non_member_is_hidden tests/test_api_worlds.py::test_platform_admin_can_create_list_and_update_worlds passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTOs, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening schedule rule redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-011.
+- Finding: F-011 found the member-readable schedule rule list REST API exposing WorldScheduleRule config to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member schedule rule shaping, then made list_schedule_rules role-aware. World admins retain full rule config; ordinary members receive safe rule identity, kind, and enabled state with config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded calendar/schedule API coverage to compare admin schedule rule config visibility against member-redacted rule list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules tests/test_api_worlds.py::test_world_composition_export_and_import_round_trip passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTO metadata/source fields, reader/player DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening narrative artifact REST redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-012.
+- Finding: F-012 found member-readable narrative artifact list/detail REST APIs exposing source_run_id, artifact metadata, continuity metadata/status, publication metadata, source_draft_id, published_by_user_id, and publication_gate to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member narrative artifact REST shaping, then made narrative artifact list/detail responses role-aware. World admins retain artifact metadata and publication review evidence; ordinary members receive safe published artifact content, identity, conversation linkage, publication status, reader visibility, and timing with operator internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded narrative reader API coverage to compare member-redacted artifact/publication internals against admin-preserved source run, metadata, continuity, and publication gate fields while retaining publication visibility behavior.
+- Verification: uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members tests/test_api_worlds.py::test_narrative_publication_workflow_filters_reader_visibility tests/test_api_realtime.py::test_world_stream_hides_admin_evidence_for_member_payloads passed with 3 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py tests/test_api_realtime.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
+- Follow-up notes: Continue backend audit for remaining member-readable worlds.py DTO metadata/source fields, player/reader DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening organization list redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-013.
+- Finding: F-013 found the member-readable organization list REST API exposing hidden_summary and arbitrary organization metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member organization list shaping, then made organization list responses role-aware. World admins retain hidden summaries and metadata; ordinary members receive safe public organization identity, description, public_summary, active state, and timing with hidden internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded organization membership/faction track API coverage to compare admin organization hidden_summary/metadata preservation against member-redacted organization list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_organization_memberships_and_faction_tracks_append_events passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs.
+- Follow-up notes: Continue backend audit for remaining organization membership/faction track metadata, player/reader DTOs, and worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening journal/notification/intervention redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-019.
+- Finding: F-019 found member-readable player journal, in-world notification, and player intervention REST APIs exposing source evidence refs, intervention prompt text, choice/event linkage, and arbitrary metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member journal, notification, and intervention response shaping, then made the relevant worlds API helpers role-aware. World admins retain source refs, prompt text, choice/event linkage, and metadata; ordinary members receive safe title/body/status/target/timing fields with internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded guardrail/player interaction API coverage to compare admin-preserved journal/notification/intervention internals against member-redacted payloads for source refs, prompt text, choice/event linkage, and metadata.
+- Verification: uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes passed; uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for member-readable agent relationship metadata, calendar metadata, remaining source/evidence DTOs, and broader worldline isolation. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening relationship/calendar metadata redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-020.
+- Finding: F-020 found member-readable agent relationship list and agent calendar list REST APIs exposing arbitrary relationship/scheduling metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member relationship and calendar metadata shaping, then made the relevant worlds API list responses role-aware. World admins retain relationship/calendar metadata; ordinary members receive safe relationship identity/score fields and calendar title/time/status fields with metadata redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded relationship graph and calendar/schedule API coverage to compare admin-preserved metadata against member-redacted relationship/calendar list payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_agent_relationship_graph_enforces_world_scope_and_updates_edges tests/test_api_worlds.py::test_world_admin_manages_calendar_entries_and_schedule_rules passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening latest snapshot redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-021.
+- Finding: F-021 found the member-readable latest snapshot REST API exposing snapshot payload, payload_uri, payload_location, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member latest snapshot shaping, then made the latest snapshot response role-aware. World admins retain snapshot payload/storage diagnostics; ordinary members receive safe snapshot identity, worldline, sequence coverage, schema/status, created-by event ref, and creation time with payload, payload_uri, payload_location, and metadata redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded replay/snapshot API coverage to compare admin-preserved latest snapshot storage metadata against ordinary member-redacted latest snapshot payloads.
+- Verification: uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, release profile/world bible/presence DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening release profile redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-022.
+- Finding: F-022 found the member-readable release profile REST API exposing release policies, checklist gate evidence, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member release profile shaping, then made the release profile response role-aware. World admins retain policies, checklist, gate decision, and metadata; ordinary members receive safe profile identity, status, and timing fields with branch_policy, backup_policy, content_review_policy, player_permission_policy, worldline_policy, checklist, and metadata redacted to empty objects.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded beta release readiness API coverage to compare admin-preserved release profile gate evidence against ordinary member-redacted release profile fields.
+- Verification: uv run pytest tests/test_api_worlds.py::test_beta_release_readiness_apis_cover_routes_evals_authoring_and_checklist passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, world bible, presence/scheduled movement DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening world bible redaction entry
+
+- Date: 2026-06-08
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-023.
+- Finding: F-023 found the member-readable world bible REST API exposing raw source material/import notes, continuity config, and metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member world bible shaping, then made the world bible response role-aware. World admins retain source material, continuity config, and metadata; ordinary members receive safe canon timeline, setting rules, forbidden changes, sequel boundaries, continuity status, identity, and timing fields with source_material blanked and continuity_config/metadata redacted to empty objects.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded world bible API coverage to compare admin-preserved source/config/metadata fields against ordinary member-redacted world bible payloads while preserving continuity status.
+- Verification: uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, presence/scheduled movement DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening agent presence redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-024.
+- Finding: F-024 found the member-readable agent presence REST API exposing scheduled_movement and last_event_id to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member agent presence shaping, then made get_agent_presence role-aware. World admins retain scheduled movement plans and last event linkage; ordinary members receive safe current scene, visibility, encounter eligibility, identity, worldline, and timing fields with scheduling internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded location graph and agent presence API coverage to compare admin-preserved scheduled movement and last event linkage against ordinary member-redacted presence payloads while preserving safe current-scene and visibility fields.
+- Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable source/evidence refs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening conversation session redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-025.
+- Finding: F-025 found member-readable conversation session list/detail REST APIs exposing objective text, opening prompts, policy, writer/provider/plugin config, memory config, and group context to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member conversation session shaping, then made conversation list/detail responses role-aware. World admins retain conversation orchestration internals; ordinary members receive safe session identity, worldline, scene, title, scope, mode, status, turn counters, terminal state, and timing fields with orchestration internals redacted.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded conversation API access coverage to compare admin-preserved objective/opening prompt, policy, writer config, memory config, and group context against ordinary member-redacted list/detail payloads while preserving safe session fields and turn access.
+- Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining conversation narrative artifact metadata/source refs, other member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening conversation narrative artifact redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-026.
+- Finding: F-026 found the member-readable conversation-scoped narrative artifact list REST API exposing draft/unpublished/non-reader-visible conversation artifacts plus source_run_id and arbitrary metadata to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member conversation narrative artifact list shaping, then made the conversation narrative list role-aware. World admins retain full draft visibility, source refs, and metadata; ordinary members receive only published reader-visible artifacts for that conversation with source_run_id and metadata redacted.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added conversation narrative list coverage that seeds published, draft, and non-reader-visible artifacts, then compares member filtered/redacted output against admin-preserved output.
+- Verification: uv run pytest tests/test_api_conversations.py::test_conversation_narrative_listing_redacts_member_evidence tests/test_api_conversations.py::test_conversation_narrative_generation_and_listing passed with 2 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening player privacy export evidence redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-027.
+- Finding: F-027 found the member-readable player privacy export REST API exposing journal/notification source refs and intervention choice/event linkage to ordinary world members, bypassing the F-019 player/member redaction boundary.
+- Summary: Added architecture-contracts and player-privacy OpenSpec deltas for privacy export evidence shaping, then redacted journal and notification source_ref plus intervention choice_id/event_id from player privacy export payloads. Safe player-owned titles, bodies, choices, statuses, target identity fields, counts, and timing remain exported.
+- Files changed: backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/tests/test_api_player_privacy.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-privacy-data-controls/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded player privacy export API coverage to seed journal source refs, notification source refs, and intervention choice/event linkage, then assert exported values are redacted to null while existing forbidden marker checks still pass.
+- Verification: uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted passed with 1 passed; uv run ruff check packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; uv run mypy packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening scene/location rule redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-028.
+- Finding: F-028 found member-readable scene and location graph REST APIs exposing scene opening_rules and location traversal_rules to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member scene/location graph rule shaping, then made scene and location-edge list responses role-aware. World admins retain opening/traversal rule config; ordinary members receive safe scene/location identity, public descriptions, region/location tags, travel labels, active state, and timing fields with rule config redacted.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded location graph and agent presence API coverage to seed opening/traversal rule configs with forbidden markers, then compare admin-preserved scene/location graph output against ordinary member-redacted output.
+- Verification: uv run pytest tests/test_api_worlds.py::test_location_graph_and_agent_presence_enforce_world_scope passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening conversation turn redaction entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: backend forbidden-data exposure remediation for F-029.
+- Finding: F-029 found member-readable conversation turn REST responses exposing runtime run_id and provider/plugin error_text to ordinary world members.
+- Summary: Added an architecture-contracts OpenSpec delta for member conversation turn shaping, then made turn list responses role-aware. World admins retain run IDs and error text; ordinary members receive safe turn identity, speaker, transcript text, status, and timing fields with runtime evidence redacted.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded conversation API access coverage to assert admin advance responses preserve run evidence while ordinary member turn list responses redact run_id and error_text.
+- Verification: uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance passed with 1 passed; uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; uv run mypy services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py passed; openspec validate audit-and-hardening-post-v1-1-rc --strict passed; openspec validate --specs --strict passed with 76 specs; git diff --check passed before commit.
+- Follow-up notes: Continue backend audit for remaining member-readable DTOs, worldline isolation checks, and forbidden-data paths before moving to Web/e2e security. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web daily-life/offscreen client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-044.
+- Finding: F-044 found browser-side daily-life preview/generation/candidate and offscreen event create/list/resolve helpers appending decoded world identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for daily-life/offscreen client route-boundary preservation, then encoded the scoped world path segment in the affected helpers while keeping query filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in daily-life/offscreen world identifiers stay inside encoded same-origin path segments and worldline filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 29 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 152 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining living-world helper groups in web/lib/worlds/client.ts, plus Next route handlers, CSRF forwarding, method exposure, response header behavior, client-side data leaks, XSS-prone rendering sinks, and admin/player/member boundary leaks. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web story/route client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-045.
+- Finding: F-045 found browser-side story hook, plot thread, route affinity, route milestone, ending candidate, long-run eval, authoring template, release profile, and beta checklist helpers appending decoded world and nested identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for story/route/ending/authoring/release/beta client route-boundary preservation, then encoded the scoped world, ending, authoring template, and checklist run path segments while keeping query filters in URLSearchParams/worldlineSuffix.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in story/route world, worldline, agent, ending, authoring template, and beta checklist run identifiers stay inside encoded same-origin path segments and query filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 30 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 153 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining living-world helper groups in web/lib/worlds/client.ts, especially event trigger conditions, scene beats, daily episodes, group interactions, relationship suggestions, organization conflicts, rumors, knowledge, secrets, emotional states, relationship repairs, player journal/notifications/interventions, reviews, agent memory/persona/observations/runs, narrative artifacts, membership/member candidates, and diagnostics. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web knowledge/review client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-047.
+- Finding: F-047 found browser-side knowledge, secret, emotional state, relationship repair, player journal, notification, intervention, player privacy, GM style review, and narrative continuity review helpers appending decoded world and nested identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for knowledge/secret/player/privacy/review client route-boundary preservation, then encoded the scoped world, secret, and relationship repair path segments while keeping query filters in URLSearchParams/searchSuffix.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in knowledge/review world, worldline, agent, user, secret, and relationship repair identifiers stay inside encoded same-origin path segments and query filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 32 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 155 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- Follow-up notes: Continue Web/e2e audit for remaining helper groups in web/lib/worlds/client.ts, especially agent memory/persona/observations/runs, narrative artifacts, memberships, member candidates, and diagnostics, plus Next route handlers, proxy CSRF forwarding, response header behavior, and client-side rendering sinks. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web agent/narrative client path boundary entry
+
+- Date: 2026-06-09
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-048.
+- Finding: F-048 found browser-side agent memory, memory profile snapshot, agent run, agent persona, agent observation, manual agent run, narrative artifact, publish/unpublish, agent update, and agent deactivate helpers appending decoded world and nested identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for agent memory/run/persona/observation/narrative client route-boundary preservation, then encoded the scoped world, agent, run, and narrative artifact path segments while keeping narrative artifact filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in agent/narrative world, agent, run, artifact, and source conversation identifiers stay inside encoded same-origin path segments and query filters remain query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 33 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 156 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- Follow-up notes: Continue Web/e2e audit for remaining helper groups in web/lib/worlds/client.ts, especially memberships, member candidates, diagnostics, and any residual raw same-origin path construction, plus Next route handlers, proxy CSRF forwarding, response header behavior, and client-side rendering sinks. Do not push unless explicitly requested.
+
+
+## Post-v1.1 RC Audit and Hardening Web membership/diagnostics client path boundary entry
+
+- Date: 2026-06-10
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-049.
+- Finding: F-049 found browser-side membership list/upsert/delete, member candidate search, and world diagnostics helpers appending decoded world and user identifiers directly into same-origin API paths.
+- Summary: Added an architecture-contracts OpenSpec delta for membership/candidate/diagnostics client route-boundary preservation, then encoded the scoped world and membership user path segments while keeping member candidate filters in URLSearchParams.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused worlds client coverage proving reserved characters in membership/diagnostics world and user identifiers stay inside encoded same-origin path segments and candidate search text remains query data.
+- Verification: `npm run test -- lib/worlds/client.test.ts` passed with 34 passed; `npm run typecheck` passed; `npm run lint` passed; full `npm run test` passed with 45 files and 157 tests, with existing runtime-admin React act warnings; `npm run build` passed; `npm run test:e2e` passed with 21 passed; `npm run check:next-env` initially failed after e2e/dev regenerated `next-env.d.ts` to `.next/dev/types/routes.d.ts`, then passed after restoring the expected `.next/types/routes.d.ts` import.
+- Follow-up notes: Browser-side `web/lib/worlds/client.ts` no longer has raw `/api/worlds/${worldId}` path construction. Continue Web/e2e audit for other client/proxy modules and Next route handlers, especially CSRF forwarding, response header behavior, role boundary, evidence redaction, and client-side rendering sinks. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web EventSource route boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-060.
+- Finding: F-060 found browser-side world and conversation EventSource subscriptions constructing same-origin stream URLs from decoded world and conversation identifiers without encoding dynamic path segments before the browser requested the Next API route.
+- Summary: Added an architecture-contracts OpenSpec scenario for EventSource route-boundary preservation, introduced `worldEventStreamPath()` and `conversationEventStreamPath()` in the realtime helper, and routed world overview, narrative workspace, narrative reader, and conversation detail stream subscriptions through those helpers.
+- Files changed: web/lib/realtime.ts, web/lib/realtime.test.ts, web/features/worlds/world-overview.tsx, web/features/worlds/world-overview.test.tsx, web/features/worlds/narrative-workspace.tsx, web/features/worlds/narrative-workspace.test.tsx, web/features/worlds/narrative-reader.tsx, web/features/worlds/narrative-reader.test.tsx, web/features/conversations/conversation-detail.tsx, web/features/conversations/conversation-detail.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added realtime helper coverage plus component assertions proving reserved world and conversation identifiers stay encoded inside EventSource route path segments.
+- Verification: `cd web && npm run test -- lib/realtime.test.ts features/conversations/conversation-detail.test.tsx features/worlds/world-overview.test.tsx features/worlds/narrative-workspace.test.tsx features/worlds/narrative-reader.test.tsx` passed with 5 files and 18 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 51 files and 184 tests, with existing RuntimeAdmin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e -- --grep publication blockers` passed after one initial full-suite transient miss on that test; rerun full `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` passed after restoring the expected `.next/types/routes.d.ts` import; `openspec validate audit-and-hardening-post-v1-1-rc --strict` passed; `openspec validate --changes --strict` passed with 1 passed; `openspec validate --specs --strict` passed with 76 specs; `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining route handlers, client-side data leaks, role boundary/evidence redaction, and product normal-use flow drift. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Web beta feedback server-loader route boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-061.
+- Finding: F-061 found `web/lib/beta-feedback/server.ts` constructing backend worldline, feedback report, and membership fetch paths from decoded Next route world identifiers.
+- Summary: Added an architecture-contracts OpenSpec scenario for beta feedback server-loader route-boundary preservation, encoded the world segment once in `getBetaFeedbackData()`, and added focused server-loader coverage for reserved world identifiers.
+- Files changed: web/lib/beta-feedback/server.ts, web/lib/beta-feedback/server.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `web/lib/beta-feedback/server.test.ts` to assert backend URLs keep reserved world identifier characters encoded inside the world path segment.
+- Verification: `cd web && npm run test -- lib/beta-feedback/server.test.ts lib/beta-feedback/client.test.ts features/private-beta/beta-feedback-panel.test.tsx` passed with 3 files and 6 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 52 files and 185 tests, with existing RuntimeAdmin React act warnings; `cd web && npm run build` passed; `cd web && npm run test:e2e` passed with 21 tests; `cd web && npm run check:next-env` passed after restoring the expected `.next/types/routes.d.ts` import; OpenSpec validation passed and `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining server loaders outside `web/lib/worlds/server.ts`, route handlers, role boundary/evidence redaction, and product normal-use flow drift. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Reader media worldline-scoped download entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend/Web security remediation for F-062.
+- Finding: F-062 found reader media object download URLs and the default backend download route omitted worldline scope, allowing same-world reader-visible object bytes from another fork to be served when the object UUID was known.
+- Summary: Added an architecture-contracts OpenSpec scenario for scoped reader media object delivery, generated reader media descriptor download URLs with worldline path scope, rejected unscoped legacy reader media object downloads before storage reads, and tightened Web reader media URL validation to exact UUID world/worldline/object download paths.
+- Files changed: backend/packages/reader_delivery/src/noveland/reader_delivery/service.py, backend/services/api/src/noveland/services/api/reader_media.py, backend/tests/test_api_reader_media.py, backend/tests/test_api_moderation.py, web/lib/worlds/media.ts, web/lib/worlds/media.test.ts, web/features/worlds/conversation-playback.test.tsx, web/features/worlds/conversation-scene-view.test.tsx, web/tests/e2e/start-with-mock-auth.mjs, web/tests/e2e/auth.spec.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added backend reader media assertions for scoped download success, unscoped legacy download 404, and cross-worldline scoped path rejection; updated Web helper/component/e2e expectations for worldline-scoped reader media paths.
+- Verification: `cd backend && uv run pytest tests/test_api_moderation.py::test_applied_moderation_takedown_hides_reader_media_without_admin_route_change tests/test_api_reader_media.py` passed with 6 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 563 passed and 8 skipped; focused Web reader media tests passed with 3 files and 13 tests; `cd web && npm run lint`, `cd web && npm run typecheck`, full `cd web && npm run test`, `cd web && npm run build`, focused and full `cd web && npm run test:e2e`, `cd web && npm run check:next-env`, OpenSpec strict validations, and `git diff --check` passed.
+- Follow-up notes: Continue backend worldline isolation audit for provider smoke/fallback/test invocation routes, observability readiness, visual/speech generation services, and product normal-use/spec drift. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Speech voice profile reference boundary entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-063.
+- Finding: F-063 found world-level voice profiles could carry `reference_asset_id` values pointing at fork-scoped audio assets because validation skipped exact worldline matching whenever the profile's `worldline_id` was null.
+- Summary: Added an architecture-contracts OpenSpec scenario for world-level voice profile media-reference isolation, rejected reference media on world-level voice profiles, and preserved same-worldline audio reference validation for scoped voice profiles.
+- Files changed: backend/packages/speech/src/noveland/speech/voice_profiles.py, backend/tests/test_voice_profiles.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a voice profile service regression proving a world-level profile cannot reference a worldline-scoped audio media asset.
+- Verification: `cd backend && uv run pytest tests/test_voice_profiles.py` passed with 4 tests; `cd backend && uv run pytest tests/test_speech_service.py tests/test_api_speech.py tests/test_voice_profiles.py` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend worldline isolation and forbidden-evidence audits for remaining speech service/API outputs, memory, player sessions, beta feedback, moderation, observability, and product/spec drift. Do not push unless explicitly requested after this batch commit.
+
+
+## Post-v1.1 RC Audit and Hardening Beta feedback reporter triage evidence entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-064.
+- Finding: F-064 found reporter-owned beta feedback reads returned full admin triage evidence after operator triage, including admin-set media job/invocation evidence refs, repair proposal refs, moderation refs, actor refs, and metadata.
+- Summary: Added an architecture-contracts OpenSpec scenario for beta feedback reporter/admin evidence separation, made `BetaFeedbackService._read()` role-aware, preserved full evidence for admin reads, and restricted reporter reads to safe report status/severity plus reporter-safe evidence kinds with metadata stripped.
+- Files changed: backend/packages/beta_feedback/src/noveland/beta_feedback/service.py, backend/tests/test_api_beta_feedback.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended beta feedback API coverage so admin triage can attach media job/invocation evidence and repair refs, while reporter detail reads after triage hide admin-only fields.
+- Verification: `cd backend && uv run pytest tests/test_api_beta_feedback.py` passed with 4 tests; `cd backend && uv run pytest tests/test_api_moderation.py tests/test_api_authoring.py` passed with 19 tests; focused backend ruff/mypy passed; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for moderation, observability, privacy export contents, speech/API output, and remaining member/player DTOs. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Observability diagnostics redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-065.
+- Finding: F-065 found runtime diagnostics only redacted details by sensitive key, while event_type/message and safe-key detail values could preserve secret-looking values, storage locators, filesystem paths, raw prompt/output markers, bytes, or base64. Focused observability tests also exposed a package import cycle through conversations importing the top-level observability package during observability service import.
+- Summary: Added an observability OpenSpec scenario for diagnostic text/value redaction, broke the conversations-to-observability package import cycle with a lazy diagnostics service lookup, redacted sensitive marker values before diagnostic persistence, and reapplied redaction on read for historical records.
+- Files changed: backend/packages/observability/src/noveland/observability/services.py, backend/packages/conversations/src/noveland/conversations/services.py, backend/tests/test_observability.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/observability-incident-diagnostics/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded observability unit coverage for value-level redaction in diagnostic details and for event_type/message/details redaction through RuntimeDiagnosticsService record/list paths.
+- Verification: `cd backend && uv run pytest tests/test_observability.py tests/test_observability_incidents.py -q` passed with 6 tests; `cd backend && uv run pytest tests/test_api_conversations.py tests/test_api_realtime.py tests/test_api_worlds.py::test_world_diagnostics_require_world_admin -q` passed with 13 tests; focused backend ruff/mypy passed; full `cd backend && uv run pytest` passed with 564 passed and 8 skipped; full `cd backend && uv run ruff check .` and `cd backend && uv run mypy .` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, speech/API output, remaining player/member DTOs, and then resume Web/e2e/product/spec-history batches. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Speech safe response entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-066.
+- Finding: F-066 found `POST /worlds/{world_id}/speech/tts` returning `output_asset.storage_uri` and `output_objects[].storage_uri` internal `media://...` locators plus raw invocation text in the speech test response.
+- Summary: Added a speech-admin-console OpenSpec scenario for safe TTS/STT test responses, introduced speech-specific API response DTOs, and shaped TTS/STT responses to preserve safe IDs, world/worldline scope, status, MIME/checksum metadata, transcript text, and invocation IDs while omitting media storage locators, media job request/result internals, and raw invocation text/json/error fields.
+- Files changed: backend/services/api/src/noveland/services/api/speech.py, backend/tests/test_api_speech.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/speech-admin-console/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Expanded the speech API integration test to assert TTS/STT responses do not contain `storage_uri`, `media://`, media job request/result/config fields, or raw invocation payload fields.
+- Verification: `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_speech.py tests/test_speech_service.py tests/test_voice_profiles.py -q` passed with 11 tests; focused backend ruff/mypy passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped.
+- Follow-up notes: Continue backend forbidden-evidence audits for privacy export contents, remaining player/member DTOs, and worldline isolation edge cases, then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Player actor profile redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-067.
+- Finding: F-067 found member-readable player actor bind/list responses returning arbitrary `PlayerActorProfile.profile_json`, allowing storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, or base64-looking values to reach ordinary world members when profile metadata was admin-authored or historically dirty.
+- Summary: Added an architecture-contracts OpenSpec scenario for member player actor profile redaction, sanitized profile JSON on player actor bind before persistence, and sanitized profile JSON again in `_player_actor_response()` for historical records.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the member player interaction API test to prove dirty bind profiles persist only safe fields and simulated historical dirty profiles are redacted on member list responses.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, worldline isolation edge cases, and then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Agent character profile redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-068.
+- Finding: F-068 found the member-readable agent catalog returning arbitrary `Agent.character_profile` JSON even after F-009 redacted provider profile IDs and config for members. Dynamic API verification showed a world admin could create an agent with `character_profile.storage_uri=media://private/agent-profile` and nested `raw_prompt=operator prompt`, and an ordinary member `GET /agents` response returned those forbidden values verbatim.
+- Summary: Added an architecture-contracts OpenSpec scenario for member agent character profile redaction, generalized the public profile sanitizer from player actor profiles, applied it to non-admin agent catalog responses, and left admin authoring/list responses unchanged.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended agent preset/materialization API coverage so admin agent responses retain full dirty character profile metadata while member agent catalog responses retain only safe public characterization fields.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, worldline isolation edge cases, and then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Player choice metadata redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-069.
+- Finding: F-069 found member-readable player choice create/list responses redacting prompt text but returning arbitrary `PlayerChoiceRecord.context_json` and `consequence_preview` JSON. Dynamic API verification showed an ordinary member choice with `context.storage_uri=media://private/choice`, nested `raw_prompt=operator prompt`, and `effects.offscreen_events[].raw_output=provider output` returned those forbidden values on both create and list responses.
+- Summary: Added an architecture-contracts OpenSpec scenario for member player choice metadata redaction, generalized the public sanitizer to member-facing JSON payloads, sanitized non-admin choice context and consequence preview responses, and blanked sensitive-looking selected-option text for non-admin reads while preserving full admin review metadata.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended member player interaction API coverage so member choice create/list responses retain safe context and diagnostics while omitting storage refs, filesystem paths, raw prompt/output markers, and unsafe values; admin choice list responses retain full dirty review metadata.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, worldline isolation edge cases, and then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Journal and notification text redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-070.
+- Finding: F-070 found member-readable player journal and notification list responses hiding source refs and metadata but returning title/body text verbatim. Dynamic API verification showed admin-created member journal/notification records containing `raw_prompt`, `media://`, and `raw_output` markers in title/body text were returned to the ordinary member.
+- Summary: Added an architecture-contracts OpenSpec scenario for journal/notification text redaction and applied the shared public text sanitizer to non-admin journal and notification title/body fields while preserving admin review responses.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended guardrail API coverage so admin reads retain raw journal/notification text and metadata while member reads blank sensitive-looking body/title text and omit source refs/metadata.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 564 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend forbidden-evidence audits for remaining member/player DTOs, player privacy export contents, worldline isolation edge cases, and then continue Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Player choice preview effect redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-071.
+- Finding: F-071 found member-readable player choice preview responses hiding diagnostics but returning arbitrary `relationship_updates`, `faction_updates`, and `offscreen_events` effect JSON verbatim. Focused regression first reproduced an ordinary member preview response echoing `raw_prompt`, `media://`, `storage_uri`, `raw_output`, and `/root/` markers from request effect JSON.
+- Summary: Added an architecture-contracts OpenSpec scenario for member player choice preview effect metadata redaction, introduced `_sanitize_public_json_list()`, and applied it to non-admin preview relationship, faction, and offscreen effect lists while preserving admin preview diagnostics and full effect metadata.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the member player interaction API test so member preview responses keep safe effect fields while omitting forbidden markers and admin preview responses retain full dirty effect metadata.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` passed with 1 test after first reproducing the raw `raw_prompt` preview leak; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 38 tests; focused backend `uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed; focused backend `uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 564 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing remaining member/player preview and dry-run surfaces for arbitrary JSON or text copied from request/admin metadata. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Offscreen event payload persistence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-072.
+- Finding: F-072 found offscreen event resolution copying `OffscreenEventQueueItem.payload_json` directly into `WorldEventAppend(payload=...)`. Queue payloads can originate from admin offscreen creation, GM macro plans, player choice effects, or forked queue state, so unsafe storage refs, raw prompt/output markers, filesystem paths, secret/auth refs, bytes, or base64-like values could become persisted `world_events.payload` evidence.
+- Summary: Added an architecture-contracts OpenSpec scenario for safe offscreen resolution payloads and introduced a domain-layer sanitizer in `LivingWorldAutonomyService.resolve_due_offscreen_events()` so historical or newly queued dirty payload JSON is filtered immediately before world event persistence while preserving safe event context fields.
+- Files changed: backend/packages/worlds/src/noveland/worlds/autonomous.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_offscreen_resolution_sanitizes_persisted_world_event_payload`, which creates a dirty due offscreen queue payload, resolves it, and asserts the persisted `WorldEventModel.payload` keeps safe summary/context fields while omitting forbidden keys and values.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_offscreen_resolution_sanitizes_persisted_world_event_payload -q` first failed on unredacted `storage_uri` persisted in `WorldEventModel.payload`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 39 tests; focused backend `uv run ruff check packages/worlds/src/noveland/worlds/autonomous.py tests/test_api_worlds.py` passed; focused backend `uv run mypy packages/worlds/src/noveland/worlds/autonomous.py tests/test_api_worlds.py` passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 565 passed and 8 skipped. `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed.
+- Follow-up notes: Continue backend audits for remaining historical dirty content paths, provider/quota/worldline isolation edge cases, and then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening GM proposal payload persistence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-073.
+- Finding: F-073 found GM proposal resolution copying arbitrary `GMEventProposal.proposed_payload` directly into `WorldEventAppend(payload=...)` when a proposal is reviewed as resolved. Proposed payload JSON can originate from admin input, macro planning, or provider-backed planning evidence, so unsafe storage refs, raw prompt/output markers, filesystem paths, secret/auth refs, bytes, or base64-like values could become persisted `world_events.payload` evidence.
+- Summary: Added an architecture-contracts OpenSpec scenario for safe GM proposal resolution payloads, moved the F-072 offscreen event sanitizer into shared `noveland.worlds.sanitization.sanitize_world_event_payload()`, and applied it to both offscreen resolution and GM proposal resolution at the domain persistence boundary.
+- Files changed: backend/packages/worlds/src/noveland/worlds/sanitization.py, backend/packages/worlds/src/noveland/worlds/autonomous.py, backend/packages/worlds/src/noveland/worlds/gm.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_gm_proposal_resolution_sanitizes_persisted_world_event_payload`, which creates a dirty GM proposal payload, resolves it, and asserts the persisted `WorldEventModel.payload` keeps safe beat/context/proposal fields while omitting forbidden keys and values; reran the F-072 offscreen payload regression to cover the shared helper.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_gm_proposal_resolution_sanitizes_persisted_world_event_payload -q` first failed on unredacted `storage_uri` persisted in `WorldEventModel.payload`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py::test_offscreen_resolution_sanitizes_persisted_world_event_payload tests/test_api_worlds.py::test_gm_proposal_resolution_sanitizes_persisted_world_event_payload -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 40 tests; focused backend ruff/mypy passed for `sanitization.py`, `autonomous.py`, `gm.py`, and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 566 passed and 8 skipped. `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed.
+- Follow-up notes: Continue auditing remaining world event producers, especially secret reveal/consequence metadata and other historical dirty event payload paths, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Event store payload safety enforcement entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-074.
+- Finding: F-074 found `WorldEventStore.append_event()` persisted `event_input.payload` directly. F-072/F-073 protected offscreen and GM proposal producers, but other producers such as `LivingWorldGuardrailService.reveal_secret()` could still write arbitrary admin-authored metadata into `world_events.payload`.
+- Summary: Added an architecture-contracts OpenSpec scenario requiring event-store-level payload safety, moved shared sanitization into `noveland.events.sanitization.sanitize_world_event_payload()`, enforced it in `WorldEventStore.append_event()`, and removed the temporary worlds-domain sanitizer plus producer-level calls.
+- Files changed: backend/packages/events/src/noveland/events/sanitization.py, backend/packages/events/src/noveland/events/event_store.py, backend/packages/worlds/src/noveland/worlds/autonomous.py, backend/packages/worlds/src/noveland/worlds/gm.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_event_store_sanitizes_secret_reveal_event_payload`, which creates a dirty secret consequence metadata payload, reveals the secret, and asserts the persisted `WorldEventModel.payload` keeps safe secret/consequence fields while omitting storage refs, filesystem paths, raw prompt/output markers, bytes, and base64-like values; reran F-072/F-073 regressions to prove the event-store enforcement covers those producers after removing producer-level calls.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_event_store_sanitizes_secret_reveal_event_payload -q` first failed on unredacted `storage_uri` persisted in `WorldEventModel.payload`, then passed after remediation; `cd backend && uv run pytest tests/test_api_worlds.py::test_offscreen_resolution_sanitizes_persisted_world_event_payload tests/test_api_worlds.py::test_gm_proposal_resolution_sanitizes_persisted_world_event_payload tests/test_api_worlds.py::test_event_store_sanitizes_secret_reveal_event_payload -q` passed with 3 tests; `cd backend && uv run pytest tests/test_api_worlds.py tests/test_event_contracts.py -q` passed with 49 tests; focused backend ruff/mypy passed for touched event/world/test files; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped. `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict`, and `git diff --check` passed.
+- Follow-up notes: Continue auditing non-event persistence and reader/member/Web exposure paths; Web was not changed in this batch, so Web gates were not run. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening World bible public canon JSON redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-075.
+- Finding: F-075 found member-readable world bible responses hiding `source_material`, `continuity_config`, and `metadata` but still returning arbitrary public canon JSON fields (`canon_timeline`, `setting_rules`, `forbidden_changes`, and `sequel_boundaries`) verbatim. Admin-authored public canon JSON can contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, base64, or other operator-only canon-management evidence.
+- Summary: Updated the architecture-contracts OpenSpec scenario for member world bible reads, applied the existing public JSON sanitizer to non-admin world bible public canon JSON fields, and preserved full unsanitized canon-management JSON for admin responses.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_bible_api_preserves_continuity_contract_and_access` so admin reads retain dirty public canon JSON while member reads keep safe canon fields and remove storage refs, filesystem paths, raw prompt/output markers, secret refs, and base64 markers.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_bible_api_preserves_continuity_contract_and_access -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing remaining member-readable replay/state and other public narrative/canon surfaces for arbitrary JSON/text, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Conversation turn transcript text redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-076.
+- Finding: F-076 found member-readable conversation turn list responses hiding runtime run IDs and error text but returning `input_text` and `output_text` verbatim. Admin seed text and provider-backed agent output can contain storage refs, filesystem paths, raw prompt/output markers, secret/auth refs, bytes, base64, or other operator-only execution evidence.
+- Summary: Updated the architecture-contracts OpenSpec conversation-turn scenario, added a conversation API member transcript text sanitizer, and applied it only to non-admin turn responses while preserving admin transcript text.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_conversation_api_enforces_access_and_manual_advance` so admin seed/advance responses retain dirty transcript text while member turn list responses blank sensitive-looking input/output text and still hide run/error fields.
+- Verification: `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests; focused backend ruff/mypy passed for `conversations.py` and `test_api_conversations.py`; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing reader/player presentation and playback DTO text/media references for comparable forbidden-evidence exposure, then resume Web/e2e route-handler and product normal-use audits. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Media catalog provenance redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-077.
+- Finding: F-077 found member-readable media asset catalog/search/detail/lineage responses redacting storage URIs and metadata but still exposing internal provider/source IDs, provider kind, actor refs, and lineage source job IDs; member source/provider filters could also infer internal provenance.
+- Summary: Updated the architecture-contracts OpenSpec media catalog scenarios, blanked internal provenance fields in non-admin media response shaping, and rejected member source/provider catalog filters while preserving admin media management responses.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_media_api_member_visibility_acl_and_csrf` and `test_media_api_member_metadata_redaction_across_visible_records` for member/admin provenance field boundaries and internal filter rejection.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_api_member_visibility_acl_and_csrf tests/test_api_media.py::test_media_api_member_metadata_redaction_across_visible_records -q` passed with 2 tests. Focused backend ruff/mypy passed for `media.py` and `test_api_media.py`; `cd backend && uv run pytest tests/test_api_media.py -q` passed with 9 tests; full backend ruff, mypy, and pytest passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing reader/player playback DTOs and Web route handlers for comparable internal provenance or provider leakage. Do not push unless explicitly requested after this batch commit.
+
+
+## Post-v1.1 RC Audit and Hardening Member presentation playback DTO entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security/product remediation for F-078.
+- Finding: F-078 found `web/lib/worlds/server.ts:getConversationPlaybackData()` fetching conversation turn presentations for playback while the backend GET route was world-admin-only. The canonical presentation record can also include internal sprite/voice/transcript authoring refs and generated `presentation_json` provenance such as media job or model invocation IDs.
+- Summary: Added an architecture-contracts OpenSpec scenario for member-safe presentation GET, changed only the presentation GET dependency to member context, and shaped non-admin responses so ordinary members keep playback-safe speaker/emotion/render/media asset fields while `sprite_set_id`, `sprite_variant_id`, `voice_profile_id`, `transcript_id`, and forbidden `presentation_json` evidence are removed. PUT/PATCH/render-visual/render-speech/transcribe-audio remain admin-only, and admin GET responses preserve the full record.
+- Files changed: backend/services/api/src/noveland/services/api/conversation_presentations.py, backend/tests/test_api_conversation_presentations.py, backend/tests/test_api_permission_matrix.py, backend/tests/test_security_regression_suite.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended conversation presentation API coverage for member GET safe DTO shaping, dirty historical `presentation_json` redaction, admin GET preservation, and member mutation/render denial; updated permission/security regression matrices so presentation GET is no longer treated as admin-only while mutation/render routes remain denied to ordinary members.
+- Verification: `cd backend && uv run pytest tests/test_api_conversation_presentations.py -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_permission_matrix.py tests/test_security_regression_suite.py tests/test_api_conversation_presentations.py -q` passed with 9 tests; focused backend ruff/mypy passed for touched backend/test files; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 567 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue auditing reader/player playback DTO media visibility edge cases, Web route handlers/proxies, and product normal-use drift. Do not push unless explicitly requested after this batch commit.
+
+
+## Post-v1.1 RC Audit and Hardening Member presentation media visibility entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security/product remediation for F-079.
+- Finding: F-079 found that F-078 member-safe presentation GET still returned `background_asset_id`, `composite_scene_asset_id`, and `tts_media_asset_id` directly from canonical presentation records. Rendering and admin upsert paths can store world-admin/private/hidden, suppressed, unreferenced, or otherwise non-reader-deliverable media asset IDs there even though Reader Media Delivery would not return descriptors or bytes for those assets.
+- Summary: Extended the architecture-contracts OpenSpec presentation scenario, reused `ReaderMediaDeliveryService.get_media()` inside non-admin presentation response shaping, and now nulls member presentation media IDs unless the same asset is reader-deliverable for the presentation worldline. Admin presentation GET still preserves full media IDs and mutation/render routes remain admin-only.
+- Files changed: backend/services/api/src/noveland/services/api/conversation_presentations.py, backend/tests/test_api_conversation_presentations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added focused presentation API coverage proving admin-only/private/hidden media IDs are preserved for admin GET but nulled for member GET, while reader-visible same-worldline assets with reader-visible turn references remain present in the member presentation DTO.
+- Verification: `cd backend && uv run pytest tests/test_api_conversation_presentations.py -q` passed with 3 tests; `cd backend && uv run pytest tests/test_api_permission_matrix.py tests/test_security_regression_suite.py tests/test_api_conversation_presentations.py -q` passed with 10 tests; focused backend ruff/mypy passed for `conversation_presentations.py` and `test_api_conversation_presentations.py`; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audits for playback server loaders/components, Next route handlers, proxy response shaping, and client-side rendering sinks. Do not push unless explicitly requested after this batch commit.
+
+
+## Post-v1.1 RC Audit and Hardening Dashboard world query navigation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web/e2e security remediation for F-080.
+- Finding: F-080 found `web/features/dashboard/world-management-dashboard.tsx` constructing local dashboard navigation as `/?world=${nextWorldId}` for selection and `/?world=${world.id}` after create. A world identifier containing `&`, `?`, or `#` could escape the intended `world` query parameter into extra local query data or a fragment.
+- Summary: Added an architecture-contracts OpenSpec scenario for dashboard query-boundary preservation, introduced a `worldQueryPath()` helper, and routed both selected-world and newly-created-world navigation through encoded query values.
+- Files changed: web/features/dashboard/world-management-dashboard.tsx, web/features/dashboard/world-management-dashboard.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended dashboard component coverage so world IDs containing `/`, `?`, and `#` are encoded in `router.replace()` for both selector changes and create-world success navigation.
+- Verification: `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` passed with 6 tests; `cd web && npm run lint` passed; `cd web && npm run typecheck` passed; full `cd web && npm run test` passed with 52 files and 187 tests, with existing RuntimeAdmin React act warnings; `cd web && npm run build` passed; `cd web && npm run check:next-env` passed after restoring the expected `.next/types/routes.d.ts` import regenerated by e2e/dev; `cd web && npm run test:e2e` passed with 21 tests; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining local query navigation, route handlers, proxy method exposure, response shaping, and client-side rendering sinks. Do not push unless explicitly requested after this batch commit.
+
+## Post-v1.1 RC Audit and Hardening Agent run source evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-081.
+- Finding: F-081 found member-readable agent runtime run list responses already hiding prompt text, response text, provider profile refs, and diagnostics, but still returning `source_calendar_entry_id`, `source_schedule_rule_id`, and `created_event_id` to ordinary world members.
+- Summary: Updated the architecture-contracts OpenSpec scenario for member agent runtime runs, redacted source calendar/schedule/event refs from non-admin `_agent_run_response()` output, and preserved admin source evidence for diagnosis.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended agent runtime API coverage so admin run list responses retain source calendar/schedule/event refs while member run list responses receive `null` for those fields.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_agent_runs_and_narrative_artifacts_api tests/test_api_worlds.py::test_agent_run_apis_filter_by_worldline -q` passed with 2 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Replay state source evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-082.
+- Finding: F-082 found member-readable replay state responses returning `clock.last_event_id` and `clock.last_event_sequence`, allowing ordinary world members to correlate reconstructed clock state to internal world event evidence even though event audit and clock transition audit routes are admin-only.
+- Summary: Added an architecture-contracts OpenSpec scenario for member replay state source evidence, shaped replay state responses by caller role, and redacted clock source event refs for ordinary members while preserving admin replay diagnostics.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended replay/snapshot API coverage so member replay state hides clock source refs and admin replay state retains them.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` passed with 1 test; `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot tests/test_api_worlds.py::test_world_event_audit_requires_admin_and_filters_events -q` passed with 2 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Agent catalog source preset provenance redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-083.
+- Finding: F-083 found member-readable agent catalog responses already hiding provider profile IDs, execution config, and unsafe character profile JSON, but still returning `source_preset_id` and `source_preset_version` to ordinary world members.
+- Summary: Updated the architecture-contracts OpenSpec member-agent scenario, gated `_agent_response()` source preset provenance behind `include_admin_fields`, and preserved admin create/update/list source preset diagnostics.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping` so admin list responses retain source preset ID/version while member list responses receive `null` for both fields.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_create_agent_from_preset_materializes_persona_calendar_and_provider_mapping -q` first failed on unredacted `source_preset_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Snapshot source evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-084.
+- Finding: F-084 found member-readable latest snapshot responses already hiding snapshot payload, payload URI/location, and metadata, but still returning `created_by_event_id` to ordinary world members.
+- Summary: Updated the architecture-contracts OpenSpec latest snapshot scenario, made `WorldSnapshotResponse.created_by_event_id` nullable, and redacted the created-by event ref from non-admin `_snapshot_response()` output while preserving admin replay diagnostics.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_replay_and_snapshot_api_reads_state_and_creates_snapshot` so admin latest snapshot responses retain `created_by_event_id` while member latest snapshot responses receive `null`.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_replay_and_snapshot_api_reads_state_and_creates_snapshot -q` first failed on unredacted `created_by_event_id`, then passed with 1 test after remediation; adjacent replay/event audit coverage passed with 2 tests; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Player choice event evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-085.
+- Finding: F-085 found member-readable player choice create/list responses already hiding prompt text and sanitizing context/consequence preview JSON, but still returning `applied_event_id` even though `record_player_choice()` always appends a `player.choice_recorded` world event.
+- Summary: Updated the architecture-contracts OpenSpec player-choice scenario and gated `_player_choice_response()` applied event refs behind `include_admin_fields`, preserving admin review/event correlation while ordinary members receive safe choice status and sanitized metadata only.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` so member choice create/list responses get `null` for `applied_event_id`, while admin list responses retain the real `player.choice_recorded` event id.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope -q` first failed on unredacted `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 41 tests; focused backend ruff/mypy passed for `worlds.py` and `test_api_worlds.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Player privacy choice event evidence redaction entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-086.
+- Finding: F-086 found player privacy exports already hiding prompts, context, consequence preview, journal/notification source refs, and intervention choice/event linkage, but still exporting player choice `applied_event_id`.
+- Summary: Updated the architecture-contracts OpenSpec privacy export scenario and redacted choice applied event refs from `PlayerPrivacyService._build_export_payload()` while preserving safe player-owned choice fields.
+- Files changed: backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/tests/test_api_player_privacy.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_privacy_export_is_player_scoped_and_redacted` so seeded player choices carry an internal applied event ID and member exports return `null` for it.
+- Verification: `cd backend && uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted -q` first failed on unredacted choice `applied_event_id`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_player_privacy.py -q` passed with 3 tests; focused backend ruff/mypy passed for `player_privacy/service.py` and `test_api_player_privacy.py`; full backend ruff, mypy, and pytest passed with 568 passed and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend/Web audits for remaining member/reader/player DTO source evidence, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Member-owned JSON sensitive-key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-087.
+- Finding: F-087 found player session resume state and beta feedback metadata sanitizers recognized snake_case sensitive keys but missed common camelCase/compact variants such as `rawPrompt`, `rawOutput`, `storageUri`, and `promptSnapshotId` when values were otherwise safe-looking strings.
+- Summary: Updated the architecture-contracts OpenSpec member-owned state JSON scenario, normalized sensitive JSON keys before comparison in player session and beta feedback services, and expanded value marker matching for compact/camelCase raw prompt/output, prompt snapshot, storage URI, and path variants.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/packages/beta_feedback/src/noveland/beta_feedback/service.py, backend/tests/test_api_player_sessions.py, backend/tests/test_api_beta_feedback.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended player session resume round-trip and beta feedback triage coverage to submit camelCase/compact sensitive keys and assert only safe state/metadata remains.
+- Verification: `cd backend && uv run pytest tests/test_api_player_sessions.py::test_player_session_resume_round_trip_is_player_safe tests/test_api_beta_feedback.py::test_tester_creates_own_feedback_and_admin_triages_without_leaks -q` first failed on unredacted camelCase sensitive keys, then passed with 2 tests after remediation; `cd backend && uv run pytest tests/test_api_player_sessions.py tests/test_api_beta_feedback.py -q` passed with 7 tests; focused backend ruff/mypy passed for `player_sessions/service.py`, `beta_feedback/service.py`, and their API tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining member-owned metadata sanitizers, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Remaining JSON sensitive-key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-088.
+- Finding: F-088 found private beta invite metadata, player privacy export/request JSON, and moderation report/review metadata sanitizers still recognized only snake_case or exact lower-case sensitive keys, allowing camelCase/compact `rawPrompt`, `rawOutput`, `storageUri`, and `promptSnapshotId` keys to persist and return.
+- Summary: Updated the architecture-contracts OpenSpec review/onboarding metadata scenario, normalized sensitive JSON keys before comparison in private beta, player privacy, and moderation services, and expanded value marker matching for compact/camelCase raw prompt/output, prompt snapshot, storage URI, and path variants.
+- Files changed: backend/packages/private_beta/src/noveland/private_beta/service.py, backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/packages/moderation/src/noveland/moderation/service.py, backend/tests/test_api_private_beta.py, backend/tests/test_api_player_privacy.py, backend/tests/test_api_moderation.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended private beta invite, player privacy export, and moderation report coverage to submit or seed camelCase/compact sensitive keys and assert only safe metadata remains.
+- Verification: `cd backend && uv run pytest tests/test_api_private_beta.py::test_admin_invite_lifecycle_redeem_and_profile_bootstrap_are_safe tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted tests/test_api_moderation.py::test_reader_can_create_report_and_admin_can_review_without_leaks -q` first failed on unredacted camelCase sensitive keys, then passed with 3 tests after remediation; `cd backend && uv run pytest tests/test_api_private_beta.py tests/test_api_player_privacy.py tests/test_api_moderation.py -q` passed with 12 tests; focused backend ruff/mypy passed for `private_beta/service.py`, `player_privacy/service.py`, `moderation/service.py`, and their API tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining package-local metadata sanitizers, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Event payload key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-089.
+- Finding: F-089 found the global world event payload sanitizer still checked forbidden keys using exact snake_case names, allowing camelCase/compact keys such as `rawPrompt`, `rawOutput`, `storageUri`, and `promptSnapshotId` to persist in `world_events.payload`.
+- Summary: Updated the architecture-contracts OpenSpec event-store normalized-key scenario, normalized forbidden world event payload keys before comparison, expanded forbidden value markers for compact/camelCase URI/path/prompt terms, and kept safe domain event context fields such as `secret_id` and `secret_key` intact.
+- Files changed: backend/packages/events/src/noveland/events/sanitization.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended secret reveal event-store payload coverage with camelCase/compact forbidden keys and assertions that persisted world event payloads omit them.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_event_store_sanitizes_secret_reveal_event_payload -q` first failed on unredacted `rawPrompt` in `world_events.payload`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py::test_offscreen_resolution_sanitizes_persisted_world_event_payload tests/test_api_worlds.py::test_gm_proposal_resolution_sanitizes_persisted_world_event_payload tests/test_api_worlds.py::test_event_store_sanitizes_secret_reveal_event_payload tests/test_event_contracts.py -q` passed with 11 tests; focused backend ruff/mypy passed for `events/sanitization.py`, `test_api_worlds.py`, and `test_event_contracts.py`; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining package-local metadata sanitizers, member DTO redaction helpers, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Member media and presentation JSON key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-090.
+- Finding: F-090 found member-readable media metadata DTOs and conversation presentation JSON already removed snake_case sensitive keys, but still returned camelCase/compact keys such as `rawPrompt`, `rawOutput`, `storageUri`, and `promptSnapshotId` when values were otherwise safe-looking strings.
+- Summary: Updated the architecture-contracts OpenSpec member media/presentation JSON scenario, normalized member media metadata and presentation JSON keys before comparison, and expanded forbidden value markers for compact/camelCase URI/path/prompt/provider/job/invocation terms.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/services/api/src/noveland/services/api/conversation_presentations.py, backend/tests/test_api_media.py, backend/tests/test_api_conversation_presentations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended media metadata redaction and member presentation GET coverage with camelCase/compact forbidden keys and assertions that ordinary member responses omit them while retaining safe fields.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_api_member_metadata_redaction_across_visible_records tests/test_api_conversation_presentations.py::test_conversation_presentation_api_renders_visual_speech_and_transcript -q` first failed on unredacted camelCase sensitive keys, then passed with 2 tests after remediation; `cd backend && uv run pytest tests/test_api_media.py tests/test_api_conversation_presentations.py -q` passed with 12 tests; focused backend ruff/mypy passed for `media.py`, `conversation_presentations.py`, and their API tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 568 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining package-local metadata sanitizers, member DTO redaction helpers, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Provider secret-key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-091.
+- Finding: F-091 found provider secret-key detection normalized keys with exact lower-case matching, so `clientSecret`, `bearerToken`, `privateKey`, and `secretKey` could bypass provider config/default-param rejection and persistence redaction even though equivalent snake_case keys were forbidden.
+- Summary: Updated the architecture-contracts OpenSpec provider secret-bearing JSON scenario, centralized normalized provider sensitive-key detection in `providers.secrets`, reused it for package provider validation/export, multimodal diagnostic secret checks, and narrative quality dashboard sanitization, and kept budget metadata covered through the shared reject path.
+- Files changed: backend/packages/providers/src/noveland/providers/secrets.py, backend/packages/package_contracts/src/noveland/package_contracts/service.py, backend/packages/multimodal_eval/src/noveland/multimodal_eval/service.py, backend/packages/narrative_quality/src/noveland/narrative_quality/service.py, backend/tests/test_provider_registry_service.py, backend/tests/test_api_package_contracts.py, backend/tests/test_provider_execution_service.py, backend/tests/test_multimodal_eval_service.py, backend/tests/test_narrative_quality_service.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added/updated provider registry, package contract validate/export, provider budget metadata, multimodal eval, and narrative quality dashboard coverage for camelCase/compact provider secret keys.
+- Verification: `cd backend && uv run pytest tests/test_provider_registry_service.py::test_registry_rejects_sensitive_provider_config_recursively tests/test_provider_registry_service.py::test_sanitizer_redacts_nested_sensitive_keys tests/test_api_package_contracts.py::test_package_contract_reports_registry_and_secret_issues tests/test_api_package_contracts.py::test_provider_config_export_is_sanitized_and_does_not_resolve_secret tests/test_provider_execution_service.py::test_budget_policy_rejects_camel_case_secret_metadata tests/test_multimodal_eval_service.py::test_multimodal_eval_detects_integrity_and_leak_failures -q` first failed with 6 failures on unblocked/unredacted camelCase secret keys, then passed with 6 tests after remediation; `cd backend && uv run pytest tests/test_narrative_quality_service.py::test_narrative_quality_dashboard_detects_blockers_and_sanitizes_evidence -q` passed with 1 test after switching provider health metadata coverage to `clientSecret`; `cd backend && uv run pytest tests/test_provider_registry_service.py tests/test_api_package_contracts.py tests/test_provider_execution_service.py tests/test_multimodal_eval_service.py tests/test_narrative_quality_service.py -q` passed with 79 tests; focused backend ruff/mypy passed for provider secrets, package contracts, multimodal eval, narrative quality, and their updated tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 569 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining package-local storage/prompt key normalization, route-handler method exposure, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Budget and diagnostics leaky-key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-092.
+- Finding: F-092 found provider budget policy JSON, multimodal prompt snapshot diagnostics, and narrative quality dashboard evidence checks still matched storage/prompt/path keys with exact lower-case names, so `storageUri`, `rawPrompt`, and `promptSnapshotId` could be accepted, under-reported, or returned where equivalent snake_case keys were rejected or flagged.
+- Summary: Updated the architecture-contracts OpenSpec budget/diagnostics JSON scenario, normalized leaky key comparisons in provider budget validation, multimodal diagnostics, and narrative quality dashboard sanitization, and expanded marker sets for storage URI, prompt snapshot, raw prompt/output, filesystem/object paths, bytes, and base64 forms.
+- Files changed: backend/packages/providers/src/noveland/providers/budget.py, backend/packages/multimodal_eval/src/noveland/multimodal_eval/service.py, backend/packages/narrative_quality/src/noveland/narrative_quality/service.py, backend/tests/test_provider_execution_service.py, backend/tests/test_multimodal_eval_service.py, backend/tests/test_narrative_quality_service.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added provider budget rejection coverage for camelCase storage/prompt metadata, multimodal prompt snapshot leak detection coverage for camelCase storage/prompt/prompt-snapshot keys, and narrative quality dashboard coverage for camelCase provider health evidence sanitization.
+- Verification: `cd backend && uv run pytest tests/test_provider_execution_service.py::test_budget_policy_rejects_camel_case_leaky_metadata tests/test_multimodal_eval_service.py::test_multimodal_eval_detects_camel_case_prompt_snapshot_leaks tests/test_narrative_quality_service.py::test_narrative_quality_dashboard_detects_camel_case_leaky_metadata -q` first failed with 3 failures on unblocked/unflagged camelCase leaky keys, then passed with 3 tests after remediation; `cd backend && uv run pytest tests/test_provider_execution_service.py tests/test_multimodal_eval_service.py tests/test_narrative_quality_service.py -q` passed with 72 tests; focused backend ruff/mypy passed for provider budget, multimodal eval, narrative quality, and their updated tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 572 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue backend/Web audits for remaining package-local import/export validators, Web route handlers, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Package and authoring leaky-key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend security remediation for F-093.
+- Finding: F-093 found world package manifest validation, authoring source metadata/config contracts, and asset generation policy/proposal contracts rejected snake_case forbidden keys such as `storage_uri` and `raw_prompt`, but accepted equivalent camelCase/compact keys including `storageUri`, `rawPrompt`, `promptSnapshotId`, and `filesystemPath`.
+- Summary: Updated the architecture-contracts OpenSpec package/authoring validator scenario, normalized forbidden key comparisons in world packaging, authoring, and asset generation contract validators, and expanded marker sets for storage URI, prompt snapshot, raw prompt/output, filesystem/object paths, bytes, and base64 forms.
+- Files changed: backend/packages/world_packaging/src/noveland/world_packaging/contracts.py, backend/packages/authoring/src/noveland/authoring/contracts.py, backend/packages/asset_generation/src/noveland/asset_generation/contracts.py, backend/tests/test_api_world_packaging.py, backend/tests/test_authoring_service.py, backend/tests/test_asset_generation_service.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Updated world package import, authoring JSON, and asset generation policy validation tests to cover camelCase/compact forbidden key variants while retaining safe metadata behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_world_packaging.py::test_world_package_import_rejects_forbidden_manifest_values tests/test_authoring_service.py::test_authoring_json_rejects_leaky_values tests/test_asset_generation_service.py::test_policy_rejects_leaky_json_and_preview_validates_worldline -q` first failed with 3 failures on accepted camelCase leaky keys, then passed with 3 tests after remediation; `cd backend && uv run pytest tests/test_api_world_packaging.py tests/test_authoring_service.py tests/test_asset_generation_service.py tests/test_api_asset_generation.py tests/test_authoring_regression_fixture.py -q` passed with 39 tests; focused backend ruff/mypy passed for world packaging, authoring, asset generation contracts, and their updated tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 572 passed and 8 skipped. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web invocation ledger evidence key normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web admin security remediation for F-094.
+- Finding: F-094 found the Web invocation ledger admin evidence renderer redacted snake_case storage/path/secret/base64 keys, but rendered camelCase or compact evidence keys such as `storageUri`, `rawPrompt`, and `promptSnapshotId` when their values were otherwise safe-looking strings.
+- Summary: Updated the architecture-contracts OpenSpec invocation-ledger evidence scenario, normalized evidence keys before redaction in `InvocationLedgerAdmin`, expanded forbidden markers for storage/path/bytes/base64/raw prompt/output/prompt snapshot/auth variants, and replaced sensitive rendered keys with `redacted_N` placeholders so key names do not leak.
+- Files changed: web/features/admin/invocation-ledger-admin.tsx, web/features/admin/invocation-ledger-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended invocation ledger admin rendering coverage with camelCase storage/prompt/snapshot evidence keys, assertions that sensitive key names and values are absent, and assertions that safe evidence fields remain visible.
+- Verification: `cd web && npm run test -- features/admin/invocation-ledger-admin.test.tsx` first failed on rendered `storageUri` and `rawPrompt`, then passed with 3 tests after remediation; `cd web && npm run test -- features/admin/invocation-ledger-admin.test.tsx lib/worlds/invocations.test.ts` passed with 6 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web provider admin JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web admin security remediation for F-095.
+- Finding: F-095 found the Web provider integration admin rendered provider config JSON, default params JSON, capability JSON, and health metadata summaries directly, so dirty legacy/API responses with `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, or `promptSnapshotId` could expose sensitive key names and values in editable admin panels.
+- Summary: Updated the architecture-contracts OpenSpec provider-admin scenario, added normalized provider JSON display sanitization in `ProviderIntegrationAdmin`, sanitized create/update payloads parsed from those panels, filtered health metadata summaries, and preserved legitimate provider config fields such as `model_discovery_path`, `chat_completions_path`, `endpoint`, and `temperature`.
+- Files changed: web/features/admin/provider-integration-admin.tsx, web/features/admin/provider-integration-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended provider admin rendering coverage with dirty camelCase/compact provider secret, prompt, storage, path, snapshot, and capability metadata keys while asserting safe provider configuration keys remain visible.
+- Verification: `cd web && npm run test -- features/admin/provider-integration-admin.test.tsx` first failed with 2 failures on rendered dirty provider JSON, then passed with 5 tests after remediation; `cd web && npm run test -- features/admin/provider-integration-admin.test.tsx lib/worlds/provider-integrations.test.ts` passed with 10 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, memory/runtime admin JSON panels, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web memory admin JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web admin security remediation for F-096.
+- Finding: F-096 found the Web memory backend admin rendered profile config JSON, `secret_refs`, health details, and write/retrieval log summaries directly, so dirty legacy/API responses with `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, or `promptSnapshotId` could expose sensitive key names and values in editable admin panels and diagnostic summaries.
+- Summary: Updated the architecture-contracts OpenSpec memory-admin scenario, added normalized memory JSON display sanitization in `MemoryBackendAdmin`, filtered unsafe `secret_refs` values while preserving safe `env:` references, sanitized create/update payloads parsed from those panels, and sanitized the health/log/job JSON diagnostic block.
+- Files changed: web/features/admin/memory-backend-admin.tsx, web/features/admin/memory-backend-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended memory admin rendering coverage with dirty camelCase/compact memory secret, prompt, storage, path, and snapshot keys while asserting safe memory config and safe `env:MEMORY_OPENAI_API_KEY` references remain visible.
+- Verification: `cd web && npm run test -- features/admin/memory-backend-admin.test.tsx` first failed on rendered dirty memory JSON, then passed with 1 test after remediation; `cd web && npm run test -- features/admin/memory-backend-admin.test.tsx lib/worlds/client.test.ts` passed with 36 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for runtime admin diagnostics, remaining route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web runtime admin diagnostics text normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web admin security remediation for F-097.
+- Finding: F-097 found the Web runtime admin rendered runtime health reasons, external tool policy messages/lists, scale readiness summaries, and runtime diagnostic component/message strings directly, so dirty legacy API or SSE payloads with `media://`, filesystem paths, local model paths, bearer tokens, `sk-` keys, raw prompt/output markers, prompt snapshot refs, bytes, or base64 markers could be displayed.
+- Summary: Updated the architecture-contracts OpenSpec runtime-admin scenario, added defensive runtime text sanitization in `RuntimeAdmin`, applied it to runtime notices, external tool policy compact lists, scale readiness text, and diagnostic rows, and preserved safe operational strings.
+- Files changed: web/features/admin/runtime-admin.tsx, web/features/admin/runtime-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added runtime admin rendering coverage for dirty loader data and SSE diagnostic payloads while asserting safe deny reasons, audit fields, readiness areas, and recommendations remain visible.
+- Verification: `cd web && npm run test -- features/admin/runtime-admin.test.tsx` first failed against the unpatched component with dirty runtime strings visible in the failure DOM, then passed with 3 tests after remediation; `cd web && npm run test -- features/admin/runtime-admin.test.tsx lib/worlds/client.test.ts` passed with 38 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored after e2e regenerated the dev route reference. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web dashboard JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web admin security remediation for F-098.
+- Finding: F-098 found the Web world management dashboard rendered agent config, schedule rule config, provider profile capabilities, and persona behavior policy through direct `JSON.stringify(...)`, and parsed dashboard JSON form submissions with raw `jsonObject(...)`, so dirty legacy API data or user-edited values with `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, `promptSnapshotId`, filesystem paths, bytes, or base64 markers could display and echo back through dashboard helpers.
+- Summary: Updated the architecture-contracts OpenSpec dashboard JSON scenario, added normalized dashboard JSON display and submit sanitization in `WorldManagementDashboard`, applied it to agent config, schedule rule config, provider capabilities, persona behavior policy, observation metadata, and narrative artifact metadata, and preserved safe dashboard config fields.
+- Files changed: web/features/dashboard/world-management-dashboard.tsx, web/features/dashboard/world-management-dashboard.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added dashboard rendering coverage for dirty JSON panels while asserting safe agent config, schedule hours, provider capability flags, and persona behavior fields remain visible.
+- Verification: `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed against the unpatched component with dirty dashboard JSON visible in editable textareas, then passed with 7 tests after remediation; `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx lib/worlds/client.test.ts` passed with 42 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with full unit tests passing on rerun after one unrelated `media-admin` timing miss passed in isolation. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web agent builder evidence normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web agent security remediation for F-099.
+- Finding: F-099 found the Web agent builder rendered agent character profile/config JSON, relationship metadata, persona policy/config JSON, selected run diagnostics, and run prompt/response summary text directly, and parsed agent-builder JSON form submissions with raw `jsonObject(...)`. Dirty legacy API data or edited form values containing `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, `promptSnapshotId`, filesystem paths, bytes, or base64 markers could therefore display in agent builder panels and be echoed back through update helpers.
+- Summary: Updated the architecture-contracts OpenSpec agent-builder scenario, added normalized agent-builder JSON display and submit sanitization in `AgentBuilder`, applied it to agent profile/config, relationship metadata, persona policy/config, selected run diagnostics, and run summary text, and preserved safe characterization, relationship, persona, and operational fields.
+- Files changed: web/features/agents/agent-builder.tsx, web/features/agents/agent-builder.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added agent builder rendering coverage for dirty JSON panels and dirty run text while asserting safe agent profile, config, relationship, persona, and diagnostic fields remain visible.
+- Verification: `cd web && npm run test -- features/agents/agent-builder.test.tsx` first failed against the unpatched component with dirty agent builder JSON and run text visible, then passed with 2 tests after remediation; `cd web && npm run test -- features/agents/agent-builder.test.tsx lib/worlds/client.test.ts` passed with 37 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored after build/e2e checks.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web preset admin JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web platform admin security remediation for F-100.
+- Finding: F-100 found the Web preset admin rendered preset behavior policy, calendar blueprint entries/metadata, and advanced config through direct `JSON.stringify(...)`, and parsed preset create/update JSON submissions with raw `jsonObject(...)` or `JSON.parse(...)`. Dirty legacy API data or edited form values containing `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, `promptSnapshotId`, filesystem paths, bytes, or base64 markers could display in preset panels and be echoed into reusable preset templates.
+- Summary: Updated the architecture-contracts OpenSpec preset-admin scenario, added normalized preset JSON display and submit sanitization in `PresetAdmin`, applied it to behavior policy, calendar blueprint arrays, nested calendar metadata, and advanced config, and preserved safe preset behavior, schedule, metadata, and operational fields.
+- Files changed: web/features/admin/preset-admin.tsx, web/features/admin/preset-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added preset admin coverage for dirty existing preset JSON panels plus dirty create/update submit payloads while asserting safe behavior, calendar, metadata, and config fields remain visible or submitted.
+- Verification: `cd web && npm run test -- features/admin/preset-admin.test.tsx` first failed against the unpatched component with dirty preset JSON visible in editable textareas, then passed with 4 tests after remediation; `cd web && npm run test -- features/admin/preset-admin.test.tsx lib/worlds/client.test.ts` passed with 39 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored after build/e2e checks.
+- Follow-up notes: Continue Web/e2e audits for remaining world overview/conversation/narrative/plugin JSON rendering sinks, route handlers, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web world overview JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web world admin security remediation for F-101.
+- Finding: F-101 found the Web world overview rendered world memory/rules plugin config, world bible JSON, release profile policies/checklists/metadata, composition rules config, and event audit payload summaries through direct `JSON.stringify(...)`, and parsed matching submissions with raw `jsonObject(...)`, `jsonObjectArray(...)`, or `JSON.parse(...)`. Dirty legacy API data or edited values containing `clientSecret`, `bearerToken`, `rawPrompt`, `storageUri`, `promptSnapshotId`, filesystem paths, bytes, or base64 markers could display on the central overview page and echo into update/validate/import helpers.
+- Summary: Updated the architecture-contracts OpenSpec world-overview scenario, added normalized world-overview JSON display and submit sanitization in `WorldOverview`, applied it to world plugin config, world bible JSON arrays/objects, release profile policies/checklists/metadata, composition rules config, and event payload summaries, and preserved safe world config, continuity, release, composition, and audit fields.
+- Files changed: web/features/worlds/world-overview.tsx, web/features/worlds/world-overview.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added world overview coverage for dirty JSON panels, dirty event payload summaries, and dirty update/world-bible/release/validate/import submit payloads while asserting safe fields remain visible or submitted.
+- Verification: `cd web && npm run test -- features/worlds/world-overview.test.tsx` first failed against the unpatched component with dirty world overview JSON/event payload visible, then passed with 5 tests after remediation; `cd web && npm run test -- features/worlds/world-overview.test.tsx lib/worlds/client.test.ts` passed with 40 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored after build/e2e checks.
+- Follow-up notes: Continue Web/e2e audits for remaining conversation detail, narrative reader, plugin config, route handlers, local query construction, product normal-use flows, and spec/history drift. Do not push unless explicitly requested.
+
+## Post-v1.1 RC Audit and Hardening Web narrative JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web narrative security remediation for F-102.
+- Finding: F-102 found the Web conversation detail rendered `writer_config.writer_plugin_config` directly and submitted it with raw `jsonObject(...)`, while the reader artifact detail rendered `artifact.metadata` directly. Dirty legacy/API data or edited values containing `clientSecret`, `bearerToken`, `rawPrompt`, `rawOutput`, `storageUri`, `promptSnapshotId`, filesystem/object paths, bytes, or base64 markers could display in admin writer config panels, echo through writer config updates, or leak on reader-visible published artifact pages.
+- Summary: Updated the architecture-contracts OpenSpec narrative scenario, added normalized writer-config JSON display and submit sanitization in `ConversationDetail`, added normalized reader artifact metadata rendering in `NarrativeReaderDetail`, omitted sensitive key variants, redacted sensitive-looking string values, and preserved safe writer options and reader-facing artifact metadata.
+- Files changed: web/features/conversations/conversation-detail.tsx, web/features/conversations/conversation-detail.test.tsx, web/features/worlds/narrative-reader.tsx, web/features/worlds/narrative-reader.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added conversation detail coverage for dirty writer plugin config display and submit payloads, plus reader detail coverage for dirty artifact metadata, asserting sensitive key/value variants are absent while safe labels and metadata remain visible or submitted.
+- Verification: `cd web && npm run test -- features/conversations/conversation-detail.test.tsx features/worlds/narrative-reader.test.tsx` first failed with 2 failures on rendered dirty writer config and reader metadata, then passed with 10 tests after remediation; `cd web && npm run test -- features/conversations/conversation-detail.test.tsx features/worlds/narrative-reader.test.tsx lib/worlds/client.test.ts` passed with 45 tests; Web lint, typecheck, `check:next-env`, full unit test suite, and build passed. The first Playwright e2e run hit an unrelated agent-create navigation timeout after 11 tests passed; the immediate rerun passed with 21 tests and `next-env.d.ts` remained clean after restoration. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining plugin config surfaces, route handlers, proxy method exposure, response shaping, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web provider profile admin JSON normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web provider profile admin security remediation for F-103.
+- Finding: F-103 found the legacy Web provider profile admin parsed `plugin_config` and `capabilities` with raw `jsonObject(...)`, rendered capabilities with direct `JSON.stringify(...)`, and rendered provider plugin config through schema-derived values plus a raw JSON fallback. Dirty legacy/API data or edited values containing `clientSecret`, `bearerToken`, `rawPrompt`, `rawOutput`, `storageUri`, `promptSnapshotId`, local model paths, filesystem paths, bytes, or base64 markers could display in provider profile admin panels and echo through create/update helpers.
+- Summary: Updated the architecture-contracts OpenSpec provider admin scenario, added normalized provider profile JSON display and submit sanitization in `ProviderAdmin`, passed sanitized plugin config into schema-derived `PluginConfigFields`, sanitized capabilities rendering, and preserved safe provider options such as endpoint, `json_mode`, `max_tokens`, and ordinary capability flags.
+- Files changed: web/features/admin/provider-admin.tsx, web/features/admin/provider-admin.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added provider admin coverage for dirty plugin config schema fields, raw plugin config JSON, capabilities JSON, and update submit payloads while asserting sensitive key/value variants are absent and safe provider options remain visible/submitted.
+- Verification: `cd web && npm run test -- features/admin/provider-admin.test.tsx` first failed with 1 failure on rendered dirty provider plugin config, then passed with 2 tests after remediation; `cd web && npm run test -- features/admin/provider-admin.test.tsx lib/worlds/client.test.ts` passed with 37 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored and checked after build/e2e. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, response shaping, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web visual resolver CSRF entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web visual admin security remediation for F-104.
+- Finding: F-104 found `resolveSprite` and `resolveBackground` in `web/lib/worlds/visual.ts` issued admin POST requests without `csrf: true`, while adjacent visual writes/deletes and compose-scene required the double-submit CSRF header. Existing visual client coverage explicitly expected resolver preview requests to omit `X-CSRF-Token`.
+- Summary: Updated the architecture-contracts OpenSpec visual admin client scenario, required CSRF for visual resolver preview POST helpers, and updated visual client tests so resolver preview and compose-scene POST requests all carry the CSRF header while retaining encoded visual path/query behavior.
+- Files changed: web/lib/worlds/visual.ts, web/lib/worlds/visual.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Updated visual admin client coverage to assert `resolve-sprite`, `resolve-background`, and `compose-scene` POST requests all forward `X-CSRF-Token`, replacing the prior no-CSRF resolver expectation.
+- Verification: `cd web && npm run test -- lib/worlds/visual.test.ts` first failed with 1 failure on a missing resolver CSRF header, then passed with 4 tests after remediation; `cd web && npm run test -- lib/worlds/visual.test.ts lib/admin/api-client.test.ts lib/worlds/proxy.test.ts` passed with 13 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored and checked after build/e2e. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, response shaping, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web agent memory search CSRF entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web world client security remediation for F-105.
+- Finding: F-105 found `searchAgentMemory` in `web/lib/worlds/client.ts` issued a world-scoped POST request without `csrf: true`, while adjacent agent memory profile refresh/forget, persona, observation, manual run, narrative, and agent mutation helpers required the double-submit CSRF header. Existing client coverage checked URL/body mapping but did not assert `X-CSRF-Token`.
+- Summary: Updated the architecture-contracts OpenSpec agent memory client scenario, required CSRF for the agent memory search POST helper, and updated world client tests to assert the `memory/search` request carries the CSRF header while preserving encoded world/agent path behavior and JSON body mapping.
+- Files changed: web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Updated memory request client coverage to set a CSRF cookie and assert `memory/search` forwards `X-CSRF-Token` along with its JSON body.
+- Verification: `cd web && npm run test -- lib/worlds/client.test.ts` first failed with 1 failure on a missing memory-search CSRF header, then passed with 35 tests after remediation; `cd web && npm run test -- lib/worlds/client.test.ts lib/worlds/proxy.test.ts lib/admin/api-client.test.ts` passed with 44 tests; Web lint, typecheck, `check:next-env`, full unit test suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored and checked after build/e2e. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, response shaping, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web backend error detail normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web client security remediation for F-106.
+- Finding: F-106 found admin, world, media upload, private-beta, and beta-feedback Web API clients parsing backend JSON `detail` / `detail.message` and throwing raw client errors. Workspace notices can display those messages, so dirty backend failures containing provider secrets, auth tokens, storage refs, filesystem/object paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence could cross into admin, member, player, or beta-user UI notices.
+- Summary: Updated the architecture-contracts OpenSpec backend-error scenario, added shared `normalizeBackendErrorDetail`, and routed admin/world/media/private-beta/beta-feedback error parsing through route-specific generic fallbacks when backend detail text looks sensitive while preserving safe business errors and safe publication gate summaries.
+- Files changed: web/lib/safe-error-detail.ts, web/lib/admin/api-client.ts, web/lib/admin/api-client.test.ts, web/lib/worlds/client.ts, web/lib/worlds/client.test.ts, web/lib/worlds/media.ts, web/lib/worlds/media.test.ts, web/lib/private-beta/client.ts, web/lib/private-beta/client.test.ts, web/lib/beta-feedback/client.ts, web/lib/beta-feedback/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added client regression coverage for dirty backend detail strings/messages across admin, world, media upload, private-beta, and beta-feedback helpers, while preserving safe admin `Forbidden` and structured publication gate summary behavior.
+- Verification: `cd web && npm run test -- lib/admin/api-client.test.ts lib/worlds/client.test.ts lib/worlds/media.test.ts lib/private-beta/client.test.ts lib/beta-feedback/client.test.ts` first failed with 5 failures against the unpatched clients because raw backend details were preserved, then passed with 53 tests after remediation; `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed; full `cd web && npm run test` passed with 52 files and 200 tests; `cd web && npm run build` passed with `next-env.d.ts` restored and checked; `cd web && npm run test:e2e` passed with 21 tests and `cd web && npm run check:next-env` passed afterward. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, response shaping, role boundary, client-side rendering sinks, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web auth error detail normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web auth client security remediation for F-107.
+- Finding: F-107 found `web/lib/auth/client.ts` parsing backend JSON `detail` and throwing `AuthClientError` with the raw string for CSRF, login, and current-subject requests. Login form maps common 401/422 responses to fixed text, but CSRF failures reached through other Web clients can be caught by generic `Error.message` UI fallbacks and display dirty backend detail.
+- Summary: Extended the architecture-contracts backend-error scenario to auth clients, applied shared `normalizeBackendErrorDetail` inside auth response parsing with each route-specific fallback, and preserved safe credential/business errors while redacting sensitive-looking backend auth/CSRF details.
+- Files changed: web/lib/auth/client.ts, web/lib/auth/client.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added auth client regression coverage for dirty CSRF backend detail with `clientSecret`, `sk-*`, `storageUri`, and `media://` markers, plus reran the F-106 client normalization suite.
+- Verification: `cd web && npm run test -- lib/auth/client.test.ts` first failed with 1 failure against the unpatched auth client because raw CSRF backend detail was preserved, then passed with 7 tests after remediation; `cd web && npm run test -- lib/auth/client.test.ts lib/admin/api-client.test.ts lib/worlds/client.test.ts lib/worlds/media.test.ts lib/private-beta/client.test.ts lib/beta-feedback/client.test.ts` passed with 60 tests; `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed; full `cd web && npm run test` passed with 52 files and 201 tests; `cd web && npm run build` passed with `next-env.d.ts` restored and checked; `cd web && npm run test:e2e` passed with 21 tests and `cd web && npm run check:next-env` passed afterward. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, server-side loader error handling, proxy response shaping, role boundary, client-side rendering sinks, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web server loader error detail normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web server-loader security remediation for F-108.
+- Finding: F-108 found `web/lib/worlds/server.ts` and `web/lib/beta-feedback/server.ts` parsing backend JSON `detail` into `WorldServerError` / `BetaFeedbackServerError` messages. Most loader failures become fixed page `loadError` strings, but `getWorldsIndexData()` and 401 rethrows can preserve dirty backend detail into Next server error/log boundaries.
+- Summary: Added an architecture-contracts scenario for server loaders, routed worlds and beta-feedback server-loader `errorDetail` parsing through shared `normalizeBackendErrorDetail`, and preserved existing fixed page `loadError` behavior for caught loader failures.
+- Files changed: web/lib/worlds/server.ts, web/lib/worlds/server.test.ts, web/lib/beta-feedback/server.ts, web/lib/beta-feedback/server.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added server-loader regression coverage for dirty worlds index backend detail and dirty beta-feedback 401 backend detail, asserting both rethrown errors use route-specific generic messages.
+- Verification: `cd web && npm run test -- lib/worlds/server.test.ts lib/beta-feedback/server.test.ts` first failed with 2 failures against unpatched server loaders because raw backend details were preserved in thrown server errors, then passed with 5 tests after remediation; `cd web && npm run lint`, `cd web && npm run typecheck`, and `cd web && npm run check:next-env` passed; full `cd web && npm run test` passed with 52 files and 203 tests; `cd web && npm run build` passed with `next-env.d.ts` restored and checked; `cd web && npm run test:e2e` passed with 21 tests and `cd web && npm run check:next-env` passed afterward. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy response shaping, server-side loader response DTOs, role boundary, client-side rendering sinks, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web proxy JSON error body normalization entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web same-origin proxy response security remediation for F-109.
+- Finding: F-109 found `web/lib/auth/proxy.ts` central `buildProxyResponse()` relaying non-204 backend response bodies as raw bytes. Auth, generic API, worlds, runtime, and private-beta proxies therefore could return dirty backend JSON error bodies containing provider secrets, auth tokens, storage refs, filesystem/object paths, local model paths, raw prompt/output markers, prompt snapshot refs, bytes, or base64-like evidence to browser clients even after UI-visible error text was normalized.
+- Summary: Added an architecture-contracts scenario for Web proxy JSON error-body normalization and sanitized non-2xx JSON response bodies centrally in `buildProxyResponse()` using the shared backend-error detail detector, while preserving successful JSON, binary/no-content responses, streaming responses, and explicit auth cookie relay behavior.
+- Files changed: web/lib/auth/proxy.ts, web/lib/auth/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added proxy regression coverage for dirty backend JSON `detail` payloads containing `rawPrompt`, bearer-token, storage URI, and `media://` markers plus safe JSON errors that must remain byte-for-byte unchanged, asserting the proxied body uses a generic message, preserves safe review status, omits sensitive storage fields, and continues stripping backend `Set-Cookie` unless explicitly relayed.
+- Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed against unpatched `buildProxyResponse()` because raw backend JSON detail was relayed, then passed with 6 tests after remediation; the proxy suite passed with 6 files and 19 tests; Web lint, typecheck, `check:next-env`, full unit suite, build, and Playwright e2e passed before commit, with `next-env.d.ts` restored and checked after build/e2e. OpenSpec strict validations and `git diff --check` passed before commit.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, server-loader response DTOs, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening platform-admin player record management entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend product/security consistency remediation for F-110.
+- Finding: F-110 found player journal, notification, and intervention routes computing admin response visibility with `context.is_platform_admin or context.role == world_admin` while using world-admin-only role checks for cross-user access and all-user listing. Platform admins without direct world membership therefore received 403 or empty self-scoped lists on workflows that world admins could use.
+- Summary: Added an architecture-contracts scenario for platform-admin player record management and reused the existing management predicate for player journal, in-world notification, and player intervention cross-user/list/create decisions while preserving member-only restrictions and member-safe DTO shaping.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added regression coverage for a platform admin without world membership listing another user's player journal, listing all notifications and interventions, and creating an intervention for that member while receiving admin-visible fields.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_platform_admin_manages_player_records_without_world_membership -q` first failed with a 403 on platform-admin cross-user player journal access, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_worlds.py::test_knowledge_player_guardrail_apis_and_acceptance_gap_fixes tests/test_api_worlds.py::test_world_member_can_use_own_player_interaction_records_without_admin_scope tests/test_api_permission_matrix.py -q` passed with 5 tests; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` and `cd backend && uv run mypy services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 573 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue Web/e2e audits for remaining route handlers, proxy method exposure, server-loader response DTOs, role boundary, client-side rendering sinks, local query construction, product normal-use flows, and spec/history drift. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening agent memory worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend memory/worldline security remediation for F-111.
+- Finding: F-111 found `MemoryService.search()` and `MemoryService.delete_scope()` accepted request scopes and called the configured memory backend before validating that an explicit `worldline_id` belongs to the requested `world_id`. For external memory backends, invalid or cross-world worldline identifiers could cross the backend/provider boundary before local validation, and then surface as inconsistent API errors.
+- Summary: Added an architecture-contracts OpenSpec scenario requiring agent memory backend calls to validate worldline scope first, resolved memory search/delete worldline IDs before backend calls, passed resolved scopes to backend search/delete operations, and mapped API search/forget validation failures to 422 responses.
+- Files changed: backend/packages/memory/src/noveland/memory/service.py, backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_memory_backend.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added a spy-backend service regression proving invalid cross-world worldline search/delete are rejected before backend search/delete calls, and extended the agent memory API test to assert cross-world worldline search/forget return 422 while valid admin memory workflows still pass.
+- Verification: `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_service_rejects_invalid_worldline_before_backend_search_or_delete -q` first failed with `backend.search_calls == 1`, then passed after remediation; `cd backend && uv run pytest tests/test_api_worlds.py::test_world_admin_manages_agent_memory tests/test_memory_backend.py::test_memory_service_rejects_invalid_worldline_before_backend_search_or_delete -q` passed with 2 tests; `cd backend && uv run pytest tests/test_memory_backend.py -q` passed with 17 tests; focused backend ruff/mypy passed for memory service, worlds API, and their updated tests; full backend `ruff`, `mypy`, and `pytest` passed with 574 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue read-only audit of remaining worldline/member response edges, especially API routes where existing invalid-worldline behavior returns empty lists rather than explicit 4xx responses, plus Web/e2e route-handler and product normal-use drift.
+
+
+## Post-v1.1 RC Audit and Hardening agent memory read-route worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend agent memory API worldline validation remediation for F-112.
+- Finding: F-112 found that after F-111 fixed memory search/forget, adjacent memory read/profile routes still handled invalid worldlines inconsistently: memory list returned `200 []` for a cross-world `worldline_id`, while profile snapshot read and refresh raised unhandled `MemoryValidationError` exceptions instead of returning a validation response.
+- Summary: Extended the architecture-contracts OpenSpec memory scenario, made `MemoryService.list_memories()` resolve and validate worldline scope before backend list calls, and mapped list/profile-snapshot/refresh `MemoryValidationError` failures to 422 responses in the worlds API while preserving valid memory list/snapshot behavior.
+- Files changed: backend/packages/memory/src/noveland/memory/service.py, backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_memory_backend.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended the spy-backend memory service regression to require invalid list scope to raise before backend calls, and extended the agent memory API regression so list, profile snapshot read, profile snapshot refresh, search, and forget all return 422 for cross-world worldline IDs.
+- Verification: `cd backend && uv run pytest tests/test_memory_backend.py::test_memory_service_rejects_invalid_worldline_before_backend_search_or_delete tests/test_api_worlds.py::test_world_admin_manages_agent_memory -q` first failed on the unpatched list/profile behavior, then passed with 2 tests; `cd backend && uv run pytest tests/test_memory_backend.py -q` passed with 17 tests; focused backend ruff/mypy passed for memory service, worlds API, and their updated tests; full backend `ruff`, `mypy`, and `pytest` passed with 574 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit outside agent memory, especially worldline query parameters in reader/player/member routes and Web clients that may mask 422 errors as empty states.
+
+
+## Post-v1.1 RC Audit and Hardening player privacy request-list worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player privacy API worldline validation remediation for F-113.
+- Finding: F-113 found `GET /worlds/{world_id}/player/privacy/export?worldline_id={other_worldline_id}` rejected a cross-world worldline through `PlayerPrivacyService._resolve_worldline_id()`, but adjacent `GET /worlds/{world_id}/player/privacy/requests?worldline_id={other_worldline_id}` returned `200 []` because request listing filtered by the supplied UUID without validating it belonged to the requested world.
+- Summary: Extended the architecture-contracts OpenSpec worldline scenario, updated `PlayerPrivacyService.list_requests()` to resolve and validate explicit worldline scope before applying request-list filters, and mapped list-route `PlayerPrivacyNotFoundError` / validation failures through the existing API 404/400 helpers.
+- Files changed: backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/services/api/src/noveland/services/api/player_privacy.py, backend/tests/test_api_player_privacy.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_privacy_rejects_cross_worldline_requests` so privacy export and privacy request list both reject cross-world worldline IDs.
+- Verification: `cd backend && uv run pytest tests/test_api_player_privacy.py::test_player_privacy_rejects_cross_worldline_requests -q` first failed with request list returning 200, then exposed missing API error mapping, then passed; `cd backend && uv run pytest tests/test_api_player_privacy.py -q` passed with 3 tests; focused backend ruff/mypy passed for player privacy service, API route, and tests; full backend `ruff`, `mypy`, and `pytest` passed with 574 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for reader media, visual/speech generation, invocation filters, and Web clients that might present invalid scopes as empty states.
+
+## Post-v1.1 RC Audit and Hardening reader media worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend reader media worldline isolation remediation for F-114.
+- Finding: F-114 found `ReaderMediaDeliveryService.list_media()` filtering directly on an explicit `worldline_id` without first validating that the worldline belongs to the requested world. Detail and download paths also compared against caller-supplied worldline UUIDs rather than a resolved same-world worldline.
+- Summary: Added an architecture-contracts scenario for reader media invalid worldline rejection, resolved explicit reader media worldline scopes through `Worldline` before list/detail/download filtering, and mapped invalid scopes through the existing reader media 404 response.
+- Files changed: backend/packages/reader_delivery/src/noveland/reader_delivery/service.py, backend/services/api/src/noveland/services/api/reader_media.py, backend/tests/test_api_reader_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_reader_media_rejects_cross_world_and_cross_worldline_requests` so reader media list requests reject a cross-world `worldline_id` instead of returning an empty success.
+- Verification: `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_rejects_cross_world_and_cross_worldline_requests -q` first failed before remediation because cross-world reader media list returned `200`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_reader_media.py -q` passed with 5 tests; focused backend ruff/mypy passed for reader delivery service, reader media API, and the updated test after ruff fixed import ordering. Full backend `ruff`, `mypy`, and `pytest` passed with 574 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for visual/speech generation, invocation filters, member/player DTOs, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening speech list worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend speech admin API worldline isolation remediation for F-115.
+- Finding: F-115 found speech list routes relying on service-level worldline validation without catching the resulting service exceptions: cross-world `worldline_id` queries against voice profile and agent binding lists raised `SpeechValidationError`, while transcript lists raised `SpeechNotFoundError`.
+- Summary: Added an architecture-contracts scenario for handled speech list invalid-worldline responses and mapped invalid explicit worldline scopes in voice profile, agent voice binding, and transcript list routes to existing 422 client errors while preserving valid list behavior and platform-admin visibility filtering.
+- Files changed: backend/services/api/src/noveland/services/api/speech.py, backend/tests/test_api_speech.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_speech_lists_reject_cross_worldline_requests` covering cross-world voice profile, agent voice binding, and transcript list rejection plus valid same-worldline list behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_speech.py::test_speech_lists_reject_cross_worldline_requests -q` first failed with an uncaught `SpeechValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_speech.py -q` passed with 2 tests; focused backend ruff/mypy passed for speech API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 575 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for visual generation list routes, media job/source filters, observability filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening visual generation model asset worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend visual generation admin API worldline isolation remediation for F-116.
+- Finding: F-116 found `GET /worlds/{world_id}/visual-generation/model-assets?worldline_id={other_worldline_id}` relying on service-level worldline validation without catching the resulting `VisualGenerationValidationError`, while valid same-worldline model asset lists returned normally.
+- Summary: Added an architecture-contracts scenario for handled visual generation model-asset list invalid-worldline responses and mapped invalid explicit worldline scopes in the model asset list route to the existing 422 client error while preserving valid list behavior and platform-admin restricted visibility filtering.
+- Files changed: backend/services/api/src/noveland/services/api/visual_generation.py, backend/tests/test_api_visual_generation.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_visual_generation_model_assets_reject_cross_worldline_requests` covering cross-world model asset list rejection and valid same-worldline model asset list behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_visual_generation.py::test_visual_generation_model_assets_reject_cross_worldline_requests -q` first failed with an uncaught `VisualGenerationValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_visual_generation.py -q` passed with 5 tests; focused backend ruff/mypy passed for visual generation API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 576 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for media job/source filters, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening media asset detail worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend media member/admin API worldline isolation remediation for F-117.
+- Finding: F-117 found `GET /worlds/{world_id}/media/assets/{asset_id}?worldline_id={other_worldline_id}` relying on service-level worldline validation without catching the resulting `MediaValidationError`, while valid same-worldline asset detail returned normally.
+- Summary: Added an architecture-contracts scenario for handled media asset detail invalid-worldline responses and mapped invalid explicit worldline scopes in the asset detail route to the existing 422 client error while preserving valid detail behavior and member/admin response shaping.
+- Files changed: backend/services/api/src/noveland/services/api/media.py, backend/tests/test_api_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_media_asset_detail_rejects_cross_worldline_requests` covering cross-world media asset detail rejection and valid same-worldline detail behavior.
+- Verification: `cd backend && uv run pytest tests/test_api_media.py::test_media_asset_detail_rejects_cross_worldline_requests -q` first failed with an uncaught `MediaValidationError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_media.py -q` passed with 10 tests; focused backend ruff/mypy passed for media API and tests. Full backend `ruff`, `mypy`, and `pytest` passed with 577 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for media object/detail subroutes, media references, observability filters, invocation-adjacent filters, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+
+## Post-v1.1 RC Audit and Hardening observability readiness worldline validation entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend platform-admin observability readiness API worldline isolation remediation for F-118.
+- Finding: F-118 found self-use readiness requests with a cross-world `worldline_id` relying on service-level `worldline_or_404()` without API error mapping, raising uncaught `ValueError`; adjacent private-beta setup, private-beta, and release-candidate readiness routes use the same worldline resolution pattern.
+- Summary: Added an architecture-contracts scenario for handled observability readiness invalid-worldline responses and mapped invalid explicit worldline scopes in self-use, private-beta setup, private-beta, and release-candidate readiness routes to existing 422 client errors while preserving valid readiness aggregation behavior.
+- Files changed: backend/services/api/src/noveland/services/api/observability.py, backend/tests/test_production_readiness_gate.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_readiness_endpoints_reject_cross_worldline_requests` covering cross-world self-use, private-beta setup, private-beta, and release-candidate readiness rejection plus valid same-worldline self-use behavior.
+- Verification: `cd backend && uv run pytest tests/test_production_readiness_gate.py::test_readiness_endpoints_reject_cross_worldline_requests -q` first failed with an uncaught `ValueError`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_production_readiness_gate.py -q` passed with 28 tests; focused backend ruff/mypy passed for observability API and production readiness tests. Full backend `ruff`, `mypy`, and `pytest` passed with 578 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue invalid-worldline behavior audit for remaining observability filters, invocation-adjacent filters, media object/reference subroutes, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening player session media worldline recovery entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player session recovery state remediation for F-119.
+- Finding: F-119 found player resume recovery treated a presentation as ready when the presentation belonged to the active player session worldline but referenced an available/player-visible media asset from a sibling worldline.
+- Summary: Added a player-session-stability spec scenario for cross-worldline presentation media, then required presentation media safety checks and media-failure checks to match the player session world and worldline before returning ready/media-failure recovery states.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/tests/test_api_player_sessions.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-session-stability/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_session_validates_references_and_safe_fallbacks` to cover a presentation in the active worldline that points to sibling-worldline player-visible media and expects `missing_media`.
+- Verification: `cd backend && uv run pytest tests/test_api_player_sessions.py::test_player_session_validates_references_and_safe_fallbacks -q` first failed because cross-worldline presentation media returned `recovery_status=ready`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 3 tests; focused backend ruff/mypy passed for player session service and tests. Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 578 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue backend audits for remaining player/member DTO recovery drift, remaining observability filters, invocation-adjacent filters, media object/reference subroutes, and Web clients that might present invalid scopes as empty states. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening player session media visibility recovery entry
+
+- Date: 2026-06-12
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player session recovery media visibility remediation for F-120.
+- Finding: F-120 found player resume recovery treated a presentation as ready when the presentation referenced an available same-worldline media asset with `visibility=private`; the same player route would also treat admin-only media as ready even though reader/player media delivery does not serve those visibilities.
+- Summary: Extended the player-session-stability spec for private/admin-only presentation media and restricted player resume media readiness to deliverable media visibilities: `world_member`, `player_visible`, and `reader_visible`.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/tests/test_api_player_sessions.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-session-stability/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_player_session_private_and_admin_only_media_are_missing_media` covering private and world-admin presentation media fallback, while preserving the cross-worldline and failed-media recovery coverage.
+- Verification: `cd backend && uv run pytest tests/test_api_player_sessions.py::test_player_session_private_and_admin_only_media_are_missing_media -q` first failed because private presentation media returned `recovery_status=ready`, then passed with 1 test after remediation; `cd backend && uv run pytest tests/test_api_player_sessions.py::test_player_session_private_and_admin_only_media_are_missing_media tests/test_api_player_sessions.py::test_player_session_validates_references_and_safe_fallbacks -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 4 tests; focused backend ruff/mypy passed for player session service and tests. Full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 579 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed after docs update.
+- Follow-up notes: Continue backend audits for remaining player-facing recovery/readiness drift, Web playback empty states when media descriptors are absent, remaining observability filters, invocation-adjacent filters, and media reference subroutes. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web dashboard runtime/provider status redaction entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web dashboard runtime/provider status text remediation for F-121.
+- Finding: F-121 found `web/features/dashboard/world-management-dashboard.tsx` sanitizing JSON panels but directly rendering platform-admin runtime `last_error`, runtime/world diagnostic text fields, and provider profile `last_test_error` values that can carry provider failures, storage URI/path evidence, raw prompt/output markers, prompt snapshot identifiers, tokens, or base64-like payload fragments.
+- Summary: Added an architecture-contracts scenario for dashboard runtime/provider status text redaction and reused the dashboard sensitive-string detector for runtime errors, diagnostic rows, and provider last-test messages while preserving safe status labels.
+- Files changed: web/features/dashboard/world-management-dashboard.tsx, web/features/dashboard/world-management-dashboard.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `redacts sensitive runtime and provider status text` to `web/features/dashboard/world-management-dashboard.test.tsx`, covering runtime last error, runtime/world diagnostics, and provider last-test error text.
+- Verification: `cd web && npm run test -- features/dashboard/world-management-dashboard.test.tsx` first failed because sensitive runtime/provider status text rendered into the document, then passed with 8 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- features/dashboard/world-management-dashboard.tsx features/dashboard/world-management-dashboard.test.tsx` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 206 tests. OpenSpec strict validations and `git diff --check` passed before docs update.
+- Follow-up notes: Continue Web/e2e audit for remaining client-side text sinks, reader/player media empty states, route handlers, and proxy/error redaction edge cases. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web proxy structured JSON error redaction entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web API proxy structured JSON error redaction remediation for F-122.
+- Finding: F-122 found `web/lib/auth/proxy.ts` only routed non-2xx proxy responses through JSON error sanitization when `content-type` contained `application/json`, leaving structured JSON error media types such as `application/problem+json` and `application/vnd.api+json` to bypass sensitive body cleanup.
+- Summary: Extended the architecture-contracts proxy error scenario to include `application/*+json` media types and changed proxy error detection to sanitize exact `application/json` and `+json` media types after stripping parameters.
+- Files changed: web/lib/auth/proxy.ts, web/lib/auth/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `normalizes sensitive structured json error content types` to `web/lib/auth/proxy.test.ts`, covering `application/problem+json`, sensitive nested fields, and content-length removal after sanitization.
+- Verification: `cd web && npm run test -- lib/auth/proxy.test.ts` first failed because `application/problem+json` retained the original sensitive body and content length, then passed with 7 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/auth/proxy.ts lib/auth/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 207 tests.
+- Follow-up notes: Continue Web/e2e audit for remaining proxy content-type edges, streaming redaction assumptions, server/client text sinks, and reader/player media empty states. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web event-stream setup error redaction entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web event-stream proxy setup error redaction remediation for F-123.
+- Finding: F-123 found `web/lib/realtime/proxy.ts` always returned `buildStreamingProxyResponse(backendResponse)`, so backend runtime/world/conversation stream endpoints returning non-2xx JSON or structured `+json` errors before stream establishment bypassed the shared proxy JSON error sanitizer.
+- Summary: Added an architecture-contracts scenario for event-stream proxy setup error redaction and changed `proxyEventStream()` to send non-2xx backend responses through `buildProxyResponse()` while preserving successful `text/event-stream` behavior through `buildStreamingProxyResponse()`.
+- Files changed: web/lib/realtime/proxy.ts, web/lib/realtime/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `normalizes sensitive json setup errors before returning stream proxy responses` to `web/lib/realtime/proxy.test.ts`, covering `application/problem+json` setup errors, sensitive nested fields, cookie stripping, and non-stream error headers.
+- Verification: `cd web && npm run test -- lib/realtime/proxy.test.ts` first failed because non-2xx stream setup errors retained stream headers and bypassed sanitized proxy handling, then passed with 4 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- lib/realtime/proxy.ts lib/realtime/proxy.test.ts` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 208 tests.
+- Follow-up notes: Continue Web/e2e audit for remaining stream client assumptions, server/client text sinks, reader/player media empty states, and backend DTO leak boundaries. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening conversation live WebSocket origin entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend conversation live WebSocket origin hardening for F-124.
+- Finding: F-124 found `backend/services/api/src/noveland/services/api/realtime.py` only compared `Origin` and request hostnames in `_origin_allowed()`, ignoring scheme and port even though the live WebSocket uses cookie authentication and supports world-admin state-changing commands.
+- Summary: Added an architecture-contracts scenario for full same-origin WebSocket boundaries and changed `_origin_allowed()` to compare HTTP/WebSocket-equivalent scheme, hostname, and effective port while preserving valid `http://testserver` to `ws://testserver` TestClient behavior.
+- Files changed: backend/services/api/src/noveland/services/api/realtime.py, backend/tests/test_api_realtime.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_conversation_live_websocket_rejects_cross_port_origin` covering rejection of same-host but cross-port Origin headers before live socket messages are accepted.
+- Verification: `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_live_websocket_rejects_cross_port_origin -q` first failed because `Origin: http://testserver:4444` was accepted, then passed after remediation; `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_live_websocket_rejects_cross_port_origin tests/test_api_realtime.py::test_conversation_live_websocket_enforces_origin_and_admin_controls -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_realtime.py -q` passed with 7 tests; focused backend ruff/mypy passed for realtime API and tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 580 tests and 8 skipped.
+- Follow-up notes: Continue backend/Web realtime audits for live socket client assumptions, close reason safety, and remaining member/admin DTO boundaries. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening conversation realtime member turn text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend conversation realtime member-safe turn text remediation for F-125.
+- Finding: F-125 found `backend/services/api/src/noveland/services/api/realtime.py` returned conversation turn `input_text` and `output_text` unchanged in member realtime deltas and live WebSocket snapshots, unlike the REST conversation turn response path that blanks sensitive-looking transcript text for members.
+- Summary: Added an architecture-contracts scenario for member realtime turn deltas and changed realtime turn DTO construction to blank sensitive-looking member transcript text while preserving safe transcript text and admin realtime visibility.
+- Files changed: backend/services/api/src/noveland/services/api/realtime.py, backend/tests/test_api_realtime.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_conversation_stream_hides_admin_evidence_for_member_payloads` for sensitive `input_text`/`output_text` redaction and added `test_conversation_live_member_snapshot_hides_sensitive_turn_text` for live WebSocket member snapshots.
+- Verification: `cd backend && uv run pytest tests/test_api_realtime.py::test_conversation_stream_hides_admin_evidence_for_member_payloads tests/test_api_realtime.py::test_conversation_live_member_snapshot_hides_sensitive_turn_text -q` passed with 2 tests; `cd backend && uv run pytest tests/test_api_realtime.py -q` passed with 8 tests; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/realtime.py tests/test_api_realtime.py` and matching mypy command passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 581 tests and 8 skipped.
+- Follow-up notes: Continue backend/Web realtime audits for close reason safety, live command error payloads, client assumptions around sanitized realtime failures, and remaining member/admin DTO boundaries. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening Web live command error notice entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web conversation detail live WebSocket error notice remediation for F-126.
+- Finding: F-126 found `web/features/conversations/conversation-detail.tsx` rendered `message.payload.message` from live WebSocket `error` messages directly into the page notice, bypassing the shared backend-error detail normalization used by HTTP client paths.
+- Summary: Added an architecture-contracts scenario for Web live socket command error notices and changed conversation detail live-error handling to normalize sensitive-looking messages with `normalizeBackendErrorDetail()` while preserving safe business messages such as `Forbidden`.
+- Files changed: web/features/conversations/conversation-detail.tsx, web/features/conversations/conversation-detail.test.tsx, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `normalizes sensitive live command error notices` to `web/features/conversations/conversation-detail.test.tsx`, covering sensitive live error fallback text and safe business error preservation.
+- Verification: `cd web && npm run test -- features/conversations/conversation-detail.test.tsx` first failed because the sensitive live WebSocket error message rendered in the notice, then passed with 6 tests after remediation; `cd web && npm run typecheck -- --pretty false` passed; `cd web && npm run lint -- features/conversations/conversation-detail.tsx features/conversations/conversation-detail.test.tsx` passed via the project lint script; full `cd web && npm run test` passed with 52 test files and 209 tests; `cd web && npm run build` passed; `cd web && npm run check:next-env` passed.
+- Follow-up notes: Continue Web/e2e audit for remaining client-side text sinks, EventSource failure assumptions, reader/player media empty states, route handlers, and role boundaries. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening reader media active content-type entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend reader media delivery MIME safety remediation for F-127.
+- Finding: F-127 found reader media delivery would expose a `reader_visible` video asset whose media object declared `mime_type="text/html"`; the descriptor returned `content_type=text/html` and the scoped reader download route returned attacker-controlled HTML bytes as same-origin `text/html`.
+- Summary: Added a reader-media-delivery OpenSpec scenario for safe MIME enforcement and changed `ReaderMediaDeliveryService` to expose only whitelisted image/audio/video object content types, hiding assets with no safe reader-deliverable objects from list/detail/download results.
+- Files changed: backend/packages/reader_delivery/src/noveland/reader_delivery/service.py, backend/tests/test_api_reader_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/reader-media-delivery/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_reader_media_suppresses_active_content_type_objects`, covering safe `video/mp4` preservation and `text/html` descriptor/detail/download suppression for reader media.
+- Verification: Temporary CLI reproduction first showed a `reader_visible` video asset with `text/html` object content appearing in reader descriptors and downloading as `200 text/html; charset=utf-8`; `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_suppresses_active_content_type_objects -q` first failed because the unsafe object was listed and downloadable, then passed after remediation; `cd backend && uv run pytest tests/test_api_reader_media.py -q` passed with 6 tests; focused `cd backend && uv run ruff check packages/reader_delivery/src/noveland/reader_delivery/service.py tests/test_api_reader_media.py` and matching mypy command passed; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 582 tests and 8 skipped.
+- Follow-up notes: Continue reader/player media empty-state and content-type audits, Web route-handler audits, and remaining member/admin DTO boundary review. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening player resume safe media object entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player session recovery and reader-safe media object alignment remediation for F-128.
+- Finding: F-128 found player resume marked a presentation `ready` when its visible/available media asset had no safe reader-deliverable object, or only an object filtered by active/scriptable MIME type, leaving `open_reader_playback` available even though reader media delivery could not serve the playback media.
+- Summary: Added a player-session-stability OpenSpec scenario for presentation media without safe reader objects and changed player resume media safety to require at least one whitelisted image/audio/video `MediaObject` before returning ready playback.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/tests/test_api_player_sessions.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-session-stability/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_player_session_media_without_safe_reader_objects_is_missing_media`, covering safe image media preservation plus objectless and `text/html` object suppression for player resume recovery.
+- Verification: Temporary CLI reproduction first showed objectless player-visible presentation media returning `recovery_status=ready` with `open_reader_playback`; the focused regression first failed before remediation, then passed after requiring a safe object; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 5 tests; focused backend ruff/mypy passed for player session service and tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 583 tests and 8 skipped.
+- Follow-up notes: Continue Web playback/scene empty-state audit for absent media descriptors, EventSource/client text-sink review, backend media object/reference route review, and remaining member/player DTO boundary checks. Push after successful commits unless the user changes that instruction.
+
+## Post-v1.1 RC Audit and Hardening player resume reader descriptor alignment entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player session recovery and reader media descriptor alignment remediation for F-129.
+- Finding: F-129 found player resume still returned `ready` with `open_reader_playback` when presentation media had a safe object but lacked reader-visible `MediaReference` descriptor requirements; reader media returned no descriptors and member presentation readback hid the asset id.
+- Summary: Extended the player-session-stability OpenSpec scenario to require reader descriptor availability and changed player resume media readiness to reuse `ReaderMediaDeliveryService.get_media()` as the final descriptor reachability check, with a lazy import to avoid package initialization cycles.
+- Files changed: backend/packages/player_sessions/src/noveland/player_sessions/service.py, backend/tests/test_api_player_sessions.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/player-session-stability/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_session_media_without_safe_reader_objects_is_missing_media` to include safe referenced media that remains ready and no-reference media that returns missing-media.
+- Verification: Temporary CLI reproduction first showed safe-object/no-reference media returning ready while reader descriptors were empty; focused player-session regression passed; `cd backend && uv run pytest tests/test_api_player_sessions.py -q` passed with 5 tests; focused backend ruff/mypy passed for player session service and tests; related player/reader/presentation API tests passed with 14 tests; full backend ruff, mypy, and pytest passed with 583 tests and 8 skipped.
+- Follow-up notes: Continue Web playback/scene empty-state audit and backend media reference/moderation descriptor alignment checks. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening Web playback explicit-media fallback entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web reader playback and scene media resolution remediation for F-130.
+- Finding: F-130 found `web/features/worlds/playback-media.ts` fell back to same-turn or same-session referenced media when explicit presentation image/audio asset ids were absent from reader media descriptors, so unavailable canonical presentation media could be replaced with unrelated media.
+- Summary: Added a reader-media-delivery OpenSpec scenario for unresolved explicit presentation media, changed shared playback media resolution to distinguish absent presentation ids from unresolved explicit ids, and blocked referenced fallback for a media kind when a presentation explicitly names media for that kind but no reader descriptor resolves.
+- Files changed: web/features/worlds/playback-media.ts, web/features/worlds/playback-media.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/reader-media-delivery/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `web/features/worlds/playback-media.test.ts` covering unresolved explicit image/audio ids, referenced fallback when no explicit ids exist, and alternate explicit image id resolution before fallback blocking.
+- Verification: `cd web && npm run test -- features/worlds/playback-media.test.ts` first failed because unresolved explicit media substituted `referenced-image`, then passed with 3 tests after remediation; focused playback/scene Web tests passed with 3 files and 11 tests; Web typecheck, full lint, full Vitest with 53 files and 212 tests, Web build, and `check:next-env` passed. OpenSpec strict validations and `git diff --check` passed. Web e2e was not run because the change is isolated to shared media resolution and covered by component/unit tests.
+- Follow-up notes: Continue Web/e2e route-handler and client-side leak audits, plus backend media reference/moderation descriptor alignment checks. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening reader media reference moderation entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend reader media delivery moderation suppression remediation for F-131.
+- Finding: F-131 found `ReaderMediaDeliveryService` only checked applied moderation suppression on the media asset itself, while moderation supports reader-delivery suppression on worldlines, narrative publications, conversation sessions, and conversation turns. A temporary CLI reproduction showed an applied `takedown_content` action targeting a conversation turn still allowed reader media list/detail/download responses for media attached to that turn.
+- Summary: Added a reader-media-delivery OpenSpec scenario for moderation suppression on referenced surfaces, reused a single `ModerationService` in reader delivery, suppressed worldline-level media, and filtered narrative publication, conversation session, and conversation turn references before descriptor assembly or object download.
+- Files changed: backend/packages/reader_delivery/src/noveland/reader_delivery/service.py, backend/tests/test_api_reader_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/reader-media-delivery/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added reader media API regressions for moderated conversation turn/session references and for moderated worldline/narrative publication targets plus mixed suppressed/unsuppressed references, covering descriptor list, detail, scoped object download suppression, and reference filtering without over-blocking.
+- Verification: Focused reader media regression first failed against the old implementation, then passed after remediation; related reader media, moderation, player session, and presentation tests passed with 24 tests; focused backend ruff/mypy passed; full backend ruff, mypy, and pytest passed with 586 tests and 8 skipped. OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend media reference/moderation descriptor alignment checks, including moderation target validation breadth and any remaining reader/member DTO leak paths. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening moderation concrete target validation entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend moderation report/action target validation remediation for F-132.
+- Finding: F-132 found `ModerationService._validate_target()` treated `narrative_publication` and `player_profile` as worldline-scoped but did not validate that their target refs existed or belonged to the supplied worldline; `scene` targets also lacked a world ownership check.
+- Summary: Added a content-safety-moderation-hardening OpenSpec scenario and changed moderation target validation to require concrete scene, narrative publication, and player profile refs to resolve within the requested world/worldline scope while preserving free-form `other` and non-persistent plugin package behavior.
+- Files changed: backend/packages/moderation/src/noveland/moderation/service.py, backend/tests/test_api_moderation.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/content-safety-moderation-hardening/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_moderation_rejects_unresolved_concrete_target_refs`, covering missing, cross-world, cross-worldline, and valid scene/publication/player-profile moderation targets.
+- Verification: Focused moderation regression first failed because an unresolved `narrative_publication` target returned 201, then passed after remediation; focused backend ruff/mypy passed; related moderation, reader media, player session, and conversation presentation tests passed with 25 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend moderation target breadth, reader/member/player DTO leak-path audits, Web route-handler audits, and product/spec-history drift review. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member calendar text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable agent calendar text remediation for F-133.
+- Finding: F-133 found `backend/services/api/src/noveland/services/api/worlds.py` redacted calendar metadata for ordinary members but returned admin-authored calendar `title`, `description`, and `recurrence_rule` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_calendar_entry_response()` to blank sensitive-looking calendar title, description, and recurrence text for non-admin member responses while preserving safe calendar text and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` for sensitive member calendar text redaction and safe calendar title preservation.
+- Verification: Focused calendar regression first failed because member calendar title text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member scene location text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable scene and location graph text remediation for F-134.
+- Finding: F-134 found `backend/services/api/src/noveland/services/api/worlds.py` redacted scene opening rules and location traversal rules for ordinary members but returned admin-authored scene `name`, scene `description`, and edge `travel_label` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_scene_response()` / `_location_edge_response()` to blank sensitive-looking scene and travel-label text for non-admin member responses while preserving safe public text and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_location_graph_and_agent_presence_enforce_world_scope` for sensitive member scene/location text redaction and safe scene-name preservation.
+- Verification: Focused location graph regression first failed because member scene name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member organization faction text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable organization, membership, and faction progress text remediation for F-135.
+- Finding: F-135 found `backend/services/api/src/noveland/services/api/worlds.py` redacted hidden summaries and metadata for ordinary members but returned admin-authored organization `name`, `description`, `public_summary`, membership `organization_name`, `role_title`, `responsibilities`, and faction `organization_name`, `name`, and `summary` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_organization_response()`, `_organization_membership_response()`, and `_faction_track_response()` to blank sensitive-looking organization, membership, and faction text for non-admin member responses while preserving safe public text, numeric state, identity fields, metadata redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_organization_memberships_and_faction_tracks_append_events` for sensitive member organization/membership/faction text redaction and safe organization description/responsibility preservation.
+- Verification: Focused organization/faction regression first failed because member organization name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for agent/worldline public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member worldline agent identity text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable worldline, agent, and relationship identity text remediation for F-136.
+- Finding: F-136 found `backend/services/api/src/noveland/services/api/worlds.py` redacted worldline metadata, agent config/provider/admin fields, agent profile JSON, and relationship metadata for ordinary members but returned worldline `name`/`description`, agent `display_name`, and relationship source/target display names unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_worldline_response()`, `_agent_response()`, and `_agent_relationship_response()` to blank sensitive-looking worldline/agent identity text for non-admin member responses while preserving safe text, keys, relationship state, existing metadata/config redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended existing relationship, agent preset/list, and worldline browser tests for sensitive member identity text redaction and safe worldline text preservation.
+- Verification: Focused relationship/agent/worldline regressions first failed because sensitive member identity text rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member schedule rule text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable schedule rule name remediation for F-137.
+- Finding: F-137 found `backend/services/api/src/noveland/services/api/worlds.py` redacted schedule rule config for ordinary members but returned admin-authored schedule rule `name` unchanged.
+- Summary: Added an architecture-contracts scenario and changed `_schedule_rule_response()` to blank sensitive-looking schedule rule names for non-admin member responses while preserving safe rule names, rule keys, kind, enabled state, config redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_admin_manages_calendar_entries_and_schedule_rules` for sensitive member schedule rule name redaction and safe schedule rule name preservation.
+- Verification: Focused schedule rule regression first failed because member schedule rule name text containing `raw_prompt` rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member player actor text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable player actor display text remediation for F-138.
+- Finding: F-138 found `backend/services/api/src/noveland/services/api/worlds.py` sanitized player actor `profile` JSON but returned member/player actor `display_name` unchanged on bind/list responses.
+- Summary: Added an architecture-contracts scenario and changed `_player_actor_response()` plus player actor callers to blank sensitive-looking display names for non-admin member responses while preserving safe names, actor identity fields, current scene refs, profile redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_use_own_player_interaction_records_without_admin_scope` for sensitive member player actor display-name redaction and admin display-name visibility.
+- Verification: Focused player actor regression first failed because member player actor display text containing `raw_prompt` and a filesystem path rendered unchanged, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+## Post-v1.1 RC Audit and Hardening member world summary text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable world list/detail summary text remediation for F-139.
+- Finding: F-139 found `backend/services/api/src/noveland/services/api/worlds.py` redacted world rules/plugin configuration for ordinary members but returned admin-authored world `name` and `description` unchanged on list/detail responses.
+- Summary: Added an architecture-contracts scenario and changed `_world_response()` to blank sensitive-looking world names/descriptions for non-admin member responses while preserving safe world summary text, slug, active state, existing admin-field redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_world_member_can_read_but_not_mutate_and_non_member_is_hidden` for sensitive member world name/description redaction and safe world summary preservation.
+- Verification: Focused world summary regression first failed because member world list/detail returned world name text containing `raw_prompt`, then passed after remediation; focused backend ruff/mypy passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full backend ruff, mypy, and pytest passed with 587 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits for other public text fields with sensitive-looking content and continue Web route-handler/client-side leak audits. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening member conversation narrative artifact text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend conversation-scoped member-readable narrative artifact text remediation for F-140.
+- Finding: F-140 found `backend/services/api/src/noveland/services/api/conversations.py` restricted member narrative listing to published reader-visible artifacts and redacted `source_run_id` plus metadata, but returned provider/admin-authored artifact `title` and `content` unchanged.
+- Summary: Tightened the conversation member text sanitizer and changed `_narrative_artifact_response()` to blank sensitive-looking published artifact titles/content for non-admin member responses while preserving safe artifact text, conversation linkage, kind, creation time, publication filtering, metadata redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_conversation_narrative_listing_redacts_member_evidence` for sensitive member artifact title/content redaction, safe artifact text preservation, and admin full-text visibility.
+- Verification: `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_narrative_listing_redacts_member_evidence -q` first failed because member narrative artifact title text containing `raw_prompt` rendered unchanged, then passed after remediation; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py` and matching mypy command passed; `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits outside `worlds.py`, especially reader media descriptors, player privacy exports, conversation diagnostics summaries, and Web route-handler/client-side leak paths. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening member conversation session title text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend member-readable conversation list/detail session title remediation for F-141.
+- Finding: F-141 found `backend/services/api/src/noveland/services/api/conversations.py` redacted objective, opening prompt, policy, writer config, memory config, and group context for non-admin members, but returned admin-authored conversation session `title` unchanged on list/detail responses.
+- Summary: Changed `_session_response()` to blank sensitive-looking session titles for non-admin member responses while preserving safe titles, identifiers, scope, mode, status, worldline/scene refs, turn progress, existing orchestration-field redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/conversations.py, backend/tests/test_api_conversations.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_conversation_api_enforces_access_and_manual_advance` for sensitive member session title redaction, safe session title preservation, and admin full-title visibility.
+- Verification: `cd backend && uv run pytest tests/test_api_conversations.py::test_conversation_api_enforces_access_and_manual_advance -q` first failed because member conversation list/detail returned session title text containing `raw_prompt`, then passed after remediation; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/conversations.py tests/test_api_conversations.py` and matching mypy command passed; `cd backend && uv run pytest tests/test_api_conversations.py -q` passed with 6 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits outside `worlds.py`, especially reader media descriptors, player privacy exports, and remaining conversation/member text fields. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening player privacy export display-name text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend player privacy export profile/player actor display-name remediation for F-142.
+- Finding: F-142 found `backend/packages/player_privacy/src/noveland/player_privacy/service.py` sanitized privacy export JSON, choices, journal, notifications, interventions, and conversation titles, but returned `User.display_name` and `PlayerActorProfile.display_name` unchanged in privacy export DTOs.
+- Summary: Changed privacy export payload shaping to apply existing `_safe_text()` redaction to profile and player actor display names while preserving safe names, player-owned scoping, counts, existing field omissions, request audit safety, and admin review behavior.
+- Files changed: backend/packages/player_privacy/src/noveland/player_privacy/service.py, backend/tests/test_api_player_privacy.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_player_privacy_export_is_player_scoped_and_redacted` for sensitive profile and player actor display-name redaction in privacy exports.
+- Verification: `cd backend && uv run pytest tests/test_api_player_privacy.py::test_player_privacy_export_is_player_scoped_and_redacted -q` first failed because the privacy export returned profile display text containing `raw_prompt`, then passed after remediation; focused `cd backend && uv run ruff check packages/player_privacy/src/noveland/player_privacy/service.py tests/test_api_player_privacy.py` and matching mypy command passed; `cd backend && uv run pytest tests/test_api_player_privacy.py -q` passed with 3 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player DTO audits outside `worlds.py`, especially reader media descriptors and remaining privacy/request text fields. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening reader media descriptor text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend reader media descriptor title/description remediation for F-143.
+- Finding: F-143 found `backend/packages/reader_delivery/src/noveland/reader_delivery/service.py` omitted storage URIs and produced scoped reader download URLs, but returned deliverable `MediaAsset.title` and `MediaAsset.description` unchanged in reader/member-readable descriptors.
+- Summary: Added reader media sensitive-text blanking and applied it to descriptor title/description while preserving safe title/description text, scoped download URLs, object/reference descriptors, moderation filtering, and admin media management behavior.
+- Files changed: backend/packages/reader_delivery/src/noveland/reader_delivery/service.py, backend/tests/test_api_reader_media.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_reader_media_lists_fetches_and_downloads_published_media` for sensitive descriptor title/description blanking and safe title preservation.
+- Verification: `cd backend && uv run pytest tests/test_api_reader_media.py::test_reader_media_lists_fetches_and_downloads_published_media -q` first failed because the reader media descriptor returned title text containing `raw_prompt`, then passed after remediation; focused `cd backend && uv run ruff check packages/reader_delivery/src/noveland/reader_delivery/service.py tests/test_api_reader_media.py` and matching mypy command passed; `cd backend && uv run pytest tests/test_api_reader_media.py -q` passed with 9 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
+- Follow-up notes: Continue backend member/player/reader DTO audits outside `worlds.py`, especially Web route handlers and remaining media/publication client-side rendering paths. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening member world narrative artifact text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend world-level member-readable narrative artifact title/content remediation for F-144.
+- Finding: F-144 found `backend/services/api/src/noveland/services/api/worlds.py` restricted world-level member narrative artifact list/detail to published reader-visible artifacts and redacted source/metadata/publication internals, but returned provider/admin-authored artifact `title` and `content` unchanged.
+- Summary: Changed `_narrative_artifact_response()` to blank sensitive-looking published artifact titles/content for non-admin member responses while preserving safe artifact text, publication filtering, conversation linkage, kind, timing fields, metadata redaction, and admin visibility.
+- Files changed: backend/services/api/src/noveland/services/api/worlds.py, backend/tests/test_api_worlds.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `test_narrative_reader_api_supports_filters_and_detail_for_world_members` for sensitive world-level member narrative artifact title/content redaction and safe artifact text preservation.
+- Verification: `cd backend && uv run pytest tests/test_api_worlds.py::test_narrative_reader_api_supports_filters_and_detail_for_world_members -q` first failed because the world-level member narrative artifact list returned title text containing `raw_prompt`, then passed after remediation; focused `cd backend && uv run ruff check services/api/src/noveland/services/api/worlds.py tests/test_api_worlds.py` and matching mypy command passed; `cd backend && uv run pytest tests/test_api_worlds.py -q` passed with 42 tests; full `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` passed with 587 tests and 8 skipped; `openspec validate audit-and-hardening-post-v1-1-rc --strict`, `openspec validate --changes --strict`, `openspec validate --specs --strict` with 76 specs, and `git diff --check` passed.
+- Follow-up notes: Continue Web/e2e route-handler and client-side rendering audits, plus remaining backend member/player/reader DTO surfaces outside `worlds.py`. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening Web error storage path variant entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web shared backend-error normalization and same-origin proxy JSON error body remediation for F-145.
+- Finding: F-145 found `web/lib/safe-error-detail.ts` recognized `media://`, Bearer tokens, base64-like strings, and only a small subset of local paths, but missed `file://`, `s3://`, `gs://`, and absolute server paths such as `/root/...` despite architecture-contract requirements to suppress storage refs, filesystem/object-storage paths, and local model paths from Web-visible errors.
+- Summary: Added an architecture-contracts scenario for storage/path variant recognition and expanded the shared Web sensitive-error value patterns so client helpers, server loaders, API proxies, and event-stream setup error handling normalize those variants to generic failure text or redacted JSON fields.
+- Files changed: web/lib/safe-error-detail.ts, web/lib/auth/proxy.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Extended `web/lib/auth/proxy.test.ts` with `normalizes filesystem and object-storage path variants in json error details`, covering `file:///root/...`, `s3://...`, `/root/...`, and safe sibling fields.
+- Verification: `cd web && npm run test -- lib/auth/proxy.test.ts -t "filesystem and object-storage"` first failed because `file:///root/...` and `s3://...` were still present in the proxied JSON error body, then passed after remediation; related Web proxy/client/server-loader tests passed with 14 files and 87 tests; full Web lint, typecheck, Vitest with 53 files and 213 tests, build, and next-env checks passed; final OpenSpec strict validations and `git diff --check` passed.
+- Follow-up notes: CLI subagents flagged additional candidates for next review: platform-only/hidden provider execution through provider smoke/test invocation, speech TTS/STT, image generation/edit, and visual-generation provider refs; Web admin/provider and world-overview server props may still serialize raw admin data before client-side display redaction; product/spec drift remains around provider reliability/quota UX and package import/export UI scope. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening provider execution visibility entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend provider smoke-test and test-invocation visibility remediation for F-146.
+- Finding: F-146 found `backend/services/api/src/noveland/services/api/providers.py` and `ProviderExecutionService` allowed ordinary world-admin provider smoke/test execution to resolve hidden, global, and developer-only provider integrations with platform-admin visibility even though registry list/detail routes hid those providers.
+- Summary: Added a provider-system scenario, made `ProviderExecutionRequest` carry caller platform-admin context, applied that context through provider registry resolution and fallback lookup before adapter execution, and passed world-admin route context from provider smoke/test invocation endpoints while preserving platform-admin diagnostics.
+- Files changed: backend/packages/providers/src/noveland/providers/contracts.py, backend/packages/providers/src/noveland/providers/registry.py, backend/packages/providers/src/noveland/providers/service.py, backend/services/api/src/noveland/services/api/providers.py, backend/tests/test_api_providers.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_provider_test_execution_respects_world_admin_visibility`, covering hidden/developer-only global provider detail hiding, smoke-test rejection, explicit test-invocation rejection, capability-routed test-invocation rejection, and absence of health-check, invocation, and prompt-snapshot writes.
+- Verification: `cd backend && uv run pytest tests/test_api_providers.py::test_provider_test_execution_respects_world_admin_visibility -q` passed; `cd backend && uv run pytest tests/test_api_providers.py tests/test_provider_execution_service.py -q` passed with 31 tests; focused backend ruff/mypy passed for the changed provider/API/test files; final `git diff --check`, OpenSpec change/changes/specs strict validations, and full backend `uv run ruff check .`, `uv run mypy .`, and `uv run pytest` passed with 588 tests and 8 skipped.
+- Follow-up notes: Continue provider execution audits for speech TTS/STT, image generation/edit, and visual-generation provider refs; continue Web server-loader/client-props review for raw admin/provider data serialized before display redaction; product/spec drift remains around provider reliability/quota UX and package import/export UI scope. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening media speech provider execution visibility entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend image, speech, presentation speech, authoring distillation, and narrative-quality provider execution visibility remediation for F-147.
+- Finding: F-147 found image and speech services resolving providers/capabilities with platform-admin visibility while ordinary world-admin routes did not pass caller context; conversation-presentation speech reused the same speech service, and provider-backed authoring/narrative-quality generation also constructed `ProviderExecutionRequest` without caller visibility.
+- Summary: Added a provider-system scenario and threaded caller platform-admin context through image generate/edit, direct speech TTS/STT, presentation speech render/transcribe, authoring character-memory distillation, and narrative-quality GM/writer generation before provider resolution, capability checks, and `ProviderExecutionRequest` execution.
+- Files changed: backend/packages/media/src/noveland/media/image_service.py, backend/packages/speech/src/noveland/speech/service.py, backend/packages/authoring/src/noveland/authoring/service.py, backend/packages/narrative_quality/src/noveland/narrative_quality/service.py, backend/services/api/src/noveland/services/api/images.py, backend/services/api/src/noveland/services/api/speech.py, backend/services/api/src/noveland/services/api/conversation_presentations.py, backend/services/api/src/noveland/services/api/authoring.py, backend/services/api/src/noveland/services/api/narrative_quality.py, backend/tests/test_api_images.py, backend/tests/test_api_speech.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added image and speech API regressions proving ordinary world admins cannot execute global developer-only providers hidden from provider detail routes, and that no media jobs, media assets, speech transcripts, model invocations, or prompt snapshots are written for those rejected requests.
+- Verification: Focused F-147 regressions first failed after fixing the test global-provider seed because image generation and speech STT returned 201 for restricted providers, then passed after remediation; affected image/speech/presentation/authoring/narrative-quality suite passed with 132 tests; focused ruff/mypy passed for changed files; full backend ruff, mypy, and pytest passed with 590 tests and 8 skipped; OpenSpec strict validations and `git diff --check` passed before the final documentation update.
+- Follow-up notes: Continue auditing remaining provider-backed world-admin text paths and Web server-loader/client-props serialization; visual-generation control plane remains dry-run/control-plane by contract but should stay in the next read-only review pass. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening Web world workspace loader props entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Web world workspace server-loader client-prop sanitization for F-148.
+- Finding: F-148 found `web/lib/worlds/server.ts` `getWorldWorkspaceData()` aggregated world, world bible, release profile, event audit, daily-life, offscreen, diagnostics, schedule, and other backend records and returned them directly to `WorldOverview` as client props while `web/features/worlds/world-overview.tsx` only redacted many dirty fields at display/submit time.
+- Summary: Added an architecture-contracts scenario and applied server-side recursive client-prop sanitization to the world workspace loader result. Forbidden keys are omitted and sensitive-looking strings are replaced before serialization, while safe sibling fields and the existing client display/submit sanitizers are preserved.
+- Files changed: web/lib/worlds/server.ts, web/lib/worlds/server.test.ts, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/architecture-contracts/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `sanitizes world workspace data before client prop serialization` in `web/lib/worlds/server.test.ts`, covering world config, world bible, release profile, event audit, daily-life, offscreen, diagnostics, and schedule dirty JSON with safe sibling preservation.
+- Verification: Focused F-148 regression first failed on serialized dirty props, then passed after remediation; `web/lib/worlds/server.test.ts` passed with 4 tests; `web/features/worlds/world-overview.test.tsx` passed with 5 tests; Web lint, typecheck, full Vitest with 53 files and 214 tests, build, next-env, and Playwright e2e with 21 tests passed; final OpenSpec change/changes/specs strict validations and `git diff --check` passed.
+- Follow-up notes: Continue Web server-loader/client-props audit outside the world overview loader, provider/admin data serialization review, and product/spec drift around provider reliability/quota UX and import/export UI scope. Do not push this branch unless the user explicitly asks.
+
+
+## Post-v1.1 RC Audit and Hardening provider diagnostic error text entry
+
+- Date: 2026-06-13
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Scope: Backend provider health-check and provider execution failure diagnostic text remediation for F-149.
+- Finding: F-149 found `sanitize_for_persistence()` redacted sensitive keys but preserved sensitive string values, while `ProviderHealthService.record_health_check()` and `ProviderExecutionService._safe_error_text()` used it for diagnostic error text. Values such as `clientSecret sk-live-secret`, `storageUri media://...`, `rawPrompt ...`, `Bearer ...`, `/tmp/...`, and base64-like tokens could persist into provider health checks, failed invocation error text, prompt snapshot error JSON, and provider diagnostics.
+- Summary: Added provider diagnostic text redaction for sensitive-looking values and applied it to provider health-check error text plus provider execution failed invocation, prompt snapshot, and media-job error handling. Safe business errors such as disabled provider or quota names remain visible.
+- Files changed: backend/packages/providers/src/noveland/providers/secrets.py, backend/packages/providers/src/noveland/providers/health.py, backend/packages/providers/src/noveland/providers/service.py, backend/tests/test_provider_registry_service.py, backend/tests/test_provider_execution_service.py, openspec/changes/audit-and-hardening-post-v1-1-rc/specs/provider-system/spec.md, openspec/changes/audit-and-hardening-post-v1-1-rc/tasks.md, and harness docs.
+- Tests added/updated: Added `test_provider_health_error_text_redacts_sensitive_values` and `test_provider_execution_failure_redacts_sensitive_error_text`; refreshed the provider registry test SQLite fixture to include `MemoryBackendProfile` after the current world model gained that foreign key.
+- Verification: Health error-text regression first failed on unredacted sensitive text, then passed; provider execution failed-invocation regression passed; provider registry/execution/API focused suite passed with 38 tests; focused provider ruff/mypy passed; full backend ruff, mypy, and pytest passed with 592 tests and 8 skipped.
+- Follow-up notes: Continue Web server-loader/client-props audit outside world overview, provider/admin data serialization review, and product/spec drift around provider reliability/quota UX. Do not push this branch unless the user explicitly asks.

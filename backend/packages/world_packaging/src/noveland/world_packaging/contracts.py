@@ -19,6 +19,7 @@ FORBIDDEN_KEYS = {
     "bearer_token",
     "authorization",
     "secret",
+    "secret_key",
     "client_secret",
     "access_key",
     "password",
@@ -27,6 +28,7 @@ FORBIDDEN_KEYS = {
     "preview_uri",
     "thumbnail_uri",
     "object_storage_path",
+    "object_path",
     "filesystem_path",
     "file_path",
     "path",
@@ -35,7 +37,9 @@ FORBIDDEN_KEYS = {
     "raw_prompt",
     "raw_output",
     "prompt_snapshot",
+    "prompt_snapshot_id",
 }
+FORBIDDEN_KEY_MARKERS = {re.sub(r"[^a-z0-9]+", "", key.lower()) for key in FORBIDDEN_KEYS}
 FORBIDDEN_VALUE_MARKERS = (
     "media://",
     "file://",
@@ -389,11 +393,15 @@ def _assert_safe_json(value: Any) -> None:
     json.dumps(value)
 
 
+def _is_forbidden_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return normalized in FORBIDDEN_KEY_MARKERS
+
+
 def _scan_safe_json(value: Any, path: str) -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            normalized = str(key).lower()
-            if normalized in FORBIDDEN_KEYS:
+            if _is_forbidden_key(str(key)):
                 raise ValueError(f"forbidden package manifest key at {path}.{key}")
             _scan_safe_json(child, f"{path}.{key}")
         return

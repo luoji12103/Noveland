@@ -25,7 +25,7 @@ from noveland.services.api.media import _media_storage
 from noveland.services.api.reader_media import _reader_media_storage
 from noveland.worlds.models import World, Worldline, WorldMembership
 from noveland.worlds.worldlines import ensure_primary_worldline
-from sqlalchemy import Table, create_engine
+from sqlalchemy import Table, create_engine, select
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -61,13 +61,34 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
         visibility="reader_visible",
         data=b"reader-image",
     )
+    sensitive_asset_id, _sensitive_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"sensitive-reader-image",
+        filename="sensitive-reader.png",
+        title="Reader raw_prompt image",
+        description="storage_uri media://private/reader-image",
+    )
     _seed_reference(engine, world_id, worldline_id, asset_id, "narrative_artifact", artifact_id)
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        sensitive_asset_id,
+        "narrative_artifact",
+        artifact_id,
+    )
 
     unauthenticated = client.get(f"/worlds/{world_id}/reader/media")
     _authenticate_session_only(client, member_token)
     listed = client.get(f"/worlds/{world_id}/reader/media")
     detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
+    sensitive_detail = client.get(f"/worlds/{world_id}/reader/media/{sensitive_asset_id}")
     downloaded = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    scoped_downloaded = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     _authenticate_session_only(client, owner_token)
     admin_listed = client.get(
@@ -77,18 +98,93 @@ def test_reader_media_lists_fetches_and_downloads_published_media() -> None:
 
     assert unauthenticated.status_code == 401
     assert listed.status_code == 200
-    assert [item["asset_id"] for item in listed.json()] == [str(asset_id)]
+    listed_assets = {item["asset_id"]: item for item in listed.json()}
+    assert set(listed_assets) == {str(asset_id), str(sensitive_asset_id)}
+    assert listed_assets[str(asset_id)]["title"] == "Reader image"
+    assert listed_assets[str(sensitive_asset_id)]["title"] == ""
+    assert listed_assets[str(sensitive_asset_id)]["description"] == ""
     assert detail.status_code == 200
+    assert sensitive_detail.status_code == 200
     assert detail.json()["asset_id"] == str(asset_id)
+    assert sensitive_detail.json()["title"] == ""
+    assert sensitive_detail.json()["description"] == ""
     assert detail.json()["objects"][0]["object_id"] == str(object_id)
-    assert detail.json()["objects"][0]["download_url"].endswith(f"{object_id}/download")
-    assert downloaded.status_code == 200
-    assert downloaded.content == b"reader-image"
-    assert downloaded.headers["content-type"].startswith("image/png")
-    assert downloaded.headers["x-content-type-options"] == "nosniff"
+    assert detail.json()["objects"][0]["download_url"] == _reader_media_download_path(
+        world_id, worldline_id, object_id
+    )
+    assert downloaded.status_code == 404
+    assert scoped_downloaded.status_code == 200
+    assert scoped_downloaded.content == b"reader-image"
+    assert scoped_downloaded.headers["content-type"].startswith("image/png")
+    assert scoped_downloaded.headers["x-content-type-options"] == "nosniff"
     assert admin_listed.status_code == 200
     _assert_no_forbidden_markers(listed.json())
     _assert_no_forbidden_markers(detail.json())
+    _assert_no_forbidden_markers(sensitive_detail.json())
+
+
+def test_reader_media_suppresses_active_content_type_objects() -> None:
+    client, engine = _client_with_database()
+    owner_id, _owner_token = _seed_user(engine, "owner-active-media@example.test")
+    member_id, member_token = _seed_user(engine, "member-active-media@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    _add_membership(engine, world_id, member_id, AuthRole.HUMAN_USER)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    safe_video_id, safe_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        asset_kind="video",
+        asset_role="video_clip",
+        object_role="original",
+        filename="reader.mp4",
+        content_type="video/mp4",
+        data=b"safe-video-bytes",
+    )
+    unsafe_video_id, unsafe_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        asset_kind="video",
+        asset_role="video_clip",
+        object_role="original",
+        filename="reader.html",
+        content_type="text/html",
+        data=b"<html><script>window.__noveland_probe=1</script></html>",
+    )
+    _seed_reference(
+        engine, world_id, worldline_id, safe_video_id, "narrative_artifact", artifact_id
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        unsafe_video_id,
+        "narrative_artifact",
+        artifact_id,
+    )
+
+    _authenticate_session_only(client, member_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    unsafe_detail = client.get(f"/worlds/{world_id}/reader/media/{unsafe_video_id}")
+    unsafe_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, unsafe_object_id)
+    )
+    safe_download = client.get(_reader_media_download_path(world_id, worldline_id, safe_object_id))
+
+    assert listed.status_code == 200
+    assert [item["asset_id"] for item in listed.json()] == [str(safe_video_id)]
+    assert listed.json()[0]["objects"][0]["content_type"] == "video/mp4"
+    assert unsafe_detail.status_code == 404
+    assert unsafe_download.status_code == 404
+    assert safe_download.status_code == 200
+    assert safe_download.headers["content-type"].startswith("video/mp4")
 
 
 def test_reader_media_suppresses_non_deliverable_assets() -> None:
@@ -135,7 +231,7 @@ def test_reader_media_suppresses_non_deliverable_assets() -> None:
     listed = client.get(f"/worlds/{world_id}/reader/media")
     hidden_detail = client.get(f"/worlds/{world_id}/reader/media/{hidden_id}")
     hidden_download = client.get(
-        f"/worlds/{world_id}/reader/media/objects/{hidden_object_id}/download"
+        _reader_media_download_path(world_id, worldline_id, hidden_object_id)
     )
     private_detail = client.get(f"/worlds/{world_id}/reader/media/{private_id}")
     unreferenced_detail = client.get(f"/worlds/{world_id}/reader/media/{unreferenced_id}")
@@ -196,20 +292,33 @@ def test_reader_media_rejects_cross_world_and_cross_worldline_requests() -> None
     )
 
     _authenticate_session_only(client, owner_token)
+    wrong_worldline_list = client.get(
+        f"/worlds/{world_id}/reader/media",
+        params={"worldline_id": str(other_worldline_id)},
+    )
     wrong_world = client.get(f"/worlds/{world_id}/reader/media/{other_asset_id}")
     wrong_worldline = client.get(
         f"/worlds/{world_id}/reader/media/{fork_asset_id}",
         params={"worldline_id": str(worldline_id)},
     )
+    unscoped_object = client.get(
+        f"/worlds/{world_id}/reader/media/objects/{fork_object_id}/download"
+    )
     wrong_object_worldline = client.get(
         f"/worlds/{world_id}/reader/media/objects/{fork_object_id}/download",
         params={"worldline_id": str(worldline_id)},
     )
-    valid_object = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    wrong_object_worldline_path = client.get(
+        _reader_media_download_path(world_id, worldline_id, fork_object_id)
+    )
+    valid_object = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
+    assert wrong_worldline_list.status_code == 404
     assert wrong_world.status_code == 404
     assert wrong_worldline.status_code == 404
+    assert unscoped_object.status_code == 404
     assert wrong_object_worldline.status_code == 404
+    assert wrong_object_worldline_path.status_code == 404
     assert valid_object.status_code == 200
 
 
@@ -245,12 +354,198 @@ def test_reader_media_requires_reader_visible_reference_context() -> None:
     _authenticate_session_only(client, owner_token)
     listed = client.get(f"/worlds/{world_id}/reader/media")
     detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
-    download = client.get(f"/worlds/{world_id}/reader/media/objects/{object_id}/download")
+    download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
 
     assert listed.status_code == 200
     assert listed.json() == []
     assert detail.status_code == 404
     assert download.status_code == 404
+
+
+def test_reader_media_suppresses_moderated_reference_targets() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-moderated-reference@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    conversation_id, turn_id = _seed_conversation(engine, world_id, worldline_id)
+    turn_asset_id, turn_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"turn-media",
+    )
+    session_asset_id, session_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"session-media",
+    )
+    _seed_reference(
+        engine, world_id, worldline_id, turn_asset_id, "conversation_turn", turn_id
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        session_asset_id,
+        "conversation_session",
+        conversation_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_turn",
+        target_ref_id=turn_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_session",
+        target_ref_id=conversation_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    turn_detail = client.get(f"/worlds/{world_id}/reader/media/{turn_asset_id}")
+    session_detail = client.get(f"/worlds/{world_id}/reader/media/{session_asset_id}")
+    turn_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, turn_object_id)
+    )
+    session_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, session_object_id)
+    )
+
+    assert listed.status_code == 200
+    assert listed.json() == []
+    assert turn_detail.status_code == 404
+    assert session_detail.status_code == 404
+    assert turn_download.status_code == 404
+    assert session_download.status_code == 404
+
+
+def test_reader_media_suppresses_moderated_worldline_and_publication_targets() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-moderated-surface@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, fork_id = _seed_worldlines(engine, world_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    publication_id = _publication_id_for_artifact(engine, artifact_id)
+    publication_asset_id, publication_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"publication-media",
+    )
+    fork_artifact_id = _seed_published_artifact(engine, world_id, fork_id)
+    worldline_asset_id, worldline_object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        fork_id,
+        visibility="reader_visible",
+        data=b"worldline-media",
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        worldline_id,
+        publication_asset_id,
+        "narrative_artifact",
+        artifact_id,
+    )
+    _seed_reference(
+        engine,
+        world_id,
+        fork_id,
+        worldline_asset_id,
+        "narrative_artifact",
+        fork_artifact_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="narrative_publication",
+        target_ref_id=publication_id,
+    )
+    _seed_moderation_action(
+        engine,
+        world_id,
+        fork_id,
+        target_ref_kind="worldline",
+        target_ref_id=fork_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    publication_detail = client.get(
+        f"/worlds/{world_id}/reader/media/{publication_asset_id}"
+    )
+    worldline_detail = client.get(f"/worlds/{world_id}/reader/media/{worldline_asset_id}")
+    publication_download = client.get(
+        _reader_media_download_path(world_id, worldline_id, publication_object_id)
+    )
+    worldline_download = client.get(
+        _reader_media_download_path(world_id, fork_id, worldline_object_id)
+    )
+
+    assert listed.status_code == 200
+    assert listed.json() == []
+    assert publication_detail.status_code == 404
+    assert worldline_detail.status_code == 404
+    assert publication_download.status_code == 404
+    assert worldline_download.status_code == 404
+
+
+def test_reader_media_keeps_unsuppressed_references_when_one_reference_is_moderated() -> None:
+    client, engine = _client_with_database()
+    owner_id, owner_token = _seed_user(engine, "owner-mixed-reference@example.test")
+    world_id = _seed_world(engine, owner_id)
+    _add_membership(engine, world_id, owner_id, AuthRole.WORLD_ADMIN)
+    worldline_id, _fork_id = _seed_worldlines(engine, world_id)
+    _conversation_id, turn_id = _seed_conversation(engine, world_id, worldline_id)
+    artifact_id = _seed_published_artifact(engine, world_id, worldline_id)
+    asset_id, object_id = _seed_available_asset_with_object(
+        engine,
+        client.reader_media_storage,
+        world_id,
+        worldline_id,
+        visibility="reader_visible",
+        data=b"mixed-media",
+    )
+    _seed_reference(engine, world_id, worldline_id, asset_id, "conversation_turn", turn_id)
+    _seed_reference(engine, world_id, worldline_id, asset_id, "narrative_artifact", artifact_id)
+    _seed_moderation_action(
+        engine,
+        world_id,
+        worldline_id,
+        target_ref_kind="conversation_turn",
+        target_ref_id=turn_id,
+    )
+
+    _authenticate_session_only(client, owner_token)
+    listed = client.get(f"/worlds/{world_id}/reader/media")
+    detail = client.get(f"/worlds/{world_id}/reader/media/{asset_id}")
+    download = client.get(_reader_media_download_path(world_id, worldline_id, object_id))
+
+    assert listed.status_code == 200
+    assert [item["asset_id"] for item in listed.json()] == [str(asset_id)]
+    assert detail.status_code == 200
+    assert [reference["ref_kind"] for reference in detail.json()["references"]] == [
+        "narrative_artifact"
+    ]
+    assert download.status_code == 200
+    assert download.content == b"mixed-media"
 
 
 def test_admin_media_download_route_is_unchanged() -> None:
@@ -410,6 +705,54 @@ def _add_membership(
         session.commit()
 
 
+def _seed_conversation(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    conversation_id = uuid.uuid4()
+    turn_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            ConversationSession(
+                id=conversation_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                session_key=f"conversation-{conversation_id.hex[:8]}",
+                title="Reader Conversation",
+                scope_type="world",
+                mode="manual_chain",
+                status="completed",
+                objective="Reader-safe conversation.",
+                opening_prompt="Begin.",
+                max_turns=1,
+                next_turn_index=1,
+                policy_config={},
+                writer_config={},
+                memory_config={},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.add(
+            ConversationTurn(
+                id=turn_id,
+                session_id=conversation_id,
+                turn_index=0,
+                speaker_kind="agent",
+                speaker_agent_id=None,
+                input_text="Reader input.",
+                output_text="Reader output.",
+                status="succeeded",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    return conversation_id, turn_id
+
+
 def _seed_published_artifact(
     engine: Engine,
     world_id: uuid.UUID,
@@ -447,6 +790,16 @@ def _seed_published_artifact(
     return artifact_id
 
 
+def _publication_id_for_artifact(engine: Engine, artifact_id: uuid.UUID) -> uuid.UUID:
+    with Session(engine) as session:
+        publication_id = session.scalars(
+            select(NarrativePublication.id).where(
+                NarrativePublication.artifact_id == artifact_id
+            )
+        ).one()
+    return publication_id
+
+
 def _seed_available_asset_with_object(
     engine: Engine,
     storage: LocalMediaObjectStorage,
@@ -456,13 +809,20 @@ def _seed_available_asset_with_object(
     visibility: str,
     status: str = "available",
     data: bytes = b"image-bytes",
+    asset_kind: str = "image",
+    asset_role: str = "reference_image",
+    object_role: str = "original",
+    filename: str = "reader.png",
+    content_type: str = "image/png",
+    title: str | None = "Reader image",
+    description: str | None = None,
 ) -> tuple[uuid.UUID, uuid.UUID]:
     asset_id = uuid.uuid4()
     object_id = uuid.uuid4()
     stored = storage.write_bytes(
-        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/reader.png",
+        f"worlds/{world_id}/worldlines/{worldline_id}/assets/{asset_id}/{filename}",
         data,
-        content_type="image/png",
+        content_type=content_type,
     )
     with Session(engine) as session:
         session.add(
@@ -470,17 +830,18 @@ def _seed_available_asset_with_object(
                 id=asset_id,
                 world_id=world_id,
                 worldline_id=worldline_id,
-                asset_kind="image",
-                asset_role="reference_image",
+                asset_kind=asset_kind,
+                asset_role=asset_role,
                 source_kind="manual_upload",
                 status=status,
                 visibility=visibility,
                 storage_uri=stored.uri,
-                mime_type="image/png",
+                mime_type=content_type,
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
                 created_by_actor_ref="test",
-                title="Reader image",
+                title=title,
+                description=description,
                 metadata_json={
                     "source_note": "safe",
                     "redaction_probe": "not an api_key or storage path",
@@ -493,10 +854,10 @@ def _seed_available_asset_with_object(
                 asset_id=asset_id,
                 world_id=world_id,
                 worldline_id=worldline_id,
-                object_role="original",
+                object_role=object_role,
                 storage_uri=stored.uri,
-                filename="reader.png",
-                mime_type="image/png",
+                filename=filename,
+                mime_type=content_type,
                 size_bytes=stored.size_bytes,
                 checksum_sha256=stored.checksum_sha256,
                 width=100,
@@ -559,6 +920,47 @@ def _seed_reference(
         )
         session.commit()
     return reference_id
+
+
+def _seed_moderation_action(
+    engine: Engine,
+    world_id: uuid.UUID,
+    worldline_id: uuid.UUID,
+    *,
+    target_ref_kind: str,
+    target_ref_id: uuid.UUID,
+    action_kind: str = "takedown_content",
+) -> uuid.UUID:
+    action_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    with Session(engine) as session:
+        session.add(
+            ModerationAction(
+                id=action_id,
+                world_id=world_id,
+                worldline_id=worldline_id,
+                action_kind=action_kind,
+                status="applied",
+                target_ref_kind=target_ref_kind,
+                target_ref_id=target_ref_id,
+                reason="Reviewed takedown.",
+                created_by_actor_ref="test",
+                audit_summary_json={"reader_delivery_suppression": True},
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        session.commit()
+    return action_id
+
+
+def _reader_media_download_path(
+    world_id: uuid.UUID, worldline_id: uuid.UUID, object_id: uuid.UUID
+) -> str:
+    return (
+        f"/worlds/{world_id}/reader/media/worldlines/"
+        f"{worldline_id}/objects/{object_id}/download"
+    )
 
 
 def _authenticate_session_only(client: TestClient, token: str) -> None:

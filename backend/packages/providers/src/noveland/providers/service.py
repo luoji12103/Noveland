@@ -85,6 +85,7 @@ from noveland.providers.secrets import (
     reject_sensitive_config,
     safe_auth_metadata,
     sanitize_for_persistence,
+    sanitize_provider_diagnostic_text,
 )
 from noveland.worlds.worldlines import worldline_or_404
 from sqlalchemy.orm import Session
@@ -279,7 +280,7 @@ class ProviderExecutionService:
             refreshed = InvocationLedgerService(self._session).get(
                 request.world_id,
                 invocation.id,
-                platform_admin=True,
+                platform_admin=request.platform_admin,
             )
             if refreshed is None:
                 raise ProviderExecutionError("provider invocation disappeared")
@@ -614,8 +615,8 @@ class ProviderExecutionService:
             provider = registry.get_provider(
                 request.world_id,
                 request.provider_id,
-                platform_admin=True,
-                include_hidden=True,
+                platform_admin=request.platform_admin,
+                include_hidden=request.platform_admin,
             )
             if provider is None:
                 raise ProviderNotFoundError("provider integration not found")
@@ -625,6 +626,8 @@ class ProviderExecutionService:
             provider_kind=provider_kind,
             capability_key=request.capability_key,
             provider_id=request.provider_id,
+            platform_admin=request.platform_admin,
+            include_hidden=request.platform_admin,
         )
 
     def _resolve_fallback_provider(
@@ -656,8 +659,8 @@ class ProviderExecutionService:
         fallback = ProviderRegistryService(self._session).get_provider(
             request.world_id,
             fallback_model.id,
-            platform_admin=True,
-            include_hidden=True,
+            platform_admin=request.platform_admin,
+            include_hidden=request.platform_admin,
         )
         if fallback is None:
             raise ProviderExecutionError("provider fallback disappeared")
@@ -829,4 +832,4 @@ def _provider_not_active_reason(status: str) -> str:
 
 
 def _safe_error_text(exc: Exception) -> str:
-    return str(sanitize_for_persistence({"error": str(exc)})["error"])
+    return sanitize_provider_diagnostic_text(str(exc))

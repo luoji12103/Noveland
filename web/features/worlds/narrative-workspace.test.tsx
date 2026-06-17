@@ -77,6 +77,17 @@ describe("NarrativeWorkspace", () => {
     });
   });
 
+
+  it("encodes world EventSource paths for reserved world identifiers", () => {
+    const worldId = "world/narrative?mode=workspace#frag";
+
+    render(<NarrativeWorkspace worldId={worldId} data={workspaceData} />);
+
+    expect(subscribeToEventStream.mock.calls[0]?.[0]).toBe(
+      `/api/worlds/${encodeURIComponent(worldId)}/stream`,
+    );
+  });
+
   it("merges narrative stream updates", async () => {
     subscribeToEventStream.mockImplementation(
       ((_, handler) => {

@@ -43,7 +43,7 @@ def _image_storage() -> LocalMediaObjectStorage:
 def generate_image(
     world_id: uuid.UUID,
     request: ImageGenerateRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_image_storage)],
@@ -53,6 +53,7 @@ def generate_image(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
     except ProviderNotFoundError as exc:
         raise _not_found() from exc
@@ -74,7 +75,7 @@ def generate_image(
 def edit_image(
     world_id: uuid.UUID,
     request: ImageEditRequest,
-    _context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
+    context: Annotated[WorldAccessContext, Depends(get_world_admin_context)],
     subject: Annotated[AuthenticatedSubject, Depends(get_current_subject)],
     db_session: Annotated[Session, Depends(get_db_session)],
     storage: Annotated[LocalMediaObjectStorage, Depends(_image_storage)],
@@ -84,6 +85,7 @@ def edit_image(
             world_id,
             request,
             actor_ref=_actor_ref(subject),
+            platform_admin=context.is_platform_admin,
         )
     except ProviderNotFoundError as exc:
         raise _not_found() from exc

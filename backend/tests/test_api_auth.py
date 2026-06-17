@@ -38,16 +38,19 @@ def test_csrf_sets_readable_csrf_cookie() -> None:
 def test_login_rejects_unknown_wrong_inactive_and_invalid_requests() -> None:
     client, engine = _client_with_database()
     _seed_user(engine, email="admin@example.test", password="correct-password")
+    csrf_headers = _csrf_headers(client)
 
     unknown = client.post(
         "/auth/login",
         json={"email": "missing@example.test", "password": "correct-password"},
+        headers=csrf_headers,
     )
     wrong = client.post(
         "/auth/login",
         json={"email": "admin@example.test", "password": "wrong-password"},
+        headers=csrf_headers,
     )
-    invalid = client.post("/auth/login", json={"email": "not-an-email"})
+    invalid = client.post("/auth/login", json={"email": "not-an-email"}, headers=csrf_headers)
 
     inactive_email = "inactive@example.test"
     _seed_user(engine, email=inactive_email, password="correct-password")
@@ -55,12 +58,34 @@ def test_login_rejects_unknown_wrong_inactive_and_invalid_requests() -> None:
     inactive = client.post(
         "/auth/login",
         json={"email": inactive_email, "password": "correct-password"},
+        headers=csrf_headers,
     )
 
     assert unknown.status_code == 401
     assert wrong.status_code == 401
     assert inactive.status_code == 401
     assert invalid.status_code == 422
+
+
+def test_login_requires_csrf_before_setting_session_cookie() -> None:
+    client, engine = _client_with_database()
+    _seed_user(engine, email="admin@example.test", password="correct-password")
+
+    missing_csrf = client.post(
+        "/auth/login",
+        json={"email": "admin@example.test", "password": "correct-password"},
+    )
+    csrf_headers = _csrf_headers(client)
+    wrong_csrf = client.post(
+        "/auth/login",
+        json={"email": "admin@example.test", "password": "correct-password"},
+        headers={CSRF_HEADER_NAME: "wrong-token"},
+    )
+
+    assert csrf_headers[CSRF_HEADER_NAME]
+    assert missing_csrf.status_code == 403
+    assert wrong_csrf.status_code == 403
+    assert client.cookies.get(SESSION_COOKIE_NAME) is None
 
 
 def test_login_sets_session_cookie_and_me_returns_subject() -> None:
@@ -70,6 +95,7 @@ def test_login_sets_session_cookie_and_me_returns_subject() -> None:
     response = client.post(
         "/auth/login",
         json={"email": "ADMIN@example.test", "password": "correct-password"},
+        headers=_csrf_headers(client),
     )
 
     assert response.status_code == 200
@@ -105,6 +131,7 @@ def test_auth_cookie_policy_uses_configured_settings(monkeypatch: pytest.MonkeyP
         response = client.post(
             "/auth/login",
             json={"email": "admin@example.test", "password": "correct-password"},
+            headers=_csrf_headers(client),
         )
 
         session_cookie = _cookie_header(response, SESSION_COOKIE_NAME)
@@ -142,6 +169,7 @@ def test_logout_requires_csrf_revokes_session_and_clears_cookies() -> None:
     login_response = client.post(
         "/auth/login",
         json={"email": "admin@example.test", "password": "correct-password"},
+        headers=_csrf_headers(client),
     )
     session_token = client.cookies.get(SESSION_COOKIE_NAME)
     csrf_token = client.cookies.get(CSRF_COOKIE_NAME)
@@ -161,6 +189,14 @@ def test_logout_requires_csrf_revokes_session_and_clears_cookies() -> None:
     assert client.cookies.get(SESSION_COOKIE_NAME) is None
     assert client.cookies.get(CSRF_COOKIE_NAME) is None
     assert _session_status(engine, session_token) == AuthSessionStatus.REVOKED.value
+
+
+def _csrf_headers(client: TestClient) -> dict[str, str]:
+    response = client.get("/auth/csrf")
+    assert response.status_code == 200
+    csrf_token = response.json()["csrf_token"]
+    assert csrf_token
+    return {CSRF_HEADER_NAME: csrf_token, "Cookie": f"{CSRF_COOKIE_NAME}={csrf_token}"}
 
 
 def _client_with_database() -> tuple[TestClient, Engine]:

@@ -1,365 +1,56 @@
 # Active Session Handoff
 
-- Date: 2026-05-22T00:00:00Z
-- Branch: main
-- Objective: report v1.1 Normal Use / Release Candidate closeout status.
-- Status: v1.1 Phase 1 through Phase 8 are complete, current specs are synced, release notes are written, and the OpenSpec change is archived locally. No push performed.
+- Date: 2026-06-13T09:37:48+08:00
+- Branch: feature/audit-and-hardening-post-v1-1-rc
+- Objective: post-v1.1 release-candidate audit, hardening, tests, and records under OpenSpec.
+- Status: F-001 through F-149 are remediated on this branch; latest batch is F-149 provider diagnostic error-text redaction pending local commit.
 
 ## Current Context
 
-- `main` is ahead of `origin/main`; do not push unless explicitly requested.
-- Phase 3-13 backend architecture is complete and frozen through architecture docs, API/data inventories, ADRs, and the multimodal sample-world regression fixture.
-- v0.4 Operator/Admin UX is complete across all seven phases: Admin UX Foundation, Provider Admin Console, Media Asset Admin Console, Visual Asset Admin Console, Speech Admin Console, Invocation Ledger Browser, and Multimodal Diagnostics Dashboard.
-- Current Phase 3-13, v0.4, v0.5, v0.6, v0.7, v0.8, and v0.9 implemented behavior is represented under `openspec/specs/`.
-- The completed v0.4 change is archived under `openspec/changes/archive/2026-05-14-v0-4-operator-admin-ux/`.
-- The completed v0.5 change is archived under `openspec/changes/archive/2026-05-15-v0-5-authoring-import-studio/`.
-- The completed v0.6 change is archived under `openspec/changes/archive/2026-05-16-v0-6-runtime-narrative-quality/`.
-- The completed v0.7 change is archived under `openspec/changes/archive/2026-05-16-v0-7-production-hardening/`.
-- The completed v0.8 change is archived under `openspec/changes/archive/2026-05-16-v0-8-public-experience-ecosystem/`.
-- The completed v0.9 change is archived under `openspec/changes/archive/2026-05-17-v0-9-self-use-mvp-demo-world-cut/`.
-- Archived v1.0 roadmap change: `openspec/changes/archive/2026-05-21-v1-0-private-beta-mvp/`.
-- Archived v1.1 roadmap change: `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/`.
-- v1.1 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.1-normal-use-release-candidate-feasibility-review.md`. Recommendation: **B. v1.1 can start after minor OpenSpec adjustments.** The current phase order remains Operational Runbooks, Real Backup/Restore Drill, Multi-world / Multi-user Stress Test, Content Safety & Moderation Hardening, Import/Export Stability, Provider Reliability Layer, User-facing Polish, and Release Candidate Gate.
-- v1.1 review decisions: Phase 2 restore target is a fresh local/single-host profile with empty database and object storage root; Phase 3 first stress baseline is 3 worlds, 2 worldlines per world, 2 player sessions per world, 2 fake provider profiles, and deterministic 120-turn or equivalent coverage; Phase 6 provider reliability is manual-first with opt-in constrained automatic fallback only after checkpoint approval; Phase 7 Web work must use `impeccable`.
-- v1.1 Phase 1 Operational Runbooks checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.1-operational-runbooks-plan.md`. The phase is docs-only and adds normal-use runbooks under `docs/agent/operations/runbooks/` plus `backend/tests/test_operational_runbooks_docs.py`.
-- v1.1 Phase 1 commit `aac9faa` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `2.5`.
-- v1.1 Phase 2 Backup Restore Drill checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.2-backup-restore-drill-plan.md`. The implementation adds read-only `BackupRestoreDrillService` under storage plus platform-admin `/observability/readiness/backup-restore-drill`, with no migration, provider calls, or persisted duplicate readiness framework.
-- v1.1 Phase 2 commit `24a62fe` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `3.6`.
-- v1.1 Phase 3 Multi-world / Multi-user Stress Test checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.3-multi-world-multi-user-stress-plan.md`. The implementation adds backend-only `NormalUseStressService` under observability plus deterministic stress tests, with no migration, API route, Web UI, real provider calls, or duplicate readiness framework.
-- v1.1 Phase 3 commit `abb2cee` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `4.6`.
-- v1.1 Phase 4 Content Safety & Moderation Hardening checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.4-content-safety-moderation-hardening-plan.md`. The implementation extends the existing moderation boundary with admin-only safety-review reports and beta-feedback-to-moderation escalation, preserving reporter privacy and safe evidence refs without migrations, Web UI, provider calls, broad `worlds.py` routes, duplicate moderation framework, or world-event writes.
-- v1.1 Phase 4 commit `ad7356f` fast-forward merged to local `main`; merge bookkeeping is being recorded in OpenSpec task `5.6`.
-- v1.1 Phase 5 Import/Export Stability checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.5-import-export-stability-plan.md`. The implementation extends the existing `world_packaging` package with safe provider, persona, memory, visual mapping, voice mapping, and source traceability manifest sections; public sample export excludes user-provided galgame media/source content as placeholder metadata; import apply preserves specialized manifests as safe review/apply metadata instead of creating provider/persona/memory/visual/voice records directly. No migration, Web UI, provider calls, broad `worlds.py` routes, marketplace behavior, proprietary fixture export, or provider/world-event mutation was added.
-- v1.1 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`325 source files`), backend pytest (`546 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.1 Phase 5 commit `ba9fb2e` fast-forward merged to local `main`; merge bookkeeping is being recorded in OpenSpec task `6.6`.
-- v1.1 Phase 6 Provider Reliability Layer checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.6-provider-reliability-layer-plan.md`. The phase will extend the existing providers boundary with migration-free health trend/degraded reports, manual-first fallback policy validation, fallback audit metadata in provider execution, and audited media-job requeue. No Web UI is scoped for Phase 6.
-- v1.1 Phase 6 implementation adds `backend/packages/providers/src/noveland/providers/reliability.py`, reliability DTOs, provider router endpoints for reliability reports, fallback planning, and provider media-job requeue, plus explicit fallback request fields on provider execution/test/smoke DTOs. Automatic fallback remains disabled; fallback only runs when explicitly requested and policy, degraded evidence, capability, quota, auth, and audit checks pass. Targeted checks passed: focused provider ruff, focused provider mypy, and `cd backend && uv run pytest tests/test_provider_execution_service.py tests/test_api_providers.py -q` (`28 passed`).
-- v1.1 Phase 6 full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`550 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.1 Phase 6 commit `43d7f47` fast-forward merged to local `main`; merge bookkeeping is being recorded in OpenSpec task `7.6`.
-- v1.1 Phase 7 User-facing Polish checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.7-user-facing-polish-plan.md`. `impeccable` was loaded before Web edits, using `PRODUCT.md`, product UI guidance, and the polish reference. Scope is limited to existing private beta onboarding, feedback, player resume, playback/scene fallbacks, provider status clarity, and shared responsive/accessibility polish.
-- v1.1 Phase 7 implementation polishes existing Web surfaces only: onboarding, feedback, player resume, playback/scene fallbacks, provider status, responsive actions, and focus/disabled states. Targeted Web unit check passed for the six touched component tests (`16 passed`). Full Web/OpenSpec gate passed: Web lint, Web typecheck, Web unit tests (`134 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`; existing `NO_COLOR`/`FORCE_COLOR` warning noise), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.1 Phase 7 commit `20b465a` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `8.6`.
-- v1.1 Phase 8 Release Candidate Gate checkpoint is recorded at `docs/agent/harness/feature-updates/v1.1.8-release-candidate-gate-plan.md`. The phase is backend/API-only under existing observability/readiness, with no migration, Web UI, duplicate readiness framework, public launch behavior, or provider calls.
-- v1.1 Phase 8 implementation adds `ReleaseCandidateGateReport`, `ProductionReadinessGateService.release_candidate_gate_report`, and platform-admin `GET /observability/readiness/release-candidate`. Targeted checks passed: focused readiness pytest (`27 passed`), focused ruff, and focused mypy.
-- v1.1 Phase 8 full backend/OpenSpec gate passed: backend ruff, backend mypy (`326 source files`), backend pytest (`555 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.1 Phase 8 commit `fbe6ce6` fast-forward merged to local `main`; merge bookkeeping is recorded in OpenSpec task `9.6`.
-- v1.1 OpenSpec change is archived under `openspec/changes/archive/2026-05-22-v1-1-normal-use-release-candidate/`, current specs are synced under `openspec/specs/`, and release notes are recorded at `docs/agent/harness/release-notes/v1.1-normal-use-release-candidate.md`.
-- v0.9 goal: make a real self-use demo world playable for about 30 minutes by productizing provider settings/model lab, Visual Generation Control Plane, provider lab worktree testing, galgame source intake, dialogue extraction, persona/memory distillation, visual mapping, voice mapping, demo assembly, and self-use gate evidence.
-- v0.9 Phase 2 is now Visual Generation Control Plane. It covers versioned workflow templates, validated slots, visual model inventory for checkpoint/LoRA/VAE/embedding/ControlNet/IP-Adapter/workflow/prompt presets, character visual generation profiles, provider-neutral visual generation plans, reference image policies, ComfyUI slot validation, and reviewable AI-assisted profile/workflow variant proposals. Runtime agents must never directly execute arbitrary ComfyUI workflow JSON.
-- v0.9 feasibility review is recorded at `docs/agent/harness/feature-updates/v0.9-self-use-mvp-demo-world-cut-feasibility-review.md`. Conclusion: proceed with v0.9 as one change after review acceptance, but Phase 1 must confirm provider text adapter/model discovery/template ownership and Phase 2 must confirm dedicated `visual_generation` package/router/schema ownership before implementation.
-- v0.9 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.1-mvp-provider-settings-model-lab-plan.md`. It confirms static/code-owned provider templates, server-side redacted model discovery, Phase 1 text adapter alignment, no real provider tests by default, and `impeccable` use before Web UI implementation.
-- v0.9 Phase 1 implementation adds static provider templates, redacted server-side model discovery, manual model-name fallback, OpenAI-compatible and Anthropic-compatible text adapters through `ProviderExecutionService`, and provider admin model lab UI. No migrations or persistent provider-template tables were added.
-- v0.9 Phase 2 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.2-visual-generation-control-plane-plan.md`. It confirms dedicated `backend/packages/visual_generation/` and `backend/services/api/src/noveland/services/api/visual_generation.py` ownership, expected migration tables, backend/API-first plus minimal admin diagnostics scope, strict worldline-scoped character visual profiles, provider-neutral visual generation plans, ComfyUI template/slot execution boundary, cross-provider mapping policy, and review/apply-only AI workflow/profile proposals.
-- v0.9 Phase 2 implementation adds `backend/packages/visual_generation/`, app-level `visual_generation.py`, migration `20260517_0045_visual_generation_control_plane.py`, and admin-scoped APIs for workflow templates/versions, model inventory, character visual generation profiles, visual generation plans, validation, and dry-run. It is backend/API-first only: no Web UI, no `worlds.py` routes, no real provider calls by default, no arbitrary runtime ComfyUI workflow execution, and no reader/player/member exposure of local paths, storage refs, raw prompts/outputs, bytes/base64, or secrets.
-- v0.9 Phase 2 targeted service/API tests cover slot validation, missing/non-whitelisted slots, malformed model IDs, checkpoint/LoRA base-model mismatch, allowed/default/banned LoRA policy, cross-worldline reference rejection, hidden/developer-only suppression, safe reference metadata, provider-neutral mapping dry-runs, no world-event pollution, and no invocation writes.
-- v0.9 Phase 3 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.3-provider-worktree-integration-harness-plan.md`.
-- v0.9 Phase 3 provider lab operating docs are recorded at `docs/agent/operations/provider-lab.md`.
-- v0.9 Phase 3 implementation adds a strict backend `real_provider` pytest marker, `NOVELAND_RUN_REAL_PROVIDER_TESTS=1` opt-in convention, default-skipped real-provider examples, and fake/mock provider contract tests covering OpenAI-compatible LLM, Anthropic-compatible LLM, MiMo TTS/ASR, Z-Image, GPT Image, ComfyUI, OpenAI-compatible image, and generic/custom HTTP. It adds no migrations, Web UI, API route changes, runtime behavior changes, or default external calls.
-- v0.9 Phase 4 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.4-galgame-source-intake-plan.md`.
-- v0.9 Phase 4 implementation adds a migration-free already-unpacked galgame source intake service under `backend/packages/authoring/`, with admin-only authoring API routes for preview/apply. It rejects packed/archive/executable-like files, stores accepted image/audio files through media as private `imported_original` assets/objects, stores text as bounded source fragments, preserves source traceability through authoring records, adds future generation-reference candidate metadata for visual assets, and does not mutate canon, memory, visual/voice bindings, world state, or world events.
-- v0.9 Phase 5 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.5-script-dialogue-extraction-plan.md`.
-- v0.9 Phase 5 implementation enhances the existing deterministic authoring parser with dialogue `line_text`, emotion hints, relationship hints, and manual-label proposals for unknown script lines. It remains proposal-only and adds no provider calls, prompt snapshots, invocation ledger writes, Web UI, migration, canon mutation, memory writes, or world events.
-- v0.9 Phase 6 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.6-character-memory-distillation-agent-plan.md`.
-- v0.9 Phase 6 implementation adds provider-backed character memory distillation to authoring. It uses `ProviderExecutionService` for invocation ledger and prompt snapshot evidence, creates reviewable persona, memory, and visual generation profile recommendation proposals, and writes `AgentPersona`, `Agent.character_profile`, and `AgentMemoryItem` only after explicit approval/apply. It adds no Web UI, migration, canon mutation, visual/voice binding mutation, `MemoryWriteJob.source_kind` widening, or world events.
-- v0.9 Phase 7 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.7-visual-asset-mapping-plan.md`.
-- v0.9 Phase 7 implementation extends authoring apply for reviewed `sprite_asset_match`, `background_asset_match`, and `cg_asset_match` proposals. Sprites/backgrounds use existing `VisualAssetService`, `CharacterSpriteSet`, `CharacterSpriteVariant`, and `SceneBackgroundProfile`; CGs use safe traceable media metadata because no first-class CG binding table exists. Approved visual media becomes generation-reference candidates. The phase adds no Web UI, migration, provider calls, broad routes, or world events.
-- v0.9 Phase 8 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.8-voice-profile-mapping-plan.md`.
-- v0.9 Phase 8 implementation extends authoring apply for reviewed `voice_asset_match` proposals. It creates or reuses `VoiceProfile` records, creates `AgentVoiceProfileBinding` records through `VoiceProfileService`, preserves optional provider/provider voice IDs without secret resolution, carries style/emotion hints into binding overrides, and marks approved audio media as voice-reference candidates. It adds no Web UI, migration, provider calls during authoring apply, broad routes, or world events.
-- v0.9 Phase 9 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.9-demo-world-assembly-plan.md`.
-- v0.9 Phase 9 implementation adds a backend/API-first demo world assembly path under authoring. `POST /worlds/{world_id}/authoring/import-runs/{run_id}/assemble-demo-world` creates a reviewable `demo_world_assembly` proposal from reviewed dialogue plus applied persona, memory, visual, voice, and visual generation profile evidence. Existing authoring review/apply then creates a manual-chain conversation session, participants, seed turn, and initial turn presentation references. It adds no Web UI, migration, provider calls, broad `worlds.py` routes, direct canon/global launch mutation, or world events.
-- v0.9 Phase 10 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v0.9.10-self-use-mvp-gate-plan.md`.
-- v0.9 Phase 10 implementation extends the existing observability readiness boundary with platform-admin-only `GET /observability/readiness/self-use-mvp`. The report is read-only and aggregates safe self-use evidence for demo entry, conversation continuity, persona/memory, visual playback and visual generation readiness, voice playback, provider/model lab setup, media jobs, invocation ledger, source traceability, recent world-event leak markers, and manual 30-minute play/resume/failure-note checklist items. It adds no Web UI, migration, provider calls, broad `worlds.py` routes, duplicate readiness framework, or world events.
-- v1.0 goal: support 1-3 invited private beta testers with onboarding, setup wizard, session stability, memory/persona QA, feedback, quota enforcement, repair iteration, and private beta gate evidence.
-- v1.0 feasibility review is recorded at `docs/agent/harness/feature-updates/v1.0-private-beta-mvp-feasibility-review.md`. Conclusion: **C. v1.0 phase order must be revised before implementation.** v0.9 provides the content/provider foundation, but private beta needs front-loaded decisions for invite/access ownership, player session restore, per-player/capability quota enforcement, feedback ownership, and readiness/gate ownership.
-- Revised v1.0 phase order: Phase 1 Private Beta Onboarding & Access Model; Phase 2 Player Session Stability; Phase 3 Cost & Quota Real Enforcement; Phase 4 World Setup Wizard; Phase 5 Memory & Persona QA; Phase 6 Beta Feedback System; Phase 7 Beta Content Iteration Loop; Phase 8 Private Beta Gate.
-- v1.0 Phase 1 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.1-private-beta-onboarding-access-model-plan.md`. It decides that private beta must use a dedicated invite/access table instead of membership-only access. Planned ownership is `backend/packages/private_beta/` plus app-level `backend/services/api/src/noveland/services/api/private_beta.py`; `WorldMembership` remains the least-privilege enforcement layer after valid redemption. The first migration is expected to add `private_beta_invites` with hashed token storage, lifecycle state, world and optional worldline scope, inviter/redeemer/revoker audit fields, expiration, beta role, and safe metadata. Phase 1 Web scope should be API-first plus minimal redemption/onboarding and must use `impeccable` before implementation.
-- v1.0 Phase 1 implementation adds `backend/packages/private_beta/`, app-level `backend/services/api/src/noveland/services/api/private_beta.py`, migration `20260517_0046_private_beta_invites.py`, hashed token-only persistence, pending/accepted/waitlisted/redeemed/expired/revoked lifecycle handling, admin invite create/list/detail/revoke APIs, tester invite redemption, least-privilege `human_user` membership bootstrap, worldline-scoped `PlayerActorProfile` setup, and minimal authenticated `/private-beta` Web onboarding. It adds no public signup, broad `worlds.py` route growth, tester provider/admin/media/invocation privileges, raw token persistence, world-event writes, or provider calls.
-- v1.1 goal: support normal-use/release-candidate evaluation with runbooks, real backup/restore drill, multi-world/multi-user stress, safety hardening, import/export stability, provider reliability, user-facing polish, and RC gate evidence.
-- v0.4 release notes live at `docs/agent/harness/release-notes/v0.4-operator-admin-ux.md`.
-- v0.5 release notes live at `docs/agent/harness/release-notes/v0.5-authoring-import-studio.md`.
-- v0.8 release notes live at `docs/agent/harness/release-notes/v0.8-public-experience-ecosystem.md`.
-- v0.9 release notes live at `docs/agent/harness/release-notes/v0.9-self-use-mvp-demo-world-cut.md`.
-- v1.0 release notes live at `docs/agent/harness/release-notes/v1.0-private-beta-mvp.md`.
-- v0.5 must use `backend/packages/authoring/` and `backend/services/api/src/noveland/services/api/authoring.py` for new authoring/import work.
-- v0.5 Phase 1 is complete: source registry plus import run/proposal/review decision/source traceability/preview/apply foundation.
-- v0.5 Phase 2 is complete: deterministic parser creates traceable proposals for dialogue, unresolved quoted dialogue, scenes, choices, routes, and events without provider calls or canonical mutation.
-- v0.5 Phase 3 is complete: deterministic extractor creates traceable proposals for characters, aliases, factions, identities, relationships, and emotional baselines without provider calls or canonical mutation.
-- v0.5 Phase 4 is complete: deterministic lore extractor creates proposal-only lore, location, organization, world-rule, secret, and knowledge-boundary candidates without provider calls or canonical mutation.
-- v0.5 Phase 5 is complete: deterministic conflict review creates reviewable conflict report proposals without provider calls, automatic resolution, or canonical mutation.
-- v0.5 Phase 6 is complete: deterministic memory migration creates reviewable fact, episodic, relationship, preference, and style memory proposals without provider calls, memory writes, or canonical mutation.
-- v0.5 Phase 7 is complete: deterministic asset matching creates reviewable sprite, background, CG, and voice-reference proposals without provider calls, media jobs, visual/speech binding writes, or canonical mutation.
-- v0.5 Phase 8 is complete: deterministic authoring regression fixture covers source registry, parser, character/lore extraction, conflict review, memory migration, asset matching, guarded review/apply, and side-effect leak checks.
-- Existing `authoring_templates`, `authoring_import_jobs`, and world composition import are legacy-compatible inputs or references, not the primary v0.5 foundation.
-- v0.5 lore/world-bible extraction is proposal-only until a later accepted architecture decision defines safe global-vs-worldline canon apply behavior.
-- v0.6 Runtime Narrative Quality is archived and closed locally.
-- v0.7 Production Hardening is archived and closed locally.
-- v0.8 Public Experience & Ecosystem feasibility review has been added at `docs/agent/harness/feature-updates/v0.8-public-experience-ecosystem-feasibility-review.md`.
-- v0.8 OpenSpec now requires Reader Media Delivery to start with public/read-only contract inventory, reader-safe media descriptors, explicit auth/delivery model, and no storage path leak before playback/galgame UI phases.
-- v0.8 Phase 1 Reader Media Delivery planning checkpoint has been added at `docs/agent/harness/feature-updates/v0.8.1-reader-media-delivery-plan.md`.
-- Phase 1 accepted delivery model is authenticated-only, application-mediated download/streaming through a dedicated `reader_delivery` package and `reader_media.py` router.
-- Phase 1 implementation adds `backend/packages/reader_delivery/` and `backend/services/api/src/noveland/services/api/reader_media.py`.
-- Phase 1 targeted tests add `backend/tests/test_api_reader_media.py` for ACL, visibility, no-leak descriptors, download streaming, cross-world/worldline rejection, and unchanged admin media download behavior.
-- v0.8 Phase 1 fast-forward merge to local `main` completed.
-- v0.8 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.2-conversation-playback-ui-plan.md`.
-- v0.8 Phase 2 implementation adds the reader playback page at `/worlds/{world_id}/reader/conversations/{conversation_id}/playback`, `ConversationPlayback`, reader media Web DTO helpers, and e2e mock reader media/presentation fixtures.
-- v0.8 Phase 2 blocker fix clears stale `.next/dev` before e2e mock server startup so playback CSS is regenerated from current source and reader-safe scene media is visibly rendered.
-- v0.8 Phase 2 fast-forward merge to local `main` completed.
-- v0.8 Phase 3 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.3-player-interaction-ui-plan.md`.
-- v0.8 Phase 3 must reuse existing choices, journal, notifications, and intervention records. The current backend already exposes journal, notifications, and interventions to members, but player choice endpoints are admin-scoped and may need a narrow existing-route ACL adjustment.
-- v0.8 Player Interaction UI must reuse existing `PlayerChoiceRecord`, `PlayerJournalEntry`, `InWorldNotification`, and `PlayerInterventionRecord`.
-- v0.8 Phase 3 implementation adds `/worlds/{world_id}/player`, `PlayerInteractions`, player data loading in the Web server helper, and a workspace Player nav link. The backend change is limited to existing player actor/choice route ACLs and current-user filtering, plus safer player choice/intervention event payload summaries.
-- v0.8 Phase 3 fast-forward merge to local `main` completed.
-- v0.8 Phase 4 must implement read-only worldline browsing/comparison only. Do not add rollback, merge, destructive branch operations, or unsafe raw event payload exposure.
-- v0.8 Phase 4 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.4-worldline-browser-plan.md`.
-- v0.8 Phase 4 should reuse existing worldline list/compare records and helpers. A narrow member-safe compare ACL adjustment is acceptable if needed, but fork/rollback/merge must remain unavailable in reader/player UI.
-- v0.8 Phase 4 implementation adds `/worlds/{world_id}/worldlines`, `WorldlineBrowser`, server-side worldline browser loading, a workspace Worldlines nav link, and a member-safe read-only compare ACL adjustment for aggregate comparison counts.
-- v0.8 Phase 4 fast-forward merge to local `main` completed.
-- v0.8 Phase 5 must build a basic galgame scene view from conversation presentation/playback data and Phase 1 reader-safe media delivery. It must not add a full game engine, direct admin media API usage, public unauthenticated access, or raw internal state exposure.
-- v0.8 Phase 5 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.5-scene-view-galgame-view-plan.md`.
-- v0.8 Phase 5 should reuse Phase 2 conversation playback data and reader-safe media resolution patterns rather than adding a second media/composition path.
-- v0.8 Phase 5 implementation adds `/worlds/{world_id}/reader/conversations/{conversation_id}/scene`, `ConversationSceneView`, and shared `playback-media` helpers reused by playback and scene view.
-- v0.8 Phase 5 fast-forward merge to local `main` completed.
-- v0.8 Phase 6 must distinguish player-owned data from shared canonical world records. It must not destructively delete shared world/media/provider records.
-- v0.8 Phase 6 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.6-player-privacy-data-controls-plan.md`.
-- v0.8 Phase 6 implementation should add a narrow privacy boundary, deterministic sanitized export, and reviewable deletion/redaction requests without provider calls, daemon jobs, or automatic shared-record deletion.
-- v0.8 Phase 6 implementation adds `backend/packages/player_privacy/`, `player_privacy.py`, `player_privacy_requests`, and `/worlds/{world_id}/player/privacy/*` APIs for sanitized export preview/export request, delete request creation, request listing, and admin review.
-- v0.8 Phase 6 Web implementation adds `/worlds/{world_id}/player/privacy` and `PlayerPrivacyControls` for export records and deletion review requests over the safe privacy API.
-- v0.8 Phase 6 fast-forward merge to local `main` completed.
-- v0.8 Phase 7 World Packaging must implement safe manifest-based export/import preview/apply discipline without exporting secrets, raw prompt snapshots by default, direct storage paths, or public marketplace scope.
-- v0.8 Phase 7 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.7-world-packaging-plan.md`.
-- v0.8 Phase 7 first implementation should be backend/API-only, use a dedicated `world_packaging` package/router, add no migration, and avoid broad `worlds.py` growth.
-- v0.8 Phase 7 implementation adds `backend/packages/world_packaging/`, `world_packaging.py`, safe package manifest DTOs, export preview, import preview, and explicit import apply without migration, provider calls, byte copy, world event writes, or Web UI.
-- v0.8 Phase 8 Plugin/Provider Package Contract planning checkpoint added `docs/agent/harness/feature-updates/v0.8.8-plugin-provider-package-contract-plan.md`.
-- v0.8 Phase 8 first implementation should be backend/API-only, response-only/no-migration, and use a dedicated package/router for package contract validation and safe provider config export without marketplace, provider execution, user-managed secret UI, or untrusted-code installation.
-- v0.8 Phase 8 implementation adds `backend/packages/package_contracts/`, `package_contracts.py`, response-only package validation, and safe provider config export without migration, provider calls, marketplace state, runtime plugin installation, or Web UI.
-- v0.8 Phase 9 Sample World Release Package planning checkpoint added `docs/agent/harness/feature-updates/v0.8.9-sample-world-release-package-plan.md`.
-- v0.8 Phase 9 first implementation should be test/docs-only runtime scope: build a deterministic sample release package helper from the Phase 13 fixture, validate with world packaging preview/apply, and avoid migration, provider calls, byte copy, Web UI, marketplace behavior, or production seed framework scope.
-- v0.8 Phase 9 implementation adds `backend/tests/fixtures/sample_world_release_package.py`, sample release package regression tests, and fixture docs without runtime API, migration, provider calls, byte copy, production seed framework behavior, marketplace behavior, or Web UI.
-- v0.8 Phase 9 Sample World Release Package fast-forward merged to local `main`.
-- v0.8 Phase 10 Moderation & Incident Workflow must start with schema/router ownership resolution. Prefer a dedicated moderation/incident package/router if persistent records or APIs are needed; do not extend `worlds.py`.
-- v0.8 Phase 10 planning checkpoint added `docs/agent/harness/feature-updates/v0.8.10-moderation-incident-workflow-plan.md` and resolved ownership to a dedicated `backend/packages/moderation/` package plus `moderation.py` router.
-- v0.8 Phase 10 implementation adds `backend/packages/moderation/`, `moderation.py`, migration `20260516_0044_moderation_incident_workflow.py`, and reader-delivery suppression for explicitly applied moderation takedown actions without mutating media/provider/world-event rows.
-- v0.8 Phase 10 Moderation & Incident Workflow fast-forward merged to local `main`.
-- v0.8 Phase 11 Public Launch Gate planning checkpoint added `docs/agent/harness/feature-updates/v0.8.11-public-launch-gate-plan.md`.
-- v0.8 Phase 11 implementation extends the existing observability/readiness boundary with a platform-admin-only `/observability/readiness/public-launch` report, reuses v0.7 internal production readiness, aggregates v0.8 public-surface evidence, requires explicit signoff flags, and keeps `auto_launch_enabled=false`.
-- v0.8 Public Experience & Ecosystem is complete locally across Phases 1-11 and has been archived/release-noted.
-- `PRODUCT.md` defines the frontend product context: product register, calm/rigorous/operator-grade personality, no marketing SaaS or gamey admin UI, WCAG AA, keyboard-first, reduced-motion friendly, and color not as sole signal.
-- `.opencode/` is ignored and must not be committed.
-- Do not push unless explicitly requested.
+- Active branch: feature/audit-and-hardening-post-v1-1-rc.
+- Current HEAD before the F-149 commit: 53ceb4e fix(web): sanitize world workspace client props.
+- Local branch is ahead of origin by the F-148 commit; this F-149 batch is not pushed and should remain local unless the user explicitly asks to push.
+- Active OpenSpec change: openspec/changes/audit-and-hardening-post-v1-1-rc/.
+- Current server status was rechecked at the start of this batch: branch was `feature/audit-and-hardening-post-v1-1-rc`, worktree clean, active OpenSpec change in progress, specs strict validation passed with 76 specs, and Noveland Postgres/NATS were healthy.
+- Only .env.example was observed in the repo; do not read or expose real secrets.
 
-## Guardrails To Preserve
+## Guardrails
 
-- Do not expose resolved provider secrets.
-- Do not expose storage URIs, filesystem paths, bytes, base64, raw prompts, or raw outputs in event payloads or reader/member routes.
-- Do not bypass backend ACLs or validation from Web code.
-- Do not use `narrative_artifacts` as media storage.
-- Do not add runtime daemon execution, streaming, provider marketplace, public reader media delivery, or Web features outside an accepted change.
-- Do not modify `worlds.py` for broad route growth unless explicitly accepted.
+- Current user instruction: use SSH/CLI only; avoid browser/computer-use plugins and other non-CLI tooling that may interrupt the session.
+- Current goal instruction says do not push unless the user explicitly asks; commit locally after verified remediation and leave branch unpushed.
+- Do not bypass OpenSpec; add or update spec deltas before behavior-changing fixes.
+- Keep real-provider tests opt-in only; do not set `NOVELAND_RUN_REAL_PROVIDER_TESTS=1` without explicit user authorization.
+- Preserve provider execution through ProviderExecutionService, quota-before-adapter execution, secret redaction, invocation ledger boundaries, media boundaries, worldline isolation, and reader/member/player DTO safety.
+- Do not expose resolved secrets, disallowed auth refs, storage URIs, filesystem/object paths, local model paths, raw prompts, raw outputs, prompt snapshot internals, invite tokens, bytes, or base64.
+- Do not broaden worlds.py into a catch-all router.
+- For UI/e2e use project Playwright/e2e only.
 
-## Required Next Steps
+## Completed This Batch
 
-- Keep `main` clean and do not push unless explicitly requested.
-- OpenSpec active changes now contain the v1.1 milestone roadmap.
-- v1.0 Phase 1 implementation and full gate are complete and fast-forward merged to local `main`.
-- v1.0 Phase 2 Player Session Stability is complete and fast-forward merged to local `main`.
-- v1.0 Phase 3 Cost & Quota Real Enforcement is complete and fast-forward merged to local `main`.
-- v1.0 Phase 4 World Setup Wizard planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.4-world-setup-wizard-plan.md`.
-- v1.0 Phase 4 implementation extends `backend/packages/observability/` and the app-level observability router with platform-admin `GET /observability/readiness/private-beta-setup`. The report aggregates private beta invite/access, player session restore, player/capability quota, provider/model lab, persona/memory, visual, voice, media, source traceability, self-use MVP, and no-leak evidence through existing readiness DTOs. It adds no setup framework tables, migration, Web UI, provider calls, broad `worlds.py` routes, or tester-visible admin diagnostics.
-- v1.0 Phase 4 targeted checks passed: focused readiness pytest (`17 passed`), focused ruff, and focused mypy.
-- v1.0 Phase 4 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`510 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.0 Phase 4 commit `0059d89` fast-forward merged to local `main`; no push performed.
-- v1.0 Phase 5 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.5-memory-persona-qa-plan.md`.
-- v1.0 Phase 5 implementation extends `backend/packages/narrative_quality/` and the app-level narrative quality router with world-admin memory/persona QA. The response-only report detects missing persona/memory, memory contamination, persona/style/relationship drift, source traceability gaps, and worldline contamination using safe evidence refs and proposal-only repair suggestion types. It adds no migration, Web UI, provider calls, direct mutation, duplicate eval framework, or world-event writes.
-- v1.0 Phase 5 targeted checks passed: focused ruff, focused mypy, and `cd backend && uv run pytest tests/test_narrative_quality_service.py tests/test_api_narrative_quality.py -q` (`75 passed`).
-- v1.0 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`315 source files`), backend pytest (`515 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.0 Phase 5 commit `abd88d2` fast-forward merged to local `main`; no push performed.
-- v1.0 Phase 6 planning checkpoint is recorded at `docs/agent/harness/feature-updates/v1.0.6-beta-feedback-system-plan.md`.
-- v1.0 Phase 6 implementation adds `backend/packages/beta_feedback/`, app-level `noveland.services.api.beta_feedback`, migration `20260520_0048_beta_feedback_reports.py`, member feedback submission/list/read for own reports, admin list/read/triage for all reports, safe evidence refs across conversation/media/invocation/persona/memory/visual/voice/provider/session/quota context, and safe repair-proposal refs for Phase 7 linkage. It adds no public forum/social features, moderation punishment, provider calls, automatic repair mutation, broad `worlds.py` routes, or world-event writes.
-- v1.0 Phase 6 Web implementation adds `/worlds/{worldId}/feedback` with tester submission and admin triage after using `impeccable`. The surface reuses workspace/admin form and list patterns and renders report summaries without raw evidence internals.
-- v1.0 Phase 6 targeted checks passed: focused ruff, focused mypy, `cd backend && uv run pytest tests/test_api_beta_feedback.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`35 passed`), `cd web && npm run test -- beta-feedback-panel.test.tsx` (`2 passed`), and `cd web && npm run typecheck`.
-- v1.0 Phase 6 full gate passed: backend ruff, backend mypy (`321 source files`), backend pytest (`520 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`133 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.0 Phase 6 commit `0cb4a7f` fast-forward merged to local `main`; no push performed.
-- v1.0 is complete, archived, and represented in current specs.
-- Do not implement v1.1 until explicitly requested.
-- Use the `impeccable` skill before frontend implementation work.
-- Keep using reader-safe media descriptors only; do not use admin media DTOs for playback images/audio.
-- Continue using `impeccable` context for Web UI decisions.
-- Preserve the authenticated-only reader media model unless OpenSpec is updated first.
-- Preserve the adapted v0.8 OpenSpec phase order unless OpenSpec is updated first.
+- Reconfirmed realtime git/OpenSpec/container state and reviewed active handoff plus Web/provider audit context.
+- Read-only provider audit found F-149: provider diagnostic error text used key-only `sanitize_for_persistence()` and preserved sensitive string values in health checks and provider execution failure evidence.
+- Added provider-system OpenSpec coverage requiring provider diagnostic error text to redact forbidden values while preserving safe business errors.
+- Added a failing health-check regression proving sensitive provider diagnostic text persisted unchanged before remediation.
+- Added a provider execution regression covering failed invocation and prompt snapshot error redaction.
+- Remediated provider diagnostic text with a shared sensitive-text detector applied to `ProviderHealthService.record_health_check()` and `ProviderExecutionService._safe_error_text()`.
 
-## Latest Verification
+## Verification This Batch
 
-- v0.4 Phase 7 full local gate passed before archive: backend ruff, backend mypy, backend pytest (`293 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after standalone rerun; initial concurrent run with `next build` timed out), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.4 archive/release-notes work is docs-only and should be validated with OpenSpec validation plus `git diff --check`.
-- v0.5 architecture decision docs are docs-only and should be validated with OpenSpec validation plus `git diff --check`.
-- v0.5 Phase 1 targeted tests passed: `32 passed`.
-- v0.5 Phase 1 full local gate passed: backend ruff, backend mypy, backend pytest (`298 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.5 Phase 2 targeted tests passed: `10 passed`.
-- v0.5 Phase 2 full local gate passed: backend ruff, backend mypy, backend pytest (`300 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 3 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 3 targeted tests passed: `12 passed`.
-- v0.5 Phase 3 full local gate passed: backend ruff, backend mypy, backend pytest (`302 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 4 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 4 targeted tests passed: `14 passed`.
-- v0.5 Phase 4 full local gate passed: backend ruff, backend mypy, backend pytest (`304 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 5 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 5 targeted tests passed: `16 passed`.
-- v0.5 Phase 5 full local gate passed: backend ruff, backend mypy, backend pytest (`306 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 6 planning checkpoint is docs-only and validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 6 targeted tests passed: `18 passed`.
-- v0.5 Phase 6 full local gate passed: backend ruff, backend mypy, backend pytest (`308 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; initial attempt timed out at the conversations e2e scene), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 6 fast-forward merge to local `main` completed.
-- v0.5 Phase 7 planning checkpoint is docs-only and should be validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 7 targeted tests passed: `21 passed`.
-- v0.5 Phase 7 full local gate passed: backend ruff, backend mypy, backend pytest (`311 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 7 fast-forward merge to local `main` completed.
-- v0.5 Phase 8 planning checkpoint is docs-only and should be validated with OpenSpec strict validate plus `git diff --check`.
-- v0.5 Phase 8 targeted tests passed: `25 passed`.
-- v0.5 Phase 8 full local gate passed: backend ruff, backend mypy, backend pytest (`315 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`35 passed`, `112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, `git diff --check`, and OpenSpec strict validate.
-- v0.5 Phase 8 fast-forward merge to local `main` completed.
-- v0.9 Phase 4 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py -q` (`21 passed`).
-- v0.9 Phase 4 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`484 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 4 commit `9d7e985` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 5 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_authoring_regression_fixture.py -q` (`25 passed`).
-- v0.9 Phase 5 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`484 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 5 commit `b688247` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 6 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py -q` (`24 passed`).
-- v0.9 Phase 6 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`487 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 6 commit `6d97262` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 7 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_visual_service.py tests/test_api_visual.py -q` (`33 passed`).
-- v0.9 Phase 7 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`488 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 7 commit `f9ee434` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 8 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_speech_service.py tests/test_voice_profiles.py tests/test_provider_lab_harness.py -q` (`41 passed, 1 skipped`).
-- v0.9 Phase 8 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`490 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 8 commit `568061b` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 9 targeted tests passed: `cd backend && uv run pytest tests/test_authoring_service.py tests/test_api_authoring.py tests/test_conversation_presentation_service.py tests/test_api_conversation_presentations.py -q` (`33 passed`).
-- v0.9 Phase 9 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`493 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 9 commit `2833233` fast-forward merged to local `main`; no push performed.
-- v0.9 Phase 10 targeted checks passed so far: ruff for observability service/API/test files, mypy for observability service/API/test files, and `cd backend && uv run pytest tests/test_production_readiness_gate.py -q` (`13 passed`).
-- v0.9 Phase 10 full backend/OpenSpec gate passed: backend ruff, backend mypy (`302 source files`), backend pytest (`497 passed, 8 skipped`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 10 commit `fe4aaee` fast-forward merged to local `main`; no push performed.
-- v1.0 Phase 1 targeted backend checks passed: `cd backend && uv run pytest tests/test_api_private_beta.py tests/test_schema_metadata.py tests/test_workspace_imports.py tests/test_alembic_config.py -q` (`31 passed`), targeted backend ruff for private beta/schema/import/alembic files, and targeted backend mypy for the same scope.
-- v1.0 Phase 1 targeted Web checks passed: `cd web && npm run test -- private-beta-onboarding.test.tsx` (`2 passed`) and `cd web && npm run typecheck`.
-- v1.0 Phase 1 full local gate passed: backend ruff, backend mypy (`309 source files`), backend pytest (`499 passed, 8 skipped`), Web lint, Web typecheck, Web unit tests (`130 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), OpenSpec strict changes/specs validation, and `git diff --check`.
-- v1.0 Phase 1 commit `8f29967` fast-forward merged to local `main`; no push performed.
-- v0.6 Phase 1 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`10 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 1 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`321 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 1 fast-forward merge to local `main` completed.
-- v0.6 Phase 2 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 2 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 2 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`327 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 2 fast-forward merge to local `main` completed.
-- v0.6 Phase 3 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 3 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`21 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 3 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`332 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed` after rerun), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- Flaky note: The first full Web test run had one isolated `agent-builder.test.tsx` mock-call failure; the individual test passed immediately afterward, and the full Web test/build/e2e sequence passed on rerun.
-- v0.6 Phase 3 fast-forward merge to local `main` completed.
-- v0.6 Phase 4 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 4 targeted checks passed: backend ruff for narrative quality files, backend mypy for narrative quality/API/tests, targeted pytest (`27 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 4 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`338 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 4 fast-forward merge to local `main` completed.
-- v0.6 Phase 5 targeted checks passed: backend ruff for narrative quality/narrative/API/tests, backend mypy for narrative quality/narrative/API/tests, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 5 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`347 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 5 fast-forward merge to local `main` completed.
-- v0.6 Phase 6 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`43 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 6 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`358 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 6 fast-forward merge to local `main` completed.
-- v0.6 Phase 7 planning checkpoint is docs-only and validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 7 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`50 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 7 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`365 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; first attempt hit an existing world composition import/export response-body race), docker compose config, and `git diff --check`.
-- v0.6 Phase 7 fast-forward merge to local `main` completed.
-- v0.6 Phase 8 planning checkpoint is docs-only and should be validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 8 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`56 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 8 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`371 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.6 Phase 8 fast-forward merge to local `main` completed.
-- v0.6 Phase 9 planning checkpoint is docs-only and was validated with OpenSpec strict validation plus `git diff --check`.
-- v0.6 Phase 9 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`63 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 9 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`378 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun; first attempt hit the existing world composition import/export response-body race), docker compose config, and `git diff --check`.
-- v0.6 Phase 9 fast-forward merge to local `main` completed.
-- v0.6 Phase 10 implementation added a read-only admin-scoped dashboard summary API under the narrative quality router.
-- v0.6 Phase 10 targeted checks passed: backend ruff for narrative quality/API/tests, backend mypy for narrative quality/API/tests, targeted pytest (`68 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.6 Phase 10 full local gate passed: backend ruff, backend mypy (`246 source files`), backend pytest (`383 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after rerun), docker compose config, and `git diff --check`.
-- Flaky note: the first Web e2e run hit the existing world composition import/export response-body race; the rerun completed cleanly.
-- v0.6 Phase 10 fast-forward merge to local `main` completed.
-- v0.7 Production Hardening feasibility review optimized the OpenSpec proposal/design/phase-plan/tasks/specs after v0.6 completion.
-- v0.7 revised first implementation target is Phase 1 Permission Matrix & ACL Regression Baseline.
-- v0.7 Phase 1 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.1-permission-matrix-acl-regression-plan.md`.
-- v0.7 Phase 1 targeted checks passed: backend ruff for `test_api_permission_matrix.py`, backend mypy for `test_api_permission_matrix.py`, targeted pytest (`3 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.7 Phase 1 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`386 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 1 fast-forward merge to local `main` completed.
-- v0.7 Phase 2 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.2-secret-provider-governance-plan.md`.
-- v0.7 Phase 2 targeted checks passed: backend ruff for provider governance code/tests, backend mypy for provider governance code/tests, targeted pytest (`70 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.7 Phase 2 full local gate passed: backend ruff, backend mypy (`247 source files`), backend pytest (`391 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 2 fast-forward merge to local `main` completed.
-- v0.7 Phase 3 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.3-cost-rate-control-plan.md`.
-- v0.7 Phase 3 targeted checks passed: backend ruff for provider budget code/tests, backend mypy for provider budget code/tests, targeted pytest (`109 passed`), and `git diff --check`.
-- v0.7 Phase 3 full local gate passed: backend ruff, backend mypy (`248 source files`), backend pytest (`397 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed` after stabilizing an existing import/export response-body race), docker compose config, and `git diff --check`.
-- Flaky note: one e2e run hit a transient unauthenticated reader redirect 404 during Next dev dynamic route cold start; the isolated test and the subsequent full e2e run passed.
-- v0.7 Phase 3 fast-forward merge to local `main` completed.
-- v0.7 Phase 4 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.4-object-storage-backup-v2-plan.md`.
-- v0.7 Phase 4 implementation added safe storage integrity auditing for media objects and object-backed snapshots, plus a platform-admin read-only `/runtime/storage-audit` endpoint.
-- v0.7 Phase 4 targeted checks passed: backend ruff for storage/runtime files, backend mypy for storage/runtime files, targeted pytest (`38 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.7 Phase 4 full local gate passed: backend ruff, backend mypy (`250 source files`), backend pytest (`401 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 4 fast-forward merge to local `main` completed.
-- v0.7 Phase 5 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.5-deployment-profile-plan.md`.
-- v0.7 Phase 5 implementation expanded `docs/agent/operations/deployment-profile.md` and added `backend/tests/test_deployment_profile_docs.py`.
-- v0.7 Phase 5 targeted checks passed: backend ruff for the deployment profile docs test, backend mypy for the docs test, targeted pytest (`13 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.7 Phase 5 full local gate passed: backend ruff, backend mypy (`251 source files`), backend pytest (`404 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 5 fast-forward merge to local `main` completed.
-- v0.7 Phase 6 implementation added `IncidentDiagnosticsService` and a platform-admin-only `/observability/incidents/summary` endpoint.
-- v0.7 Phase 6 targeted checks passed: backend ruff for observability/API/tests, backend mypy for observability/API/tests, targeted pytest (`15 passed`), OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.7 Phase 6 full local gate passed: backend ruff, backend mypy (`253 source files`), backend pytest (`407 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 6 fast-forward merge to local `main` completed.
-- v0.7 Phase 7 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.7-security-regression-suite-plan.md`.
-- v0.7 Phase 7 targeted checks passed: backend ruff for security regression tests/helpers, backend mypy for security regression tests/helpers, and targeted pytest (`83 passed`).
-- v0.7 Phase 7 full local gate passed: backend ruff, backend mypy (`255 source files`), backend pytest (`411 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.9 Phase 1 full local gate passed: backend ruff, backend mypy (`289 source files`), backend pytest (`453 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`128 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed` after rerun), docker compose config, OpenSpec strict changes/specs validation, and `git diff --check`.
-- Flaky note: the first v0.9 Phase 1 full Web e2e run timed out on the existing broad conversation participants scenario; the isolated scenario and subsequent full e2e run passed.
-- v0.9 Phase 2 targeted checks passed: targeted schema/Alembic/workspace/service/API pytest (`40 passed`), focused service/API pytest (`12 passed`), and focused hardening service pytest (`8 passed`).
-- v0.9 Phase 2 full local gate passed: backend ruff, backend mypy (`300 source files`), backend pytest (`466 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`128 passed`), Web build, Web `check:next-env`, docker compose config, OpenSpec strict changes/specs validation, and `git diff --check`.
-- v0.9 Phase 2 Web e2e was not run because no Web files were touched.
-- v0.7 Phase 7 fast-forward merge to local `main` completed.
-- v0.7 Phase 8 planning checkpoint added `docs/agent/harness/feature-updates/v0.7.8-production-readiness-gate-plan.md`.
-- v0.7 Phase 8 targeted checks passed: backend ruff for observability readiness code/API/tests, backend mypy for the same files, and targeted pytest (`14 passed`).
-- v0.7 Phase 8 full local gate passed: backend ruff, backend mypy (`256 source files`), backend pytest (`415 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, and `git diff --check`.
-- v0.7 Phase 8 fast-forward merge to local `main` completed.
-- v0.8 feasibility review and OpenSpec plan adaptation are docs-only. Validation target is OpenSpec strict validation plus `git diff --check`.
-- v0.8 Phase 1 targeted checks passed: backend ruff for `packages/reader_delivery`, `reader_media.py`, and `test_api_reader_media.py`; backend mypy for the same paths; targeted pytest (`5 passed`).
-- v0.8 Phase 1 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`112 passed`), Web build, Web `check:next-env`, Web e2e (`13 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.8 Phase 2 targeted checks passed: Web lint, Web typecheck, focused Vitest (`2 passed files, 7 passed tests`), focused playback e2e (`1 passed` after tightening a heading selector), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.8 Phase 2 blocker investigation found Playwright dev server was serving stale Next dev CSS from `.next/dev`, causing the active reader-safe scene media element to exist without playback layout rules and be considered hidden.
-- v0.8 Phase 2 blocker fix targeted checks passed: `npm run test:e2e -- --grep "reader playback renders conversation turns through safe media"` and full `npm run test:e2e` (`14 passed`).
-- v0.8 Phase 2 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`420 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`36 passed`, `115 passed`), Web build, Web `check:next-env`, Web e2e (`14 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.8 Phase 3 targeted checks passed: backend pytest for the member-owned player interaction API/ACL regression, focused Web component tests for player interactions, Web typecheck, Web lint, focused player interaction e2e, targeted backend ruff for changed Phase 3 backend files, and `git diff --check`.
-- v0.8 Phase 3 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`421 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`37 passed files`, `118 passed`), Web build, Web `check:next-env`, Web e2e (`16 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 3 fast-forward merge to local `main` completed.
-- v0.8 Phase 4 planning checkpoint is docs-only and validated with OpenSpec strict changes validation plus `git diff --check`.
-- v0.8 Phase 4 targeted checks passed: backend ruff and mypy for changed worldline API/test files, focused backend pytest for member-safe worldline comparison, focused Web component tests for worldline browser, Web lint, Web typecheck, focused worldline browser e2e, and `git diff --check`.
-- v0.8 Phase 4 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`38 passed files`, `121 passed`), Web build, Web `check:next-env`, Web e2e (`18 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 4 fast-forward merge to local `main` completed.
-- v0.8 Phase 5 planning checkpoint is docs-only and validated with OpenSpec strict changes validation plus `git diff --check`.
-- v0.8 Phase 5 targeted checks passed: focused Web component tests for scene view and playback, focused scene view e2e, Web lint, Web typecheck, OpenSpec strict changes validation, and `git diff --check`.
-- v0.8 Phase 5 full local gate passed: backend ruff, backend mypy (`261 source files`), backend pytest (`422 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`39 passed files`, `124 passed`), Web build, Web `check:next-env`, Web e2e (`19 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 5 fast-forward merge to local `main` completed.
-- v0.8 Phase 6 targeted checks passed: backend ruff and mypy for player privacy files, targeted pytest (`31 passed` after Alembic head update), Web lint, Web typecheck, focused privacy component tests (`2 passed`), focused privacy e2e (`1 passed`), OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.8 Phase 6 full local gate passed: backend ruff, backend mypy (`267 source files`), backend pytest (`425 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`40 passed files`, `126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed` after fixing the serial-state privacy count assertion), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 6 fast-forward merge to local `main` completed.
-- v0.8 Phase 7 targeted checks passed: backend ruff and mypy for world packaging files, targeted pytest (`7 passed`) including package API coverage and existing world composition round trip, and no forbidden storage/prompt/secret markers in tested manifests.
-- v0.8 Phase 7 full local gate passed: backend ruff, backend mypy (`272 source files`), backend pytest (`430 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 7 fast-forward merge to local `main` completed.
-- v0.8 Phase 8 planning checkpoint completed.
-- v0.8 Phase 8 targeted checks passed: backend ruff and mypy for package contract files, targeted pytest (`37 passed`) including package contract API coverage, provider API compatibility, plugin registry/contract harness, provider registry service, and workspace imports.
-- v0.8 Phase 8 full local gate passed: backend ruff, backend mypy (`277 source files`), backend pytest (`435 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 8 fast-forward merge to local `main` completed.
-- v0.8 Phase 9 planning checkpoint completed.
-- v0.8 Phase 9 targeted checks passed: backend ruff and mypy for sample release package files, targeted pytest (`19 passed`) covering sample release package, multimodal fixture, world packaging API, security regression, and workspace imports.
-- v0.8 Phase 9 full local gate passed: backend ruff, backend mypy (`279 source files`), backend pytest (`439 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 9 fast-forward merge to local `main` completed.
-- v0.8 Phase 10 planning checkpoint completed and fixed moderation ownership to a dedicated package/router.
-- v0.8 Phase 10 targeted checks passed: backend ruff and mypy for moderation/API/reader-delivery/schema files, and targeted pytest (`41 passed`) covering moderation API, reader media suppression, observability incident diagnostics, schema metadata, Alembic config, and workspace imports.
-- v0.8 Phase 10 full local gate passed: backend ruff, backend mypy (`285 source files`), backend pytest (`444 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, OpenSpec strict specs validation, and `git diff --check`.
-- v0.8 Phase 10 fast-forward merge to local `main` completed.
-- v0.8 Phase 11 planning checkpoint completed. Evidence inputs are v0.7 production readiness, reader media, conversation presentations, player privacy, moderation workflow, sample package/eval evidence, package/provider safety evidence, security regression, and explicit platform-admin signoffs.
-- v0.8 Phase 11 targeted checks passed: backend ruff and mypy for observability/API/test files, targeted pytest (`70 passed`) covering production readiness, observability incidents, moderation, reader media, sample package, package contracts, player privacy, multimodal sample regression, schema, Alembic, and workspace imports.
-- v0.8 Phase 11 full local gate passed: backend ruff, backend mypy (`285 source files`), backend pytest (`449 passed, 7 skipped`), Web lint, Web typecheck, Web tests (`126 passed`), Web build, Web `check:next-env`, Web e2e (`21 passed`), docker compose config, OpenSpec strict changes/spec validation, and `git diff --check`.
-- v0.8 Phase 11 fast-forward merge to local `main` completed.
+- F-149 health regression first failed before remediation, then passed: `cd backend && uv run pytest tests/test_provider_registry_service.py::test_provider_health_error_text_redacts_sensitive_values -q`.
+- Provider execution failed-evidence regression passed: `cd backend && uv run pytest tests/test_provider_execution_service.py::test_provider_execution_failure_redacts_sensitive_error_text -q`.
+- Provider focused suite passed: `cd backend && uv run pytest tests/test_provider_registry_service.py tests/test_provider_execution_service.py tests/test_api_providers.py -q` with 38 tests.
+- Focused provider ruff/mypy passed for changed provider source and tests.
+- Full backend gate passed: `cd backend && uv run ruff check .`, `cd backend && uv run mypy .`, and `cd backend && uv run pytest` with 592 tests and 8 skipped.
+
+## Remaining Work
+
+1. Continue Web/e2e security audit for remaining server loaders, API proxies, provider/admin data serialization, and client-side leaks outside the F-148 world overview loader.
+2. Continue read-only audit for remaining provider-backed world-admin text paths and provider selection defaults outside the F-147/F-149 sets.
+3. Continue product normal-use/spec-history drift review for provider reliability/quota UX, import/export/package UI scope, release notes, and archived v0.9/v1.0/v1.1 evidence.
+4. Do not push unless the user explicitly asks; keep local branch clean after commits.
+
+## Finding F-149
+
+- Provider diagnostic error text must not rely on key-only JSON sanitization when the sensitive material is inside the string value.
+- The remediation redacts sensitive-looking diagnostic strings before provider health-check, failed invocation, prompt snapshot, and media-job error evidence persists.
+- Residual risk: continue auditing Web provider/admin props and other provider API response paths for legacy dirty records or display-only redaction assumptions.

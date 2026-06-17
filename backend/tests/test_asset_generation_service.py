@@ -159,12 +159,12 @@ def test_policy_rejects_leaky_json_and_preview_validates_worldline() -> None:
     fork_id = _seed_fork(engine, graph.world_id, graph.worldline_id)
     with Session(engine) as session:
         service = AssetGenerationService(session)
-        with pytest.raises(ValueError, match="storage_uri"):
+        with pytest.raises(ValueError, match="rawPrompt"):
             AssetGenerationPolicyCreate(
                 world_id=graph.world_id,
                 worldline_id=graph.worldline_id,
                 policy_key="default",
-                rules_json={"nested": {"storage_uri": "local://leak"}},
+                rules_json={"nested": {"rawPrompt": "hidden prompt"}},
             )
         with pytest.raises(AssetGenerationValidationError, match="turn"):
             service.preview(

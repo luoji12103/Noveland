@@ -28,9 +28,10 @@ from noveland.moderation.contracts import (
     ModerationTargetKind,
 )
 from noveland.moderation.models import ModerationAction, ModerationIncident, ModerationReport
+from noveland.narrative.models import NarrativePublication
 from noveland.observability.contracts import IncidentEvidenceRef
 from noveland.providers.models import ProviderIntegration
-from noveland.worlds.models import Worldline
+from noveland.worlds.models import PlayerActorProfile, Scene, Worldline
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -58,9 +59,13 @@ _SENSITIVE_KEYS = {
     "raw_output",
     "prompt_snapshot",
 }
+_SENSITIVE_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _SENSITIVE_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"sk-[A-Za-z0-9]|raw_prompt|raw_output|bearer\s+)",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|sk-[A-Za-z0-9]|raw[-_ ]?prompt|raw[-_ ]?output|"
+    r"prompt[-_ ]?snapshot|file[-_ ]?path|filesystem[-_ ]?path|bearer\s+)",
     re.IGNORECASE,
 )
 _WORLDLINE_SCOPED_TARGETS = {
@@ -495,6 +500,28 @@ class ModerationService:
                 raise ModerationNotFoundError("target worldline not found")
             if worldline_id is not None and target_id != worldline_id:
                 raise ModerationValidationError("worldline target_ref_id must match worldline_id")
+        if target_kind == ModerationTargetKind.SCENE:
+            scene = self._session.get(Scene, target_id)
+            if target_id is None or scene is None or scene.world_id != world_id:
+                raise ModerationNotFoundError("scene not found")
+        if target_kind == ModerationTargetKind.NARRATIVE_PUBLICATION:
+            publication = self._session.get(NarrativePublication, target_id)
+            if (
+                target_id is None
+                or publication is None
+                or publication.world_id != world_id
+                or publication.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("narrative publication not found")
+        if target_kind == ModerationTargetKind.PLAYER_PROFILE:
+            profile = self._session.get(PlayerActorProfile, target_id)
+            if (
+                target_id is None
+                or profile is None
+                or profile.world_id != world_id
+                or profile.worldline_id != worldline_id
+            ):
+                raise ModerationNotFoundError("player profile not found")
         if target_kind == ModerationTargetKind.PROVIDER_INTEGRATION:
             if target_id is None:
                 raise ModerationValidationError("provider target_ref_id is required")
@@ -674,8 +701,7 @@ def _sanitize_json(value: Any) -> Any:
     if isinstance(value, dict):
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
-            normalized_key = str(key).lower()
-            if normalized_key not in _SENSITIVE_KEYS:
+            if not _is_sensitive_key(str(key)):
                 sanitized[str(key)] = _sanitize_json(item)
         return sanitized
     if isinstance(value, list):
@@ -694,3 +720,8 @@ def _validate_safe_text(value: str | None, field_name: str) -> None:
 
 def _safe_text(value: str) -> str:
     return _LEAK_PATTERN.sub("[REDACTED]", value)
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _SENSITIVE_KEY_MARKERS)

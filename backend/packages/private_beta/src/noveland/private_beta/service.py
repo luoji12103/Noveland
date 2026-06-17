@@ -50,9 +50,13 @@ _LEAKY_KEYS = {
     "storage_uri",
     "token",
 }
+_LEAKY_KEY_MARKERS = {
+    re.sub(r"[^a-z0-9]+", "", marker.lower()) for marker in _LEAKY_KEYS
+}
 _LEAK_PATTERN = re.compile(
-    r"(storage_uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|BEGIN PRIVATE KEY|"
-    r"raw_prompt|raw_output|prompt_snapshot|sk-[A-Za-z0-9])",
+    r"(storage[-_ ]?uri|media://|file://|s3://|gs://|/root/|/tmp/|base64,|"
+    r"BEGIN PRIVATE KEY|raw[-_ ]?prompt|raw[-_ ]?output|prompt[-_ ]?snapshot|"
+    r"file[-_ ]?path|filesystem[-_ ]?path|object[-_ ]?path|sk-[A-Za-z0-9]|bearer\s+)",
     re.IGNORECASE,
 )
 
@@ -432,7 +436,7 @@ def _sanitize_json(value: object) -> Any:
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if key_text.lower() in _LEAKY_KEYS:
+            if _is_leaky_key(key_text):
                 continue
             sanitized[key_text] = _sanitize_json(item)
         return sanitized
@@ -449,3 +453,8 @@ def _sanitize_json(value: object) -> Any:
 
 def _contains_forbidden_marker(value: object) -> bool:
     return _LEAK_PATTERN.search(str(value)) is not None
+
+
+def _is_leaky_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
+    return any(marker and marker in normalized for marker in _LEAKY_KEY_MARKERS)

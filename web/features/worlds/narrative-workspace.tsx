@@ -8,7 +8,7 @@ import {
   publishNarrativeArtifact,
   unpublishNarrativeArtifact,
 } from "@/lib/worlds/client";
-import { mergeById, subscribeToEventStream } from "@/lib/realtime";
+import { mergeById, subscribeToEventStream, worldEventStreamPath } from "@/lib/realtime";
 import type { WorldStreamEnvelope } from "@/lib/realtime";
 import type { NarrativeWorkspaceData } from "@/lib/worlds/server";
 import type { NarrativeArtifact } from "@/lib/worlds/types";
@@ -32,7 +32,7 @@ export function NarrativeWorkspace({ worldId, data }: NarrativeWorkspaceProps) {
 
   useEffect(() => {
     return subscribeToEventStream<WorldStreamEnvelope["payload"]>(
-      `/api/worlds/${worldId}/stream`,
+      worldEventStreamPath(worldId),
       (envelope) => {
         if (envelope.payload.narrative_artifacts.length > 0) {
           setStreamedArtifacts((current) =>

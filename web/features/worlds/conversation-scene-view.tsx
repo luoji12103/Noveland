@@ -61,12 +61,12 @@ export function ConversationSceneView({ worldId, conversationId, data }: Convers
             </p>
           </div>
           <div className="button-row">
-            <Link className="secondary-button" href={`/worlds/${worldId}/reader`}>
+            <Link className="secondary-button" href={`/worlds/${encodeURIComponent(worldId)}/reader`}>
               Reader
             </Link>
             <Link
               className="secondary-button"
-              href={`/worlds/${worldId}/reader/conversations/${conversationId}/playback`}
+              href={`/worlds/${encodeURIComponent(worldId)}/reader/conversations/${encodeURIComponent(conversationId)}/playback`}
             >
               Playback
             </Link>

@@ -20,6 +20,7 @@ from noveland.providers.registry import ProviderRegistryService
 from noveland.providers.routing import ProviderRoutingError, validate_provider_adapter_compatibility
 from noveland.providers.secrets import (
     ProviderSecretValidationError,
+    is_sensitive_key,
     reject_sensitive_config,
     validate_auth_ref_reference,
 )
@@ -44,10 +45,15 @@ FORBIDDEN_EXPORT_KEYS = {
     "bearer_token",
     "authorization",
     "secret",
+    "secret_key",
     "client_secret",
     "access_key",
     "password",
     "private_key",
+}
+FORBIDDEN_EXPORT_KEY_MARKERS = {
+    "".join(character for character in key.lower() if character.isalnum())
+    for key in FORBIDDEN_EXPORT_KEYS
 }
 FORBIDDEN_VALUE_MARKERS = (
     "media://",
@@ -308,8 +314,7 @@ def _safety_issues(value: dict[str, Any], field: str) -> list[PackageContractIss
 def _contains_forbidden_export_marker(value: Any) -> bool:
     if isinstance(value, dict):
         return any(
-            str(key).strip().lower() in FORBIDDEN_EXPORT_KEYS
-            or _contains_forbidden_export_marker(child)
+            _is_forbidden_export_key(str(key)) or _contains_forbidden_export_marker(child)
             for key, child in value.items()
         )
     if isinstance(value, list | tuple):
@@ -320,10 +325,15 @@ def _contains_forbidden_export_marker(value: Any) -> bool:
     return False
 
 
+def _is_forbidden_export_key(key: str) -> bool:
+    normalized = "".join(character for character in key.lower() if character.isalnum())
+    return is_sensitive_key(key) or normalized in FORBIDDEN_EXPORT_KEY_MARKERS
+
+
 def _safe_export_json(value: dict[str, Any]) -> dict[str, Any]:
     safe: dict[str, Any] = {}
     for key, child in value.items():
-        if str(key).strip().lower() in FORBIDDEN_EXPORT_KEYS:
+        if _is_forbidden_export_key(str(key)):
             continue
         safe[str(key)] = _safe_export_value(child)
     return safe
