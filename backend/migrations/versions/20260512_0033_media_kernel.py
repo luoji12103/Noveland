@@ -313,5 +313,6 @@ def downgrade() -> None:
 
 
 def _replace_check(table_name: str, constraint_name: str, condition: str) -> None:
-    op.drop_constraint(constraint_name, table_name, type_="check")
-    op.create_check_constraint(constraint_name, table_name, condition)
+    formatted_name = op.f(constraint_name)
+    op.drop_constraint(formatted_name, table_name, type_="check")
+    op.create_check_constraint(formatted_name, table_name, condition)

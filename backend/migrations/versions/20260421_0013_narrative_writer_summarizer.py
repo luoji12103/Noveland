@@ -16,12 +16,19 @@ down_revision: str | None = "20260421_0012"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+SOURCE_CONVERSATION_FK_NAME = "fk_narrative_artifacts_source_conversation"
+
 DEFAULT_WRITER_CONFIG_JSON = (
     '{"provider_profile_id":null,'
     '"auto_generate_on_complete":false,'
     '"generate_summary":true,'
     '"generate_chapter":true}'
 )
+
+
+def writer_config_server_default() -> sa.TextClause:
+    escaped_json = DEFAULT_WRITER_CONFIG_JSON.replace(":", r"\:")
+    return sa.text(f"'{escaped_json}'")
 
 
 def upgrade() -> None:
@@ -31,7 +38,7 @@ def upgrade() -> None:
                 "writer_config",
                 postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), "sqlite"),
                 nullable=False,
-                server_default=sa.text(f"'{DEFAULT_WRITER_CONFIG_JSON}'"),
+                server_default=writer_config_server_default(),
             ),
         )
         batch_op.alter_column("writer_config", server_default=None)
@@ -39,7 +46,7 @@ def upgrade() -> None:
     with op.batch_alter_table("narrative_artifacts") as batch_op:
         batch_op.add_column(sa.Column("source_conversation_id", sa.Uuid(), nullable=True))
         batch_op.create_foreign_key(
-            "fk_narrative_artifacts_source_conversation_id_conversation_sessions",
+            SOURCE_CONVERSATION_FK_NAME,
             "conversation_sessions",
             ["source_conversation_id"],
             ["id"],
@@ -72,7 +79,7 @@ def downgrade() -> None:
 
     with op.batch_alter_table("narrative_artifacts") as batch_op:
         batch_op.drop_constraint(
-            "fk_narrative_artifacts_source_conversation_id_conversation_sessions",
+            SOURCE_CONVERSATION_FK_NAME,
             type_="foreignkey",
         )
         batch_op.drop_constraint("ck_narrative_artifacts_artifact_kind", type_="check")

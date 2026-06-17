@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -48,6 +49,7 @@ class World(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=dict,
     )
     memory_backend_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
         ForeignKey("memory_backend_profiles.id", ondelete="SET NULL"),
         nullable=True,
     )

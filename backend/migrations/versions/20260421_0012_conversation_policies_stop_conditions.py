@@ -24,6 +24,11 @@ DEFAULT_POLICY_JSON = (
 )
 
 
+def policy_config_server_default() -> sa.TextClause:
+    escaped_json = DEFAULT_POLICY_JSON.replace(":", r"\:")
+    return sa.text(f"'{escaped_json}'")
+
+
 def upgrade() -> None:
     with op.batch_alter_table("conversation_sessions") as batch_op:
         batch_op.add_column(
@@ -31,7 +36,7 @@ def upgrade() -> None:
                 "policy_config",
                 postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), "sqlite"),
                 nullable=False,
-                server_default=sa.text(f"'{DEFAULT_POLICY_JSON}'"),
+                server_default=policy_config_server_default(),
             ),
         )
         batch_op.add_column(sa.Column("terminal_reason", sa.String(length=64), nullable=True))
